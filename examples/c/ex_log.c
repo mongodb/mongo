@@ -270,6 +270,12 @@ walk_log(WT_SESSION *session)
 	return (ret);
 }
 
+#define	RETCHK(msg)					\
+	if (ret != 0) {					\
+		fprintf(stderr, "%s: ret %d\n", msg, ret);	\
+		abort();				\
+	}
+
 int
 main(void)
 {
@@ -293,8 +299,10 @@ main(void)
 
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
 	ret = session->create(session, uri, "key_format=S,value_format=S");
+	RETCHK("Create");
 
 	ret = session->open_cursor(session, uri, NULL, NULL, &cursor);
+	RETCHK("open_cursor");
 	/*
 	 * Perform some operations with individual auto-commit transactions.
 	 */
@@ -304,8 +312,10 @@ main(void)
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
 		ret = cursor->insert(cursor);
+		RETCHK("insert auto-commit");
 	}
 	ret = session->begin_transaction(session, NULL);
+	RETCHK("begin");
 	/*
 	 * Perform some operations within a single transaction.
 	 */
@@ -315,12 +325,16 @@ main(void)
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
 		ret = cursor->insert(cursor);
+		RETCHK("insert txn");
 	}
 	ret = session->commit_transaction(session, NULL);
+	RETCHK("commit");
 	ret = cursor->close(cursor);
+	RETCHK("cur close");
 
 	/*! [log cursor printf] */
 	ret = session->log_printf(session, "Wrote %d records", record_count);
+	RETCHK("log printf");
 	/*! [log cursor printf] */
 
 	/*
