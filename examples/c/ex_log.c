@@ -303,6 +303,7 @@ main(void)
 
 	ret = session->open_cursor(session, uri, NULL, NULL, &cursor);
 	RETCHK("open_cursor");
+	printf("Created table.  Insert with auto-txns\n");
 	/*
 	 * Perform some operations with individual auto-commit transactions.
 	 */
@@ -314,6 +315,7 @@ main(void)
 		ret = cursor->insert(cursor);
 		RETCHK("insert auto-commit");
 	}
+	printf("Done.  Now insert with one txn\n");
 	ret = session->begin_transaction(session, NULL);
 	RETCHK("begin");
 	/*
@@ -328,12 +330,14 @@ main(void)
 		RETCHK("insert txn");
 	}
 	ret = session->commit_transaction(session, NULL);
+	printf("Done.  Committed.\n");
 	RETCHK("commit");
 	ret = cursor->close(cursor);
 	RETCHK("cur close");
 
 	/*! [log cursor printf] */
 	ret = session->log_printf(session, "Wrote %d records", record_count);
+	printf("Done.  Added log_printf message\n");
 	RETCHK("log printf");
 	/*! [log cursor printf] */
 
@@ -342,6 +346,7 @@ main(void)
 	 * a variety of records such as file sync and checkpoint.  We
 	 * have archiving turned off.
 	 */
+	printf("Close and reopen connection\n");
 	ret = wt_conn->close(wt_conn, NULL);
 	if ((ret = wiredtiger_open(home1, NULL, CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
