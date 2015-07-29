@@ -167,6 +167,8 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
     }
 
     OpTime opTime(ts, term);
+    // We set this even if the oplog insert transaction rolls back.
+    replCoord->setMyLastOptime(opTime);
     return std::pair<OpTime, long long>(opTime, hashNew);
 }
 
@@ -317,8 +319,6 @@ void _logOp(OperationContext* txn,
     // This transaction might roll back.
     checkOplogInsert(_localOplogCollection->insertDocument(txn, &writer, false));
 
-    // Set this only after we're sure the insert didn't abort and roll back.
-    replCoord->setMyLastOptime(slot.first);
     ReplClientInfo::forClient(txn->getClient()).setLastOp(slot.first);
 }
 
