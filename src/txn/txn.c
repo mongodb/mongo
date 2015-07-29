@@ -306,11 +306,18 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 				oldest_id = id;
 		}
 
-		/* Make sure the ID doesn't move past any named snapshots. */
+#ifdef HAVE_DIAGNOSTIC
+		/*
+		 * Make sure the ID doesn't move past any named snapshots.
+		 *
+		 * Don't include the read/assignment in the assert statement.
+		 * Coverity complains if there are assignments only done in
+		 * diagnostic builds, and when the read is from a volatile.
+		 */
+		id = txn_global->nsnap_oldest_id;
 		WT_ASSERT(session,
-		    (id = txn_global->nsnap_oldest_id) == WT_TXN_NONE ||
-		    !WT_TXNID_LT(id, oldest_id));
-
+		    id == WT_TXN_NONE || !WT_TXNID_LT(id, oldest_id));
+#endif
 		if (WT_TXNID_LT(txn_global->oldest_id, oldest_id))
 			txn_global->oldest_id = oldest_id;
 		txn_global->scan_count = 0;
