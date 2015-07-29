@@ -1587,6 +1587,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -1741,6 +1742,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
+  - name: jstestfuzz
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -1792,6 +1794,7 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: noPassthrough_WT
   - name: noPassthroughWithMongod_WT
   - name: bulk_gle_passthrough_WT
@@ -1860,6 +1863,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: mongosTest
   - name: mmap
   - name: multiversion
@@ -2026,6 +2030,7 @@ buildvariants:
   - name: dbtest_WT
   - name: failpoints_auth
   - name: jsCore_auth
+  - name: jstestfuzz
   - name: mmap
   - name: noPassthrough
   - name: noPassthrough_WT
@@ -2103,6 +2108,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -2803,6 +2809,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: jsCore_auth
+  - name: jstestfuzz
   - name: mmap
   - name: replicasets_auth
   - name: sasl
@@ -2843,6 +2850,7 @@ buildvariants:
   - name: dbtest_WT
   - name: ese_WT
   - name: jsCore_WT_ese
+  - name: jstestfuzz
   - name: replica_sets_WT_ese
   - name: sharding_WT_ese
   - name: mmap
@@ -2884,6 +2892,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: jsCore_auth
+  - name: jstestfuzz
   - name: mmap
   - name: replicasets_auth
   - name: sasl
@@ -2951,6 +2960,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -3046,6 +3056,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -3141,6 +3152,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -3213,6 +3225,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: jsCore_auth
+  - name: jstestfuzz
   - name: mmap
   - name: replicasets_auth
   - name: sasl
@@ -3251,6 +3264,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: jsCore_auth
+  - name: jstestfuzz
   - name: mmap
   - name: replicasets_auth
   - name: sasl
@@ -3293,6 +3307,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: jsCore_auth
+  - name: jstestfuzz
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
@@ -3358,6 +3373,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -3503,6 +3519,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: jsCore_auth
+  - name: jstestfuzz
   - name: mmap
   - name: replicasets_auth
   - name: sasl
@@ -3568,6 +3585,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -3651,6 +3669,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
+  - name: jstestfuzz
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: bulk_gle_passthrough
@@ -3812,6 +3831,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: mmap
   - name: mongosTest
   - name: multiversion
