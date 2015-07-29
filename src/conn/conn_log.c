@@ -541,14 +541,10 @@ restart:
 int
 __wt_log_force_write(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_LOG *log;
 	WT_MYSLOT myslot;
 	int64_t release_size;
 	int free_slot;
 
-	conn = S2C(session);
-	log = conn->log;
 	WT_RET(__wt_log_slot_join(session, 0, 0, &myslot));
 	WT_RET(__wt_log_slot_switch(session, (wt_off_t)myslot.end_offset));
 	release_size = __wt_log_slot_release(myslot.slot, 0);

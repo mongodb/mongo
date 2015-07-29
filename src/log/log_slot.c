@@ -32,12 +32,10 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset)
 	WT_LOGSLOT *current, *slot;
 	int64_t new_state, old_state;
 	int32_t i;
-	int created_log;
 
 	conn = S2C(session);
 	log = conn->log;
 	current = log->active_slot;
-	created_log = 1;
 	/*
 	 * Keep trying until we can find a slot to switch.
 	 */
