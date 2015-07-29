@@ -262,19 +262,14 @@ int
 __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
 
-	WT_CONNECTION_IMPL *conn;
-	WT_LOG *log;
-
-	conn = S2C(session);
-	log = conn->log;
 	/*
 	 * Make sure flags don't get retained between uses.
 	 * We have to reset them them here because multiple threads may
 	 * change the flags when joining the slot.
 	 */
+	WT_UNUSED(session);
 	slot->flags = WT_SLOT_INIT_FLAGS;
 	slot->slot_error = 0;
 	slot->slot_state = WT_LOG_SLOT_FREE;
-	WT_ASSERT(session, slot != log->active_slot);
 	return (0);
 }
