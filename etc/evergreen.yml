@@ -20,6 +20,7 @@
 # - 'config_root' (references the root directory for the executor's configuration artifacts).
 
 stepback: true
+command_type: system
 
 ## Some variables for convenience:
 variables:
@@ -192,6 +193,7 @@ functions:
 
   "run tests" :
     command: shell.exec
+    type: test
     params:
       working_dir: src
       script: |
@@ -256,6 +258,7 @@ tasks:
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -342,6 +345,7 @@ tasks:
       params:
         directory: src
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -373,6 +377,7 @@ tasks:
           curl --silent --max-time 600 http://boxes.10gen.com/build/node-v0.12.4-linux-x64.tar.gz --output node.tar.gz
           ${decompress} node.tar.gz
     - command: shell.exec
+      type: test
       params:
         working_dir: src/jstestfuzz
         script: |
@@ -759,6 +764,7 @@ tasks:
   commands:
   - func: "do setup"
   - command: shell.exec
+    type: test
     params:
       working_dir: src
       script: |
@@ -1071,6 +1077,7 @@ tasks:
   commands:
   - func: "do setup"
   - command: shell.exec
+    type: test
     params:
       working_dir: src
       script: |
@@ -1087,6 +1094,7 @@ tasks:
   commands:
   - func: "do setup"
   - command: shell.exec
+    type: test
     params:
       working_dir: src
       script: |
