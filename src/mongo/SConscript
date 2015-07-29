@@ -101,6 +101,7 @@ env.Library(
         'util/log.cpp',
         'util/signal_handlers_synchronous.cpp',
         'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
+        'util/stacktrace.cpp',
         'util/static_observer.cpp',
         'util/stringutils.cpp',
         'util/system_tick_source.cpp',

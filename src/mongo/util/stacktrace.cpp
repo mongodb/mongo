@@ -1,4 +1,4 @@
-/*    Copyright 2009 10gen Inc.
+/*    Copyright 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,33 +25,28 @@
  *    then also delete it in the license file.
  */
 
-/**
- * Tools for working with in-process stack traces.
- */
+// stacktrace_${TARGET_OS_FAMILY}.cpp sets default log component to kControl.
+// Setting kDefault to preserve previous behavior in (defunct) getStacktraceLogger().
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <iosfwd>
+#include "mongo/util/stacktrace.h"
 
-#if defined(_WIN32)
-// We need to pick up a decl for CONTEXT. Forward declaring would be preferable, but it is
-// unclear that we can do so.
-#include "mongo/platform/windows_basic.h"
-#endif
+#include "mongo/util/log.h"
 
 namespace mongo {
 
-// Print stack trace information to "os", default to the log stream.
-void printStackTrace(std::ostream& os);
-void printStackTrace();
+void printStackTrace() {
+    printStackTrace(log().stream());
+}
 
 #if defined(_WIN32)
-// Print stack trace (using a specified stack context) to "os", default to the log stream.
-void printWindowsStackTrace(CONTEXT& context, std::ostream& os);
-void printWindowsStackTrace(CONTEXT& context);
 
-// Print error message from C runtime followed by stack trace
-int crtDebugCallback(int, char* originalMessage, int*);
-#endif
+void printWindowsStackTrace(CONTEXT& context) {
+    printWindowsStackTrace(context, log().stream());
+}
+
+#endif  // defined(_WIN32)
 
 }  // namespace mongo
