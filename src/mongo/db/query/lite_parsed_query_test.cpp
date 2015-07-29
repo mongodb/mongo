@@ -1049,6 +1049,14 @@ TEST(LiteParsedQueryTest, ParseCommandFirstFieldNotString) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+TEST(LiteParsedQueryTest, ParseCommandIgnoreShardVersionField) {
+    BSONObj cmdObj = fromjson("{find: 'test.testns', shardVersion: 'foo'}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    auto result = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
+    ASSERT_OK(result.getStatus());
+}
+
 TEST(LiteParsedQueryTest, DefaultQueryParametersCorrect) {
     BSONObj cmdObj = fromjson("{find: 'testns'}");
 

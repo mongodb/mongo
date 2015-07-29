@@ -92,6 +92,8 @@ const char kNoCursorTimeoutField[] = "noCursorTimeout";
 const char kAwaitDataField[] = "awaitData";
 const char kPartialField[] = "partial";
 const char kTermField[] = "term";
+const char kOptionsField[] = "options";
+const char kShardVersionField[] = "shardVersion";
 
 }  // namespace
 
@@ -318,7 +320,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_partial = el.boolean();
-        } else if (str::equals(fieldName, "options")) {
+        } else if (str::equals(fieldName, kOptionsField)) {
             // 3.0.x versions of the shell may generate an explain of a find command with an
             // 'options' field. We accept this only if the 'options' field is empty so that
             // the shell's explain implementation is forwards compatible.
@@ -326,7 +328,8 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             // TODO: Remove for 3.4.
             if (!pq->isExplain()) {
                 return Status(ErrorCodes::FailedToParse,
-                              "Field 'options' is only allowed for explain.");
+                              str::stream() << "Field '" << kOptionsField
+                                            << "' is only allowed for explain.");
             }
 
             Status status = checkFieldType(el, Object);
@@ -338,12 +341,13 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             if (!optionsObj.isEmpty()) {
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "Failed to parse options: " << optionsObj.toString()
-                                            << ". "
-                                            << "You may need to update your shell or driver.");
+                                            << ". You may need to update your shell or driver.");
             }
         } else if (str::equals(fieldName, repl::ReadConcernArgs::kReadConcernFieldName.c_str())) {
             // read concern parsing is handled elsewhere.
             continue;
+        } else if (str::equals(fieldName, kShardVersionField)) {
+            // Shard version parsing is handled elsewhere.
         } else if (str::equals(fieldName, kTermField)) {
             Status status = checkFieldType(el, NumberLong);
             if (!status.isOK()) {

@@ -83,6 +83,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/request_interface.h"
@@ -1225,6 +1226,9 @@ void Command::execCommand(OperationContext* txn,
                 !request.getCommandArgs().hasField("$maxTimeMS"));
 
         CurOp::get(txn)->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS) * 1000);
+
+        // Handle shard version that may have been sent along with the command.
+        OperationShardVersion::get(txn).initializeFromCommand(request.getCommandArgs());
 
         // Can throw
         txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.

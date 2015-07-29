@@ -5,6 +5,7 @@ Import("env")
 env.Library(
     target='metadata',
     source=[
+        'operation_shard_version.cpp',
         'collection_metadata.cpp',
         'metadata_loader.cpp',
     ],
