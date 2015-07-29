@@ -357,7 +357,7 @@ extern int __wt_logop_row_truncate_pack( WT_SESSION_IMPL *session, WT_ITEM *logr
 extern int __wt_logop_row_truncate_unpack( WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, uint32_t *fileidp, WT_ITEM *startp, WT_ITEM *stopp, uint32_t *modep);
 extern int __wt_logop_row_truncate_print( WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out);
 extern int __wt_txn_op_printlog( WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out);
-extern int __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset);
+extern int __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset, int *rel);
 extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_destroy(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, WT_MYSLOT *myslotp);

@@ -554,13 +554,12 @@ int
 __wt_log_force_write(WT_SESSION_IMPL *session)
 {
 	WT_MYSLOT myslot;
-	int64_t release_size;
-	int free_slot;
+	int free_slot, release;
 
 	WT_RET(__wt_log_slot_join(session, 0, 0, &myslot));
-	WT_RET(__wt_log_slot_switch(session, (wt_off_t)myslot.end_offset));
-	release_size = __wt_log_slot_release(myslot.slot, 0);
-	if (WT_LOG_SLOT_DONE(release_size)) {
+	WT_RET(__wt_log_slot_switch(session,
+	    (wt_off_t)myslot.end_offset, &release));
+	if (release) {
 		WT_RET(__wt_log_release(session, myslot.slot, &free_slot));
 		if (free_slot)
 			WT_RET(__wt_log_slot_free(session, myslot.slot));

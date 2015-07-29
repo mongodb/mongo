@@ -25,7 +25,7 @@
  *	Find a new free slot and switch out the old active slot.
  */
 int
-__wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset)
+__wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset, int *rel)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
@@ -36,6 +36,8 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset)
 	conn = S2C(session);
 	log = conn->log;
 	current = log->active_slot;
+	if (rel != NULL)
+		*rel = 0;
 	/*
 	 * Keep trying until we can find a slot to switch.
 	 */
@@ -63,8 +65,11 @@ retry:
 				    current->slot_state, old_state, new_state))
 					goto retry;
 				/*
+				 * We own the slot now.  No one else can join.
 				 * Set the end LSN.  Then check for file change.
 				 */
+				if (WT_LOG_SLOT_DONE(new_state) && rel != NULL)
+					*rel = 1;
 				current->slot_end_lsn = current->slot_start_lsn;
 				current->slot_end_lsn.offset += new_offset;
 				log->alloc_lsn = current->slot_end_lsn;

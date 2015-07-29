@@ -1093,12 +1093,10 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 
 	if (F_ISSET(slot, WT_SLOT_BUFFERED)) {
 		write_size = (size_t)release_bytes - slot->slot_unbuffered;
-		if (write_size != 0) {
+		if (write_size != 0)
 			WT_ERR(__wt_write(session,
 			    slot->slot_fh, slot->slot_start_offset,
 			    write_size, slot->slot_buf.mem));
-			WT_ASSERT(session, slot != log->active_slot);
-		}
 	}
 
 	/*
@@ -1864,7 +1862,7 @@ F_SET(log, WT_LOG_FORCE_CONSOLIDATE);
 	force = LF_ISSET(WT_LOG_FLUSH | WT_LOG_FSYNC);
 	if (myslot.end_offset >= WT_LOG_SLOT_BUF_MAX || force)
 		WT_ERR(__wt_log_slot_switch(
-		    session, (wt_off_t)myslot.end_offset));
+		    session, (wt_off_t)myslot.end_offset, NULL));
 	WT_ERR(__log_fill(session, &myslot, 0, record, &lsn));
 	release_size = __wt_log_slot_release(myslot.slot, (int64_t)rdup_len);
 	if (WT_LOG_SLOT_DONE(release_size)) {
