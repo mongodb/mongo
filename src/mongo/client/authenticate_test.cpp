@@ -65,7 +65,7 @@ public:
           _responses() {
         _runCommandCallback =
             [this](RemoteCommandRequest request, RunCommandResultHandler handler) {
-                runCommand(request, handler);
+                runCommand(std::move(request), handler);
             };
 
         // create our digest
@@ -86,7 +86,6 @@ public:
         // Validate the received request
         ASSERT(!_requests.empty());
         RemoteCommandRequest expected = _requests.front();
-
         ASSERT(expected.dbname == request.dbname);
         ASSERT_EQ(expected.cmdObj, request.cmdObj);
         _requests.pop();
@@ -111,6 +110,50 @@ public:
         _requests.emplace(_mockHost, dbname.toString(), cmd);
     }
 
+    BSONObj loadMongoCRConversation() {
+        // 1. Client sends 'getnonce' command
+        pushRequest("admin", BSON("getnonce" << 1));
+
+        // 2. Client receives nonce
+        pushResponse(BSON("nonce" << _nonce << "ok" << 1));
+
+        // 3. Client sends 'authenticate' command
+        pushRequest("admin",
+                    BSON("authenticate" << 1 << "nonce" << _nonce << "user" << _username << "key"
+                                        << _digest));
+
+        // 4. Client receives 'ok'
+        pushResponse(BSON("ok" << 1));
+
+        // Call clientAuthenticate()
+        return BSON("mechanism"
+                    << "MONGODB-CR"
+                    << "db"
+                    << "admin"
+                    << "user" << _username << "pwd" << _password << "digest"
+                    << "true");
+    }
+
+
+    BSONObj loadX509Conversation() {
+        // 1. Client sends 'authenticate' command
+        pushRequest("$external",
+                    BSON("authenticate" << 1 << "mechanism"
+                                        << "MONGODB-X509"
+                                        << "user" << _username));
+
+        // 2. Client receives 'ok'
+        pushResponse(BSON("ok" << 1));
+
+        // Call clientAuthenticate()
+        return BSON("mechanism"
+                    << "MONGODB-X509"
+                    << "db"
+                    << "$external"
+                    << "user" << _username);
+    }
+
+
     auth::RunCommandHook _runCommandCallback;
 
     // Auth code doesn't use HostAndPort information.
@@ -129,49 +172,33 @@ public:
 };
 
 TEST_F(AuthClientTest, MongoCR) {
-    // 1. Client sends 'getnonce' command
-    pushRequest("admin", BSON("getnonce" << 1));
-
-    // 2. Client receives nonce
-    pushResponse(BSON("nonce" << _nonce << "ok" << 1));
-
-    // 3. Client sends 'authenticate' command
-    pushRequest(
-        "admin",
-        BSON("authenticate" << 1 << "nonce" << _nonce << "user" << _username << "key" << _digest));
-
-    // 4. Client receives 'ok'
-    pushResponse(BSON("ok" << 1));
-
-    // Call clientAuthenticate()
-    auto params = BSON("mechanism"
-                       << "MONGODB-CR"
-                       << "db"
-                       << "admin"
-                       << "user" << _username << "pwd" << _password << "digest"
-                       << "true");
-    auth::authenticateClient(params, "", "", _runCommandCallback);
+    auto params = loadMongoCRConversation();
+    auth::authenticateClient(std::move(params), "", "", _runCommandCallback);
 }
 
-TEST_F(AuthClientTest, X509) {
+TEST_F(AuthClientTest, asyncMongoCR) {
+    auto params = loadMongoCRConversation();
+    auth::authenticateClient(std::move(params),
+                             "",
+                             "",
+                             _runCommandCallback,
+                             [this](auth::AuthResponse response) { ASSERT(response.isOK()); });
+}
+
 #ifdef MONGO_CONFIG_SSL
-    // 1. Client sends 'authenticate' command
-    pushRequest("$external",
-                BSON("authenticate" << 1 << "mechanism"
-                                    << "MONGODB-X509"
-                                    << "user" << _username));
-
-    // 2. Client receives 'ok'
-    pushResponse(BSON("ok" << 1));
-
-    // Call clientAuthenticate()
-    auto params = BSON("mechanism"
-                       << "MONGODB-X509"
-                       << "db"
-                       << "$external"
-                       << "user" << _username);
-    auth::authenticateClient(params, "", _username, _runCommandCallback);
-#endif
+TEST_F(AuthClientTest, X509) {
+    auto params = loadX509Conversation();
+    auth::authenticateClient(std::move(params), "", _username, _runCommandCallback);
 }
+
+TEST_F(AuthClientTest, asyncX509) {
+    auto params = loadX509Conversation();
+    auth::authenticateClient(std::move(params),
+                             "",
+                             _username,
+                             _runCommandCallback,
+                             [this](auth::AuthResponse response) { ASSERT(response.isOK()); });
+}
+#endif
 
 }  // namespace

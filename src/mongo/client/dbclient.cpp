@@ -533,21 +533,27 @@ void DBClientWithCommands::_auth(const BSONObj& params) {
         params,
         HostAndPort(getServerAddress()).host(),
         clientName,
-        [this](RemoteCommandRequest request, auth::RunCommandResultHandler handler) {
+        [this](RemoteCommandRequest request, auth::AuthCompletionHandler handler) {
             BSONObj info;
             auto start = Date_t::now();
 
             auto commandName = request.cmdObj.firstElementFieldName();
-            auto reply = runCommandWithMetadata(
-                request.dbname, commandName, request.metadata, request.cmdObj);
 
-            BSONObj data = reply->getCommandReply().getOwned();
-            BSONObj metadata = reply->getMetadata().getOwned();
-            Milliseconds millis(Date_t::now() - start);
+            try {
+                auto reply = runCommandWithMetadata(
+                    request.dbname, commandName, request.metadata, request.cmdObj);
 
-            // Hand control back to authenticateClient()
-            handler(
-                StatusWith<RemoteCommandResponse>(RemoteCommandResponse(data, metadata, millis)));
+                BSONObj data = reply->getCommandReply().getOwned();
+                BSONObj metadata = reply->getMetadata().getOwned();
+                Milliseconds millis(Date_t::now() - start);
+
+                // Hand control back to authenticateClient()
+                handler(StatusWith<RemoteCommandResponse>(
+                    RemoteCommandResponse(data, metadata, millis)));
+
+            } catch (...) {
+                handler(exceptionToStatus());
+            }
         });
 }
 

@@ -48,11 +48,18 @@ namespace auth {
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
+using AuthRequest = StatusWith<RemoteCommandRequest>;
+
+const char* const kMechanismMongoCR = "MONGODB-CR";
+const char* const kMechanismMongoX509 = "MONGODB-X509";
+const char* const kMechanismSaslPlain = "PLAIN";
+const char* const kMechanismGSSAPI = "GSSAPI";
+const char* const kMechanismScramSha1 = "SCRAM-SHA-1";
+
 namespace {
 
-// TODO: These constants need to be cleaned up.
-const char* const saslCommandUserSourceFieldName = "userSource";
-const BSONObj getnoncecmdobj = fromjson("{getnonce:1}");
+const char* const kUserSourceFieldName = "userSource";
+const BSONObj kGetNonceCmd = BSON("getnonce" << 1);
 
 bool isOk(const BSONObj& o) {
     return getStatusFromCommandResult(o).isOK();
@@ -65,39 +72,64 @@ BSONObj getFallbackAuthParams(const BSONObj& params) {
     return params["fallbackParams"].Obj();
 }
 
-// Use the MONGODB-CR protocol to authenticate as "username" against the database "dbname",
-// with the given password.  If digestPassword is false, the password is assumed to be
-// pre-digested.  Returns false on failure, and sets "errmsg".
-bool authMongoCR(RunCommandHook runCommand,
-                 StringData dbname,
-                 StringData username,
-                 StringData password_text,
-                 BSONObj* info,
-                 bool digestPassword) {
+StatusWith<std::string> extractDBField(const BSONObj& params) {
+    std::string db;
+    if (params.hasField(kUserSourceFieldName)) {
+        if (!bsonExtractStringField(params, kUserSourceFieldName, &db).isOK()) {
+            return {ErrorCodes::AuthenticationFailed, "userSource field must contain a string"};
+        }
+    } else {
+        if (!bsonExtractStringField(params, saslCommandUserDBFieldName, &db).isOK()) {
+            return {ErrorCodes::AuthenticationFailed, "db field must contain a string"};
+        }
+    }
+
+    return std::move(db);
+}
+
+//
+// MONGODB-CR
+//
+
+AuthRequest createMongoCRGetNonceCmd(const BSONObj& params) {
+    auto db = extractDBField(params);
+    if (!db.isOK())
+        return std::move(db.getStatus());
+
     auto request = RemoteCommandRequest();
-    request.cmdObj = getnoncecmdobj;
-    request.dbname = dbname.toString();
+    request.cmdObj = kGetNonceCmd;
+    request.dbname = db.getValue();
 
-    std::string password = password_text.toString();
-    if (digestPassword)
-        password = createPasswordDigest(username, password_text);
+    return std::move(request);
+}
 
-    std::string nonce;
-    invariant(info != nullptr && runCommand);
-    auto runCommandHandler = [&info](StatusWith<RemoteCommandResponse> response) {
-        *info = response.getValue().data.getOwned();
-    };
+AuthRequest createMongoCRAuthenticateCmd(const BSONObj& params, StringData nonce) {
+    std::string username;
+    auto response = bsonExtractStringField(params, saslCommandUserFieldName, &username);
+    if (!response.isOK())
+        return response;
 
-    runCommand(request, runCommandHandler);
-    if (!isOk(*info)) {
-        return false;
-    }
+    std::string password;
+    response = bsonExtractStringField(params, saslCommandPasswordFieldName, &password);
+    if (!response.isOK())
+        return response;
 
-    {
-        BSONElement e = info->getField("nonce");
-        verify(e.type() == String);
-        nonce = e.valuestr();
-    }
+    bool shouldDigest;
+    response = bsonExtractBooleanFieldWithDefault(
+        params, saslCommandDigestPasswordFieldName, true, &shouldDigest);
+    if (!response.isOK())
+        return response;
+
+    std::string digested = password;
+    if (shouldDigest)
+        digested = createPasswordDigest(username, password);
+
+    auto db = extractDBField(params);
+    if (!db.isOK())
+        return std::move(db.getStatus());
+
+    auto request = RemoteCommandRequest();
+    request.dbname = db.getValue();
 
     BSONObjBuilder b;
     {
@@ -106,124 +138,200 @@ bool authMongoCR(RunCommandHook runCommand,
         {
             md5_state_t st;
             md5_init(&st);
-            md5_append(&st, (const md5_byte_t*)nonce.c_str(), nonce.size());
-            md5_append(&st, (const md5_byte_t*)username.rawData(), username.size());
-            md5_append(&st, (const md5_byte_t*)password.c_str(), password.size());
+            md5_append(&st, reinterpret_cast<const md5_byte_t*>(nonce.rawData()), nonce.size());
+            md5_append(&st, reinterpret_cast<const md5_byte_t*>(username.c_str()), username.size());
+            md5_append(&st, reinterpret_cast<const md5_byte_t*>(digested.c_str()), digested.size());
             md5_finish(&st, d);
         }
         b << "key" << digestToString(d);
-        request.cmdObj = b.done();
+        request.cmdObj = b.obj();
+    }
+    return std::move(request);
+}
+
+void authMongoCR(RunCommandHook runCommand, const BSONObj& params, AuthCompletionHandler handler) {
+    invariant(runCommand);
+    invariant(handler);
+
+    // Step 1: send getnonce command, receive nonce
+    auto nonceRequest = createMongoCRGetNonceCmd(params);
+    if (!nonceRequest.isOK())
+        return handler(std::move(nonceRequest.getStatus()));
+
+    runCommand(nonceRequest.getValue(),
+               [runCommand, params, handler](AuthResponse response) {
+                   if (!response.isOK())
+                       return handler(std::move(response));
+
+                   // Ensure response was valid
+                   std::string nonce;
+                   BSONObj nonceResponse = response.getValue().data;
+                   auto valid = bsonExtractStringField(nonceResponse, "nonce", &nonce);
+                   if (!valid.isOK())
+                       return handler({ErrorCodes::AuthenticationFailed,
+                                       "Invalid nonce response: " + nonceResponse.toString()});
+
+                   // Step 2: send authenticate command, receive response
+                   auto authRequest = createMongoCRAuthenticateCmd(params, nonce);
+                   if (!authRequest.isOK())
+                       return handler(std::move(authRequest.getStatus()));
+
+                   runCommand(authRequest.getValue(), handler);
+               });
+}
+
+//
+// X-509
+//
+
+AuthRequest createX509AuthCmd(const BSONObj& params, StringData clientName) {
+    auto db = extractDBField(params);
+    if (!db.isOK())
+        return std::move(db.getStatus());
+
+    auto request = RemoteCommandRequest();
+    request.dbname = db.getValue();
+
+    std::string username;
+    auto response = bsonExtractStringField(params, saslCommandUserFieldName, &username);
+    if (!response.isOK())
+        return response;
+
+    if (clientName.toString() == "") {
+        return {ErrorCodes::AuthenticationFailed,
+                "Please enable SSL on the client-side to use the MONGODB-X509 authentication "
+                "mechanism."};
     }
 
-    runCommand(request, runCommandHandler);
-    return isOk(*info);
+    if (username != clientName.toString()) {
+        StringBuilder message;
+        message << "Username \"";
+        message << params[saslCommandUserFieldName].valuestr();
+        message << "\" does not match the provided client certificate user \"";
+        message << clientName.toString() << "\"";
+        return {ErrorCodes::AuthenticationFailed, message.str()};
+    }
+
+    request.cmdObj = BSON("authenticate" << 1 << "mechanism"
+                                         << "MONGODB-X509"
+                                         << "user" << username);
+    return std::move(request);
 }
 
 // Use the MONGODB-X509 protocol to authenticate as "username." The certificate details
-// has already been communicated automatically as part of the connect call.
-// Returns false on failure and set "errmsg".
-bool authX509(RunCommandHook runCommand, StringData dbname, StringData username, BSONObj* info) {
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder << "authenticate" << 1 << "mechanism"
-               << "MONGODB-X509"
-               << "user" << username;
+// have already been communicated automatically as part of the connect call.
+void authX509(RunCommandHook runCommand,
+              const BSONObj& params,
+              StringData clientName,
+              AuthCompletionHandler handler) {
+    invariant(runCommand);
+    invariant(handler);
 
-    auto request = RemoteCommandRequest();
-    request.dbname = dbname.toString();
-    request.cmdObj = cmdBuilder.done();
+    // Just 1 step: send authenticate command, receive response
+    auto authRequest = createX509AuthCmd(params, clientName);
+    if (!authRequest.isOK())
+        return handler(std::move(authRequest.getStatus()));
 
-    runCommand(request,
-               [&info](StatusWith<RemoteCommandResponse> response) {
-                   *info = response.getValue().data.getOwned();
-               });
-
-    return isOk(*info);
+    runCommand(authRequest.getValue(), handler);
 }
+
+//
+// General Auth
+//
 
 void auth(RunCommandHook runCommand,
           const BSONObj& params,
           StringData hostname,
-          StringData clientName) {
+          StringData clientName,
+          AuthCompletionHandler handler) {
     std::string mechanism;
+    auto response = bsonExtractStringField(params, saslCommandMechanismFieldName, &mechanism);
+    if (!response.isOK())
+        return handler(std::move(response));
 
-    uassertStatusOK(bsonExtractStringField(params, saslCommandMechanismFieldName, &mechanism));
-
-    uassert(17232,
-            "You cannot specify both 'db' and 'userSource'. Please use only 'db'.",
-            !(params.hasField(saslCommandUserDBFieldName) &&
-              params.hasField(saslCommandUserSourceFieldName)));
-
-    if (mechanism == StringData("MONGODB-CR", StringData::LiteralTag())) {
-        std::string db;
-        if (params.hasField(saslCommandUserSourceFieldName)) {
-            uassertStatusOK(bsonExtractStringField(params, saslCommandUserSourceFieldName, &db));
-        } else {
-            uassertStatusOK(bsonExtractStringField(params, saslCommandUserDBFieldName, &db));
-        }
-        std::string user;
-        uassertStatusOK(bsonExtractStringField(params, saslCommandUserFieldName, &user));
-        std::string password;
-        uassertStatusOK(bsonExtractStringField(params, saslCommandPasswordFieldName, &password));
-        bool digestPassword;
-        uassertStatusOK(bsonExtractBooleanFieldWithDefault(
-            params, saslCommandDigestPasswordFieldName, true, &digestPassword));
-        BSONObj result;
-        uassert(result["code"].Int(),
-                result.toString(),
-                authMongoCR(runCommand, db, user, password, &result, digestPassword));
+    if (mechanism != kMechanismMongoCR && mechanism != kMechanismMongoX509 &&
+        mechanism != kMechanismSaslPlain && mechanism != kMechanismGSSAPI &&
+        mechanism != kMechanismScramSha1) {
+        return handler(
+            {ErrorCodes::AuthenticationFailed, "Auth mechanism " + mechanism + " not supported."});
     }
+
+    if (params.hasField(saslCommandUserDBFieldName) && params.hasField(kUserSourceFieldName)) {
+        return handler({ErrorCodes::AuthenticationFailed,
+                        "You cannot specify both 'db' and 'userSource'. Please use only 'db'."});
+    }
+
+    if (mechanism == kMechanismMongoCR)
+        return authMongoCR(runCommand, params, handler);
+
 #ifdef MONGO_CONFIG_SSL
-    else if (mechanism == StringData("MONGODB-X509", StringData::LiteralTag())) {
-        std::string db;
-        if (params.hasField(saslCommandUserSourceFieldName)) {
-            uassertStatusOK(bsonExtractStringField(params, saslCommandUserSourceFieldName, &db));
-        } else {
-            uassertStatusOK(bsonExtractStringField(params, saslCommandUserDBFieldName, &db));
-        }
-        std::string user;
-        uassertStatusOK(bsonExtractStringField(params, saslCommandUserFieldName, &user));
-
-        uassert(ErrorCodes::AuthenticationFailed,
-                "Please enable SSL on the client-side to use the MONGODB-X509 "
-                "authentication mechanism.",
-                clientName.toString() != "");
-
-        uassert(ErrorCodes::AuthenticationFailed,
-                "Username \"" + user + "\" does not match the provided client certificate user \"" +
-                    clientName.toString() + "\"",
-                user == clientName.toString());
-
-        BSONObj result;
-        uassert(result["code"].Int(), result.toString(), authX509(runCommand, db, user, &result));
-    }
+    else if (mechanism == kMechanismMongoX509)
+        return authX509(runCommand, params, clientName, handler);
 #endif
-    else if (saslClientAuthenticate != nullptr) {
-        uassertStatusOK(saslClientAuthenticate(runCommand, hostname, params));
-    } else {
-        uasserted(ErrorCodes::BadValue,
-                  mechanism + " mechanism support not compiled into client library.");
-    }
+
+    else if (saslClientAuthenticate != nullptr)
+        return saslClientAuthenticate(runCommand, hostname, params, handler);
+
+    return handler({ErrorCodes::AuthenticationFailed,
+                    mechanism + " mechanism support not compiled into client library."});
 };
+
+bool needsFallback(const AuthResponse& response) {
+    // TODO: BadValue is sometimes returned for auth failures with unsupported mechanisms
+    // in 2.6 servers. We should investigate removing this BadValue check eventually.
+    return (response == ErrorCodes::BadValue || response == ErrorCodes::CommandNotFound);
+}
+
+void asyncAuth(RunCommandHook runCommand,
+               const BSONObj& params,
+               StringData hostname,
+               StringData clientName,
+               AuthCompletionHandler handler) {
+    auth(runCommand,
+         params,
+         hostname,
+         clientName,
+         [runCommand, params, hostname, clientName, handler](AuthResponse response) {
+             // If auth failed, try again with fallback params when appropriate
+             if (needsFallback(response))
+                 return auth(runCommand,
+                             std::move(getFallbackAuthParams(params)),
+                             hostname,
+                             clientName,
+                             handler);
+
+             // otherwise, call handler
+             return handler(std::move(response));
+         });
+}
 
 }  // namespace
 
 void authenticateClient(const BSONObj& params,
                         StringData hostname,
                         StringData clientName,
-                        RunCommandHook runCommand) {
-    try {
-        auth(runCommand, params, hostname, clientName);
-        return;
-    } catch (const UserException& ex) {
-        if (getFallbackAuthParams(params).isEmpty() ||
-            (ex.getCode() != ErrorCodes::BadValue && ex.getCode() != ErrorCodes::CommandNotFound)) {
-            throw ex;
-        }
-    }
+                        RunCommandHook runCommand,
+                        AuthCompletionHandler handler) {
+    if (handler) {
+        // Run asynchronously
+        return asyncAuth(std::move(runCommand), params, hostname, clientName, std::move(handler));
+    } else {
+        // Run synchronously through async framework
+        // NOTE: this assumes that runCommand executes synchronously.
+        asyncAuth(runCommand,
+                  params,
+                  hostname,
+                  clientName,
+                  [](AuthResponse response) {
+                      // DBClient expects us to throw in case of an auth error.
+                      uassertStatusOK(response);
 
-    // BadValue or CommandNotFound indicates unsupported auth mechanism so fall back to
-    // MONGODB-CR for 2.6 compatibility.
-    auth(runCommand, getFallbackAuthParams(params), hostname, clientName);
+                      auto serverResponse = response.getValue().data;
+                      uassert(ErrorCodes::AuthenticationFailed,
+                              serverResponse["errmsg"].str(),
+                              isOk(serverResponse));
+                  });
+    }
 }
 
 BSONObj buildAuthParams(StringData dbname,
