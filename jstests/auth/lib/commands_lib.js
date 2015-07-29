@@ -804,7 +804,7 @@ var authCommandsLib = {
                     ]
                 }
             ]
-        }, /* Removed until SERVER-19640 is resolved.
+        },
         {
             testname: "dataSize_1",
             command: {dataSize: firstDbName + ".x"},
@@ -830,7 +830,7 @@ var authCommandsLib = {
                     ]
                 }
             ]
-        },*/
+        },
         {
             testname: "dbHash",
             command: {dbHash: 1},

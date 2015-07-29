@@ -721,6 +721,9 @@ public:
 class DataSizeCmd : public PublicGridCommand {
 public:
     DataSizeCmd() : PublicGridCommand("dataSize", "datasize") {}
+    virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const override {
+        return parseNsFullyQualified(dbname, cmdObj);
+    }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
