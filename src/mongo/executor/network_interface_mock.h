@@ -28,7 +28,10 @@
 
 #pragma once
 
+#include <memory>
 #include <queue>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -167,6 +170,19 @@ public:
      */
     void runReadyNetworkOperations();
 
+    /**
+     * Sets the reply of the 'isMaster' handshake for a specific host. This reply will only
+     * be given to the 'validateHost' method of the ConnectionHook set on this object - NOT
+     * to the completion handlers of any 'isMaster' commands scheduled with 'startCommand'.
+     *
+     * This reply will persist until it is changed again using this method.
+     *
+     * If the NetworkInterfaceMock conducts a handshake with a simulated host which has not
+     * had a handshake reply set, a default constructed RemoteCommandResponse will be passed
+     * to validateHost if a hook is set.
+     */
+    void setHandshakeReplyForHost(const HostAndPort& host, RemoteCommandResponse&& reply);
+
 private:
     /**
      * Information describing a scheduled alarm.
@@ -216,6 +232,16 @@ private:
      * Returns true if the executor thread could run right now.
      */
     bool _isExecutorThreadRunnable_inlock();
+
+    /**
+     * Enqueues a network operation to run in order of 'consideration date'.
+     */
+    void _enqueueOperation_inlock(NetworkOperation&& op);
+
+    /**
+     * "Connects" to a remote host, and then enqueues the provided operation.
+     */
+    void _connectThenEnqueueOperation_inlock(const HostAndPort& target, NetworkOperation&& op);
 
     /**
      * Runs all ready network operations, called while holding "lk".  May drop and
@@ -273,6 +299,18 @@ private:
 
     // Heap of alarms, with the next alarm always on top.
     std::priority_queue<AlarmInfo, std::vector<AlarmInfo>, std::greater<AlarmInfo>> _alarms;  // (M)
+
+    // The connection hook.
+    std::unique_ptr<ConnectionHook> _hook;  // (R)
+
+    // The set of hosts we have seen so far. If we see a new host, we will execute the
+    // ConnectionHook's validation and post-connection logic.
+    //
+    // TODO: provide a way to simulate disconnections.
+    std::unordered_set<HostAndPort> _connections;  // (M)
+
+    // The handshake replies set for each host.
+    std::unordered_map<HostAndPort, RemoteCommandResponse> _handshakeReplies;  // (M)
 };
 
 /**
@@ -304,6 +342,10 @@ public:
      */
     bool isForCallback(const TaskExecutor::CallbackHandle& cbHandle) const {
         return cbHandle == _cbHandle;
+    }
+
+    const TaskExecutor::CallbackHandle& getCallbackHandle() const {
+        return _cbHandle;
     }
 
     /**
