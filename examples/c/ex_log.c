@@ -270,12 +270,6 @@ walk_log(WT_SESSION *session)
 	return (ret);
 }
 
-#define	RETCHK(msg)					\
-	if (ret != 0) {					\
-		fprintf(stderr, "%s: ret %d\n", msg, ret);	\
-		abort();				\
-	}
-
 int
 main(void)
 {
@@ -291,27 +285,16 @@ main(void)
 		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
 		return (ret);
 	}
-	printf("Create connection dir %s\n", home1);
-	fflush(stdout);
 	if ((ret = wiredtiger_open(home1, NULL, CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home1, wiredtiger_strerror(ret));
 		return (ret);
 	}
 
-	printf("Open session\n");
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
-	printf("Create table %s\n", uri);
-	fflush(stdout);
 	ret = session->create(session, uri, "key_format=S,value_format=S");
-	RETCHK("Create");
-	printf("Open cursor to uri %s\n",uri);
-	fflush(stdout);
 
 	ret = session->open_cursor(session, uri, NULL, NULL, &cursor);
-	RETCHK("open_cursor");
-	printf("Created table.  Insert with auto-txns\n");
-	fflush(stdout);
 	/*
 	 * Perform some operations with individual auto-commit transactions.
 	 */
@@ -321,12 +304,8 @@ main(void)
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
 		ret = cursor->insert(cursor);
-		RETCHK("insert auto-commit");
 	}
-	printf("Done.  Now insert with one txn\n");
-	fflush(stdout);
 	ret = session->begin_transaction(session, NULL);
-	RETCHK("begin");
 	/*
 	 * Perform some operations within a single transaction.
 	 */
@@ -336,29 +315,20 @@ main(void)
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
 		ret = cursor->insert(cursor);
-		RETCHK("insert txn");
 	}
 	ret = session->commit_transaction(session, NULL);
-	printf("Done.  Committed.\n");
-	fflush(stdout);
-	RETCHK("commit");
 	ret = cursor->close(cursor);
-	RETCHK("cur close");
 
 	/*! [log cursor printf] */
 	ret = session->log_printf(session, "Wrote %d records", record_count);
-	printf("Done.  Added log_printf message\n");
-	fflush(stdout);
-	RETCHK("log printf");
 	/*! [log cursor printf] */
+	sleep(2);
 
 	/*
 	 * Close and reopen the connection so that the log ends up with
 	 * a variety of records such as file sync and checkpoint.  We
 	 * have archiving turned off.
 	 */
-	printf("Close and reopen connection\n");
-	fflush(stdout);
 	ret = wt_conn->close(wt_conn, NULL);
 	if ((ret = wiredtiger_open(home1, NULL, CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
