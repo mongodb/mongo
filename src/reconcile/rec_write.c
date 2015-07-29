@@ -969,21 +969,27 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			r->first_dirty_txn = txnid;
 
 		/*
-		 * Eviction can write any committed update, checkpoint can only
-		 * write updates visible as of the snapshot.
+		 * Find the first update we can use: eviction can write any
+		 * committed update, checkpoint can only write updates that
+		 * are visible as of the snapshot
+		 *
+		 * When reconciling for eviction, track whether any uncommitted
+		 * updates were found.
+		 *
+		 * When reconciling for a checkpoint, track whether any updates
+		 * were skipped on the way to finding the first visible update;
 		 *
 		 * KEITH: I think this is wrong, we're ignoring we can't write
 		 * updates committed more recently than in-progress checkpoints.
-		 *
-		 * Track whether any updates were skipped on the way to finding
-		 * the first visible update; if no updates are skipped, the page
-		 * can safely be marked clean and does not need to be reconciled
-		 * again until it's modified again.
 		 */
-		if (*updp == NULL) {
-			if (F_ISSET(r, WT_EVICTING) ?
-			    __wt_txn_committed(session, txnid) :
-			    __wt_txn_visible(session, txnid))
+		if (F_ISSET(r, WT_EVICTING)) {
+			if (__wt_txn_committed(session, txnid)) {
+				if (*updp == NULL)
+					*updp = upd;
+			} else
+				skipped = 1;
+		} else if (*updp == NULL) {
+			if (__wt_txn_visible(session, txnid))
 				*updp = upd;
 			else
 				skipped = 1;
@@ -1000,32 +1006,21 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		r->max_txn = max_txn;
 
 	/*
-	 * If no updates were skipped and all updates are globally visible, the
-	 * page can be marked clean and we're done, regardless of whether we're
-	 * evicting or checkpointing.
+	 * If there are no skipped updates and all updates are globally visible,
+	 * the page can be marked clean and we're done, regardless if evicting
+	 * or checkpointing.
 	 *
 	 * We have to check both: the oldest transaction ID may have moved while
-	 * we were scanning the update list, so it is possible to skip an update
-	 * but then find that by the end of the scan, all updates are stable.
+	 * we were scanning the update list, so it is possible to find a skipped
+	 * update, but then find all updates are stable at the end of the scan.
+	 *
+	 * Skip the visibility check for the lookaside file as a special-case,
+	 * we know there are no older readers of that file.
 	 */
-	if (!skipped) {
-		/*
-		 * The lookaside file is treated specially: first, having any
-		 * pages at all in the lookaside file indicates some eviction
-		 * pressure, so we'd like to evict the lookaside file's pages
-		 * to reduce that pressure. As a special-case, we know there
-		 * are no older readers of the lookaside file, we can skip the
-		 * check. Second, when evicting pages where we didn't skip any
-		 * updates, the way forward after the visibility check fails is
-		 * to store the update list in the lookaside file, and storing
-		 * lookaside file updates in the lookaside file isn't a plan.
-		 */
-		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
-			return (0);
-
-		if (__wt_txn_visible_all(session, max_txn))
-			return (0);
-	}
+	if (!skipped &&
+	    (F_ISSET(btree, WT_BTREE_LAS_FILE) ||
+	    __wt_txn_visible_all(session, max_txn)))
+		return (0);
 
 	/*
 	 * In some cases, there had better not be skipped updates or updates not
@@ -1034,12 +1029,12 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	if (F_ISSET(r, WT_VISIBILITY_ERR))
 		WT_PANIC_RET(session, EINVAL,
 		    "reconciliation error, uncommitted update or update not "
-		    "visible");
+		    "globally visible");
 
 	/*
-	 * If not evicting the page, we know what we'll write and we're done.
-	 * Because some updates were skipped or are not globally visible, the
-	 * page can't be marked clean.
+	 * If not trying to evict the page, we know what we'll write and we're
+	 * done. Because some updates were skipped or are not globally visible,
+	 * the page can't be marked clean.
 	 */
 	if (!F_ISSET(r, WT_EVICTING)) {
 		r->leave_dirty = 1;
@@ -1047,27 +1042,20 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	}
 
 	/*
-	 * Evicting and either there are skipped updates (uncommitted changes),
-	 * or updates not yet globally visible (committed changes some readers
-	 * in the system cannot see).
+	 * Evicting and there are either uncommitted changes or updates not yet
+	 * globally visible. There are two ways to continue with the eviction,
+	 * based on whether or not there are uncommitted updates.
 	 *
-	 * There are two ways to continue forward with the eviction, based on
-	 * whether or not we skipped an update (there are uncommitted changes
-	 * on the page).
-	 *
-	 *
-	 * First, if we skipped updates, can evict most of the page and create
-	 * a new, smaller page with just the skipped updates.
+	 * First, if there are uncommitted updates, we can evict most of the
+	 * page and create a new, smaller page with just the skipped updates.
 	 */
 	append_value = 0;
 	if (skipped) {
 		/*
-		 * Currently, the save/restore eviction path is only configured
-		 * when forcibly evicting pages (it's intended for large pages
-		 * that will split into many smaller pages).
-		 *
-		 * If there are skipped updates we can't save/restore, eviction
-		 * fails.
+		 * The save/restore eviction path is only configured if forcibly
+		 * evicting pages (it's intended for large pages that split into
+		 * many smaller pages). If not configured to save/restore the
+		 * updates, fail eviction.
 		 */
 		if (!F_ISSET(r, WT_SKIP_UPDATE_RESTORE))
 			return (EBUSY);
@@ -1129,14 +1117,23 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * list in the lookaside table and proceed with eviction. If/when the
 	 * page is read back into the cache, we'll re-apply the update list (if
 	 * any of the old readers are still around).
-	 *
-	 * If at least one update is globally visible, we copy the update list,
-	 * but can ignore the current on-page value. If no updates is globally
-	 * visible, readers may require the page's original value.
 	 */
-	if (!skipped)
+	if (!skipped) {
+		/*
+		 * Saving lookaside file updates into the lookaside file won't
+		 * work.
+		 */
+		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
+			return (EBUSY);
+
+		/*
+		 * If at least one update is globally visible, copy the update
+		 * list and ignore the current on-page value. If no update is
+		 * globally visible, readers require the page's original value.
+		 */
 		if (!__wt_txn_visible_all(session, min_txn))
 			append_value = 1;
+	}
 
 	/*
 	 * We need the original on-page value for some reason: get a copy and
@@ -1157,7 +1154,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			WT_RET(__wt_update_alloc(
 			    session, NULL, &append, &notused));
 		else {
-			__wt_scr_alloc(session, 0, &tmp);
+			WT_RET(__wt_scr_alloc(session, 0, &tmp));
 			if ((ret = __wt_page_cell_data_ref(
 			    session, page, vpack, tmp)) == 0)
 				ret = __wt_update_alloc(
