@@ -403,10 +403,6 @@ struct ChunkVersion {
         b.appendElements(toBSONWithPrefix(prefix));
     }
 
-    void addEpochToBSON(BSONObjBuilder& b, const std::string& prefix = "") const {
-        b.append(prefix + "Epoch", _epoch);
-    }
-
     BSONObj toBSON() const {
         // ChunkVersion wants to be an array.
         BSONArrayBuilder b;

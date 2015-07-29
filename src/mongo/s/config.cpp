@@ -168,6 +168,15 @@ const ShardId& DBConfig::getShardId(const string& ns) {
     return _primaryId;
 }
 
+void DBConfig::invalidateNs(const std::string& ns) {
+    stdx::lock_guard<stdx::mutex> lk(_lock);
+
+    CollectionInfoMap::iterator it = _collections.find(ns);
+    if (it != _collections.end()) {
+        _collections.erase(it);
+    }
+}
+
 void DBConfig::enableSharding() {
     verify(_name != "config");
 

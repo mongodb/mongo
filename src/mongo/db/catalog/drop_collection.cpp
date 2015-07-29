@@ -48,6 +48,7 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+
 Status dropCollection(OperationContext* txn,
                       const NamespaceString& collectionName,
                       BSONObjBuilder& result) {
@@ -55,7 +56,7 @@ Status dropCollection(OperationContext* txn,
         log() << "CMD: drop " << collectionName;
     }
 
-    std::string dbname = collectionName.db().toString();
+    const std::string dbname = collectionName.db().toString();
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(txn, MODE_IX);
@@ -68,7 +69,9 @@ Status dropCollection(OperationContext* txn,
         if (!db || !coll) {
             return Status(ErrorCodes::NamespaceNotFound, "ns not found");
         }
-        OldClientContext context(txn, collectionName.ns());
+
+        const bool shardVersionCheck = true;
+        OldClientContext context(txn, collectionName.ns(), shardVersionCheck);
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
             !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionName);
@@ -97,6 +100,8 @@ Status dropCollection(OperationContext* txn,
         wunit.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "drop", collectionName.ns());
+
     return Status::OK();
 }
+
 }  // namespace mongo

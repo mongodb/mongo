@@ -37,8 +37,11 @@
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/stdx/chrono.h"
 
 namespace mongo {
@@ -93,7 +96,7 @@ public:
         });
     }
 
-    void expectRemoveChunks() {
+    void expectRemoveChunksAndMarkCollectionDropped() {
         onCommand([this](const RemoteCommandRequest& request) {
             ASSERT_EQ(_configHost, request.target);
             ASSERT_EQ("config", request.dbname);
@@ -108,6 +111,14 @@ public:
 
             return BSON("n" << 1 << "ok" << 1);
         });
+
+        CollectionType coll;
+        coll.setNs(NamespaceString("test.user"));
+        coll.setDropped(true);
+        coll.setEpoch(ChunkVersion::DROPPED().epoch());
+        coll.setUpdatedAt(network()->now());
+
+        expectUpdateCollection(configHost(), coll);
     }
 
     void expectSetShardVersionZero(const ShardType& shard) {
@@ -116,7 +127,6 @@ public:
             ASSERT_EQ("admin", request.dbname);
 
             BSONObjBuilder builder;
-
             builder.append("setShardVersion", _dropNS.ns());
             builder.append("configdb", catalogManager()->connectionString().toString());
             builder.append("shard", shard.getName());
@@ -189,7 +199,7 @@ TEST_F(DropColl2ShardTest, Basic) {
     expectDrop(shard1());
     expectDrop(shard2());
 
-    expectRemoveChunks();
+    expectRemoveChunksAndMarkCollectionDropped();
 
     expectSetShardVersionZero(shard1());
     expectUnsetSharding(shard1());
@@ -235,7 +245,7 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
         return BSON("ok" << 0 << "code" << ErrorCodes::NamespaceNotFound);
     });
 
-    expectRemoveChunks();
+    expectRemoveChunksAndMarkCollectionDropped();
 
     expectSetShardVersionZero(shard1());
     expectUnsetSharding(shard1());
@@ -487,7 +497,7 @@ TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard1) {
     expectDrop(shard1());
     expectDrop(shard2());
 
-    expectRemoveChunks();
+    expectRemoveChunksAndMarkCollectionDropped();
 
     onCommand([](const RemoteCommandRequest& request) {
         return BSON("ok" << 0 << "code" << ErrorCodes::Unauthorized << "errmsg"
@@ -517,7 +527,7 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard1) {
     expectDrop(shard1());
     expectDrop(shard2());
 
-    expectRemoveChunks();
+    expectRemoveChunksAndMarkCollectionDropped();
 
     onCommand([this](const RemoteCommandRequest& request) {
         shutdownExecutor();  // shutdown executor so ssv command will fail.
@@ -547,7 +557,7 @@ TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard1) {
     expectDrop(shard1());
     expectDrop(shard2());
 
-    expectRemoveChunks();
+    expectRemoveChunksAndMarkCollectionDropped();
 
     expectSetShardVersionZero(shard1());
 
@@ -579,7 +589,7 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard1) {
     expectDrop(shard1());
     expectDrop(shard2());
 
-    expectRemoveChunks();
+    expectRemoveChunksAndMarkCollectionDropped();
 
     expectSetShardVersionZero(shard1());
 
@@ -611,7 +621,7 @@ TEST_F(DropColl2ShardTest, SSVCmdErrorOnShard2) {
     expectDrop(shard1());
     expectDrop(shard2());
 
-    expectRemoveChunks();
+    expectRemoveChunksAndMarkCollectionDropped();
 
     expectSetShardVersionZero(shard1());
     expectUnsetSharding(shard1());
@@ -644,7 +654,7 @@ TEST_F(DropColl2ShardTest, SSVErrorOnShard2) {
     expectDrop(shard1());
     expectDrop(shard2());
 
-    expectRemoveChunks();
+    expectRemoveChunksAndMarkCollectionDropped();
 
     expectSetShardVersionZero(shard1());
     expectUnsetSharding(shard1());
@@ -677,7 +687,7 @@ TEST_F(DropColl2ShardTest, UnsetCmdErrorOnShard2) {
     expectDrop(shard1());
     expectDrop(shard2());
 
-    expectRemoveChunks();
+    expectRemoveChunksAndMarkCollectionDropped();
 
     expectSetShardVersionZero(shard1());
     expectUnsetSharding(shard1());
@@ -712,7 +722,7 @@ TEST_F(DropColl2ShardTest, UnsetErrorOnShard2) {
     expectDrop(shard1());
     expectDrop(shard2());
 
-    expectRemoveChunks();
+    expectRemoveChunksAndMarkCollectionDropped();
 
     expectSetShardVersionZero(shard1());
     expectUnsetSharding(shard1());

@@ -434,39 +434,24 @@ public:
             return appendCommandStatus(result, status.getStatus());
         }
 
-        shared_ptr<DBConfig> conf = status.getValue();
-
         const string fullns = dbName + "." + cmdObj.firstElement().valuestrsafe();
+
         log() << "DROP: " << fullns;
 
-        if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
+        const auto& db = status.getValue();
+        if (!db->isShardingEnabled() || !db->isSharded(fullns)) {
             log() << "\tdrop going to do passthrough";
-            return passthrough(conf, cmdObj, result);
-        }
-
-        //
-        // TODO: There will be problems if we simultaneously shard and drop a collection
-        //
-
-        ChunkManagerPtr cm;
-        ShardPtr primary;
-        conf->getChunkManagerOrPrimary(fullns, cm, primary);
-
-        if (!cm) {
-            log() << "\tdrop going to do passthrough after re-check";
-            return passthrough(conf, cmdObj, result);
+            return passthrough(db, cmdObj, result);
         }
 
         uassertStatusOK(grid.catalogManager()->dropCollection(txn, NamespaceString(fullns)));
 
-        if (!conf->removeSharding(fullns)) {
-            warning() << "collection " << fullns
-                      << " was reloaded as unsharded before drop completed"
-                      << " during single drop";
-        }
+        // Force a full reload next time the just dropped namespace is accessed
+        db->invalidateNs(fullns);
 
-        return 1;
+        return true;
     }
+
 } dropCmd;
 
 class RenameCollectionCmd : public PublicGridCommand {

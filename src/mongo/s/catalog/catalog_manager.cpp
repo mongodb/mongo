@@ -42,6 +42,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -683,13 +684,27 @@ Status CatalogManager::dropCollection(OperationContext* txn, const NamespaceStri
 
     LOG(1) << "dropCollection " << ns << " shard data deleted";
 
-    // remove chunk data
+    // Remove chunk data
     Status result = remove(ChunkType::ConfigNS, BSON(ChunkType::ns(ns.ns())), 0, nullptr);
     if (!result.isOK()) {
         return result;
     }
 
     LOG(1) << "dropCollection " << ns << " chunk data deleted";
+
+    // Mark the collection as dropped
+    CollectionType coll;
+    coll.setNs(ns);
+    coll.setDropped(true);
+    coll.setEpoch(ChunkVersion::DROPPED().epoch());
+    coll.setUpdatedAt(grid.shardRegistry()->getNetwork()->now());
+
+    result = updateCollection(ns.ns(), coll);
+    if (!result.isOK()) {
+        return result;
+    }
+
+    LOG(1) << "dropCollection " << ns << " collection marked as dropped";
 
     for (const auto& shardEntry : allShards) {
         BSONObjBuilder cmdBuilder;

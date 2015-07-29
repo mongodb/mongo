@@ -39,6 +39,7 @@ namespace mongo {
 
 class BSONObj;
 class CatalogManagerReplicaSet;
+class CollectionType;
 class DistLockManagerMock;
 class NamespaceString;
 class RemoteCommandTargeterFactoryMock;
@@ -134,6 +135,12 @@ protected:
                                const std::string& what,
                                const std::string& ns,
                                const BSONObj& detail);
+
+    /**
+     * Expects an update call, which changes the specified collection's namespace contents to match
+     * those of the input argument.
+     */
+    void expectUpdateCollection(const HostAndPort& expectedHost, const CollectionType& coll);
 
     void setUp() override;
 

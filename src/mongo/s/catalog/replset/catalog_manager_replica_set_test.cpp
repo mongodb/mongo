@@ -176,29 +176,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateCollection) {
         ASSERT_OK(status);
     });
 
-    onCommand([collection](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS("config", request.dbname);
-
-        BatchedUpdateRequest actualBatchedUpdate;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
-        ASSERT_EQUALS(CollectionType::ConfigNS, actualBatchedUpdate.getNS().ns());
-        auto updates = actualBatchedUpdate.getUpdates();
-        ASSERT_EQUALS(1U, updates.size());
-        auto update = updates.front();
-
-        ASSERT_TRUE(update->getUpsert());
-        ASSERT_FALSE(update->getMulti());
-        ASSERT_EQUALS(update->getQuery(),
-                      BSON(CollectionType::fullNs(collection.getNs().toString())));
-        ASSERT_EQUALS(update->getUpdateExpr(), collection.toBSON());
-
-        BatchedCommandResponse response;
-        response.setOk(true);
-        response.setNModified(1);
-
-        return response.toBSON();
-    });
+    expectUpdateCollection(HostAndPort("TestHost1"), collection);
 
     // Now wait for the updateCollection call to return
     future.timed_get(kFutureTimeout);
@@ -284,29 +262,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateCollectionNotMasterRetrySuccess) {
         return response.toBSON();
     });
 
-    onCommand([host2, collection](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(host2, request.target);
-
-        BatchedUpdateRequest actualBatchedUpdate;
-        std::string errmsg;
-        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
-        ASSERT_EQUALS(CollectionType::ConfigNS, actualBatchedUpdate.getNS().ns());
-        auto updates = actualBatchedUpdate.getUpdates();
-        ASSERT_EQUALS(1U, updates.size());
-        auto update = updates.front();
-
-        ASSERT_TRUE(update->getUpsert());
-        ASSERT_FALSE(update->getMulti());
-        ASSERT_EQUALS(update->getQuery(),
-                      BSON(CollectionType::fullNs(collection.getNs().toString())));
-        ASSERT_EQUALS(update->getUpdateExpr(), collection.toBSON());
-
-        BatchedCommandResponse response;
-        response.setOk(true);
-        response.setNModified(1);
-
-        return response.toBSON();
-    });
+    expectUpdateCollection(HostAndPort(host2), collection);
 
     // Now wait for the updateCollection call to return
     future.timed_get(kFutureTimeout);

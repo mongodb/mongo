@@ -62,11 +62,13 @@ struct CollectionInfo {
     void resetCM(ChunkManager* cm);
 
     void shard(ChunkManager* cm);
+
     void unshard();
 
     bool isDirty() const {
         return _dirty;
     }
+
     bool wasDropped() const {
         return _dropped;
     }
@@ -78,6 +80,7 @@ struct CollectionInfo {
     bool unique() const {
         return _unique;
     }
+
     BSONObj key() const {
         return _key;
     }
@@ -115,6 +118,12 @@ public:
     const ShardId& getPrimaryId() const {
         return _primaryId;
     }
+
+    /**
+     * Removes all cached metadata for the specified namespace so that subsequent attempts to
+     * retrieve it will cause a full reload.
+     */
+    void invalidateNs(const std::string& ns);
 
     void enableSharding();
 

@@ -46,6 +46,7 @@
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/type_changelog.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -301,6 +302,33 @@ void CatalogManagerReplSetTestFixture::expectChangeLogInsert(const HostAndPort& 
 
         BatchedCommandResponse response;
         response.setOk(true);
+
+        return response.toBSON();
+    });
+}
+
+void CatalogManagerReplSetTestFixture::expectUpdateCollection(const HostAndPort& expectedHost,
+                                                              const CollectionType& coll) {
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(expectedHost, request.target);
+        ASSERT_EQUALS("config", request.dbname);
+
+        BatchedUpdateRequest actualBatchedUpdate;
+        std::string errmsg;
+        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(CollectionType::ConfigNS, actualBatchedUpdate.getNS().ns());
+        auto updates = actualBatchedUpdate.getUpdates();
+        ASSERT_EQUALS(1U, updates.size());
+        auto update = updates.front();
+
+        ASSERT_TRUE(update->getUpsert());
+        ASSERT_FALSE(update->getMulti());
+        ASSERT_EQUALS(update->getQuery(), BSON(CollectionType::fullNs(coll.getNs().toString())));
+        ASSERT_EQUALS(update->getUpdateExpr(), coll.toBSON());
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+        response.setNModified(1);
 
         return response.toBSON();
     });
