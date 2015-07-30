@@ -162,10 +162,6 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	truncate_item = STAILQ_FIRST(&cfg->stone_head);
 	trunc_cfg->num_stones--;
 	STAILQ_REMOVE_HEAD(&cfg->stone_head, q);
-	free(truncate_item->key);
-	free(truncate_item);
-	truncate_item = NULL;
-
 	cursor->set_key(cursor,truncate_item->key);
 	if ((ret = cursor->search(cursor)) != 0) {
 		lprintf(cfg, ret, 0, "Truncate search: failed");
@@ -181,11 +177,14 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	*truncatedp = 1;
 	trunc_cfg->expected_total -= truncate_item->diff;
 
-err:	if ((t_ret = cursor->reset(cursor)) != 0) {
+err:	free(truncate_item->key);
+	free(truncate_item);
+	truncate_item = NULL;
+	t_ret = cursor->reset(cursor);
+	if (t_ret != 0)
 		lprintf(cfg, t_ret, 0, "Cursor reset failed");
-		return (t_ret);
-	}
-
+	if (ret == 0 && t_ret != 0)
+		ret = t_ret;
 	return (ret);
 }
 
