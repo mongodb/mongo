@@ -36,19 +36,9 @@ from wtscenario import multiply_scenarios, number_scenarios
 class test_txn12(wttest.WiredTigerTestCase, suite_subprocess):
     name = 'test_txn12'
     uri = 'table:' + name
+    create_params = 'key_format=i,value_format=i'
 
-    types = [
-        ('row', dict(tabletype='row',
-                    create_params = 'key_format=i,value_format=i')),
-        ('var', dict(tabletype='var',
-                    create_params = 'key_format=r,value_format=i')),
-        ('fix', dict(tabletype='fix',
-                    create_params = 'key_format=r,value_format=8t')),
-    ]
-
-    scenarios = types
-
-    # Test compaction.
+    # Test that read-only transactions can commit following a failure.
     def test_txn12(self):
 
         # Setup the session and table.
@@ -73,7 +63,7 @@ class test_txn12(wttest.WiredTigerTestCase, suite_subprocess):
             lambda:session.open_cursor(self.uri, None, "next_random=bar"), msg)
         # This commit should fail as we have written something
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:session.commit_transaction(),'/requires rollback/')
+            lambda:session.commit_transaction(), '/requires rollback/')
 
 if __name__ == '__main__':
     wttest.run()
