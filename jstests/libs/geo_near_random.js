@@ -81,6 +81,9 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
             printjson(cmd);
             throw e; // rethrow
         }
+        
+        // Make sure distances are in increasing order
+        assert.gte(ret[ret.length - 1].dis, last[last.length - 1].dis);
 
         last = ret;
     }
