@@ -50,6 +50,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
@@ -331,6 +332,29 @@ void CatalogManagerReplSetTestFixture::expectUpdateCollection(const HostAndPort&
         response.setNModified(1);
 
         return response.toBSON();
+    });
+}
+
+void CatalogManagerReplSetTestFixture::expectSetShardVersion(
+    const HostAndPort& expectedHost,
+    const ShardType& expectedShard,
+    const NamespaceString& expectedNs,
+    const ChunkVersion& expectedChunkVersion) {
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(expectedHost, request.target);
+
+        SetShardVersionRequest ssv =
+            assertGet(SetShardVersionRequest::parseFromBSON(request.cmdObj));
+
+        ASSERT(!ssv.isInit());
+        ASSERT(ssv.isAuthoritative());
+        ASSERT_EQ(catalogManager()->connectionString().toString(),
+                  ssv.getConfigServer().toString());
+        ASSERT_EQ(expectedShard.getHost(), ssv.getShardConnectionString().toString());
+        ASSERT_EQ(expectedNs.toString(), ssv.getNS().ns());
+        ASSERT_EQ(expectedChunkVersion.toString(), ssv.getNSVersion().toString());
+
+        return BSON("ok" << true);
     });
 }
 

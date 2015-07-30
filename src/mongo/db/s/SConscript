@@ -34,6 +34,17 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='commands',
+    source=[
+        'set_shard_version_command.cpp',
+    ],
+    LIBDEPS=[
+        'metadata',
+        'sharding',
+    ]
+)
+
 env.CppUnitTest(
     target='metadata_test',
     source=[

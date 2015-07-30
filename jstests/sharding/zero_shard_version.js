@@ -18,7 +18,6 @@ var checkShardMajorVersion = function(conn, expectedVersion) {
 
 ///////////////////////////////////////////////////////
 // Test shard with empty chunk
-// mongos versions: s0: 1|0|a
 
 // shard0: 0|0|a
 // shard1: 1|0|a, [-inf, inf)
@@ -37,7 +36,6 @@ assert.commandWorked(testDB_s1.adminCommand({ moveChunk: 'test.user',
 // Shard metadata:
 // shard0: 0|0|a
 // shard1: 0|0|a
-//
 // mongos0: 1|0|a
 
 checkShardMajorVersion(st.d0, 0);

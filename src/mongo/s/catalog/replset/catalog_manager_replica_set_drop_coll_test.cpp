@@ -122,23 +122,8 @@ public:
     }
 
     void expectSetShardVersionZero(const ShardType& shard) {
-        onCommand([this, shard](const RemoteCommandRequest& request) {
-            ASSERT_EQ(HostAndPort(shard.getHost()), request.target);
-            ASSERT_EQ("admin", request.dbname);
-
-            BSONObjBuilder builder;
-            builder.append("setShardVersion", _dropNS.ns());
-            builder.append("configdb", catalogManager()->connectionString().toString());
-            builder.append("shard", shard.getName());
-            builder.append("shardHost", shard.getHost());
-            builder.appendTimestamp("version", 0);
-            builder.append("versionEpoch", OID());
-            builder.append("authoritative", true);
-
-            ASSERT_EQ(builder.obj(), request.cmdObj);
-
-            return BSON("n" << 1 << "ok" << 1);
-        });
+        expectSetShardVersion(
+            HostAndPort(shard.getHost()), shard, dropNS(), ChunkVersion::DROPPED());
     }
 
     void expectUnsetSharding(const ShardType& shard) {

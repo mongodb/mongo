@@ -651,6 +651,7 @@ serveronlyLibdeps = [
     "repl/rslog",
     "repl/sync_tail",
     "repl/topology_coordinator_impl",
+    "s/commands",
     "s/metadata",
     "s/sharding",
     "startup_warnings_mongod",

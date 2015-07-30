@@ -52,6 +52,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -707,18 +708,16 @@ Status CatalogManager::dropCollection(OperationContext* txn, const NamespaceStri
     LOG(1) << "dropCollection " << ns << " collection marked as dropped";
 
     for (const auto& shardEntry : allShards) {
-        BSONObjBuilder cmdBuilder;
-        cmdBuilder.append("setShardVersion", ns.ns());
-        cmdBuilder.append("configdb", connectionString().toString());
-        cmdBuilder.append("shard", shardEntry.getName());
-        cmdBuilder.append("shardHost", shardEntry.getHost());
-
-        ChunkVersion::DROPPED().addToBSON(cmdBuilder);
-
-        cmdBuilder.append("authoritative", true);
+        SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioning(
+            connectionString(),
+            shardEntry.getName(),
+            fassertStatusOK(28753, ConnectionString::parse(shardEntry.getHost())),
+            ns,
+            ChunkVersion::DROPPED(),
+            true);
 
         auto ssvResult = shardRegistry->runCommandWithNotMasterRetries(
-            shardEntry.getName(), "admin", cmdBuilder.obj());
+            shardEntry.getName(), "admin", ssv.toBSON());
 
         if (!ssvResult.isOK()) {
             return ssvResult.getStatus();

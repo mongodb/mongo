@@ -32,9 +32,11 @@ env.Library(
     target='common',
     source=[
         'chunk_diff.cpp',
+        'set_shard_version_request.cpp',
     ],
     LIBDEPS=[
         'catalog/catalog_types',
+        '$BUILD_DIR/mongo/client/connection_string',
     ]
 )
 
@@ -49,23 +51,29 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='chunk_diff_test',
+    source=[
+        'chunk_diff_test.cpp',
+    ],
+    LIBDEPS=[
+        'common',
+    ]
+)
+
+env.CppUnitTest(
     target='chunk_version_test',
     source=[
         'chunk_version_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/range_arithmetic',
-        'catalog/catalog_types',
+        'common',
     ]
 )
 
 env.CppUnitTest(
-    target='chunk_diff_test',
+    target='set_shard_version_request_test',
     source=[
-        'chunk_diff_test.cpp',
+        'set_shard_version_request_test.cpp',
     ],
     LIBDEPS=[
         'common',

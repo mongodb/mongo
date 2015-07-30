@@ -1,4 +1,6 @@
-// server-7781 $geoNear pipeline stage
+// SERVER-7781 $geoNear pipeline stage
+(function() {
+
 load('jstests/libs/geo_near_random.js');
 load('jstests/aggregation/extras/utils.js');
 
@@ -11,7 +13,6 @@ db[coll].insert({loc:[0,0]});
 assertErrorCode(db[coll],
                 [{$match: {x:1}}, {$geoNear:{near: [1,1], spherical: true, distanceField: 'dis'}}],
                 16602);
-
 
 function checkOutput(cmdOut, aggOut, expectedNum) {
     assert.commandWorked(cmdOut, "geoNear command");
@@ -51,7 +52,7 @@ function test(db, sharded, indexType) {
     if (sharded) { // sharded setup
         var shards = [];
         var config = db.getSiblingDB("config");
-        config.shards.find().forEach(function(shard) { shards.push(shard._id) });
+        config.shards.find().forEach(function(shard) { shards.push(shard._id); });
 
         db.adminCommand({shardCollection: db[coll].getFullName(), key: {rand:1}});
         for (var i=1; i < 10; i++) {
@@ -124,7 +125,10 @@ var sharded = new ShardingTest({shards: 3, verbose: 0, mongos: 1});
 sharded.stopBalancer();
 sharded.adminCommand( { enablesharding : "test" } );
 sharded.ensurePrimaryShard('test', 'shard0001');
+
 test(sharded.getDB('test'), true, '2d');
 test(sharded.getDB('test'), true, '2dsphere');
 
 sharded.stop();
+
+})();

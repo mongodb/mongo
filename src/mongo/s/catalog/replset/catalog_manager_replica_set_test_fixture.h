@@ -39,6 +39,7 @@ namespace mongo {
 
 class BSONObj;
 class CatalogManagerReplicaSet;
+struct ChunkVersion;
 class CollectionType;
 class DistLockManagerMock;
 class NamespaceString;
@@ -141,6 +142,14 @@ protected:
      * those of the input argument.
      */
     void expectUpdateCollection(const HostAndPort& expectedHost, const CollectionType& coll);
+
+    /**
+     * Expects a setShardVersion command to be executed on the specified shard.
+     */
+    void expectSetShardVersion(const HostAndPort& expectedHost,
+                               const ShardType& expectedShard,
+                               const NamespaceString& expectedNs,
+                               const ChunkVersion& expectedChunkVersion);
 
     void setUp() override;
 

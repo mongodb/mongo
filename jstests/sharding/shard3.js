@@ -168,7 +168,4 @@ printjson( x )
 y = dbb.foo.stats()
 printjson( y )
 
-
-
-
 s.stop();
