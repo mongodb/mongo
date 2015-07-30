@@ -23,6 +23,8 @@
 # - 'builder_num'
 # - 'builde
 
+command_type: system
+
 functions:
   "fetch source" :
     command: git.get_project
@@ -222,6 +224,7 @@ tasks:
     - func: "build new tools" #noop if ${newtools} is not "true"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -315,6 +318,7 @@ tasks:
       params:
         directory: src
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -334,6 +338,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -357,6 +362,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -380,6 +386,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -403,6 +410,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -426,6 +434,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -449,6 +458,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -472,6 +482,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -495,6 +506,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -518,6 +530,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -541,6 +554,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -564,6 +578,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -587,6 +602,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -610,6 +626,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -633,6 +650,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -656,6 +674,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -679,6 +698,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -702,6 +722,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -725,6 +746,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -748,6 +770,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -771,6 +794,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -794,6 +818,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -817,6 +842,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -840,6 +866,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -863,6 +890,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -886,6 +914,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -909,6 +938,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -930,6 +960,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -953,6 +984,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -976,6 +1008,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1001,6 +1034,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1024,6 +1058,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1047,6 +1082,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1070,6 +1106,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1093,6 +1130,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1116,6 +1154,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1139,6 +1178,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       timeout_secs: 10800
       params:
         working_dir: src
@@ -1163,6 +1203,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       timeout_secs: 10800
       params:
         working_dir: src
@@ -1187,6 +1228,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1210,6 +1252,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1233,6 +1276,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1256,6 +1300,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1279,6 +1324,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1302,6 +1348,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1325,6 +1372,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1348,6 +1396,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1371,6 +1420,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1394,6 +1444,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1417,6 +1468,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1440,6 +1492,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1463,6 +1516,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1486,6 +1540,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1509,6 +1564,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1532,6 +1588,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1555,6 +1612,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1578,6 +1636,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1601,6 +1660,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1626,6 +1686,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1651,6 +1712,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1674,6 +1736,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1697,6 +1760,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
@@ -1720,6 +1784,7 @@ tasks:
     - func: "setup credentials"
     - func: "get buildnumber"
     - command: shell.exec
+      type: test
       params:
         working_dir: src
         script: |
