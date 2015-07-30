@@ -47,26 +47,32 @@ namespace mongo {
  * is useful when we do not have a full ordering computed over the distance metric and don't
  * want to generate one.
  *
- * Child stages need to implement functionality which:
+ * Some parts of the geoNear implementation depend on the type of index being used, so
+ * subclasses need to implement these three functions:
  *
- * - defines a distance metric
- * - iterates through ordered distance intervals, nearest to farthest
- * - provides a covering for each distance interval
+ * - initialize() - Prepares the stage to begin the geoNear search. Must return IS_EOF iff the
+ *                  stage is prepared to begin buffering documents.
+ * - nextInterval() - Must return the bounds of the next interval with a PlanStage that will find
+ *                    all of the results in this interval that have not already been buffered in
+ *                    previous intervals.
+ * - computeDistance() - Must return the distance from a document to the centroid of search using
+ *                       the correct metric (spherical/flat, radians/meters).
  *
  * For example - given a distance search over documents with distances from [0 -> 10], the child
  * stage might break up the search into intervals [0->5),[5,7),[7->10].
  *
- * Each interval requires a PlanStage which *covers* the interval (returns all results in the
- * interval).  Results in each interval are buffered fully before being returned to ensure that
- * ordering is preserved. Results that are in the cover, but not in the interval will remain
- * buffered to be returned in subsequent search intervals.
+ * Each interval requires a PlanStage which returns all of the results in the interval that have
+ * not been buffered in a previous interval.  Results in each interval are buffered fully before
+ * being returned to ensure that ordering is preserved. Results that are in the cover, but outside
+ * the outer bounds of the current interval will remain buffered to be returned in subsequent
+ * search intervals.
  *
- * For efficient search, the child stage which covers the distance interval in question should
- * not return too many results outside the interval, but correctness only depends on the child
- * stage returning all results inside the interval. As an example, a PlanStage which covers the
- * interval [0->5) might just be a full collection scan - this will always cover every interval,
- * but is slow.  If there is an index available, an IndexScan stage might also return all
- * documents with distance [0->5) but would be much faster.
+ * For efficient search, the child stage should not return too many results outside the interval,
+ * but correctness only depends on all the results in the interval being buffered before any are
+ * returned. As an example, a PlanStage for the interval [0->5) might just be a full collection
+ * scan - this will always buffer every result in the interval, but is slow.  If there is an index
+ * available, an IndexScan stage might also return all documents with distance [0->5) but
+ * would be much faster.
  *
  * Also for efficient search, the intervals should not be too large or too small - though again
  * correctness does not depend on interval size.
@@ -78,7 +84,9 @@ namespace mongo {
  * TODO: If a document is indexed in multiple cells (Polygons, PolyLines, etc.), there is a
  * possibility that it will be returned more than once. Since doInvalidate() force fetches a
  * document and removes it from _seenDocuments, NearStage will not deduplicate if it encounters
- * another instance of this document.
+ * another instance of this document. This will only occur if two cells for a document are in the
+ * same interval and the invalidation occurs between the scan of the first cell and the second, so
+ * NearStage no longer knows that it's seen this document before.
  *
  * TODO: Right now the interface allows the nextCovering() to be adaptive, but doesn't allow
  * aborting and shrinking a covered range being buffered if we guess wrong.

@@ -524,28 +524,17 @@ struct SkipStats : public SpecificStats {
 };
 
 struct IntervalStats {
-    IntervalStats()
-        : numResultsFound(0),
-          numResultsBuffered(0),
-          minDistanceAllowed(-1),
-          maxDistanceAllowed(-1),
-          inclusiveMaxDistanceAllowed(false),
-          minDistanceFound(-1),
-          maxDistanceFound(-1),
-          minDistanceBuffered(-1),
-          maxDistanceBuffered(-1) {}
+    // Number of results found in the covering of this interval.
+    long long numResultsBuffered = 0;
+    // Number of documents in this interval returned to the parent stage.
+    long long numResultsReturned = 0;
 
-    long long numResultsFound;
-    long long numResultsBuffered;
-
-    double minDistanceAllowed;
-    double maxDistanceAllowed;
-    bool inclusiveMaxDistanceAllowed;
-
-    double minDistanceFound;
-    double maxDistanceFound;
-    double minDistanceBuffered;
-    double maxDistanceBuffered;
+    // Min distance of this interval - always inclusive.
+    double minDistanceAllowed = -1;
+    // Max distance of this interval - inclusive iff inclusiveMaxDistanceAllowed.
+    double maxDistanceAllowed = -1;
+    // True only in the last interval.
+    bool inclusiveMaxDistanceAllowed = false;
 };
 
 class NearStats : public SpecificStats {
@@ -554,16 +543,6 @@ public:
 
     SpecificStats* clone() const final {
         return new NearStats(*this);
-    }
-
-    long long totalResultsFound() {
-        long long totalResultsFound = 0;
-        for (std::vector<IntervalStats>::iterator it = intervalStats.begin();
-             it != intervalStats.end();
-             ++it) {
-            totalResultsFound += it->numResultsFound;
-        }
-        return totalResultsFound;
     }
 
     std::vector<IntervalStats> intervalStats;

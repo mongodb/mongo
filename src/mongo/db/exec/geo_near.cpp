@@ -562,9 +562,9 @@ StatusWith<NearStage::CoveredInterval*>  //
         const IntervalStats& lastIntervalStats = _specificStats.intervalStats.back();
 
         // TODO: Generally we want small numbers of results fast, then larger numbers later
-        if (lastIntervalStats.numResultsBuffered < 300)
+        if (lastIntervalStats.numResultsReturned < 300)
             _boundsIncrement *= 2;
-        else if (lastIntervalStats.numResultsBuffered > 600)
+        else if (lastIntervalStats.numResultsReturned > 600)
             _boundsIncrement /= 2;
     }
 
@@ -949,9 +949,9 @@ StatusWith<NearStage::CoveredInterval*>  //
         const IntervalStats& lastIntervalStats = _specificStats.intervalStats.back();
 
         // TODO: Generally we want small numbers of results fast, then larger numbers later
-        if (lastIntervalStats.numResultsBuffered < 300)
+        if (lastIntervalStats.numResultsReturned < 300)
             _boundsIncrement *= 2;
-        else if (lastIntervalStats.numResultsBuffered > 600)
+        else if (lastIntervalStats.numResultsReturned > 600)
             _boundsIncrement /= 2;
     }
 

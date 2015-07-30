@@ -321,6 +321,8 @@ void Explain::statsToBSON(const PlanStageStats& stats,
                 intervalBob.append("minDistance", it->minDistanceAllowed);
                 intervalBob.append("maxDistance", it->maxDistanceAllowed);
                 intervalBob.append("maxInclusive", it->inclusiveMaxDistanceAllowed);
+                intervalBob.appendNumber("nBuffered", it->numResultsBuffered);
+                intervalBob.appendNumber("nReturned", it->numResultsReturned);
             }
             intervalsBob.doneFast();
         }
