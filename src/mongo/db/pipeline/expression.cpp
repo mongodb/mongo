@@ -359,27 +359,17 @@ intrusive_ptr<Expression> Expression::parseOperand(BSONElement exprElement,
 
 /* ----------------------- ExpressionAbs ---------------------------- */
 
-Value ExpressionAbs::evaluateInternal(Variables* vars) const {
-    Value val = vpOperand[0]->evaluateInternal(vars);
-
-    if (val.numeric()) {
-        BSONType type = val.getType();
-        if (type == NumberDouble) {
-            return Value(std::abs(val.getDouble()));
-        } else {
-            long long num = val.getLong();
-            uassert(28680,
-                    "can't take $abs of long long min",
-                    num != std::numeric_limits<long long>::min());
-            long long absVal = std::abs(num);
-            return type == NumberLong ? Value(absVal) : Value::createIntOrLong(absVal);
-        }
-    } else if (val.nullish()) {
-        return Value(BSONNULL);
+Value ExpressionAbs::evaluateNumericArg(const Value& numericArg) const {
+    BSONType type = numericArg.getType();
+    if (type == NumberDouble) {
+        return Value(std::abs(numericArg.getDouble()));
     } else {
-        uasserted(28681,
-                  str::stream() << "$abs only supports numeric types, not "
-                                << typeName(val.getType()));
+        long long num = numericArg.getLong();
+        uassert(28680,
+                "can't take $abs of long long min",
+                num != std::numeric_limits<long long>::min());
+        long long absVal = std::abs(num);
+        return type == NumberLong ? Value(absVal) : Value::createIntOrLong(absVal);
     }
 }
 
@@ -628,6 +618,19 @@ Value ExpressionArrayElemAt::evaluateInternal(Variables* vars) const {
 REGISTER_EXPRESSION(arrayElemAt, ExpressionArrayElemAt::parse);
 const char* ExpressionArrayElemAt::getOpName() const {
     return "$arrayElemAt";
+}
+
+/* ------------------------- ExpressionCeil -------------------------- */
+
+Value ExpressionCeil::evaluateNumericArg(const Value& numericArg) const {
+    // There's no point in taking the ceiling of integers or longs, it will have no effect.
+    return numericArg.getType() == NumberDouble ? Value(std::ceil(numericArg.getDouble()))
+                                                : numericArg;
+}
+
+REGISTER_EXPRESSION(ceil, ExpressionCeil::parse);
+const char* ExpressionCeil::getOpName() const {
+    return "$ceil";
 }
 
 /* -------------------- ExpressionCoerceToBool ------------------------- */
@@ -1156,17 +1159,9 @@ const char* ExpressionDivide::getOpName() const {
 
 /* ----------------------- ExpressionExp ---------------------------- */
 
-Value ExpressionExp::evaluateInternal(Variables* vars) const {
-    Value expVal = vpOperand[0]->evaluateInternal(vars);
-    if (expVal.nullish())
-        return Value(BSONNULL);
-
-    uassert(28765,
-            str::stream() << "$exp only supports numeric types, not " << typeName(expVal.getType()),
-            expVal.numeric());
-
+Value ExpressionExp::evaluateNumericArg(const Value& numericArg) const {
     // exp() always returns a double since e is a double.
-    return Value(exp(expVal.coerceToDouble()));
+    return Value(exp(numericArg.coerceToDouble()));
 }
 
 REGISTER_EXPRESSION(exp, ExpressionExp::parse);
@@ -1672,6 +1667,19 @@ void ExpressionFilter::addDependencies(DepsTracker* deps, vector<string>* path) 
     _filter->addDependencies(deps);
 }
 
+/* ------------------------- ExpressionFloor -------------------------- */
+
+Value ExpressionFloor::evaluateNumericArg(const Value& numericArg) const {
+    // There's no point in taking the floor of integers or longs, it will have no effect.
+    return numericArg.getType() == NumberDouble ? Value(std::floor(numericArg.getDouble()))
+                                                : numericArg;
+}
+
+REGISTER_EXPRESSION(floor, ExpressionFloor::parse);
+const char* ExpressionFloor::getOpName() const {
+    return "$floor";
+}
+
 /* ------------------------- ExpressionLet ----------------------------- */
 
 REGISTER_EXPRESSION(let, ExpressionLet::parse);
@@ -2075,17 +2083,9 @@ const char* ExpressionIfNull::getOpName() const {
 
 /* ----------------------- ExpressionLn ---------------------------- */
 
-Value ExpressionLn::evaluateInternal(Variables* vars) const {
-    Value argVal = vpOperand[0]->evaluateInternal(vars);
-    if (argVal.nullish())
-        return Value(BSONNULL);
-
+Value ExpressionLn::evaluateNumericArg(const Value& numericArg) const {
+    double argDouble = numericArg.coerceToDouble();
     uassert(28766,
-            str::stream() << "$ln only supports numeric types, not " << typeName(argVal.getType()),
-            argVal.numeric());
-
-    double argDouble = argVal.coerceToDouble();
-    uassert(28767,
             str::stream() << "$ln's argument must be a positive number, but is " << argDouble,
             argDouble > 0 || std::isnan(argDouble));
     return Value(std::log(argDouble));
@@ -2130,17 +2130,8 @@ const char* ExpressionLog::getOpName() const {
 
 /* ----------------------- ExpressionLog10 ---------------------------- */
 
-Value ExpressionLog10::evaluateInternal(Variables* vars) const {
-    Value argVal = vpOperand[0]->evaluateInternal(vars);
-    if (argVal.nullish())
-        return Value(BSONNULL);
-
-    uassert(28760,
-            str::stream() << "$log10 only supports numeric types, not "
-                          << typeName(argVal.getType()),
-            argVal.numeric());
-
-    double argDouble = argVal.coerceToDouble();
+Value ExpressionLog10::evaluateNumericArg(const Value& numericArg) const {
+    double argDouble = numericArg.coerceToDouble();
     uassert(28761,
             str::stream() << "$log10's argument must be a positive number, but is " << argDouble,
             argDouble > 0 || std::isnan(argDouble));
@@ -2844,17 +2835,8 @@ const char* ExpressionSize::getOpName() const {
 
 /* ----------------------- ExpressionSqrt ---------------------------- */
 
-Value ExpressionSqrt::evaluateInternal(Variables* vars) const {
-    Value argVal = vpOperand[0]->evaluateInternal(vars);
-    if (argVal.nullish())
-        return Value(BSONNULL);
-
-    uassert(28715,
-            str::stream() << "$sqrt only supports numeric types, not "
-                          << typeName(argVal.getType()),
-            argVal.numeric());
-
-    double argDouble = argVal.coerceToDouble();
+Value ExpressionSqrt::evaluateNumericArg(const Value& numericArg) const {
+    double argDouble = numericArg.coerceToDouble();
     uassert(28714,
             "$sqrt's argument must be greater than or equal to 0",
             argDouble >= 0 || std::isnan(argDouble));
@@ -3013,6 +2995,19 @@ Value ExpressionToUpper::evaluateInternal(Variables* vars) const {
 REGISTER_EXPRESSION(toUpper, ExpressionToUpper::parse);
 const char* ExpressionToUpper::getOpName() const {
     return "$toUpper";
+}
+
+/* ------------------------- ExpressionTrunc -------------------------- */
+
+Value ExpressionTrunc::evaluateNumericArg(const Value& numericArg) const {
+    // There's no point in truncating integers or longs, it will have no effect.
+    return numericArg.getType() == NumberDouble ? Value(std::trunc(numericArg.getDouble()))
+                                                : numericArg;
+}
+
+REGISTER_EXPRESSION(trunc, ExpressionTrunc::parse);
+const char* ExpressionTrunc::getOpName() const {
+    return "$trunc";
 }
 
 /* ------------------------- ExpressionWeek ----------------------------- */

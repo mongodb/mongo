@@ -57,7 +57,7 @@ load('jstests/aggregation/extras/utils.js');
     // Invalid
 
     // using $abs on string
-    assertErrorCode(coll, [{$project: {a: {$abs:  "string"}}}], 28681);
+    assertErrorCode(coll, [{$project: {a: {$abs:  "string"}}}], 28765);
 
     // using $abs on LLONG_MIN (-2 ^ 63)
     assertErrorCode(coll, [{$project: {a: {$abs: NumberLong("-9223372036854775808")}}}], 28680);

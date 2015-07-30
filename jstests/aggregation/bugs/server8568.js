@@ -37,7 +37,7 @@ load('jstests/aggregation/extras/utils.js');
     // Invalid input: non-numeric/non-null, arg is negative.
 
     // Arg must be numeric or null.
-    testError({$sqrt: ["string"]}, 28715);
+    testError({$sqrt: ["string"]}, 28765);
     // Args cannot be negative.
     testError({$sqrt: [-1]}, 28714);
 }());

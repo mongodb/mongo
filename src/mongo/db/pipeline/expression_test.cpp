@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/unittest/unittest.h"
 
 namespace ExpressionTests {
 
@@ -94,6 +95,158 @@ Value valueFromBson(BSONObj obj) {
     BSONElement element = obj.firstElement();
     return Value(element);
 }
+
+class ExpressionNaryTest : public unittest::Test {
+public:
+    void addOperand(intrusive_ptr<ExpressionNary> expr, Value arg) {
+        expr->addOperand(ExpressionConstant::create(arg));
+    }
+};
+
+class ExpressionNaryTestOneArg : public ExpressionNaryTest {
+public:
+    virtual void assertEvaluates(Value input, Value output) {
+        addOperand(_expr, input);
+        ASSERT_EQUALS(output, _expr->evaluate(Document()));
+        ASSERT_EQUALS(output.getType(), _expr->evaluate(Document()).getType());
+    }
+
+    intrusive_ptr<ExpressionNary> _expr;
+};
+
+/* ------------------------- ExpressionCeil -------------------------- */
+
+class ExpressionCeilTest : public ExpressionNaryTestOneArg {
+public:
+    virtual void assertEvaluates(Value input, Value output) override {
+        _expr = new ExpressionCeil();
+        ExpressionNaryTestOneArg::assertEvaluates(input, output);
+    }
+};
+
+TEST_F(ExpressionCeilTest, IntArg) {
+    assertEvaluates(Value(0), Value(0));
+    assertEvaluates(Value(numeric_limits<int>::min()), Value(numeric_limits<int>::min()));
+    assertEvaluates(Value(numeric_limits<int>::max()), Value(numeric_limits<int>::max()));
+}
+
+TEST_F(ExpressionCeilTest, LongArg) {
+    assertEvaluates(Value(0LL), Value(0LL));
+    assertEvaluates(Value(numeric_limits<long long>::min()),
+                    Value(numeric_limits<long long>::min()));
+    assertEvaluates(Value(numeric_limits<long long>::max()),
+                    Value(numeric_limits<long long>::max()));
+}
+
+TEST_F(ExpressionCeilTest, FloatArg) {
+    assertEvaluates(Value(2.0), Value(2.0));
+    assertEvaluates(Value(-2.0), Value(-2.0));
+    assertEvaluates(Value(0.9), Value(1.0));
+    assertEvaluates(Value(0.1), Value(1.0));
+    assertEvaluates(Value(-1.2), Value(-1.0));
+    assertEvaluates(Value(-1.7), Value(-1.0));
+
+    // Outside the range of long longs (there isn't enough precision for decimals in this range, so
+    // ceil should just preserve the number).
+    double largerThanLong = numeric_limits<long long>::max() * 2.0;
+    assertEvaluates(Value(largerThanLong), Value(largerThanLong));
+    double smallerThanLong = numeric_limits<long long>::min() * 2.0;
+    assertEvaluates(Value(smallerThanLong), Value(smallerThanLong));
+}
+
+TEST_F(ExpressionCeilTest, NullArg) {
+    assertEvaluates(Value(BSONNULL), Value(BSONNULL));
+}
+
+/* ------------------------- ExpressionFloor -------------------------- */
+
+class ExpressionFloorTest : public ExpressionNaryTestOneArg {
+public:
+    virtual void assertEvaluates(Value input, Value output) override {
+        _expr = new ExpressionFloor();
+        ExpressionNaryTestOneArg::assertEvaluates(input, output);
+    }
+};
+
+TEST_F(ExpressionFloorTest, IntArg) {
+    assertEvaluates(Value(0), Value(0));
+    assertEvaluates(Value(numeric_limits<int>::min()), Value(numeric_limits<int>::min()));
+    assertEvaluates(Value(numeric_limits<int>::max()), Value(numeric_limits<int>::max()));
+}
+
+TEST_F(ExpressionFloorTest, LongArg) {
+    assertEvaluates(Value(0LL), Value(0LL));
+    assertEvaluates(Value(numeric_limits<long long>::min()),
+                    Value(numeric_limits<long long>::min()));
+    assertEvaluates(Value(numeric_limits<long long>::max()),
+                    Value(numeric_limits<long long>::max()));
+}
+
+TEST_F(ExpressionFloorTest, FloatArg) {
+    assertEvaluates(Value(2.0), Value(2.0));
+    assertEvaluates(Value(-2.0), Value(-2.0));
+    assertEvaluates(Value(0.9), Value(0.0));
+    assertEvaluates(Value(0.1), Value(0.0));
+    assertEvaluates(Value(-1.2), Value(-2.0));
+    assertEvaluates(Value(-1.7), Value(-2.0));
+
+    // Outside the range of long longs (there isn't enough precision for decimals in this range, so
+    // floor should just preserve the number).
+    double largerThanLong = numeric_limits<long long>::max() * 2.0;
+    assertEvaluates(Value(largerThanLong), Value(largerThanLong));
+    double smallerThanLong = numeric_limits<long long>::min() * 2.0;
+    assertEvaluates(Value(smallerThanLong), Value(smallerThanLong));
+}
+
+TEST_F(ExpressionFloorTest, NullArg) {
+    assertEvaluates(Value(BSONNULL), Value(BSONNULL));
+}
+
+/* ------------------------- ExpressionTrunc -------------------------- */
+
+class ExpressionTruncTest : public ExpressionNaryTestOneArg {
+public:
+    virtual void assertEvaluates(Value input, Value output) override {
+        _expr = new ExpressionTrunc();
+        ExpressionNaryTestOneArg::assertEvaluates(input, output);
+    }
+};
+
+TEST_F(ExpressionTruncTest, IntArg) {
+    assertEvaluates(Value(0), Value(0));
+    assertEvaluates(Value(numeric_limits<int>::min()), Value(numeric_limits<int>::min()));
+    assertEvaluates(Value(numeric_limits<int>::max()), Value(numeric_limits<int>::max()));
+}
+
+TEST_F(ExpressionTruncTest, LongArg) {
+    assertEvaluates(Value(0LL), Value(0LL));
+    assertEvaluates(Value(numeric_limits<long long>::min()),
+                    Value(numeric_limits<long long>::min()));
+    assertEvaluates(Value(numeric_limits<long long>::max()),
+                    Value(numeric_limits<long long>::max()));
+}
+
+TEST_F(ExpressionTruncTest, FloatArg) {
+    assertEvaluates(Value(2.0), Value(2.0));
+    assertEvaluates(Value(-2.0), Value(-2.0));
+    assertEvaluates(Value(0.9), Value(0.0));
+    assertEvaluates(Value(0.1), Value(0.0));
+    assertEvaluates(Value(-1.2), Value(-1.0));
+    assertEvaluates(Value(-1.7), Value(-1.0));
+
+    // Outside the range of long longs (there isn't enough precision for decimals in this range, so
+    // should just preserve the number).
+    double largerThanLong = numeric_limits<long long>::max() * 2.0;
+    assertEvaluates(Value(largerThanLong), Value(largerThanLong));
+    double smallerThanLong = numeric_limits<long long>::min() * 2.0;
+    assertEvaluates(Value(smallerThanLong), Value(smallerThanLong));
+}
+
+TEST_F(ExpressionTruncTest, NullArg) {
+    assertEvaluates(Value(BSONNULL), Value(BSONNULL));
+}
+
+/* ------------------------- Old-style tests -------------------------- */
 
 namespace Add {
 

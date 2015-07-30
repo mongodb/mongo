@@ -43,18 +43,18 @@ load('jstests/aggregation/extras/utils.js');
     // Args/bases must be numeric or null.
     assertErrorCode(coll, [{$project: {log: {$log: ["string", 5]}}}], 28756);
     assertErrorCode(coll, [{$project: {log: {$log: [5, "string"]}}}], 28757);
-    assertErrorCode(coll, [{$project: {log10: {$log10: ["string"]}}}], 28760);
-    assertErrorCode(coll, [{$project: {ln: {$ln: ["string"]}}}], 28766);
+    assertErrorCode(coll, [{$project: {log10: {$log10: ["string"]}}}], 28765);
+    assertErrorCode(coll, [{$project: {ln: {$ln: ["string"]}}}], 28765);
     // Args/bases cannot equal 0.
     assertErrorCode(coll, [{$project: {log: {$log: [0, 5]}}}], 28758);
     assertErrorCode(coll, [{$project: {log: {$log: [5, 0]}}}], 28759);
     assertErrorCode(coll, [{$project: {log10: {$log10: [0]}}}], 28761);
-    assertErrorCode(coll, [{$project: {ln: {$ln: [0]}}}], 28767);
+    assertErrorCode(coll, [{$project: {ln: {$ln: [0]}}}], 28766);
     // Args/bases cannot be negative.
     assertErrorCode(coll, [{$project: {log: {$log: [-1, 5]}}}], 28758);
     assertErrorCode(coll, [{$project: {log: {$log: [5, -1]}}}], 28759);
     assertErrorCode(coll, [{$project: {log10: {$log10: [-1]}}}], 28761);
-    assertErrorCode(coll, [{$project: {ln: {$ln: [-1]}}}], 28767);
+    assertErrorCode(coll, [{$project: {ln: {$ln: [-1]}}}], 28766);
     // Base can't equal 1.
     assertErrorCode(coll, [{$project: {log: {$log: [5, 1]}}}], 28759);
 
