@@ -227,6 +227,10 @@ public:
 
         appendReplicationInfo(txn, result, 0);
 
+        if (serverGlobalParams.configsvrMode == ServerGlobalParams::ConfigServerMode::CSRS) {
+            result.append("configsvr", 1);
+        }
+
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
         result.appendNumber("maxWriteBatchSize", BatchedCommandRequest::kMaxWriteBatchSize);
