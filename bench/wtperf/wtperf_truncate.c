@@ -122,7 +122,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	TRUNCATE_CONFIG *trunc_cfg;
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 	char *truncate_key;
-	int ret;
+	int ret, t_ret;
 
 	ret = 0;
 	trunc_cfg = &thread->trunc_cfg;
@@ -162,26 +162,29 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	truncate_item = STAILQ_FIRST(&cfg->stone_head);
 	trunc_cfg->num_stones--;
 	STAILQ_REMOVE_HEAD(&cfg->stone_head, q);
+	free(truncate_item->key);
+	free(truncate_item);
+	truncate_item = NULL;
+
 	cursor->set_key(cursor,truncate_item->key);
 	if ((ret = cursor->search(cursor)) != 0) {
 		lprintf(cfg, ret, 0, "Truncate search: failed");
-		return (ret);
+		goto err;
 	}
 
 	if ((ret = session->truncate(session, NULL, NULL, cursor, NULL)) != 0) {
 		lprintf(cfg, ret, 0, "Truncate: failed");
-		return (ret);
+		goto err;
 	}
 
-	if ((ret = cursor->reset(cursor)) != 0) {
-		lprintf(cfg, ret, 0, "Cursor reset failed");
-		return (ret);
-	}
+
 	*truncatedp = 1;
 	trunc_cfg->expected_total -= truncate_item->diff;
-	free(truncate_item->key);
-	free(truncate_item);
-	truncate_item = NULL;
+
+err:	if ((t_ret = cursor->reset(cursor)) != 0) {
+		lprintf(cfg, t_ret, 0, "Cursor reset failed");
+		return (t_ret);
+	}
 
 	return (ret);
 }
