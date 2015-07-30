@@ -276,6 +276,16 @@ public:
     virtual void setMyLastOptime(const OpTime& opTime) = 0;
 
     /**
+     * Updates our internal tracking of the last OpTime applied to this node, but only
+     * if the supplied optime is later than the current last OpTime known to the replication
+     * coordinator.
+     *
+     * This function is used by logOp() on a primary, since the ops in the oplog do not
+     * necessarily commit in sequential order.
+     */
+    virtual void setMyLastOptimeForward(const OpTime& opTime) = 0;
+
+    /**
      * Same as above, but used during places we need to zero our last optime.
      */
     virtual void resetMyLastOptime() = 0;

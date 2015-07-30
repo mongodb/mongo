@@ -728,6 +728,13 @@ void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
     _replExecutor.wait(cbh.getValue());
 }
 
+void ReplicationCoordinatorImpl::setMyLastOptimeForward(const OpTime& opTime) {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    if (opTime > _getMyLastOptime_inlock()) {
+        _setMyLastOptime_inlock(&lock, opTime, false);
+    }
+}
+
 void ReplicationCoordinatorImpl::setMyLastOptime(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     _setMyLastOptime_inlock(&lock, opTime, false);

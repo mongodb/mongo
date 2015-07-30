@@ -150,6 +150,8 @@ public:
 
     virtual void setMyLastOptime(const OpTime& opTime);
 
+    virtual void setMyLastOptimeForward(const OpTime& opTime);
+
     virtual void resetMyLastOptime();
 
     virtual void setMyHeartbeatMessage(const std::string& msg);

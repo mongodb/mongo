@@ -2497,6 +2497,26 @@ TEST_F(ReplCoordTest, SnapshotCommitting) {
     ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshot_forTest());
 }
 
+TEST_F(ReplCoordTest, MoveOpTimeForward) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
+                                                                              << "node1:12345"
+                                                                              << "_id" << 0))),
+                       HostAndPort("node1", 12345));
+
+
+    OpTime time1(Timestamp(100, 1), 1);
+    OpTime time2(Timestamp(100, 2), 1);
+    OpTime time3(Timestamp(100, 3), 1);
+
+    getReplCoord()->setMyLastOptime(time1);
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastOptime());
+    getReplCoord()->setMyLastOptimeForward(time3);
+    ASSERT_EQUALS(time3, getReplCoord()->getMyLastOptime());
+    getReplCoord()->setMyLastOptimeForward(time2);
+    ASSERT_EQUALS(time3, getReplCoord()->getMyLastOptime());
+}
 // TODO(schwerin): Unit test election id updating
 
 }  // namespace

@@ -145,6 +145,12 @@ void ReplicationCoordinatorMock::setMyLastOptime(const OpTime& opTime) {
     _myLastOpTime = opTime;
 }
 
+void ReplicationCoordinatorMock::setMyLastOptimeForward(const OpTime& opTime) {
+    if (opTime > _myLastOpTime) {
+        _myLastOpTime = opTime;
+    }
+}
+
 void ReplicationCoordinatorMock::resetMyLastOptime() {
     _myLastOpTime = OpTime();
 }

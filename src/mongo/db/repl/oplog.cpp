@@ -167,8 +167,6 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
     }
 
     OpTime opTime(ts, term);
-    // We set this even if the oplog insert transaction rolls back.
-    replCoord->setMyLastOptime(opTime);
     return std::pair<OpTime, long long>(opTime, hashNew);
 }
 
@@ -209,6 +207,22 @@ public:
 private:
     BSONObj _frame;
     BSONObj _oField;
+};
+
+class UpdateReplOpTimeChange : public RecoveryUnit::Change {
+public:
+    UpdateReplOpTimeChange(OpTime newOpTime, ReplicationCoordinator* replCoord)
+        : _newOpTime(newOpTime), _replCoord(replCoord) {}
+
+    virtual void commit() {
+        _replCoord->setMyLastOptimeForward(_newOpTime);
+    }
+
+    virtual void rollback() {}
+
+private:
+    const OpTime _newOpTime;
+    ReplicationCoordinator* _replCoord;
 };
 
 }  // namespace
@@ -318,6 +332,9 @@ void _logOp(OperationContext* txn,
     OplogDocWriter writer(partial, obj);
     // This transaction might roll back.
     checkOplogInsert(_localOplogCollection->insertDocument(txn, &writer, false));
+
+    // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
+    txn->recoveryUnit()->registerChange(new UpdateReplOpTimeChange(slot.first, replCoord));
 
     ReplClientInfo::forClient(txn->getClient()).setLastOp(slot.first);
 }
