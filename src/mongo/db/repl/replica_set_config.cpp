@@ -45,6 +45,7 @@ const size_t ReplicaSetConfig::kMaxMembers;
 const size_t ReplicaSetConfig::kMaxVotingMembers;
 #endif
 
+const std::string ReplicaSetConfig::kConfigServerFieldName = "configServer";
 const std::string ReplicaSetConfig::kVersionFieldName = "version";
 const std::string ReplicaSetConfig::kMajorityWriteConcernModeName = "$majority";
 const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
@@ -61,7 +62,8 @@ const std::string kLegalConfigTopFieldNames[] = {kIdFieldName,
                                                  ReplicaSetConfig::kVersionFieldName,
                                                  kMembersFieldName,
                                                  kSettingsFieldName,
-                                                 kProtocolVersionFieldName};
+                                                 kProtocolVersionFieldName,
+                                                 ReplicaSetConfig::kConfigServerFieldName};
 
 const std::string kHeartbeatTimeoutFieldName = "heartbeatTimeoutSecs";
 const std::string kChainingAllowedFieldName = "chainingAllowed";
@@ -71,7 +73,10 @@ const std::string kGetLastErrorModesFieldName = "getLastErrorModes";
 }  // namespace
 
 ReplicaSetConfig::ReplicaSetConfig()
-    : _isInitialized(false), _heartbeatTimeoutPeriod(0), _protocolVersion(0) {}
+    : _isInitialized(false),
+      _heartbeatTimeoutPeriod(0),
+      _protocolVersion(0),
+      _configServer(false) {}
 
 Status ReplicaSetConfig::initialize(const BSONObj& cfg) {
     _isInitialized = false;
@@ -115,6 +120,14 @@ Status ReplicaSetConfig::initialize(const BSONObj& cfg) {
         status = _members.back().initialize(memberElement.Obj(), &_tagConfig);
         if (!status.isOK())
             return status;
+    }
+
+    //
+    // Parse configServer
+    //
+    status = bsonExtractBooleanFieldWithDefault(cfg, kConfigServerFieldName, false, &_configServer);
+    if (!status.isOK()) {
+        return status;
     }
 
     //
@@ -342,6 +355,12 @@ Status ReplicaSetConfig::validate() const {
                       "one non-arbiter member with priority > 0");
     }
 
+    if (_configServer && arbiterCount > 0) {
+        return Status(ErrorCodes::BadValue,
+                      "Arbiters are not allowed in replica set configurations being used for "
+                      "config servers");
+    }
+
     // TODO(schwerin): Validate satisfiability of write modes? Omitting for backwards
     // compatibility.
     if (_defaultWriteConcern.wMode.empty()) {
@@ -511,6 +530,7 @@ BSONObj ReplicaSetConfig::toBSON() const {
     BSONObjBuilder configBuilder;
     configBuilder.append(kIdFieldName, _replSetName);
     configBuilder.appendIntOrLL(kVersionFieldName, _version);
+    configBuilder.append(kConfigServerFieldName, _configServer);
 
     BSONArrayBuilder members(configBuilder.subarrayStart(kMembersFieldName));
     for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {

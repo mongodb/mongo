@@ -52,6 +52,7 @@ TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
     ASSERT_EQUALS(Seconds(10), config.getHeartbeatTimeoutPeriod());
     ASSERT_TRUE(config.isChainingAllowed());
+    ASSERT_FALSE(config.isConfigServer());
     ASSERT_EQUALS(0, config.getProtocolVersion());
 }
 
@@ -77,6 +78,7 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_EQUALS(0, config.getDefaultWriteConcern().wNumNodes);
     ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
     ASSERT_FALSE(config.isChainingAllowed());
+    ASSERT_FALSE(config.isConfigServer());
     ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
     ASSERT_EQUALS(2, config.getProtocolVersion());
 }
@@ -495,6 +497,18 @@ TEST(ReplicaSetConfig, ParseFailsWithNonBoolChainingAllowedField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
+TEST(ReplicaSetConfig, ParseFailsWithNonBoolConfigServerField) {
+    ReplicaSetConfig config;
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345")) << "configServer"
+                               << "no"));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+}
+
 TEST(ReplicaSetConfig, ParseFailsWithNonObjectSettingsField) {
     ReplicaSetConfig config;
     Status status =
@@ -667,6 +681,25 @@ TEST(ReplicaSetConfig, ChainingAllowedField) {
     ASSERT_FALSE(config.isChainingAllowed());
 }
 
+TEST(ReplicaSetConfig, ConfigServerField) {
+    ReplicaSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "configServer" << true << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_OK(config.validate());
+    ASSERT_TRUE(config.isConfigServer());
+
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "configServer" << false << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")))));
+    ASSERT_OK(config.validate());
+    ASSERT_FALSE(config.isConfigServer());
+}
+
 TEST(ReplicaSetConfig, HeartbeatTimeoutField) {
     ReplicaSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
@@ -791,6 +824,7 @@ bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
         a.getConfigVersion() == b.getConfigVersion() && a.getNumMembers() == b.getNumMembers() &&
         a.getHeartbeatTimeoutPeriod() == b.getHeartbeatTimeoutPeriod() &&
         a.isChainingAllowed() == b.isChainingAllowed() &&
+        a.isConfigServer() == b.isConfigServer() &&
         a.getDefaultWriteConcern().wNumNodes == b.getDefaultWriteConcern().wNumNodes &&
         a.getDefaultWriteConcern().wMode == b.getDefaultWriteConcern().wMode &&
         a.getProtocolVersion() == b.getProtocolVersion();
@@ -1208,6 +1242,19 @@ TEST(ReplicaSetConfig, CheckBeyondMaximumNodesFailsValidate) {
     ASSERT_NOT_OK(configA.validate());
     ASSERT_NOT_OK(configB.validate());
     ASSERT_TRUE(configA == configB);
+}
+
+TEST(ReplicaSetConfig, CheckConfigServerCantHaveArbiters) {
+    ReplicaSetConfig configA;
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "configServer" << true << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345")
+                                                    << BSON("_id" << 1 << "host"
+                                                                  << "localhost:54321"
+                                                                  << "arbiterOnly" << true)))));
+    ASSERT_NOT_OK(configA.validate());
 }
 
 }  // namespace

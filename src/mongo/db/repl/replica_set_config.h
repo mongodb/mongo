@@ -52,6 +52,7 @@ class ReplicaSetConfig {
 public:
     typedef std::vector<MemberConfig>::const_iterator MemberIterator;
 
+    static const std::string kConfigServerFieldName;
     static const std::string kVersionFieldName;
     static const std::string kMajorityWriteConcernModeName;
 
@@ -204,6 +205,13 @@ public:
     }
 
     /**
+     * Returns true if this replica set is for use as a config server replica set.
+     */
+    bool isConfigServer() const {
+        return _configServer;
+    }
+
+    /**
      * Returns a ReplicaSetTag with the given "key" and "value", or an invalid
      * tag if the configuration describes no such tag.
      */
@@ -283,6 +291,7 @@ private:
     ReplicaSetTagConfig _tagConfig;
     StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
     long long _protocolVersion;
+    bool _configServer;
 };
 
 
