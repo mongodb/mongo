@@ -182,10 +182,6 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
 	txn_state->snap_min = snap_min;
 
-	/* Update the last running ID if we have a much newer value. */
-	if (snap_min > txn_global->last_running + 100)
-		txn_global->last_running = snap_min;
-
 	WT_ASSERT(session, txn_global->scan_count > 0);
 	(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
 
@@ -287,24 +283,23 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		oldest_id = id;
 
 	/* Update the last running ID. */
-	if (WT_TXNID_LT(txn_global->last_running, snap_min)) {
-		txn_global->last_running = snap_min;
-		last_running_moved = 1;
-	} else
-		last_running_moved = 0;
+	last_running_moved = WT_TXNID_LT(txn_global->last_running, snap_min);
 
 	/* Update the oldest ID. */
-	if (WT_TXNID_LT(prev_oldest_id, oldest_id) &&
+	if ((WT_TXNID_LT(prev_oldest_id, oldest_id) || last_running_moved) &&
 	    WT_ATOMIC_CAS4(txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 			if ((id = s->id) != WT_TXN_NONE &&
-			    WT_TXNID_LT(id, oldest_id))
+			    WT_TXNID_LT(id, snap_min))
 				oldest_id = id;
 			if ((id = s->snap_min) != WT_TXN_NONE &&
 			    WT_TXNID_LT(id, oldest_id))
 				oldest_id = id;
 		}
+
+		if (WT_TXNID_LT(snap_min, oldest_id))
+			oldest_id = snap_min;
 
 #ifdef HAVE_DIAGNOSTIC
 		/*
@@ -318,6 +313,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		WT_ASSERT(session,
 		    id == WT_TXN_NONE || !WT_TXNID_LT(id, oldest_id));
 #endif
+		if (WT_TXNID_LT(txn_global->last_running, snap_min))
+			txn_global->last_running = snap_min;
 		if (WT_TXNID_LT(txn_global->oldest_id, oldest_id))
 			txn_global->oldest_id = oldest_id;
 		txn_global->scan_count = 0;
@@ -419,6 +416,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		txn_global->checkpoint_id = 0;
 		txn_global->checkpoint_pinned = WT_TXN_NONE;
 	} else if (F_ISSET(txn, WT_TXN_HAS_ID)) {
+		WT_ASSERT(session,
+		    !WT_TXNID_LT(txn->id, txn_global->last_running));
+
 		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 		    txn->id != WT_TXN_NONE);
 		WT_PUBLISH(txn_state->id, WT_TXN_NONE);
@@ -593,6 +593,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		switch (op->type) {
 		case WT_TXN_OP_BASIC:
 		case WT_TXN_OP_INMEM:
+                       WT_ASSERT(session, op->u.upd->txnid == txn->id);
 			op->u.upd->txnid = WT_TXN_ABORTED;
 			break;
 		case WT_TXN_OP_REF:
