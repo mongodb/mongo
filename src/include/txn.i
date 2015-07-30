@@ -378,7 +378,7 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
 			txn_state->id = txn->id = txn_global->current;
 		} while (!WT_ATOMIC_CAS8(
 		    txn_global->current, txn->id, txn->id + 1) ||
-                        WT_TXNID_LT(txn->id, txn_global->last_running));
+			WT_TXNID_LT(txn->id, txn_global->last_running));
 
 		/*
 		 * If we have used 64-bits of transaction IDs, there is nothing
