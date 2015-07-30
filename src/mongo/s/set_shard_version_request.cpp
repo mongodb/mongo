@@ -47,6 +47,7 @@ const char kShardConnectionString[] = "shardHost";
 const char kInit[] = "init";
 const char kAuthoritative[] = "authoritative";
 const char kVersion[] = "version";
+const char kNoConnectionVersioning[] = "noConnectionVersioning";
 
 }  // namespace
 
@@ -93,6 +94,19 @@ SetShardVersionRequest SetShardVersionRequest::makeForVersioning(
         configServer, shardName, shardConnectionString, nss, nssVersion, isAuthoritative);
 }
 
+SetShardVersionRequest SetShardVersionRequest::makeForVersioningNoPersist(
+    const ConnectionString& configServer,
+    const std::string& shardName,
+    const ConnectionString& shard,
+    const NamespaceString& nss,
+    const ChunkVersion& nssVersion,
+    bool isAuthoritative) {
+    auto ssv = makeForVersioning(configServer, shardName, shard, nss, nssVersion, isAuthoritative);
+    ssv._noConnectionVersioning = true;
+
+    return ssv;
+}
+
 StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const BSONObj& cmdObj) {
     SetShardVersionRequest request;
 
@@ -137,6 +151,13 @@ StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const B
     {
         Status status = bsonExtractBooleanFieldWithDefault(
             cmdObj, kAuthoritative, false, &request._isAuthoritative);
+        if (!status.isOK())
+            return status;
+    }
+
+    {
+        Status status = bsonExtractBooleanFieldWithDefault(
+            cmdObj, kNoConnectionVersioning, false, &request._noConnectionVersioning);
         if (!status.isOK())
             return status;
     }
@@ -189,6 +210,10 @@ BSONObj SetShardVersionRequest::toBSON() const {
 
     if (!_init) {
         _version.get().addToBSON(cmdBuilder, kVersion);
+    }
+
+    if (_noConnectionVersioning) {
+        cmdBuilder.append(kNoConnectionVersioning, true);
     }
 
     return cmdBuilder.obj();

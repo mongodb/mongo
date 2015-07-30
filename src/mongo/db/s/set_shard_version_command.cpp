@@ -105,15 +105,22 @@ public:
         // 3. fast check
         // 4. slow check (LOCKS)
 
-        // step 1
-
+        // Step 1
         Client* client = txn->getClient();
         LastError::get(client).disable();
-        ShardedConnectionInfo* info = ShardedConnectionInfo::get(client, true);
 
-        bool authoritative = cmdObj.getBoolField("authoritative");
+        const bool authoritative = cmdObj.getBoolField("authoritative");
+        const bool noConnectionVersioning = cmdObj.getBoolField("noConnectionVersioning");
 
-        // check config server is ok or enable sharding
+        ShardedConnectionInfo dummyInfo;
+        ShardedConnectionInfo* info;
+        if (noConnectionVersioning) {
+            info = &dummyInfo;
+        } else {
+            info = ShardedConnectionInfo::get(client, true);
+        }
+
+        // Check config server is ok or enable sharding
         if (!_checkConfigOrInit(
                 txn, cmdObj["configdb"].valuestrsafe(), authoritative, errmsg, result)) {
             return false;

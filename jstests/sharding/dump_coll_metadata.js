@@ -14,7 +14,6 @@ var shardAdmin = st.shard0.getDB( "admin" );
 assert( admin.runCommand({ enableSharding : coll.getDB() + "" }).ok );
 printjson( admin.runCommand({ movePrimary : coll.getDB() + "", to : shards[0]._id }) );
 assert( admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } }).ok );
-coll.findOne(); // TODO remove as part of SERVER-19319
 
 assert( shardAdmin.runCommand({ getShardVersion : coll + "" }).ok );
 printjson( shardAdmin.runCommand({ getShardVersion : coll + "", fullMetadata : true }) );

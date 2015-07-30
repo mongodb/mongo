@@ -708,7 +708,7 @@ Status CatalogManager::dropCollection(OperationContext* txn, const NamespaceStri
     LOG(1) << "dropCollection " << ns << " collection marked as dropped";
 
     for (const auto& shardEntry : allShards) {
-        SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioning(
+        SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
             connectionString(),
             shardEntry.getName(),
             fassertStatusOK(28753, ConnectionString::parse(shardEntry.getHost())),

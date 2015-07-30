@@ -96,6 +96,7 @@ Status initializeGlobalShardingState(const ConnectionString& configCS) {
         if (!status.isOK()) {
             return status;
         }
+
         catalogManager = std::move(catalogManagerReplicaSet);
     } else {
         auto catalogManagerLegacy = stdx::make_unique<CatalogManagerLegacy>();
@@ -103,6 +104,7 @@ Status initializeGlobalShardingState(const ConnectionString& configCS) {
         if (!status.isOK()) {
             return status;
         }
+
         catalogManager = std::move(catalogManagerLegacy);
     }
 

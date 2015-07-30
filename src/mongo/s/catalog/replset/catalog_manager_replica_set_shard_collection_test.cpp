@@ -404,14 +404,16 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     expectReloadChunks(ns, {expectedChunk});
     expectLoadNewestChunk(ns, expectedChunk);
 
+    // Expect the set shard version for that namespace
+    expectSetShardVersion(shardHost, shard, NamespaceString(ns), actualVersion);
+
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
                           clientHost.toString(),
                           network()->now(),
                           "shardCollection",
                           ns,
-                          BSON("version"
-                               << ""));
+                          BSON("version" << actualVersion.toString()));
 
     future.timed_get(kFutureTimeout);
 }
@@ -421,6 +423,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     const HostAndPort shard0Host{"shardHost0"};
     const HostAndPort shard1Host{"shardHost1"};
     const HostAndPort shard2Host{"shardHost2"};
+
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost(shard0Host.toString());
@@ -581,14 +584,16 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectReloadChunks(ns, expectedChunks);
     expectLoadNewestChunk(ns, expectedChunks[4]);
 
+    // Expect the set shard version for that namespace
+    expectSetShardVersion(shard0Host, shard0, NamespaceString(ns), expectedChunks[4].getVersion());
+
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
                           clientHost.toString(),
                           network()->now(),
                           "shardCollection",
                           ns,
-                          BSON("version"
-                               << ""));
+                          BSON("version" << expectedChunks[4].getVersion().toString()));
 
     future.timed_get(kFutureTimeout);
 }
@@ -759,14 +764,16 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectReloadChunks(ns, expectedChunks);
     expectLoadNewestChunk(ns, expectedChunks[4]);
 
+    // Expect the set shard version for that namespace
+    expectSetShardVersion(shardHost, shard, NamespaceString(ns), expectedChunks[4].getVersion());
+
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
                           clientHost.toString(),
                           network()->now(),
                           "shardCollection",
                           ns,
-                          BSON("version"
-                               << ""));
+                          BSON("version" << expectedChunks[4].getVersion().toString()));
 
     future.timed_get(kFutureTimeout);
 }
