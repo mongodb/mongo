@@ -122,7 +122,7 @@ err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
  */
 static int
 __las_page_instantiate(WT_SESSION_IMPL *session,
-    WT_REF *ref, const uint8_t *addr, size_t addr_size)
+    WT_REF *ref, const uint8_t *addr, size_t addr_size, int *need_las_removep)
 {
 	WT_CURSOR *cursor;
 	WT_CURSOR_BTREE cbt;
@@ -138,6 +138,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	uint8_t prefix[WT_MAX_PREFIX_SIZE];
 	int exact;
 	void *p;
+
+	*need_las_removep = 0;
 
 	cursor = NULL;
 	page = ref->page;
@@ -184,6 +186,12 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		if (klas->size <= prefix_len ||
 		    memcmp(klas->data, prefix, prefix_len) != 0)
 			break;
+
+		/*
+		 * If we find/instantiate records, we'll want to remove them
+		 * once this page instantiation is successful.
+		 */
+		*need_las_removep = 1;
 
 		/*
 		 * Skip to the on-page transaction ID stored in the key; if it's
@@ -339,9 +347,11 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PAGE *page;
 	WT_PAGE_STATE previous_state;
 	size_t addr_size;
+	int need_las_remove;
 	const uint8_t *addr;
 
 	page = NULL;
+	need_las_remove = 0;
 
 	/*
 	 * Don't pass an allocated buffer to the underlying block read function,
@@ -389,23 +399,25 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 		if (previous_state == WT_REF_DELETED)
 			WT_ERR(__wt_delete_page_instantiate(session, ref));
 
-		/*
-		 * Instantiate entries from the database's lookaside file; if
-		 * successful, we know this page will be instantiated, remove
-		 * the entries from the lookaside file.
-		 */
+		/* Instantiate updates from the database's lookaside file. */
 		dsk = tmp.data;
-		if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE)) {
+		if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE))
 			WT_ERR(__las_page_instantiate(
-			    session, ref, addr, addr_size));
-			WT_ERR(__wt_las_remove_block(session, addr, addr_size));
-		}
+			    session, ref, addr, addr_size, &need_las_remove));
 	}
 
 	WT_ERR(__wt_verbose(session, WT_VERB_READ,
 	    "page %p: %s", page, __wt_page_type_string(page->type)));
 
+	/*
+	 * We successfully instantiated the page, remove any update entries from
+	 * the lookaside file.
+	 */
+	if (need_las_remove)
+		WT_ERR(__wt_las_remove_block(session, addr, addr_size));
+
 	WT_PUBLISH(ref->state, WT_REF_MEM);
+
 	return (0);
 
 err:	/*
