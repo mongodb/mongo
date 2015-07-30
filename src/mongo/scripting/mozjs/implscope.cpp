@@ -406,16 +406,7 @@ BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
     JS::RootedValue out(_context);
     JS::RootedObject thisv(_context);
 
-    bool success = JS::Call(_context, thisv, function, argv, &out);
-
-    if (!success) {
-        auto status = currentJSExceptionToStatus(
-            _context, ErrorCodes::JSInterpreterFailure, "Unknown callThread failure");
-
-        log() << "js thread raised js exception: " << status;
-
-        uasserted(status.code(), status.reason());
-    }
+    _checkErrorState(JS::Call(_context, thisv, function, argv, &out), false, true);
 
     BSONObjBuilder b;
     ValueWriter(_context, out).writeThis(&b, "ret");

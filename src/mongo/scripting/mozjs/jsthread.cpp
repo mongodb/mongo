@@ -177,7 +177,7 @@ private:
             } catch (...) {
                 auto status = exceptionToStatus();
 
-                log() << "js thread threw c++ exception: " << status;
+                log() << "js thread raised js exception: " << status;
                 _sharedData->setErrored(true);
                 _sharedData->_returnData = BSON("ret" << BSONUndefined);
             }
