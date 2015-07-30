@@ -240,6 +240,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _maxKeyProto(_context),
       _minKeyProto(_context),
       _mongoExternalProto(_context),
+      _mongoHelpersProto(_context),
       _mongoLocalProto(_context),
       _nativeFunctionProto(_context),
       _numberIntProto(_context),
@@ -276,6 +277,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
 
     // install global utility functions
     installGlobalUtils(*this);
+    _mongoHelpersProto.install(_global);
 }
 
 MozJSImplScope::~MozJSImplScope() {
@@ -420,22 +422,11 @@ bool hasFunctionIdentifier(StringData code) {
     return code[8] == ' ' || code[8] == '(';
 }
 
-// TODO: This function identification code is broken.  Fix it up to be more robust
-//
-// See: SERVER-16703 for more info
 void MozJSImplScope::_MozJSCreateFunction(const char* raw,
                                           ScriptingFunction functionNumber,
                                           JS::MutableHandleValue fun) {
-    std::string code = jsSkipWhiteSpace(raw);
-    if (!hasFunctionIdentifier(code)) {
-        if (code.find('\n') == std::string::npos && !hasJSReturn(code) &&
-            (code.find(';') == std::string::npos || code.find(';') == code.size() - 1)) {
-            code = "return " + code;
-        }
-        code = "function(){ " + code + "}";
-    }
-
-    code = str::stream() << "_funcs" << functionNumber << " = " << code;
+    std::string code = str::stream() << "_funcs" << functionNumber << " = "
+                                     << parseJSFunctionOrExpression(_context, StringData(raw));
 
     JS::CompileOptions co(_context);
     setCompileOptions(&co);
