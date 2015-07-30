@@ -138,12 +138,13 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
                 val = ValueWriter(cx, arg).toInt64();
 
             // values above 2^53 are not accurately represented in JS
-            if ((long long)val == (long long)(double)(long long)(val) && val < 9007199254740992LL) {
+            if (val == INT64_MIN || std::abs(val) >= 9007199254740992LL) {
+                auto val64 = static_cast<unsigned long long>(val);
                 o.setNumber(kFloatApprox, val);
+                o.setNumber(kTop, val64 >> 32);
+                o.setNumber(kBottom, val64 & 0x00000000ffffffff);
             } else {
                 o.setNumber(kFloatApprox, val);
-                o.setNumber(kTop, val >> 32);
-                o.setNumber(kBottom, val & 0x00000000ffffffff);
             }
         }
     } else {
