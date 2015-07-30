@@ -161,7 +161,7 @@ var $config = (function() {
     function teardown(db, collName, cluster) {
         cluster.executeOnMongodNodes(function disableFailPoint(db) {
             assertAlways.commandWorked(
-                db.adminCommand({ configureFailPoint: 'recordNeedsFetchFail', mode: 'off'})
+                db.adminCommand({ configureFailPoint: 'recordNeedsFetchFail', mode: 'off' })
             );
         });
         cluster.executeOnMongodNodes(function resetYieldParams(db) {
