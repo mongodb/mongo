@@ -1227,13 +1227,12 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LSN end_lsn;
-	int create_log, locked;
+	int create_log;
 
 	conn = S2C(session);
 	log = conn->log;
 
 	create_log = 1;
-	locked = 0;
 	/*
 	 * Set aside the log file handle to be closed later.  Other threads
 	 * may still be using it to write to the log.  If the log file size
@@ -1242,11 +1241,7 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	 */
 	while (log->log_close_fh != NULL) {
 		WT_STAT_FAST_CONN_INCR(session, log_close_yields);
-		__wt_spin_lock(session, &log->log_slot_lock);
-		locked = 1;
-		WT_ERR(__wt_log_wrlsn(session, NULL, NULL));
-		__wt_spin_unlock(session, &log->log_slot_lock);
-		locked = 0;
+		WT_RET(__wt_log_wrlsn(session, NULL));
 		__wt_yield();
 	}
 	log->log_close_fh = log->log_fh;
@@ -1257,7 +1252,6 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	 * If we're pre-allocating log files, look for one.  If there aren't any
 	 * or we're not pre-allocating, then create one.
 	 */
-	ret = 0;
 	if (conn->log_prealloc) {
 		ret = __log_alloc_prealloc(session, log->fileid);
 		/*
@@ -1280,10 +1274,10 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	 */
 	if (create_log) {
 		log->prep_missed++;
-		WT_ERR(__wt_log_allocfile(
+		WT_RET(__wt_log_allocfile(
 		    session, log->fileid, WT_LOG_FILENAME, 1));
 	}
-	WT_ERR(__log_openfile(session,
+	WT_RET(__log_openfile(session,
 	    0, &log->log_fh, WT_LOG_FILENAME, log->fileid));
 	/*
 	 * We need to setup the LSNs.  Set the end LSN and alloc LSN to
@@ -1298,16 +1292,14 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	 * the LSNs since we're the only write in progress.
 	 */
 	if (conn_create) {
-		WT_ERR(__wt_fsync(session, log->log_fh));
+		WT_RET(__wt_fsync(session, log->log_fh));
 		log->sync_lsn = end_lsn;
 		log->write_lsn = end_lsn;
 		log->write_start_lsn = end_lsn;
 	}
 	if (created != NULL)
 		*created = create_log;
-err:	if (locked)
-		__wt_spin_unlock(session, &log->log_slot_lock);
-	return (ret);
+	return (0);
 }
 
 /*
