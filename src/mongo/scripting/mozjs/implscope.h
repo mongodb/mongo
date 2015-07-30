@@ -46,6 +46,7 @@
 #include "mongo/scripting/mozjs/maxkey.h"
 #include "mongo/scripting/mozjs/minkey.h"
 #include "mongo/scripting/mozjs/mongo.h"
+#include "mongo/scripting/mozjs/mongohelpers.h"
 #include "mongo/scripting/mozjs/nativefunction.h"
 #include "mongo/scripting/mozjs/numberint.h"
 #include "mongo/scripting/mozjs/numberlong.h"
@@ -194,6 +195,10 @@ public:
         return _mongoExternalProto;
     }
 
+    WrapType<MongoHelpersInfo>& getMongoHelpersProto() {
+        return _mongoHelpersProto;
+    }
+
     WrapType<MongoLocalInfo>& getMongoLocalProto() {
         return _mongoLocalProto;
     }
@@ -231,7 +236,6 @@ public:
 
     static const char* const kExecResult;
     static const char* const kInvokeResult;
-
     static MozJSImplScope* getThreadScope();
     void setOOM();
 
@@ -310,6 +314,7 @@ private:
     WrapType<MaxKeyInfo> _maxKeyProto;
     WrapType<MinKeyInfo> _minKeyProto;
     WrapType<MongoExternalInfo> _mongoExternalProto;
+    WrapType<MongoHelpersInfo> _mongoHelpersProto;
     WrapType<MongoLocalInfo> _mongoLocalProto;
     WrapType<NativeFunctionInfo> _nativeFunctionProto;
     WrapType<NumberIntInfo> _numberIntProto;

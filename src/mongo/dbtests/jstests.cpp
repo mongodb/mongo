@@ -2139,20 +2139,11 @@ public:
         s->invoke("String(' return ')", 0, 0);
         ASSERT_EQUALS(" return ", s->getString("__returnValue"));
 
-        // This should fail so we set the expected __returnValue to undefined
-        s->invoke(";x = 5", 0, 0);
-        ASSERT_EQUALS("undefined", s->getString("__returnValue"));
-
         s->invoke("String(\"'return\")", 0, 0);
         ASSERT_EQUALS("'return", s->getString("__returnValue"));
 
         s->invoke("String('\"return')", 0, 0);
         ASSERT_EQUALS("\"return", s->getString("__returnValue"));
-
-        // A fail case
-        s->invoke("return$ = 0", 0, 0);
-        // Checks to confirm that the result is NaN
-        ASSERT(s->getNumber("__returnValue") != s->getNumber("__returnValue"));
     }
 };
 
