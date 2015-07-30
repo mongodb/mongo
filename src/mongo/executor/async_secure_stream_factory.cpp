@@ -26,54 +26,40 @@
  *    it in the license file.
  */
 
-#include "mongo/executor/network_interface_factory.h"
+#include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/config.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/executor/async_secure_stream_factory.h"
-#include "mongo/executor/async_stream_factory.h"
-#include "mongo/executor/async_stream_interface.h"
-#include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/network_interface_impl.h"
+
+#include "mongo/executor/async_secure_stream.h"
+#include "mongo/executor/async_stream.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_options.h"
+
+#ifdef MONGO_CONFIG_SSL
 
 namespace mongo {
 namespace executor {
 
-namespace {
-
-const char kNetworkImplASIO[] = "ASIO";
-const char kNetworkImplThreadPool[] = "threadPool";
-
-}  // namespace
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(outboundNetworkImpl, std::string, kNetworkImplThreadPool);
-MONGO_INITIALIZER(outboundNetworkImpl)(InitializerContext*) {
-    if (outboundNetworkImpl != kNetworkImplThreadPool && outboundNetworkImpl != kNetworkImplASIO) {
-        return Status(ErrorCodes::BadValue,
-                      "unsupported networking option: " + outboundNetworkImpl);
-    }
-    return Status::OK();
+AsyncSecureStreamFactory::AsyncSecureStreamFactory(SSLManagerInterface* sslManager)
+    : _sslContext(asio::ssl::context::sslv23) {
+    // We use sslv23, which corresponds to OpenSSLs SSLv23_method, for compatibility with older
+    // versions of OpenSSL. This mirrors the call to SSL_CTX_new in ssl_manager.cpp. In
+    // initAsyncSSLContext we explicitly disable all protocols other than TLSv1, TLSv1.1,
+    // and TLSv1.2.
+    uassertStatusOK(sslManager->initSSLContext(_sslContext.native_handle(), getSSLGlobalParams()));
 }
 
-std::unique_ptr<NetworkInterface> makeNetworkInterface() {
-    if (outboundNetworkImpl == kNetworkImplASIO) {
-#ifdef MONGO_CONFIG_SSL
-        if (SSLManagerInterface* manager = getSSLManager()) {
-            auto factory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
-            return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
-        }
-#endif
-        auto factory = stdx::make_unique<AsyncStreamFactory>();
-        return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
-
-    } else {
-        return stdx::make_unique<NetworkInterfaceImpl>();
+std::unique_ptr<AsyncStreamInterface> AsyncSecureStreamFactory::makeStream(
+    asio::io_service* io_service, const HostAndPort&) {
+    int sslModeVal = getSSLGlobalParams().sslMode.load();
+    if (sslModeVal == SSLParams::SSLMode_preferSSL || sslModeVal == SSLParams::SSLMode_requireSSL) {
+        return stdx::make_unique<AsyncSecureStream>(io_service, &_sslContext);
     }
+    return stdx::make_unique<AsyncStream>(io_service);
 }
 
 }  // namespace executor
 }  // namespace mongo
+
+#endif

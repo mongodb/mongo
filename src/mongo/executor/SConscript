@@ -72,11 +72,15 @@ env.Library(target='network_test_env',
 env.Library(
     target='network_interface_asio',
     source=[
+        'async_mock_stream_factory.cpp',
+        'async_secure_stream.cpp',
+        'async_secure_stream_factory.cpp',
+        'async_stream.cpp',
+        'async_stream_factory.cpp',
         'network_interface_asio.cpp',
         'network_interface_asio_auth.cpp',
         'network_interface_asio_command.cpp',
         'network_interface_asio_connect.cpp',
-        'network_interface_asio_ssl.cpp',
         'network_interface_asio_operation.cpp',
     ],
     LIBDEPS=[
@@ -85,6 +89,16 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/third_party/shim_asio',
     ])
+
+env.CppUnitTest(
+    target='network_interface_asio_test',
+    source=[
+        'network_interface_asio_test.cpp',
+    ],
+    LIBDEPS=[
+        'network_interface_asio',
+    ],
+)
 
 env.Library(
     target='network_interface_factory',

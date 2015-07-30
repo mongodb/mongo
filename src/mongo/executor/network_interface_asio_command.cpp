@@ -35,6 +35,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "mongo/executor/async_stream_interface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/factory.h"

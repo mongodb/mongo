@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
 #include <asio.hpp>
 
 #include <boost/optional.hpp>
@@ -37,10 +35,6 @@
 #include <string>
 #include <system_error>
 #include <unordered_map>
-
-#ifdef MONGO_CONFIG_SSL
-#include <asio/ssl.hpp>
-#endif
 
 #include "mongo/base/status.h"
 #include "mongo/executor/network_interface.h"
@@ -57,31 +51,9 @@
 namespace mongo {
 namespace executor {
 
+class AsyncStreamFactoryInterface;
+class AsyncStreamInterface;
 class NetworkConnectionHook;
-
-/**
- * A two-way stream supporting asynchronous reads and writes.
- */
-class AsyncStreamInterface {
-    MONGO_DISALLOW_COPYING(AsyncStreamInterface);
-
-public:
-    virtual ~AsyncStreamInterface() = default;
-
-    using ConnectHandler = stdx::function<void(std::error_code)>;
-
-    using StreamHandler = stdx::function<void(std::error_code, std::size_t)>;
-
-    virtual void connect(asio::ip::tcp::resolver::iterator endpoints,
-                         ConnectHandler&& connectHandler) = 0;
-
-    virtual void write(asio::const_buffer buf, StreamHandler&& writeHandler) = 0;
-
-    virtual void read(asio::mutable_buffer buf, StreamHandler&& readHandler) = 0;
-
-protected:
-    AsyncStreamInterface() = default;
-};
 
 /**
  * Implementation of the replication system's network interface using Christopher
@@ -89,7 +61,7 @@ protected:
  */
 class NetworkInterfaceASIO final : public NetworkInterface {
 public:
-    NetworkInterfaceASIO();
+    NetworkInterfaceASIO(std::unique_ptr<AsyncStreamFactoryInterface> streamFactory);
     std::string getDiagnosticString() override;
     std::string getHostName() override;
     void startup() override;
@@ -112,9 +84,6 @@ private:
     using NetworkOpHandler = stdx::function<void(std::error_code, size_t)>;
 
     enum class State { kReady, kRunning, kShutdown };
-
-    class AsyncStream;
-    class AsyncSecureStream;
 
     /**
      * AsyncConnection encapsulates the per-connection state we maintain.
@@ -270,11 +239,6 @@ private:
     // setup plaintext TCP socket
     void _setupSocket(AsyncOp* op, asio::ip::tcp::resolver::iterator endpoints);
 
-#ifdef MONGO_CONFIG_SSL
-    // setup SSL socket
-    void _setupSecureSocket(AsyncOp* op, asio::ip::tcp::resolver::iterator endpoints);
-#endif
-
     void _runIsMaster(AsyncOp* op);
     void _authenticate(AsyncOp* op);
 
@@ -295,19 +259,14 @@ private:
 
     std::atomic<State> _state;
 
+    std::unique_ptr<AsyncStreamFactoryInterface> _streamFactory;
+
     stdx::mutex _inProgressMutex;
     std::unordered_map<AsyncOp*, std::unique_ptr<AsyncOp>> _inProgress;
 
     stdx::mutex _executorMutex;
     bool _isExecutorRunnable;
     stdx::condition_variable _isExecutorRunnableCondition;
-
-#ifdef MONGO_CONFIG_SSL
-    // The SSL context. This declaration is wrapped in an ifdef because the asio::ssl::context
-    // type does not exist unless SSL support is compiled in. We also use a boost::optional as
-    // even if SSL support is compiled in, it can be disabled at runtime.
-    boost::optional<asio::ssl::context> _sslContext;
-#endif
 };
 
 }  // namespace executor

@@ -35,48 +35,17 @@
 #include <utility>
 
 #include "mongo/config.h"
+#include "mongo/executor/async_stream.h"
+#include "mongo/executor/async_stream_factory.h"
+#include "mongo/executor/async_stream_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
-
-#ifdef MONGO_CONFIG_SSL
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/net/ssl_options.h"
-#endif
 
 namespace mongo {
 namespace executor {
 
 using asio::ip::tcp;
-
-class NetworkInterfaceASIO::AsyncStream final : public AsyncStreamInterface {
-public:
-    // TODO: after we get rid of the bootstrap connection path, change this constructor
-    // to take the io_service instead to more closely match AsyncSecureStream
-    AsyncStream(tcp::socket&& stream) : _stream(std::move(stream)) {}
-
-    void connect(tcp::resolver::iterator iter, ConnectHandler&& connectHandler) override {
-        asio::async_connect(
-            _stream,
-            std::move(iter),
-            // We need to wrap this with a lambda of the right signature so it compiles, even
-            // if we don't actually use the resolver iterator.
-            [this, connectHandler](std::error_code ec, tcp::resolver::iterator) {
-                return connectHandler(ec);
-            });
-    }
-
-    void write(asio::const_buffer buffer, StreamHandler&& streamHandler) override {
-        asio::async_write(_stream, asio::buffer(buffer), std::move(streamHandler));
-    }
-
-    void read(asio::mutable_buffer buffer, StreamHandler&& streamHandler) override {
-        asio::async_read(_stream, asio::buffer(buffer), std::move(streamHandler));
-    }
-
-private:
-    tcp::socket _stream;
-};
 
 NetworkInterfaceASIO::AsyncConnection::AsyncConnection(std::unique_ptr<AsyncStreamInterface> stream,
                                                        rpc::ProtocolSet protocols)
@@ -118,29 +87,18 @@ void NetworkInterfaceASIO::_connect(AsyncOp* op) {
                                std::to_string(op->request().target.port()));
     // TODO: Investigate how we might hint or use shortcuts to resolve when possible.
     const auto thenConnect = [this, op](std::error_code ec, tcp::resolver::iterator endpoints) {
-        _validateAndRun(op,
-                        ec,
-                        [this, op, endpoints]() {
-
-#ifdef MONGO_CONFIG_SSL
-            int sslModeVal = getSSLGlobalParams().sslMode.load();
-            if (sslModeVal == SSLParams::SSLMode_preferSSL ||
-                sslModeVal == SSLParams::SSLMode_requireSSL) {
-                invariant(_sslContext.is_initialized());
-                return _setupSecureSocket(op, std::move(endpoints));
-            }
-#endif
-            _setupSocket(op, std::move(endpoints));
-
-                        });
+        _validateAndRun(
+            op, ec, [this, op, endpoints]() { _setupSocket(op, std::move(endpoints)); });
     };
     _resolver.async_resolve(query, std::move(thenConnect));
 }
 
 void NetworkInterfaceASIO::_setupSocket(AsyncOp* op, tcp::resolver::iterator endpoints) {
     // TODO: Consider moving this call to post-auth so we only assign completed connections.
-    op->setConnection(AsyncConnection(stdx::make_unique<AsyncStream>(tcp::socket{_io_service}),
-                                      rpc::supports::kOpQueryOnly));
+    {
+        auto stream = _streamFactory->makeStream(&_io_service, op->request().target);
+        op->setConnection({std::move(stream), rpc::supports::kOpQueryOnly});
+    }
 
     auto& stream = op->connection().stream();
 

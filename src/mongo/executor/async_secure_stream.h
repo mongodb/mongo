@@ -26,54 +26,40 @@
  *    it in the license file.
  */
 
-#include "mongo/executor/network_interface_factory.h"
+#pragma once
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
 #include "mongo/config.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/executor/async_secure_stream_factory.h"
-#include "mongo/executor/async_stream_factory.h"
+
+#ifdef MONGO_CONFIG_SSL
+
+#include <asio.hpp>
+#include <asio/ssl.hpp>
+
 #include "mongo/executor/async_stream_interface.h"
-#include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/network_interface_impl.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
 namespace executor {
 
-namespace {
+class AsyncSecureStream final : public AsyncStreamInterface {
+public:
+    AsyncSecureStream(asio::io_service* io_service, asio::ssl::context* sslContext);
 
-const char kNetworkImplASIO[] = "ASIO";
-const char kNetworkImplThreadPool[] = "threadPool";
+    void connect(const asio::ip::tcp::resolver::iterator endpoints,
+                 ConnectHandler&& connectHandler) override;
+    void write(asio::const_buffer buffer, StreamHandler&& streamHandler);
 
-}  // namespace
+    void read(asio::mutable_buffer buffer, StreamHandler&& streamHandler);
 
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(outboundNetworkImpl, std::string, kNetworkImplThreadPool);
-MONGO_INITIALIZER(outboundNetworkImpl)(InitializerContext*) {
-    if (outboundNetworkImpl != kNetworkImplThreadPool && outboundNetworkImpl != kNetworkImplASIO) {
-        return Status(ErrorCodes::BadValue,
-                      "unsupported networking option: " + outboundNetworkImpl);
-    }
-    return Status::OK();
-}
+private:
+    void _handleConnect(std::error_code ec, asio::ip::tcp::resolver::iterator iter);
 
-std::unique_ptr<NetworkInterface> makeNetworkInterface() {
-    if (outboundNetworkImpl == kNetworkImplASIO) {
-#ifdef MONGO_CONFIG_SSL
-        if (SSLManagerInterface* manager = getSSLManager()) {
-            auto factory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
-            return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
-        }
-#endif
-        auto factory = stdx::make_unique<AsyncStreamFactory>();
-        return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
+    void _handleHandshake(std::error_code ec, const std::string& hostName);
 
-    } else {
-        return stdx::make_unique<NetworkInterfaceImpl>();
-    }
-}
+    asio::ssl::stream<asio::ip::tcp::socket> _stream;
+    ConnectHandler _userHandler;
+};
 
 }  // namespace executor
 }  // namespace mongo
+
+#endif

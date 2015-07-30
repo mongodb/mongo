@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/executor/network_interface_asio.h"
+#include "mongo/executor/async_stream_interface.h"
 
 namespace mongo {
 namespace executor {

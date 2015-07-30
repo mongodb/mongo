@@ -44,9 +44,9 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
     // have to communicate with servers that do not support OP_COMMAND
     rpc::LegacyRequestBuilder requestBuilder{};
     requestBuilder.setDatabase("admin");
-    requestBuilder.setCommandName("ismaster");
+    requestBuilder.setCommandName("isMaster");
     requestBuilder.setMetadata(rpc::makeEmptyMetadata());
-    requestBuilder.setCommandArgs(BSON("ismaster" << 1));
+    requestBuilder.setCommandArgs(BSON("isMaster" << 1));
 
     // Set current command to ismaster request and run
     auto& cmd = op->beginCommand(std::move(*(requestBuilder.done())));
@@ -65,7 +65,7 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
             op->connection().setServerProtocols(protocolSet.getValue());
 
             // Advance the state machine
-            _authenticate(op);
+            _beginCommunication(op);
 
         } catch (...) {
             // makeReply will throw if the rely was invalid.
@@ -81,7 +81,7 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
 
 void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
     // TODO: Implement asynchronous authentication, SERVER-19155
-    asio::post(_io_service, [this, op]() { _beginCommunication(op); });
+    asio::post(_io_service, [this, op]() { _runIsMaster(op); });
 }
 
 }  // namespace executor

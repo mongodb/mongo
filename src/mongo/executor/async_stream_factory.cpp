@@ -26,53 +26,21 @@
  *    it in the license file.
  */
 
-#include "mongo/executor/network_interface_factory.h"
+#include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/config.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/executor/async_secure_stream_factory.h"
 #include "mongo/executor/async_stream_factory.h"
-#include "mongo/executor/async_stream_interface.h"
-#include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/network_interface_impl.h"
+
+#include "mongo/executor/async_secure_stream.h"
+#include "mongo/executor/async_stream.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace executor {
 
-namespace {
-
-const char kNetworkImplASIO[] = "ASIO";
-const char kNetworkImplThreadPool[] = "threadPool";
-
-}  // namespace
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(outboundNetworkImpl, std::string, kNetworkImplThreadPool);
-MONGO_INITIALIZER(outboundNetworkImpl)(InitializerContext*) {
-    if (outboundNetworkImpl != kNetworkImplThreadPool && outboundNetworkImpl != kNetworkImplASIO) {
-        return Status(ErrorCodes::BadValue,
-                      "unsupported networking option: " + outboundNetworkImpl);
-    }
-    return Status::OK();
-}
-
-std::unique_ptr<NetworkInterface> makeNetworkInterface() {
-    if (outboundNetworkImpl == kNetworkImplASIO) {
-#ifdef MONGO_CONFIG_SSL
-        if (SSLManagerInterface* manager = getSSLManager()) {
-            auto factory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
-            return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
-        }
-#endif
-        auto factory = stdx::make_unique<AsyncStreamFactory>();
-        return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
-
-    } else {
-        return stdx::make_unique<NetworkInterfaceImpl>();
-    }
+std::unique_ptr<AsyncStreamInterface> AsyncStreamFactory::makeStream(asio::io_service* io_service,
+                                                                     const HostAndPort&) {
+    return stdx::make_unique<AsyncStream>(io_service);
 }
 
 }  // namespace executor
