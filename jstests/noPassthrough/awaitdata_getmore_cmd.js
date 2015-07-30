@@ -35,17 +35,18 @@
         assert.writeOK(coll.insert({a: i}));
     }
 
-    // GetMore should fail if query has awaitData but no maxTimeMS is supplied.
+    // GetMore should succeed if query has awaitData but no maxTimeMS is supplied.
     cmdRes = db.runCommand({find: collName, batchSize: 2, awaitData: true, tailable: true});
     assert.commandWorked(cmdRes);
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 2);
     cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName});
-    assert.commandFailed(cmdRes);
+    assert.commandWorked(cmdRes);
+    assert.gt(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
 
-    // Should fail in the same way even if maxTimeMS is supplied on the original find; getMore with
-    // awaitData expects maxTimeMS to be set directly on the getMore command.
+    // Should also succeed if maxTimeMS is supplied on the original find.
     cmdRes = db.runCommand({
         find: collName,
         batchSize: 2,
@@ -58,7 +59,9 @@
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 2);
     cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName});
-    assert.commandFailed(cmdRes);
+    assert.commandWorked(cmdRes);
+    assert.gt(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
 
     // Check that we can set up a tailable cursor over the capped collection.
     cmdRes = db.runCommand({find: collName, batchSize: 5, awaitData: true, tailable: true});
