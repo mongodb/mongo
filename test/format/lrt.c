@@ -47,6 +47,7 @@ lrt(void *arg)
 	void *buf;
 
 	(void)(arg);			/* Unused parameter */
+
 	saved_keyno = 0;		/* [-Werror=maybe-uninitialized] */
 
 	key_gen_setup(&keybuf);
@@ -168,6 +169,7 @@ lrt(void *arg)
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 
+	free(keybuf);
 	free(buf);
 
 	return (NULL);

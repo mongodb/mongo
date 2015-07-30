@@ -238,12 +238,12 @@ ops(void *arg)
 
 	tinfo = arg;
 
-	/* Initialize the per-thread random number generator. */
-	__wt_random_init(&tinfo->rnd);
-
 	conn = g.wts_conn;
 	keybuf = valbuf = NULL;
 	readonly = 0;			/* -Wconditional-uninitialized */
+
+	/* Initialize the per-thread random number generator. */
+	__wt_random_init(&tinfo->rnd);
 
 	/* Set up the default key and value buffers. */
 	key_gen_setup(&keybuf);
