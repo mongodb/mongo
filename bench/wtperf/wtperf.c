@@ -742,26 +742,34 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 	}
 
 	/*
-	 * Check for a simple case where the thread is only doing insert,
-	 * truncate or update operations (because the default operation for a
+	 * Handle truncate first - it's a special case that can't be used in
+	 * a mixed workload.
+	 */
+	if (workp->truncate != 0) {
+		if (workp->insert != 0 ||
+		    workp->read != 0 || workp->update != 0) {
+			lprintf(cfg, EINVAL, 0,
+			    "Can't configure truncate in a mixed workload");
+			return (EINVAL);
+		}
+		memset(workp->ops, WORKER_TRUNCATE, sizeof(workp->ops));
+		return (0);
+	}
+
+	/*
+	 * Check for a simple case where the thread is only doing insert or
+	 * update operations (because the default operation for a
 	 * job-mix is read, the subsequent code works fine if only reads are
 	 * specified).
 	 */
-	if (workp->insert != 0 && workp->read == 0 &&
-	    workp->truncate == 0 && workp->update == 0) {
+	if (workp->insert != 0 && workp->read == 0 && workp->update == 0) {
 		memset(workp->ops,
 		    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT,
 		    sizeof(workp->ops));
 		return (0);
 	}
-	if (workp->insert == 0 && workp->read == 0 &&
-	    workp->truncate == 0 && workp->update != 0) {
+	if (workp->insert == 0 && workp->read == 0 && workp->update != 0) {
 		memset(workp->ops, WORKER_UPDATE, sizeof(workp->ops));
-		return (0);
-	}
-	if (workp->insert == 0 && workp->read == 0 &&
-	    workp->truncate != 0 && workp->update == 0) {
-		memset(workp->ops, WORKER_TRUNCATE, sizeof(workp->ops));
 		return (0);
 	}
 
@@ -785,18 +793,14 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 	memset(workp->ops, WORKER_READ, sizeof(workp->ops));
 
 	pct = (workp->insert * 100) /
-	    (workp->insert + workp->read + workp->truncate + workp->update);
+	    (workp->insert + workp->read + workp->update);
 	if (pct != 0)
 		run_mix_schedule_op(workp,
 		    cfg->insert_rmw ? WORKER_INSERT_RMW : WORKER_INSERT, pct);
 	pct = (workp->update * 100) /
-	    (workp->insert + workp->read + workp->truncate + workp->update);
+	    (workp->insert + workp->read + workp->update);
 	if (pct != 0)
 		run_mix_schedule_op(workp, WORKER_UPDATE, pct);
-	pct = (workp->truncate * 100) /
-	    (workp->insert + workp->read + workp->truncate + workp->update);
-	if (pct != 0)
-		run_mix_schedule_op(workp, WORKER_TRUNCATE, pct);
 	return (0);
 }
 
