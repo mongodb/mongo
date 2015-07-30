@@ -104,7 +104,7 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
     args = [executable]
 
     eval_sb = []  # String builder.
-    global_vars = kwargs.pop("global_vars", {})
+    global_vars = kwargs.pop("global_vars", {}).copy()
 
     shortcut_opts = {
         "noJournal": (config.NO_JOURNAL, False),
@@ -125,6 +125,23 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
             # Only use 'opt_default' if the property wasn't set in the YAML configuration.
             test_data[opt_name] = opt_default
     global_vars["TestData"] = test_data
+
+    # Pass setParameters for mongos and mongod through TestData. The setParameter parsing in
+    # servers.js is very primitive (just splits on commas), so this may break for non-scalar
+    # setParameter values.
+    if config.MONGOD_SET_PARAMETERS is not None:
+        if "setParameters" in test_data:
+            raise ValueError("setParameters passed via TestData can only be set from either the"
+                             " command line or the suite YAML, not both")
+        mongod_set_parameters = utils.load_yaml(config.MONGOD_SET_PARAMETERS)
+        test_data["setParameters"] = _format_test_data_set_parameters(mongod_set_parameters)
+
+    if config.MONGOS_SET_PARAMETERS is not None:
+        if "setParametersMongos" in test_data:
+            raise ValueError("setParametersMongos passed via TestData can only be set from either"
+                             " the command line or the suite YAML, not both")
+        mongos_set_parameters = utils.load_yaml(config.MONGOS_SET_PARAMETERS)
+        test_data["setParametersMongos"] = _format_test_data_set_parameters(mongos_set_parameters)
 
     for var_name in global_vars:
         _format_shell_vars(eval_sb, var_name, global_vars[var_name])
@@ -148,7 +165,7 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
     # Have the mongos shell run the specified file.
     args.append(filename)
 
-    _set_keyfile_permissions(global_vars["TestData"])
+    _set_keyfile_permissions(test_data)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
     return _process.Process(logger, args, **process_kwargs)
@@ -199,6 +216,26 @@ def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **
     process_kwargs = utils.default_if_none(process_kwargs, {})
     return _process.Process(logger, args, **process_kwargs)
 
+
+def _format_test_data_set_parameters(set_parameters):
+    """
+    Converts key-value pairs from 'set_parameters' into the comma
+    delimited list format expected by the parser in servers.js.
+
+    WARNING: the parsing logic in servers.js is very primitive.
+    Non-scalar options such as logComponentVerbosity will not work
+    correctly.
+    """
+    params = []
+    for param_name in set_parameters:
+        param_value = set_parameters[param_name]
+        if isinstance(param_value, bool):
+            # Boolean valued setParameters are specified as lowercase strings.
+            param_value = "true" if param_value else "false"
+        elif isinstance(param_value, dict):
+            raise TypeError("Non-scalar setParameter values are not currently supported.")
+        params.append("%s=%s" % (param_name, param_value))
+    return ",".join(params)
 
 def _apply_set_parameters(args, set_parameter):
     """
