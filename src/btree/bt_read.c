@@ -97,15 +97,6 @@ __wt_las_remove_block(
 		    memcmp(klas->data, prefix, prefix_len) != 0)
 			break;
 
-		/*
-		 * Make sure we have a local copy of the record.
-		 *
-		 * KEITH: Why is this necessary?
-		 */
-		if (!WT_DATA_IN_ITEM(klas))
-			WT_ERR(__wt_buf_set(
-			    session, klas, klas->data, klas->size));
-
 		WT_ERR(cursor->remove(cursor));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
