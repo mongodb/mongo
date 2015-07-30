@@ -436,7 +436,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
 
 WiredTigerRecordStore::~WiredTigerRecordStore() {
     {
-        stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
+        stdx::lock_guard<boost::timed_mutex> lk(_cappedDeleterMutex);  // NOLINT
         _shuttingDown = true;
     }
 
@@ -451,7 +451,7 @@ const char* WiredTigerRecordStore::name() const {
 }
 
 bool WiredTigerRecordStore::inShutdown() const {
-    stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
+    stdx::lock_guard<boost::timed_mutex> lk(_cappedDeleterMutex);  // NOLINT
     return _shuttingDown;
 }
 
@@ -580,7 +580,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
         return 0;
 
     // ensure only one thread at a time can do deletes, otherwise they'll conflict.
-    stdx::unique_lock<stdx::timed_mutex> lock(_cappedDeleterMutex, stdx::defer_lock);
+    boost::unique_lock<boost::timed_mutex> lock(_cappedDeleterMutex, boost::defer_lock);  // NOLINT
 
     if (_cappedMaxDocs != -1) {
         lock.lock();  // Max docs has to be exact, so have to check every time.
@@ -598,8 +598,9 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
         // Don't wait forever: we're in a transaction, we could block eviction.
         if (!lock.try_lock()) {
             Date_t before = Date_t::now();
-            (void)lock.try_lock_for(stdx::chrono::milliseconds(200));
-            stdx::chrono::milliseconds delay = Date_t::now() - before;
+            (void)lock.try_lock_for(boost::chrono::milliseconds(200));  // NOLINT
+            auto delay = boost::chrono::milliseconds(
+                durationCount<Milliseconds>(Date_t::now() - before));  // NOLINT
             _cappedSleep.fetchAndAdd(1);
             _cappedSleepMS.fetchAndAdd(delay.count());
         }
@@ -613,8 +614,9 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
 
             // Don't wait forever: we're in a transaction, we could block eviction.
             Date_t before = Date_t::now();
-            bool gotLock = lock.try_lock_for(stdx::chrono::milliseconds(200));
-            stdx::chrono::milliseconds delay = Date_t::now() - before;
+            bool gotLock = lock.try_lock_for(boost::chrono::milliseconds(200));  // NOLINT
+            auto delay = boost::chrono::milliseconds(
+                durationCount<Milliseconds>(Date_t::now() - before));  // NOLINT
             _cappedSleep.fetchAndAdd(1);
             _cappedSleepMS.fetchAndAdd(delay.count());
             if (!gotLock)

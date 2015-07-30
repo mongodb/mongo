@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include <boost/thread/mutex.hpp>
 #include <set>
 #include <string>
 
@@ -208,7 +209,7 @@ public:
 
     int64_t cappedDeleteAsNeeded_inlock(OperationContext* txn, const RecordId& justInserted);
 
-    stdx::timed_mutex& cappedDeleterMutex() {
+    boost::timed_mutex& cappedDeleterMutex() {  // NOLINT
         return _cappedDeleterMutex;
     }
 
@@ -247,8 +248,10 @@ private:
     AtomicInt64 _cappedSleep;
     AtomicInt64 _cappedSleepMS;
     CappedDocumentDeleteCallback* _cappedDeleteCallback;
-    int _cappedDeleteCheckCount;                    // see comment in ::cappedDeleteAsNeeded
-    mutable stdx::timed_mutex _cappedDeleterMutex;  // see comment in ::cappedDeleteAsNeeded
+
+    // See comment in ::cappedDeleteAsNeeded
+    int _cappedDeleteCheckCount;
+    mutable boost::timed_mutex _cappedDeleterMutex;  // NOLINT
 
     const bool _useOplogHack;
 
