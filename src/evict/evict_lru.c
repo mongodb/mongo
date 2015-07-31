@@ -227,9 +227,10 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 
 	for (i = conn->evict_workers_alloc; i < conn->evict_workers_max; i++) {
 		WT_ERR(__wt_open_internal_session(conn,
-		    "eviction-worker", 0, 0, &workers[i].session));
+		    "eviction-worker", 1, 0, &workers[i].session));
 		workers[i].id = i;
-		F_SET(workers[i].session, WT_SESSION_CAN_WAIT);
+		F_SET(workers[i].session,
+		    WT_SESSION_EVICTION_WORKER | WT_SESSION_CAN_WAIT);
 
 		if (i < conn->evict_workers_min) {
 			++conn->evict_workers;

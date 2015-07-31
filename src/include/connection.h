@@ -175,7 +175,6 @@ struct __wt_connection_impl {
 	WT_SPINLOCK checkpoint_lock;	/* Checkpoint spinlock */
 	WT_SPINLOCK dhandle_lock;	/* Data handle list spinlock */
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
-	WT_SPINLOCK las_lock;		/* Lookaside server spinlock */
 	WT_SPINLOCK reconfig_lock;	/* Single thread reconfigure */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK table_lock;		/* Table creation spinlock */
@@ -355,8 +354,14 @@ struct __wt_connection_impl {
 	time_t		 sweep_interval;/* Handle sweep interval */
 	u_int		 sweep_handles_min;/* Handle sweep minimum open */
 
-	WT_SESSION_IMPL *las_session;	/* Lookaside server session */
-	WT_CURSOR	*las_cursor;	/* Lookaside store cursor */
+	/*
+	 * Shared lookaside lock, session and cursor, used by threads accessing
+	 * the lookaside table (other than eviction worker threads, which have
+	 * their own lookaside table cursors).
+	 */
+	WT_SPINLOCK	 las_lock;	/* Lookaside file spinlock */
+	WT_SESSION_IMPL *las_session;	/* Lookaside file session */
+	WT_CURSOR	*las_cursor;	/* Lookaside file cursor */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;

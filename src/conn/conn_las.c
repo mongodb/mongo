@@ -22,6 +22,25 @@ __las_drop(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __las_cursor_create --
+ *	Open a new lookaside file cursor.
+ */
+static int
+__las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
+{
+	const char *open_cursor_cfg[] = {
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor),
+	    "overwrite=false", NULL };
+
+	/*
+	 * Open the cursor (note the "overwrite=false" configuration, we want
+	 * to see errors if we try to remove records that aren't there).
+	 */
+	return (__wt_open_cursor(
+	    session, WT_LASFILE_URI, NULL, open_cursor_cfg, cursorp));
+}
+
+/*
  * __wt_las_create --
  *	Initialize the database's lookaside store.
  */
@@ -30,9 +49,6 @@ __wt_las_create(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	const char *open_cursor_cfg[] = {
-	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor),
-	    "overwrite=false", NULL };
 
 	conn = S2C(session);
 
@@ -43,7 +59,7 @@ __wt_las_create(WT_SESSION_IMPL *session)
 		return (0);
 	}
 
-	/* Open an internal session, used for lookaside cursors. */
+	/* Open an internal session, used for the shared lookaside cursor. */
 	WT_ERR(__wt_open_internal_session(
 	    conn, "lookaside file", 1, 1, &conn->las_session));
 	session = conn->las_session;
@@ -55,18 +71,17 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_session_create(
 	    session, WT_LASFILE_URI, "key_format=u,value_format=QIu"));
 
-	/*
-	 * Open the cursor. (Note the "overwrite=false" configuration, we want
-	 * to see errors if we try to remove records that aren't there.)
-	 */
-	WT_ERR(__wt_open_cursor(
-	    session, WT_LASFILE_URI, NULL, open_cursor_cfg, &conn->las_cursor));
+	/* Open the shared cursor. */
+	WT_ERR(__las_cursor_create(session, &conn->las_cursor));
 
 	/*
-	 * No eviction.
-	 * Forced discard on release.
-	 * No lookaside records for the lookaside file during reconciliation.
-	 * No checkpoints or logging.
+	 * Configure the session:
+	 *	Don't tap for eviction.
+	 * Configure the session and file handles:
+	 *	Force discard on release.
+	 *	Flag as a lookaside handle (used, for example, to avoid writing
+	 *	lookaside records for the lookaside file during reconciliation).
+	 *	No checkpoints or logging.
 	 */
 	F_SET(session, WT_SESSION_NO_EVICTION);
 	F_SET(session->dhandle, WT_DHANDLE_DISCARD_FORCE);
@@ -127,23 +142,43 @@ __wt_las_cursor(
     WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t *saved_flagsp)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	uint32_t saved_flags;
 
 	*cursorp = NULL;
-	*saved_flagsp = session->flags;
 
 	conn = S2C(session);
 
-	/* On the first access, create the lookaside store and cursor. */
-	if (conn->las_cursor == NULL)
-		WT_RET(__wt_las_create(session));
-
-	__wt_spin_lock(session, &conn->las_lock);
-
+	/*
+	 * We don't want to get tapped for eviction anywhere in this process;
+	 * immediately save a copy of the current flags for error or when the
+	 * cursor is closed, and turn eviction off.
+	 */
+	saved_flags = session->flags;
 	F_SET(session, WT_SESSION_NO_EVICTION);
 
-	*cursorp = conn->las_cursor;
+	/* On the first access, create the shared lookaside store and cursor. */
+	if (conn->las_cursor == NULL)
+		WT_ERR(__wt_las_create(session));
 
-	return (0);
+	/* Eviction worker threads get their own lookaside file cursors. */
+	if (F_ISSET(session, WT_SESSION_EVICTION_WORKER)) {
+		if (session->las_cursor == NULL)
+			WT_ERR(
+			    __las_cursor_create(session, &session->las_cursor));
+
+		*cursorp = session->las_cursor;
+	} else {
+		__wt_spin_lock(session, &conn->las_lock);
+
+		*cursorp = conn->las_cursor;
+	}
+	*saved_flagsp = saved_flags;
+
+	if (0) {
+err:		session->flags = saved_flags;
+	}
+	return (ret);
 }
 
 /*
@@ -163,13 +198,19 @@ __wt_las_cursor_close(
 	if ((cursor = *cursorp) == NULL)
 		return (0);
 	*cursorp = NULL;
-	session->flags = saved_flags;
 
 	/* Reset the cursor. */
 	ret = cursor->reset(cursor);
 
-	__wt_spin_unlock(session, &conn->las_lock);
+	/* Unlock the shared cursor. */
+	if (cursor == conn->las_cursor)
+		__wt_spin_unlock(session, &conn->las_lock);
 
+	/*
+	 * We don't want to get tapped for eviction anywhere in this process;
+	 * the last thing we do is turn eviction back on.
+	 */
+	session->flags = saved_flags;
 	return (ret);
 }
 
@@ -210,26 +251,25 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	WT_CURSOR *cursor;
 	WT_DECL_ITEM(klas);
 	WT_DECL_RET;
-	uint32_t saved_flags;
-
-	cursor = NULL;
-	saved_flags = 0;		/* [-Werror=maybe-uninitialized] */
 
 	/*
-	 * If the lookaside store isn't yet open, there's no work to do.
+	 * If the lookaside file isn't yet open, there's no work to do.
 	 */
-	if (S2C(session)->las_cursor == 0)
+	if (S2C(session)->las_cursor == NULL)
 		return (0);
 
 	/*
+	 * If the sweep thread does not yet have a lookaside file cursor,
+	 * create one.
+	 */
+	if (session->las_cursor == NULL)
+		WT_RET(__las_cursor_create(session, &session->las_cursor));
+	cursor = session->las_cursor;
+
+	/*
 	 * KEITH
-	 * Currently called from the sweep thread (just as a place-holder until
-	 * we decide if the lookaside sweeper gets its own thread or not). It
-	 * could also be called by an eviction-worker thread, more reasonably,
-	 * given how tightly the lookaside file is tied to eviction.
-	 *
-	 * There's also some tuning questions: we should track the total number
-	 * of records in the lookaside file, and only sweep if there are enough
+	 * There's some tuning questions: we should track the total number of
+	 * records in the lookaside file, and only sweep if there are enough
 	 * records to make sweeping worthwhile, and only sweep part of the file
 	 * if there are too many to sweep at once. We might also want to sweep
 	 * the records in the cache more frequently, and out-of-cache records
@@ -237,8 +277,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &klas));
 
-	/* Open a lookaside table cursor and walk the file. */
-	WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
+	/* Walk the file. */
 	while ((ret = cursor->next(cursor)) == 0) {
 		WT_ERR(cursor->get_key(cursor, klas));
 
@@ -259,11 +298,12 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 			WT_ERR(__wt_buf_set(
 			    session, klas, klas->data, klas->size));
 
-		WT_ERR(cursor->remove(cursor));
+		WT_ERR_NOTFOUND_OK(cursor->remove(cursor));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
+	/* Don't leave the cursor positioned. */
+err:	WT_TRET(cursor->reset(cursor));
 
 	__wt_scr_free(session, &klas);
 	return (ret);
