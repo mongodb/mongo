@@ -153,6 +153,7 @@ struct Cloner::Fun {
                                 BSON("create" << to_collection.coll()));
                 }
                 wunit.commit();
+                collection = db->getCollection(to_collection);
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", to_collection.ns());
         }
@@ -218,6 +219,7 @@ struct Cloner::Fun {
                 msgasserted(28531, ss);
             }
 
+            verify(collection);
             ++numSeen;
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 WriteUnitOfWork wunit(txn);
@@ -415,20 +417,23 @@ bool Cloner::copyCollection(OperationContext* txn,
     if (!collList.empty()) {
         invariant(collList.size() <= 1);
         BSONObj col = collList.front();
-        options = col.getObjectField("options");
         if (col["options"].isABSONObj()) {
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                WriteUnitOfWork wunit(txn);
-                Status status = userCreateNS(txn, db, ns, options, logForRepl, 0);
-                if (!status.isOK()) {
-                    errmsg = status.toString();
-                    // aborts write unit of work
-                    return false;
-                }
-                wunit.commit();
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", ns);
+            options = col["options"].Obj();
         }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            WriteUnitOfWork wunit(txn);
+            Status status = userCreateNS(txn, db, ns, options, logForRepl, 0);
+            if (!status.isOK()) {
+                errmsg = status.toString();
+                // aborts write unit of work
+                return false;
+            }
+            wunit.commit();
+        }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", ns);
+    } else {
+        LOG(1) << "No collection info found for ns:" << nss.toString()
+               << ", host:" << _conn->getServerAddress();
     }
 
     // main data
