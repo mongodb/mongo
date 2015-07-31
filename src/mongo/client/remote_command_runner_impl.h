@@ -41,26 +41,40 @@ class NetworkConnectionHook;
 template <typename T>
 class StatusWith;
 
+/**
+ * Utility used by the network executor to run commands against a MongoDB instance. It abstracts
+ * the logic of managing connections and turns the remote instance into a stateless
+ * request-response service.
+ */
 class RemoteCommandRunnerImpl {
 public:
     RemoteCommandRunnerImpl(int messagingTags,
                             std::unique_ptr<executor::NetworkConnectionHook> hook);
-    virtual ~RemoteCommandRunnerImpl();
+    ~RemoteCommandRunnerImpl();
+
+    /**
+     * Starts up the connection pool.
+     */
+    void startup();
 
     /**
      * Closes all underlying connections. Must be called before the destructor runs.
      */
     void shutdown();
 
-    virtual StatusWith<executor::RemoteCommandResponse> runCommand(
+    /**
+     * Synchronously invokes the command described by "request" and returns the server's
+     * response or any status.
+     */
+    StatusWith<executor::RemoteCommandResponse> runCommand(
         const executor::RemoteCommandRequest& request);
 
 private:
     // The connection pool on which to send requests
     ConnectionPool _connPool;
 
-    // Whether shutdown has been called
-    bool _shutDown;
+    // True if startup has been called
+    bool _active{false};
 };
 
 }  // namespace mongo

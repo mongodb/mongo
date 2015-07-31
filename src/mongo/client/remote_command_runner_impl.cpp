@@ -220,19 +220,23 @@ Status runDownconvertedGetMoreCommand(DBClientConnection* conn,
 
 RemoteCommandRunnerImpl::RemoteCommandRunnerImpl(
     int messagingTags, std::unique_ptr<executor::NetworkConnectionHook> hook)
-    : _connPool(messagingTags, std::move(hook)), _shutDown(false) {}
+    : _connPool(messagingTags, std::move(hook)) {}
 
 RemoteCommandRunnerImpl::~RemoteCommandRunnerImpl() {
-    invariant(_shutDown);
+    invariant(!_active);
+}
+
+void RemoteCommandRunnerImpl::startup() {
+    _active = true;
 }
 
 void RemoteCommandRunnerImpl::shutdown() {
-    if (_shutDown) {
+    if (!_active) {
         return;
     }
 
-    _shutDown = true;
     _connPool.closeAllInUseConnections();
+    _active = false;
 }
 
 StatusWith<RemoteCommandResponse> RemoteCommandRunnerImpl::runCommand(

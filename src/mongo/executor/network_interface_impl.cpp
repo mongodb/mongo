@@ -88,22 +88,25 @@ std::string NetworkInterfaceImpl::getDiagnosticString() {
 }
 
 void NetworkInterfaceImpl::startup() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(!_inShutdown);
+    lk.unlock();
+
+    _commandRunner.startup();
     _pool.startup();
     fassert(27824, _pool.schedule([this]() { _processAlarms(); }));
 }
 
 void NetworkInterfaceImpl::shutdown() {
-    using std::swap;
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _inShutdown = true;
     _hasPending.notify_all();
     _newAlarmReady.notify_all();
-    _pool.shutdown();
     lk.unlock();
-    _commandRunner.shutdown();
+
+    _pool.shutdown();
     _pool.join();
+    _commandRunner.shutdown();
 }
 
 void NetworkInterfaceImpl::signalWorkAvailable() {
