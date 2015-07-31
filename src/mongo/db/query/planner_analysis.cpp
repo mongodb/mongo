@@ -467,7 +467,8 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
     // N + M items so that the skip stage can discard the first M results.
     if (lpq.getLimit()) {
         // We have a true limit. The limit can be combined with the SORT stage.
-        sort->limit = static_cast<size_t>(*lpq.getLimit()) + static_cast<size_t>(lpq.getSkip());
+        sort->limit =
+            static_cast<size_t>(*lpq.getLimit()) + static_cast<size_t>(lpq.getSkip().value_or(0));
     } else if (!lpq.isFromFindCommand() && lpq.getBatchSize()) {
         // We have an ntoreturn specified by an OP_QUERY style find. This is used
         // by clients to mean both batchSize and limit.
@@ -475,7 +476,8 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         // Overflow here would be bad and could cause a nonsense limit. Cast
         // skip and limit values to unsigned ints to make sure that the
         // sum is never stored as signed. (See SERVER-13537).
-        sort->limit = static_cast<size_t>(*lpq.getBatchSize()) + static_cast<size_t>(lpq.getSkip());
+        sort->limit = static_cast<size_t>(*lpq.getBatchSize()) +
+            static_cast<size_t>(lpq.getSkip().value_or(0));
 
         // This is a SORT with a limit. The wire protocol has a single quantity
         // called "numToReturn" which could mean either limit or batchSize.
@@ -715,9 +717,9 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
         }
     }
 
-    if (0 != lpq.getSkip()) {
+    if (lpq.getSkip()) {
         SkipNode* skip = new SkipNode();
-        skip->skip = lpq.getSkip();
+        skip->skip = *lpq.getSkip();
         skip->children.push_back(solnRoot);
         solnRoot = skip;
     }

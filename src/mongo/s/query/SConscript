@@ -29,6 +29,7 @@ env.Library(
         "router_stage_limit.cpp",
         "router_stage_merge.cpp",
         "router_stage_mock.cpp",
+        "router_stage_skip.cpp",
     ],
     LIBDEPS=[
         "async_results_merger",
@@ -39,6 +40,7 @@ env.CppUnitTest(
     target="router_exec_stage_test",
     source=[
         "router_stage_limit_test.cpp",
+        "router_stage_skip_test.cpp",
     ],
     LIBDEPS=[
         "router_exec_stage",

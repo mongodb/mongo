@@ -26,27 +26,38 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
-#include "mongo/s/query/router_exec_stage.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/s/query/router_stage_skip.h"
 
 namespace mongo {
 
-/**
- * Passes through the first n results and then returns boost::none.
- */
-class RouterStageLimit final : public RouterExecStage {
-public:
-    RouterStageLimit(std::unique_ptr<RouterExecStage> child, long long limit);
+RouterStageSkip::RouterStageSkip(std::unique_ptr<RouterExecStage> child, long long skip)
+    : RouterExecStage(std::move(child)), _skip(skip) {
+    invariant(skip > 0);
+}
 
-    StatusWith<boost::optional<BSONObj>> next() final;
+StatusWith<boost::optional<BSONObj>> RouterStageSkip::next() {
+    while (_skippedSoFar < _skip) {
+        auto next = getChildStage()->next();
+        if (!next.isOK()) {
+            return next;
+        }
 
-    void kill() final;
+        if (!next.getValue()) {
+            return next;
+        }
 
-private:
-    long long _limit;
+        ++_skippedSoFar;
+    }
 
-    long long _returnedSoFar = 0;
-};
+    return getChildStage()->next();
+}
+
+void RouterStageSkip::kill() {
+    getChildStage()->kill();
+}
 
 }  // namespace mongo

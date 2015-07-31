@@ -242,7 +242,7 @@ void IDHackStage::doInvalidate(OperationContext* txn, const RecordId& dl, Invali
 // static
 bool IDHackStage::supportsQuery(const CanonicalQuery& query) {
     return !query.getParsed().showRecordId() && query.getParsed().getHint().isEmpty() &&
-        0 == query.getParsed().getSkip() &&
+        !query.getParsed().getSkip() &&
         CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter()) &&
         !query.getParsed().isTailable();
 }

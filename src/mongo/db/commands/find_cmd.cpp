@@ -219,7 +219,7 @@ public:
 
         // Fill out curop information.
         long long ntoreturn = lpq->getBatchSize().value_or(0);
-        beginQueryOp(txn, nss, cmdObj, ntoreturn, lpq->getSkip());
+        beginQueryOp(txn, nss, cmdObj, ntoreturn, lpq->getSkip().value_or(0));
 
         // 1b) Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
         WhereCallbackReal whereCallback(txn, nss.db());

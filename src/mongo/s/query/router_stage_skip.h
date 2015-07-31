@@ -33,20 +33,20 @@
 namespace mongo {
 
 /**
- * Passes through the first n results and then returns boost::none.
+ * Skips the first n results from the child and then passes through the remaining results.
  */
-class RouterStageLimit final : public RouterExecStage {
+class RouterStageSkip final : public RouterExecStage {
 public:
-    RouterStageLimit(std::unique_ptr<RouterExecStage> child, long long limit);
+    RouterStageSkip(std::unique_ptr<RouterExecStage> child, long long skip);
 
     StatusWith<boost::optional<BSONObj>> next() final;
 
     void kill() final;
 
 private:
-    long long _limit;
+    long long _skip;
 
-    long long _returnedSoFar = 0;
+    long long _skippedSoFar = 0;
 };
 
 }  // namespace mongo

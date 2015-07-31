@@ -76,9 +76,7 @@ protected:
         params.projection = lpq->getProj();
         params.limit = lpq->getLimit();
         params.batchSize = lpq->getBatchSize();
-        if (lpq->getSkip()) {
-            params.skip = lpq->getSkip();
-        }
+        params.skip = lpq->getSkip();
 
         arm = stdx::make_unique<AsyncResultsMerger>(executor, params, remotes);
     }

@@ -34,6 +34,7 @@
 
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"
+#include "mongo/s/query/router_stage_skip.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -59,6 +60,10 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     auto leaf = stdx::make_unique<RouterStageMerge>(executor, params, remotes);
 
     std::unique_ptr<RouterExecStage> root = std::move(leaf);
+    if (params.skip) {
+        root = stdx::make_unique<RouterStageSkip>(std::move(root), *params.skip);
+    }
+
     if (params.limit) {
         root = stdx::make_unique<RouterStageLimit>(std::move(root), *params.limit);
     }

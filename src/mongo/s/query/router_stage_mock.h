@@ -38,7 +38,7 @@ namespace mongo {
 /**
  * Passes through the first n results and then returns boost::none.
  */
-class RouterStageMock : public RouterExecStage {
+class RouterStageMock final : public RouterExecStage {
 public:
     ~RouterStageMock() final {}
 

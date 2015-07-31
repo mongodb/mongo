@@ -79,12 +79,35 @@ public:
     /**
      * Constructs a LiteParseQuery object that can be used to serialize to find command
      * BSON object.
+     *
+     * Input must be fully validated (e.g. if there is a limit value, it must be non-negative).
      */
-    static StatusWith<std::unique_ptr<LiteParsedQuery>> makeAsFindCmd(
+    static std::unique_ptr<LiteParsedQuery> makeAsFindCmd(
         NamespaceString nss,
-        const BSONObj& query,
-        const BSONObj& sort,
-        boost::optional<long long> limit);
+        const BSONObj& filter = BSONObj(),
+        const BSONObj& projection = BSONObj(),
+        const BSONObj& sort = BSONObj(),
+        const BSONObj& hint = BSONObj(),
+        boost::optional<long long> skip = boost::none,
+        boost::optional<long long> limit = boost::none,
+        boost::optional<long long> batchSize = boost::none,
+        bool wantMore = true,
+        bool isExplain = false,
+        const std::string& comment = "",
+        int maxScan = 0,
+        int maxTimeMS = 0,
+        const BSONObj& min = BSONObj(),
+        const BSONObj& max = BSONObj(),
+        bool returnKey = false,
+        bool showRecordId = false,
+        bool isSnapshot = false,
+        bool hasReadPref = false,
+        bool isTailable = false,
+        bool isSlaveOk = false,
+        bool isOplogReplay = false,
+        bool isNoCursorTimeout = false,
+        bool isAwaitData = false,
+        bool isPartial = false);
 
     /**
      * Converts this LPQ into a find command.
@@ -167,7 +190,7 @@ public:
 
     static const long long kDefaultBatchSize;
 
-    long long getSkip() const {
+    boost::optional<long long> getSkip() const {
         return _skip;
     }
     boost::optional<long long> getLimit() const {
@@ -317,10 +340,18 @@ private:
     // {$hint: <String>}, where <String> is the index name hinted.
     BSONObj _hint;
 
-    long long _skip = 0;
     bool _wantMore = true;
 
+    // Must be either unset or positive. Negative skip is illegal and a skip of zero received from
+    // the client is interpreted as the absence of a skip value.
+    boost::optional<long long> _skip;
+
+    // Must be either unset or positive. Negative limit is illegal and a limit value of zero
+    // received from the client is interpreted as the absence of a limit value.
     boost::optional<long long> _limit;
+
+    // Must be either unset or non-negative. Negative batchSize is illegal but batchSize of 0 is
+    // allowed.
     boost::optional<long long> _batchSize;
 
     bool _fromCommand = false;

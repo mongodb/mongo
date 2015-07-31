@@ -134,7 +134,7 @@ Status runDownconvertedFindCommand(DBClientConnection* conn,
         query.snapshot();
     }
     int nToReturn = lpq->getLimit().value_or(0) * -1;
-    int nToSkip = lpq->getSkip();
+    int nToSkip = lpq->getSkip().value_or(0);
     const BSONObj* fieldsToReturn = &lpq->getProj();
     int queryOptions = lpq->getOptions();
     int batchSize = lpq->getBatchSize().value_or(0);

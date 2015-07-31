@@ -41,13 +41,11 @@ namespace mongo {
  * merged documents manipulated by the MergerPlanStage pipeline. Used to present a stream of
  * documents merged from the shards to the stages later in the pipeline.
  */
-class RouterStageMerge : public RouterExecStage {
+class RouterStageMerge final : public RouterExecStage {
 public:
     RouterStageMerge(executor::TaskExecutor* executor,
                      const ClusterClientCursorParams& params,
                      const std::vector<HostAndPort>& remotes);
-
-    ~RouterStageMerge() final = default;
 
     StatusWith<boost::optional<BSONObj>> next() final;
 

@@ -169,7 +169,10 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                 return Status(ErrorCodes::BadValue, "skip value must be non-negative");
             }
 
-            pq->_skip = skip;
+            // A skip value of 0 means that there is no skip.
+            if (skip) {
+                pq->_skip = skip;
+            }
         } else if (str::equals(fieldName, kLimitField)) {
             if (!el.isNumber()) {
                 str::stream ss;
@@ -179,11 +182,14 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             long long limit = el.numberLong();
-            if (limit <= 0) {
-                return Status(ErrorCodes::BadValue, "limit value must be positive");
+            if (limit < 0) {
+                return Status(ErrorCodes::BadValue, "limit value must be non-negative");
             }
 
-            pq->_limit = limit;
+            // A limit value of 0 means that there is no limit.
+            if (limit) {
+                pq->_limit = limit;
+            }
         } else if (str::equals(fieldName, kBatchSizeField)) {
             if (!el.isNumber()) {
                 str::stream ss;
@@ -391,31 +397,63 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsOpQuery(Namespace
 }
 
 // static
-StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeAsFindCmd(
+std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     NamespaceString nss,
-    const BSONObj& query,
+    const BSONObj& filter,
+    const BSONObj& projection,
     const BSONObj& sort,
-    boost::optional<long long> limit) {
+    const BSONObj& hint,
+    boost::optional<long long> skip,
+    boost::optional<long long> limit,
+    boost::optional<long long> batchSize,
+    bool wantMore,
+    bool isExplain,
+    const std::string& comment,
+    int maxScan,
+    int maxTimeMS,
+    const BSONObj& min,
+    const BSONObj& max,
+    bool returnKey,
+    bool showRecordId,
+    bool isSnapshot,
+    bool hasReadPref,
+    bool isTailable,
+    bool isSlaveOk,
+    bool isOplogReplay,
+    bool isNoCursorTimeout,
+    bool isAwaitData,
+    bool isPartial) {
     unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
-
     pq->_fromCommand = true;
-    pq->_filter = query.getOwned();
-    pq->_sort = sort.getOwned();
 
-    if (limit) {
-        if (*limit <= 0) {
-            return Status(ErrorCodes::BadValue, "limit value must be positive");
-        }
+    pq->_filter = filter;
+    pq->_proj = projection;
+    pq->_sort = sort;
+    pq->_hint = hint;
 
-        pq->_limit = std::move(limit);
-    }
+    pq->_skip = skip;
+    pq->_limit = limit;
+    pq->_batchSize = batchSize;
+    pq->_wantMore = wantMore;
 
-    pq->addMetaProjection();
+    pq->_explain = isExplain;
+    pq->_comment = comment;
+    pq->_maxScan = maxScan;
+    pq->_maxTimeMS = maxTimeMS;
 
-    Status validateStatus = pq->validateFindCmd();
-    if (!validateStatus.isOK()) {
-        return validateStatus;
-    }
+    pq->_min = min;
+    pq->_max = max;
+
+    pq->_returnKey = returnKey;
+    pq->_showRecordId = showRecordId;
+    pq->_snapshot = isSnapshot;
+    pq->_hasReadPref = hasReadPref;
+    pq->_tailable = isTailable;
+    pq->_slaveOk = isSlaveOk;
+    pq->_oplogReplay = isOplogReplay;
+    pq->_noCursorTimeout = isNoCursorTimeout;
+    pq->_awaitData = isAwaitData;
+    pq->_partial = isPartial;
 
     return std::move(pq);
 }
@@ -441,8 +479,8 @@ BSONObj LiteParsedQuery::asFindCommand() const {
         bob.append(kHintField, _hint);
     }
 
-    if (_skip > 0) {
-        bob.append(kSkipField, _skip);
+    if (_skip) {
+        bob.append(kSkipField, *_skip);
     }
 
     if (_limit) {
@@ -727,8 +765,11 @@ Status LiteParsedQuery::init(int ntoskip,
                              const BSONObj& queryObj,
                              const BSONObj& proj,
                              bool fromQueryMessage) {
-    _skip = ntoskip;
     _proj = proj.getOwned();
+
+    if (ntoskip) {
+        _skip = ntoskip;
+    }
 
     if (ntoreturn) {
         _batchSize = ntoreturn;
@@ -737,7 +778,7 @@ Status LiteParsedQuery::init(int ntoskip,
     // Initialize flags passed as 'queryOptions' bit vector.
     initFromInt(queryOptions);
 
-    if (_skip < 0) {
+    if (_skip && *_skip < 0) {
         return Status(ErrorCodes::BadValue, "bad skip value in query");
     }
 

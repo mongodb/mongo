@@ -47,6 +47,48 @@
 
 namespace mongo {
 
+namespace {
+
+/**
+ * Given the LiteParsedQuery 'lpq' being executed by mongos, returns a copy of the query which is
+ * suitable for forwarding to the targeted hosts.
+ */
+std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& lpq) {
+    // If there is a limit, we forward the sum of the limit and the skip.
+    boost::optional<long long> newLimit;
+    if (lpq.getLimit()) {
+        newLimit = *lpq.getLimit() + lpq.getSkip().value_or(0);
+    }
+
+    return LiteParsedQuery::makeAsFindCmd(lpq.nss(),
+                                          lpq.getFilter(),
+                                          lpq.getProj(),
+                                          lpq.getSort(),
+                                          lpq.getHint(),
+                                          boost::none,  // Don't forward skip.
+                                          newLimit,
+                                          lpq.getBatchSize(),
+                                          lpq.wantMore(),
+                                          lpq.isExplain(),
+                                          lpq.getComment(),
+                                          lpq.getMaxScan(),
+                                          lpq.getMaxTimeMS(),
+                                          lpq.getMin(),
+                                          lpq.getMax(),
+                                          lpq.returnKey(),
+                                          lpq.showRecordId(),
+                                          lpq.isSnapshot(),
+                                          lpq.hasReadPref(),
+                                          lpq.isTailable(),
+                                          lpq.isSlaveOk(),
+                                          lpq.isOplogReplay(),
+                                          lpq.isNoCursorTimeout(),
+                                          lpq.isAwaitData(),
+                                          lpq.isPartial());
+}
+
+}  // namespace
+
 StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                                            const CanonicalQuery& query,
                                            const ReadPreferenceSetting& readPref,
@@ -89,11 +131,13 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
         remotes.emplace_back(std::move(hostAndPort.getValue()));
     }
 
-    // TODO: handle other query options (skip and projection).
+    // TODO: handle other query options (projection).
     ClusterClientCursorParams params(query.nss());
-    params.cmdObj = query.getParsed().asFindCommand();
     params.sort = query.getParsed().getSort();
-    params.limit = query.getParsed().getLimit();
+    params.skip = query.getParsed().getSkip();
+
+    const auto lpqToForward = transformQueryForShards(query.getParsed());
+    params.cmdObj = lpqToForward->asFindCommand();
 
     ClusterClientCursorImpl ccc(shardRegistry->getExecutor(), params, remotes);
 
