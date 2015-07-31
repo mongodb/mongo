@@ -237,6 +237,15 @@ void MozJSProxyScope::kill() {
  * Idle -> ProxyRequest -> ImplResponse -> Idle
  */
 void MozJSProxyScope::runOnImplThread(std::function<void()> f) {
+    // We can end up calling functions on the proxy scope from the impl thread
+    // when callbacks from javascript have a handle to the proxy scope and call
+    // methods on it from there. If we're on the same thread, it's safe to
+    // simply call back in, so let's do that.
+
+    if (_thread.get_id() == std::this_thread::get_id()) {
+        return f();
+    }
+
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _function = std::move(f);
 

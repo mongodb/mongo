@@ -2156,6 +2156,25 @@ public:
     }
 };
 
+class RecursiveInvoke {
+public:
+    static BSONObj callback(const BSONObj& args, void* data) {
+        auto scope = static_cast<Scope*>(data);
+
+        scope->invoke("x = 10;", 0, 0);
+
+        return BSONObj();
+    }
+
+    void run() {
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
+
+        s->injectNative("foo", callback, s.get());
+        s->invoke("var x = 1; foo();", 0, 0);
+        ASSERT_EQUALS(s->getNumberInt("x"), 10);
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("js") {
@@ -2205,6 +2224,8 @@ public:
         add<InvalidStoredJS>();
 
         add<NoReturnSpecified>();
+
+        add<RecursiveInvoke>();
 
         add<RoundTripTests::DBRefTest>();
         add<RoundTripTests::DBPointerTest>();
