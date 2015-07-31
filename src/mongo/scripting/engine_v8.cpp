@@ -1321,7 +1321,7 @@ void V8Scope::installBSONTypes() {
     injectV8Function("BinData", BinDataFT(), _global);
     injectV8Function("NumberLong", NumberLongFT(), _global);
     injectV8Function("NumberInt", NumberIntFT(), _global);
-    if (experimentalDecimalSupport) {
+    if (Decimal128::enabled) {
         injectV8Function("NumberDecimal", NumberDecimalFT(), _global);
     }
     injectV8Function("Timestamp", TimestampFT(), _global);

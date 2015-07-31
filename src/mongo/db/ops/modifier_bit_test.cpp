@@ -37,11 +37,13 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/log_builder.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
 using mongo::BSONObj;
+using mongo::Decimal128;
 using mongo::LogBuilder;
 using mongo::ModifierBit;
 using mongo::ModifierInterface;
@@ -116,6 +118,13 @@ TEST(Init, FailToInitWithInvalidValue) {
     modObj = fromjson("{ $bit : { a : { or : 1.0 } } }");
     ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
                            ModifierInterface::Options::normal()));
+
+    if (mongo::Decimal128::enabled) {
+        // The argument to the sub-operator must be integral
+        modObj = fromjson("{ $bit : { a : { or : NumberDecimal(\"1.0\") } } }");
+        ASSERT_NOT_OK(mod.init(modObj["$bit"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
+    }
 }
 
 TEST(Init, ParsesAndInt) {

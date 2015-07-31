@@ -1450,7 +1450,7 @@ bool Element::isNumeric() const {
     const ElementRep& thisRep = impl.getElementRep(_repIdx);
     const BSONType type = impl.getType(thisRep);
     return ((type == mongo::NumberLong) || (type == mongo::NumberInt) ||
-            (type == mongo::NumberDouble));
+            (type == mongo::NumberDouble) || (type == mongo::NumberDecimal));
 }
 
 bool Element::isIntegral() const {
@@ -1478,6 +1478,8 @@ SafeNum Element::getValueSafeNum() const {
             return static_cast<long long int>(getValueLong());
         case mongo::NumberDouble:
             return getValueDouble();
+        case mongo::NumberDecimal:
+            return getValueDecimal();
         default:
             return SafeNum();
     }
@@ -1845,6 +1847,15 @@ Status Element::setValueLong(const int64_t value) {
     return setValue(newValue._repIdx);
 }
 
+Status Element::setValueDecimal(const Decimal128 value) {
+    verify(ok());
+    Document::Impl& impl = getDocument().getImpl();
+    ElementRep thisRep = impl.getElementRep(_repIdx);
+    const StringData fieldName = impl.getFieldNameForNewElement(thisRep);
+    Element newValue = getDocument().makeElementDecimal(fieldName, value);
+    return setValue(newValue._repIdx);
+}
+
 Status Element::setValueMinKey() {
     verify(ok());
     Document::Impl& impl = getDocument().getImpl();
@@ -1888,6 +1899,8 @@ Status Element::setValueSafeNum(const SafeNum value) {
             return setValueLong(value._value.int64Val);
         case mongo::NumberDouble:
             return setValueDouble(value._value.doubleVal);
+        case mongo::NumberDecimal:
+            return setValueDecimal(value._value.decimalVal);
         default:
             return Status(ErrorCodes::UnsupportedFormat,
                           "Don't know how to handle unexpected SafeNum type");
@@ -2444,6 +2457,16 @@ Element Document::makeElementLong(StringData fieldName, const int64_t value) {
     return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
 }
 
+Element Document::makeElementDecimal(StringData fieldName, const Decimal128 value) {
+    Impl& impl = getImpl();
+    dassert(impl.doesNotAlias(fieldName));
+
+    BSONObjBuilder& builder = impl.leafBuilder();
+    const int leafRef = builder.len();
+    builder.append(fieldName, value);
+    return Element(this, impl.insertLeafElement(leafRef, fieldName.size() + 1));
+}
+
 Element Document::makeElementMinKey(StringData fieldName) {
     Impl& impl = getImpl();
     dassert(impl.doesNotAlias(fieldName));
@@ -2516,6 +2539,8 @@ Element Document::makeElementSafeNum(StringData fieldName, SafeNum value) {
             return makeElementLong(fieldName, value._value.int64Val);
         case mongo::NumberDouble:
             return makeElementDouble(fieldName, value._value.doubleVal);
+        case mongo::NumberDecimal:
+            return makeElementDecimal(fieldName, value._value.decimalVal);
         default:
             // Return an invalid element to indicate that we failed.
             return end();

@@ -43,7 +43,8 @@ class Document;
  * SafeNum holds and does arithmetic on a number in a safe way, handling overflow
  * and casting for the user. 32-bit integers will overflow into 64-bit integers. But
  * 64-bit integers will NOT overflow to doubles. Also, this class does NOT
- * downcast. This class should be as conservative as possible about upcasting, but
+ * downcast. Doubles will NOT overflow to decimal, but mixed type arithmetic with a decimal
+ * will. This class should be as conservative as possible about upcasting, but
  * should never lose precision.
  *
  * This class does not throw any exceptions, so the user should call type() before
@@ -82,6 +83,7 @@ public:
     SafeNum(int num);
     SafeNum(long long int num);
     SafeNum(double num);
+    SafeNum(Decimal128 num);
     // TODO: add Paul's mutablebson::Element ctor
 
     //
@@ -90,8 +92,9 @@ public:
 
     /**
      * Returns true if the numeric quantity of 'rhs' and 'this' are the same. That is,
-     * an int32(10), an int64(10), and a double(10) are equivalent. An EOO-typed safe
-     * num is equivalent only to another EOO-typed instance. Otherwise, returns false.
+     * an int32(10), an int64(10), a double(10), and a decimal(10) are equivalent. An
+     * EOO-typed safe num is equivalent only to another EOO-typed instance. Otherwise,
+     * returns false.
      */
     bool isEquivalent(const SafeNum& rhs) const;
     bool operator==(const SafeNum& rhs) const;
@@ -124,8 +127,8 @@ public:
 
     //
     // logical operation support. Note that these operations are only supported for
-    // integral types. Attempts to apply with either side holding a double value
-    // will result in an EOO typed safenum.
+    // integral types. Attempts to apply with either side holding a double or decimal
+    // value will result in an EOO typed safenum.
     //
 
     // Bitwise 'and' support
@@ -170,7 +173,7 @@ public:
     static const long long maxIntInDouble = 9007199254740992LL;  // 2^53
 
 private:
-    // One of the following: NumberInt, NumberLong, NumberDouble, or EOO.
+    // One of the following: NumberInt, NumberLong, NumberDouble, NumberDecimal, or EOO.
     BSONType _type;
 
     // Value of the safe num. Indeterminate if _type is EOO.
@@ -178,6 +181,7 @@ private:
         int int32Val;
         long long int int64Val;
         double doubleVal;
+        Decimal128::Value decimalVal;
     } _value;
 
     /**
@@ -211,7 +215,7 @@ private:
 
     /**
      * Extracts the value of 'snum' in a long format. It assumes 'snum' is an NumberInt
-     * or a NumberDouble.
+     * or a NumberLong.
      */
     static long long getLongLong(const SafeNum& snum);
 
@@ -220,6 +224,13 @@ private:
      * SafeNum, i.e., that _type is not EOO.
      */
     static double getDouble(const SafeNum& snum);
+
+    /**
+     * Extracts the value of 'snum' in a Decimal128 format.  It assumes 'snum' is an
+     * NumberInt, NumberDouble, or NumberLong.  Integral values are converted exactly.
+     * NumberDouble is converted to 15 digits of precision, as defined in Decimal128.
+     */
+    static Decimal128 getDecimal(const SafeNum& snum);
 };
 
 // Convenience method for unittest code. Please use accessors otherwise.

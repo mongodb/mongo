@@ -53,6 +53,10 @@ inline SafeNum::SafeNum(double num) : _type(NumberDouble) {
     _value.doubleVal = num;
 }
 
+inline SafeNum::SafeNum(Decimal128 num) : _type(NumberDecimal) {
+    _value.decimalVal = num.getValue();
+}
+
 inline bool SafeNum::operator==(const SafeNum& rhs) const {
     return isEquivalent(rhs);
 }

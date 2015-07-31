@@ -416,6 +416,7 @@ const std::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMa
     {"int", NumberInt},
     {"timestamp", bsonTimestamp},
     {"long", NumberLong},
+    {"decimal", NumberDecimal},
     {"maxKey", MaxKey},
     {"minKey", MinKey}};
 

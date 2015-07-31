@@ -377,6 +377,9 @@ public:
     /** Create a new long integer Element with the given value and field name. */
     Element makeElementLong(StringData fieldName, int64_t value);
 
+    /** Create a new dec128 Element with the given value and field name. */
+    Element makeElementDecimal(StringData fieldName, Decimal128 value);
+
     /** Create a new min key Element with the given field name. */
     Element makeElementMinKey(StringData fieldName);
 

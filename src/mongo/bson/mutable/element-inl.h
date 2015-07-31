@@ -101,6 +101,11 @@ inline int64_t Element::getValueLong() const {
     return getValue()._numberLong();
 }
 
+inline Decimal128 Element::getValueDecimal() const {
+    dassert(hasValue() && isType(mongo::NumberDecimal));
+    return getValue()._numberDecimal();
+}
+
 inline bool Element::isValueMinKey() const {
     return isType(mongo::MinKey);
 }

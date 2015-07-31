@@ -306,6 +306,4 @@ private:
     Value _value;
 };
 
-std::ostream& operator<<(std::ostream& stream, const Decimal128& value);
-
 }  // namespace mongo

@@ -148,6 +148,10 @@ inline int64_t ConstElement::getValueLong() const {
     return _basis.getValueLong();
 }
 
+inline Decimal128 ConstElement::getValueDecimal() const {
+    return _basis.getValueDecimal();
+}
+
 inline bool ConstElement::isValueMinKey() const {
     return _basis.isValueMinKey();
 }
