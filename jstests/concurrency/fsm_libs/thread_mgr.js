@@ -20,8 +20,10 @@ var ThreadManager = function(clusterOptions, executionMode) {
             try {
                 return threadFn(workloads, args, options);
             } finally {
-                db = null;
-                gc();
+                if (typeof db !== 'undefined') {
+                    db = null;
+                    gc();
+                }
             }
         };
 
