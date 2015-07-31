@@ -55,6 +55,14 @@ void setJSException(JSContext* cx, ErrorCodes::Error code, StringData sd);
 Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, StringData altReason);
 
 /**
+ * Converts a JSErrorReport to status
+ */
+Status JSErrorReportToStatus(JSContext* cx,
+                             JSErrorReport* report,
+                             ErrorCodes::Error altCode,
+                             StringData altReason);
+
+/**
  * Turns the current JS exception into a C++ exception
  *
  * The altCode and altReason are used if no JS exception is pending

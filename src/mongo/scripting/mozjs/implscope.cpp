@@ -114,10 +114,9 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
             ss << " :\n" << ValueWriter(cx, stack).toString();
         }
 
-        scope->_status =
-            Status(report->errorNumber ? static_cast<ErrorCodes::Error>(report->errorNumber)
-                                       : ErrorCodes::JSInterpreterFailure,
-                   ss);
+        scope->_status = Status(
+            JSErrorReportToStatus(cx, report, ErrorCodes::JSInterpreterFailure, message).code(),
+            ss);
     }
 }
 

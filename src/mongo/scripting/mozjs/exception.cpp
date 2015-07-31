@@ -31,6 +31,7 @@
 #include "mongo/scripting/mozjs/exception.h"
 
 #include <jsfriendapi.h>
+#include <limits>
 
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/util/assert_util.h"
@@ -50,6 +51,9 @@ const JSErrorFormatString* uncatchableErrorCallback(void* data, const unsigned c
     return &kUncatchableErrorFormatString;
 }
 
+static_assert(std::numeric_limits<std::uint32_t>::max() - JSErr_Limit > ErrorCodes::MaxError,
+              "Not enough space in an unsigned int for Mongo ErrorCodes and JSErrorNumbers");
+
 }  // namespace
 
 void mongoToJSException(JSContext* cx) {
@@ -58,14 +62,15 @@ void mongoToJSException(JSContext* cx) {
     auto callback =
         status.code() == ErrorCodes::JSUncatchableError ? uncatchableErrorCallback : errorCallback;
 
-    JS_ReportErrorNumber(cx, callback, nullptr, status.code(), status.reason().c_str());
+    JS_ReportErrorNumber(
+        cx, callback, nullptr, JSErr_Limit + status.code(), status.reason().c_str());
 }
 
 void setJSException(JSContext* cx, ErrorCodes::Error code, StringData sd) {
     auto callback =
         code == ErrorCodes::JSUncatchableError ? uncatchableErrorCallback : errorCallback;
 
-    JS_ReportErrorNumber(cx, callback, nullptr, code, sd.rawData());
+    JS_ReportErrorNumber(cx, callback, nullptr, JSErr_Limit + code, sd.rawData());
 }
 
 Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {
@@ -78,17 +83,28 @@ Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, Stri
     if (!report)
         return Status(altCode, altReason.rawData());
 
+    return JSErrorReportToStatus(cx, report, altCode, altReason);
+}
+
+Status JSErrorReportToStatus(JSContext* cx,
+                             JSErrorReport* report,
+                             ErrorCodes::Error altCode,
+                             StringData altReason) {
     JSStringWrapper jsstr(cx, js::ErrorReportToString(cx, report));
     if (!jsstr)
         return Status(altCode, altReason.rawData());
 
-    /**
-     * errorNumber is only set by library consumers of MozJS, and then only via
-     * JS_ReportErrorNumber, so all of the codes we see here are ours.
-     */
-    return Status(report->errorNumber ? static_cast<ErrorCodes::Error>(report->errorNumber)
-                                      : altCode,
-                  jsstr.toStringData().toString());
+    ErrorCodes::Error error = altCode;
+
+    if (report->errorNumber) {
+        if (report->errorNumber < JSErr_Limit) {
+            error = ErrorCodes::JSInterpreterFailure;
+        } else {
+            error = static_cast<ErrorCodes::Error>(report->errorNumber - JSErr_Limit);
+        }
+    }
+
+    return Status(error, jsstr.toStringData().toString());
 }
 
 void throwCurrentJSException(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {

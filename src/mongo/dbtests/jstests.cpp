@@ -2175,6 +2175,43 @@ public:
     }
 };
 
+class ErrorCodeFromInvoke {
+public:
+    void run() {
+        unique_ptr<Scope> s(globalScriptEngine->newScope());
+
+        {
+            bool threwException = false;
+            try {
+                s->invoke("\"use strict\"; x = 10;", 0, 0);
+            } catch (...) {
+                threwException = true;
+
+                auto status = exceptionToStatus();
+
+                ASSERT_EQUALS(status.code(), ErrorCodes::JSInterpreterFailure);
+            }
+
+            ASSERT(threwException);
+        }
+
+        {
+            bool threwException = false;
+            try {
+                s->invoke("UUID(1,2,3,4,5);", 0, 0);
+            } catch (...) {
+                threwException = true;
+
+                auto status = exceptionToStatus();
+
+                ASSERT_EQUALS(status.code(), ErrorCodes::BadValue);
+            }
+
+            ASSERT(threwException);
+        }
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("js") {
@@ -2226,6 +2263,7 @@ public:
         add<NoReturnSpecified>();
 
         add<RecursiveInvoke>();
+        add<ErrorCodeFromInvoke>();
 
         add<RoundTripTests::DBRefTest>();
         add<RoundTripTests::DBPointerTest>();
