@@ -149,6 +149,7 @@ struct Cloner::Fun {
                 Status s = userCreateNS(txn, db, to_collection.toString(), from_options, false);
                 verify(s.isOK());
                 wunit.commit();
+                collection = db->getCollection(to_collection);
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", to_collection.ns());
         }
@@ -214,6 +215,7 @@ struct Cloner::Fun {
                 msgasserted(28531, ss);
             }
 
+            dassert(collection);
             ++numSeen;
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 if (_mayBeInterrupted) {
@@ -407,21 +409,24 @@ bool Cloner::copyCollection(OperationContext* txn,
         BSONObj col = collList.front();
         if (col["options"].isABSONObj()) {
             options = col["options"].Obj();
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                if (mayBeInterrupted)
-                    txn->checkForInterrupt();
-
-                WriteUnitOfWork wunit(txn);
-                Status status = userCreateNS(txn, db, ns, options, false);
-                if (!status.isOK()) {
-                    errmsg = status.toString();
-                    // abort write unit of work
-                    return false;
-                }
-                wunit.commit();
-            }
-            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", ns);
         }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            if (mayBeInterrupted)
+                txn->checkForInterrupt();
+
+            WriteUnitOfWork wunit(txn);
+            Status status = userCreateNS(txn, db, ns, options, false);
+            if (!status.isOK()) {
+                errmsg = status.toString();
+                // abort write unit of work
+                return false;
+            }
+            wunit.commit();
+        }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", ns);
+    } else {
+        LOG(1) << "No collection info found for ns:" << nss.toString()
+               << ", host:" << _conn->getServerAddress();
     }
 
     // main data
