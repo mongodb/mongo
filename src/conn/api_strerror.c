@@ -13,7 +13,7 @@
 
 /*
  * __wt_wiredtiger_error --
- *	Return a constant string for WiredTiger POSIX-standard and errors.
+ *	Return a constant string for POSIX-standard and WiredTiger errors.
  */
 const char *
 __wt_wiredtiger_error(int error)
@@ -41,8 +41,8 @@ __wt_wiredtiger_error(int error)
 	}
 
 	/*
-	 * POSIX errors are non-negative integers; check for 0 explicitly
-	 * in-case the underlying strerror doesn't handle 0, some don't.
+	 * POSIX errors are non-negative integers; check for 0 explicitly incase
+	 * the underlying strerror doesn't handle 0, some historically didn't.
 	 */
 	if (error == 0)
 		return ("Successful return: 0");

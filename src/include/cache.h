@@ -28,8 +28,8 @@
  *	Encapsulation of an eviction candidate.
  */
 struct __wt_evict_entry {
-	WT_BTREE *btree;			/* Enclosing btree object */
-	WT_REF	 *ref;				/* Page to flush/evict */
+	WT_BTREE *btree;		/* Enclosing btree object */
+	WT_REF	 *ref;			/* Page to flush/evict */
 };
 
 /*
@@ -65,12 +65,17 @@ struct __wt_cache {
 	uint64_t pages_dirty;
 	uint64_t bytes_read;		/* Bytes read into memory */
 
+	uint64_t app_evicts;		/* Pages evicted by user threads */
+	uint64_t app_waits;		/* User threads waited for cache */
+
 	uint64_t evict_max_page_size;	/* Largest page seen at eviction */
 
 	/*
 	 * Read information.
 	 */
 	uint64_t   read_gen;		/* Page read generation (LRU) */
+	uint64_t   read_gen_oldest;	/* The oldest read generation that
+					   eviction knows about */
 
 	/*
 	 * Eviction thread information.
@@ -84,6 +89,7 @@ struct __wt_cache {
 	u_int eviction_trigger;		/* Percent to trigger eviction */
 	u_int eviction_target;		/* Percent to end eviction */
 	u_int eviction_dirty_target;    /* Percent to allow dirty */
+	u_int eviction_dirty_trigger;	/* Percent to trigger dirty eviction */
 
 	u_int overhead_pct;	        /* Cache percent adjustment */
 
@@ -100,20 +106,17 @@ struct __wt_cache {
 		*evict_file_next;	/* LRU next file to search */
 
 	/*
-	 * Sync/flush request information.
-	 */
-	volatile uint64_t sync_request;	/* File sync requests */
-	volatile uint64_t sync_complete;/* File sync requests completed */
-
-	/*
 	 * Cache pool information.
 	 */
-	uint64_t cp_saved_read;		/* Read count from last pass */
-	uint64_t cp_current_read;	/* Read count from current pass */
-	uint32_t cp_skip_count;		/* Post change stabilization */
+	uint64_t cp_pass_pressure;	/* Calculated pressure from this pass */
 	uint64_t cp_reserved;		/* Base size for this cache */
 	WT_SESSION_IMPL *cp_session;	/* May be used for cache management */
+	uint32_t cp_skip_count;		/* Post change stabilization */
 	wt_thread_t cp_tid;		/* Thread ID for cache pool manager */
+	/* State seen at the last pass of the shared cache manager */
+	uint64_t cp_saved_app_evicts;	/* User eviction count at last review */
+	uint64_t cp_saved_app_waits;	/* User wait count at last review */
+	uint64_t cp_saved_read;		/* Read count at last review */
 
 	/*
 	 * Flags.

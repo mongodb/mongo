@@ -54,7 +54,7 @@ wts_ops(int lastrun)
 	TINFO *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	pthread_t backup_tid, compact_tid;
+	pthread_t backup_tid, compact_tid, lrt_tid;
 	int64_t fourths, thread_ops;
 	uint32_t i;
 	int ret, running;
@@ -114,13 +114,19 @@ wts_ops(int lastrun)
 			die(ret, "pthread_create");
 	}
 
-	/* If a multi-threaded run, start backup and compaction threads. */
+	/*
+	 * If a multi-threaded run, start optional backup, compaction and
+	 * long-running reader threads.
+	 */
 	if (g.c_backups &&
 	    (ret = pthread_create(&backup_tid, NULL, backup, NULL)) != 0)
 		die(ret, "pthread_create: backup");
 	if (g.c_compact &&
 	    (ret = pthread_create(&compact_tid, NULL, compact, NULL)) != 0)
 		die(ret, "pthread_create: compaction");
+	if (!SINGLETHREADED && g.c_long_running_txn &&
+	    (ret = pthread_create(&lrt_tid, NULL, lrt, NULL)) != 0)
+		die(ret, "pthread_create: long-running reader");
 
 	/* Spin on the threads, calculating the totals. */
 	for (;;) {
@@ -174,12 +180,14 @@ wts_ops(int lastrun)
 	}
 	free(tinfo);
 
-	/* Wait for the backup, compaction thread. */
+	/* Wait for the backup, compaction, long-running reader threads. */
 	g.workers_finished = 1;
 	if (g.c_backups)
 		(void)pthread_join(backup_tid, NULL);
 	if (g.c_compact)
 		(void)pthread_join(compact_tid, NULL);
+	if (!SINGLETHREADED && g.c_long_running_txn)
+		(void)pthread_join(lrt_tid, NULL);
 
 	if (g.logging != 0) {
 		(void)g.wt_api->msg_printf(g.wt_api, session,
@@ -194,7 +202,7 @@ wts_ops(int lastrun)
  *	Return the current session configuration.
  */
 static const char *
-ops_session_config(uint32_t *rnd)
+ops_session_config(WT_RAND_STATE *rnd)
 {
 	u_int v;
 
@@ -232,7 +240,7 @@ ops(void *arg)
 	tinfo = arg;
 
 	/* Initialize the per-thread random number generator. */
-	__wt_random_init(tinfo->rnd);
+	__wt_random_init(&tinfo->rnd);
 
 	conn = g.wts_conn;
 	keybuf = valbuf = NULL;
@@ -240,7 +248,7 @@ ops(void *arg)
 
 	/* Set up the default key and value buffers. */
 	key_gen_setup(&keybuf);
-	val_gen_setup(tinfo->rnd, &valbuf);
+	val_gen_setup(&tinfo->rnd, &valbuf);
 
 	/* Set the first operation where we'll create sessions and cursors. */
 	session_op = 0;
@@ -248,7 +256,7 @@ ops(void *arg)
 	cursor = cursor_insert = NULL;
 
 	/* Set the first operation where we'll perform checkpoint operations. */
-	ckpt_op = g.c_checkpoints ? mmrand(tinfo->rnd, 100, 10000) : 0;
+	ckpt_op = g.c_checkpoints ? mmrand(&tinfo->rnd, 100, 10000) : 0;
 	ckpt_available = 0;
 
 	for (intxn = 0; !tinfo->quit; ++tinfo->ops) {
@@ -273,7 +281,7 @@ ops(void *arg)
 				die(ret, "session.close");
 
 			if ((ret = conn->open_session(conn, NULL,
-			    ops_session_config(tinfo->rnd), &session)) != 0)
+			    ops_session_config(&tinfo->rnd), &session)) != 0)
 				die(ret, "connection.open_session");
 
 			/*
@@ -288,7 +296,7 @@ ops(void *arg)
 			 * checkpoints.
 			 */
 			if (!SINGLETHREADED && !DATASOURCE("lsm") &&
-			    ckpt_available && mmrand(tinfo->rnd, 1, 10) == 1) {
+			    ckpt_available && mmrand(&tinfo->rnd, 1, 10) == 1) {
 				if ((ret = session->open_cursor(session,
 				    g.uri, NULL, ckpt_name, &cursor)) != 0)
 					die(ret, "session.open_cursor");
@@ -321,7 +329,7 @@ ops(void *arg)
 					die(ret, "session.open_cursor");
 
 				/* Pick the next session/cursor close/open. */
-				session_op += mmrand(tinfo->rnd, 100, 5000);
+				session_op += mmrand(&tinfo->rnd, 100, 5000);
 
 				/* Updates supported. */
 				readonly = 0;
@@ -338,7 +346,7 @@ ops(void *arg)
 			 */
 			if (DATASOURCE("helium") || DATASOURCE("kvsbdb") ||
 			    DATASOURCE("lsm") ||
-			    readonly || mmrand(tinfo->rnd, 1, 5) == 1)
+			    readonly || mmrand(&tinfo->rnd, 1, 5) == 1)
 				ckpt_config = NULL;
 			else {
 				(void)snprintf(ckpt_name, sizeof(ckpt_name),
@@ -373,7 +381,7 @@ ops(void *arg)
 			ckpt_available = 1;
 
 			/* Pick the next checkpoint operation. */
-			ckpt_op += mmrand(tinfo->rnd, 5000, 20000);
+			ckpt_op += mmrand(&tinfo->rnd, 5000, 20000);
 		}
 
 		/*
@@ -381,7 +389,7 @@ ops(void *arg)
 		 * start a transaction 20% of the time.
 		 */
 		if (!SINGLETHREADED &&
-		    !intxn && mmrand(tinfo->rnd, 1, 10) >= 8) {
+		    !intxn && mmrand(&tinfo->rnd, 1, 10) >= 8) {
 			if ((ret =
 			    session->begin_transaction(session, NULL)) != 0)
 				die(ret, "session.begin_transaction");
@@ -390,7 +398,7 @@ ops(void *arg)
 
 		insert = notfound = 0;
 
-		keyno = mmrand(tinfo->rnd, 1, (u_int)g.rows);
+		keyno = mmrand(&tinfo->rnd, 1, (u_int)g.rows);
 		key.data = keybuf;
 		value.data = valbuf;
 
@@ -401,7 +409,7 @@ ops(void *arg)
 		 * of deletes will mean fewer inserts and writes.  Modifications
 		 * are always followed by a read to confirm it worked.
 		 */
-		op = readonly ? UINT32_MAX : mmrand(tinfo->rnd, 1, 100);
+		op = readonly ? UINT32_MAX : mmrand(&tinfo->rnd, 1, 100);
 		if (op < g.c_delete_pct) {
 			++tinfo->remove;
 			switch (g.type) {
@@ -479,8 +487,8 @@ skip_insert:			if (col_update(tinfo,
 		 * a random direction.
 		 */
 		if (!insert) {
-			dir = (int)mmrand(tinfo->rnd, 0, 1);
-			for (np = 0; np < mmrand(tinfo->rnd, 1, 8); ++np) {
+			dir = (int)mmrand(&tinfo->rnd, 0, 1);
+			for (np = 0; np < mmrand(&tinfo->rnd, 1, 8); ++np) {
 				if (notfound)
 					break;
 				if (nextprev(cursor, dir, &notfound))
@@ -502,7 +510,7 @@ skip_insert:			if (col_update(tinfo,
 		 * rollback 10% of the time.
 		 */
 		if (intxn)
-			switch (mmrand(tinfo->rnd, 1, 10)) {
+			switch (mmrand(&tinfo->rnd, 1, 10)) {
 			case 1: case 2: case 3: case 4:		/* 40% */
 				if ((ret = session->commit_transaction(
 				    session, NULL)) != 0)
@@ -807,7 +815,7 @@ row_update(TINFO *tinfo,
 	session = cursor->session;
 
 	key_gen((uint8_t *)key->data, &key->size, keyno);
-	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
+	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -851,7 +859,7 @@ col_update(TINFO *tinfo,
 
 	session = cursor->session;
 
-	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
+	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS) {
@@ -925,7 +933,7 @@ table_append(uint64_t keyno)
 
 	/*
 	 * We don't want to ignore records we append, which requires we update
-	 * the "last row" as we insert new records.   Threads allocating record
+	 * the "last row" as we insert new records. Threads allocating record
 	 * numbers can race with other threads, so the thread allocating record
 	 * N may return after the thread allocating N + 1.  We can't update a
 	 * record before it's been inserted, and so we can't leave gaps when the
@@ -943,7 +951,7 @@ table_append(uint64_t keyno)
 	 * to sleep (so the append table fills up), then N threads of control
 	 * used the same g.append_cnt value to decide there was an available
 	 * slot in the append table and both allocated new records, we could run
-	 * out of space in the table.   It's unfortunately not even unlikely in
+	 * out of space in the table. It's unfortunately not even unlikely in
 	 * the case of a large number of threads all inserting as fast as they
 	 * can and a single thread going to sleep for an unexpectedly long time.
 	 * If it happens, sleep and retry until earlier records are resolved
@@ -1010,8 +1018,8 @@ row_insert(TINFO *tinfo,
 
 	session = cursor->session;
 
-	key_gen_insert(tinfo->rnd, (uint8_t *)key->data, &key->size, keyno);
-	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
+	key_gen_insert(&tinfo->rnd, (uint8_t *)key->data, &key->size, keyno);
+	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -1056,7 +1064,7 @@ col_insert(TINFO *tinfo,
 
 	session = cursor->session;
 
-	val_gen(tinfo->rnd, (uint8_t *)value->data, &value->size, g.rows + 1);
+	val_gen(&tinfo->rnd, (uint8_t *)value->data, &value->size, g.rows + 1);
 
 	if (g.type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value->data);

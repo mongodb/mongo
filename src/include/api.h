@@ -72,7 +72,7 @@
 				ret = 0;				\
 				continue;				\
 			}						\
-			WT_TRET(__wt_session_reset_cursors(s));		\
+			WT_TRET(__wt_session_reset_cursors(s, 0));	\
 		}							\
 	}								\
 	break;								\

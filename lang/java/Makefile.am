@@ -44,10 +44,13 @@ JAVA_SRC = \
 JAVA_JUNIT = \
 		$(JAVATEST)/AutoCloseTest.java \
 		$(JAVATEST)/AsyncTest.java \
+		$(JAVATEST)/BackupCursorTest.java \
 		$(JAVATEST)/CursorTest.java \
 		$(JAVATEST)/CursorTest02.java \
 		$(JAVATEST)/ExceptionTest.java \
 		$(JAVATEST)/PackTest.java \
+		$(JAVATEST)/PackTest02.java \
+		$(JAVATEST)/PackTest03.java \
 		$(JAVATEST)/WiredTigerSuite.java
 
 dist_java_JAVA = $(JAVA_SRC) @JAVA_JUNIT@

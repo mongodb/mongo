@@ -246,7 +246,7 @@ __curfile_insert(WT_CURSOR *cursor)
 
 	/*
 	 * Insert is the one cursor operation that doesn't end with the cursor
-	 * pointing to an on-page item.   The standard macro handles errors
+	 * pointing to an on-page item. The standard macro handles errors
 	 * correctly, but we need to leave the application cursor unchanged in
 	 * the case of success, except for column-store appends, where we are
 	 * returning a key.

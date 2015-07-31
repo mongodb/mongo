@@ -195,6 +195,11 @@ struct __wt_page_modify {
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
 
+#ifdef HAVE_DIAGNOSTIC
+	/* Check that transaction time moves forward. */
+	uint64_t last_oldest_id;
+#endif
+
 	/* Dirty bytes added to the cache. */
 	size_t bytes_dirty;
 
@@ -551,10 +556,9 @@ struct __wt_page {
 #define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
-#define	WT_PAGE_REFUSE_DEEPEN	0x10	/* Don't deepen the tree at this page */
-#define	WT_PAGE_SCANNING	0x20	/* Obsolete updates are being scanned */
-#define	WT_PAGE_SPLIT_INSERT	0x40	/* A leaf page was split for append */
-#define	WT_PAGE_SPLIT_LOCKED	0x80	/* An internal page is growing */
+#define	WT_PAGE_SCANNING	0x10	/* Obsolete updates are being scanned */
+#define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
+#define	WT_PAGE_SPLIT_LOCKED	0x40	/* An internal page is growing */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	/*
@@ -658,7 +662,7 @@ typedef enum __wt_page_state {
 	WT_REF_LOCKED,			/* Page locked for exclusive access */
 	WT_REF_MEM,			/* Page is in cache and valid */
 	WT_REF_READING,			/* Page being read */
-	WT_REF_SPLIT			/* Page was split */
+	WT_REF_SPLIT			/* Parent page split (WT_REF dead) */
 } WT_PAGE_STATE;
 
 /*
@@ -685,7 +689,7 @@ struct __wt_ref {
 	 * up our slot in the page's index structure.
 	 */
 	WT_PAGE * volatile home;	/* Reference page */
-	uint32_t ref_hint;		/* Reference page index hint */
+	uint32_t pindex_hint;		/* Reference page index hint */
 
 	volatile WT_PAGE_STATE state;	/* Page state */
 
@@ -902,7 +906,7 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
  *
  * In column-store variable-length run-length encoded pages, a single indx
  * entry may reference a large number of records, because there's a single
- * on-page entry representing many identical records.   (We don't expand those
+ * on-page entry representing many identical records. (We don't expand those
  * entries when the page comes into memory, as that would require resources as
  * pages are moved to/from the cache, including read-only files.)  Instead, a
  * single indx entry represents all of the identical records originally found

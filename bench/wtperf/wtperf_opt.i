@@ -115,6 +115,7 @@ DEF_OPT_AS_BOOL(index, 0,
 DEF_OPT_AS_BOOL(insert_rmw, 0,
     "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(key_sz, 20, "key size")
+DEF_OPT_AS_BOOL(log_partial, 0, "perform partial logging on first table only.")
 DEF_OPT_AS_UINT32(min_throughput, 0,
     "abort if any throughput measured is less than this amount.  Requires "
     "sample_interval to be configured")
@@ -166,7 +167,8 @@ DEF_OPT_AS_STRING(threads, "", "workload configuration: each 'count' "
     "'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))' "
     "which would create 2 threads doing nothing but reads and 8 threads "
     "each doing 50% inserts and 25% reads and updates.  Allowed configuration "
-    "values are 'count', 'throttle', 'reads', 'inserts', 'updates'. There are "
+    "values are 'count', 'throttle', 'reads', 'inserts', 'updates', 'truncate',"
+    " 'truncate_pct' and 'truncate_count'. There are "
     "also behavior modifiers, supported modifiers are 'ops_per_txn'")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
     "transaction configuration string, relevant when populate_opts_per_txn "

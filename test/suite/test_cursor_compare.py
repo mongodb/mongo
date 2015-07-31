@@ -26,8 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wiredtiger, wttest, exceptions
 from helper import complex_populate, simple_populate, key_populate
+from helper import complex_populate_index_name
 from wtscenario import multiply_scenarios, number_scenarios
 
 # Test cursor comparisons.
@@ -52,15 +53,31 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
 
         # Build the object.
         if self.type == 'file:':
-            simple_populate(self, uri,
-                            'key_format=' + self.keyfmt + self.config, 100)
-            simple_populate(self, uriX,
-                            'key_format=' + self.keyfmt + self.config, 100)
+            simple_populate(
+                self, uri, 'key_format=' + self.keyfmt + self.config, 100)
+            simple_populate(
+                self, uriX, 'key_format=' + self.keyfmt + self.config, 100)
+            ix0_0 = None
+            ix0_1 = None
+            ix1_0 = None
+            ixX_0 = None
         else:
-            complex_populate(self, uri,
-                             'key_format=' + self.keyfmt + self.config, 100)
-            complex_populate(self, uriX,
-                             'key_format=' + self.keyfmt + self.config, 100)
+            complex_populate(
+                self, uri, 'key_format=' + self.keyfmt + self.config, 100)
+            complex_populate(
+                self, uriX, 'key_format=' + self.keyfmt + self.config, 100)
+            ix0_0 = self.session.open_cursor(
+                complex_populate_index_name(self, uri, 0), None)
+            ix0_1 = self.session.open_cursor(
+                complex_populate_index_name(self, uri, 0), None)
+            ix1_0 = self.session.open_cursor(
+                complex_populate_index_name(self, uri, 1), None)
+            ixX_0 = self.session.open_cursor(
+                complex_populate_index_name(self, uriX, 0), None)
+            ix0_0.next()
+            ix0_1.next()
+            ix1_0.next()
+            ixX_0.next()
 
         c1 = self.session.open_cursor(uri, None)
         c2 = self.session.open_cursor(uri, None)
@@ -87,6 +104,25 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
         msg = '/must reference the same object/'
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError, lambda: cX.compare(c1), msg)
+        msg = '/wt_cursor.* is None/'
+        self.assertRaisesHavingMessage(
+            exceptions.RuntimeError,  lambda: cX.compare(None), msg)
+        if ix0_0 != None:
+            self.assertEqual(ix0_0.compare(ix0_1), 0)
+            ix0_1.reset()
+            ix0_1.prev()
+            self.assertLess(ix0_0.compare(ix0_1), 0)
+            self.assertGreater(ix0_1.compare(ix0_0), 0)
+            # Main table vs. index not allowed
+            msg = '/must reference the same object/'
+            self.assertRaisesWithMessage(
+                wiredtiger.WiredTigerError, lambda: c1.compare(ix0_0), msg)
+            # Two unrelated indices not allowed
+            self.assertRaisesWithMessage(
+                wiredtiger.WiredTigerError, lambda: ixX_0.compare(ix0_0), msg)
+            # Two different indices from same table not allowed
+            self.assertRaisesWithMessage(
+                wiredtiger.WiredTigerError, lambda: ix0_0.compare(ix1_0), msg)
 
         # Test cursors after they're positioned (shouldn't matter for compare).
         c1.set_key(key_populate(c1, 10))
@@ -114,15 +150,31 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
 
         # Build the object.
         if self.type == 'file:':
-            simple_populate(self, uri,
-                            'key_format=' + self.keyfmt + self.config, 100)
-            simple_populate(self, uriX,
-                            'key_format=' + self.keyfmt + self.config, 100)
+            simple_populate(
+                self, uri, 'key_format=' + self.keyfmt + self.config, 100)
+            simple_populate(
+                self, uriX, 'key_format=' + self.keyfmt + self.config, 100)
+            ix0_0 = None
+            ix0_1 = None
+            ix1_0 = None
+            ixX_0 = None
         else:
-            complex_populate(self, uri,
-                             'key_format=' + self.keyfmt + self.config, 100)
-            complex_populate(self, uriX,
-                             'key_format=' + self.keyfmt + self.config, 100)
+            complex_populate(
+                self, uri, 'key_format=' + self.keyfmt + self.config, 100)
+            complex_populate(
+                self, uriX, 'key_format=' + self.keyfmt + self.config, 100)
+            ix0_0 = self.session.open_cursor(
+                complex_populate_index_name(self, uri, 0), None)
+            ix0_1 = self.session.open_cursor(
+                complex_populate_index_name(self, uri, 0), None)
+            ix1_0 = self.session.open_cursor(
+                complex_populate_index_name(self, uri, 1), None)
+            ixX_0 = self.session.open_cursor(
+                complex_populate_index_name(self, uriX, 0), None)
+            ix0_0.next()
+            ix0_1.next()
+            ix1_0.next()
+            ixX_0.next()
 
         c1 = self.session.open_cursor(uri, None)
         c2 = self.session.open_cursor(uri, None)
@@ -148,7 +200,25 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
         cX.set_key(key_populate(cX, 10))
         msg = '/must reference the same object/'
         self.assertRaisesWithMessage(
-            wiredtiger.WiredTigerError, lambda: cX.compare(c1), msg)
+            wiredtiger.WiredTigerError, lambda: cX.equals(c1), msg)
+        msg = '/wt_cursor.* is None/'
+        self.assertRaisesHavingMessage(
+            exceptions.RuntimeError,  lambda: cX.equals(None), msg)
+        if ix0_0 != None:
+            self.assertTrue(ix0_0.equals(ix0_1))
+            ix0_1.reset()
+            ix0_1.prev()
+            self.assertFalse(ix0_0.equals(ix0_1))
+            # Main table vs. index not allowed
+            msg = '/must reference the same object/'
+            self.assertRaisesWithMessage(
+                wiredtiger.WiredTigerError, lambda: c1.equals(ix0_0), msg)
+            # Two unrelated indices not allowed
+            self.assertRaisesWithMessage(
+                wiredtiger.WiredTigerError, lambda: ixX_0.equals(ix0_0), msg)
+            # Two different indices from same table not allowed
+            self.assertRaisesWithMessage(
+                wiredtiger.WiredTigerError, lambda: ix0_0.equals(ix1_0), msg)
 
         # Test cursors after they're positioned (internally, it's a different
         # search path if keys are positioned in the tree).
@@ -169,7 +239,7 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
         self.assertEqual(cX.search(), 0)
         msg = '/must reference the same object/'
         self.assertRaisesWithMessage(
-            wiredtiger.WiredTigerError, lambda: cX.compare(c1), msg)
+            wiredtiger.WiredTigerError, lambda: cX.equals(c1), msg)
 
 
 if __name__ == '__main__':

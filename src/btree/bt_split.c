@@ -618,7 +618,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			 */
 			if (child_ref->home == parent) {
 				child_ref->home = child;
-				child_ref->ref_hint = 0;
+				child_ref->pindex_hint = 0;
 			}
 		} WT_INTL_FOREACH_END;
 		WT_LEAVE_PAGE_INDEX(session);
@@ -753,7 +753,7 @@ __split_multi_inmem(
 
 	/*
 	 * We modified the page above, which will have set the first dirty
-	 * transaction to the last transaction current running.  However, the
+	 * transaction to the last transaction currently running.  However, the
 	 * updates we installed may be older than that.  Set the first dirty
 	 * transaction to an impossibly old value so this page is never skipped
 	 * in a checkpoint.
@@ -837,6 +837,9 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	return (0);
 }
 
+#define	WT_SPLIT_EXCLUSIVE	0x01		/* Page held exclusively */
+#define	WT_SPLIT_INMEM		0x02		/* In-memory split */
+
 /*
  * __split_parent --
  *	Resolve a multi-page split, inserting new information into the parent.
@@ -890,7 +893,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 		 * trying to split a page while its parent is being
 		 * checkpointed.
 		 */
-		if (LF_ISSET(WT_EVICT_INMEM_SPLIT))
+		if (LF_ISSET(WT_SPLIT_INMEM))
 			return (EBUSY);
 		__wt_yield();
 	}
@@ -1087,7 +1090,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	WT_TRET(__split_safe_free(session,
-	    split_gen, LF_ISSET(WT_EVICT_EXCLUSIVE), pindex, size));
+	    split_gen, LF_ISSET(WT_SPLIT_EXCLUSIVE) ? 1 : 0, pindex, size));
 	parent_decr += size;
 
 	/*
@@ -1112,21 +1115,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 *	Do the check here because we've just grown the parent page and
 	 * are holding it locked.
 	 */
-	if (ret == 0 && !LF_ISSET(WT_EVICT_EXCLUSIVE) &&
-	    !F_ISSET_ATOMIC(parent, WT_PAGE_REFUSE_DEEPEN) &&
-	    __split_should_deepen(session, parent_ref)) {
-		/*
-		 * XXX
-		 * Temporary hack to avoid a bug where the root page is split
-		 * even when it's no longer doing any good.
-		 */
-		uint64_t __a, __b;
-		__a = parent->memory_footprint;
+	if (ret == 0 && !LF_ISSET(WT_SPLIT_EXCLUSIVE) &&
+	    __split_should_deepen(session, parent_ref))
 		ret = __split_deepen(session, parent);
-		__b = parent->memory_footprint;
-		if (__b * 2 >= __a)
-			F_SET_ATOMIC(parent, WT_PAGE_REFUSE_DEEPEN);
-	}
 
 err:	if (!complete)
 		for (i = 0; i < parent_entries; ++i) {
@@ -1375,8 +1366,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * longer locked, so we cannot safely look at it.
 	 */
 	page = NULL;
-	if ((ret = __split_parent(session,
-	    ref, split_ref, 2, parent_incr, WT_EVICT_INMEM_SPLIT)) != 0) {
+	if ((ret = __split_parent(
+	    session, ref, split_ref, 2, parent_incr, WT_SPLIT_INMEM)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
@@ -1467,7 +1458,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Resolve a page split.
  */
 int
-__wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+__wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -1491,9 +1482,12 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		WT_ERR(__wt_multi_to_ref(session,
 		    page, &mod->mod_multi[i], &ref_new[i], &parent_incr));
 
-	/* Split into the parent. */
+	/*
+	 * Split into the parent; if we're closing the file, we hold it
+	 * exclusively.
+	 */
 	WT_ERR(__split_parent( session, ref, ref_new,
-	    new_entries, parent_incr, exclusive ? WT_EVICT_EXCLUSIVE : 0));
+	    new_entries, parent_incr, closing ? WT_SPLIT_EXCLUSIVE : 0));
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split);

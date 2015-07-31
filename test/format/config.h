@@ -211,6 +211,10 @@ static CONFIG c[] = {
 	  "if log file pre-allocation configured",		/* 50% */
 	  C_BOOL, 50, 0, 0, &g.c_logging_prealloc, NULL },
 
+	{ "long_running_txn",
+	  "if a long-running transaction configured",		/* 0% */
+	  C_BOOL, 0, 0, 0, &g.c_long_running_txn, NULL },
+
 	{ "lsm_worker_threads",
 	  "the number of LSM worker threads",
 	  0x0, 3, 4, 20, &g.c_lsm_worker_threads, NULL },
@@ -251,6 +255,10 @@ static CONFIG c[] = {
 	  "the number of runs",
 	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_runs, NULL },
 
+	{ "salvage",
+	  "verify integrity via salvage",			/* 100% */
+	  C_BOOL, 100, 1, 0, &g.c_salvage, NULL },
+
 	{ "split_pct",
 	  "page split size as a percentage of the maximum page size",
 	  0x0, 40, 85, 85, &g.c_split_pct, NULL },
@@ -278,6 +286,10 @@ static CONFIG c[] = {
 	{ "value_min",
 	  "minimum size of values",
 	  0x0, 0, 20, 4096, &g.c_value_min, NULL },
+
+	{ "verify",
+	  "to regularly verify during a run",			/* 100% */
+	  C_BOOL, 100, 1, 0, &g.c_verify, NULL },
 
 	{ "wiredtiger_config",
 	  "configuration string used to wiredtiger_open",

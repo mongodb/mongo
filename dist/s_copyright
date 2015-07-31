@@ -2,10 +2,50 @@
 
 # Check the copyrights.
 
-c1=__wt.1$$
-c2=__wt.2$$
-c3=__wt.3$$
-c4=__wt.4$$
+c1=__wt.copyright.1
+c2=__wt.copyright.2
+c3=__wt.copyright.3
+c4=__wt.copyright.4
+
+check()
+{
+	# Skip files in which WiredTiger holds no rights.
+	if `egrep "skip	$1" dist/s_copyright.list > /dev/null`; then
+		return;
+	fi
+
+	# It's okay if the file doesn't exist: we may be running in a release
+	# tree with some files removed.
+	test -f $1 || return
+
+	# Check for a correct copyright header.
+	if `sed -e 2,5p -e 6q -e d $1 | diff - dist/$c1 > /dev/null` ; then
+		return;
+	fi
+	if `sed -e 2,4p -e 5q -e d $1 | diff - dist/$c2 > /dev/null` ; then
+		return;
+	fi
+	if `sed -e 3,6p -e 7q -e d $1 | diff - dist/$c3 > /dev/null` ; then
+		return;
+	fi
+	if `sed -e 3,5p -e 6q -e d $1 | diff - dist/$c4 > /dev/null` ; then
+		return;
+	fi
+	if `sed -e 1,3p -e 4q -e d $1 | diff - dist/$c4 > /dev/null` ; then
+		return;
+	fi
+
+	echo "$1: copyright information is incorrect"
+	exit 1
+}
+
+# s_copyright is re-entrant, calling itself with individual file names.
+# Any single argument call is a file name, check its copyright.
+if [ $# -ne 0 ]; then
+	check $1
+	exit 0
+fi
+
 trap 'rm -f $c1 $c2 $c3 $c4; exit 0' 0 1 2 3 13 15
 
 year=`date +%Y`
@@ -41,57 +81,27 @@ cat > $c4 <<ENDOFTEXT
 # This is free and unencumbered software released into the public domain.
 ENDOFTEXT
 
-check()
-{
-	# Skip files in which WiredTiger holds no rights.
-	if `egrep "skip	$1" s_copyright.list > /dev/null`; then
-		return;
-	fi
-
-	# It's okay if the file doesn't exist: we may be running in a release
-	# tree with some files removed.
-	test -f ../$i || return
-
-	# Check for a correct copyright header.
-	if `sed -e 2,5p -e 6q -e d ../$1 | diff - $c1 > /dev/null` ; then
-		return;
-	fi
-	if `sed -e 2,4p -e 5q -e d ../$1 | diff - $c2 > /dev/null` ; then
-		return;
-	fi
-	if `sed -e 3,6p -e 7q -e d ../$1 | diff - $c3 > /dev/null` ; then
-		return;
-	fi
-	if `sed -e 3,5p -e 6q -e d ../$1 | diff - $c4 > /dev/null` ; then
-		return;
-	fi
-	if `sed -e 1,3p -e 4q -e d ../$1 | diff - $c4 > /dev/null` ; then
-		return;
-	fi
-
-	echo "$1: copyright information is incorrect"
-}
-
 # Search for files, skipping some well-known 3rd party directories.
-for i in `cd .. &&
-    find [a-z]* -name '*.[chi]' \
-        -o -name '*.cxx' -o -name '*.in' -o -name '*.java' -o -name '*.py' |
+(cd .. && find [a-z]* -name '*.[chi]' \
+	-o -name '*.cxx' \
+	-o -name '*.in' \
+	-o -name '*.java' \
+	-o -name '*.py' |
     sed	-e '/Makefile.in/d' \
 	-e '/^build_posix\//d' \
-        -e '/api\/leveldb\/basho\//d' \
-        -e '/api\/leveldb\/hyperleveldb\//d' \
-        -e '/api\/leveldb\/leveldb\//d' \
-        -e '/api\/leveldb\/rocksdb\//d' \
-        -e '/test\/3rdparty\//d' \
-        -e '/tools\/wtperf_stats\/3rdparty\//d' \
-	-e 's/^\.\///'`
-do
-	check $i
-done
+	-e '/api\/leveldb\/basho\//d' \
+	-e '/api\/leveldb\/hyperleveldb\//d' \
+	-e '/api\/leveldb\/leveldb\//d' \
+	-e '/api\/leveldb\/rocksdb\//d' \
+	-e '/\/3rdparty\//d' \
+	-e '/\/node_modules\//d' \
+	-e '/dist\/__/d' \
+	-e 's/^\.\///' |
+    xargs -P 20 -n 1 -I{} sh dist/s_copyright {})
 
-# A few special cases: LICENSE, documentation, wt utility, some of which
-# have more than one copyright notice in the file. For files that have
-# only a single copyright notice, we give it to MongoDB, from 2008 to now.
+# A few special cases: LICENSE, documentation, wt utility, some of which have
+# more than one copyright notice in the file. For files that have only a single
+# copyright notice, we give it to MongoDB, from 2008 to now.
 string1="Copyright \(c\) 2014-$year MongoDB, Inc."
 string2="Copyright \(c\) 2008-$year MongoDB, Inc."
 string3="printf.*Copyright \(c\) 2008-$year MongoDB, Inc."

@@ -61,7 +61,7 @@ class test_drop(wttest.WiredTigerTestCase):
             self.reopen_conn()
 
         if drop_index:
-            drop_uri = complex_populate_index_name(self, uri)
+            drop_uri = complex_populate_index_name(self, uri, 0)
         else:
             drop_uri = uri
         self.session.drop(drop_uri, None)

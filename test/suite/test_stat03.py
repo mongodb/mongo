@@ -98,11 +98,11 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
         if self.pop != simple_populate:
             statc.close()
             statc = self.stat_cursor(
-                complex_populate_index_name(self, self.uri))
+                complex_populate_index_name(self, self.uri, 0))
             self.assertEqual(statc[stat.dsrc.btree_entries][2], n)
             statc.close()
             statc = self.stat_cursor(
-                complex_populate_colgroup_name(self, self.uri))
+                complex_populate_colgroup_name(self, self.uri, 0))
             self.assertEqual(statc[stat.dsrc.btree_entries][2], n)
         statc.close()
 

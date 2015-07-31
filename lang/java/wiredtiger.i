@@ -177,6 +177,9 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
 	}
 %enddef
 
+/*
+ * 'Declare' a WiredTiger class. This sets up boilerplate typemaps.
+ */
 %define WT_CLASS(type, class, name)
 /*
  * Extra 'self' elimination.
@@ -210,17 +213,32 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
   */"
 %enddef
 
-%define WT_CLASS_WITH_CLOSE_HANDLER(type, class, name, closeHandler, priv)
+/*
+ * Declare a WT_CLASS so that close methods call a specified closeHandler,
+ * after the WT core close function has completed. Arguments to the
+ * closeHandler are saved in advance since, as macro args, they may refer to
+ * values that are freed/zeroed by the close.
+ */
+%define WT_CLASS_WITH_CLOSE_HANDLER(type, class, name, closeHandler,
+    sess, priv)
 WT_CLASS(type, class, name)
 
-%typemap(in, numinputs=0) class ## _CLOSED *name (JAVA_CALLBACK *jcb) {
+/*
+ * This typemap recognizes a close function via a special declaration on its
+ * first argument. See WT_HANDLE_CLOSED in wiredtiger.h .  Like
+ * WT_CURSOR_NULLABLE, the WT_{CURSOR,SESSION,CONNECTION}_CLOSED typedefs
+ * are only visible to the SWIG parser.
+ */
+%typemap(in, numinputs=0) class ## _CLOSED *name (
+    WT_SESSION *savesess, JAVA_CALLBACK *jcb) {
 	$1 = *(type **)&jarg1;
 	NULL_CHECK($1, $1_name)
+	savesess = sess;
 	jcb = (JAVA_CALLBACK *)(priv);
 }
 
 %typemap(freearg, numinputs=0) class ## _CLOSED *name {
-	closeHandler(jcb2);
+	closeHandler(jenv, savesess2, jcb2);
 	priv = NULL;
 }
 
@@ -239,11 +257,11 @@ WT_CLASS(type, class, name)
 %}
 
 WT_CLASS_WITH_CLOSE_HANDLER(struct __wt_connection, WT_CONNECTION, connection,
-    closeHandler, ((WT_CONNECTION_IMPL *)$1)->lang_private)
+    closeHandler, NULL, ((WT_CONNECTION_IMPL *)$1)->lang_private)
 WT_CLASS_WITH_CLOSE_HANDLER(struct __wt_session, WT_SESSION, session,
-    closeHandler, ((WT_SESSION_IMPL *)$1)->lang_private)
+    closeHandler, $1, ((WT_SESSION_IMPL *)$1)->lang_private)
 WT_CLASS_WITH_CLOSE_HANDLER(struct __wt_cursor, WT_CURSOR, cursor,
-    cursorCloseHandler, ((WT_CURSOR *)$1)->lang_private)
+    cursorCloseHandler, $1->session, ((WT_CURSOR *)$1)->lang_private)
 WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 
 %define COPYDOC(SIGNATURE_CLASS, CLASS, METHOD)
@@ -281,6 +299,7 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op)
 %ignore __wt_cursor::set_value;
 %ignore __wt_cursor::insert;
 %ignore __wt_cursor::remove;
+%ignore __wt_cursor::reset;
 %ignore __wt_cursor::search;
 %ignore __wt_cursor::search_near;
 %ignore __wt_cursor::update;
@@ -312,21 +331,35 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 %wrapper %{
 /* Zero out SWIG's pointer to the C object,
  * equivalent to 'jobj.swigCPtr = 0;' in java.
+ * We expect that either env in non-null (if called
+ * via an explicit session/cursor close() call), or
+ * that session is non-null (if called implicitly
+ * as part of connection/session close).
  */
 static int
-javaClose(JNIEnv *env, JAVA_CALLBACK *jcb, jfieldID *pfid)
+javaClose(JNIEnv *env, WT_SESSION *session, JAVA_CALLBACK *jcb, jfieldID *pfid)
 {
 	jclass cls;
 	jfieldID fid;
+	WT_CONNECTION_IMPL *conn;
 
+	/* If we were not called via an implicit close call,
+	 * we won't have a JNIEnv yet.  Get one from the connection,
+	 * since the thread that started the session may have
+	 * terminated.
+	 */
+	if (env == NULL) {
+		conn = (WT_CONNECTION_IMPL *)session->connection;
+		env = ((JAVA_CALLBACK *)conn->lang_private)->jnienv;
+	}
 	if (pfid == NULL || *pfid == NULL) {
 		cls = (*env)->GetObjectClass(env, jcb->jobj);
 		fid = (*env)->GetFieldID(env, cls, "swigCPtr", "J");
 		if (pfid != NULL)
 			*pfid = fid;
-	} else {
+	} else
 		fid = *pfid;
-	}
+
 	(*env)->SetLongField(env, jcb->jobj, fid, 0L);
 	(*env)->DeleteGlobalRef(env, jcb->jobj);
 	__wt_free(jcb->session, jcb);
@@ -335,20 +368,22 @@ javaClose(JNIEnv *env, JAVA_CALLBACK *jcb, jfieldID *pfid)
 
 /* Connection and Session close handler. */
 static int
-closeHandler(JAVA_CALLBACK *jcb)
+closeHandler(JNIEnv *env, WT_SESSION *session, JAVA_CALLBACK *jcb)
 {
-	return (javaClose(jcb->jnienv, jcb, NULL));
+	return (javaClose(env, session, jcb, NULL));
 }
 
 /* Cursor specific close handler. */
 static int
-cursorCloseHandler(JAVA_CALLBACK *jcb)
+cursorCloseHandler(JNIEnv *env, WT_SESSION *wt_session, JAVA_CALLBACK *jcb)
 {
 	int ret;
 	JAVA_CALLBACK *sess_jcb;
+	WT_SESSION_IMPL *session;
 
-	sess_jcb = (JAVA_CALLBACK *)jcb->session->lang_private;
-	ret = javaClose(jcb->jnienv, jcb,
+	session = (WT_SESSION_IMPL *)wt_session;
+	sess_jcb = (JAVA_CALLBACK *)session->lang_private;
+	ret = javaClose(env, wt_session, jcb,
 	    sess_jcb ? &sess_jcb->cptr_fid : NULL);
 
 	return (ret);
@@ -364,9 +399,10 @@ javaCloseHandler(WT_EVENT_HANDLER *handler, WT_SESSION *session,
 	WT_UNUSED(handler);
 
 	if (cursor != NULL)
-		ret = cursorCloseHandler((JAVA_CALLBACK *)cursor->lang_private);
+		ret = cursorCloseHandler(NULL, session, (JAVA_CALLBACK *)
+		    cursor->lang_private);
 	else
-		ret = closeHandler((JAVA_CALLBACK *)
+		ret = closeHandler(NULL, session, (JAVA_CALLBACK *)
 		    ((WT_SESSION_IMPL *)session)->lang_private);
 	return (ret);
 }
@@ -474,7 +510,7 @@ err:		__wt_err(session, ret, "Java async callback error");
 	}
 
 	/* Invalidate the AsyncOp, further use throws NullPointerException. */
-	ret = javaClose(jenv, jcb, &conn_jcb->asynccptr_fid);
+	ret = javaClose(jenv, NULL, jcb, &conn_jcb->asynccptr_fid);
 
 	(*jenv)->DeleteGlobalRef(jenv, jcallback);
 
@@ -1103,6 +1139,11 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		return $self->remove($self);
 	}
 
+	%javamethodmodifiers reset_wrap "protected";
+	int reset_wrap() {
+		return $self->reset($self);
+	}
+
 	%javamethodmodifiers search_wrap "protected";
 	int search_wrap(WT_ITEM *k) {
 		$self->set_key($self, k);
@@ -1650,10 +1691,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret = next_wrap();
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret == 0);
+		valueUnpacker = initValueUnpacker(ret == 0);
 		return ret;
 	}
 
@@ -1667,10 +1706,23 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret = prev_wrap();
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret == 0);
+		valueUnpacker = initValueUnpacker(ret == 0);
+		return ret;
+	}
+
+	/**
+	 * Reset a cursor.
+	 *
+	 * \return The status of the operation.
+	 */
+	public int reset()
+	throws WiredTigerException {
+		int ret = reset_wrap();
+		keyPacker.reset();
+		valuePacker.reset();
+		keyUnpacker = null;
+		valueUnpacker = null;
 		return ret;
 	}
 
@@ -1684,10 +1736,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		int ret = search_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret == 0) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret == 0) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret == 0);
+		valueUnpacker = initValueUnpacker(ret == 0);
 		return ret;
 	}
 
@@ -1701,11 +1751,40 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		SearchStatus ret = search_near_wrap(keyPacker.getValue());
 		keyPacker.reset();
 		valuePacker.reset();
-		keyUnpacker = (ret != SearchStatus.NOTFOUND) ?
-		    new PackInputStream(keyFormat, get_key_wrap()) : null;
-		valueUnpacker = (ret != SearchStatus.NOTFOUND) ?
-		    new PackInputStream(valueFormat, get_value_wrap()) : null;
+		keyUnpacker = initKeyUnpacker(ret != SearchStatus.NOTFOUND);
+		valueUnpacker = initValueUnpacker(ret != SearchStatus.NOTFOUND);
 		return ret;
+	}
+
+	/**
+	 * Initialize a key unpacker after an operation that changes
+	 * the cursor position.
+	 *
+	 * \param success Whether the associated operation succeeded.
+	 * \return The key unpacker.
+	 */
+	private PackInputStream initKeyUnpacker(boolean success)
+	throws WiredTigerException {
+		if (!success || keyFormat.equals(""))
+			return null;
+		else
+			return new PackInputStream(keyFormat, get_key_wrap());
+	}
+
+	/**
+	 * Initialize a value unpacker after an operation that changes
+	 * the cursor position.
+	 *
+	 * \param success Whether the associated operation succeeded.
+	 * \return The value unpacker.
+	 */
+	private PackInputStream initValueUnpacker(boolean success)
+	throws WiredTigerException {
+		if (!success || valueFormat.equals(""))
+			return null;
+		else
+			return new PackInputStream(valueFormat,
+			    get_value_wrap());
 	}
 %}
 
@@ -1868,8 +1947,8 @@ err:	if (ret != 0)
 		jcb->jnienv = jenv;
 		jcb->session = connimpl->default_session;
 		(*jenv)->GetJavaVM(jenv, &jcb->javavm);
-		jcb->jcallback = JCALL1(NewGlobalRef, jcb->jnienv, callbackObject);
-		JCALL1(DeleteLocalRef, jcb->jnienv, callbackObject);
+		jcb->jcallback = JCALL1(NewGlobalRef, jenv, callbackObject);
+		JCALL1(DeleteLocalRef, jenv, callbackObject);
 		asyncop->c.lang_private = jcb;
 		asyncop->c.flags |= WT_CURSTD_RAW;
 

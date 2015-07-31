@@ -106,7 +106,7 @@ main(int argc, char *argv[])
 	argv += __wt_optind;
 
 	/* Initialize the global random number generator. */
-	__wt_random_init(g.rnd);
+	__wt_random_init(&g.rnd);
 
 	/* Set up paths. */
 	path_setup(home);

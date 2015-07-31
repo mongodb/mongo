@@ -34,10 +34,13 @@ import org.junit.runners.Suite;
 @Suite.SuiteClasses( {
     AsyncTest.class,
     AutoCloseTest.class,
+    BackupCursorTest.class,
     CursorTest.class,
     CursorTest02.class,
     ExceptionTest.class,
-    PackTest.class
+    PackTest.class,
+    PackTest02.class,
+    PackTest03.class
 })
 
 public class WiredTigerSuite {

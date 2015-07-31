@@ -158,7 +158,8 @@ __wt_txn_log_op(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	txn = &session->txn;
 
 	if (!FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED) ||
-	    F_ISSET(session, WT_SESSION_NO_LOGGING))
+	    F_ISSET(session, WT_SESSION_NO_LOGGING) ||
+	    F_ISSET(S2BT(session), WT_BTREE_NO_LOGGING))
 		return (0);
 
 	/* We'd better have a transaction. */
@@ -204,6 +205,11 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_UNUSED(cfg);
 	txn = &session->txn;
+	/*
+	 * If there are no log records there is nothing to do.
+	 */
+	if (txn->logrec == NULL)
+		return (0);
 
 	/* Write updates to the log. */
 	return (__wt_log_write(session, txn->logrec, NULL, txn->txn_logsync));
@@ -295,16 +301,21 @@ __wt_txn_checkpoint_log(
 			if (lsnp != NULL)
 				*lsnp = *ckpt_lsn;
 			return (0);
-		} else
-			return (__txn_log_file_sync(session, flags, lsnp));
+		}
+		return (__txn_log_file_sync(session, flags, lsnp));
 	}
 
 	switch (flags) {
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = 1;
 		*ckpt_lsn = S2C(session)->log->write_start_lsn;
+		/*
+		 * We need to make sure that the log records in the checkpoint
+		 * LSN are on disk.  In particular to make sure that the
+		 * current log file exists.
+		 */
+		WT_ERR(__wt_log_force_sync(session, ckpt_lsn));
 		break;
-
 	case WT_TXN_LOG_CKPT_START:
 		/* Take a copy of the transaction snapshot. */
 		txn->ckpt_nsnapshot = txn->snapshot_count;
@@ -316,7 +327,6 @@ __wt_txn_checkpoint_log(
 			WT_ERR(__wt_vpack_uint(
 			    &p, WT_PTRDIFF(end, p), txn->snapshot[i]));
 		break;
-
 	case WT_TXN_LOG_CKPT_STOP:
 		/*
 		 * During a clean connection close, we get here without the
@@ -362,7 +372,6 @@ __wt_txn_checkpoint_log(
 		__wt_scr_free(session, &txn->ckpt_snapshot);
 		txn->full_ckpt = 0;
 		break;
-
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 

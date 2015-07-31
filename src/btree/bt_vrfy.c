@@ -23,7 +23,7 @@ typedef struct {
 #define	WT_VRFY_DUMP(vs)						\
 	((vs)->dump_address ||						\
 	    (vs)->dump_blocks || (vs)->dump_pages || (vs)->dump_shape)
-	int dump_address;			/* Debugging hooks */
+	int dump_address;			/* Configure: dump special */
 	int dump_blocks;
 	int dump_pages;
 	int dump_shape;
@@ -183,7 +183,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	    __wt_meta_ckptlist_get(session, btree->dhandle->name, &ckptbase));
 
 	/* Inform the underlying block manager we're verifying. */
-	WT_ERR(bm->verify_start(bm, session, ckptbase));
+	WT_ERR(bm->verify_start(bm, session, ckptbase, cfg));
 	bm_start = 1;
 
 	/* Loop through the file's checkpoints, verifying each one. */
@@ -325,7 +325,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	/*
 	 * The page's physical structure was verified when it was read into
 	 * memory by the read server thread, and then the in-memory version
-	 * of the page was built.   Now we make sure the page and tree are
+	 * of the page was built. Now we make sure the page and tree are
 	 * logically consistent.
 	 *
 	 * !!!

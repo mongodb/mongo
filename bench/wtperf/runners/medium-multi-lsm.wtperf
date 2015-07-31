@@ -8,3 +8,6 @@ threads=((count=8,read=1),(count=8,update=1))
 run_time=180
 report_interval=5
 table_count=4
+# Add throughput/latency monitoring
+max_latency=2000
+sample_interval=5

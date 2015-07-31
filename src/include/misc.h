@@ -159,6 +159,24 @@
 	}								\
 } while (0)
 
+/*
+ * Binary search for an integer key.
+ */
+#define	WT_BINARY_SEARCH(key, arrayp, n, found) do {			\
+	uint32_t __base, __indx, __limit;				\
+	found = 0;							\
+	for (__base = 0, __limit = (n); __limit != 0; __limit >>= 1) {	\
+		__indx = __base + (__limit >> 1);			\
+		if ((arrayp)[__indx] < key) {				\
+			__base = __indx + 1;				\
+			--__limit;					\
+		} else if ((arrayp)[__indx] == key) {			\
+			found = 1;					\
+			break;						\
+		}							\
+	}								\
+} while (0)
+
 /* Verbose messages. */
 #ifdef HAVE_VERBOSE
 #define	WT_VERBOSE_ISSET(session, f)					\
@@ -237,3 +255,11 @@
 #define	__wt_page_swap(session, held, want, flags)			\
 	__wt_page_swap_func(session, held, want, flags)
 #endif
+
+/* Random number generator state. */
+union __wt_rand_state {
+	uint64_t v;
+	struct {
+		uint32_t w, z;
+	} x;
+};

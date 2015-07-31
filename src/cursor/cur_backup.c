@@ -210,16 +210,16 @@ __backup_start(
 	 * The hot backup copy is done outside of WiredTiger, which means file
 	 * blocks can't be freed and re-allocated until the backup completes.
 	 * The checkpoint code checks the backup flag, and if a backup cursor
-	 * is open checkpoints aren't discarded.   We release the lock as soon
+	 * is open checkpoints aren't discarded. We release the lock as soon
 	 * as we've set the flag, we don't want to block checkpoints, we just
 	 * want to make sure no checkpoints are deleted.  The checkpoint code
 	 * holds the lock until it's finished the checkpoint, otherwise we
 	 * could start a hot backup that would race with an already-started
 	 * checkpoint.
 	 */
-	__wt_spin_lock(session, &conn->hot_backup_lock);
+	WT_RET(__wt_writelock(session, conn->hot_backup_lock));
 	conn->hot_backup = 1;
-	__wt_spin_unlock(session, &conn->hot_backup_lock);
+	WT_ERR(__wt_writeunlock(session, conn->hot_backup_lock));
 
 	/* Create the hot backup file. */
 	WT_ERR(__backup_file_create(session, cb, 0));
@@ -318,9 +318,9 @@ __backup_stop(WT_SESSION_IMPL *session)
 	ret = __wt_backup_file_remove(session);
 
 	/* Checkpoint deletion can proceed, as can the next hot backup. */
-	__wt_spin_lock(session, &conn->hot_backup_lock);
+	WT_TRET(__wt_writelock(session, conn->hot_backup_lock));
 	conn->hot_backup = 0;
-	__wt_spin_unlock(session, &conn->hot_backup_lock);
+	WT_TRET(__wt_writeunlock(session, conn->hot_backup_lock));
 
 	return (ret);
 }

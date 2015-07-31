@@ -21,9 +21,12 @@
 	((t1) <= (t2))
 
 #define	WT_TXNID_LT(t1, t2)						\
-	((t1) != (t2) && WT_TXNID_LE(t1, t2))
+	((t1) < (t2))
 
 #define	WT_SESSION_TXN_STATE(s) (&S2C(s)->txn_global.states[(s)->id])
+
+#define	WT_SESSION_IS_CHECKPOINT(s)					\
+	((s)->id != 0 && (s)->id == S2C(s)->txn_global.checkpoint_id)
 
 struct __wt_named_snapshot {
 	const char *name;
@@ -56,15 +59,15 @@ struct __wt_txn_global {
 	volatile int32_t scan_count;
 
 	/*
-	 * Track information about the running checkpoint. The transaction IDs
-	 * used when checkpointing are special. Checkpoints can run for a long
-	 * time so we keep them out of regular visibility checks. Eviction and
-	 * checkpoint operations know when they need to be aware of
-	 * checkpoint IDs.
+	 * Track information about the running checkpoint. The transaction
+	 * snapshot used when checkpointing are special. Checkpoints can run
+	 * for a long time so we keep them out of regular visibility checks.
+	 * Eviction and checkpoint operations know when they need to be aware
+	 * of checkpoint transactions.
 	 */
+	volatile uint32_t checkpoint_id;	/* Checkpoint's session ID */
 	volatile uint64_t checkpoint_gen;
-	volatile uint64_t checkpoint_id;
-	volatile uint64_t checkpoint_snap_min;
+	volatile uint64_t checkpoint_pinned;
 
 	/* Named snapshot state. */
 	WT_RWLOCK *nsnap_rwlock;
@@ -162,5 +165,6 @@ struct __wt_txn {
 #define	WT_TXN_NAMED_SNAPSHOT	0x10
 #define	WT_TXN_READONLY		0x20
 #define	WT_TXN_RUNNING		0x40
+#define	WT_TXN_SYNC_SET		0x80
 	uint32_t flags;
 };

@@ -334,6 +334,8 @@ __wt_debug_disk(
 
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
 		__dmsg(ds, ", compressed");
+	if (F_ISSET(dsk, WT_PAGE_ENCRYPTED))
+		__dmsg(ds, ", encrypted");
 	if (F_ISSET(dsk, WT_PAGE_EMPTY_V_ALL))
 		__dmsg(ds, ", empty-all");
 	if (F_ISSET(dsk, WT_PAGE_EMPTY_V_NONE))
@@ -641,8 +643,6 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", disk-mapped");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 		__dmsg(ds, ", evict-lru");
-	if (F_ISSET_ATOMIC(page, WT_PAGE_REFUSE_DEEPEN))
-		__dmsg(ds, ", refuse-deepen");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SCANNING))
 		__dmsg(ds, ", scanning");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))

@@ -219,6 +219,7 @@ PARAM
 POSIX
 PREDEFINE
 PRIu
+PRNG
 PTHREAD
 PTR
 Pandis
@@ -505,6 +506,7 @@ dmsg
 doxgen
 doxygen
 ds
+dsb
 dsk
 dsrc
 dst
@@ -606,6 +608,8 @@ icount
 idx
 ifdef's
 ikey
+impl
+incase
 incr
 incrementing
 indices
@@ -646,6 +650,7 @@ lang
 latencies
 lbrace
 lbracket
+ld
 len
 lenp
 level's
@@ -672,6 +677,7 @@ logtest
 lookup
 lookups
 lossy
+lrt
 lru
 lseek
 lsm
@@ -755,6 +761,7 @@ opendir
 openfile
 optimizations
 optype
+ori
 os
 ovfl
 ownp
@@ -841,6 +848,7 @@ sd
 secretkey
 sed
 sessionp
+setkv
 setstr
 setv
 sfence
@@ -853,6 +861,7 @@ skiplists
 slotsp
 slvg
 snaplen
+snapsort
 snprintf
 sp
 spinlock
@@ -891,6 +900,7 @@ subtree
 sunique
 superset
 sw
+sy
 sys
 t's
 tV

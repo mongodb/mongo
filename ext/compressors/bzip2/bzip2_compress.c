@@ -232,7 +232,7 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * it's a small number of slots, we're not going to take them because
 	 * they aren't worth compressing.  In all likelihood, that's going to
 	 * be because the btree is wrapping up a page, but that's OK, that is
-	 * going to happen a lot.   In addition, add a 2% chance of not taking
+	 * going to happen a lot. In addition, add a 2% chance of not taking
 	 * anything at all just because we don't want to take it.  Otherwise,
 	 * select between 80 and 100% of the slots and compress them, stepping
 	 * down by 5 slots at a time until something works.

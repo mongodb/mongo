@@ -1,10 +1,18 @@
-WiredTiger 2.6.1: (May 15, 2015)
+WiredTiger 2.6.2: (June  4, 2015)
 
-This is version 2.6.1 of WiredTiger.
+This is version 2.6.2 of WiredTiger.
 
 WiredTiger release packages and documentation can be found at:
 
 	http://source.wiredtiger.com/
+
+The documentation for this specific release can be found at:
+
+	http://source.wiredtiger.com/2.6.2/index.html
+
+The WiredTiger source code can be found at:
+
+	http://github.com/wiredtiger/wiredtiger
 
 WiredTiger uses JIRA for issue management:
 
@@ -12,16 +20,10 @@ WiredTiger uses JIRA for issue management:
 
 Please do not report issues through GitHub.
 
-Information on configuring, building and installing WiredTiger can be
-found at:
-
-	http://source.wiredtiger.com/2.6.1/install.html
-
 WiredTiger licensing information can be found at:
 
 	http://source.wiredtiger.com/license.html
 
-For general questions and discussion, please use the WiredTiger mailing
-list:
+For general questions and discussion, there's a WiredTiger group:
 
 	http://groups.google.com/group/wiredtiger-users

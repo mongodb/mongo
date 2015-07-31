@@ -100,11 +100,10 @@ __wt_block_manager_create(
 	WT_TRET(__wt_close(session, &fh));
 
 	/*
-	 * If checkpoint syncing is enabled, some filesystems require that we
-	 * sync the directory to be confident that the file will appear.
+	 * Some filesystems require that we sync the directory to be confident
+	 * that the file will appear.
 	 */
-	if (ret == 0 && F_ISSET(S2C(session), WT_CONN_CKPT_SYNC) &&
-	    (ret = __wt_filename(session, filename, &path)) == 0) {
+	if (ret == 0 && (ret = __wt_filename(session, filename, &path)) == 0) {
 		ret = __wt_directory_sync(session, path);
 		__wt_free(session, path);
 	}
@@ -133,8 +132,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	bucket = block->name_hash % WT_HASH_ARRAY_SIZE;
 	WT_CONN_BLOCK_REMOVE(conn, block, bucket);
 
-	if (block->name != NULL)
-		__wt_free(session, block->name);
+	__wt_free(session, block->name);
 
 	if (block->fh != NULL)
 		WT_TRET(__wt_close(session, &block->fh));
@@ -180,10 +178,10 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	uint64_t bucket, hash;
 
-	WT_TRET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
+	WT_RET(__wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename));
 
 	conn = S2C(session);
-	*blockp = NULL;
+	*blockp = block = NULL;
 	hash = __wt_hash_city64(filename, strlen(filename));
 	bucket = hash % WT_HASH_ARRAY_SIZE;
 	__wt_spin_lock(session, &conn->block_lock);
@@ -196,14 +194,20 @@ __wt_block_open(WT_SESSION_IMPL *session,
 		}
 	}
 
-	/* Basic structure allocation, initialization. */
+	/*
+	 * Basic structure allocation, initialization.
+	 *
+	 * Note: set the block's name-hash value before any work that can fail
+	 * because cleanup calls the block destroy code which uses that hash
+	 * value to remove the block from the underlying linked lists.
+	 */
 	WT_ERR(__wt_calloc_one(session, &block));
 	block->ref = 1;
+	block->name_hash = hash;
+	block->allocsize = allocsize;
 	WT_CONN_BLOCK_INSERT(conn, block, bucket);
 
 	WT_ERR(__wt_strdup(session, filename, &block->name));
-	block->name_hash = hash;
-	block->allocsize = allocsize;
 
 	WT_ERR(__wt_config_gets(session, cfg, "block_allocation", &cval));
 	block->allocfirst =
@@ -264,7 +268,8 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	__wt_spin_unlock(session, &conn->block_lock);
 	return (0);
 
-err:	WT_TRET(__block_destroy(session, block));
+err:	if (block != NULL)
+		WT_TRET(__block_destroy(session, block));
 	__wt_spin_unlock(session, &conn->block_lock);
 	return (ret);
 }
@@ -388,7 +393,7 @@ err:	__wt_scr_free(session, &buf);
 
 /*
  * __wt_block_stat --
- *	Block statistics
+ *	Set the statistics for a live block handle.
  */
 void
 __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
@@ -408,4 +413,20 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 	WT_STAT_SET(stats, block_reuse_bytes, block->live.avail.bytes);
 	WT_STAT_SET(stats, block_size, block->fh->size);
 	__wt_spin_unlock(session, &block->live_lock);
+}
+
+/*
+ * __wt_block_manager_size --
+ *	Set the size statistic for a file.
+ */
+int
+__wt_block_manager_size(
+    WT_SESSION_IMPL *session, const char *filename, WT_DSRC_STATS *stats)
+{
+	wt_off_t filesize;
+
+	WT_RET(__wt_filesize_name(session, filename, &filesize));
+	WT_STAT_SET(stats, block_size, filesize);
+
+	return (0);
 }

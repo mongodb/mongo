@@ -15,8 +15,9 @@
  */
 typedef struct __wt_meta_track {
 	enum {
-		WT_ST_EMPTY,		/* Unused slot */
+		WT_ST_EMPTY = 0,	/* Unused slot */
 		WT_ST_CHECKPOINT,	/* Complete a checkpoint */
+		WT_ST_DROP_COMMIT,	/* Drop post commit */
 		WT_ST_FILEOP,		/* File operation */
 		WT_ST_LOCK,		/* Lock a handle */
 		WT_ST_REMOVE,		/* Remove a metadata entry */
@@ -66,6 +67,35 @@ __meta_track_next(WT_SESSION_IMPL *session, WT_META_TRACK **trkp)
 }
 
 /*
+ * __meta_track_clear --
+ *	Clear the structure.
+ */
+static void
+__meta_track_clear(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
+{
+	__wt_free(session, trk->a);
+	__wt_free(session, trk->b);
+	memset(trk, 0, sizeof(WT_META_TRACK));
+}
+
+/*
+ * __meta_track_err --
+ *	Drop the last operation off the end of the list, something went wrong
+ * during initialization.
+ */
+static void
+__meta_track_err(WT_SESSION_IMPL *session)
+{
+	WT_META_TRACK *trk;
+
+	trk = session->meta_track_next;
+	--trk;
+	__meta_track_clear(session, trk);
+
+	session->meta_track_next = trk;
+}
+
+/*
  * __wt_meta_track_discard --
  *	Cleanup metadata tracking when closing a session.
  */
@@ -95,33 +125,64 @@ __wt_meta_track_on(WT_SESSION_IMPL *session)
  *	Apply the changes in a metadata tracking record.
  */
 static int
-__meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
+__meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	int tret;
 
-	/*
-	 * Unlock handles and complete checkpoints regardless of whether we are
-	 * unrolling.
-	 */
-	if (!unroll && trk->op != WT_ST_CHECKPOINT && trk->op != WT_ST_LOCK)
-		goto free;
+	switch (trk->op) {
+	case WT_ST_EMPTY:	/* Unused slot */
+		break;
+	case WT_ST_CHECKPOINT:	/* Checkpoint, see above */
+		btree = trk->dhandle->handle;
+		bm = btree->bm;
+		WT_WITH_DHANDLE(session, trk->dhandle,
+		    WT_TRET(bm->checkpoint_resolve(bm, session)));
+		break;
+	case WT_ST_DROP_COMMIT:
+		if ((tret = __wt_remove_if_exists(session, trk->a)) != 0) {
+			__wt_err(session, tret,
+			    "metadata remove dropped file %s",
+			    trk->a);
+			WT_TRET(tret);
+		}
+		break;
+	case WT_ST_LOCK:
+		WT_WITH_DHANDLE(session, trk->dhandle,
+		    WT_TRET(__wt_session_release_btree(session)));
+		break;
+	case WT_ST_FILEOP:
+	case WT_ST_REMOVE:
+	case WT_ST_SET:
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	__meta_track_clear(session, trk);
+	return (ret);
+}
+
+/*
+ * __meta_track_unroll --
+ *	Undo the changes in a metadata tracking record.
+ */
+static int
+__meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
+{
+	WT_DECL_RET;
+	int tret;
 
 	switch (trk->op) {
 	case WT_ST_EMPTY:	/* Unused slot */
 		break;
 	case WT_ST_CHECKPOINT:	/* Checkpoint, see above */
-		if (!unroll) {
-			btree = trk->dhandle->handle;
-			bm = btree->bm;
-			WT_WITH_DHANDLE(session, trk->dhandle,
-			    WT_TRET(bm->checkpoint_resolve(bm, session)));
-		}
+		break;
+	case WT_ST_DROP_COMMIT:
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */
-		if (unroll && trk->created)
+		if (trk->created)
 			F_SET(trk->dhandle, WT_DHANDLE_DISCARD);
 		WT_WITH_DHANDLE(session, trk->dhandle,
 		    WT_TRET(__wt_session_release_btree(session)));
@@ -175,11 +236,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-free:	trk->op = WT_ST_EMPTY;
-	__wt_free(session, trk->a);
-	__wt_free(session, trk->b);
-	trk->dhandle = NULL;
-
+	__meta_track_clear(session, trk);
 	return (ret);
 }
 
@@ -243,33 +300,38 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int need_sync, int unroll)
 	if (trk == trk_orig)
 		return (0);
 
-	while (--trk >= trk_orig)
-		WT_TRET(__meta_track_apply(session, trk, unroll));
+	if (unroll) {
+		while (--trk >= trk_orig)
+			WT_TRET(__meta_track_unroll(session, trk));
+		/* Unroll operations don't need to flush the metadata. */
+		return (ret);
+	}
 
 	/*
-	 * Unroll operations don't need to flush the metadata.
-	 *
-	 * Also, if we don't have the metadata handle (e.g, we're in the
-	 * process of creating the metadata), we can't sync it.
+	 * If we don't have the metadata handle (e.g, we're in the process of
+	 * creating the metadata), we can't sync it.
 	 */
-	if (unroll || ret != 0 || !need_sync || session->meta_dhandle == NULL)
-		return (ret);
+	if (!need_sync || session->meta_dhandle == NULL)
+		goto done;
 
 	/* If we're logging, make sure the metadata update was flushed. */
 	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED)) {
-		if (!FLD_ISSET(S2C(session)->txn_logsync,
-		    WT_LOG_DSYNC | WT_LOG_FSYNC))
-			WT_WITH_DHANDLE(session, session->meta_dhandle,
-			    ret = __wt_txn_checkpoint_log(session,
-			    0, WT_TXN_LOG_CKPT_SYNC, NULL));
+		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		    ret = __wt_txn_checkpoint_log(session,
+		    0, WT_TXN_LOG_CKPT_SYNC, NULL));
+		WT_RET(ret);
 	} else {
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_checkpoint(session, NULL));
 		WT_RET(ret);
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_checkpoint_sync(session, NULL));
+		WT_RET(ret);
 	}
 
+done:	/* Apply any tracked operations post-commit. */
+	for (; trk_orig < trk; trk_orig++)
+		WT_TRET(__meta_track_apply(session, trk_orig));
 	return (ret);
 }
 
@@ -306,7 +368,7 @@ __wt_meta_track_sub_off(WT_SESSION_IMPL *session)
 	session->meta_track_next = session->meta_track_sub = NULL;
 
 	while (--trk >= trk_orig)
-		WT_TRET(__meta_track_apply(session, trk, 0));
+		WT_TRET(__meta_track_apply(session, trk));
 
 	session->meta_track_next = trk_orig;
 	return (ret);
@@ -336,14 +398,17 @@ __wt_meta_track_checkpoint(WT_SESSION_IMPL *session)
 int
 __wt_meta_track_insert(WT_SESSION_IMPL *session, const char *key)
 {
+	WT_DECL_RET;
 	WT_META_TRACK *trk;
 
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_REMOVE;
-	WT_RET(__wt_strdup(session, key, &trk->a));
-
+	WT_ERR(__wt_strdup(session, key, &trk->a));
 	return (0);
+
+err:	__meta_track_err(session);
+	return (ret);
 }
 
 /*
@@ -359,7 +424,7 @@ __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key)
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_SET;
-	WT_RET(__wt_strdup(session, key, &trk->a));
+	WT_ERR(__wt_strdup(session, key, &trk->a));
 
 	/*
 	 * If there was a previous value, keep it around -- if not, then this
@@ -370,6 +435,10 @@ __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key)
 		trk->op = WT_ST_REMOVE;
 		ret = 0;
 	}
+	WT_ERR(ret);
+	return (0);
+
+err:	__meta_track_err(session);
 	return (ret);
 }
 
@@ -381,14 +450,39 @@ int
 __wt_meta_track_fileop(
     WT_SESSION_IMPL *session, const char *olduri, const char *newuri)
 {
+	WT_DECL_RET;
 	WT_META_TRACK *trk;
 
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_FILEOP;
-	WT_RET(__wt_strdup(session, olduri, &trk->a));
-	WT_RET(__wt_strdup(session, newuri, &trk->b));
+	WT_ERR(__wt_strdup(session, olduri, &trk->a));
+	WT_ERR(__wt_strdup(session, newuri, &trk->b));
 	return (0);
+
+err:	__meta_track_err(session);
+	return (ret);
+}
+
+/*
+ * __wt_meta_track_drop --
+ *	Track a file drop, where the remove is deferred until commit.
+ */
+int
+__wt_meta_track_drop(
+    WT_SESSION_IMPL *session, const char *filename)
+{
+	WT_DECL_RET;
+	WT_META_TRACK *trk;
+
+	WT_RET(__meta_track_next(session, &trk));
+
+	trk->op = WT_ST_DROP_COMMIT;
+	WT_ERR(__wt_strdup(session, filename, &trk->a));
+	return (0);
+
+err:	__meta_track_err(session);
+	return (ret);
 }
 
 /*

@@ -67,7 +67,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	 * worth doing.  Ignore small files, and files where we are unlikely
 	 * to recover 10% of the file.
 	 */
-	if (fh->size <= 10 * 1024)
+	if (fh->size <= WT_MEGABYTE)
 		return (0);
 
 	__wt_spin_lock(session, &block->live_lock);
@@ -106,6 +106,8 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	    *skipp ? "skipped" : "proceeding"));
 
 	/*
+	 * Skip files where we can't recover at least 1MB.
+	 *
 	 * If at least 20% of the total file is available and in the first 80%
 	 * of the file, we'll try compaction on the last 20% of the file; else,
 	 * if at least 10% of the total file is available and in the first 90%
@@ -115,11 +117,14 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	 * empty file can be processed quickly, so more aggressive compaction is
 	 * less useful.
 	 */
-	if (avail_ninety >= fh->size / 10) {
+	if (avail_eighty > WT_MEGABYTE &&
+	    avail_eighty >= ((fh->size / 10) * 2)) {
+		*skipp = 0;
+		block->compact_pct_tenths = 2;
+	} else if (avail_ninety > WT_MEGABYTE &&
+	    avail_ninety >= fh->size / 10) {
 		*skipp = 0;
 		block->compact_pct_tenths = 1;
-		if (avail_eighty >= ((fh->size / 10) * 2))
-			block->compact_pct_tenths = 2;
 	}
 
 err:	__wt_spin_unlock(session, &block->live_lock);

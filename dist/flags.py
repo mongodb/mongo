@@ -29,6 +29,7 @@ flags = {
         'LOGSCAN_RECOVER',
     ],
     'log_write' : [
+        'LOG_BACKGROUND',
         'LOG_DSYNC',
         'LOG_FLUSH',
         'LOG_FSYNC',
@@ -43,11 +44,6 @@ flags = {
         'READ_SKIP_INTL',
         'READ_TRUNCATE',
         'READ_WONT_NEED',
-    ],
-    'page_eviction' : [
-        'EVICT_CHECK_SPLITS',
-        'EVICT_EXCLUSIVE',
-        'EVICT_INMEM_SPLIT',
     ],
     'rec_write' : [
         'EVICTING',
@@ -71,6 +67,7 @@ flags = {
         'VERB_FILEOPS',
         'VERB_LOG',
         'VERB_LSM',
+        'VERB_LSM_MANAGER',
         'VERB_METADATA',
         'VERB_MUTEX',
         'VERB_OVERFLOW',

@@ -109,7 +109,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	 * enough to trigger checkpoints.
 	 */
 	if (evict_chunk != NULL && flush_chunk != NULL) {
-		chunk = (__wt_random(session->rnd) & 1) ?
+		chunk = (__wt_random(&session->rnd) & 1) ?
 		    evict_chunk : flush_chunk;
 		WT_ERR(__wt_lsm_manager_push_entry(
 		    session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
@@ -333,6 +333,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 
 	/* Update the flush timestamp to help track ongoing progress. */
 	WT_RET(__wt_epoch(session, &lsm_tree->last_flush_ts));
+	++lsm_tree->chunks_flushed;
 
 	/* Lock the tree, mark the chunk as on disk and update the metadata. */
 	WT_RET(__wt_lsm_tree_writelock(session, lsm_tree));

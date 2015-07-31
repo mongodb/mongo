@@ -309,13 +309,13 @@ __ckpt_extlist_fblocks(
 
 	/*
 	 * Free blocks used to write checkpoint extents into the live system's
-	 * checkpoint avail list (they were never on any alloc list).   Do not
+	 * checkpoint avail list (they were never on any alloc list). Do not
 	 * use the live system's avail list because that list is used to decide
 	 * if the file can be truncated, and we can't truncate any part of the
 	 * file that contains a previous checkpoint's extents.
 	 */
 	return (__wt_block_insert_ext(
-	    session, &block->live.ckpt_avail, el->offset, el->size));
+	    session, block, &block->live.ckpt_avail, el->offset, el->size));
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -403,7 +403,8 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 	 */
 	if (block->ckpt_inprogress) {
 		__wt_errx(session,
-		    "%s: checkpointed without the checkpoint being resolved",
+		    "%s: checkpointed without first resolving the previous "
+		    "checkpoint",
 		    block->name);
 
 		WT_RET(__wt_block_checkpoint_resolve(session, block));
@@ -537,7 +538,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 		 * must be paired in the checkpoint.
 		 */
 		if (a->root_offset != WT_BLOCK_INVALID_OFFSET)
-			WT_ERR(__wt_block_insert_ext(session,
+			WT_ERR(__wt_block_insert_ext(session, block,
 			    &a->discard, a->root_offset, a->root_size));
 
 		/*
@@ -554,10 +555,10 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 		 */
 		if (a->alloc.entries != 0)
 			WT_ERR(__wt_block_extlist_merge(
-			    session, &a->alloc, &b->alloc));
+			    session, block, &a->alloc, &b->alloc));
 		if (a->discard.entries != 0)
 			WT_ERR(__wt_block_extlist_merge(
-			    session, &a->discard, &b->discard));
+			    session, block, &a->discard, &b->discard));
 
 		/*
 		 * If the "to" checkpoint is also being deleted, we're done with
@@ -775,7 +776,8 @@ __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	block->ckpt_inprogress = 0;
 
 	__wt_spin_lock(session, &block->live_lock);
-	ret = __wt_block_extlist_merge(session, &ci->ckpt_avail, &ci->avail);
+	ret = __wt_block_extlist_merge(
+	    session, block, &ci->ckpt_avail, &ci->avail);
 	__wt_spin_unlock(session, &block->live_lock);
 
 	/* Discard the lists remaining after the checkpoint call. */

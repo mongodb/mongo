@@ -47,13 +47,13 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 int
 __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
-    WT_ITEM *key, WT_ITEM *value, WT_UPDATE *upd, int is_remove)
+    WT_ITEM *key, WT_ITEM *value, WT_UPDATE *upd_arg, int is_remove)
 {
 	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head, **ins_headp;
 	WT_PAGE *page;
-	WT_UPDATE *old_upd, **upd_entry;
+	WT_UPDATE *old_upd, *upd, **upd_entry;
 	size_t ins_size, upd_size;
 	uint32_t ins_slot;
 	u_int i, skipdepth;
@@ -61,6 +61,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 
 	ins = NULL;
 	page = cbt->ref->page;
+	upd = upd_arg;
 	logged = 0;
 
 	/* This code expects a remove to have a NULL value. */
@@ -90,7 +91,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		} else
 			upd_entry = &cbt->ins->upd;
 
-		if (upd == NULL) {
+		if (upd_arg == NULL) {
 			/* Make sure the update can proceed. */
 			WT_ERR(__wt_txn_update_check(
 			    session, old_upd = *upd_entry));
@@ -165,7 +166,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		cbt->ins_head = ins_head;
 		cbt->ins = ins;
 
-		if (upd == NULL) {
+		if (upd_arg == NULL) {
 			WT_ERR(
 			    __wt_update_alloc(session, value, &upd, &upd_size));
 			WT_ERR(__wt_txn_modify(session, upd));
@@ -218,7 +219,8 @@ err:		/*
 			__wt_txn_unmodify(session);
 		__wt_free(session, ins);
 		cbt->ins = NULL;
-		__wt_free(session, upd);
+		if (upd_arg == NULL)
+			__wt_free(session, upd);
 	}
 
 	return (ret);
@@ -261,7 +263,6 @@ int
 __wt_update_alloc(
     WT_SESSION_IMPL *session, WT_ITEM *value, WT_UPDATE **updp, size_t *sizep)
 {
-	WT_UPDATE *upd;
 	size_t size;
 
 	/*
@@ -269,16 +270,15 @@ __wt_update_alloc(
 	 * the value into place.
 	 */
 	size = value == NULL ? 0 : value->size;
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_UPDATE) + size, &upd));
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_UPDATE) + size, updp));
 	if (value == NULL)
-		WT_UPDATE_DELETED_SET(upd);
+		WT_UPDATE_DELETED_SET(*updp);
 	else {
-		upd->size = WT_STORE_SIZE(size);
-		memcpy(WT_UPDATE_DATA(upd), value->data, size);
+		(*updp)->size = WT_STORE_SIZE(size);
+		memcpy(WT_UPDATE_DATA(*updp), value->data, size);
 	}
 
-	*updp = upd;
-	*sizep = WT_UPDATE_MEMSIZE(upd);
+	*sizep = WT_UPDATE_MEMSIZE(*updp);
 	return (0);
 }
 
