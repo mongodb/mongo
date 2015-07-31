@@ -73,9 +73,7 @@ public:
      * Constructs a new AsyncResultsMerger. The TaskExecutor* and ClusterClientCursorParams& must
      * remain valid for the lifetime of the ARM.
      */
-    AsyncResultsMerger(executor::TaskExecutor* executor,
-                       const ClusterClientCursorParams& params,
-                       const std::vector<HostAndPort>& remotes);
+    AsyncResultsMerger(executor::TaskExecutor* executor, const ClusterClientCursorParams& params);
 
     /**
      * In order to be destroyed, either
@@ -149,7 +147,7 @@ private:
      * reported from the remote.
      */
     struct RemoteCursorData {
-        RemoteCursorData(const HostAndPort& host);
+        RemoteCursorData(const ClusterClientCursorParams::Remote& params);
 
         /**
          * Returns whether there is another buffered result available for this remote node.
@@ -163,10 +161,14 @@ private:
         bool exhausted() const;
 
         HostAndPort hostAndPort;
+        BSONObj cmdObj;
         boost::optional<CursorId> cursorId;
         std::queue<BSONObj> docBuffer;
         executor::TaskExecutor::CallbackHandle cbHandle;
         Status status = Status::OK();
+
+        // Set to true once we have heard from the remote node at least once.
+        bool gotFirstResponse = false;
     };
 
     class MergingComparator {
@@ -189,6 +191,16 @@ private:
      */
     static void handleKillCursorsResponse(
         const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData);
+
+    /**
+     * Helper to schedule a command asking the remote node for another batch of results.
+     *
+     * The 'remoteIndex' gives the position of the remote node from which we are retrieving the
+     * batch in '_remotes'.
+     *
+     * Returns success if the command to retrieve the next batch was scheduled successfully.
+     */
+    Status askForNextBatch_inlock(size_t remoteIndex);
 
     //
     // Helpers for ready().

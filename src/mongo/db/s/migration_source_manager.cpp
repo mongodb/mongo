@@ -225,7 +225,7 @@ void MigrationSourceManager::logOp(OperationContext* txn,
                                    const BSONObj& obj,
                                    BSONObj* patt,
                                    bool notInActiveChunk) {
-    ensureShardVersionOKOrThrow(txn->getClient(), ns);
+    ensureShardVersionOKOrThrow(txn, ns);
 
     const char op = opstr[0];
 

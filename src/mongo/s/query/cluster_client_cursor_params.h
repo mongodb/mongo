@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
@@ -36,14 +37,25 @@
 namespace mongo {
 
 struct ClusterClientCursorParams {
+    /**
+     * Contains any CCC parameters that are specified per-remote node.
+     */
+    struct Remote {
+        // How the networking layer should contact this remote.
+        HostAndPort hostAndPort;
+
+        // The raw command parameters to send to this remote (e.g. the find command specification).
+        BSONObj cmdObj;
+    };
+
     ClusterClientCursorParams() {}
 
     ClusterClientCursorParams(NamespaceString nss) : nsString(std::move(nss)) {}
 
     NamespaceString nsString;
 
-    // The raw command parameters (e.g. the find command specification).
-    BSONObj cmdObj;
+    // Per-remote node data.
+    std::vector<Remote> remotes;
 
     // The sort specification. Leave empty if there is no sort.
     BSONObj sort;
@@ -56,8 +68,7 @@ struct ClusterClientCursorParams {
     boost::optional<long long> skip;
 
     // The number of results per batch. Optional. If specified, will be specified as the batch for
-    // each
-    // getMore.
+    // each getMore.
     boost::optional<long long> batchSize;
 
     // Limits the number of results returned by the ClusterClientCursor to this many. Optional.

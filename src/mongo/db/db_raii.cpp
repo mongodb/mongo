@@ -81,7 +81,7 @@ void AutoGetCollectionForRead::_init(const std::string& ns, StringData coll) {
 
     // We have both the DB and collection locked, which the prerequisite to do a stable shard
     // version check.
-    ensureShardVersionOKOrThrow(_txn->getClient(), ns);
+    ensureShardVersionOKOrThrow(_txn, ns);
 
     auto curOp = CurOp::get(_txn);
     stdx::lock_guard<Client> lk(*_txn->getClient());
@@ -158,7 +158,7 @@ void OldClientContext::_checkNotStale() const {
         case dbDelete:   // here as well.
             break;
         default:
-            ensureShardVersionOKOrThrow(_txn->getClient(), _ns);
+            ensureShardVersionOKOrThrow(_txn, _ns);
     }
 }
 

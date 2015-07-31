@@ -46,6 +46,10 @@ struct ReadPreferenceSetting;
  */
 class ClusterFind {
 public:
+    // The number of times we are willing to re-target and re-run the query after receiving a stale
+    // config message.
+    static const size_t kMaxStaleConfigRetries;
+
     /**
      * Runs query 'query', targeting remote hosts according to the read preference in 'readPref'.
      *

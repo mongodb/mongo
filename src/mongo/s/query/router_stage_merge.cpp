@@ -37,12 +37,11 @@
 namespace mongo {
 
 RouterStageMerge::RouterStageMerge(executor::TaskExecutor* executor,
-                                   const ClusterClientCursorParams& params,
-                                   const std::vector<HostAndPort>& remotes)
-    : _executor(executor), _arm(executor, params, remotes) {}
+                                   const ClusterClientCursorParams& params)
+    : _executor(executor), _arm(executor, params) {}
 
 StatusWith<boost::optional<BSONObj>> RouterStageMerge::next() {
-    // On error, kill the underlying ACCC.
+    // On error, kill the underlying async results merger.
     auto killer = MakeGuard(&RouterStageMerge::kill, this);
 
     while (!_arm.ready()) {

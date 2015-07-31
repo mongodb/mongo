@@ -48,6 +48,7 @@ class StatusWith;
 class LiteParsedQuery {
 public:
     static const char kFindCommandName[];
+    static const char kShardVersionField[];
 
     /**
      * Parses a find command object, 'cmdObj'. Caller must indicate whether or not this lite
@@ -113,6 +114,7 @@ public:
      * Converts this LPQ into a find command.
      */
     BSONObj asFindCommand() const;
+    void asFindCommand(BSONObjBuilder* cmdBuilder) const;
 
     /**
      * Helper functions to parse maxTimeMS from a command object.  Returns the contained value,

@@ -40,9 +40,8 @@
 namespace mongo {
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
-                                                 const ClusterClientCursorParams& params,
-                                                 const std::vector<HostAndPort>& remotes)
-    : _root(buildMergerPlan(executor, params, remotes)) {}
+                                                 const ClusterClientCursorParams& params)
+    : _root(buildMergerPlan(executor, params)) {}
 
 StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
     return _root->next();
@@ -53,11 +52,9 @@ void ClusterClientCursorImpl::kill() {
 }
 
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
-    executor::TaskExecutor* executor,
-    const ClusterClientCursorParams& params,
-    const std::vector<HostAndPort>& remotes) {
+    executor::TaskExecutor* executor, const ClusterClientCursorParams& params) {
     // The first stage is always the one which merges from the remotes.
-    auto leaf = stdx::make_unique<RouterStageMerge>(executor, params, remotes);
+    auto leaf = stdx::make_unique<RouterStageMerge>(executor, params);
 
     std::unique_ptr<RouterExecStage> root = std::move(leaf);
     if (params.skip) {

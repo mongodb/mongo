@@ -63,7 +63,7 @@ bool haveLocalShardingInfo(Client* client, const std::string& ns);
  *
  * @param ns Complete collection namespace to be cheched.
  */
-void ensureShardVersionOKOrThrow(Client* client, const std::string& ns);
+void ensureShardVersionOKOrThrow(OperationContext* txn, const std::string& ns);
 
 /**
  * If a migration for the chunk in 'ns' where 'obj' lives is occurring, save this log entry

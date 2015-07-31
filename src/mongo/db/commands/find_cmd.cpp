@@ -47,6 +47,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
@@ -170,10 +171,6 @@ public:
      *   5) Generate the first batch.
      *   6) Save state for getMore.
      *   7) Generate response to send to the client.
-     *
-     * TODO: Rather than using the sharding version available in thread-local storage (i.e. the
-     *       call to ShardingState::needCollectionMetadata() below), shard version information
-     *       should be passed as part of the command parameter.
      */
     bool run(OperationContext* txn,
              const std::string& dbname,
@@ -229,14 +226,23 @@ public:
         }
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
+        // If the received version is newer than the version cached in 'shardingState', then we have
+        // to refresh 'shardingState' from the config servers. We do this before acquiring locks so
+        // that we don't hold locks while waiting on the network.
+        ShardingState* const shardingState = ShardingState::get(txn);
+        if (OperationShardVersion::get(txn).hasShardVersion() && shardingState->enabled()) {
+            ChunkVersion receivedVersion = OperationShardVersion::get(txn).getShardVersion();
+            ChunkVersion latestVersion;
+            uassertStatusOK(shardingState->refreshMetadataIfNeeded(
+                txn, nss.ns(), receivedVersion, &latestVersion));
+        }
+
         // 2) Acquire locks.
         AutoGetCollectionForRead ctx(txn, nss);
         Collection* collection = ctx.getCollection();
 
         const int dbProfilingLevel =
             ctx.getDb() ? ctx.getDb()->getProfilingLevel() : serverGlobalParams.defaultProfile;
-
-        ShardingState* const shardingState = ShardingState::get(txn);
 
         // It is possible that the sharding version will change during yield while we are
         // retrieving a plan executor. If this happens we will throw an error and mongos will

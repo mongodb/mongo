@@ -98,6 +98,7 @@ const char kShardVersionField[] = "shardVersion";
 }  // namespace
 
 const char LiteParsedQuery::kFindCommandName[] = "find";
+const char LiteParsedQuery::kShardVersionField[] = "shardVersion";
 
 LiteParsedQuery::LiteParsedQuery(NamespaceString nss) : _nss(std::move(nss)) {}
 
@@ -464,98 +465,100 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
 
 BSONObj LiteParsedQuery::asFindCommand() const {
     BSONObjBuilder bob;
+    asFindCommand(&bob);
+    return bob.obj();
+}
 
-    bob.append(kFindCommandName, _nss.coll());
+void LiteParsedQuery::asFindCommand(BSONObjBuilder* cmdBuilder) const {
+    cmdBuilder->append(kFindCommandName, _nss.coll());
 
     if (!_filter.isEmpty()) {
-        bob.append(kFilterField, _filter);
+        cmdBuilder->append(kFilterField, _filter);
     }
 
     if (!_proj.isEmpty()) {
-        bob.append(kProjectionField, _proj);
+        cmdBuilder->append(kProjectionField, _proj);
     }
 
     if (!_sort.isEmpty()) {
-        bob.append(kSortField, _sort);
+        cmdBuilder->append(kSortField, _sort);
     }
 
     if (!_hint.isEmpty()) {
-        bob.append(kHintField, _hint);
+        cmdBuilder->append(kHintField, _hint);
     }
 
     if (_skip) {
-        bob.append(kSkipField, *_skip);
+        cmdBuilder->append(kSkipField, *_skip);
     }
 
     if (_limit) {
-        bob.append(kLimitField, *_limit);
+        cmdBuilder->append(kLimitField, *_limit);
     }
 
     if (_batchSize) {
-        bob.append(kBatchSizeField, *_batchSize);
+        cmdBuilder->append(kBatchSizeField, *_batchSize);
     }
 
     if (!_wantMore) {
-        bob.append(kSingleBatchField, true);
+        cmdBuilder->append(kSingleBatchField, true);
     }
 
     if (!_comment.empty()) {
-        bob.append(kCommentField, _comment);
+        cmdBuilder->append(kCommentField, _comment);
     }
 
     if (_maxScan > 0) {
-        bob.append(kMaxScanField, _maxScan);
+        cmdBuilder->append(kMaxScanField, _maxScan);
     }
 
     if (_maxTimeMS > 0) {
-        bob.append(cmdOptionMaxTimeMS, _maxTimeMS);
+        cmdBuilder->append(cmdOptionMaxTimeMS, _maxTimeMS);
     }
 
     if (!_max.isEmpty()) {
-        bob.append(kMaxField, _max);
+        cmdBuilder->append(kMaxField, _max);
     }
 
     if (!_min.isEmpty()) {
-        bob.append(kMinField, _min);
+        cmdBuilder->append(kMinField, _min);
     }
 
     if (_returnKey) {
-        bob.append(kReturnKeyField, true);
+        cmdBuilder->append(kReturnKeyField, true);
     }
 
     if (_showRecordId) {
-        bob.append(kShowRecordIdField, true);
+        cmdBuilder->append(kShowRecordIdField, true);
     }
 
     if (_snapshot) {
-        bob.append(kSnapshotField, true);
+        cmdBuilder->append(kSnapshotField, true);
     }
 
     if (_tailable) {
-        bob.append(kTailableField, true);
+        cmdBuilder->append(kTailableField, true);
     }
 
     if (_oplogReplay) {
-        bob.append(kOplogReplayField, true);
+        cmdBuilder->append(kOplogReplayField, true);
     }
 
     if (_noCursorTimeout) {
-        bob.append(kNoCursorTimeoutField, true);
+        cmdBuilder->append(kNoCursorTimeoutField, true);
     }
 
     if (_awaitData) {
-        bob.append(kAwaitDataField, true);
+        cmdBuilder->append(kAwaitDataField, true);
     }
 
     if (_partial) {
-        bob.append(kPartialField, true);
+        cmdBuilder->append(kPartialField, true);
     }
 
     if (_replicationTerm) {
-        bob.append(kTermField, *_replicationTerm);
+        cmdBuilder->append(kTermField, *_replicationTerm);
     }
-
-    return bob.obj();
 }
 
 void LiteParsedQuery::addReturnKeyMetaProj() {

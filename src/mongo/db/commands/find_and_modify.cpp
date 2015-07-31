@@ -233,8 +233,6 @@ public:
         const FindAndModifyRequest& args = parseStatus.getValue();
         const NamespaceString& nsString = args.getNamespaceString();
 
-        auto client = txn->getClient();
-
         if (args.isRemove()) {
             DeleteRequest request(nsString);
             const bool isExplain = true;
@@ -251,7 +249,7 @@ public:
             AutoGetDb autoDb(txn, dbName, MODE_IX);
             Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
-            ensureShardVersionOKOrThrow(client, nsString.ns());
+            ensureShardVersionOKOrThrow(txn, nsString.ns());
 
             Collection* collection = nullptr;
             if (autoDb.getDb()) {
@@ -287,7 +285,7 @@ public:
             AutoGetDb autoDb(txn, dbName, MODE_IX);
             Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
-            ensureShardVersionOKOrThrow(client, nsString.ns());
+            ensureShardVersionOKOrThrow(txn, nsString.ns());
 
             Collection* collection = nullptr;
             if (autoDb.getDb()) {
@@ -370,7 +368,7 @@ public:
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
                 Collection* collection = autoDb.getDb()->getCollection(nsString.ns());
 
-                ensureShardVersionOKOrThrow(client, nsString.ns());
+                ensureShardVersionOKOrThrow(txn, nsString.ns());
 
                 Status isPrimary = checkCanAcceptWritesForDatabase(nsString);
                 if (!isPrimary.isOK()) {
@@ -411,7 +409,7 @@ public:
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
                 Collection* collection = autoDb.getDb()->getCollection(nsString.ns());
 
-                ensureShardVersionOKOrThrow(client, nsString.ns());
+                ensureShardVersionOKOrThrow(txn, nsString.ns());
 
                 Status isPrimary = checkCanAcceptWritesForDatabase(nsString);
                 if (!isPrimary.isOK()) {

@@ -44,6 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
@@ -222,11 +223,12 @@ public:
  * @ return true if not in sharded mode
                  or if version for this client is ok
  */
-bool shardVersionOk(Client* client,
+bool shardVersionOk(OperationContext* txn,
                     const string& ns,
                     string& errmsg,
                     ChunkVersion& received,
                     ChunkVersion& wanted) {
+    Client* client = txn->getClient();
     ShardingState* shardingState = ShardingState::get(client->getServiceContext());
     if (!shardingState->enabled()) {
         return true;
@@ -237,22 +239,25 @@ bool shardVersionOk(Client* client,
         return true;
     }
 
-    ShardedConnectionInfo* info = ShardedConnectionInfo::get(client, false);
+    // If there is a version attached to the OperationContext, use it as the received version.
+    // Otherwise, get the received version from the ShardedConnectionInfo.
+    if (OperationShardVersion::get(txn).hasShardVersion()) {
+        received = OperationShardVersion::get(txn).getShardVersion();
+    } else {
+        ShardedConnectionInfo* info = ShardedConnectionInfo::get(client, false);
+        if (!info) {
+            // There is no shard version information on either 'txn' or 'client'. This means that
+            // the operation represented by 'txn' is unversioned, and the shard version is always OK
+            // for unversioned operations.
+            return true;
+        }
 
-    if (!info) {
-        // this means the client has nothing sharded
-        // so this allows direct connections to do whatever they want
-        // which i think is the correct behavior
-        return true;
+        if (info->inForceVersionOkMode()) {
+            return true;
+        }
+
+        received = info->getVersion(ns);
     }
-
-    if (info->inForceVersionOkMode()) {
-        return true;
-    }
-
-    // TODO : all collections at some point, be sharded or not, will have a version
-    //  (and a CollectionMetadata)
-    received = info->getVersion(ns);
 
     if (ChunkVersion::isIgnoredVersion(received)) {
         return true;
@@ -327,11 +332,11 @@ bool haveLocalShardingInfo(Client* client, const string& ns) {
     return ShardedConnectionInfo::get(client, false) != NULL;
 }
 
-void ensureShardVersionOKOrThrow(Client* client, const std::string& ns) {
+void ensureShardVersionOKOrThrow(OperationContext* txn, const std::string& ns) {
     string errmsg;
     ChunkVersion received;
     ChunkVersion wanted;
-    if (!shardVersionOk(client, ns, errmsg, received, wanted)) {
+    if (!shardVersionOk(txn, ns, errmsg, received, wanted)) {
         StringBuilder sb;
         sb << "[" << ns << "] shard version not ok: " << errmsg;
         throw SendStaleConfigException(ns, sb.str(), received, wanted);
