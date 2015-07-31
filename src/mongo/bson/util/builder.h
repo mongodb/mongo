@@ -40,6 +40,7 @@
 #include "mongo/base/data_view.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/inline_decls.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 
@@ -52,8 +53,6 @@ namespace mongo {
 struct PackedDouble {
     double d;
 } PACKED_DECL;
-
-
 /* Note the limit here is rather arbitrary and is simply a standard. generally the code works
    with any object that fits in ram.
 
@@ -220,6 +219,10 @@ public:
     void appendNum(unsigned long long j) {
         appendNumImpl(j);
     }
+    void appendNum(Decimal128 j) {
+        BOOST_STATIC_ASSERT(sizeof(Decimal128::Value) == 16);
+        appendNumImpl(j.getValue());
+    }
 
     void appendBuf(const void* src, size_t len) {
         memcpy(grow((int)len), src, len);
@@ -290,8 +293,6 @@ private:
         // we bake that assumption in here. This decision should be revisited soon.
         DataView(grow(sizeof(t))).write(tagLittleEndian(t));
     }
-
-
     /* "slow" portion of 'grow()'  */
     void NOINLINE_DECL grow_reallocate(int minSize) {
         int a = 64;

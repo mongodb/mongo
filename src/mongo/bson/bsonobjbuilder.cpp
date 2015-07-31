@@ -46,6 +46,7 @@ void BSONObjBuilder::appendMinForType(StringData fieldName, int t) {
         case NumberInt:
         case NumberDouble:
         case NumberLong:
+        case NumberDecimal:
             append(fieldName, std::numeric_limits<double>::quiet_NaN());
             return;
         case Symbol:
@@ -116,6 +117,7 @@ void BSONObjBuilder::appendMaxForType(StringData fieldName, int t) {
         case NumberInt:
         case NumberDouble:
         case NumberLong:
+        case NumberDecimal:
             append(fieldName, std::numeric_limits<double>::infinity());
             return;
         case Symbol:

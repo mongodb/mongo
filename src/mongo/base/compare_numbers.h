@@ -29,6 +29,7 @@
 
 #include <cmath>
 
+#include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -37,6 +38,11 @@ namespace mongo {
  * These functions compare numbers using the same rules as BSON. Care is taken to always give
  * numerically correct results when comparing different types. Returns are always -1, 0, or 1 to
  * ensure it is safe to negate the result to invert the direction of the comparison.
+ *
+ * lhs > rhs returns 1
+ * lhs < rhs returns -1
+ * lhs == rhs returns 0
+ *
  */
 
 inline int compareInts(int lhs, int rhs) {
@@ -96,6 +102,78 @@ inline int compareLongToDouble(long long lhs, double rhs) {
 inline int compareDoubleToLong(double lhs, long long rhs) {
     // Only implement the real logic once.
     return -compareLongToDouble(rhs, lhs);
+}
+
+/** Decimal type comparisons
+ * These following cases need support:
+ * 1. decimal and decimal: directly compare (enforce ordering: NaN < -Inf < N < +Inf)
+ * 2. decimal and int: convert int to decimal and compare
+ * 3. decimal and long: convert long to decimal and compare
+ * 4. decimal to double: convert decimal to double with round toward negative.
+ *    Check for exact conversion and determine ordering based on result.
+ */
+
+// Case 1: Compare two decimal values, but enforce MongoDB's total ordering convention
+inline int compareDecimals(Decimal128 lhs, Decimal128 rhs) {
+    // When we're comparing, lhs is always a decimal, which means more often than not
+    // the rhs will be less than the lhs (decimal type has the largest capacity)
+    if (lhs.isGreater(rhs))
+        return 1;
+    if (lhs.isLess(rhs))
+        return -1;
+    if (lhs.isNaN())
+        return (rhs.isNaN() ? 0 : -1);
+    if (rhs.isNaN())
+        return 1;
+    else  // lhs is necessarily equal to rhs
+        return 0;
+}
+
+// Compare decimal and int
+inline int compareDecimalToInt(Decimal128 lhs, int rhs) {
+    return compareDecimals(lhs, Decimal128(rhs));
+}
+
+inline int compareIntToDecimal(int lhs, Decimal128 rhs) {
+    return -compareDecimalToInt(rhs, lhs);
+}
+
+// Compare decimal and long
+inline int compareDecimalToLong(Decimal128 lhs, long long rhs) {
+    return compareDecimals(lhs, Decimal128(rhs));
+}
+
+inline int compareLongToDecimal(long long lhs, Decimal128 rhs) {
+    return -compareDecimalToLong(rhs, lhs);
+}
+
+// Compare decimal and double
+inline int compareDecimalToDouble(Decimal128 lhs, double rhs) {
+    uint32_t sigFlags = Decimal128::SignalingFlag::kNoFlag;
+    double decToDouble = lhs.toDouble(&sigFlags, Decimal128::RoundingMode::kRoundTowardNegative);
+
+    if (decToDouble == rhs) {
+        // If our conversion was not exact, lhs was necessarily greater than rhs
+        // otherwise, they are equal
+        if (Decimal128::hasFlag(sigFlags, Decimal128::SignalingFlag::kInexact)) {
+            return 1;
+        } else {
+            return 0;
+        }
+    } else if (decToDouble < rhs) {
+        return -1;
+    } else if (decToDouble > rhs) {
+        return 1;
+    }
+
+    if (lhs.isNaN())
+        return (std::isnan(rhs) ? 0 : -1);
+    invariant(std::isnan(rhs));
+    return 1;
+}
+
+inline int compareDoubleToDecimal(double lhs, Decimal128 rhs) {
+    return -compareDecimalToDouble(rhs, lhs);
 }
 
 }  // namespace mongo

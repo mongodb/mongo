@@ -51,9 +51,9 @@ public:
  * and is set by the build flag --experimental-decimal-support.
  */
 #ifdef MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT
-    const bool enabled = true;
+    static const bool enabled = true;
 #else
-    const bool enabled = false;
+    static const bool enabled = false;
 #endif
 
     /**

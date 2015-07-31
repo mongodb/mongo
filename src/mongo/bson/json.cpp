@@ -33,6 +33,7 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/platform/strtoll.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
@@ -71,6 +72,7 @@ enum {
     NS_RESERVE_SIZE = 64,
     DB_RESERVE_SIZE = 64,
     NUMBERLONG_RESERVE_SIZE = 64,
+    NUMBERDECIMAL_RESERVE_SIZE = 64,
     DATE_RESERVE_SIZE = 64
 };
 
@@ -130,6 +132,11 @@ Status JParse::value(StringData fieldName, BSONObjBuilder& builder) {
         }
     } else if (readToken("NumberInt")) {
         Status ret = numberInt(fieldName, builder);
+        if (ret != Status::OK()) {
+            return ret;
+        }
+    } else if (readToken("NumberDecimal")) {
+        Status ret = numberDecimal(fieldName, builder);
         if (ret != Status::OK()) {
             return ret;
         }
@@ -262,6 +269,14 @@ Status JParse::object(StringData fieldName, BSONObjBuilder& builder, bool subObj
             return parseError("Reserved field name in base object: $numberLong");
         }
         Status ret = numberLongObject(fieldName, builder);
+        if (ret != Status::OK()) {
+            return ret;
+        }
+    } else if (firstField == "$numberDecimal") {
+        if (!subObject) {
+            return parseError("Reserved field name in base object: $numberDecimal");
+        }
+        Status ret = numberDecimalObject(fieldName, builder);
         if (ret != Status::OK()) {
             return ret;
         }
@@ -470,6 +485,7 @@ Status JParse::timestampObject(StringData fieldName, BSONObjBuilder& builder) {
     if (!readField("t")) {
         return parseError("Expected field name \"t\" in \"$timestamp\" sub object");
     }
+
     if (!readToken(COLON)) {
         return parseError("Expecting ':'");
     }
@@ -635,6 +651,25 @@ Status JParse::numberLongObject(StringData fieldName, BSONObjBuilder& builder) {
     }
 
     builder.append(fieldName, numberLong);
+    return Status::OK();
+}
+
+Status JParse::numberDecimalObject(StringData fieldName, BSONObjBuilder& builder) {
+    if (!readToken(COLON)) {
+        return parseError("Expecting ':'");
+    }
+    // The number must be a quoted string, since large decimal numbers could overflow other types
+    // and thus may not be valid JSON
+    std::string numberDecimalString;
+    numberDecimalString.reserve(NUMBERDECIMAL_RESERVE_SIZE);
+    Status ret = quotedString(&numberDecimalString);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    Decimal128 numberDecimal(numberDecimalString);
+
+    builder.appendNumber(fieldName, numberDecimal);
     return Status::OK();
 }
 
@@ -823,6 +858,26 @@ Status JParse::numberLong(StringData fieldName, BSONObjBuilder& builder) {
     return Status::OK();
 }
 
+Status JParse::numberDecimal(StringData fieldName, BSONObjBuilder& builder) {
+    if (!readToken(LPAREN)) {
+        return parseError("Expecting '('");
+    }
+
+    std::string decString;
+    decString.reserve(NUMBERDECIMAL_RESERVE_SIZE);
+    Status ret = quotedString(&decString);
+    if (ret != Status::OK()) {
+        return ret;
+    }
+    Decimal128 val(decString);
+
+    if (!readToken(RPAREN)) {
+        return parseError("Expecting ')'");
+    }
+    builder.appendNumber(fieldName, val);
+    return Status::OK();
+}
+
 Status JParse::numberInt(StringData fieldName, BSONObjBuilder& builder) {
     if (!readToken(LPAREN)) {
         return parseError("Expecting '('");
@@ -845,7 +900,6 @@ Status JParse::numberInt(StringData fieldName, BSONObjBuilder& builder) {
     builder.appendNumber(fieldName, static_cast<int>(val));
     return Status::OK();
 }
-
 
 Status JParse::dbRef(StringData fieldName, BSONObjBuilder& builder) {
     BSONObjBuilder subBuilder(builder.subobjStart(fieldName));

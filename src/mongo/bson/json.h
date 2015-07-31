@@ -107,6 +107,7 @@ public:
      *   | NUMBER
      *   | NUMBERINT
      *   | NUMBERLONG
+     *   | NUMBERDECIMAL
      *   | OBJECT
      *   | ARRAY
      *
@@ -152,6 +153,7 @@ private:
      *   | REFOBJECT
      *   | UNDEFINEDOBJECT
      *   | NUMBERLONGOBJECT
+     *   | NUMBERDECIMALOBJECT
      *   | MINKEYOBJECT
      *   | MAXKEYOBJECT
      *
@@ -225,6 +227,12 @@ private:
     Status numberLongObject(StringData fieldName, BSONObjBuilder&);
 
     /*
+     * NUMBERDECIMALOBJECT :
+     *     { FIELD("$numberDecimal") : "<number>" }
+     */
+    Status numberDecimalObject(StringData fieldName, BSONObjBuilder&);
+
+    /*
      * MINKEYOBJECT :
      *     { FIELD("$minKey") : 1 }
      */
@@ -280,6 +288,12 @@ private:
      *     NumberLong( <number> )
      */
     Status numberLong(StringData fieldName, BSONObjBuilder&);
+
+    /*
+     * NUMBERDECIMAL :
+     *     NumberDecimal( <number> )
+     */
+    Status numberDecimal(StringData fieldName, BSONObjBuilder&);
 
     /*
      * NUMBERINT :

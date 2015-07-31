@@ -36,6 +36,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/config.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/path.h"
@@ -395,6 +396,9 @@ const std::string TypeMatchExpression::kMatchesAllNumbersAlias = "number";
 
 const std::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMap = {
     {"double", NumberDouble},
+#ifdef MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT
+    {"decimal", NumberDecimal},
+#endif
     {"string", String},
     {"object", Object},
     {"array", Array},

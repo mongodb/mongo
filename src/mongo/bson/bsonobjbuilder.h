@@ -44,6 +44,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/platform/decimal128.h"
 
 namespace mongo {
 
@@ -235,6 +236,14 @@ public:
         return append(fieldName, (int)n);
     }
 
+    /** Append a NumberDecimal */
+    BSONObjBuilder& append(StringData fieldName, Decimal128 n) {
+        _b.appendNum(static_cast<char>(NumberDecimal));
+        _b.appendStr(fieldName);
+        _b.appendNum(n);
+        return *this;
+    }
+
     /** Append a NumberLong */
     BSONObjBuilder& append(StringData fieldName, long long n) {
         _b.appendNum((char)NumberLong);
@@ -270,12 +279,15 @@ public:
 
     BSONObjBuilder& appendNumber(StringData fieldName, size_t n) {
         static const size_t maxInt = (1 << 30);
-
         if (n < maxInt)
             append(fieldName, static_cast<int>(n));
         else
             append(fieldName, static_cast<long long>(n));
         return *this;
+    }
+
+    BSONObjBuilder& appendNumber(StringData fieldName, Decimal128 decNumber) {
+        return append(fieldName, decNumber);
     }
 
     BSONObjBuilder& appendNumber(StringData fieldName, long long llNumber) {
@@ -895,7 +907,6 @@ inline BSONObjBuilder& BSONObjBuilder::append(StringData fieldName, const std::m
     return *this;
 }
 
-
 template <class L>
 inline BSONArrayBuilder& _appendArrayIt(BSONArrayBuilder& _this, const L& vals) {
     for (typename L::const_iterator i = vals.begin(); i != vals.end(); i++)
@@ -919,7 +930,6 @@ inline BSONFieldValue<BSONObj> BSONField<T>::query(const char* q, const T& t) co
     b.append(q, t);
     return BSONFieldValue<BSONObj>(_name, b.obj());
 }
-
 
 // $or helper: OR(BSON("x" << GT << 7), BSON("y" << LT 6));
 inline BSONObj OR(const BSONObj& a, const BSONObj& b) {
@@ -962,7 +972,6 @@ inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const UndefinedLabe
     return *_builder;
 }
 
-
 inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(const MinKeyLabeler& id) {
     _builder->appendMinKey(_fieldName);
     _fieldName = StringData();
@@ -1001,4 +1010,5 @@ inline BSONObjBuilder& BSONObjBuilder::appendTimestamp(StringData fieldName,
                                                        unsigned long long val) {
     return append(fieldName, Timestamp(val));
 }
-}
+
+}  // namespace mongo

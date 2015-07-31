@@ -356,6 +356,10 @@ TEST(KeyStringTest, Timestamp) {
 
 TEST(KeyStringTest, AllTypesRoundtrip) {
     for (int i = 1; i <= JSTypeMax; i++) {
+        // TODO: Currently KeyString does not support NumberDecimal
+        // SERVER-19703
+        if (i == NumberDecimal)
+            continue;
         {
             BSONObjBuilder b;
             b.appendMinForType("", i);
