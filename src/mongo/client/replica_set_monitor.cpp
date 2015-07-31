@@ -257,17 +257,7 @@ int ReplicaSetMonitor::maxConsecutiveFailedChecks = 30;
 bool ReplicaSetMonitor::useDeterministicHostSelection = false;
 
 ReplicaSetMonitor::ReplicaSetMonitor(StringData name, const std::set<HostAndPort>& seeds)
-    : _state(std::make_shared<SetState>(name, seeds)) {
-    log() << "starting new replica set monitor for replica set " << name << " with seeds ";
-
-    for (std::set<HostAndPort>::const_iterator it = seeds.begin(); it != seeds.end(); ++it) {
-        if (it != seeds.begin()) {
-            log() << ',';
-        }
-
-        log() << *it;
-    }
-}
+    : _state(std::make_shared<SetState>(name, seeds)) {}
 
 HostAndPort ReplicaSetMonitor::getHostOrRefresh(const ReadPreferenceSetting& criteria) {
     {

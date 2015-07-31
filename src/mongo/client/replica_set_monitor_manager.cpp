@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/replica_set_monitor_manager.h"
@@ -34,6 +36,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 
 namespace mongo {
@@ -63,6 +66,8 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
     if (!monitor) {
         const std::set<HostAndPort> servers(connStr.getServers().begin(),
                                             connStr.getServers().end());
+
+        log() << "Starting new replica set monitor for " << connStr.toString();
 
         monitor = std::make_shared<ReplicaSetMonitor>(connStr.getSetName(), servers);
     }
