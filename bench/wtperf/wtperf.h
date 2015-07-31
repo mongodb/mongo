@@ -122,7 +122,7 @@ struct __truncate_struct {
 /* Queue entry for use with the Truncate Logic */
 struct __truncate_queue_entry {
 	char *key;			/* Truncation point */
-	u_int diff;			/* Number of items to be truncated*/
+	uint64_t diff;			/* Number of items to be truncated*/
 	STAILQ_ENTRY(__truncate_queue_entry) q;
 };
 typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;

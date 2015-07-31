@@ -37,8 +37,7 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	WT_CURSOR *cursor;
 	char *key, *truncate_key;
 	int ret;
-	size_t i;
-	uint64_t end_point, final_stone_gap, start_point;
+	uint64_t end_point, final_stone_gap, i, start_point;
 
 	end_point = final_stone_gap = start_point = 0;
 	trunc_cfg = &thread->trunc_cfg;
@@ -94,6 +93,10 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 		trunc_cfg->expected_total = (end_point - start_point);
 		for (i = 1; i <= trunc_cfg->needed_stones; i++) {
 			truncate_key = calloc(cfg->key_sz, 1);
+			if (truncate_key == NULL) {
+				ret = enomem(cfg);
+				goto err;
+			}
 			truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 			if (truncate_item == NULL) {
 				ret = enomem(cfg);
@@ -111,7 +114,9 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	}
 	trunc_cfg->stone_gap = final_stone_gap;
 
-err:	cursor->close(cursor);
+err:	if ((ret = cursor->close(cursor)) != 0) {
+		lprintf(cfg, ret, 0, "truncate setup: cursor close failed");
+	}
 	return (ret);
 }
 
@@ -141,10 +146,15 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	while (trunc_cfg->num_stones < trunc_cfg->needed_stones) {
 		trunc_cfg->last_key += trunc_cfg->stone_gap;
 		truncate_key = calloc(cfg->key_sz, 1);
+		if (truncate_key == NULL) {
+			lprintf(cfg, ENOMEM, 0,
+			    "truncate: couldn't allocate key array");
+			return (ENOMEM);
+		}
 		truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 		if (truncate_item == NULL) {
 			lprintf(cfg, ENOMEM, 0,
-			    "worker: couldn't allocate cursor array");
+			    "truncate: couldn't allocate item");
 			return (ENOMEM);
 		}
 		generate_key(cfg, truncate_key, trunc_cfg->last_key);
@@ -179,7 +189,6 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 
 err:	free(truncate_item->key);
 	free(truncate_item);
-	truncate_item = NULL;
 	t_ret = cursor->reset(cursor);
 	if (t_ret != 0)
 		lprintf(cfg, t_ret, 0, "Cursor reset failed");
