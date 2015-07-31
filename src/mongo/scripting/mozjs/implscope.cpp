@@ -571,11 +571,8 @@ bool MozJSImplScope::exec(StringData code,
     ObjectWrapper(_context, _global).setValue(kExecResult, out);
 
     if (printResult && !out.isUndefined()) {
-        // TODO: We seem to use this productively in v8, but it seems
-        // unecessary under sm.  That probably means somethings off
-        //
         // appears to only be used by shell
-        // std::cout << ValueWriter(_context, out).toString() << std::endl;
+        std::cout << ValueWriter(_context, out).toString() << std::endl;
     }
 
     return true;
