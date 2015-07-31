@@ -604,7 +604,7 @@ Status applyOperation_inlock(OperationContext* txn,
     if (fieldO.isABSONObj())
         o = fieldO.embeddedObject();
 
-    const char* ns = fieldNs.valuestrsafe();
+    const StringData ns = fieldNs.valueStringData();
 
     BSONObj o2;
     if (fieldO2.isABSONObj())
@@ -633,8 +633,7 @@ Status applyOperation_inlock(OperationContext* txn,
     if (*opType == 'i') {
         opCounters->gotInsert();
 
-        const char* p = strchr(ns, '.');
-        if (p && nsToCollectionSubstring(p) == "system.indexes") {
+        if (nsToCollectionSubstring(ns) == "system.indexes") {
             if (o["background"].trueValue()) {
                 IndexBuilder* builder = new IndexBuilder(o);
                 // This spawns a new thread and returns immediately.
@@ -790,7 +789,8 @@ Status applyOperation_inlock(OperationContext* txn,
     // AuthorizationManager's logOp method registers a RecoveryUnit::Change
     // and to do so we need to have begun a UnitOfWork
     WriteUnitOfWork wuow(txn);
-    getGlobalAuthorizationManager()->logOp(txn, opType, ns, o, fieldO2.isABSONObj() ? &o2 : NULL);
+    getGlobalAuthorizationManager()->logOp(
+        txn, opType, ns.toString().c_str(), o, fieldO2.isABSONObj() ? &o2 : NULL);
     wuow.commit();
 
     return Status::OK();
