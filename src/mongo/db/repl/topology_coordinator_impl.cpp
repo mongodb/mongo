@@ -1503,6 +1503,10 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
         response->append("syncingTo", _syncSource.toString());
     }
 
+    if (_rsConfig.isConfigServer()) {
+        response->append("configServer", true);
+    }
+
     response->append("members", membersOut);
     *result = Status::OK();
 }

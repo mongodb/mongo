@@ -36,6 +36,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
@@ -182,20 +183,34 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
     }
 
     // Is it a mongos config server?
-    if (foundSetName.empty()) {
-        cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("replSetGetStatus" << 1));
-        if (!cmdStatus.isOK()) {
-            return cmdStatus.getStatus();
+    cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("replSetGetStatus" << 1));
+    if (!cmdStatus.isOK()) {
+        return cmdStatus.getStatus();
+    }
+
+    BSONObj res = cmdStatus.getValue();
+
+    if (getStatusFromCommandResult(res).isOK()) {
+        bool isConfigServer;
+        Status status =
+            bsonExtractBooleanFieldWithDefault(res, "configServer", false, &isConfigServer);
+        if (!status.isOK()) {
+            return Status(status.code(),
+                          str::stream() << "replSetGetStatus returned invalid \"configServer\" "
+                                        << "field when attempting to add "
+                                        << connectionString.toString()
+                                        << " as a shard: " << status.reason());
         }
 
-        BSONObj res = cmdStatus.getValue();
-
-        if (!getStatusFromCommandResult(res).isOK() && (res["info"].type() == String) &&
-            (res["info"].String() == "configsvr")) {
+        if (isConfigServer) {
             return {ErrorCodes::BadValue,
-                    "the specified mongod is a legacy-style config "
-                    "server and cannot be used as a shard server"};
+                    str::stream() << "Cannot add " << connectionString.toString()
+                                  << " as a shard since it is part of a config server replica set"};
         }
+    } else if ((res["info"].type() == String) && (res["info"].String() == "configsvr")) {
+        return {ErrorCodes::BadValue,
+                "the specified mongod is a legacy-style config "
+                "server and cannot be used as a shard server"};
     }
 
     // If the shard is part of a replica set, make sure all the hosts mentioned in the connection
