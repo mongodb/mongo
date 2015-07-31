@@ -509,6 +509,12 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
+        if (cmdObj.hasField("autoIndexId")) {
+            const char* deprecationWarning =
+                "the autoIndexId option is deprecated and will be removed in a future release";
+            warning() << deprecationWarning;
+            result.append("note", deprecationWarning);
+        }
         return appendCommandStatus(result, createCollection(txn, dbname, cmdObj));
     }
 } cmdCreate;
