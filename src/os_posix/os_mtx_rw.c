@@ -243,6 +243,11 @@ __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	    session, WT_VERB_MUTEX, "rwlock: read unlock %s", rwlock->name));
 
 	l = &rwlock->rwlock;
+
+	/*
+	 * Increment the writers value (other readers are doing the same, make
+	 * sure we don't race).
+	 */
 	WT_ATOMIC_ADD2(l->s.writers, 1);
 
 	return (0);
