@@ -138,6 +138,8 @@ public:
                                      const mutablebson::DamageVector& damages);
 
     std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
+    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* txn) const final;
+
     std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const final;
 
     virtual Status truncate(OperationContext* txn);
@@ -215,6 +217,7 @@ public:
 
 private:
     class Cursor;
+    class RandomCursor;
 
     class CappedInsertChange;
     class NumRecordsChange;

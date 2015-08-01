@@ -305,6 +305,79 @@ StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj o
     return StatusWith<std::string>(ss.str());
 }
 
+class WiredTigerRecordStore::RandomCursor final : public RecordCursor {
+public:
+    RandomCursor(OperationContext* txn, const WiredTigerRecordStore& rs)
+        : _cursor(nullptr), _rs(&rs), _txn(txn) {
+        restore();
+    }
+
+    ~RandomCursor() {
+        detachFromOperationContext();
+    }
+
+    boost::optional<Record> next() final {
+        int advanceRet = WT_OP_CHECK(_cursor->next(_cursor));
+        if (advanceRet == WT_NOTFOUND)
+            return {};
+        invariantWTOK(advanceRet);
+
+        int64_t key;
+        invariantWTOK(_cursor->get_key(_cursor, &key));
+        const RecordId id = _fromKey(key);
+
+        WT_ITEM value;
+        invariantWTOK(_cursor->get_value(_cursor, &value));
+        auto data = RecordData(static_cast<const char*>(value.data), value.size);
+        data.makeOwned();  // TODO delete this line once safe.
+
+        return {{id, std::move(data)}};
+    }
+
+    boost::optional<Record> seekExact(const RecordId& id) final {
+        return {};
+    }
+
+    void savePositioned() final {
+        if (_cursor && !wt_keeptxnopen()) {
+            try {
+                _cursor->reset(_cursor);
+            } catch (const WriteConflictException& wce) {
+                // Ignore since this is only called when we are about to kill our transaction
+                // anyway.
+            }
+        }
+    }
+
+    bool restore() final {
+        // We can't use the CursorCache since this cursor needs a special config string.
+        WT_SESSION* session = WiredTigerRecoveryUnit::get(_txn)->getSession(_txn)->getSession();
+
+        if (!_cursor) {
+            invariantWTOK(
+                session->open_cursor(session, _rs->_uri.c_str(), NULL, "next_random", &_cursor));
+            invariant(_cursor);
+        }
+        return true;
+    }
+    void detachFromOperationContext() final {
+        invariant(_txn);
+        _txn = nullptr;
+        _cursor->close(_cursor);
+        _cursor = nullptr;
+    }
+    void reattachToOperationContext(OperationContext* txn) final {
+        invariant(!_txn);
+        _txn = txn;
+    }
+
+private:
+    WT_CURSOR* _cursor;
+    const WiredTigerRecordStore* _rs;
+    OperationContext* _txn;
+};
+
+
 // static
 StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     StringData ns, const CollectionOptions& options, StringData extraStrings) {
@@ -883,6 +956,10 @@ std::unique_ptr<RecordCursor> WiredTigerRecordStore::getCursor(OperationContext*
     }
 
     return stdx::make_unique<Cursor>(txn, *this, forward);
+}
+
+std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(OperationContext* txn) const {
+    return stdx::make_unique<RandomCursor>(txn, *this);
 }
 
 std::vector<std::unique_ptr<RecordCursor>> WiredTigerRecordStore::getManyCursors(

@@ -414,6 +414,23 @@ public:
     }
 
     /**
+     * Constructs a cursor over a record store that returns documents in a randomized order, and
+     * allows storage engines to provide a more efficient way of random sampling of a record store
+     * than MongoDB's default sampling methods, which is used when this method returns {}.
+     *
+     * This method may be implemented using a pseudo-random walk over B-trees or a similar approach.
+     * Different cursors should return documents in a different order. Random cursors may return
+     * the same document more than once and, as a result, may return more documents than exist in
+     * the record store. Implementations should avoid obvious biases toward older, newer, larger
+     * smaller or other specific classes of documents.
+     *
+     * The seekExact() method may not be called for random cursors.
+     */
+    virtual std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* txn) const {
+        return {};
+    }
+
+    /**
      * Returns many RecordCursors that partition the RecordStore into many disjoint sets.
      * Iterating all returned RecordCursors is equivalent to iterating the full store.
      *
