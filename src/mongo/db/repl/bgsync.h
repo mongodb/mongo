@@ -94,6 +94,8 @@ public:
     void shutdown();
     void notify(OperationContext* txn);
 
+    bool isPaused() const;
+
     // Blocks until _pause becomes true from a call to stop() or shutdown()
     void waitUntilPaused();
 
@@ -173,16 +175,9 @@ private:
     void _fetcherCallback(const StatusWith<Fetcher::QueryResponse>& result,
                           BSONObjBuilder* bob,
                           const HostAndPort& source,
+                          OpTime lastOpTimeFetched,
+                          long long lastFetchedHash,
                           Status* remoteOplogStartStatus);
-
-    /**
-     * Checks the criteria for rolling back.
-     * 'getNextOperation' returns the first result of the oplog tailing query.
-     * Returns RemoteOplogStale if the oplog query has no results.
-     * Returns OplogStartMissing if we cannot find the timestamp of the last fetched operation in
-     * the remote oplog.
-     */
-    Status _checkRemoteOplogStart(stdx::function<StatusWith<BSONObj>()> getNextOperation);
 
     /**
      * Executes a rollback.
