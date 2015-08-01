@@ -219,7 +219,8 @@ public:
      * Inform the cursor that this id is being invalidated.
      * Must be called between save and restore.
      *
-     * WARNING: Storage engines other than MMAPv1 should not depend on this being called.
+     * WARNING: Storage engines other than MMAPv1 should use the default implementation,
+     *          and not depend on this being called.
      */
     virtual void invalidate(const RecordId& id){};
 
