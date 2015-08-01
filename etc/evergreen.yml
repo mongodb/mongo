@@ -3924,6 +3924,7 @@ buildvariants:
   modules: ~
   run_on:
   - ubuntu1404-test
+  stepback: false
   expansions:
     tooltags: "-tags ssl"
     compile_flags: --ssl --distmod=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
@@ -3964,6 +3965,7 @@ buildvariants:
   modules: ~
   run_on:
   - windows-64-vs2013-test
+  stepback: false
   expansions:
     exe: ".exe"
     gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"'
