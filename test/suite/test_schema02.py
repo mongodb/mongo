@@ -214,13 +214,13 @@ class test_schema02(wttest.WiredTigerTestCase):
         n = self.nentries
         for s1key, i4key, s1, i2, s3, i4 in cursor:
             i = int(i4key ** (1 / 3.0) + 0.0001)  # cuberoot
-            #tty_pr('index:main:S1i4[' + str(i) + '] (' +
-            #       str(s1key) + ',' +
-            #       str(i4key) + ') -> (' +
-            #       str(s1) + ',' +
-            #       str(i2) + ',' +
-            #       str(s3) + ',' +
-            #       str(i4) + ')')
+            #self.tty('index:main:S1i4[' + str(i) + '] (' +
+            #         str(s1key) + ',' +
+            #         str(i4key) + ') -> (' +
+            #         str(s1) + ',' +
+            #         str(i2) + ',' +
+            #         str(s3) + ',' +
+            #         str(i4) + ')')
             self.assertEqual(s1key, s1)
             self.assertEqual(i4key, i4)
             ikey = i
@@ -242,14 +242,14 @@ class test_schema02(wttest.WiredTigerTestCase):
         count = 0
         for i2key, s1key, i4key, s1, i2, s3, i4 in cursor:
             i = int(i4key ** (1 / 3.0) + 0.0001)  # cuberoot
-            #tty_pr('index:main:i2S1i4[' + str(i) + '] (' +
-            #       str(i2key) + ',' +
-            #       str(s1key) + ',' +
-            #       str(i4key) + ') -> (' +
-            #       str(s1) + ',' +
-            #       str(i2) + ',' +
-            #       str(s3) + ',' +
-            #       str(i4) + ')')
+            #self.tty('index:main:i2S1i4[' + str(i) + '] (' +
+            #         str(i2key) + ',' +
+            #         str(s1key) + ',' +
+            #         str(i4key) + ') -> (' +
+            #         str(s1) + ',' +
+            #         str(i2) + ',' +
+            #         str(s3) + ',' +
+            #         str(i4) + ')')
             self.assertEqual(i2key, i2)
             self.assertEqual(s1key, s1)
             self.assertEqual(i4key, i4)
