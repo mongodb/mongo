@@ -93,6 +93,10 @@ class test_schema05(wttest.WiredTigerTestCase):
                                 "key_format=S,columns=(key),"
                                 "extractor=csv,app_metadata=" + si)
 
+    def drop_indices(self):
+        for i in range(0, self.nindices):
+            self.session.drop("index:schema05:x" + str(i))
+
     def csv(self, s, i):
         return s.split(',')[i]
 
@@ -157,6 +161,11 @@ class test_schema05(wttest.WiredTigerTestCase):
         if self.create_index == 2:
             self.create_indices()
         self.populate(2)
+        self.check_entries()
+
+        # Drop and recreate all indices, everything should be there.
+        self.drop_indices()
+        self.create_indices()
         self.check_entries()
 
 
