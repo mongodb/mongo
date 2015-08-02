@@ -19,16 +19,6 @@
 
 #define	WT_WITH_BTREE(s, b, e)	WT_WITH_DHANDLE(s, (b)->dhandle, e)
 
-/*
- * With a btree already exclusively locked, call a function with a flag
- * to indicate that the same btree should not be relocked.
- */
-#define	WT_WITH_PRELOCKED_BTREE(s, e) do {				\
-	F_SET(s, WT_SESSION_LOCKED_BTREE);				\
-	e;								\
-	F_CLR(s, WT_SESSION_LOCKED_BTREE);				\
-} while (0)
-
 /* Call a function without the caller's data handle, restore afterwards. */
 #define	WT_WITHOUT_DHANDLE(s, e) WT_WITH_DHANDLE(s, NULL, e)
 
@@ -54,7 +44,9 @@ struct __wt_data_handle {
 	 */
 	uint32_t session_ref;		/* Sessions referencing this handle */
 	int32_t	 session_inuse;		/* Sessions using this handle */
+	uint32_t excl_ref;		/* Refs of handle by excl_session */
 	time_t	 timeofdeath;		/* Use count went to 0 */
+	WT_SESSION_IMPL *excl_session;	/* Session with exclusive use, if any */
 
 	uint64_t name_hash;		/* Hash of name */
 	const char *name;		/* Object name as a URI */

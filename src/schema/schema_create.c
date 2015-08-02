@@ -348,8 +348,7 @@ __fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, const char *name)
 		return (0);
 
 	WT_ERR(sess->open_cursor(sess, table->name, NULL, "readonly", &tcur));
-	WT_WITH_PRELOCKED_BTREE(session,
-	    WT_ERR(sess->open_cursor(sess, name, NULL, NULL, &icur)));
+	WT_ERR(sess->open_cursor(sess, name, NULL, NULL, &icur));
 
 	ctable = (WT_CURSOR_TABLE *)tcur;
 	cindex = (WT_CURSOR_INDEX *)icur;
@@ -363,8 +362,9 @@ __fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, const char *name)
 		 * a switch.
 		 */
 		WT_WITHOUT_LOCKS(session,
-		    WT_ERR(__wt_apply_single_idx(session, idx,
-		    child, ctable, child->insert)));
+		    ret = __wt_apply_single_idx(session, idx,
+		    child, ctable, child->insert));
+		WT_ERR(ret);
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 err:
@@ -532,7 +532,15 @@ __create_index(WT_SESSION_IMPL *session,
 	sourcecfg[1] = fmt.data;
 	WT_ERR(__wt_config_merge(session, sourcecfg, NULL, &sourceconf));
 
-	WT_ERR(__wt_schema_create(session, source, sourceconf));
+	/*
+	 * Allow the newly created dhandle to be reopened later.
+	 * This avoids self deadlock on the handle, opened exclusively
+	 * here, when we reopen it to fill the index.
+	 */
+	F_SET(session, WT_SESSION_RELOCK_DATA_HANDLES);
+	ret = __wt_schema_create(session, source, sourceconf);
+	F_CLR(session, WT_SESSION_RELOCK_DATA_HANDLES);
+	WT_ERR(ret);
 
 	cfg[1] = sourceconf;
 	cfg[2] = confbuf.data;
