@@ -56,8 +56,8 @@
  *
  * Next, consider exclusive (write) locks. The 'now serving' number for writers
  * is 'writers'. To lock, 'take a number' and wait until that number is being
- * served; more specifically, atomically copy the current value of 'users' and
- * increment it, and then wait until 'writers' equals that copied number.
+ * served; more specifically, atomically copy and increment the current value of
+ * 'users', and then wait until 'writers' equals that copied number.
  *
  * Shared (read) locks are similar. Like writers, readers atomically get the
  * next number available. However, instead of waiting for 'writers' to equal
@@ -66,14 +66,13 @@
  * This has the effect of queueing lock requests in the order they arrive
  * (incidentally avoiding starvation).
  *
- * When readers unlock, they increment the value of 'writers'; when 'writers'
- * unlock, they increment the value of 'readers' and 'writers'. Specifically,
- * each lock/unlock pair requires incrementing both 'readers' and 'writers':
- * in the case of a reader, the 'readers' increment happens immediately and the
- * 'writers' increment happens when the reader unlocks. In the case of a writer,
- * the 'readers' and 'writers' increment both happen when the writer unlocks.
+ * Each lock/unlock pair requires incrementing both 'readers' and 'writers'.
+ * In the case of a reader, the 'readers' increment happens when the reader
+ * acquires the lock (to allow read-lock sharing), and the 'writers' increment
+ * happens when the reader releases the lock. In the case of a writer, both
+ * 'readers' and 'writers' are incremented when the writer releases the lock.
  *
- * For example, consider the following read and write lock requests (R, W):
+ * For example, consider the following read (R) and write (W) lock requests:
  *
  *						writers	readers	users
  *						0	0	0
@@ -84,7 +83,7 @@
  *	R: ticket 2, unlock			1	3	4
  *	R: ticket 0, unlock			2	3	4
  *	R: ticket 1, unlock			3	3	4
- *	W: ticket 3, writers match	OK
+ *	W: ticket 3, writers match	OK	3	3	4
  *
  * Note the writer blocks until 'writers' equals its ticket number and it does
  * not matter if readers unlock in order or not.
@@ -93,28 +92,24 @@
  * and the next ticket holder (reader or writer) will unblock when the writer
  * unlocks.
  *						writers	readers	users
- *	...
- *	W: ticket 3, writers no match	block	0	3	4
- *	R: ticket 0, unlock			1	3	4
- *	R: ticket 2, unlock			2	3	4
- *	R: ticket 1, unlock			3	3	4
+ *	[continued from above]
+ *	W: ticket 3, writers match	OK	3	3	4
  *	R: ticket 4, readers no match	block	3	3	5
- *	W: ticket 5, writers no match	block	3	3	6
- *	W: ticket 3, writers match	OK
- *	R: ticket 6, readers no match	block	3	3	7
- *	W: ticket 7, writers no match	block	3	3	8
- *	W: ticket 3, unlock			4	4	8
- *	R: ticket 4, readers match	OK	4	5	8
+ *	R: ticket 5, readers no match	block	3	3	6
+ *	W: ticket 6, writers no match	block	3	3	7
+ *	W: ticket 3, unlock			4	4	7
+ *	R: ticket 4, readers match	OK	4	5	7
+ *	R: ticket 5, readers match	OK	4	6	7
  *
- * The 'users' field is a 2B value so the available ticket number wraps at 64K
- * requests. If a thread's lock request is not granted until the 'users' field
- * cycles and the same ticket is taken by another thread, we could grant a lock
- * to two separate threads at the same time, and bad things happen: two writer
- * threads, or a reader thread and a writer thread, would run in parallel, and
- * lock waiters could be skipped if the unlocks race. This is unlikely, it only
- * happens if a lock request is blocked by 64K other requests. The fix would be
+ * The 'users' field is a 2-byte value so the available ticket number wraps at
+ * 64K requests. If a thread's lock request is not granted until the 'users'
+ * field cycles and the same ticket is taken by another thread, we could grant
+ * a lock to two separate threads at the same time, and bad things happen: two
+ * writer threads or a reader thread and a writer thread would run in parallel,
+ * and lock waiters could be skipped if the unlocks race. This is unlikely, it
+ * only happens if a lock request is blocked by 64K other requests. The fix is
  * to grow the lock structure fields, but the largest atomic instruction we have
- * is 8B, the structure has no room to grow.
+ * is 8 bytes, the structure has no room to grow.
  */
 
 #include "wt_internal.h"
@@ -193,7 +188,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
 	uint64_t me;
-	uint16_t val;
+	uint16_t ticket;
 	int pause_cnt;
 
 	WT_RET(__wt_verbose(
@@ -208,8 +203,8 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * lock.
 	 */
 	me = WT_ATOMIC_FETCH_ADD8(l->u, (uint64_t)1 << 32);
-	val = (uint16_t)(me >> 32);
-	for (pause_cnt = 0; val != l->s.readers;) {
+	ticket = (uint16_t)(me >> 32);
+	for (pause_cnt = 0; ticket != l->s.readers;) {
 		/*
 		 * We failed to get the lock; pause before retrying and if we've
 		 * paused enough, sleep so we don't burn CPU to no purpose. This
@@ -306,7 +301,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
 	uint64_t me;
-	uint16_t val;
+	uint16_t ticket;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: writelock %s", rwlock->name));
@@ -320,8 +315,8 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * lock.
 	 */
 	me = WT_ATOMIC_FETCH_ADD8(l->u, (uint64_t)1 << 32);
-	val = (uint16_t)(me >> 32);
-	while (val != l->s.writers)
+	ticket = (uint16_t)(me >> 32);
+	while (ticket != l->s.writers)
 		WT_PAUSE();
 
 	return (0);
@@ -354,7 +349,7 @@ __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	++copy.s.writers;
 	++copy.s.readers;
 
-	l->i.us = copy.i.us;
+	l->i.wr = copy.i.wr;
 
 	return (0);
 }

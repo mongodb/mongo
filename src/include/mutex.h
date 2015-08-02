@@ -33,7 +33,7 @@ typedef union {			/* Read/write lock */
 #else
 	uint64_t u;
 	struct {
-		uint32_t us;
+		uint32_t wr;		/* Writers and readers */
 	} i;
 	struct {
 		uint16_t writers;	/* Now serving for writers */
