@@ -225,6 +225,10 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 			__wt_sleep(0, 10);
 	}
 
+	/*
+	 * We're the only writer of the readers field, so the update does not
+	 * need to be atomic.
+	 */
 	++l->s.readers;
 
 	return (0);
@@ -342,8 +346,10 @@ __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	WT_BARRIER();
 
 	/*
-	 * The try-lock functions are reading the lock fields separately as they
-	 * create old/new values, we need to update atomically to avoid races.
+	 * We're the only writer of the writers/readers fields, so the update
+	 * does not need to be atomic; we have to update both values at the
+	 * same time though, otherwise we'd potentially race with the thread
+	 * next granted the lock.
 	 */
 	++copy.s.writers;
 	++copy.s.readers;
