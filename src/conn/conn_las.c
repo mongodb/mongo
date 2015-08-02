@@ -29,13 +29,8 @@ static int
 __las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 {
 	const char *open_cursor_cfg[] = {
-	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor),
-	    "overwrite=false", NULL };
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
 
-	/*
-	 * Open the cursor (note the "overwrite=false" configuration, we want
-	 * to see errors if we try to remove records that aren't there).
-	 */
 	return (__wt_open_cursor(
 	    session, WT_LASFILE_URI, NULL, open_cursor_cfg, cursorp));
 }
