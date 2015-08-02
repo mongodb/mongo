@@ -46,7 +46,7 @@
  *		uint16_t writers;	Now serving for writers
  *		uint16_t readers;	Now serving for readers
  *		uint16_t users;		Next available ticket number
- *		uint16_t pad;		Not used
+ *		uint16_t __notused;	Padding
  *	}
  *
  * First, imagine a store's 'take a number' ticket algorithm. A customer takes
