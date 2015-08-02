@@ -177,6 +177,16 @@ TEST(ServerSelectionMetadata, UpconvertInvalidMetadata) {
                              << "pong"
                              << "$queryOptions" << BSONObj()),
                         ErrorCodes::NoSuchKey);
+
+    // invalid wrapped query
+    checkUpconvertFails(BSON("$query" << 1), ErrorCodes::TypeMismatch);
+    checkUpconvertFails(BSON("$query"
+                             << ""),
+                        ErrorCodes::TypeMismatch);
+    checkUpconvertFails(BSON("query" << 1), ErrorCodes::TypeMismatch);
+    checkUpconvertFails(BSON("query"
+                             << ""),
+                        ErrorCodes::TypeMismatch);
 }
 
 }  // namespace

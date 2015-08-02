@@ -55,17 +55,26 @@ const char kQueryWrapper[] = "query";
 
 /**
  * Utility to unwrap a '$query' or 'query' wrapped command object. The first element of the
- * return value indicates whether the command was unwrapped, and the second element is either
+ * returned tuple indicates whether the command was unwrapped, and the second element is either
  * the unwrapped command (if it was wrapped), or the original command if it was not.
  */
-std::tuple<bool, BSONObj> unwrapCommand(const BSONObj& maybeWrapped) {
+StatusWith<std::tuple<bool, BSONObj>> unwrapCommand(const BSONObj& maybeWrapped) {
     const auto firstElFieldName = maybeWrapped.firstElementFieldName();
-    if ((firstElFieldName == StringData(kDollarQueryWrapper)) ||
-        (firstElFieldName == StringData(kQueryWrapper))) {
-        // TODO: do we need getOwned here?
-        return std::make_tuple(true, maybeWrapped.firstElement().embeddedObject());
+
+    if ((firstElFieldName != StringData(kDollarQueryWrapper)) &&
+        (firstElFieldName != StringData(kQueryWrapper))) {
+        return std::make_tuple(false, maybeWrapped);
     }
-    return std::make_tuple(false, maybeWrapped);
+
+    BSONElement inner;
+    auto extractStatus =
+        bsonExtractTypedField(maybeWrapped, firstElFieldName, mongo::Object, &inner);
+
+    if (!extractStatus.isOK()) {
+        return extractStatus;
+    }
+
+    return std::make_tuple(true, inner.Obj());
 }
 
 /**
@@ -215,9 +224,14 @@ Status ServerSelectionMetadata::upconvert(const BSONObj& legacyCommand,
     // First we need to check if we have a wrapped command. That is, a command of the form
     // {'$query': { 'commandName': 1, ...}, '$someOption': 5, ....}. Curiously, the field name
     // of the wrapped query can be either '$query', or 'query'.
+    auto swUnwrapped = unwrapCommand(legacyCommand);
+    if (!swUnwrapped.isOK()) {
+        return swUnwrapped.getStatus();
+    }
+
     BSONObj maybeUnwrapped;
     bool wasWrapped;
-    std::tie(wasWrapped, maybeUnwrapped) = unwrapCommand(legacyCommand);
+    std::tie(wasWrapped, maybeUnwrapped) = swUnwrapped.getValue();
 
     if (wasWrapped) {
         // Check if legacyCommand has an invalid $maxTimeMS option.
