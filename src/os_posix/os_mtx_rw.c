@@ -349,14 +349,18 @@ __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	copy = *l;
 
-	WT_BARRIER();
-
 	/*
 	 * We're the only writer of the writers/readers fields, so the update
 	 * does not need to be atomic; we have to update both values at the
 	 * same time though, otherwise we'd potentially race with the thread
 	 * next granted the lock.
+	 *
+	 * Use a memory barrier to ensure the compiler doesn't mess with these
+	 * instructions and rework the code in a way that avoids the update as
+	 * a unit.
 	 */
+	WT_BARRIER();
+
 	++copy.s.writers;
 	++copy.s.readers;
 
