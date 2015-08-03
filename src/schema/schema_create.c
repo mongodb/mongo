@@ -532,15 +532,7 @@ __create_index(WT_SESSION_IMPL *session,
 	sourcecfg[1] = fmt.data;
 	WT_ERR(__wt_config_merge(session, sourcecfg, NULL, &sourceconf));
 
-	/*
-	 * Allow the newly created dhandle to be reopened later.
-	 * This avoids self deadlock on the handle, opened exclusively
-	 * here, when we reopen it to fill the index.
-	 */
-	F_SET(session, WT_SESSION_RELOCK_DATA_HANDLES);
-	ret = __wt_schema_create(session, source, sourceconf);
-	F_CLR(session, WT_SESSION_RELOCK_DATA_HANDLES);
-	WT_ERR(ret);
+	WT_ERR(__wt_schema_create(session, source, sourceconf));
 
 	cfg[1] = sourceconf;
 	cfg[2] = confbuf.data;

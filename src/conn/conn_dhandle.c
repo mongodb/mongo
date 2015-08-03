@@ -329,8 +329,7 @@ __wt_conn_btree_open(
 	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
 
 	WT_ERR(__wt_btree_open(session, cfg));
-	if (F_ISSET(session, WT_SESSION_RELOCK_DATA_HANDLES) &&
-	    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
+	if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
 	    !LF_ISSET(WT_BTREE_SPECIAL_FLAGS)) {
 		dhandle->excl_session = session;
 		dhandle->excl_ref = 1;
