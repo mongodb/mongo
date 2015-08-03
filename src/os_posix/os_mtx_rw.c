@@ -90,9 +90,9 @@
  *
  * Readers or writers entering the system after the write lock is queued block,
  * and the next ticket holder (reader or writer) will unblock when the writer
- * unlocks.
+ * unlocks. An example, continuing from the last line of the above example:
+ *
  *						writers	readers	users
- *	[continued from above]
  *	W: ticket 3, writers match	OK	3	3	4
  *	R: ticket 4, readers no match	block	3	3	5
  *	R: ticket 5, readers no match	block	3	3	6
