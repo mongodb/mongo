@@ -116,13 +116,6 @@ __col_append_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 			    &ins_head->head[i] : &ins_head->tail[i]->next[i];
 	}
 
-	/* !!!
-	 * Test for an uninitialized cursor, ins_stack[0] is cleared as part of
-	 * initializing a cursor for a search.
-	 */
-	if (ins_stack[0] == NULL)
-		return (WT_RESTART);
-
 	/* Confirm position and insert the new WT_INSERT item. */
 	WT_RET(__insert_serial_func(
 	    session, ins_head, ins_stack, new_ins, skipdepth));
@@ -149,6 +142,13 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 {
 	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
+
+	/* !!!
+	 * Test for an uninitialized cursor, ins_stack[0] is cleared as part of
+	 * initializing a cursor for a search.
+	 */
+	if (ins_stack[0] == NULL)
+		return (WT_RESTART);
 
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
