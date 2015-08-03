@@ -63,7 +63,7 @@
  * next number available. However, instead of waiting for 'writers' to equal
  * their number, they wait for 'readers' to equal their number.
  *
- * This has the effect of queueing lock requests in the order they arrive
+ * This has the effect of queuing lock requests in the order they arrive
  * (incidentally avoiding starvation).
  *
  * Each lock/unlock pair requires incrementing both 'readers' and 'writers'.
@@ -141,17 +141,14 @@ __wt_rwlock_alloc(
 int
 __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	wt_rwlock_t *l;
-	uint64_t new, old, users, writers;
+	wt_rwlock_t *l, new, old;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: try_readlock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	l = &rwlock->rwlock;
-
-	writers = l->s.writers;
-	users = l->s.users;
+	new = old = *l;
 
 	/*
 	 * This read lock can only be granted if the lock was last granted to
@@ -159,22 +156,17 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * that is, if this thread's ticket would be the next ticket granted.
 	 * Do the cheap check to see if this can possibly succeed.
 	 */
-	if (l->s.readers != users)
+	if (old.s.readers != old.s.users)
 		return (EBUSY);
 
 	/*
 	 * The old and new values for the lock: note the use of "users" instead
-	 * of "writers", this may not be the lock's current value, rather it's
-	 * the value the lock must have if we are to grant this write lock.
-	 *
-	 * Note the masking of "users + 1" in the calculation of the new value:
-	 * we want to set the readers field to the next readers value, not the
-	 * next users value, so it has to wrap, not overflow.
+	 * of "readers", this may not be the lock's current value, rather it's
+	 * the value the lock must have if we are to grant this read lock.
 	 */
-	old = (users << 32) + (users << 16) + writers;
-	new = (((users + 1) & 0xffff) << 32) +
-	    (((users + 1) & 0xffff) << 16) + writers;
-	return (WT_ATOMIC_CAS8(l->u, old, new) ? 0 : EBUSY);
+	old.s.readers = old.s.users;
+	new.s.readers = new.s.users = old.s.users + 1;
+	return (WT_ATOMIC_CAS8(l->u, old.u, new.u) ? 0 : EBUSY);
 }
 
 /*
@@ -255,17 +247,14 @@ __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 int
 __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	wt_rwlock_t *l;
-	uint64_t new, old, readers, users;
+	wt_rwlock_t *l, new, old;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: try_writelock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	l = &rwlock->rwlock;
-
-	readers = l->s.readers;
-	users = l->s.users;
+	old = new = *l;
 
 	/*
 	 * This write lock can only be granted if the lock was last granted to
@@ -273,7 +262,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * that is, if this thread's ticket would be the next ticket granted.
 	 * Do the cheap check to see if this can possibly succeed.
 	 */
-	if (l->s.writers != users)
+	if (old.s.writers != old.s.users)
 		return (EBUSY);
 
 	/*
@@ -281,9 +270,9 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * of "writers", this may not be the lock's current value, rather it's
 	 * the value the lock must have if we are to grant this write lock.
 	 */
-	old = (users << 32) + (readers << 16) + users;
-	new = (((users + 1) & 0xffff) << 32) + (readers << 16) + users;
-	return (WT_ATOMIC_CAS8(l->u, old, new) ? 0 : EBUSY);
+	old.s.writers = new.s.writers = old.s.users;
+	++new.s.users;
+	return (WT_ATOMIC_CAS8(l->u, old.u, new.u) ? 0 : EBUSY);
 }
 
 /*
