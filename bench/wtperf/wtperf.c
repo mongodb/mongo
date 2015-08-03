@@ -96,12 +96,6 @@ static uint64_t	 wtperf_value_range(CONFIG *);
 #define	HELIUM_CONFIG	",type=helium"
 #define	INDEX_COL_NAMES	",columns=(key,val)"
 
-inline uint64_t
-decode_key(char *key_buf)
-{
-	return (strtoull(key_buf, NULL, 10));
-}
-
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
 get_next_incr(CONFIG *cfg)

@@ -28,6 +28,12 @@
 
 #include "wtperf.h"
 
+static inline uint64_t
+decode_key(char *key_buf)
+{
+	return (strtoull(key_buf, NULL, 10));
+}
+
 int
 setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 
