@@ -105,6 +105,7 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 			}
 			truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 			if (truncate_item == NULL) {
+				free(truncate_key);
 				ret = enomem(cfg);
 				goto err;
 			}
@@ -159,6 +160,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 		}
 		truncate_item = calloc(sizeof(TRUNCATE_QUEUE_ENTRY), 1);
 		if (truncate_item == NULL) {
+			free(truncate_key);
 			lprintf(cfg, ENOMEM, 0,
 			    "truncate: couldn't allocate item");
 			return (ENOMEM);
