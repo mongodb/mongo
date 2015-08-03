@@ -227,6 +227,12 @@ TEST_F(QueryPlannerTest, NearNoIndex) {
     runInvalidQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
 }
 
+TEST_F(QueryPlannerTest, NearEmptyPath) {
+    addIndex(BSON(""
+                  << "2dsphere"));
+    runInvalidQuery(fromjson("{'': {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}"));
+}
+
 TEST_F(QueryPlannerTest, TwoDSphereNoGeoPred) {
     addIndex(BSON("x" << 1 << "a"
                       << "2dsphere"));
