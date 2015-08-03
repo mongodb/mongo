@@ -222,19 +222,19 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->isolation = session->isolation;
 	txn->txn_logsync = S2C(session)->txn_logsync;
 
-        if (cfg != NULL)
-                WT_RET(__wt_txn_config(session, cfg));
+	if (cfg != NULL)
+		WT_RET(__wt_txn_config(session, cfg));
 
 	F_SET(txn, TXN_RUNNING);
 	if (txn->isolation == TXN_ISO_SNAPSHOT) {
 		if (session->ncursors > 0)
 			WT_RET(__wt_session_copy_values(session));
 
-                /*
-                 * We're about to allocate a snapshot: if we need to block for
-                 * eviction, it's better to do it beforehand.
-                 */
-                WT_RET(__wt_cache_full_check(session));
+		/*
+		 * We're about to allocate a snapshot: if we need to block for
+		 * eviction, it's better to do it beforehand.
+		 */
+		WT_RET(__wt_cache_full_check(session));
 		__wt_txn_get_snapshot(session);
 	}
 	return (0);
