@@ -116,6 +116,10 @@ RegExp.prototype.tojson = RegExp.prototype.toString;
 
 // Array
 Array.contains = function(a, x){
+    if (!Array.isArray(a)) {
+        throw new Error("The first argument to Array.contains must be an array");
+    }
+
     for (var i=0; i<a.length; i++){
         if (a[i] == x)
             return true;
@@ -124,6 +128,10 @@ Array.contains = function(a, x){
 }
 
 Array.unique = function(a){
+    if (!Array.isArray(a)) {
+        throw new Error("The first argument to Array.unique must be an array");
+    }
+
     var u = [];
     for (var i=0; i<a.length; i++){
         var o = a[i];
@@ -135,6 +143,10 @@ Array.unique = function(a){
 }
 
 Array.shuffle = function(arr){
+    if (!Array.isArray(arr)) {
+        throw new Error("The first argument to Array.shuffle must be an array");
+    }
+
     for (var i=0; i<arr.length-1; i++){
         var pos = i+Random.randInt(arr.length-i);
         var save = arr[i];
@@ -145,6 +157,10 @@ Array.shuffle = function(arr){
 }
 
 Array.tojson = function(a, indent, nolint){
+    if (!Array.isArray(a)) {
+        throw new Error("The first argument to Array.tojson must be an array");
+    }
+
     var elementSeparator = nolint ? " " : "\n";
 
     if (!indent)
@@ -178,6 +194,10 @@ Array.tojson = function(a, indent, nolint){
 }
 
 Array.fetchRefs = function(arr, coll){
+    if (!Array.isArray(arr)) {
+        throw new Error("The first argument to Array.fetchRefs must be an array");
+    }
+
     var n = [];
     for (var i=0; i<arr.length; i ++){
         var z = arr[i];
@@ -189,6 +209,10 @@ Array.fetchRefs = function(arr, coll){
 }
 
 Array.sum = function(arr){
+    if (!Array.isArray(arr)) {
+        throw new Error("The first argument to Array.sum must be an array");
+    }
+
     if (arr.length == 0)
         return null;
     var s = arr[0];
@@ -198,12 +222,20 @@ Array.sum = function(arr){
 }
 
 Array.avg = function(arr){
+    if (!Array.isArray(arr)) {
+        throw new Error("The first argument to Array.avg must be an array");
+    }
+
     if (arr.length == 0)
         return null;
     return Array.sum(arr) / arr.length;
 }
 
 Array.stdDev = function(arr){
+    if (!Array.isArray(arr)) {
+        throw new Error("The first argument to Array.stdDev must be an array");
+    }
+
     var avg = Array.avg(arr);
     var sum = 0;
 
