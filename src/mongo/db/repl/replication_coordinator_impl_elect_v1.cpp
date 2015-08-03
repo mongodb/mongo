@@ -186,6 +186,7 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     _topCoord->incrementTerm();
     // Secure our vote for ourself first
     _topCoord->voteForMyselfV1();
+    // TODO(siyuan): SERVER-19764 store the vote in persistent storage.
 
     _voteRequester.reset(new VoteRequester);
 
@@ -231,7 +232,7 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
         return;
     }
 
-    log() << "election succeeded, assuming primary role";
+    log() << "election succeeded, assuming primary role in term " << _topCoord->getTerm();
     // Prevent last committed optime from updating until we finish draining.
     _setFirstOpTimeOfMyTerm(
         OpTime(Timestamp(std::numeric_limits<int>::max(), 0), std::numeric_limits<int>::max()));

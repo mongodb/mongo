@@ -710,7 +710,8 @@ private:
      */
     void _finishLoadLocalConfig(const ReplicationExecutor::CallbackArgs& cbData,
                                 const ReplicaSetConfig& localConfig,
-                                const StatusWith<OpTime>& lastOpTimeStatus);
+                                const StatusWith<OpTime>& lastOpTimeStatus,
+                                const StatusWith<LastVote>& lastVoteStatus);
 
     /**
      * Callback that finishes the work of processReplSetInitiate() inside the replication

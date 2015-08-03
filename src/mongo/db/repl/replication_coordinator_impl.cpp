@@ -296,14 +296,16 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
                                           this,
                                           stdx::placeholders::_1,
                                           localConfig,
-                                          lastOpTimeStatus));
+                                          lastOpTimeStatus,
+                                          lastVote));
     return false;
 }
 
 void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     const ReplicationExecutor::CallbackArgs& cbData,
     const ReplicaSetConfig& localConfig,
-    const StatusWith<OpTime>& lastOpTimeStatus) {
+    const StatusWith<OpTime>& lastOpTimeStatus,
+    const StatusWith<LastVote>& lastVoteStatus) {
     if (!cbData.status.isOK()) {
         LOG(1) << "Loading local replica set configuration failed due to " << cbData.status;
         return;
@@ -346,6 +348,17 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
             lastOpTime = lastOpTimeStatus.getValue();
         }
     }
+
+    // Restore the current term according to the terms of last oplog entry and last vote.
+    long long term = lastOpTime.getTerm();
+    if (lastVoteStatus.isOK()) {
+        long long lastVoteTerm = lastVoteStatus.getValue().getTerm();
+        if (term < lastVoteTerm) {
+            term = lastVoteTerm;
+        }
+    }
+    _updateTerm_incallback(term, nullptr);
+
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigStartingUp);

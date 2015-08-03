@@ -1498,6 +1498,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
     response->append("set", _rsConfig.isInitialized() ? _rsConfig.getReplSetName() : "");
     response->append("date", now);
     response->append("myState", myState.s);
+    response->append("term", _term);
 
     // Add sync source info
     if (!_syncSource.empty() && !myState.primary() && !myState.removed()) {
