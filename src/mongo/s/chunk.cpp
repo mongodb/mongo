@@ -619,9 +619,9 @@ bool Chunk::splitIfShould(long dataWritten) const {
     }
 }
 
-const ConnectionString& Chunk::_getShardConnectionString() const {
+std::string Chunk::_getShardConnectionString() const {
     const auto shard = grid.shardRegistry()->getShard(getShardId());
-    return shard->getConnString();
+    return shard->getConnString().toString();
 }
 
 long Chunk::getPhysicalSize() const {

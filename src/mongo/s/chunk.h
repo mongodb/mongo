@@ -252,9 +252,9 @@ public:
 
 private:
     /**
-     * Returns the connection string for the shard on which this chunk lives on.
+     * Returns the connection string for the shard on which this chunk resides.
      */
-    const ConnectionString& _getShardConnectionString() const;
+    std::string _getShardConnectionString() const;
 
     // if min/max key is pos/neg infinity
     bool _minIsInf() const;
