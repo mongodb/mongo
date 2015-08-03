@@ -54,11 +54,9 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 	    session, cfg->uris[0], NULL, NULL, &cursor)) != 0)
 		goto err;
 
-	/* Truncation percentage value. eg 10% is 0.1. */
-	trunc_cfg->truncation_percentage = (double)workload->truncate_pct / 100;
 	/* How many entries between each stone. */
 	trunc_cfg->stone_gap =
-	    workload->truncate_count * trunc_cfg->truncation_percentage;
+	    (workload->truncate_count * workload->truncate_pct) / 100;
 	/* How many stones we need. */
 	trunc_cfg->needed_stones =
 	    workload->truncate_count / trunc_cfg->stone_gap;

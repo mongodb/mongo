@@ -95,7 +95,7 @@ typedef struct {
 	int64_t ops_per_txn;
 	int64_t truncate;		/* Truncate ratio */
 	uint64_t truncate_pct;		/* Truncate Percent */
-	uint64_t truncate_count;	/* Truncate Percent */
+	uint64_t truncate_count;	/* Truncate Count */
 
 #define	WORKER_INSERT		1	/* Insert */
 #define	WORKER_INSERT_RMW	2	/* Insert with read-modify-write */
@@ -108,7 +108,6 @@ typedef struct {
 /* Steering items for the truncate workload */
 typedef struct __truncate_struct TRUNCATE_CONFIG;
 struct __truncate_struct {
-	double truncation_percentage;
 	uint64_t stone_gap;
 	uint64_t needed_stones;
 	uint64_t final_stone_gap;
