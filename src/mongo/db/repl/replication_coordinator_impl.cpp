@@ -2898,7 +2898,6 @@ bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term, Handle* 
 
 void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(_memberState.readable());  // Snapshots can only be taken in a readable state.
 
     if (timeOfSnapshot <= _lastCommittedOpTime) {
         // This snapshot is ready to be marked as committed.
@@ -2921,7 +2920,7 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(OpTime newCommi
     invariant(!newCommittedSnapshot.isNull());
     invariant(newCommittedSnapshot <= _lastCommittedOpTime);
     if (_currentCommittedSnapshot)
-        invariant(newCommittedSnapshot > *_currentCommittedSnapshot);
+        invariant(newCommittedSnapshot >= *_currentCommittedSnapshot);
     if (!_uncommittedSnapshots.empty())
         invariant(newCommittedSnapshot < _uncommittedSnapshots.front());
 

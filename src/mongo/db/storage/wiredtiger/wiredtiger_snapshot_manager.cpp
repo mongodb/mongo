@@ -55,7 +55,7 @@ Status WiredTigerSnapshotManager::createSnapshot(OperationContext* txn, const Sn
 void WiredTigerSnapshotManager::setCommittedSnapshot(const SnapshotName& name) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    invariant(!_committedSnapshot || *_committedSnapshot < name);
+    invariant(!_committedSnapshot || *_committedSnapshot <= name);
     _committedSnapshot = name;
 
     const std::string config = str::stream() << "drop=(before=" << name.asU64() << ')';

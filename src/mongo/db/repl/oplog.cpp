@@ -948,7 +948,8 @@ void SnapshotThread::run() {
                 // take snapshots. When we transition into a readable state from a non-readable
                 // state, a snapshot is forced to ensure we don't miss the latest write. This must
                 // be checked each time we acquire the global IS lock since that prevents the node
-                // from transitioning to a !readable() state from a readable() one.
+                // from transitioning to a !readable() state from a readable() one in the cases
+                // where we shouldn't be creating a snapshot.
                 continue;
             }
 
