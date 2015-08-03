@@ -113,7 +113,7 @@ public:
      * Prepares this RU to be the basis for a named snapshot.
      *
      * Begins a WT transaction, and invariants if we are already in one.
-     * Bans being in a WriteUnitOfWork until the next call to commitAndRestart().
+     * Bans being in a WriteUnitOfWork until the next call to abandonSnapshot().
      */
     void prepareForCreateSnapshot(OperationContext* opCtx);
 
