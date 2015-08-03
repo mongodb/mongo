@@ -734,12 +734,22 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
                                      ("SetGlobalEnvironment", "SSLManager"))
 (InitializerContext* context) {
+    repl::TopologyCoordinatorImpl::Options topoCoordOptions;
+    topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
+    topoCoordOptions.configServerMode = serverGlobalParams.configsvrMode;
+    // TODO(SERVER-19739):  Rather than checking if the storage engine name is "wiredTiger"
+    // we should be asking the global storage engine whether it supports readCommitted,
+    // however at this point in mongod startup the storage engine has not yet been
+    // initialized.
+    topoCoordOptions.storageEngineSupportsReadCommitted =
+        storageGlobalParams.engine == "wiredTiger";
+
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         getGlobalReplSettings(),
         new repl::ReplicationCoordinatorExternalStateImpl,
         executor::makeNetworkInterface().release(),
         new repl::StorageInterfaceImpl{},
-        new repl::TopologyCoordinatorImpl(Seconds(repl::maxSyncSourceLagSecs)),
+        new repl::TopologyCoordinatorImpl(topoCoordOptions),
         static_cast<int64_t>(curTimeMillis64()));
     auto serviceContext = getGlobalServiceContext();
     serviceContext->registerKillOpListener(replCoord.get());

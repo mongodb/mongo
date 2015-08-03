@@ -150,6 +150,14 @@ Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
                                     << newConfig.getReplSetName());
     }
 
+    if (oldConfig.isConfigServer() && !newConfig.isConfigServer()) {
+        return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                      str::stream() << "Cannot remove \""
+                                    << ReplicaSetConfig::kConfigServerFieldName
+                                    << "\" from replica set configuration on reconfig");
+    }
+
+
     //
     // For every member config mNew in newConfig, if there exists member config mOld
     // in oldConfig such that mNew.getHostAndPort() == mOld.getHostAndPort(), it is required

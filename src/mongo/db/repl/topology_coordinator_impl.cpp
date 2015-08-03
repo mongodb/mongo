@@ -122,12 +122,12 @@ void PingStats::miss() {
     ++_numFailuresSinceLastStart;
 }
 
-TopologyCoordinatorImpl::TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs)
+TopologyCoordinatorImpl::TopologyCoordinatorImpl(Options options)
     : _role(Role::follower),
       _term(0),
       _currentPrimaryIndex(-1),
       _forceSyncSourceIndex(-1),
-      _maxSyncSourceLagSecs(maxSyncSourceLagSecs),
+      _options(std::move(options)),
       _selfIndex(-1),
       _stepDownPending(false),
       _maintenanceModeCalls(0),
@@ -210,13 +210,13 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
     OpTime oldestSyncOpTime;
 
     // Find primary's oplog time. Reject sync candidates that are more than
-    // maxSyncSourceLagSecs seconds behind.
+    // _options.maxSyncSourceLagSecs seconds behind.
     if (_currentPrimaryIndex != -1) {
         OpTime primaryOpTime = _hbdata[_currentPrimaryIndex].getOpTime();
 
         // Check if primaryOpTime is still close to 0 because we haven't received
         // our first heartbeat from a new primary yet.
-        unsigned int maxLag = static_cast<unsigned int>(_maxSyncSourceLagSecs.count());
+        unsigned int maxLag = static_cast<unsigned int>(_options.maxSyncSourceLagSecs.count());
         if (primaryOpTime.getSecs() >= maxLag) {
             oldestSyncOpTime =
                 OpTime(Timestamp(primaryOpTime.getSecs() - maxLag, 0), primaryOpTime.getTerm());
@@ -1951,6 +1951,21 @@ MemberState TopologyCoordinatorImpl::getMemberState() const {
         }
         return MemberState::RS_STARTUP;
     }
+
+    if (_rsConfig.isConfigServer()) {
+        if (_options.configServerMode == ServerGlobalParams::ConfigServerMode::NONE) {
+            return MemberState::RS_REMOVED;
+        }
+        if (_options.configServerMode == ServerGlobalParams::ConfigServerMode::CSRS &&
+            !_options.storageEngineSupportsReadCommitted) {
+            return MemberState::RS_REMOVED;
+        }
+    } else {
+        if (_options.configServerMode != ServerGlobalParams::ConfigServerMode::NONE) {
+            return MemberState::RS_REMOVED;
+        }
+    }
+
     if (_role == Role::leader) {
         invariant(_currentPrimaryIndex == _selfIndex);
         return MemberState::RS_PRIMARY;
@@ -2101,8 +2116,8 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
                                                      Date_t now) const {
     // Methodology:
     // If there exists a viable sync source member other than currentSource, whose oplog has
-    // reached an optime greater than _maxSyncSourceLagSecs later than currentSource's, return
-    // true.
+    // reached an optime greater than _options.maxSyncSourceLagSecs later than currentSource's,
+    // return true.
 
     // If the user requested a sync source change, return true.
     if (_forceSyncSourceIndex != -1) {
@@ -2122,7 +2137,7 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
         return false;
     }
     unsigned int currentSecs = currentOpTime.getSecs();
-    unsigned int goalSecs = currentSecs + _maxSyncSourceLagSecs.count();
+    unsigned int goalSecs = currentSecs + _options.maxSyncSourceLagSecs.count();
 
     for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); it != _hbdata.end();
          ++it) {
@@ -2134,7 +2149,7 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
             goalSecs < it->getOpTime().getSecs()) {
             log() << "changing sync target because current sync target's most recent OpTime is "
                   << currentOpTime.toString() << " which is more than "
-                  << _maxSyncSourceLagSecs.count() << " seconds behind member "
+                  << _options.maxSyncSourceLagSecs.count() << " seconds behind member "
                   << candidateConfig.getHostAndPort().toString() << " whose most recent OpTime is "
                   << it->getOpTime().toString();
             invariant(itIndex != _selfIndex);

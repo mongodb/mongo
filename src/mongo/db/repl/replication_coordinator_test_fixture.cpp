@@ -107,7 +107,8 @@ void ReplCoordTest::init() {
     // PRNG seed for tests.
     const int64_t seed = 0;
 
-    _topo = new TopologyCoordinatorImpl(Seconds(0));
+    TopologyCoordinatorImpl::Options settings;
+    _topo = new TopologyCoordinatorImpl(settings);
     _net = new NetworkInterfaceMock;
     _storage = new StorageInterfaceMock;
     _externalState = new ReplicationCoordinatorExternalStateMock;

@@ -656,22 +656,11 @@ TEST(ReplicaSetConfig, ChainingAllowedField) {
     ASSERT_FALSE(config.isChainingAllowed());
 }
 
-TEST(ReplicaSetConfig, ConfigServerFieldDoesntWorkWithOldProtocol) {
-    ReplicaSetConfig config;
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 1 << "configServer" << true << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")))));
-    ASSERT_NOT_OK(config.validate());
-}
-
 TEST(ReplicaSetConfig, ConfigServerField) {
     ReplicaSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version" << 1 << "configServer" << true << "settings"
-                                     << BSON("protocolVersion" << 1) << "members"
+                                     << "version" << 1 << "configServer" << true << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_OK(config.validate());

@@ -67,7 +67,9 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
 class TopoCoordTest : public mongo::unittest::Test {
 public:
     virtual void setUp() {
-        _topo.reset(new TopologyCoordinatorImpl(Seconds(100)));
+        _options = TopologyCoordinatorImpl::Options{};
+        _options.maxSyncSourceLagSecs = Seconds{100};
+        _topo.reset(new TopologyCoordinatorImpl(_options));
         _now = Date_t();
         _selfIndex = -1;
         _cbData.reset(new ReplicationExecutor::CallbackArgs(
@@ -88,6 +90,11 @@ protected:
     }
     Date_t& now() {
         return _now;
+    }
+
+    void setOptions(const TopologyCoordinatorImpl::Options& options) {
+        _options = options;
+        _topo.reset(new TopologyCoordinatorImpl(_options));
     }
 
     int64_t countLogLinesContaining(const std::string& needle) {
@@ -217,6 +224,7 @@ private:
     ReplicaSetConfig _currentConfig;
     Date_t _now;
     int _selfIndex;
+    TopologyCoordinatorImpl::Options _options;
 };
 
 TEST_F(TopoCoordTest, ChooseSyncSourceBasic) {
@@ -5072,6 +5080,97 @@ TEST_F(TopoCoordTest, ProcessDeclareElectionWinner) {
         "replSet name does not match",
         getTopoCoord().processReplSetDeclareElectionWinner(winnerArgs5, &responseTerm5).reason());
     ASSERT_EQUALS(2, responseTerm5);
+}
+
+TEST_F(TopoCoordTest, GetMemberStateConfigSvrInRSConfigButNotOnCmdLine) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 1 << "configServer" << true << "members"
+                      << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                               << "hself")
+                                    << BSON("_id" << 20 << "host"
+                                                  << "h2") << BSON("_id" << 30 << "host"
+                                                                         << "h3"))),
+                 0);
+    ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
+}
+
+TEST_F(TopoCoordTest, GetMemberStateConfigSvrOnCmdLineButNotInRSConfig) {
+    TopologyCoordinatorImpl::Options options;
+    options.configServerMode = ServerGlobalParams::ConfigServerMode::CSRS;
+    options.storageEngineSupportsReadCommitted = true;
+    setOptions(options);
+
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                               << "hself")
+                                    << BSON("_id" << 20 << "host"
+                                                  << "h2") << BSON("_id" << 30 << "host"
+                                                                         << "h3"))),
+                 0);
+    ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
+}
+
+TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommitted) {
+    TopologyCoordinatorImpl::Options options;
+    options.configServerMode = ServerGlobalParams::ConfigServerMode::CSRS;
+    options.storageEngineSupportsReadCommitted = false;
+    setOptions(options);
+
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 1 << "configsvr" << true << "members"
+                      << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                               << "hself")
+                                    << BSON("_id" << 20 << "host"
+                                                  << "h2") << BSON("_id" << 30 << "host"
+                                                                         << "h3"))),
+                 0);
+    ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
+}
+
+TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommittedButInSCCCMode) {
+    TopologyCoordinatorImpl::Options options;
+    options.configServerMode = ServerGlobalParams::ConfigServerMode::SCCC;
+    options.storageEngineSupportsReadCommitted = false;
+    setOptions(options);
+
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 1 << "configsvr" << true << "members"
+                      << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                               << "hself")
+                                    << BSON("_id" << 20 << "host"
+                                                  << "h2") << BSON("_id" << 30 << "host"
+                                                                         << "h3"))),
+                 0);
+
+    ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
+    ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
+}
+
+TEST_F(TopoCoordTest, GetMemberStateValidConfigSvr) {
+    TopologyCoordinatorImpl::Options options;
+    options.configServerMode = ServerGlobalParams::ConfigServerMode::CSRS;
+    options.storageEngineSupportsReadCommitted = true;
+    setOptions(options);
+
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 1 << "configServer" << true << "members"
+                      << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                               << "hself")
+                                    << BSON("_id" << 20 << "host"
+                                                  << "h2") << BSON("_id" << 30 << "host"
+                                                                         << "h3"))),
+                 0);
+
+    ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
+    ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
 }
 
 }  // namespace

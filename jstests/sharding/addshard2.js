@@ -26,11 +26,13 @@ rs4.startSet();
 rs4.initiate();
 
 // replica set with configServer: true should *not* be allowed to be added as a shard
-var rs5 = new ReplSetTest({ 'name': 'csrs', nodes: 3, startPort: 31212 });
+var rs5 = new ReplSetTest({ name: 'csrs',
+                            nodes: 3,
+                            startPort: 31212,
+                            nodeOptions: {configsvr: "", storageEngine: "wiredTiger" }});
 rs5.startSet();
 var conf = rs5.getReplSetConfig();
 conf.configServer = true;
-conf.settings = {protocolVersion: 1};
 rs5.initiate(conf);
 
 

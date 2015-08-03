@@ -385,11 +385,6 @@ Status ReplicaSetConfig::validate() const {
                           "Arbiters are not allowed in replica set configurations being used for "
                           "config servers");
         }
-        if (_protocolVersion < 1) {
-            return Status(ErrorCodes::BadValue,
-                          "Replica sets must have protocol version of at least 1 in order to be "
-                          "used as sharding config servers");
-        }
     }
 
     return Status::OK();
@@ -539,9 +534,8 @@ BSONObj ReplicaSetConfig::toBSON() const {
     BSONObjBuilder configBuilder;
     configBuilder.append(kIdFieldName, _replSetName);
     configBuilder.appendIntOrLL(kVersionFieldName, _version);
-    if (_protocolVersion > 0) {
-        // Don't include "configServer" field if protocol version is less than 1 to preserve
-        // backwards compatibility
+    if (_configServer) {
+        // Only include "configServer" field if true.
         configBuilder.append(kConfigServerFieldName, _configServer);
     }
 

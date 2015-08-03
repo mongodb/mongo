@@ -39,6 +39,7 @@
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/topology_coordinator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -121,12 +122,23 @@ private:
 
 class TopologyCoordinatorImpl : public TopologyCoordinator {
 public:
+    struct Options {
+        // A sync source is re-evaluated after it lags behind further than this amount.
+        Seconds maxSyncSourceLagSecs{0};
+
+        // Whether or not this node is running as a config server, and if so whether it was started
+        // with --configsvrMode=SCCC.
+        ServerGlobalParams::ConfigServerMode configServerMode{
+            ServerGlobalParams::ConfigServerMode::NONE};
+
+        // Whether or not the storage engine supports read committed.
+        bool storageEngineSupportsReadCommitted{true};
+    };
+
     /**
      * Constructs a Topology Coordinator object.
-     * @param maxSyncSourceLagSecs a sync source is re-evaluated after it lags behind further
-     *                             than this amount.
      **/
-    TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs);
+    TopologyCoordinatorImpl(Options options);
 
     ////////////////////////////////////////////////////////////
     //
@@ -370,8 +382,9 @@ private:
     std::map<HostAndPort, Date_t> _syncSourceBlacklist;
     // The next sync source to be chosen, requested via a replSetSyncFrom command
     int _forceSyncSourceIndex;
-    // How far this node must fall behind before considering switching sync sources
-    Seconds _maxSyncSourceLagSecs;
+
+    // Options for this TopologyCoordinator
+    Options _options;
 
     // "heartbeat message"
     // sent in requestHeartbeat respond in field "hbm"

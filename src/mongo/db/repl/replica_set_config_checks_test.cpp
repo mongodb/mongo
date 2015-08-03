@@ -714,6 +714,37 @@ TEST(ValidateForReconfig, ForceStillNeedsSelfPresent) {
                       .getStatus());
 }
 
+TEST(ValidateForReconfig, CantRemoveConfigServer) {
+    ReplicationCoordinatorExternalStateMock externalState;
+    externalState.addSelf(HostAndPort("h0"));
+
+    // The new config does not contain self. This tests that ValidateForReconfig fails
+    // if the member receiving it is absent from the config, even if force is true.
+    ReplicaSetConfig oldConfig;
+    ASSERT_OK(oldConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 1 << "configServer" << true << "members"
+                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                 << "h0")
+                                                      << BSON("_id" << 1 << "host"
+                                                                    << "h1")))));
+    ASSERT_OK(oldConfig.validate());
+
+    ReplicaSetConfig newConfig;
+    ASSERT_OK(newConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version" << 1 << "members"
+                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                 << "h0")
+                                                      << BSON("_id" << 1 << "host"
+                                                                    << "h1")))));
+    ASSERT_OK(oldConfig.validate());
+
+    ASSERT_EQUALS(
+        ErrorCodes::NewReplicaSetConfigurationIncompatible,
+        validateConfigForReconfig(&externalState, oldConfig, newConfig, false).getStatus());
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
