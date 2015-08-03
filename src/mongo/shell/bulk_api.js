@@ -369,6 +369,7 @@ var _bulk_api_module = (function() {
     this.toString = function() {
       return "BulkWriteError(" + this.tojson() + ")";
     }
+    this.stack = this.toString() + "\n" + (new Error().stack);
 
     this.toResult = function() {
       return new BulkWriteResult(bulkResult, singleBatchType, writeConcern);
@@ -415,6 +416,7 @@ var _bulk_api_module = (function() {
     this.toString = function() {
       return "WriteCommandError(" + this.tojson() + ")";
     }
+    this.stack = this.toString() + "\n" + (new Error().stack);
 
     this.shellPrint = function() {
       return this.toString();
