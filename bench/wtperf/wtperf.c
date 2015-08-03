@@ -507,8 +507,8 @@ worker(void *arg)
 		 * is 0, to avoid first time latency spikes.
 		 */
 		measure_latency =
-		    cfg->sample_interval != 0 && trk->ops != 0 && (
-		    trk->ops % cfg->sample_rate == 0);
+		    cfg->sample_interval != 0 && trk != NULL &&
+		    trk->ops != 0 && (trk->ops % cfg->sample_rate == 0);
 		if (measure_latency &&
 		    (ret = __wt_epoch(NULL, &start)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
