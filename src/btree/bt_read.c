@@ -62,6 +62,7 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 	uint8_t prefix[WT_MAX_PREFIX_SIZE];
 
 	cursor = NULL;
+	saved_flags = 0;		/* [-Werror=maybe-uninitialized] */
 
 	/* Build the unique file/address prefix. */
 	__las_build_prefix(session, addr, addr_size, prefix, &prefix_len);
