@@ -227,11 +227,17 @@ void refetch(FixUpInfo& fixUpInfo, const BSONObj& ourObj) {
             log() << "replSet " << obj.toString();
             throw RSFatalException();
         } else if (cmdname == "collMod") {
-            if (obj.nFields() == 2 && obj["usePowerOf2Sizes"].type() == Bool) {
-                log() << "replSet not rolling back change of usePowerOf2Sizes: " << obj;
-            } else {
-                severe() << "replSet error cannot rollback a collMod command: " << obj;
-                throw RSFatalException();
+            BSONForEach(elt, obj) {
+                if (elt.fieldNameStringData() == "collMod") {
+                    // ignore the command name.
+                } else if (elt.fieldNameStringData() == "usePowerOf2Sizes") {
+                    log() << "replSet not rolling back change of usePowerOf2Sizes: " << obj;
+                } else if (elt.fieldNameStringData() == "noPadding") {
+                    log() << "replSet not rolling back change of noPadding: " << obj;
+                } else {
+                    severe() << "replSet error cannot rollback this collMod command: " << obj;
+                    throw RSFatalException();
+                }
             }
         } else {
             severe() << "replSet error can't rollback this command yet: " << obj.toString();
@@ -242,8 +248,8 @@ void refetch(FixUpInfo& fixUpInfo, const BSONObj& ourObj) {
 
     doc._id = obj["_id"];
     if (doc._id.eoo()) {
-        warning() << "replSet WARNING ignoring op on rollback no _id TODO : " << doc.ns << ' '
-                  << doc.ownedObj.toString();
+        warning() << "ignoring op with no _id during rollback. ns: " << doc.ns << ", "
+                  << "document: " << doc.ownedObj.toString();
         return;
     }
 

@@ -33,6 +33,7 @@ var BID = replTest.getNodeId(b_conn);
 
 var options = {writeConcern: {w: 2, wtimeout: 60000}, upsert: true};
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
+assert.writeOK(a_conn.getDB(name).bar.insert({x: 1}, options));
 
 // shut down master
 replTest.stop(AID);
@@ -41,6 +42,8 @@ replTest.stop(AID);
 master = replTest.getMaster();
 assert(b_conn.host === master.host, "b_conn assumed to be master");
 assert.commandWorked(b_conn.getDB(name).runCommand({collMod: "foo", usePowerOf2Sizes: false}));
+assert.commandWorked(b_conn.getDB(name).runCommand({collMod: "bar", noPadding: true}));
+assert.commandWorked(b_conn.getDB(name).runCommand({collMod: "bar", usePowerOf2Sizes: false, noPadding: true}));
 
 // shut down B and bring back the original master
 replTest.stop(BID);
@@ -54,15 +57,25 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
 // restart B, which should rollback and log a message about not rolling back usePowerOf2Sizes
 replTest.restart(BID);
-var msg = RegExp("replSet not rolling back change of usePowerOf2Sizes: ");
+var rollbackMsg = RegExp("replSet not rolling back change of usePowerOf2Sizes: ");
 assert.soon(function() {
     try {
         var log = b_conn.getDB("admin").adminCommand({getLog: "global"}).log;
-        return doesEntryMatch(log, msg);
+        return doesEntryMatch(log, rollbackMsg);
     }
     catch (e) {
         return false;
     }
 }, "Did not see a log entry about skipping the usePowerOf2Sizes command during rollback");
+var paddingMsg = RegExp("replSet not rolling back change of noPadding: ");
+assert.soon(function() {
+    try {
+        var log = b_conn.getDB("admin").adminCommand({getLog: "global"}).log;
+        return doesEntryMatch(log, paddingMsg);
+    }
+    catch (e) {
+        return false;
+    }
+}, "Did not see a log entry about skipping the noPadding command during rollback");
 
 replTest.stopSet();
