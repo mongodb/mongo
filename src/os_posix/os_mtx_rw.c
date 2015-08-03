@@ -46,8 +46,8 @@
  *		uint16_t writers;	Now serving for writers
  *		uint16_t readers;	Now serving for readers
  *		uint16_t users;		Next available ticket number
- *		uint16_t overflow;	Overflow from users
- *	} s;
+ *		uint16_t __notused;	Padding
+ *	}
  *
  * First, imagine a store's 'take a number' ticket algorithm. A customer takes
  * a unique ticket number and customers are served in ticket order. In the data
@@ -142,7 +142,7 @@ int
 __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
-	uint64_t new, old, overflow, users, writers;
+	uint64_t new, old, users, writers;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: try_readlock %s", rwlock->name));
@@ -150,14 +150,8 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	l = &rwlock->rwlock;
 
-	/*
-	 * Note the overflow field: we are updating the entire 8B of the lock
-	 * atomically, so we have handle the eventual overflow of the 'users'
-	 * field as part of our calculation.
-	 */
 	writers = l->s.writers;
 	users = l->s.users;
-	overflow = l->s.overflow;
 
 	/*
 	 * This read lock can only be granted if the lock was last granted to
@@ -177,9 +171,9 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * we want to set the readers field to the next readers value, not the
 	 * next users value, so it has to wrap, not overflow.
 	 */
-	old = (overflow << 48) + (users << 32) + (users << 16) + writers;
-	new = (overflow << 48) +
-	    ((users + 1) << 32) + (((users + 1) & 0xffff) << 16) + writers;
+	old = (users << 32) + (users << 16) + writers;
+	new = (((users + 1) & 0xffff) << 32) +
+	    (((users + 1) & 0xffff) << 16) + writers;
 	return (WT_ATOMIC_CAS8(l->u, old, new) ? 0 : EBUSY);
 }
 
@@ -191,7 +185,6 @@ int
 __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
-	uint64_t me;
 	uint16_t ticket;
 	int pause_cnt;
 
@@ -206,8 +199,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * value will wrap and two lockers will simultaneously be granted the
 	 * lock.
 	 */
-	me = WT_ATOMIC_FETCH_ADD8(l->u, (uint64_t)1 << 32);
-	ticket = (uint16_t)(me >> 32);
+	ticket = WT_ATOMIC_FETCH_ADD2(l->s.users, 1);
 	for (pause_cnt = 0; ticket != l->s.readers;) {
 		/*
 		 * We failed to get the lock; pause before retrying and if we've
@@ -264,7 +256,7 @@ int
 __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
-	uint64_t new, old, overflow, readers, users;
+	uint64_t new, old, readers, users;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: try_writelock %s", rwlock->name));
@@ -272,14 +264,8 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	l = &rwlock->rwlock;
 
-	/*
-	 * Note the overflow field: we are updating the entire 8B of the lock
-	 * atomically, so we have handle the eventual overflow of the 'users'
-	 * field as part of our calculation.
-	 */
 	readers = l->s.readers;
 	users = l->s.users;
-	overflow = l->s.overflow;
 
 	/*
 	 * This write lock can only be granted if the lock was last granted to
@@ -295,8 +281,8 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * of "writers", this may not be the lock's current value, rather it's
 	 * the value the lock must have if we are to grant this write lock.
 	 */
-	old = (overflow << 48) + (users << 32) + (readers << 16) + users;
-	new = (overflow << 48) + ((users + 1) << 32) + (readers << 16) + users;
+	old = (users << 32) + (readers << 16) + users;
+	new = (((users + 1) & 0xffff) << 32) + (readers << 16) + users;
 	return (WT_ATOMIC_CAS8(l->u, old, new) ? 0 : EBUSY);
 }
 
@@ -308,7 +294,6 @@ int
 __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
-	uint64_t me;
 	uint16_t ticket;
 	int pause_cnt;
 
@@ -323,8 +308,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * value will wrap and two lockers will simultaneously be granted the
 	 * lock.
 	 */
-	me = WT_ATOMIC_FETCH_ADD8(l->u, (uint64_t)1 << 32);
-	ticket = (uint16_t)(me >> 32);
+	ticket = WT_ATOMIC_FETCH_ADD2(l->s.users, 1);
 	for (pause_cnt = 0; ticket != l->s.writers;) {
 		/*
 		 * We failed to get the lock; pause before retrying and if we've
