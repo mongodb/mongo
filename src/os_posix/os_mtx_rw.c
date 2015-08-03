@@ -160,14 +160,18 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	overflow = l->s.overflow;
 
 	/*
-	 * The old and new values for the lock.
-	 *
-	 * We use "users" twice in the calculation of the old value: this read
-	 * lock can only be granted if the lock was last granted to a reader and
-	 * there are no writers blocked on the lock, that is, if the ticket for
-	 * this thread would be the next ticket granted. This might not be the
-	 * lock's current value, rather it's the value the lock must have if we
-	 * are to grant this read lock.
+	 * This read lock can only be granted if the lock was last granted to
+	 * a reader and there are no readers or writers blocked on the lock,
+	 * that is, if this thread's ticket would be the next ticket granted.
+	 * Do the cheap check to see if this can possibly succeed.
+	 */
+	if (l->s.readers != users)
+		return (EBUSY);
+
+	/*
+	 * The old and new values for the lock: note the use of "users" instead
+	 * of "writers", this may not be the lock's current value, rather it's
+	 * the value the lock must have if we are to grant this write lock.
 	 *
 	 * Note the masking of "users + 1" in the calculation of the new value:
 	 * we want to set the readers field to the next readers value, not the
@@ -278,14 +282,18 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	overflow = l->s.overflow;
 
 	/*
-	 * The old and new values for the lock.
-	 *
-	 * We use "users" twice in the calculation of the old value: this write
-	 * lock can only be granted if the lock was last granted to a writer and
-	 * there are no readers or writers blocked on the lock, that is, if the
-	 * ticket for this thread would be the next ticket granted. This might
-	 * not be the lock's current value, rather it's the value the lock must
-	 * have if we are to grant this write lock.
+	 * This write lock can only be granted if the lock was last granted to
+	 * a writer and there are no readers or writers blocked on the lock,
+	 * that is, if this thread's ticket would be the next ticket granted.
+	 * Do the cheap check to see if this can possibly succeed.
+	 */
+	if (l->s.writers != users)
+		return (EBUSY);
+
+	/*
+	 * The old and new values for the lock: note the use of "users" instead
+	 * of "writers", this may not be the lock's current value, rather it's
+	 * the value the lock must have if we are to grant this write lock.
 	 */
 	old = (overflow << 48) + (users << 32) + (readers << 16) + users;
 	new = (overflow << 48) + ((users + 1) << 32) + (readers << 16) + users;
