@@ -150,11 +150,11 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
 
-	/* Clear references to memory we now own. */
-	*new_insp = NULL;
-
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
+
+	/* Clear references to memory we now own and must free on error. */
+	*new_insp = NULL;
 
 	/* Acquire the page's spinlock, call the worker function. */
 	WT_PAGE_LOCK(session, page);
@@ -203,11 +203,11 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	if (ins_stack[0] == NULL)
 		return (WT_RESTART);
 
-	/* Clear references to memory we now own. */
-	*new_insp = NULL;
-
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
+
+	/* Clear references to memory we now own and must free on error. */
+	*new_insp = NULL;
 
 	simple = 1;
 	for (i = 0; i < skipdepth; i++)
@@ -255,11 +255,11 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_DECL_RET;
 	WT_UPDATE *obsolete, *upd = *updp;
 
-	/* Clear references to memory we now own. */
-	*updp = NULL;
-
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
+
+	/* Clear references to memory we now own and must free on error. */
+	*updp = NULL;
 
 	/*
 	 * Swap the update into place.  If that fails, a new update was added
