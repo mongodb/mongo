@@ -750,6 +750,7 @@ nop
 noraw
 notfound
 notsup
+notused
 nset
 nsnap
 nul
