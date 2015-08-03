@@ -180,7 +180,7 @@ __sweep_flush(WT_SESSION_IMPL *session)
 
 		/* We closed the btree handle, bump the statistic. */
 		if (ret == 0)
-			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
+			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles_closed);
 
 		WT_RET_BUSY_OK(ret);
 	}
@@ -223,6 +223,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
 		    dhandle->session_inuse != 0 || dhandle->session_ref != 0) {
+			WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
 			WT_RET(__wt_writeunlock(session, dhandle->rwlock));
 			continue;
 		}
@@ -234,7 +235,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 		if (ret != 0)
 			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 		WT_RET_BUSY_OK(ret);
-		WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
+		WT_STAT_FAST_CONN_INCR(session, dh_conn_handles_removed);
 	}
 
 	return (ret == EBUSY ? 0 : ret);

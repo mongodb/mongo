@@ -196,7 +196,8 @@ struct __wt_connection_stats {
 	WT_STATS cursor_search;
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
-	WT_STATS dh_conn_handles;
+	WT_STATS dh_conn_handles_closed;
+	WT_STATS dh_conn_handles_removed;
 	WT_STATS dh_conn_ref;
 	WT_STATS dh_conn_sweeps;
 	WT_STATS dh_conn_tod;
