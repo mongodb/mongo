@@ -272,59 +272,53 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
         const BatchedRequestMetadata* requestMetadata = request.getMetadata();
         dassert(requestMetadata);
 
+        ShardingState* shardingState = ShardingState::get(_txn);
+
         // Make sure our shard name is set or is the same as what was set previously
-        if (ShardingState::get(getGlobalServiceContext())
-                ->setShardName(requestMetadata->getShardName())) {
+        shardingState->setShardName(requestMetadata->getShardName());
+
+        //
+        // First, we refresh metadata if we need to based on the requested version.
+        //
+        ChunkVersion latestShardVersion;
+        shardingState->refreshMetadataIfNeeded(_txn,
+                                               request.getTargetingNS(),
+                                               requestMetadata->getShardVersion(),
+                                               &latestShardVersion);
+
+        // Report if we're still changing our metadata
+        // TODO: Better reporting per-collection
+        if (shardingState->inCriticalMigrateSection()) {
+            noteInCriticalSection(writeErrors.back());
+        }
+
+        if (queueForMigrationCommit) {
             //
-            // First, we refresh metadata if we need to based on the requested version.
+            // Queue up for migration to end - this allows us to be sure that clients will
+            // not repeatedly try to refresh metadata that is not yet written to the config
+            // server.  Not necessary for correctness.
+            // Exposed as optional parameter to allow testing of queuing behavior with
+            // different network timings.
             //
 
-            ChunkVersion latestShardVersion;
-            ShardingState::get(getGlobalServiceContext())
-                ->refreshMetadataIfNeeded(_txn,
-                                          request.getTargetingNS(),
-                                          requestMetadata->getShardVersion(),
-                                          &latestShardVersion);
+            const ChunkVersion& requestShardVersion = requestMetadata->getShardVersion();
 
-            // Report if we're still changing our metadata
-            // TODO: Better reporting per-collection
-            if (ShardingState::get(getGlobalServiceContext())->inCriticalMigrateSection()) {
-                noteInCriticalSection(writeErrors.back());
-            }
+            //
+            // Only wait if we're an older version (in the current collection epoch) and
+            // we're not write compatible, implying that the current migration is affecting
+            // writes.
+            //
 
-            if (queueForMigrationCommit) {
-                //
-                // Queue up for migration to end - this allows us to be sure that clients will
-                // not repeatedly try to refresh metadata that is not yet written to the config
-                // server.  Not necessary for correctness.
-                // Exposed as optional parameter to allow testing of queuing behavior with
-                // different network timings.
-                //
+            if (requestShardVersion.isOlderThan(latestShardVersion) &&
+                !requestShardVersion.isWriteCompatibleWith(latestShardVersion)) {
+                while (shardingState->inCriticalMigrateSection()) {
+                    log() << "write request to old shard version "
+                          << requestMetadata->getShardVersion().toString()
+                          << " waiting for migration commit" << endl;
 
-                const ChunkVersion& requestShardVersion = requestMetadata->getShardVersion();
-
-                //
-                // Only wait if we're an older version (in the current collection epoch) and
-                // we're not write compatible, implying that the current migration is affecting
-                // writes.
-                //
-
-                if (requestShardVersion.isOlderThan(latestShardVersion) &&
-                    !requestShardVersion.isWriteCompatibleWith(latestShardVersion)) {
-                    while (
-                        ShardingState::get(getGlobalServiceContext())->inCriticalMigrateSection()) {
-                        log() << "write request to old shard version "
-                              << requestMetadata->getShardVersion().toString()
-                              << " waiting for migration commit" << endl;
-
-                        ShardingState::get(getGlobalServiceContext())
-                            ->waitTillNotInCriticalSection(10 /* secs */);
-                    }
+                    shardingState->waitTillNotInCriticalSection(10 /* secs */);
                 }
             }
-        } else {
-            // If our shard name is stale, our version must have been stale as well
-            dassert(writeErrors.size() == request.sizeWriteOps());
         }
     }
 
@@ -409,7 +403,7 @@ static bool checkShardVersion(OperationContext* txn,
         ? request.getMetadata()->getShardVersion()
         : ChunkVersion::IGNORED();
 
-    ShardingState* shardingState = ShardingState::get(getGlobalServiceContext());
+    ShardingState* shardingState = ShardingState::get(txn);
     if (shardingState->enabled()) {
         CollectionMetadataPtr metadata = shardingState->getCollectionMetadata(nss.ns());
 
@@ -457,7 +451,7 @@ static bool checkIndexConstraints(OperationContext* txn,
     if (!request.isUniqueIndexRequest())
         return true;
 
-    ShardingState* shardingState = ShardingState::get(getGlobalServiceContext());
+    ShardingState* shardingState = ShardingState::get(txn);
     if (shardingState->enabled()) {
         CollectionMetadataPtr metadata = shardingState->getCollectionMetadata(nss.ns());
 

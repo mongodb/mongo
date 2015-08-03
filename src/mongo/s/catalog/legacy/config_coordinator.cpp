@@ -37,6 +37,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/client/multi_command_dispatch.h"
+#include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/log.h"
@@ -47,48 +48,6 @@ using std::string;
 using std::vector;
 
 namespace {
-
-/**
- * A BSON serializable object representing a setShardVersion command request.
- */
-class SSVRequest : public BSONSerializable {
-    MONGO_DISALLOW_COPYING(SSVRequest);
-
-public:
-    SSVRequest(const std::string& configDBString) : _configDBString(configDBString) {}
-
-    bool isValid(std::string* errMsg) const {
-        return true;
-    }
-
-    /** Returns the BSON representation of the entry. */
-    BSONObj toBSON() const {
-        BSONObjBuilder builder;
-        builder.append("setShardVersion", "");  // empty ns for init
-        builder.append("configdb", _configDBString);
-        builder.append("init", true);
-        builder.append("authoritative", true);
-        return builder.obj();
-    }
-
-    bool parseBSON(const BSONObj& source, std::string* errMsg) {
-        // Not implemented
-        invariant(false);
-        return false;
-    }
-
-    void clear() {
-        // Not implemented
-        invariant(false);
-    }
-
-    string toString() const {
-        return toBSON().toString();
-    }
-
-private:
-    const std::string _configDBString;
-};
 
 /**
  * A BSON serializable object representing a setShardVersion command response.
@@ -309,8 +268,9 @@ bool ConfigCoordinator::_checkConfigString(BatchedCommandResponse* clientRespons
     //
 
     for (const HostAndPort& server : _configServerConnectionString.getServers()) {
-        SSVRequest ssvRequest(_configServerConnectionString.toString());
-        _dispatcher->addCommand(ConnectionString(server), "admin", ssvRequest.toBSON());
+        SetShardVersionRequest ssv = SetShardVersionRequest::makeForInit(
+            _configServerConnectionString, "config", _configServerConnectionString);
+        _dispatcher->addCommand(ConnectionString(server), "admin", ssv.toBSON());
     }
 
     _dispatcher->sendAll();

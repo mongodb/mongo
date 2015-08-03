@@ -35,8 +35,7 @@
 namespace mongo {
 
 /**
- * "Types" are the interface to a known data structure that will be serialized to and
- * deserialized from BSON.
+ * "Types" are the interface to a known data structure that will be deserialized from BSON.
  */
 class BSONSerializable {
 public:
@@ -47,9 +46,6 @@ public:
      * representations. Otherwise returns false and fills in the optional 'errMsg' string.
      */
     virtual bool isValid(std::string* errMsg) const = 0;
-
-    /** Returns the BSON representation of the entry. */
-    virtual BSONObj toBSON() const = 0;
 
     /**
      * Clears and populates the internal state using the 'source' BSON object if the

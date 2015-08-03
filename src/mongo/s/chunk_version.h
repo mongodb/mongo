@@ -340,48 +340,6 @@ struct ChunkVersion {
         return version;
     }
 
-    enum VersionChoice { VersionChoice_Local, VersionChoice_Remote, VersionChoice_Unknown };
-
-    /**
-     * Compares a remotely-loaded version 'remoteVersion' to the latest local version of a
-     * collection, 'localVersion', and returns the newest.
-     *
-     * Because it isn't clear during epoch changes which epoch is newer, the local version
-     * before the reload occurred, 'prevLocalVersion', is used to determine whether the remote
-     * epoch is definitely newer, or we're not sure.
-     */
-    static VersionChoice chooseNewestVersion(ChunkVersion prevLocalVersion,
-                                             ChunkVersion localVersion,
-                                             ChunkVersion remoteVersion) {
-        OID prevEpoch = prevLocalVersion.epoch();
-        OID localEpoch = localVersion.epoch();
-        OID remoteEpoch = remoteVersion.epoch();
-
-        // Everything changed in-flight, so we need to try again
-        if (prevEpoch != localEpoch && localEpoch != remoteEpoch) {
-            return VersionChoice_Unknown;
-        }
-
-        // We're in the same (zero) epoch as the latest metadata, nothing to do
-        if (localEpoch == remoteEpoch && !remoteEpoch.isSet()) {
-            return VersionChoice_Local;
-        }
-
-        // We're in the same (non-zero) epoch as the latest metadata, so increment the version
-        if (localEpoch == remoteEpoch && remoteEpoch.isSet()) {
-            // Use the newer version if possible
-            if (localVersion < remoteVersion) {
-                return VersionChoice_Remote;
-            } else {
-                return VersionChoice_Local;
-            }
-        }
-
-        // We're now sure we're installing a new epoch and the epoch didn't change during reload
-        dassert(prevEpoch == localEpoch && localEpoch != remoteEpoch);
-        return VersionChoice_Remote;
-    }
-
     //
     // Currently our BSON output is to two different fields, to cleanly work with older
     // versions that know nothing about epochs.

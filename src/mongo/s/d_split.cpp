@@ -601,7 +601,7 @@ public:
         }
 
         // Initialize our current shard name in the shard state if needed
-        shardingState->gotShardName(shardName);
+        shardingState->setShardName(shardName);
 
         auto configLocStatus = ConnectionString::parse(shardingState->getConfigServer(txn));
         if (!configLocStatus.isOK()) {

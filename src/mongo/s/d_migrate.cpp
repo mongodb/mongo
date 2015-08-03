@@ -403,7 +403,7 @@ public:
         }
 
         // Initialize our current shard name in the shard state if needed
-        ShardingState::get(txn)->gotShardName(fromShardName);
+        ShardingState::get(txn)->setShardName(fromShardName);
 
         // Make sure we're as up-to-date as possible with shard information
         // This catches the case where we had to previously changed a shard's host by
@@ -1133,7 +1133,7 @@ public:
 
         if (!cmdObj["toShardName"].eoo()) {
             dassert(cmdObj["toShardName"].type() == String);
-            ShardingState::get(txn)->gotShardName(cmdObj["toShardName"].String());
+            ShardingState::get(txn)->setShardName(cmdObj["toShardName"].String());
         }
 
         string ns = cmdObj.firstElement().String();

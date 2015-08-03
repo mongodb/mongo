@@ -162,7 +162,7 @@ public:
         if (!extracted)
             return false;
         if (extracted != FieldParser::FIELD_NONE) {
-            shardingState->gotShardName(shardName);
+            shardingState->setShardName(shardName);
         }
 
         //

@@ -80,14 +80,14 @@ public:
     // and versions will not be tracked.
     void initialize(const std::string& server);
 
-    void gotShardName(const std::string& name);
-    bool setShardName(const std::string& name);  // Same as above, does not throw
-
-    // Helpers for SetShardVersion which report the host name sent to this shard when the shard
-    // name does not match.  Do not use in other places.
-    // TODO: Remove once SSV is deprecated
-    void gotShardNameAndHost(const std::string& name, const std::string& host);
-    bool setShardNameAndHost(const std::string& name, const std::string& host);
+    // TODO: The only reason we need this method and cannot merge it together with the initialize
+    // call is the setShardVersion request being sent by the config coordinator to the config server
+    // instances. This is the only command, which does not include shard name and once we get rid of
+    // the legacy style config servers, we can merge these methods.
+    //
+    // Throws an error if shard name has always been set and the newly specified value does not
+    // match
+    void setShardName(const std::string& shardName);
 
     /**
      * Clears the collection metadata cache after step down.
@@ -97,7 +97,6 @@ public:
     // versioning support
 
     bool hasVersion(const std::string& ns);
-    bool hasVersion(const std::string& ns, ChunkVersion& version);
     ChunkVersion getVersion(const std::string& ns);
 
     /**

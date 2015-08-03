@@ -80,7 +80,7 @@ void ConfigServerFixture::setUp() {
     const ConnectionString connStr(uassertStatusOK(ConnectionString::parse("$dummy:10000")));
 
     ShardingState::get(getGlobalServiceContext())->initialize(connStr.toString());
-    ShardingState::get(getGlobalServiceContext())->gotShardName(shardName());
+    ShardingState::get(getGlobalServiceContext())->setShardName(shardName());
 }
 
 void ConfigServerFixture::clearServer() {
