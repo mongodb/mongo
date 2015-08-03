@@ -46,12 +46,14 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/stdx/memory.h"
 
 namespace QueryPlanExecutor {
 
 using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
+using stdx::make_unique;
 
 static const NamespaceString nss("unittests.QueryPlanExecutor");
 
@@ -277,15 +279,14 @@ public:
         ASSERT_EQUALS(errmsg, "");
 
         // Create the output PlanExecutor that pulls results from the pipeline.
-        std::unique_ptr<WorkingSet> ws(new WorkingSet());
-        std::unique_ptr<PipelineProxyStage> proxy(
-            new PipelineProxyStage(pipeline, innerExec, ws.get()));
+        auto ws = make_unique<WorkingSet>();
+        auto proxy = make_unique<PipelineProxyStage>(&_txn, pipeline, innerExec, ws.get());
         Collection* collection = ctx.getCollection();
 
         auto statusWithPlanExecutor = PlanExecutor::make(
             &_txn, std::move(ws), std::move(proxy), collection, PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        std::unique_ptr<PlanExecutor> outerExec = std::move(statusWithPlanExecutor.getValue());
+        unique_ptr<PlanExecutor> outerExec = std::move(statusWithPlanExecutor.getValue());
 
         // Only the outer executor gets registered.
         registerExec(outerExec.get());

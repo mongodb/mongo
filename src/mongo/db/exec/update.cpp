@@ -415,8 +415,7 @@ UpdateStage::UpdateStage(OperationContext* txn,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _params(params),
       _ws(ws),
       _collection(collection),
@@ -506,7 +505,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     if (docWasModified) {
         // Verify that no immutable fields were changed and data is valid for storage.
 
-        if (!(!_txn->writesAreReplicated() || request->isFromMigration())) {
+        if (!(!getOpCtx()->writesAreReplicated() || request->isFromMigration())) {
             const std::vector<FieldRef*>* immutableFields = NULL;
             if (lifecycle)
                 immutableFields = lifecycle->getImmutableFields();
@@ -516,7 +515,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         }
 
         // Prepare to write back the modified document
-        WriteUnitOfWork wunit(_txn);
+        WriteUnitOfWork wunit(getOpCtx());
 
         RecordId newLoc;
 
@@ -532,7 +531,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
                 _collection->updateDocumentWithDamages(
-                    _txn,
+                    getOpCtx(),
                     loc,
                     Snapshotted<RecordData>(oldObj.snapshotId(), oldRec),
                     source,
@@ -559,7 +558,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
-                StatusWith<RecordId> res = _collection->updateDocument(_txn,
+                StatusWith<RecordId> res = _collection->updateDocument(getOpCtx(),
                                                                        loc,
                                                                        oldObj,
                                                                        newObj,
@@ -572,7 +571,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
             }
         }
 
-        invariant(oldObj.snapshotId() == _txn->recoveryUnit()->getSnapshotId());
+        invariant(oldObj.snapshotId() == getOpCtx()->recoveryUnit()->getSnapshotId());
         wunit.commit();
 
         // If the document moved, we might see it again in a collection scan (maybe it's
@@ -676,7 +675,7 @@ void UpdateStage::doInsert() {
     _specificStats.inserted = true;
 
     const UpdateRequest* request = _params.request;
-    bool isInternalRequest = !_txn->writesAreReplicated() || request->isFromMigration();
+    bool isInternalRequest = !getOpCtx()->writesAreReplicated() || request->isFromMigration();
 
     // Reset the document we will be writing to.
     _doc.reset();
@@ -698,17 +697,17 @@ void UpdateStage::doInsert() {
         return;
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        WriteUnitOfWork wunit(_txn);
+        WriteUnitOfWork wunit(getOpCtx());
         invariant(_collection);
         const bool enforceQuota = !request->isGod();
-        uassertStatusOK(
-            _collection->insertDocument(_txn, newObj, enforceQuota, request->isFromMigration()));
+        uassertStatusOK(_collection->insertDocument(
+            getOpCtx(), newObj, enforceQuota, request->isFromMigration()));
 
         // Technically, we should save/restore state here, but since we are going to return
         // immediately after, it would just be wasted work.
         wunit.commit();
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "upsert", _collection->ns().ns());
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(getOpCtx(), "upsert", _collection->ns().ns());
 }
 
 bool UpdateStage::doneUpdating() {
@@ -757,8 +756,8 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 BSONObj newObj = _specificStats.objInserted;
                 *out = _ws->allocate();
                 WorkingSetMember* member = _ws->get(*out);
-                member->obj =
-                    Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(), newObj.getOwned());
+                member->obj = Snapshotted<BSONObj>(getOpCtx()->recoveryUnit()->getSnapshotId(),
+                                                   newObj.getOwned());
                 member->transitionToOwnedObj();
                 ++_commonStats.advanced;
                 return PlanStage::ADVANCED;
@@ -835,10 +834,10 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
 
         try {
             std::unique_ptr<RecordCursor> cursor;
-            if (_txn->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
-                cursor = _collection->getCursor(_txn);
+            if (getOpCtx()->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
+                cursor = _collection->getCursor(getOpCtx());
                 // our snapshot has changed, refetch
-                if (!WorkingSetCommon::fetch(_txn, _ws, id, cursor)) {
+                if (!WorkingSetCommon::fetch(getOpCtx(), _ws, id, cursor)) {
                     // document was deleted, we're done here
                     ++_commonStats.needTime;
                     return PlanStage::NEED_TIME;
@@ -877,7 +876,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
             // Set member's obj to be the doc we want to return.
             if (_params.request->shouldReturnAnyDocs()) {
                 if (_params.request->shouldReturnNewDocs()) {
-                    member->obj = Snapshotted<BSONObj>(_txn->recoveryUnit()->getSnapshotId(),
+                    member->obj = Snapshotted<BSONObj>(getOpCtx()->recoveryUnit()->getSnapshotId(),
                                                        newObj.getOwned());
                 } else {
                     invariant(_params.request->shouldReturnOldDocs());
@@ -963,7 +962,7 @@ Status UpdateStage::restoreUpdateState() {
     const NamespaceString& nsString(request.getNamespaceString());
 
     // We may have stepped down during the yield.
-    bool userInitiatedWritesAndNotPrimary = _txn->writesAreReplicated() &&
+    bool userInitiatedWritesAndNotPrimary = getOpCtx()->writesAreReplicated() &&
         !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
 
     if (userInitiatedWritesAndNotPrimary) {
@@ -982,7 +981,7 @@ Status UpdateStage::restoreUpdateState() {
                           17270);
         }
 
-        _params.driver->refreshIndexKeys(lifecycle->getIndexKeys(_txn));
+        _params.driver->refreshIndexKeys(lifecycle->getIndexKeys(getOpCtx()));
     }
 
     return Status::OK();
@@ -990,10 +989,6 @@ Status UpdateStage::restoreUpdateState() {
 
 void UpdateStage::doRestoreState() {
     uassertStatusOK(restoreUpdateState());
-}
-
-void UpdateStage::doReattachToOperationContext(OperationContext* opCtx) {
-    _txn = opCtx;
 }
 
 unique_ptr<PlanStageStats> UpdateStage::getStats() {

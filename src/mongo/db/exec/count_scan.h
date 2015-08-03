@@ -73,7 +73,7 @@ public:
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doReattachToOperationContext() final;
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
@@ -87,9 +87,6 @@ public:
     static const char* kStageType;
 
 private:
-    // transactional context for read locks. Not owned by us
-    OperationContext* _txn;
-
     // The WorkingSet we annotate with results.  Not owned by us.
     WorkingSet* _workingSet;
 

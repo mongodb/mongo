@@ -63,7 +63,7 @@ public:
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doReattachToOperationContext() final;
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
@@ -82,8 +82,6 @@ private:
      * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
      */
     StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
-
-    OperationContext* _txn;
 
     // Collection which is used by this stage. Used to resolve record ids retrieved by child
     // stages. The lifetime of the collection must supersede that of the stage.

@@ -61,7 +61,7 @@ public:
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doReattachToOperationContext() final;
 
     StageType stageType() const final {
         return STAGE_COLLSCAN;
@@ -79,9 +79,6 @@ private:
      * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
      */
     StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
-
-    // transactional context for read locks. Not owned by us
-    OperationContext* _txn;
 
     // WorkingSet is not owned by us.
     WorkingSet* _workingSet;

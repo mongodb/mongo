@@ -59,8 +59,7 @@ SubplanStage::SubplanStage(OperationContext* txn,
                            WorkingSet* ws,
                            const QueryPlannerParams& params,
                            CanonicalQuery* cq)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _collection(collection),
       _ws(ws),
       _plannerParams(params),
@@ -186,7 +185,7 @@ Status SubplanStage::planSubqueries() {
         LOG(5) << "Subplanner: index " << i << " is " << ie.toString();
     }
 
-    const WhereCallbackReal whereCallback(_txn, _collection->ns().db());
+    const WhereCallbackReal whereCallback(getOpCtx(), _collection->ns().db());
 
     for (size_t i = 0; i < _orExpression->numChildren(); ++i) {
         // We need a place to shove the results from planning this branch.
@@ -323,13 +322,14 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
             _ws->clear();
 
-            MultiPlanStage multiPlanStage(_txn, _collection, branchResult->canonicalQuery.get());
+            MultiPlanStage multiPlanStage(
+                getOpCtx(), _collection, branchResult->canonicalQuery.get());
 
             // Dump all the solutions into the MPS.
             for (size_t ix = 0; ix < branchResult->solutions.size(); ++ix) {
                 PlanStage* nextPlanRoot;
                 invariant(StageBuilder::build(
-                    _txn, _collection, *branchResult->solutions[ix], _ws, &nextPlanRoot));
+                    getOpCtx(), _collection, *branchResult->solutions[ix], _ws, &nextPlanRoot));
 
                 // Takes ownership of solution with index 'ix' and 'nextPlanRoot'.
                 multiPlanStage.addPlan(branchResult->solutions.releaseAt(ix), nextPlanRoot, _ws);
@@ -408,7 +408,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     // and set that solution as our child stage.
     _ws->clear();
     PlanStage* root;
-    invariant(StageBuilder::build(_txn, _collection, *_compositeSolution.get(), _ws, &root));
+    invariant(StageBuilder::build(getOpCtx(), _collection, *_compositeSolution.get(), _ws, &root));
     invariant(_children.empty());
     _children.emplace_back(root);
 
@@ -441,7 +441,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     if (1 == solutions.size()) {
         PlanStage* root;
         // Only one possible plan.  Run it.  Build the stages from the solution.
-        verify(StageBuilder::build(_txn, _collection, *solutions[0], _ws, &root));
+        verify(StageBuilder::build(getOpCtx(), _collection, *solutions[0], _ws, &root));
         invariant(_children.empty());
         _children.emplace_back(root);
 
@@ -453,7 +453,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
         // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
         // and so on. The working set will be shared by all candidate plans.
         invariant(_children.empty());
-        _children.emplace_back(new MultiPlanStage(_txn, _collection, _query));
+        _children.emplace_back(new MultiPlanStage(getOpCtx(), _collection, _query));
         MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
@@ -463,7 +463,8 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
 
             // version of StageBuild::build when WorkingSet is shared
             PlanStage* nextPlanRoot;
-            verify(StageBuilder::build(_txn, _collection, *solutions[ix], _ws, &nextPlanRoot));
+            verify(
+                StageBuilder::build(getOpCtx(), _collection, *solutions[ix], _ws, &nextPlanRoot));
 
             // Takes ownership of 'solutions[ix]' and 'nextPlanRoot'.
             multiPlanStage->addPlan(solutions.releaseAt(ix), nextPlanRoot, _ws);
@@ -528,10 +529,6 @@ PlanStage::StageState SubplanStage::work(WorkingSetID* out) {
     }
 
     return state;
-}
-
-void SubplanStage::doReattachToOperationContext(OperationContext* opCtx) {
-    _txn = opCtx;
 }
 
 unique_ptr<PlanStageStats> SubplanStage::getStats() {

@@ -65,8 +65,7 @@ MultiPlanStage::MultiPlanStage(OperationContext* txn,
                                const Collection* collection,
                                CanonicalQuery* cq,
                                bool shouldCache)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _collection(collection),
       _shouldCache(shouldCache),
       _query(cq),
@@ -219,7 +218,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     // make sense.
     ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-    size_t numWorks = getTrialPeriodWorks(_txn, _collection);
+    size_t numWorks = getTrialPeriodWorks(getOpCtx(), _collection);
     size_t numResults = getTrialPeriodNumToReturn(*_query);
 
     // Work the plans, stopping when a plan hits EOF or returns some
@@ -386,10 +385,6 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
     }
 
     return !doneWorking;
-}
-
-void MultiPlanStage::doReattachToOperationContext(OperationContext* opCtx) {
-    _txn = opCtx;
 }
 
 namespace {

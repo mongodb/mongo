@@ -278,8 +278,11 @@ bool SortStage::WorkingSetComparator::operator()(const SortableDataItem& lhs,
     return lhs.loc < rhs.loc;
 }
 
-SortStage::SortStage(const SortStageParams& params, WorkingSet* ws, PlanStage* child)
-    : PlanStage(kStageType),
+SortStage::SortStage(OperationContext* opCtx,
+                     const SortStageParams& params,
+                     WorkingSet* ws,
+                     PlanStage* child)
+    : PlanStage(kStageType, opCtx),
       _collection(params.collection),
       _ws(ws),
       _pattern(params.pattern),

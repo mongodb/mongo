@@ -32,6 +32,7 @@
 
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -39,13 +40,14 @@ using namespace mongo;
 namespace {
 
 using std::unique_ptr;
+using stdx::make_unique;
 
 //
 // Basic test that we get out valid stats objects.
 //
 TEST(QueuedDataStageTest, getValidStats) {
     WorkingSet ws;
-    unique_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
+    auto mock = make_unique<QueuedDataStage>(nullptr, &ws);
     const CommonStats* commonStats = mock->getCommonStats();
     ASSERT_EQUALS(commonStats->works, static_cast<size_t>(0));
     const SpecificStats* specificStats = mock->getSpecificStats();
@@ -60,7 +62,7 @@ TEST(QueuedDataStageTest, getValidStats) {
 TEST(QueuedDataStageTest, validateStats) {
     WorkingSet ws;
     WorkingSetID wsID;
-    unique_ptr<QueuedDataStage> mock(new QueuedDataStage(&ws));
+    auto mock = make_unique<QueuedDataStage>(nullptr, &ws);
 
     // make sure that we're at all zero
     const CommonStats* stats = mock->getCommonStats();

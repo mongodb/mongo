@@ -228,7 +228,7 @@ Status prepareExecution(OperationContext* opCtx,
         const string& ns = canonicalQuery->ns();
         LOG(2) << "Collection " << ns << " does not exist."
                << " Using EOF plan: " << canonicalQuery->toStringShort();
-        *rootOut = new EOFStage();
+        *rootOut = new EOFStage(opCtx);
         return Status::OK();
     }
 
@@ -246,7 +246,8 @@ Status prepareExecution(OperationContext* opCtx,
 
         // Might have to filter out orphaned docs.
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            *rootOut = new ShardFilterStage(ShardingState::get(getGlobalServiceContext())
+            *rootOut = new ShardFilterStage(opCtx,
+                                            ShardingState::get(getGlobalServiceContext())
                                                 ->getCollectionMetadata(collection->ns().ns()),
                                             ws,
                                             *rootOut);
@@ -268,7 +269,7 @@ Status prepareExecution(OperationContext* opCtx,
                 params.projImpl = ProjectionStageParams::SIMPLE_DOC;
             }
 
-            *rootOut = new ProjectionStage(params, ws, *rootOut);
+            *rootOut = new ProjectionStage(opCtx, params, ws, *rootOut);
         }
 
         return Status::OK();
@@ -446,8 +447,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutor(OperationContext* txn,
     if (!collection) {
         LOG(2) << "Collection " << ns << " does not exist."
                << " Using EOF stage: " << unparsedQuery.toString();
-        unique_ptr<EOFStage> eofStage = make_unique<EOFStage>();
-        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+        auto eofStage = make_unique<EOFStage>(txn);
+        auto ws = make_unique<WorkingSet>();
         return PlanExecutor::make(txn, std::move(ws), std::move(eofStage), ns, yieldPolicy);
     }
 
@@ -473,7 +474,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutor(OperationContext* txn,
 
     // Might have to filter out orphaned docs.
     if (plannerOptions & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        root = make_unique<ShardFilterStage>(ShardingState::get(getGlobalServiceContext())
+        root = make_unique<ShardFilterStage>(txn,
+                                             ShardingState::get(getGlobalServiceContext())
                                                  ->getCollectionMetadata(collection->ns().ns()),
                                              ws.get(),
                                              root.release());
@@ -648,7 +650,7 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* txn,
     ProjectionStageParams params(WhereCallbackReal(txn, nsString.db()));
     params.projObj = proj;
     params.fullExpression = cq->root();
-    return {make_unique<ProjectionStage>(params, ws, root.release())};
+    return {make_unique<ProjectionStage>(txn, params, ws, root.release())};
 }
 
 }  // namespace
@@ -708,8 +710,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* txn,
             // a DeleteStage, so in this case we put a DeleteStage on top of an EOFStage.
             LOG(2) << "Collection " << nss.ns() << " does not exist."
                    << " Using EOF stage: " << unparsedQuery.toString();
-            unique_ptr<DeleteStage> deleteStage =
-                make_unique<DeleteStage>(txn, deleteStageParams, ws.get(), nullptr, new EOFStage());
+            auto deleteStage = make_unique<DeleteStage>(
+                txn, deleteStageParams, ws.get(), nullptr, new EOFStage(txn));
             return PlanExecutor::make(txn, std::move(ws), std::move(deleteStage), nss.ns(), policy);
         }
 
@@ -850,8 +852,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
             // an UpdateStage, so in this case we put an UpdateStage on top of an EOFStage.
             LOG(2) << "Collection " << nsString.ns() << " does not exist."
                    << " Using EOF stage: " << unparsedQuery.toString();
-            unique_ptr<UpdateStage> updateStage = make_unique<UpdateStage>(
-                txn, updateStageParams, ws.get(), collection, new EOFStage());
+            auto updateStage = make_unique<UpdateStage>(
+                txn, updateStageParams, ws.get(), collection, new EOFStage(txn));
             return PlanExecutor::make(
                 txn, std::move(ws), std::move(updateStage), nsString.ns(), policy);
         }
@@ -943,7 +945,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
         // reporting machinery always assumes that the root stage for a group operation is a
         // GroupStage, so in this case we put a GroupStage on top of an EOFStage.
         unique_ptr<PlanStage> root =
-            make_unique<GroupStage>(txn, request, ws.get(), new EOFStage());
+            make_unique<GroupStage>(txn, request, ws.get(), new EOFStage(txn));
 
         return PlanExecutor::make(txn, std::move(ws), std::move(root), request.ns, yieldPolicy);
     }
@@ -1210,7 +1212,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
         // reporting machinery always assumes that the root stage for a count operation is
         // a CountStage, so in this case we put a CountStage on top of an EOFStage.
         unique_ptr<PlanStage> root =
-            make_unique<CountStage>(txn, collection, request, ws.get(), new EOFStage());
+            make_unique<CountStage>(txn, collection, request, ws.get(), new EOFStage(txn));
         return PlanExecutor::make(
             txn, std::move(ws), std::move(root), request.getNs().ns(), yieldPolicy);
     }
@@ -1304,7 +1306,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     if (!collection) {
         // Treat collections that do not exist as empty collections.
         return PlanExecutor::make(
-            txn, make_unique<WorkingSet>(), make_unique<EOFStage>(), ns, yieldPolicy);
+            txn, make_unique<WorkingSet>(), make_unique<EOFStage>(txn), ns, yieldPolicy);
     }
 
     // TODO: check for idhack here?

@@ -92,7 +92,6 @@ public:
     bool isEOF() final;
     StageState work(WorkingSetID* out) final;
 
-    void doReattachToOperationContext(OperationContext* opCtx) final;
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final;
@@ -160,8 +159,6 @@ private:
     // Generic state for progressive near search
     //
 
-    // Not owned here
-    OperationContext* _txn;
     // Not owned here
     WorkingSet* const _workingSet;
     // Not owned here, used for fetching buffered results before invalidation

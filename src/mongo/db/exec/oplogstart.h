@@ -73,7 +73,7 @@ public:
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doReattachToOperationContext() final;
 
     // Returns empty PlanStageStats object
     std::unique_ptr<PlanStageStats> getStats() final;
@@ -109,9 +109,6 @@ private:
     void switchToExtentHopping();
 
     StageState workExtentHopping(WorkingSetID* out);
-
-    // transactional context for read locks. Not owned by us
-    OperationContext* _txn;
 
     // This is only used for the extent hopping scan.
     std::vector<std::unique_ptr<RecordCursor>> _subIterators;

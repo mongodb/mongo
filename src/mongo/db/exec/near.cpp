@@ -46,8 +46,7 @@ NearStage::NearStage(OperationContext* txn,
                      StageType type,
                      WorkingSet* workingSet,
                      Collection* collection)
-    : PlanStage(typeName),
-      _txn(txn),
+    : PlanStage(typeName, txn),
       _workingSet(workingSet),
       _collection(collection),
       _searchState(SearchState_Initializing),
@@ -70,7 +69,7 @@ NearStage::CoveredInterval::CoveredInterval(PlanStage* covering,
 
 
 PlanStage::StageState NearStage::initNext(WorkingSetID* out) {
-    PlanStage::StageState state = initialize(_txn, _workingSet, _collection, out);
+    PlanStage::StageState state = initialize(getOpCtx(), _workingSet, _collection, out);
     if (state == PlanStage::IS_EOF) {
         _searchState = SearchState_Buffering;
         return PlanStage::NEED_TIME;
@@ -150,7 +149,8 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     //
 
     if (!_nextInterval) {
-        StatusWith<CoveredInterval*> intervalStatus = nextInterval(_txn, _workingSet, _collection);
+        StatusWith<CoveredInterval*> intervalStatus =
+            nextInterval(getOpCtx(), _workingSet, _collection);
         if (!intervalStatus.isOK()) {
             _searchState = SearchState_Finished;
             *error = intervalStatus.getStatus();
@@ -300,10 +300,6 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
 
 bool NearStage::isEOF() {
     return SearchState_Finished == _searchState;
-}
-
-void NearStage::doReattachToOperationContext(OperationContext* opCtx) {
-    _txn = opCtx;
 }
 
 void NearStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

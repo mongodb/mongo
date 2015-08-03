@@ -77,8 +77,7 @@ GroupStage::GroupStage(OperationContext* txn,
                        const GroupRequest& request,
                        WorkingSet* workingSet,
                        PlanStage* child)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _request(request),
       _ws(workingSet),
       _specificStats(),
@@ -94,7 +93,8 @@ void GroupStage::initGroupScripting() {
         AuthorizationSession::get(ClientBasic::getCurrent())->getAuthenticatedUserNamesToken();
 
     const NamespaceString nss(_request.ns);
-    _scope = globalScriptEngine->getPooledScope(_txn, nss.db().toString(), "group" + userToken);
+    _scope =
+        globalScriptEngine->getPooledScope(getOpCtx(), nss.db().toString(), "group" + userToken);
     if (!_request.reduceScope.isEmpty()) {
         _scope->init(&_request.reduceScope);
     }
@@ -255,10 +255,6 @@ PlanStage::StageState GroupStage::work(WorkingSetID* out) {
 
 bool GroupStage::isEOF() {
     return _groupState == GroupState_Done;
-}
-
-void GroupStage::doReattachToOperationContext(OperationContext* opCtx) {
-    _txn = opCtx;
 }
 
 unique_ptr<PlanStageStats> GroupStage::getStats() {

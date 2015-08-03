@@ -44,8 +44,10 @@ using stdx::make_unique;
 // static
 const char* AndSortedStage::kStageType = "AND_SORTED";
 
-AndSortedStage::AndSortedStage(WorkingSet* ws, const Collection* collection)
-    : PlanStage(kStageType),
+AndSortedStage::AndSortedStage(OperationContext* opCtx,
+                               WorkingSet* ws,
+                               const Collection* collection)
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _ws(ws),
       _targetNode(numeric_limits<size_t>::max()),

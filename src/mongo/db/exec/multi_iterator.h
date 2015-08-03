@@ -60,7 +60,7 @@ public:
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doReattachToOperationContext() final;
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     // Returns empty PlanStageStats object

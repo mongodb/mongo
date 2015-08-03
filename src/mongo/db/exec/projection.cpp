@@ -52,10 +52,11 @@ static const char* kIdField = "_id";
 // static
 const char* ProjectionStage::kStageType = "PROJECTION";
 
-ProjectionStage::ProjectionStage(const ProjectionStageParams& params,
+ProjectionStage::ProjectionStage(OperationContext* opCtx,
+                                 const ProjectionStageParams& params,
                                  WorkingSet* ws,
                                  PlanStage* child)
-    : PlanStage(kStageType), _ws(ws), _projImpl(params.projImpl) {
+    : PlanStage(kStageType, opCtx), _ws(ws), _projImpl(params.projImpl) {
     _children.emplace_back(child);
     _projObj = params.projObj;
 

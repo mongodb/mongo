@@ -47,8 +47,7 @@ OplogStart::OplogStart(OperationContext* txn,
                        const Collection* collection,
                        MatchExpression* filter,
                        WorkingSet* ws)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _needInit(true),
       _backwardsScanning(false),
       _extentHopping(false),
@@ -63,7 +62,7 @@ PlanStage::StageState OplogStart::work(WorkingSetID* out) {
         CollectionScanParams params;
         params.collection = _collection;
         params.direction = CollectionScanParams::BACKWARD;
-        _children.emplace_back(new CollectionScan(_txn, params, _workingSet, NULL));
+        _children.emplace_back(new CollectionScan(getOpCtx(), params, _workingSet, NULL));
 
         _needInit = false;
         _backwardsScanning = true;
@@ -108,7 +107,7 @@ PlanStage::StageState OplogStart::workExtentHopping(WorkingSetID* out) {
                 WorkingSetID id = _workingSet->allocate();
                 WorkingSetMember* member = _workingSet->get(id);
                 member->loc = record->id;
-                member->obj = {_txn->recoveryUnit()->getSnapshotId(), std::move(obj)};
+                member->obj = {getOpCtx()->recoveryUnit()->getSnapshotId(), std::move(obj)};
                 _workingSet->transitionToLocAndObj(id);
                 *out = id;
                 return PlanStage::ADVANCED;
@@ -125,7 +124,7 @@ PlanStage::StageState OplogStart::workExtentHopping(WorkingSetID* out) {
 
 void OplogStart::switchToExtentHopping() {
     // Set up our extent hopping state.
-    _subIterators = _collection->getManyCursors(_txn);
+    _subIterators = _collection->getManyCursors(getOpCtx());
 
     // Transition from backwards scanning to extent hopping.
     _backwardsScanning = false;
@@ -197,17 +196,14 @@ void OplogStart::doRestoreState() {
 }
 
 void OplogStart::doDetachFromOperationContext() {
-    _txn = NULL;
     for (auto&& iterator : _subIterators) {
         iterator->detachFromOperationContext();
     }
 }
 
-void OplogStart::doReattachToOperationContext(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
+void OplogStart::doReattachToOperationContext() {
     for (auto&& iterator : _subIterators) {
-        iterator->reattachToOperationContext(opCtx);
+        iterator->reattachToOperationContext(getOpCtx());
     }
 }
 

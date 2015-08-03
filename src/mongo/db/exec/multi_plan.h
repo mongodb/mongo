@@ -66,8 +66,6 @@ public:
 
     StageState work(WorkingSetID* out) final;
 
-    void doReattachToOperationContext(OperationContext* opCtx) final;
-
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
@@ -166,9 +164,6 @@ private:
     Status tryYield(PlanYieldPolicy* yieldPolicy);
 
     static const int kNoSuchPlan = -1;
-
-    // Not owned here.
-    OperationContext* _txn;
 
     // Not owned here. Must be non-null.
     const Collection* _collection;

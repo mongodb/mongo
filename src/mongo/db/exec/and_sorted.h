@@ -53,7 +53,7 @@ namespace mongo {
  */
 class AndSortedStage final : public PlanStage {
 public:
-    AndSortedStage(WorkingSet* ws, const Collection* collection);
+    AndSortedStage(OperationContext* opCtx, WorkingSet* ws, const Collection* collection);
 
     void addChild(PlanStage* child);
 

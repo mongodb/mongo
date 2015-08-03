@@ -85,7 +85,6 @@ public:
     StageState work(WorkingSetID* out) final;
 
     void doRestoreState() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
 
     StageType stageType() const final {
         return STAGE_UPDATE;
@@ -165,9 +164,6 @@ private:
      * Helper for restoring the state of this update.
      */
     Status restoreUpdateState();
-
-    // Transactional context.  Not owned by us.
-    OperationContext* _txn;
 
     UpdateStageParams _params;
 

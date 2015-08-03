@@ -46,7 +46,10 @@ namespace mongo {
  */
 class KeepMutationsStage final : public PlanStage {
 public:
-    KeepMutationsStage(const MatchExpression* filter, WorkingSet* ws, PlanStage* child);
+    KeepMutationsStage(OperationContext* opCtx,
+                       const MatchExpression* filter,
+                       WorkingSet* ws,
+                       PlanStage* child);
     ~KeepMutationsStage();
 
     bool isEOF() final;

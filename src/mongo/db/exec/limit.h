@@ -44,7 +44,7 @@ namespace mongo {
  */
 class LimitStage final : public PlanStage {
 public:
-    LimitStage(long long limit, WorkingSet* ws, PlanStage* child);
+    LimitStage(OperationContext* opCtx, long long limit, WorkingSet* ws, PlanStage* child);
     ~LimitStage();
 
     bool isEOF() final;

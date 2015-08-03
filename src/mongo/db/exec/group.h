@@ -89,7 +89,6 @@ public:
 
     StageState work(WorkingSetID* out) final;
     bool isEOF() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
 
     StageType stageType() const final {
         return STAGE_GROUP;
@@ -127,9 +126,6 @@ private:
     // Finalize the results for this group operation.  Returns an owned BSONObj with the results
     // array.
     BSONObj finalizeResults();
-
-    // Transactional context for read locks.  Not owned by us.
-    OperationContext* _txn;
 
     GroupRequest _request;
 

@@ -65,7 +65,6 @@ public:
 
     StageState work(WorkingSetID* out) final;
 
-    void doReattachToOperationContext(OperationContext* opCtx) final;
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
@@ -114,9 +113,6 @@ private:
      * Returns a non-OK status if the plan was killed during a yield.
      */
     Status tryYield(PlanYieldPolicy* yieldPolicy);
-
-    // Not owned.
-    OperationContext* _txn;
 
     // Not owned. Must be non-null.
     Collection* _collection;

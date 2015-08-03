@@ -45,10 +45,11 @@ using stdx::make_unique;
 // static
 const char* MergeSortStage::kStageType = "SORT_MERGE";
 
-MergeSortStage::MergeSortStage(const MergeSortStageParams& params,
+MergeSortStage::MergeSortStage(OperationContext* opCtx,
+                               const MergeSortStageParams& params,
                                WorkingSet* ws,
                                const Collection* collection)
-    : PlanStage(kStageType),
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _ws(ws),
       _pattern(params.pattern),

@@ -47,7 +47,7 @@ class RecordId;
  */
 class QueuedDataStage final : public PlanStage {
 public:
-    QueuedDataStage(WorkingSet* ws);
+    QueuedDataStage(OperationContext* opCtx, WorkingSet* ws);
 
     StageState work(WorkingSetID* out) final;
 

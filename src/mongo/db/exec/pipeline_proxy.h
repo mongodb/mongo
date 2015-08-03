@@ -44,7 +44,8 @@ namespace mongo {
  */
 class PipelineProxyStage final : public PlanStage {
 public:
-    PipelineProxyStage(boost::intrusive_ptr<Pipeline> pipeline,
+    PipelineProxyStage(OperationContext* opCtx,
+                       boost::intrusive_ptr<Pipeline> pipeline,
                        const std::shared_ptr<PlanExecutor>& child,
                        WorkingSet* ws);
 
@@ -58,7 +59,7 @@ public:
     // Manage our OperationContext.
     //
     void doDetachFromOperationContext() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doReattachToOperationContext() final;
 
     /**
      * Make obj the next object returned by getNext().

@@ -54,8 +54,8 @@ const size_t AndHashStage::kLookAheadWorks = 10;
 // static
 const char* AndHashStage::kStageType = "AND_HASH";
 
-AndHashStage::AndHashStage(WorkingSet* ws, const Collection* collection)
-    : PlanStage(kStageType),
+AndHashStage::AndHashStage(OperationContext* opCtx, WorkingSet* ws, const Collection* collection)
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _ws(ws),
       _hashingChildren(true),
@@ -63,8 +63,11 @@ AndHashStage::AndHashStage(WorkingSet* ws, const Collection* collection)
       _memUsage(0),
       _maxMemUsage(kDefaultMaxMemUsageBytes) {}
 
-AndHashStage::AndHashStage(WorkingSet* ws, const Collection* collection, size_t maxMemUsage)
-    : PlanStage(kStageType),
+AndHashStage::AndHashStage(OperationContext* opCtx,
+                           WorkingSet* ws,
+                           const Collection* collection,
+                           size_t maxMemUsage)
+    : PlanStage(kStageType, opCtx),
       _collection(collection),
       _ws(ws),
       _hashingChildren(true),

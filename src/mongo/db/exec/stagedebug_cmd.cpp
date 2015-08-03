@@ -273,7 +273,7 @@ public:
             uassert(
                 16921, "Nodes argument must be provided to AND", nodeArgs["nodes"].isABSONObj());
 
-            unique_ptr<AndHashStage> andStage(new AndHashStage(workingSet, collection));
+            auto andStage = make_unique<AndHashStage>(txn, workingSet, collection);
 
             int nodesAdded = 0;
             BSONObjIterator it(nodeArgs["nodes"].Obj());
@@ -296,7 +296,7 @@ public:
             uassert(
                 16924, "Nodes argument must be provided to AND", nodeArgs["nodes"].isABSONObj());
 
-            unique_ptr<AndSortedStage> andStage(new AndSortedStage(workingSet, collection));
+            auto andStage = make_unique<AndSortedStage>(txn, workingSet, collection);
 
             int nodesAdded = 0;
             BSONObjIterator it(nodeArgs["nodes"].Obj());
@@ -320,7 +320,7 @@ public:
                 16934, "Nodes argument must be provided to AND", nodeArgs["nodes"].isABSONObj());
             uassert(16935, "Dedup argument must be provided to OR", !nodeArgs["dedup"].eoo());
             BSONObjIterator it(nodeArgs["nodes"].Obj());
-            unique_ptr<OrStage> orStage(new OrStage(workingSet, nodeArgs["dedup"].Bool(), matcher));
+            auto orStage = make_unique<OrStage>(txn, workingSet, nodeArgs["dedup"].Bool(), matcher);
             while (it.more()) {
                 BSONElement e = it.next();
                 if (!e.isABSONObj()) {
@@ -354,7 +354,7 @@ public:
             uassert(28732,
                     "Can't parse sub-node of LIMIT: " + nodeArgs["node"].Obj().toString(),
                     NULL != subNode);
-            return new LimitStage(nodeArgs["num"].numberInt(), workingSet, subNode);
+            return new LimitStage(txn, nodeArgs["num"].numberInt(), workingSet, subNode);
         } else if ("skip" == nodeName) {
             uassert(
                 16938, "Skip stage doesn't have a filter (put it on the child)", NULL == matcher);
@@ -365,7 +365,7 @@ public:
             uassert(28733,
                     "Can't parse sub-node of SKIP: " + nodeArgs["node"].Obj().toString(),
                     NULL != subNode);
-            return new SkipStage(nodeArgs["num"].numberInt(), workingSet, subNode);
+            return new SkipStage(txn, nodeArgs["num"].numberInt(), workingSet, subNode);
         } else if ("cscan" == nodeName) {
             CollectionScanParams params;
             params.collection = collection;
@@ -406,8 +406,7 @@ public:
             params.pattern = nodeArgs["pattern"].Obj();
             // Dedup is true by default.
 
-            unique_ptr<MergeSortStage> mergeStage(
-                new MergeSortStage(params, workingSet, collection));
+            auto mergeStage = make_unique<MergeSortStage>(txn, params, workingSet, collection);
 
             BSONObjIterator it(nodeArgs["nodes"].Obj());
             while (it.more()) {

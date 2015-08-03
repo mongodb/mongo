@@ -40,7 +40,8 @@ using stdx::make_unique;
 
 const char* QueuedDataStage::kStageType = "QUEUED_DATA";
 
-QueuedDataStage::QueuedDataStage(WorkingSet* ws) : PlanStage(kStageType), _ws(ws) {}
+QueuedDataStage::QueuedDataStage(OperationContext* opCtx, WorkingSet* ws)
+    : PlanStage(kStageType, opCtx), _ws(ws) {}
 
 PlanStage::StageState QueuedDataStage::work(WorkingSetID* out) {
     ++_commonStats.works;

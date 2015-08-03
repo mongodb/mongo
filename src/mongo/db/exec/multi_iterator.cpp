@@ -46,8 +46,7 @@ const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 MultiIteratorStage::MultiIteratorStage(OperationContext* txn,
                                        WorkingSet* ws,
                                        Collection* collection)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _collection(collection),
       _ws(ws),
       _wsidForFetch(_ws->allocate()) {}
@@ -92,7 +91,7 @@ PlanStage::StageState MultiIteratorStage::work(WorkingSetID* out) {
     *out = _ws->allocate();
     WorkingSetMember* member = _ws->get(*out);
     member->loc = record->id;
-    member->obj = {_txn->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
+    member->obj = {getOpCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
     _ws->transitionToLocAndObj(*out);
     return PlanStage::ADVANCED;
 }
@@ -121,17 +120,14 @@ void MultiIteratorStage::doRestoreState() {
 }
 
 void MultiIteratorStage::doDetachFromOperationContext() {
-    _txn = NULL;
     for (auto&& iterator : _iterators) {
         iterator->detachFromOperationContext();
     }
 }
 
-void MultiIteratorStage::doReattachToOperationContext(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
+void MultiIteratorStage::doReattachToOperationContext() {
     for (auto&& iterator : _iterators) {
-        iterator->reattachToOperationContext(opCtx);
+        iterator->reattachToOperationContext(getOpCtx());
     }
 }
 

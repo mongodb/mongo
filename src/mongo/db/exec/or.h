@@ -45,7 +45,7 @@ namespace mongo {
  */
 class OrStage final : public PlanStage {
 public:
-    OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter);
+    OrStage(OperationContext* opCtx, WorkingSet* ws, bool dedup, const MatchExpression* filter);
 
     void addChild(PlanStage* child);
 

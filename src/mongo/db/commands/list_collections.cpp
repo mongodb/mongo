@@ -45,13 +45,15 @@
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::list;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
+using stdx::make_unique;
 
 class CmdListCollections : public Command {
 public:
@@ -99,7 +101,7 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        std::unique_ptr<MatchExpression> matcher;
+        unique_ptr<MatchExpression> matcher;
         BSONElement filterElt = jsobj["filter"];
         if (!filterElt.eoo()) {
             if (filterElt.type() != mongo::Object) {
@@ -134,8 +136,8 @@ public:
             names.sort();
         }
 
-        std::unique_ptr<WorkingSet> ws(new WorkingSet());
-        std::unique_ptr<QueuedDataStage> root(new QueuedDataStage(ws.get()));
+        auto ws = make_unique<WorkingSet>();
+        auto root = make_unique<QueuedDataStage>(txn, ws.get());
 
         for (std::list<std::string>::const_iterator i = names.begin(); i != names.end(); ++i) {
             const std::string& ns = *i;
@@ -175,7 +177,7 @@ public:
         if (!statusWithPlanExecutor.isOK()) {
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
-        std::unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
+        unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         BSONArrayBuilder firstBatch;
 

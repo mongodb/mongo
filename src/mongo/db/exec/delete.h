@@ -90,7 +90,6 @@ public:
     StageState work(WorkingSetID* out) final;
 
     void doRestoreState() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
 
     StageType stageType() const final {
         return STAGE_DELETE;
@@ -110,9 +109,6 @@ public:
     static long long getNumDeleted(const PlanExecutor& exec);
 
 private:
-    // Transactional context.  Not owned by us.
-    OperationContext* _txn;
-
     DeleteStageParams _params;
 
     // Not owned by us.

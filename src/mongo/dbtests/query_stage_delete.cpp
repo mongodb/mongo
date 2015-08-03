@@ -48,6 +48,7 @@ namespace QueryStageDelete {
 
 using std::unique_ptr;
 using std::vector;
+using stdx::make_unique;
 
 static const NamespaceString nss("unittests.QueryStageDelete");
 
@@ -191,7 +192,7 @@ public:
         Collection* coll = ctx.getCollection();
         const int targetDocIndex = 0;
         const BSONObj query = BSON("foo" << BSON("$gte" << targetDocIndex));
-        const unique_ptr<WorkingSet> ws(stdx::make_unique<WorkingSet>());
+        const auto ws = make_unique<WorkingSet>();
         const unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Get the RecordIds that would be returned by an in-order scan.
@@ -200,7 +201,7 @@ public:
 
         // Configure a QueuedDataStage to pass the first object in the collection back in a
         // LOC_AND_OBJ state.
-        std::unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
+        auto qds = make_unique<QueuedDataStage>(&_txn, ws.get());
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->loc = locs[targetDocIndex];
@@ -214,8 +215,8 @@ public:
         deleteParams.returnDeleted = true;
         deleteParams.canonicalQuery = cq.get();
 
-        const unique_ptr<DeleteStage> deleteStage(
-            stdx::make_unique<DeleteStage>(&_txn, deleteParams, ws.get(), coll, qds.release()));
+        const auto deleteStage =
+            make_unique<DeleteStage>(&_txn, deleteParams, ws.get(), coll, qds.release());
 
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
 
@@ -257,11 +258,11 @@ public:
         OldClientWriteContext ctx(&_txn, nss.ns());
         Collection* coll = ctx.getCollection();
         const BSONObj query = BSONObj();
-        const unique_ptr<WorkingSet> ws(stdx::make_unique<WorkingSet>());
+        const auto ws = make_unique<WorkingSet>();
         const unique_ptr<CanonicalQuery> cq(canonicalize(query));
 
         // Configure a QueuedDataStage to pass an OWNED_OBJ to the delete stage.
-        unique_ptr<QueuedDataStage> qds(stdx::make_unique<QueuedDataStage>(ws.get()));
+        auto qds = make_unique<QueuedDataStage>(&_txn, ws.get());
         {
             WorkingSetID id = ws->allocate();
             WorkingSetMember* member = ws->get(id);
@@ -276,8 +277,8 @@ public:
         deleteParams.returnDeleted = true;
         deleteParams.canonicalQuery = cq.get();
 
-        const unique_ptr<DeleteStage> deleteStage(
-            stdx::make_unique<DeleteStage>(&_txn, deleteParams, ws.get(), coll, qds.release()));
+        const auto deleteStage =
+            make_unique<DeleteStage>(&_txn, deleteParams, ws.get(), coll, qds.release());
         const DeleteStats* stats = static_cast<const DeleteStats*>(deleteStage->getSpecificStats());
 
         // Call work, passing the set up member to the delete stage.

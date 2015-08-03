@@ -50,10 +50,11 @@ using stdx::make_unique;
 // static
 const char* ShardFilterStage::kStageType = "SHARDING_FILTER";
 
-ShardFilterStage::ShardFilterStage(const shared_ptr<CollectionMetadata>& metadata,
+ShardFilterStage::ShardFilterStage(OperationContext* opCtx,
+                                   const shared_ptr<CollectionMetadata>& metadata,
                                    WorkingSet* ws,
                                    PlanStage* child)
-    : PlanStage(kStageType), _ws(ws), _metadata(metadata) {
+    : PlanStage(kStageType, opCtx), _ws(ws), _metadata(metadata) {
     _children.emplace_back(child);
 }
 

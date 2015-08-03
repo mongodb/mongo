@@ -52,7 +52,7 @@ using stdx::make_unique;
 class MockStage final : public PlanStage {
 public:
     MockStage(const vector<BSONObj>& data, WorkingSet* workingSet)
-        : PlanStage("MOCK_STAGE"), _data(data), _pos(0), _workingSet(workingSet) {}
+        : PlanStage("MOCK_STAGE", nullptr), _data(data), _pos(0), _workingSet(workingSet) {}
 
     StageState work(WorkingSetID* out) final {
         ++_commonStats.works;

@@ -69,7 +69,7 @@ Tee* migrateLog = RamLog::get("migrate");
 class DeleteNotificationStage final : public PlanStage {
 public:
     DeleteNotificationStage(MigrationSourceManager* migrationSourceManager)
-        : PlanStage("NOTIFY_DELETE"), _migrationSourceManager(migrationSourceManager) {}
+        : PlanStage("NOTIFY_DELETE", nullptr), _migrationSourceManager(migrationSourceManager) {}
 
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) override {
         if (type == INVALIDATION_DELETION) {

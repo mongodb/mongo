@@ -43,8 +43,7 @@ using stdx::make_unique;
 const char* CountScan::kStageType = "COUNT_SCAN";
 
 CountScan::CountScan(OperationContext* txn, const CountScanParams& params, WorkingSet* workingSet)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _workingSet(workingSet),
       _descriptor(params.descriptor),
       _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
@@ -81,7 +80,7 @@ PlanStage::StageState CountScan::work(WorkingSetID* out) {
 
         if (needInit) {
             // First call to work().  Perform cursor init.
-            _cursor = _iam->newCursor(_txn);
+            _cursor = _iam->newCursor(getOpCtx());
             _cursor->setEndPosition(_params.endKey, _params.endKeyInclusive);
 
             entry = _cursor->seek(_params.startKey, _params.startKeyInclusive, kWantLoc);
@@ -131,20 +130,17 @@ void CountScan::doRestoreState() {
 
     // This can change during yielding.
     // TODO this isn't sufficient. See SERVER-17678.
-    _shouldDedup = _descriptor->isMultikey(_txn);
+    _shouldDedup = _descriptor->isMultikey(getOpCtx());
 }
 
 void CountScan::doDetachFromOperationContext() {
-    _txn = NULL;
     if (_cursor)
         _cursor->detachFromOperationContext();
 }
 
-void CountScan::doReattachToOperationContext(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
+void CountScan::doReattachToOperationContext() {
     if (_cursor)
-        _cursor->reattachToOperationContext(opCtx);
+        _cursor->reattachToOperationContext(getOpCtx());
 }
 
 void CountScan::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

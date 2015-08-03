@@ -45,10 +45,11 @@ using stdx::make_unique;
 
 const char* PipelineProxyStage::kStageType = "PIPELINE_PROXY";
 
-PipelineProxyStage::PipelineProxyStage(intrusive_ptr<Pipeline> pipeline,
+PipelineProxyStage::PipelineProxyStage(OperationContext* opCtx,
+                                       intrusive_ptr<Pipeline> pipeline,
                                        const std::shared_ptr<PlanExecutor>& child,
                                        WorkingSet* ws)
-    : PlanStage(kStageType),
+    : PlanStage(kStageType, opCtx),
       _pipeline(pipeline),
       _includeMetaData(_pipeline->getContext()->inShard),  // send metadata to merger
       _childExec(child),
@@ -107,11 +108,11 @@ void PipelineProxyStage::doDetachFromOperationContext() {
     }
 }
 
-void PipelineProxyStage::doReattachToOperationContext(OperationContext* opCtx) {
+void PipelineProxyStage::doReattachToOperationContext() {
     invariant(_pipeline->getContext()->opCtx == NULL);
-    _pipeline->getContext()->opCtx = opCtx;
+    _pipeline->getContext()->opCtx = getOpCtx();
     if (auto child = getChildExecutor()) {
-        child->reattachToOperationContext(opCtx);
+        child->reattachToOperationContext(getOpCtx());
     }
 }
 

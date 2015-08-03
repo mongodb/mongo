@@ -77,8 +77,6 @@ public:
     bool isEOF() final;
     StageState work(WorkingSetID* out) final;
 
-    void doReattachToOperationContext(OperationContext* opCtx) final;
-
     StageType stageType() const final {
         return STAGE_SUBPLAN;
     }
@@ -173,9 +171,6 @@ private:
      * Used as a fallback if subplanning fails. Helper for pickBestPlan().
      */
     Status choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy);
-
-    // transactional context for read locks. Not owned by us
-    OperationContext* _txn;
 
     // Not owned here. Must be non-null.
     Collection* _collection;

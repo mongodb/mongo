@@ -56,8 +56,6 @@ public:
     bool isEOF() final;
     StageState work(WorkingSetID* out) final;
 
-    void doReattachToOperationContext(OperationContext* opCtx) final;
-
     StageType stageType() const final {
         return STAGE_COUNT;
     }
@@ -74,9 +72,6 @@ private:
      * limit if necessary. The result is stored in '_specificStats'.
      */
     void trivialCount();
-
-    // Transactional context for read locks. Not owned by us.
-    OperationContext* _txn;
 
     // The collection over which we are counting.
     Collection* _collection;

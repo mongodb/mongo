@@ -43,12 +43,14 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/stdx/memory.h"
 
 namespace QueryStageFetch {
 
+using std::set;
 using std::shared_ptr;
 using std::unique_ptr;
-using std::set;
+using stdx::make_unique;
 
 class QueryStageFetchBase {
 public:
@@ -107,7 +109,7 @@ public:
         ASSERT_EQUALS(size_t(1), locs.size());
 
         // Create a mock stage that returns the WSM.
-        unique_ptr<QueuedDataStage> mockStage(new QueuedDataStage(&ws));
+        auto mockStage = make_unique<QueuedDataStage>(&_txn, &ws);
 
         // Mock data.
         {
@@ -173,7 +175,7 @@ public:
         ASSERT_EQUALS(size_t(1), locs.size());
 
         // Create a mock stage that returns the WSM.
-        unique_ptr<QueuedDataStage> mockStage(new QueuedDataStage(&ws));
+        auto mockStage = make_unique<QueuedDataStage>(&_txn, &ws);
 
         // Mock data.
         {

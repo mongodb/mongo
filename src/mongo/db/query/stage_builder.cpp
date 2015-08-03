@@ -54,11 +54,13 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 using std::unique_ptr;
+using stdx::make_unique;
 
 PlanStage* buildStages(OperationContext* txn,
                        Collection* collection,
@@ -115,7 +117,7 @@ PlanStage* buildStages(OperationContext* txn,
         params.pattern = sn->pattern;
         params.query = sn->query;
         params.limit = sn->limit;
-        return new SortStage(params, ws, childStage);
+        return new SortStage(txn, params, ws, childStage);
     } else if (STAGE_PROJECTION == root->getType()) {
         const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
         PlanStage* childStage = buildStages(txn, collection, qsol, pn->children[0], ws);
@@ -139,24 +141,24 @@ PlanStage* buildStages(OperationContext* txn,
             params.projImpl = ProjectionStageParams::SIMPLE_DOC;
         }
 
-        return new ProjectionStage(params, ws, childStage);
+        return new ProjectionStage(txn, params, ws, childStage);
     } else if (STAGE_LIMIT == root->getType()) {
         const LimitNode* ln = static_cast<const LimitNode*>(root);
         PlanStage* childStage = buildStages(txn, collection, qsol, ln->children[0], ws);
         if (NULL == childStage) {
             return NULL;
         }
-        return new LimitStage(ln->limit, ws, childStage);
+        return new LimitStage(txn, ln->limit, ws, childStage);
     } else if (STAGE_SKIP == root->getType()) {
         const SkipNode* sn = static_cast<const SkipNode*>(root);
         PlanStage* childStage = buildStages(txn, collection, qsol, sn->children[0], ws);
         if (NULL == childStage) {
             return NULL;
         }
-        return new SkipStage(sn->skip, ws, childStage);
+        return new SkipStage(txn, sn->skip, ws, childStage);
     } else if (STAGE_AND_HASH == root->getType()) {
         const AndHashNode* ahn = static_cast<const AndHashNode*>(root);
-        unique_ptr<AndHashStage> ret(new AndHashStage(ws, collection));
+        auto ret = make_unique<AndHashStage>(txn, ws, collection);
         for (size_t i = 0; i < ahn->children.size(); ++i) {
             PlanStage* childStage = buildStages(txn, collection, qsol, ahn->children[i], ws);
             if (NULL == childStage) {
@@ -167,7 +169,7 @@ PlanStage* buildStages(OperationContext* txn,
         return ret.release();
     } else if (STAGE_OR == root->getType()) {
         const OrNode* orn = static_cast<const OrNode*>(root);
-        unique_ptr<OrStage> ret(new OrStage(ws, orn->dedup, orn->filter.get()));
+        auto ret = make_unique<OrStage>(txn, ws, orn->dedup, orn->filter.get());
         for (size_t i = 0; i < orn->children.size(); ++i) {
             PlanStage* childStage = buildStages(txn, collection, qsol, orn->children[i], ws);
             if (NULL == childStage) {
@@ -178,7 +180,7 @@ PlanStage* buildStages(OperationContext* txn,
         return ret.release();
     } else if (STAGE_AND_SORTED == root->getType()) {
         const AndSortedNode* asn = static_cast<const AndSortedNode*>(root);
-        unique_ptr<AndSortedStage> ret(new AndSortedStage(ws, collection));
+        auto ret = make_unique<AndSortedStage>(txn, ws, collection);
         for (size_t i = 0; i < asn->children.size(); ++i) {
             PlanStage* childStage = buildStages(txn, collection, qsol, asn->children[i], ws);
             if (NULL == childStage) {
@@ -192,7 +194,7 @@ PlanStage* buildStages(OperationContext* txn,
         MergeSortStageParams params;
         params.dedup = msn->dedup;
         params.pattern = msn->sort;
-        unique_ptr<MergeSortStage> ret(new MergeSortStage(params, ws, collection));
+        auto ret = make_unique<MergeSortStage>(txn, params, ws, collection);
         for (size_t i = 0; i < msn->children.size(); ++i) {
             PlanStage* childStage = buildStages(txn, collection, qsol, msn->children[i], ws);
             if (NULL == childStage) {
@@ -283,7 +285,8 @@ PlanStage* buildStages(OperationContext* txn,
         if (NULL == childStage) {
             return NULL;
         }
-        return new ShardFilterStage(ShardingState::get(getGlobalServiceContext())
+        return new ShardFilterStage(txn,
+                                    ShardingState::get(getGlobalServiceContext())
                                         ->getCollectionMetadata(collection->ns().ns()),
                                     ws,
                                     childStage);
@@ -293,7 +296,7 @@ PlanStage* buildStages(OperationContext* txn,
         if (NULL == childStage) {
             return NULL;
         }
-        return new KeepMutationsStage(km->filter.get(), ws, childStage);
+        return new KeepMutationsStage(txn, km->filter.get(), ws, childStage);
     } else if (STAGE_DISTINCT_SCAN == root->getType()) {
         const DistinctNode* dn = static_cast<const DistinctNode*>(root);
 

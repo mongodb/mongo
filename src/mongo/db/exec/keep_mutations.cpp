@@ -41,10 +41,11 @@ using stdx::make_unique;
 // static
 const char* KeepMutationsStage::kStageType = "KEEP_MUTATIONS";
 
-KeepMutationsStage::KeepMutationsStage(const MatchExpression* filter,
+KeepMutationsStage::KeepMutationsStage(OperationContext* opCtx,
+                                       const MatchExpression* filter,
                                        WorkingSet* ws,
                                        PlanStage* child)
-    : PlanStage(kStageType),
+    : PlanStage(kStageType, opCtx),
       _workingSet(ws),
       _filter(filter),
       _doneReadingChild(false),

@@ -75,7 +75,10 @@ struct ProjectionStageParams {
  */
 class ProjectionStage final : public PlanStage {
 public:
-    ProjectionStage(const ProjectionStageParams& params, WorkingSet* ws, PlanStage* child);
+    ProjectionStage(OperationContext* opCtx,
+                    const ProjectionStageParams& params,
+                    WorkingSet* ws,
+                    PlanStage* child);
 
     bool isEOF() final;
     StageState work(WorkingSetID* out) final;

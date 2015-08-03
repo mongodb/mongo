@@ -54,8 +54,7 @@ FetchStage::FetchStage(OperationContext* txn,
                        PlanStage* child,
                        const MatchExpression* filter,
                        const Collection* collection)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _collection(collection),
       _ws(ws),
       _filter(filter),
@@ -109,7 +108,7 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
 
             try {
                 if (!_cursor)
-                    _cursor = _collection->getCursor(_txn);
+                    _cursor = _collection->getCursor(getOpCtx());
 
                 if (auto fetcher = _cursor->fetcherForId(member->loc)) {
                     // There's something to fetch. Hand the fetcher off to the WSM, and pass up
@@ -123,7 +122,7 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
 
                 // The doc is already in memory, so go ahead and grab it. Now we have a RecordId
                 // as well as an unowned object
-                if (!WorkingSetCommon::fetch(_txn, _ws, id, _cursor)) {
+                if (!WorkingSetCommon::fetch(getOpCtx(), _ws, id, _cursor)) {
                     _ws->free(id);
                     _commonStats.needTime++;
                     return NEED_TIME;
@@ -170,16 +169,13 @@ void FetchStage::doRestoreState() {
 }
 
 void FetchStage::doDetachFromOperationContext() {
-    _txn = NULL;
     if (_cursor)
         _cursor->detachFromOperationContext();
 }
 
-void FetchStage::doReattachToOperationContext(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
+void FetchStage::doReattachToOperationContext() {
     if (_cursor)
-        _cursor->reattachToOperationContext(opCtx);
+        _cursor->reattachToOperationContext(getOpCtx());
 }
 
 void FetchStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

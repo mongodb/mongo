@@ -58,8 +58,7 @@ DeleteStage::DeleteStage(OperationContext* txn,
                          WorkingSet* ws,
                          Collection* collection,
                          PlanStage* child)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _params(params),
       _ws(ws),
       _collection(collection),
@@ -138,9 +137,9 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
             // If the snapshot changed, then we have to make sure we have the latest copy of the
             // doc and that it still matches.
             std::unique_ptr<RecordCursor> cursor;
-            if (_txn->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
-                cursor = _collection->getCursor(_txn);
-                if (!WorkingSetCommon::fetch(_txn, _ws, id, cursor)) {
+            if (getOpCtx()->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
+                cursor = _collection->getCursor(getOpCtx());
+                if (!WorkingSetCommon::fetch(getOpCtx(), _ws, id, cursor)) {
                     // Doc is already deleted. Nothing more to do.
                     ++_commonStats.needTime;
                     return PlanStage::NEED_TIME;
@@ -179,13 +178,13 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
 
             // Do the write, unless this is an explain.
             if (!_params.isExplain) {
-                WriteUnitOfWork wunit(_txn);
+                WriteUnitOfWork wunit(getOpCtx());
 
                 const bool deleteCappedOK = false;
                 const bool deleteNoWarn = false;
                 BSONObj deletedId;
 
-                _collection->deleteDocument(_txn,
+                _collection->deleteDocument(getOpCtx(),
                                             rloc,
                                             deleteCappedOK,
                                             deleteNoWarn,
@@ -263,10 +262,6 @@ void DeleteStage::doRestoreState() {
             str::stream() << "Demoted from primary while removing from " << ns.ns(),
             !_params.shouldCallLogOp ||
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns));
-}
-
-void DeleteStage::doReattachToOperationContext(OperationContext* opCtx) {
-    _txn = opCtx;
 }
 
 unique_ptr<PlanStageStats> DeleteStage::getStats() {

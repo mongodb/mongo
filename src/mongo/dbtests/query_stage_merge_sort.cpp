@@ -140,7 +140,7 @@ public:
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -210,7 +210,7 @@ public:
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -279,7 +279,7 @@ public:
         MergeSortStageParams msparams;
         msparams.dedup = false;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -350,7 +350,7 @@ public:
         // Sort by c:-1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << -1);
-        MergeSortStage* ms = new MergeSortStage(msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -420,7 +420,7 @@ public:
         // Sort by c:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("c" << 1);
-        MergeSortStage* ms = new MergeSortStage(msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -476,7 +476,7 @@ public:
         // Sort by foo:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("foo" << 1);
-        MergeSortStage* ms = new MergeSortStage(msparams, ws.get(), coll);
+        MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws.get(), coll);
 
         IndexScanParams params;
         params.bounds.isSimpleRange = true;
@@ -535,7 +535,7 @@ public:
         // Sort by foo:1
         MergeSortStageParams msparams;
         msparams.pattern = BSON("foo" << 1);
-        unique_ptr<MergeSortStage> ms(new MergeSortStage(msparams, &ws, coll));
+        auto ms = make_unique<MergeSortStage>(&_txn, msparams, &ws, coll);
 
         IndexScanParams params;
         params.bounds.isSimpleRange = true;

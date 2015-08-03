@@ -49,8 +49,7 @@ CountStage::CountStage(OperationContext* txn,
                        const CountRequest& request,
                        WorkingSet* ws,
                        PlanStage* child)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _collection(collection),
       _request(request),
       _leftToSkip(request.getSkip()),
@@ -73,7 +72,7 @@ bool CountStage::isEOF() {
 
 void CountStage::trivialCount() {
     invariant(_collection);
-    long long nCounted = _collection->numRecords(_txn);
+    long long nCounted = _collection->numRecords(getOpCtx());
 
     if (0 != _request.getSkip()) {
         nCounted -= _request.getSkip();
@@ -161,10 +160,6 @@ PlanStage::StageState CountStage::work(WorkingSetID* out) {
 
     _commonStats.needTime++;
     return PlanStage::NEED_TIME;
-}
-
-void CountStage::doReattachToOperationContext(OperationContext* opCtx) {
-    _txn = opCtx;
 }
 
 unique_ptr<PlanStageStats> CountStage::getStats() {

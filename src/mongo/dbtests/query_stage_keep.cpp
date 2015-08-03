@@ -48,11 +48,14 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_registry.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/stdx/memory.h"
 
 namespace QueryStageKeep {
 
-using std::shared_ptr;
 using std::set;
+using std::shared_ptr;
+using std::unique_ptr;
+using stdx::make_unique;
 
 class QueryStageKeepBase {
 public:
@@ -142,7 +145,7 @@ public:
         // Create a KeepMutations stage to merge in the 10 flagged objects.
         // Takes ownership of 'cs'
         MatchExpression* nullFilter = NULL;
-        std::unique_ptr<KeepMutationsStage> keep(new KeepMutationsStage(nullFilter, &ws, cs));
+        auto keep = make_unique<KeepMutationsStage>(&_txn, nullFilter, &ws, cs);
 
         for (size_t i = 0; i < 10; ++i) {
             WorkingSetID id = getNextResult(keep.get());
@@ -190,8 +193,7 @@ public:
         // Create a KeepMutationsStage with an EOF child, and flag 50 objects.  We expect these
         // objects to be returned by the KeepMutationsStage.
         MatchExpression* nullFilter = NULL;
-        std::unique_ptr<KeepMutationsStage> keep(
-            new KeepMutationsStage(nullFilter, &ws, new EOFStage()));
+        auto keep = make_unique<KeepMutationsStage>(&_txn, nullFilter, &ws, new EOFStage(&_txn));
         for (size_t i = 0; i < 50; ++i) {
             WorkingSetID id = ws.allocate();
             WorkingSetMember* member = ws.get(id);

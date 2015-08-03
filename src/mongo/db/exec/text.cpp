@@ -60,7 +60,7 @@ TextStage::TextStage(OperationContext* txn,
                      const TextStageParams& params,
                      WorkingSet* ws,
                      const MatchExpression* filter)
-    : PlanStage(kStageType), _params(params) {
+    : PlanStage(kStageType, txn), _params(params) {
     _children.emplace_back(buildTextTree(txn, ws, filter));
     _specificStats.indexPrefix = _params.indexPrefix;
     _specificStats.indexName = _params.index->indexName();
@@ -138,7 +138,8 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* txn,
     auto fetcher = make_unique<FetchStage>(
         txn, ws, textScorer.release(), nullptr, _params.index->getCollection());
 
-    auto matcher = make_unique<TextMatchStage>(std::move(fetcher), _params.query, _params.spec, ws);
+    auto matcher =
+        make_unique<TextMatchStage>(txn, std::move(fetcher), _params.query, _params.spec, ws);
 
     unique_ptr<PlanStage> treeRoot = std::move(matcher);
     return treeRoot;

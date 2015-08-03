@@ -45,11 +45,12 @@ using stdx::make_unique;
 
 const char* TextMatchStage::kStageType = "TEXT_MATCH";
 
-TextMatchStage::TextMatchStage(unique_ptr<PlanStage> child,
+TextMatchStage::TextMatchStage(OperationContext* opCtx,
+                               unique_ptr<PlanStage> child,
                                const FTSQuery& query,
                                const FTSSpec& spec,
                                WorkingSet* ws)
-    : PlanStage(kStageType), _ftsMatcher(query, spec), _ws(ws) {
+    : PlanStage(kStageType, opCtx), _ftsMatcher(query, spec), _ws(ws) {
     _children.emplace_back(std::move(child));
 }
 

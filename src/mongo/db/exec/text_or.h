@@ -89,7 +89,7 @@ public:
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doReattachToOperationContext() final;
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     StageType stageType() const final {
@@ -157,7 +157,6 @@ private:
 
     // Members needed only for using the TextMatchableDocument.
     const MatchExpression* _filter;
-    OperationContext* _txn;
     WorkingSetID _idRetrying;
     std::unique_ptr<RecordCursor> _recordCursor;
     IndexDescriptor* _index;

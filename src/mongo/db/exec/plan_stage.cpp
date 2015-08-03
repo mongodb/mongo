@@ -62,6 +62,9 @@ void PlanStage::invalidate(OperationContext* txn, const RecordId& dl, Invalidati
 }
 
 void PlanStage::detachFromOperationContext() {
+    invariant(_opCtx);
+    _opCtx = nullptr;
+
     for (auto&& child : _children) {
         child->detachFromOperationContext();
     }
@@ -70,11 +73,14 @@ void PlanStage::detachFromOperationContext() {
 }
 
 void PlanStage::reattachToOperationContext(OperationContext* opCtx) {
+    invariant(_opCtx == nullptr);
+    _opCtx = opCtx;
+
     for (auto&& child : _children) {
         child->reattachToOperationContext(opCtx);
     }
 
-    doReattachToOperationContext(opCtx);
+    doReattachToOperationContext();
 }
 
 }  // namespace mongo

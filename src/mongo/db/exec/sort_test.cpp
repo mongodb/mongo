@@ -45,9 +45,9 @@ TEST(SortStageTest, SortEmptyWorkingSet) {
     WorkingSet ws;
 
     // QueuedDataStage will be owned by SortStage.
-    QueuedDataStage* ms = new QueuedDataStage(&ws);
+    QueuedDataStage* ms = new QueuedDataStage(nullptr, &ws);
     SortStageParams params;
-    SortStage sort(params, &ws, ms);
+    SortStage sort(nullptr, params, &ws, ms);
 
     // Check initial EOF state.
     ASSERT_TRUE(ms->isEOF());
@@ -87,7 +87,7 @@ void testWork(const char* patternStr,
     WorkingSet ws;
 
     // QueuedDataStage will be owned by SortStage.
-    QueuedDataStage* ms = new QueuedDataStage(&ws);
+    QueuedDataStage* ms = new QueuedDataStage(nullptr, &ws);
     BSONObj inputObj = fromjson(inputStr);
     BSONElement inputElt = inputObj.getField("input");
     ASSERT(inputElt.isABSONObj());
@@ -112,7 +112,7 @@ void testWork(const char* patternStr,
     params.query = fromjson(queryStr);
     params.limit = limit;
 
-    SortStage sort(params, &ws, ms);
+    SortStage sort(nullptr, params, &ws, ms);
 
     WorkingSetID id = WorkingSet::INVALID_ID;
     PlanStage::StageState state = PlanStage::NEED_TIME;

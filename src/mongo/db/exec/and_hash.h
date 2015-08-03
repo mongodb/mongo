@@ -51,12 +51,15 @@ namespace mongo {
  */
 class AndHashStage final : public PlanStage {
 public:
-    AndHashStage(WorkingSet* ws, const Collection* collection);
+    AndHashStage(OperationContext* opCtx, WorkingSet* ws, const Collection* collection);
 
     /**
      * For testing only. Allows tests to set memory usage threshold.
      */
-    AndHashStage(WorkingSet* ws, const Collection* collection, size_t maxMemUsage);
+    AndHashStage(OperationContext* opCtx,
+                 WorkingSet* ws,
+                 const Collection* collection,
+                 size_t maxMemUsage);
 
     void addChild(PlanStage* child);
 

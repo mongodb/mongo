@@ -60,8 +60,7 @@ CachedPlanStage::CachedPlanStage(OperationContext* txn,
                                  const QueryPlannerParams& params,
                                  size_t decisionWorks,
                                  PlanStage* root)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _collection(collection),
       _ws(ws),
       _canonicalQuery(cq),
@@ -228,7 +227,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
 
         PlanStage* newRoot;
         // Only one possible plan. Build the stages from the solution.
-        verify(StageBuilder::build(_txn, _collection, *solutions[0], _ws, &newRoot));
+        verify(StageBuilder::build(getOpCtx(), _collection, *solutions[0], _ws, &newRoot));
         _children.emplace_back(newRoot);
         _replannedQs.reset(solutions.popAndReleaseBack());
         return Status::OK();
@@ -236,7 +235,8 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
 
     // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
     // and so on. The working set will be shared by all candidate plans.
-    _children.emplace_back(new MultiPlanStage(_txn, _collection, _canonicalQuery, shouldCache));
+    _children.emplace_back(
+        new MultiPlanStage(getOpCtx(), _collection, _canonicalQuery, shouldCache));
     MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
     for (size_t ix = 0; ix < solutions.size(); ++ix) {
@@ -245,7 +245,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
         }
 
         PlanStage* nextPlanRoot;
-        verify(StageBuilder::build(_txn, _collection, *solutions[ix], _ws, &nextPlanRoot));
+        verify(StageBuilder::build(getOpCtx(), _collection, *solutions[ix], _ws, &nextPlanRoot));
 
         // Takes ownership of 'solutions[ix]' and 'nextPlanRoot'.
         multiPlanStage->addPlan(solutions.releaseAt(ix), nextPlanRoot, _ws);
@@ -289,11 +289,6 @@ PlanStage::StageState CachedPlanStage::work(WorkingSetID* out) {
     }
 
     return childStatus;
-}
-
-
-void CachedPlanStage::doReattachToOperationContext(OperationContext* opCtx) {
-    _txn = opCtx;
 }
 
 void CachedPlanStage::doInvalidate(OperationContext* txn,

@@ -42,7 +42,7 @@ using stdx::make_unique;
 // static
 const char* EOFStage::kStageType = "EOF";
 
-EOFStage::EOFStage() : PlanStage(kStageType) {}
+EOFStage::EOFStage(OperationContext* opCtx) : PlanStage(kStageType, opCtx) {}
 
 EOFStage::~EOFStage() {}
 

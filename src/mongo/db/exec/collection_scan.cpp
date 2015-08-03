@@ -58,8 +58,7 @@ CollectionScan::CollectionScan(OperationContext* txn,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
                                const MatchExpression* filter)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _workingSet(workingSet),
       _filter(filter),
       _params(params),
@@ -98,7 +97,7 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
     try {
         if (needToMakeCursor) {
             const bool forward = _params.direction == CollectionScanParams::FORWARD;
-            _cursor = _params.collection->getCursor(_txn, forward);
+            _cursor = _params.collection->getCursor(getOpCtx(), forward);
 
             if (!_lastSeenId.isNull()) {
                 invariant(_params.tailable);
@@ -165,7 +164,7 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
     WorkingSetID id = _workingSet->allocate();
     WorkingSetMember* member = _workingSet->get(id);
     member->loc = record->id;
-    member->obj = {_txn->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
+    member->obj = {getOpCtx()->recoveryUnit()->getSnapshotId(), record->data.releaseToBson()};
     _workingSet->transitionToLocAndObj(id);
 
     return returnIfMatches(member, id, out);
@@ -223,23 +222,21 @@ void CollectionScan::doSaveState() {
 void CollectionScan::doRestoreState() {
     if (_cursor) {
         if (!_cursor->restore()) {
-            warning() << "Could not restore RecordCursor for CollectionScan: " << _txn->getNS();
+            warning() << "Could not restore RecordCursor for CollectionScan: "
+                      << getOpCtx()->getNS();
             _isDead = true;
         }
     }
 }
 
 void CollectionScan::doDetachFromOperationContext() {
-    _txn = NULL;
     if (_cursor)
         _cursor->detachFromOperationContext();
 }
 
-void CollectionScan::doReattachToOperationContext(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
+void CollectionScan::doReattachToOperationContext() {
     if (_cursor)
-        _cursor->reattachToOperationContext(opCtx);
+        _cursor->reattachToOperationContext(getOpCtx());
 }
 
 unique_ptr<PlanStageStats> CollectionScan::getStats() {

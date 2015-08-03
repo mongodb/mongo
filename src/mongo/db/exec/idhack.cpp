@@ -54,8 +54,7 @@ IDHackStage::IDHackStage(OperationContext* txn,
                          const Collection* collection,
                          CanonicalQuery* query,
                          WorkingSet* ws)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _collection(collection),
       _workingSet(ws),
       _key(query->getQueryObj()["_id"].wrap()),
@@ -72,8 +71,7 @@ IDHackStage::IDHackStage(OperationContext* txn,
                          Collection* collection,
                          const BSONObj& key,
                          WorkingSet* ws)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _collection(collection),
       _workingSet(ws),
       _key(key),
@@ -108,7 +106,7 @@ PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
         WorkingSetID id = _idBeingPagedIn;
         _idBeingPagedIn = WorkingSet::INVALID_ID;
 
-        invariant(WorkingSetCommon::fetchIfUnfetched(_txn, _workingSet, id, _recordCursor));
+        invariant(WorkingSetCommon::fetchIfUnfetched(getOpCtx(), _workingSet, id, _recordCursor));
 
         WorkingSetMember* member = _workingSet->get(id);
         return advance(id, member, out);
@@ -120,14 +118,14 @@ PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
         const IndexCatalog* catalog = _collection->getIndexCatalog();
 
         // Find the index we use.
-        IndexDescriptor* idDesc = catalog->findIdIndex(_txn);
+        IndexDescriptor* idDesc = catalog->findIdIndex(getOpCtx());
         if (NULL == idDesc) {
             _done = true;
             return PlanStage::IS_EOF;
         }
 
         // Look up the key by going directly to the index.
-        RecordId loc = catalog->getIndex(idDesc)->findSingle(_txn, _key);
+        RecordId loc = catalog->getIndex(idDesc)->findSingle(getOpCtx(), _key);
 
         // Key not found.
         if (loc.isNull()) {
@@ -145,7 +143,7 @@ PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
         _workingSet->transitionToLocAndIdx(id);
 
         if (!_recordCursor)
-            _recordCursor = _collection->getCursor(_txn);
+            _recordCursor = _collection->getCursor(getOpCtx());
 
         // We may need to request a yield while we fetch the document.
         if (auto fetcher = _recordCursor->fetcherForId(loc)) {
@@ -159,7 +157,7 @@ PlanStage::StageState IDHackStage::work(WorkingSetID* out) {
         }
 
         // The doc was already in memory, so we go ahead and return it.
-        if (!WorkingSetCommon::fetch(_txn, _workingSet, id, _recordCursor)) {
+        if (!WorkingSetCommon::fetch(getOpCtx(), _workingSet, id, _recordCursor)) {
             // _id is immutable so the index would return the only record that could
             // possibly match the query.
             _workingSet->free(id);
@@ -210,16 +208,13 @@ void IDHackStage::doRestoreState() {
 }
 
 void IDHackStage::doDetachFromOperationContext() {
-    _txn = NULL;
     if (_recordCursor)
         _recordCursor->detachFromOperationContext();
 }
 
-void IDHackStage::doReattachToOperationContext(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
+void IDHackStage::doReattachToOperationContext() {
     if (_recordCursor)
-        _recordCursor->reattachToOperationContext(opCtx);
+        _recordCursor->reattachToOperationContext(getOpCtx());
 }
 
 void IDHackStage::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

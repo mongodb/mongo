@@ -104,15 +104,15 @@ public:
      */
     PlanExecutor* makePlanExecutorWithSortStage(Collection* coll) {
         // Build the mock scan stage which feeds the data.
-        unique_ptr<WorkingSet> ws(new WorkingSet());
-        unique_ptr<QueuedDataStage> ms(new QueuedDataStage(ws.get()));
+        auto ws = make_unique<WorkingSet>();
+        auto ms = make_unique<QueuedDataStage>(&_txn, ws.get());
         insertVarietyOfObjects(ws.get(), ms.get(), coll);
 
         SortStageParams params;
         params.collection = coll;
         params.pattern = BSON("foo" << 1);
         params.limit = limit();
-        unique_ptr<SortStage> ss(new SortStage(params, ws.get(), ms.release()));
+        auto ss = make_unique<SortStage>(&_txn, params, ws.get(), ms.release());
 
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
@@ -137,8 +137,8 @@ public:
      * If limit is not zero, we limit the output of the sort stage to 'limit' results.
      */
     void sortAndCheck(int direction, Collection* coll) {
-        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-        QueuedDataStage* ms = new QueuedDataStage(ws.get());
+        auto ws = make_unique<WorkingSet>();
+        QueuedDataStage* ms = new QueuedDataStage(&_txn, ws.get());
 
         // Insert a mix of the various types of data.
         insertVarietyOfObjects(ws.get(), ms, coll);
@@ -148,8 +148,8 @@ public:
         params.pattern = BSON("foo" << direction);
         params.limit = limit();
 
-        unique_ptr<FetchStage> fetchStage = make_unique<FetchStage>(
-            &_txn, ws.get(), new SortStage(params, ws.get(), ms), nullptr, coll);
+        auto fetchStage = make_unique<FetchStage>(
+            &_txn, ws.get(), new SortStage(&_txn, params, ws.get(), ms), nullptr, coll);
 
         // Must fetch so we can look at the doc as a BSONObj.
         auto statusWithPlanExecutor = PlanExecutor::make(
@@ -513,8 +513,8 @@ public:
             wuow.commit();
         }
 
-        unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-        QueuedDataStage* ms = new QueuedDataStage(ws.get());
+        auto ws = make_unique<WorkingSet>();
+        QueuedDataStage* ms = new QueuedDataStage(&_txn, ws.get());
 
         for (int i = 0; i < numObj(); ++i) {
             {
@@ -539,8 +539,8 @@ public:
         params.pattern = BSON("b" << -1 << "c" << 1 << "a" << 1);
         params.limit = 0;
 
-        unique_ptr<FetchStage> fetchStage = make_unique<FetchStage>(
-            &_txn, ws.get(), new SortStage(params, ws.get(), ms), nullptr, coll);
+        auto fetchStage = make_unique<FetchStage>(
+            &_txn, ws.get(), new SortStage(&_txn, params, ws.get(), ms), nullptr, coll);
         // We don't get results back since we're sorting some parallel arrays.
         auto statusWithPlanExecutor = PlanExecutor::make(
             &_txn, std::move(ws), std::move(fetchStage), coll, PlanExecutor::YIELD_MANUAL);

@@ -62,8 +62,7 @@ IndexScan::IndexScan(OperationContext* txn,
                      const IndexScanParams& params,
                      WorkingSet* workingSet,
                      const MatchExpression* filter)
-    : PlanStage(kStageType),
-      _txn(txn),
+    : PlanStage(kStageType, txn),
       _workingSet(workingSet),
       _iam(params.descriptor->getIndexCatalog()->getIndex(params.descriptor)),
       _keyPattern(params.descriptor->keyPattern().getOwned()),
@@ -77,7 +76,7 @@ IndexScan::IndexScan(OperationContext* txn,
     // any info we need for stats reporting out here.
     _specificStats.keyPattern = _keyPattern;
     _specificStats.indexName = _params.descriptor->indexName();
-    _specificStats.isMultiKey = _params.descriptor->isMultikey(_txn);
+    _specificStats.isMultiKey = _params.descriptor->isMultikey(getOpCtx());
     _specificStats.isUnique = _params.descriptor->unique();
     _specificStats.isSparse = _params.descriptor->isSparse();
     _specificStats.isPartial = _params.descriptor->isPartial();
@@ -89,11 +88,11 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
         _shouldDedup = false;
     } else {
         // TODO it is incorrect to rely on this not changing. SERVER-17678
-        _shouldDedup = _params.descriptor->isMultikey(_txn);
+        _shouldDedup = _params.descriptor->isMultikey(getOpCtx());
     }
 
     // Perform the possibly heavy-duty initialization of the underlying index cursor.
-    _indexCursor = _iam->newCursor(_txn, _forward);
+    _indexCursor = _iam->newCursor(getOpCtx(), _forward);
 
     if (_params.bounds.isSimpleRange) {
         // Start at one key, end at another.
@@ -251,16 +250,13 @@ void IndexScan::doRestoreState() {
 }
 
 void IndexScan::doDetachFromOperationContext() {
-    _txn = NULL;
     if (_indexCursor)
         _indexCursor->detachFromOperationContext();
 }
 
-void IndexScan::doReattachToOperationContext(OperationContext* opCtx) {
-    invariant(_txn == NULL);
-    _txn = opCtx;
+void IndexScan::doReattachToOperationContext() {
     if (_indexCursor)
-        _indexCursor->reattachToOperationContext(opCtx);
+        _indexCursor->reattachToOperationContext(getOpCtx());
 }
 
 void IndexScan::doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {

@@ -55,7 +55,8 @@ class MergeSortStageParams;
  */
 class MergeSortStage final : public PlanStage {
 public:
-    MergeSortStage(const MergeSortStageParams& params,
+    MergeSortStage(OperationContext* opCtx,
+                   const MergeSortStageParams& params,
                    WorkingSet* ws,
                    const Collection* collection);
 

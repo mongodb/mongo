@@ -128,7 +128,7 @@ public:
         fillOutPlannerParams(&_txn, collection, cq.get(), &plannerParams);
 
         // Queued data stage will return a failure during the cached plan trial period.
-        std::unique_ptr<QueuedDataStage> mockChild = stdx::make_unique<QueuedDataStage>(&_ws);
+        auto mockChild = stdx::make_unique<QueuedDataStage>(&_txn, &_ws);
         mockChild->pushBack(PlanStage::FAILURE);
 
         // High enough so that we shouldn't trigger a replan based on works.
@@ -196,7 +196,7 @@ public:
         const size_t decisionWorks = 10;
         const size_t mockWorks =
             1U + static_cast<size_t>(internalQueryCacheEvictionRatio * decisionWorks);
-        std::unique_ptr<QueuedDataStage> mockChild = stdx::make_unique<QueuedDataStage>(&_ws);
+        auto mockChild = stdx::make_unique<QueuedDataStage>(&_txn, &_ws);
         for (size_t i = 0; i < mockWorks; i++) {
             mockChild->pushBack(PlanStage::NEED_TIME);
         }

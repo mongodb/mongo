@@ -61,7 +61,7 @@ public:
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void doReattachToOperationContext() final;
     void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) final;
 
     /**
@@ -86,9 +86,6 @@ private:
      * Called whenever we have a WSM containing the matching obj.
      */
     StageState advance(WorkingSetID id, WorkingSetMember* member, WorkingSetID* out);
-
-    // transactional context for read locks. Not owned by us
-    OperationContext* _txn;
 
     // Not owned here.
     const Collection* _collection;

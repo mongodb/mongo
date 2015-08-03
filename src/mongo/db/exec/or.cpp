@@ -43,8 +43,8 @@ using stdx::make_unique;
 // static
 const char* OrStage::kStageType = "OR";
 
-OrStage::OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter)
-    : PlanStage(kStageType), _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup) {}
+OrStage::OrStage(OperationContext* opCtx, WorkingSet* ws, bool dedup, const MatchExpression* filter)
+    : PlanStage(kStageType, opCtx), _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup) {}
 
 void OrStage::addChild(PlanStage* child) {
     _children.emplace_back(child);

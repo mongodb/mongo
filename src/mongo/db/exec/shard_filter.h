@@ -71,7 +71,8 @@ class CollectionMetadata;
  */
 class ShardFilterStage final : public PlanStage {
 public:
-    ShardFilterStage(const std::shared_ptr<CollectionMetadata>& metadata,
+    ShardFilterStage(OperationContext* opCtx,
+                     const std::shared_ptr<CollectionMetadata>& metadata,
                      WorkingSet* ws,
                      PlanStage* child);
     ~ShardFilterStage();

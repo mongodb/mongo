@@ -141,7 +141,10 @@ private:
  */
 class SortStage final : public PlanStage {
 public:
-    SortStage(const SortStageParams& params, WorkingSet* ws, PlanStage* child);
+    SortStage(OperationContext* opCtx,
+              const SortStageParams& params,
+              WorkingSet* ws,
+              PlanStage* child);
     ~SortStage();
 
     bool isEOF() final;
