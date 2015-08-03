@@ -118,6 +118,7 @@
 typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	volatile int64_t slot_state;	/* Slot state */
 	int64_t	 slot_unbuffered;	/* Unbuffered data in this slot */
+	int64_t	 slot_direct_size;	/* Direct write size */
 	int32_t	 slot_error;		/* Error value */
 	wt_off_t slot_start_offset;	/* Starting file offset */
 	WT_LSN	 slot_release_lsn;	/* Slot release LSN */
@@ -136,9 +137,9 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 #define	WT_SLOT_INIT_FLAGS	(WT_SLOT_BUFFERED)
 
 typedef struct {
-	WT_LOGSLOT	*slot;
-	wt_off_t	 end_offset;
-	wt_off_t	 offset;
+	WT_LOGSLOT	*slot;		/* Slot I'm using */
+	wt_off_t	 end_offset;	/* My end offset in buffer */
+	wt_off_t	 offset;	/* Slot buffer offset */
 } WT_MYSLOT;
 
 					/* Offset of first record */
@@ -179,7 +180,8 @@ typedef struct {
 	WT_SPINLOCK      log_slot_lock; /* Locked: Consolidation array */
 	WT_SPINLOCK      log_sync_lock; /* Locked: Single-thread fsync */
 
-	WT_RWLOCK	 *log_archive_lock; /* Archive and log cursors */
+	WT_RWLOCK	 *log_archive_lock;	/* Archive and log cursors */
+	WT_RWLOCK	 *log_direct_lock;	/* Direct and buffered writes */
 
 	/* Notify any waiting threads when sync_lsn is updated. */
 	WT_CONDVAR	*log_sync_cond;

@@ -442,7 +442,6 @@ restart:
 			*free_i = save_i;
 		if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
 			continue;
-		WT_ASSERT(session, slot != log->active_slot);
 		written[written_i].slot_index = save_i;
 		written[written_i++].lsn = slot->slot_release_lsn;
 	}
@@ -549,19 +548,21 @@ err:
  *	Force a switch and release and write of the current slot.
  */
 int
-__wt_log_force_write(WT_SESSION_IMPL *session)
+__wt_log_force_write(WT_SESSION_IMPL *session, int new_slot)
 {
 	WT_MYSLOT myslot;
 	int free_slot, release;
 
 	WT_RET(__wt_log_slot_join(session, 0, 0, &myslot));
-	WT_RET(__wt_log_slot_switch(session,
+	WT_RET(__wt_log_slot_close(session,
 	    (wt_off_t)myslot.end_offset, &release));
 	if (release) {
 		WT_RET(__wt_log_release(session, myslot.slot, &free_slot));
 		if (free_slot)
 			WT_RET(__wt_log_slot_free(session, myslot.slot));
 	}
+	if (new_slot)
+		WT_RET(__wt_log_slot_new(session));
 	return (0);
 }
 
@@ -625,7 +626,9 @@ __log_server(void *arg)
 		 * and a buffer may need to wait for the write_lsn to advance
 		 * in the case of a synchronous buffer.  We end up with a hang.
 		 */
-		WT_ERR(__wt_log_force_write(session));
+		WT_ERR(__wt_readlock(session, log->log_direct_lock));
+		WT_ERR(__wt_log_force_write(session, 1));
+		WT_ERR(__wt_readunlock(session, log->log_direct_lock));
 		/*
 		 * Perform log pre-allocation.
 		 */
@@ -691,6 +694,8 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_spin_init(session, &log->log_sync_lock, "log sync"));
 	WT_RET(__wt_rwlock_alloc(session,
 	    &log->log_archive_lock, "log archive lock"));
+	WT_RET(__wt_rwlock_alloc(session,
+	    &log->log_direct_lock, "log direct write lock"));
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize =
 		    WT_MAX((uint32_t)conn->buffer_alignment, WT_LOG_ALIGN);
@@ -857,6 +862,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_write_cond));
 	WT_TRET(__wt_rwlock_destroy(session, &conn->log->log_archive_lock));
+	WT_TRET(__wt_rwlock_destroy(session, &conn->log->log_direct_lock));
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);

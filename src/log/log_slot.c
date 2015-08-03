@@ -21,65 +21,96 @@
  */
 
 /*
+ * __wt_log_slot_close --
+ *	Close out the current active slot.
+ */
+int
+__wt_log_slot_close(WT_SESSION_IMPL *session, wt_off_t new_offset, int *rel)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	WT_LOGSLOT *current;
+	int64_t new_state, old_state;
+
+	conn = S2C(session);
+	log = conn->log;
+	if (rel != NULL)
+		*rel = 0;
+retry:
+	current = log->active_slot;
+	if (current == NULL)
+		return (0);
+	old_state = current->slot_state;
+	/*
+	 * If someone else is switching out this slot we lost.  Nothing to
+	 * do but return.
+	 */
+	if (WT_LOG_SLOT_CLOSED(old_state))
+		return (0);
+	new_state = (old_state | WT_LOG_SLOT_CLOSE);
+	/*
+	 * Close this slot.  If we lose the race retry.
+	 */
+	if (!WT_ATOMIC_CAS8(current->slot_state, old_state, new_state))
+		goto retry;
+	/*
+	 * We own the slot now.  No one else can join.
+	 * Set the end LSN.
+	 */
+	if (WT_LOG_SLOT_DONE(new_state) && rel != NULL)
+		*rel = 1;
+	current->slot_end_lsn = current->slot_start_lsn;
+	current->slot_end_lsn.offset += new_offset;
+	log->alloc_lsn = current->slot_end_lsn;
+	WT_ASSERT(session, log->alloc_lsn.file >= log->write_lsn.file);
+	return (0);
+}
+
+/*
  * __wt_log_slot_switch --
- *	Find a new free slot and switch out the old active slot.
+ *	Switch out the current slot and set up a new one.
  */
 int
 __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset, int *rel)
 {
+	WT_RET(__wt_log_slot_close(session, new_offset, rel));
+	WT_RET(__wt_log_slot_new(session));
+	return (0);
+}
+
+/*
+ * __wt_log_slot_new --
+ *	Find a free slot and switch it as the new active slot.
+ */
+int
+__wt_log_slot_new(WT_SESSION_IMPL *session)
+{
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
-	WT_LOGSLOT *current, *slot;
-	int64_t new_state, old_state;
+	WT_LOGSLOT *slot;
 	int32_t i;
 
 	conn = S2C(session);
 	log = conn->log;
-	current = log->active_slot;
-	if (rel != NULL)
-		*rel = 0;
+	if (!F_ISSET(log,  WT_LOG_FORCE_CONSOLIDATE))
+		return (0);
 	/*
-	 * Keep trying until we can find a slot to switch.
+	 * Keep trying until we can find a free slot.
 	 */
 	for (;;) {
 		/*
 		 * For now just restart at 0.  We could use log->pool_index
 		 * if that is inefficient.
 		 */
-retry:
 		for (i = 0; i < WT_SLOT_POOL; i++) {
 			slot = &log->slot_pool[i];
 			if (slot->slot_state == WT_LOG_SLOT_FREE) {
-				old_state = current->slot_state;
-				/*
-				 * If someone else is switching out this slot
-				 * we lost.  Nothing to do but return.
-				 */
-				new_state = (old_state | WT_LOG_SLOT_CLOSE);
-				if (WT_LOG_SLOT_CLOSED(old_state))
-					return (0);
-				/*
-				 * Close this slot.  If we lose the race retry.
-				 */
-				if (!WT_ATOMIC_CAS8(
-				    current->slot_state, old_state, new_state))
-					goto retry;
-				/*
-				 * We own the slot now.  No one else can join.
-				 * Set the end LSN.  Then check for file change.
-				 */
-				if (WT_LOG_SLOT_DONE(new_state) && rel != NULL)
-					*rel = 1;
-				current->slot_end_lsn = current->slot_start_lsn;
-				current->slot_end_lsn.offset += new_offset;
-				log->alloc_lsn = current->slot_end_lsn;
 				WT_RET(__wt_log_acquire(session,
-				    WT_LOG_SLOT_BUF_SIZE, slot));
+				    log->slot_buf_size, slot));
 				/*
-				 * We have a new, free slot to use.  Initialize.
+				 * We have a new, free slot to use.
+				 * Set it as the active slot.
 				 */
-				slot->slot_state = 0;
-				slot->slot_unbuffered = 0;
 				log->active_slot = slot;
 				return (0);
 			}
@@ -90,10 +121,11 @@ retry:
 		(void)__wt_cond_signal(session, conn->log_wrlsn_cond);
 		__wt_yield();
 	}
+	/* NOTREACHED */
 }
 
 /*
- * __wt_log_slot_init --
+ 
  *	Initialize the slot array.
  */
 int
@@ -118,9 +150,13 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	 * Cap the slot buffer to the log file size times two if needed.
 	 * That means we try to fill to half the buffer but allow some
 	 * extra space.
+	 *
+	 * !!! If the buffer size is too close to the log file size, we will
+	 * switch log files very aggressively.  Scale back the buffer for
+	 * small log file sizes.
 	 */
 	log->slot_buf_size = (uint32_t)WT_MIN(
-	    (size_t)conn->log_file_max, WT_LOG_SLOT_BUF_SIZE);
+	    (size_t)conn->log_file_max/10, WT_LOG_SLOT_BUF_SIZE);
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		WT_ERR(__wt_buf_init(session,
 		    &log->slot_pool[i].slot_buf, log->slot_buf_size));
@@ -131,6 +167,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	/*
 	 * Set up the available slot from the pool the first time.
 	 */
+#if 0
 	slot = &log->slot_pool[0];
 	slot->slot_state = 0;
 	slot->slot_start_lsn = log->alloc_lsn;
@@ -138,6 +175,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	slot->slot_release_lsn = log->alloc_lsn;
 	slot->slot_fh = log->log_fh;
 	log->active_slot = slot;
+#endif
 
 	if (0) {
 err:		while (--i >= 0)
@@ -167,9 +205,7 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 
 /*
  * __wt_log_slot_join --
- *	Join a consolidated logging slot. Callers should be prepared to deal
- *	with a ENOMEM return - which indicates no slots could accommodate
- *	the log record.
+ *	Join a consolidated logging slot.
  */
 int
 __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
@@ -187,11 +223,18 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	/*
 	 * Make sure the length cannot overflow.
 	 */
-	if (mysize >= (uint64_t)WT_LOG_SLOT_MAXIMUM) {
-		WT_STAT_FAST_CONN_INCR(session, log_slot_toobig);
-		return (ENOMEM);
-	}
+	WT_ASSERT(session, mysize < WT_LOG_SLOT_MAXIMUM);
 
+	/*
+	 * If we're doing direct writes, there may not be a slot active.
+	 * Verify we're from the worker thread.  There is nothing to do
+	 * so just return.
+	 */
+	if (log->active_slot == NULL) {
+		WT_ASSERT(session, !F_ISSET(log,  WT_LOG_FORCE_CONSOLIDATE));
+		WT_ASSERT(session, mysize == 0);
+		return (0);
+	}
 	/*
 	 * There should almost always be a slot open.
 	 */

@@ -238,7 +238,7 @@ extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_log_truncate_files( WT_SESSION_IMPL *session, WT_CURSOR *cursor, const char *cfg[]);
 extern int __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i);
-extern int __wt_log_force_write(WT_SESSION_IMPL *session);
+extern int __wt_log_force_write(WT_SESSION_IMPL *session, int new_slot);
 extern int __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_logmgr_open(WT_SESSION_IMPL *session);
 extern int __wt_logmgr_destroy(WT_SESSION_IMPL *session);
@@ -357,7 +357,9 @@ extern int __wt_logop_row_truncate_pack( WT_SESSION_IMPL *session, WT_ITEM *logr
 extern int __wt_logop_row_truncate_unpack( WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, uint32_t *fileidp, WT_ITEM *startp, WT_ITEM *stopp, uint32_t *modep);
 extern int __wt_logop_row_truncate_print( WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out);
 extern int __wt_txn_op_printlog( WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out);
+extern int __wt_log_slot_close(WT_SESSION_IMPL *session, wt_off_t new_offset, int *rel);
 extern int __wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset, int *rel);
+extern int __wt_log_slot_new(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_destroy(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, WT_MYSLOT *myslotp);

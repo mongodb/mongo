@@ -405,6 +405,8 @@ __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 
 	slot->slot_error = 0;
 	slot->slot_fh = log->log_fh;
+	slot->slot_state = 0;
+	slot->slot_unbuffered = 0;
 	return (0);
 }
 
@@ -1074,8 +1076,12 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	conn = S2C(session);
 	log = conn->log;
 	locked = yield_count = 0;
-	*freep = 1;
-	release_bytes = WT_LOG_SLOT_RELEASED(slot->slot_state);
+	if (freep != NULL)
+		*freep = 1;
+	if (F_ISSET(slot, WT_SLOT_BUFFERED))
+		release_bytes = WT_LOG_SLOT_RELEASED(slot->slot_state);
+	else
+		release_bytes = slot->slot_direct_size;
 
 	/* Write the buffered records */
 	/*
@@ -1108,7 +1114,8 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 */
 	if (F_ISSET(slot, WT_SLOT_BUFFERED) &&
 	    !F_ISSET(slot, WT_SLOT_SYNC | WT_SLOT_SYNC_DIR)) {
-		*freep = 0;
+		if (freep != NULL)
+			*freep = 0;
 		slot->slot_state = WT_LOG_SLOT_WRITTEN;
 		/*
 		 * After this point the worker thread owns the slot.  There
@@ -1129,6 +1136,14 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 */
 	WT_STAT_FAST_CONN_INCR(session, log_release_write_lsn);
 	while (WT_LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0) {
+		if (WT_LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) > 0) {
+			__wt_errx(session, "RELEASE: write_lsn %d/%lu",
+			    log->write_lsn.file, log->write_lsn.offset);
+			__wt_errx(session, "RELEASE: release_lsn %d/%lu",
+			    slot->slot_release_lsn.file,
+			    slot->slot_release_lsn.offset);
+			abort();
+		}
 		if (++yield_count < 1000)
 			__wt_yield();
 		else
@@ -1137,6 +1152,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	}
 	log->write_start_lsn = slot->slot_start_lsn;
 	log->write_lsn = slot->slot_end_lsn;
+
 	WT_ASSERT(session, slot != log->active_slot);
 	WT_ERR(__wt_cond_signal(session, log->log_write_cond));
 
@@ -1245,9 +1261,9 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 		__wt_yield();
 	}
 	log->log_close_fh = log->log_fh;
-	log->log_close_lsn = log->alloc_lsn;
+	if (log->log_close_fh != NULL)
+		log->log_close_lsn = log->alloc_lsn;
 	log->fileid++;
-
 	/*
 	 * If we're pre-allocating log files, look for one.  If there aren't any
 	 * or we're not pre-allocating, then create one.
@@ -1583,42 +1599,61 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 
 /*
  * __log_direct_write --
- *	Write a log record without using the consolidation arrays.
+ *	Write a log record without using the consolidation slots.  We
+ *	must hold the direct lock for writing.
  */
 static int
 __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
     uint32_t flags)
 {
-	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOGSLOT tmp;
 	WT_MYSLOT myslot;
-	int dummy, locked;
 
 	log = S2C(session)->log;
 	myslot.slot = &tmp;
 	myslot.offset = 0;
-	dummy = 0;
 	WT_CLEAR(tmp);
 
-	/* Fast path the contended case. */
-	if (__wt_spin_trylock(session, &log->log_slot_lock) != 0)
-		return (EAGAIN);
-	locked = 1;
-
+	/*
+	 * Set up the flags in the temporary slot.
+	 */
 	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC))
 		F_SET(&tmp, WT_SLOT_SYNC_DIR);
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(&tmp, WT_SLOT_SYNC);
-	WT_ERR(__wt_log_acquire(session, record->size, &tmp));
-	__wt_spin_unlock(session, &log->log_slot_lock);
-	locked = 0;
-	WT_ERR(__log_fill(session, &myslot, 1, record, lsnp));
-	WT_ERR(__wt_log_release(session, &tmp, &dummy));
-
-err:	if (locked)
-		__wt_spin_unlock(session, &log->log_slot_lock);
-	return (ret);
+	/*
+	 * Join the existing slot to force it out.
+	 */
+	if (F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE))
+		WT_RET(__wt_log_force_write(session, 0));
+	/*
+	 * Set up the temporary slot with the correct LSN information.
+	 * Set our size in the slot for release.
+	 */
+	WT_ASSERT(session, WT_LOG_CMP(&log->write_lsn, &log->alloc_lsn) == 0);
+	WT_RET(__wt_log_acquire(session, record->size, &tmp));
+	if (WT_LOG_CMP(&log->write_lsn, &tmp.slot_release_lsn) > 0) {
+		__wt_errx(session, "DIRECT: write_lsn %d/%lu",
+		    log->write_lsn.file, log->write_lsn.offset);
+		__wt_errx(session, "DIRECT: release_lsn %d/%lu",
+		    tmp.slot_release_lsn.file,
+		    tmp.slot_release_lsn.offset);
+		abort();
+	}
+	tmp.slot_end_lsn.offset += record->size;
+	tmp.slot_direct_size = record->size;
+	WT_RET(__log_fill(session, &myslot, 1, record, lsnp));
+	WT_RET(__wt_log_release(session, myslot.slot, NULL));
+	log->alloc_lsn = tmp.slot_end_lsn;
+	/*
+	 * Now that we have written our buffer, we can set up a new slot.
+	 * This is split out from the forced write call so that the LSN
+	 * values reflect our write.
+	 */
+	if (F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE))
+		WT_RET(__wt_log_slot_new(session));
+	return (0);
 }
 
 /*
@@ -1770,7 +1805,8 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 	conn = S2C(session);
 	log = conn->log;
-	free_slot = locked = 0;
+	free_slot = 0;
+	locked = WT_NOT_LOCKED;
 	WT_INIT_LSN(&lsn);
 	myslot.slot = NULL;
 	/*
@@ -1802,11 +1838,26 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 	WT_STAT_FAST_CONN_INCR(session, log_writes);
 
-F_SET(log, WT_LOG_FORCE_CONSOLIDATE);
-	/* XXX */
 	if (!F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE) ||
-	    rdup_len > WT_LOG_SLOT_MAXIMUM) {
+	    rdup_len >= WT_LOG_SLOT_MAXIMUM) {
+		/*
+		 * Large records must use direct write.
+		 */
+		if (rdup_len >= WT_LOG_SLOT_MAXIMUM) {
+			WT_STAT_FAST_CONN_INCR(session, log_slot_toobig);
+			WT_ERR(__wt_writelock(session, log->log_direct_lock));
+		} else {
+			ret = __wt_try_writelock(session, log->log_direct_lock);
+			if (ret != 0) {
+				F_SET(log, WT_LOG_FORCE_CONSOLIDATE);
+				WT_ERR(__wt_log_slot_new(session));
+				goto use_slots;
+			}
+		}
+		locked = WT_WRITE_LOCKED;
 		ret = __log_direct_write(session, record, &lsn, flags);
+		WT_ERR(__wt_writeunlock(session, log->log_direct_lock));
+		locked = WT_NOT_LOCKED;
 		if (ret == 0 && lsnp != NULL)
 			*lsnp = lsn;
 		/*
@@ -1819,34 +1870,18 @@ F_SET(log, WT_LOG_FORCE_CONSOLIDATE);
 			else
 				return (0);
 		}
-		if (ret != EAGAIN)
-			WT_ERR(ret);
-		/*
-		 * An EAGAIN return means we failed to get the try lock -
-		 * fall through to the consolidation code in that case.
-		 */
 	}
 
+use_slots:
 	/*
 	 * As soon as we see contention for the log slot, disable direct
 	 * log writes. We get better performance by forcing writes through
 	 * the consolidation code. This is because individual writes flood
 	 * the I/O system faster than they contend on the log slot lock.
 	 */
-	F_SET(log, WT_LOG_FORCE_CONSOLIDATE);
-	if ((ret = __wt_log_slot_join(
-	    session, rdup_len, flags, &myslot)) == ENOMEM) {
-		/*
-		 * If we couldn't find a consolidated slot for this record
-		 * write the record directly. XXX
-		 */
-		while ((ret = __log_direct_write(
-		    session, record, lsnp, flags)) == EAGAIN)
-			;
-		WT_ERR(ret);
-		return (0);
-	}
-	WT_ERR(ret);
+	WT_ERR(__wt_readlock(session, log->log_direct_lock));
+	locked = WT_READ_LOCKED;
+	WT_ERR(__wt_log_slot_join(session, rdup_len, flags, &myslot));
 	/*
 	 * If the addition of this record crosses the buffer boundary,
 	 * switch in a new slot.
@@ -1870,8 +1905,10 @@ F_SET(log, WT_LOG_FORCE_CONSOLIDATE);
 			WT_ERR(__wt_cond_signal(session, conn->log_cond));
 			__wt_yield();
 		} else
-			WT_ERR(__wt_log_force_write(session));
+			WT_ERR(__wt_log_force_write(session, 1));
 	}
+	WT_ERR(__wt_readunlock(session, log->log_direct_lock));
+	locked = WT_NOT_LOCKED;
 	if (LF_ISSET(WT_LOG_FLUSH)) {
 		/* Wait for our writes to reach the OS */
 		while (WT_LOG_CMP(&log->write_lsn, &lsn) <= 0 &&
@@ -1893,8 +1930,12 @@ bg:	if (LF_ISSET(WT_LOG_BACKGROUND) &&
 	    WT_LOG_CMP(&session->bg_sync_lsn, &lsn) <= 0)
 		WT_ERR(__wt_log_background(session, &lsn));
 
-err:	if (locked)
-		__wt_spin_unlock(session, &log->log_slot_lock);
+err:	if (locked != WT_NOT_LOCKED) {
+		if (locked == WT_READ_LOCKED)
+			WT_RET(__wt_readunlock(session, log->log_direct_lock));
+		else
+			WT_RET(__wt_writeunlock(session, log->log_direct_lock));
+	}
 	if (ret == 0 && lsnp != NULL)
 		*lsnp = lsn;
 	/*
