@@ -93,7 +93,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         time.sleep(5)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close1 = stat_cursor[stat.conn.dh_conn_handles][2]
+        close1 = stat_cursor[stat.conn.dh_conn_handles_closed][2]
         sweep1 = stat_cursor[stat.conn.dh_conn_sweeps][2]
         stat_cursor.close()
 
@@ -127,7 +127,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # Grab the stats post table drop to see things have decremented
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache2 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        close2 = stat_cursor[stat.conn.dh_conn_handles][2]
+        close2 = stat_cursor[stat.conn.dh_conn_handles_closed][2]
         sweep2 = stat_cursor[stat.conn.dh_conn_sweeps][2]
         stat_cursor.close()
 
@@ -151,7 +151,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # We just filled the table, now check what the stats are
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache1 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        close1 = stat_cursor[stat.conn.dh_conn_handles][2]
+        close1 = stat_cursor[stat.conn.dh_conn_handles_closed][2]
         sweep1 = stat_cursor[stat.conn.dh_conn_sweeps][2]
         stat_cursor.close()
 
@@ -162,7 +162,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # Grab the stats post table drop to see things have decremented
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache2 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        close2 = stat_cursor[stat.conn.dh_conn_handles][2]
+        close2 = stat_cursor[stat.conn.dh_conn_handles_closed][2]
         sweep2 = stat_cursor[stat.conn.dh_conn_sweeps][2]
         stat_cursor.close()
 
