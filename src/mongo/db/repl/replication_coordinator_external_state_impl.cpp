@@ -354,10 +354,10 @@ void ReplicationCoordinatorExternalStateImpl::dropAllSnapshots() {
         manager->dropAllSnapshots();
 }
 
-void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(OpTime newCommitPoint) {
+void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(SnapshotName newCommitPoint) {
     auto manager = getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager();
     invariant(manager);  // This should never be called if there is no SnapshotManager.
-    manager->setCommittedSnapshot(SnapshotName(newCommitPoint.getTimestamp()));
+    manager->setCommittedSnapshot(newCommitPoint);
 }
 
 void ReplicationCoordinatorExternalStateImpl::forceSnapshotCreation() {

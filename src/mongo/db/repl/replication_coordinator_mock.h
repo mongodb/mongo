@@ -31,6 +31,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 namespace repl {
@@ -204,11 +205,14 @@ public:
 
     virtual Status updateTerm(long long term);
 
-    virtual void onSnapshotCreate(OpTime timeOfSnapshot);
+    virtual SnapshotName reserveSnapshotName();
+
+    virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name);
 
     virtual void dropAllSnapshots() override;
 
 private:
+    AtomicUInt64 _snapshotNameGenerator;
     const ReplSettings _settings;
     MemberState _memberState;
     OpTime _myLastOpTime;

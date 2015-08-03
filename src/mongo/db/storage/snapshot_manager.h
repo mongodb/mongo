@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <limits>
 #include <string>
 
 #include "mongo/base/status.h"
@@ -41,42 +42,43 @@ class RecoveryUnit;
 
 class SnapshotName {
 public:
-    explicit SnapshotName(Timestamp ts) : _ts(ts) {
-        invariant(!_ts.isNull());
+    explicit SnapshotName(uint64_t value) : _value(value) {}
+
+    /**
+     * Returns a SnapshotName guaranteed to compare > all others.
+     */
+    static SnapshotName max() {
+        return SnapshotName(std::numeric_limits<uint64_t>::max());
     }
 
     /**
      * Returns an unsigned number that compares with the same ordering as the SnapshotName.
      */
     uint64_t asU64() const {
-        return _ts.asULL();
-    }
-
-    Timestamp timestamp() const {
-        return _ts;
+        return _value;
     }
 
     bool operator==(const SnapshotName& rhs) const {
-        return _ts == rhs._ts;
+        return _value == rhs._value;
     }
     bool operator!=(const SnapshotName& rhs) const {
-        return _ts != rhs._ts;
+        return _value != rhs._value;
     }
     bool operator<(const SnapshotName& rhs) const {
-        return _ts < rhs._ts;
+        return _value < rhs._value;
     }
     bool operator<=(const SnapshotName& rhs) const {
-        return _ts <= rhs._ts;
+        return _value <= rhs._value;
     }
     bool operator>(const SnapshotName& rhs) const {
-        return _ts > rhs._ts;
+        return _value > rhs._value;
     }
     bool operator>=(const SnapshotName& rhs) const {
-        return _ts >= rhs._ts;
+        return _value >= rhs._value;
     }
 
 private:
-    Timestamp _ts;
+    uint64_t _value;
 };
 
 /**

@@ -46,6 +46,7 @@ class IndexDescriptor;
 class NamespaceString;
 class OperationContext;
 class ServiceContext;
+class SnapshotName;
 class Timestamp;
 struct WriteConcernOptions;
 
@@ -636,9 +637,17 @@ public:
     virtual Status updateTerm(long long term) = 0;
 
     /**
+     * Reserves a unique SnapshotName.
+     *
+     * This name is guaranteed to compare > all names reserved before and < all names reserved
+     * after.
+     */
+    virtual SnapshotName reserveSnapshotName() = 0;
+
+    /**
      * Called when a new snapshot is created.
      */
-    virtual void onSnapshotCreate(OpTime timeOfSnapshot) = 0;
+    virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) = 0;
 
     /**
      * Resets all information related to snapshotting.

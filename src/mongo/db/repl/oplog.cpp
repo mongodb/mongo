@@ -953,10 +953,18 @@ void SnapshotThread::run() {
                 continue;
             }
 
+            SnapshotName name(0); // assigned real value in block.
             {
                 // Make sure there are no in-flight capped inserts while we create our snapshot.
                 Lock::ResourceLock cappedInsertLock(
                     txn->lockState(), resourceCappedInFlight, MODE_X);
+
+                // Reserve the name immediately before we take our snapshot. This ensures that all
+                // names that compare lower must be from points in time visible to this named
+                // snapshot.
+                name = replCoord->reserveSnapshotName();
+
+                // This establishes the view that we will name.
                 _manager->prepareForCreateSnapshot(txn.get());
             }
 
@@ -975,8 +983,8 @@ void SnapshotThread::run() {
                 invariant(!opTimeOfSnapshot.isNull());
             }
 
-            _manager->createSnapshot(txn.get(), SnapshotName(opTimeOfSnapshot.getTimestamp()));
-            replCoord->onSnapshotCreate(opTimeOfSnapshot);
+            _manager->createSnapshot(txn.get(), name);
+            replCoord->onSnapshotCreate(opTimeOfSnapshot, name);
         } catch (const WriteConflictException& wce) {
             log() << "skipping storage snapshot pass due to write conflict";
             continue;

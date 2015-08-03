@@ -250,7 +250,7 @@ ReplicaSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
 OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshot_forTest() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_currentCommittedSnapshot) {
-        return *_currentCommittedSnapshot;
+        return _currentCommittedSnapshot->opTime;
     }
     return OpTime();
 }
@@ -813,8 +813,9 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
     bool isMajorityReadConcern =
         settings.getLevel() == ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern;
     auto loopCondition = [this, isMajorityReadConcern, ts] {
-        return isMajorityReadConcern ? !_currentCommittedSnapshot || ts > *_currentCommittedSnapshot
-                                     : ts > _getMyLastOptime_inlock();
+        return isMajorityReadConcern
+            ? !_currentCommittedSnapshot || ts > _currentCommittedSnapshot->opTime
+            : ts > _getMyLastOptime_inlock();
     };
 
     while (loopCondition()) {
@@ -980,7 +981,7 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
                 if (!_currentCommittedSnapshot) {
                     return false;
                 }
-                return opTime <= *_currentCommittedSnapshot;
+                return opTime <= _currentCommittedSnapshot->opTime;
             } else {
                 patternName = ReplicaSetConfig::kMajorityWriteConcernModeName;
             }
@@ -2586,12 +2587,13 @@ void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& co
 
     _lastCommittedOpTime = committedOpTime;
 
-    if (!_uncommittedSnapshots.empty() && _uncommittedSnapshots.front() <= committedOpTime) {
+    auto maxSnapshotForOpTime = SnapshotInfo{committedOpTime, SnapshotName::max()};
+    if (!_uncommittedSnapshots.empty() && _uncommittedSnapshots.front() <= maxSnapshotForOpTime) {
         // At least one uncommitted snapshot is ready to be blessed as committed.
 
         // Seek to the first entry > the commit point. Previous element must be <=.
         const auto onePastCommitPoint = std::upper_bound(
-            _uncommittedSnapshots.begin(), _uncommittedSnapshots.end(), committedOpTime);
+            _uncommittedSnapshots.begin(), _uncommittedSnapshots.end(), maxSnapshotForOpTime);
         const auto newSnapshot = *std::prev(onePastCommitPoint);
 
         // Forget about all snapshots <= the new commit point.
@@ -2915,37 +2917,47 @@ bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term, Handle* 
     return updated;
 }
 
-void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot) {
+SnapshotName ReplicationCoordinatorImpl::reserveSnapshotName() {
+    return SnapshotName(_snapshotNameGenerator.addAndFetch(1));
+}
+
+void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+    auto snapshotInfo = SnapshotInfo{timeOfSnapshot, name};
 
     if (timeOfSnapshot <= _lastCommittedOpTime) {
         // This snapshot is ready to be marked as committed.
         invariant(_uncommittedSnapshots.empty());
-        _updateCommittedSnapshot_inlock(timeOfSnapshot);
+        _updateCommittedSnapshot_inlock(snapshotInfo);
         return;
     }
 
     if (!_uncommittedSnapshots.empty()) {
-        if (timeOfSnapshot == _uncommittedSnapshots.back()) {
-            // This is already in the set. Don't want to double add.
-            return;
-        }
-        invariant(timeOfSnapshot > _uncommittedSnapshots.back());
+        invariant(snapshotInfo > _uncommittedSnapshots.back());
+        // The name must independently be newer.
+        invariant(snapshotInfo.name > _uncommittedSnapshots.back().name);
+        // Technically, we could delete older snapshots from the same optime since we will only ever
+        // want the newest. However, multiple snapshots on the same optime will be very rare so it
+        // isn't worth the effort and potential bugs that would introduce.
     }
-    _uncommittedSnapshots.push_back(timeOfSnapshot);
+    _uncommittedSnapshots.push_back(snapshotInfo);
 }
 
-void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(OpTime newCommittedSnapshot) {
-    invariant(!newCommittedSnapshot.isNull());
-    invariant(newCommittedSnapshot <= _lastCommittedOpTime);
-    if (_currentCommittedSnapshot)
-        invariant(newCommittedSnapshot >= *_currentCommittedSnapshot);
+void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
+    SnapshotInfo newCommittedSnapshot) {
+    invariant(!newCommittedSnapshot.opTime.isNull());
+    invariant(newCommittedSnapshot.opTime <= _lastCommittedOpTime);
+    if (_currentCommittedSnapshot) {
+        invariant(newCommittedSnapshot.opTime >= _currentCommittedSnapshot->opTime);
+        invariant(newCommittedSnapshot.name > _currentCommittedSnapshot->name);
+    }
     if (!_uncommittedSnapshots.empty())
         invariant(newCommittedSnapshot < _uncommittedSnapshots.front());
 
     _currentCommittedSnapshot = newCommittedSnapshot;
 
-    _externalState->updateCommittedSnapshot(newCommittedSnapshot);
+    _externalState->updateCommittedSnapshot(newCommittedSnapshot.name);
 
     // Wake up any threads waiting for read concern or write concern.
     _wakeReadyWaiters_inlock();

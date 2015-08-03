@@ -652,7 +652,7 @@ TEST_F(ReplCoordTest, AwaitReplicationNamedModesNonBlocking) {
     // Majority satisfied but not either custom mode
     getReplCoord()->setLastOptime_forTest(2, 1, time1);
     getReplCoord()->setLastOptime_forTest(2, 2, time1);
-    getReplCoord()->onSnapshotCreate(time1);
+    getReplCoord()->onSnapshotCreate(time1, SnapshotName(1));
 
     statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
     ASSERT_OK(statusAndDur.status);
@@ -1909,7 +1909,7 @@ TEST_F(ReplCoordTest, AwaitReplicationReconfigToSmallerMajority) {
     OpTime time(Timestamp(100, 2), 1);
 
     getReplCoord()->setMyLastOptime(time);
-    getReplCoord()->onSnapshotCreate(time);
+    getReplCoord()->onSnapshotCreate(time, SnapshotName(1));
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(2, 1, time));
 
 
@@ -2006,7 +2006,7 @@ TEST_F(ReplCoordTest, AwaitReplicationMajority) {
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                   getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
 
-    getReplCoord()->onSnapshotCreate(time);
+    getReplCoord()->onSnapshotCreate(time, SnapshotName(1));
     ASSERT_OK(getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
 }
 
@@ -2239,7 +2239,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedGreaterOpTime) {
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
 
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
-    getReplCoord()->onSnapshotCreate(OpTime(Timestamp(100, 0), 0));
+    getReplCoord()->onSnapshotCreate(OpTime(Timestamp(100, 0), 0), SnapshotName(1));
     auto result = getReplCoord()->waitUntilOpTime(
         &txn,
         ReadConcernArgs(OpTime(Timestamp(50, 0), 0),
@@ -2262,7 +2262,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedEqualOpTime) {
 
     OpTime time(Timestamp(100, 0), 0);
     getReplCoord()->setMyLastOptime(time);
-    getReplCoord()->onSnapshotCreate(time);
+    getReplCoord()->onSnapshotCreate(time, SnapshotName(1));
     auto result = getReplCoord()->waitUntilOpTime(
         &txn, ReadConcernArgs(time, ReadConcernArgs::ReadConcernLevel::kMajorityReadConcern));
 
@@ -2282,12 +2282,13 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
 
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(0, 0), 0));
     OpTime committedOpTime(Timestamp(200, 0), 0);
-    auto pseudoLogOp = stdx::async(stdx::launch::async,
-                                   [this, &committedOpTime]() {
-                                       // Not guaranteed to be scheduled after waitUntil blocks...
-                                       getReplCoord()->setMyLastOptime(committedOpTime);
-                                       getReplCoord()->onSnapshotCreate(committedOpTime);
-                                   });
+    auto pseudoLogOp =
+        stdx::async(stdx::launch::async,
+                    [this, &committedOpTime]() {
+                        // Not guaranteed to be scheduled after waitUntil blocks...
+                        getReplCoord()->setMyLastOptime(committedOpTime);
+                        getReplCoord()->onSnapshotCreate(committedOpTime, SnapshotName(1));
+                    });
 
     auto result = getReplCoord()->waitUntilOpTime(
         &txn,
@@ -2313,12 +2314,13 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
 
     OpTime opTimeToWait(Timestamp(100, 0), 0);
 
-    auto pseudoLogOp = stdx::async(stdx::launch::async,
-                                   [this, &opTimeToWait]() {
-                                       // Not guaranteed to be scheduled after waitUntil blocks...
-                                       getReplCoord()->setMyLastOptime(opTimeToWait);
-                                       getReplCoord()->onSnapshotCreate(opTimeToWait);
-                                   });
+    auto pseudoLogOp =
+        stdx::async(stdx::launch::async,
+                    [this, &opTimeToWait]() {
+                        // Not guaranteed to be scheduled after waitUntil blocks...
+                        getReplCoord()->setMyLastOptime(opTimeToWait);
+                        getReplCoord()->onSnapshotCreate(opTimeToWait, SnapshotName(1));
+                    });
 
     auto result = getReplCoord()->waitUntilOpTime(
         &txn,
@@ -2384,7 +2386,7 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
 
     OpTime time(Timestamp(10, 0), 1);
-    getReplCoord()->onSnapshotCreate(time);
+    getReplCoord()->onSnapshotCreate(time, SnapshotName(1));
 
     // higher OpTime, should change
     ReplicationMetadata metadata;
@@ -2474,9 +2476,9 @@ TEST_F(ReplCoordTest, SnapshotCommitting) {
     OpTime time5(Timestamp(100, 5), 1);
     OpTime time6(Timestamp(100, 6), 1);
 
-    getReplCoord()->onSnapshotCreate(time1);
-    getReplCoord()->onSnapshotCreate(time2);
-    getReplCoord()->onSnapshotCreate(time5);
+    getReplCoord()->onSnapshotCreate(time1, SnapshotName(1));
+    getReplCoord()->onSnapshotCreate(time2, SnapshotName(2));
+    getReplCoord()->onSnapshotCreate(time5, SnapshotName(3));
 
     // ensure current snapshot follows price is right rules (closest but not greater than)
     getReplCoord()->setMyLastOptime(time3);
@@ -2489,7 +2491,7 @@ TEST_F(ReplCoordTest, SnapshotCommitting) {
     ASSERT_EQUALS(time5, getReplCoord()->getCurrentCommittedSnapshot_forTest());
 
     // ensure current snapshot updates on new snapshot if we are that far
-    getReplCoord()->onSnapshotCreate(time6);
+    getReplCoord()->onSnapshotCreate(time6, SnapshotName(4));
     ASSERT_EQUALS(time6, getReplCoord()->getCurrentCommittedSnapshot_forTest());
 
     // ensure dropping all snapshots should reset the current committed snapshot

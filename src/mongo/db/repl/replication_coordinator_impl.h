@@ -43,6 +43,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
@@ -270,7 +271,9 @@ public:
 
     virtual Status updateTerm(long long term) override;
 
-    virtual void onSnapshotCreate(OpTime timeOfSnapshot) override;
+    virtual SnapshotName reserveSnapshotName() override;
+
+    virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) override;
 
     // ================== Test support API ===================
 
@@ -298,6 +301,30 @@ public:
     bool updateTerm_forTest(long long term);
 
 private:
+    struct SnapshotInfo {
+        OpTime opTime;
+        SnapshotName name;
+
+        bool operator==(const SnapshotInfo& other) const {
+            return std::tie(opTime, name) == std::tie(other.opTime, other.name);
+        }
+        bool operator!=(const SnapshotInfo& other) const {
+            return std::tie(opTime, name) != std::tie(other.opTime, other.name);
+        }
+        bool operator<(const SnapshotInfo& other) const {
+            return std::tie(opTime, name) < std::tie(other.opTime, other.name);
+        }
+        bool operator<=(const SnapshotInfo& other) const {
+            return std::tie(opTime, name) <= std::tie(other.opTime, other.name);
+        }
+        bool operator>(const SnapshotInfo& other) const {
+            return std::tie(opTime, name) > std::tie(other.opTime, other.name);
+        }
+        bool operator>=(const SnapshotInfo& other) const {
+            return std::tie(opTime, name) >= std::tie(other.opTime, other.name);
+        }
+    };
+
     ReplicationCoordinatorImpl(const ReplSettings& settings,
                                ReplicationCoordinatorExternalState* externalState,
                                TopologyCoordinator* topCoord,
@@ -920,7 +947,7 @@ private:
     /**
      * Blesses a snapshot to be used for new committed reads.
      */
-    void _updateCommittedSnapshot_inlock(OpTime newCommittedSnapshot);
+    void _updateCommittedSnapshot_inlock(SnapshotInfo newCommittedSnapshot);
 
     /**
      * Drops all snapshots and clears the "committed" snapshot.
@@ -1072,12 +1099,17 @@ private:
     // Data Replicator used to replicate data
     DataReplicator _dr;  // (S)
 
-    // The OpTimes for all snapshots newer than the current commit point, kept in sorted order.
-    std::deque<OpTime> _uncommittedSnapshots;  // (M)
+    // Hands out the next snapshot name.
+    AtomicUInt64 _snapshotNameGenerator;  // (S)
 
-    // The non-null OpTime of the current snapshot used for committed reads, if there is one. When
-    // engaged, this must be <= _lastCommittedOpTime and < _uncommittedSnapshots.front().
-    boost::optional<OpTime> _currentCommittedSnapshot;  // (M)
+    // The OpTimes and SnapshotNames for all snapshots newer than the current commit point, kept in
+    // sorted order.
+    std::deque<SnapshotInfo> _uncommittedSnapshots;  // (M)
+
+    // The non-null OpTime and SnapshotName of the current snapshot used for committed reads, if
+    // there is one.
+    // When engaged, this must be <= _lastCommittedOpTime and < _uncommittedSnapshots.front().
+    boost::optional<SnapshotInfo> _currentCommittedSnapshot;  // (M)
 };
 
 }  // namespace repl

@@ -36,6 +36,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_response.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -357,7 +358,11 @@ Status ReplicationCoordinatorMock::updateTerm(long long term) {
     return Status::OK();
 }
 
-void ReplicationCoordinatorMock::onSnapshotCreate(OpTime timeOfSnapshot) {}
+SnapshotName ReplicationCoordinatorMock::reserveSnapshotName() {
+    return SnapshotName(_snapshotNameGenerator.addAndFetch(1));
+}
+
+void ReplicationCoordinatorMock::onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) {}
 
 void ReplicationCoordinatorMock::dropAllSnapshots() {}
 

@@ -40,6 +40,7 @@ namespace mongo {
 class BSONObj;
 class OID;
 class OperationContext;
+class SnapshotName;
 class Status;
 struct HostAndPort;
 template <typename T>
@@ -202,7 +203,7 @@ public:
      *
      * It is illegal to call with a newCommitPoint that does not name an existing snapshot.
      */
-    virtual void updateCommittedSnapshot(OpTime newCommitPoint) = 0;
+    virtual void updateCommittedSnapshot(SnapshotName newCommitPoint) = 0;
 
     /**
      * Signals the SnapshotThread, if running, to take a forced snapshot even if the global

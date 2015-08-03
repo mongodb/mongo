@@ -74,7 +74,7 @@ public:
             return appendCommandStatus(result, {ErrorCodes::CommandNotSupported, ""});
         }
 
-        const auto name = SnapshotName(cmdObj.firstElement().timestamp());
+        const auto name = SnapshotName(cmdObj.firstElement().Long());
 
         ScopedTransaction st(txn, MODE_IX);
         Lock::GlobalLock lk(txn->lockState(), MODE_IX, UINT_MAX);
@@ -124,7 +124,7 @@ public:
 
         ScopedTransaction st(txn, MODE_IX);
         Lock::GlobalLock lk(txn->lockState(), MODE_IX, UINT_MAX);
-        auto name = SnapshotName(cmdObj.firstElement().timestamp());
+        auto name = SnapshotName(cmdObj.firstElement().Long());
         snapshotManager->setCommittedSnapshot(name);
         return true;
     }

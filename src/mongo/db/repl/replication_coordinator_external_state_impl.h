@@ -71,7 +71,7 @@ public:
     virtual OperationContext* createOperationContext(const std::string& threadName);
     virtual void dropAllTempCollections(OperationContext* txn);
     void dropAllSnapshots() final;
-    void updateCommittedSnapshot(OpTime newCommitPoint) final;
+    void updateCommittedSnapshot(SnapshotName newCommitPoint) final;
     void forceSnapshotCreation() final;
     virtual bool snapshotsEnabled() const;
 

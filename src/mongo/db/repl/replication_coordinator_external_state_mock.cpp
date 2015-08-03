@@ -36,6 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
+#include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 
@@ -186,7 +187,8 @@ void ReplicationCoordinatorExternalStateMock::dropAllTempCollections(OperationCo
 
 void ReplicationCoordinatorExternalStateMock::dropAllSnapshots() {}
 
-void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(OpTime newCommitPoint) {}
+void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(SnapshotName newCommitPoint) {
+}
 
 void ReplicationCoordinatorExternalStateMock::forceSnapshotCreation() {}
 
