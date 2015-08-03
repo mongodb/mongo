@@ -869,15 +869,10 @@ __rec_block_free(
 	WT_BM *bm;
 	WT_BTREE *btree;
 
-	btree= S2BT(session);
+	btree = S2BT(session);
 	bm = btree->bm;
 
-	if (!F_ISSET(btree, WT_BTREE_LAS_FILE))
-		WT_RET(__wt_las_remove_block(session, addr, addr_size));
-
-	WT_RET(bm->free(bm, session, addr, addr_size));
-
-	return (0);
+	return (bm->free(bm, session, addr, addr_size));
 }
 
 /*
@@ -3194,6 +3189,28 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 	 * Enter each update in the boundary list into the lookaside store.
 	 */
 	for (i = 0, list = bnd->skip; i < bnd->skip_next; ++i, ++list) {
+		/*
+		 * Each key in the lookaside file is associated with a block,
+		 * and those blocks are freed and reallocated to other pages
+		 * as pages in the tree are modified and reconciled. We want
+		 * to be sure we don't add records to the lookaside file, then
+		 * discard the block to which they apply, then write a new
+		 * block to the same address, and then apply the old records
+		 * to the new block when it's read. We don't want to clean old
+		 * records out of the lookaside file every time we free a block
+		 * because that happens a lot and would be costly; instead, we
+		 * clean out the old records when adding new records into the
+		 * lookaside file. This works because we only read from the
+		 * lookaside file for pages marked with the WT_PAGE_LAS_UPDATE
+		 * flag. If we rewrite a block that has no lookaside records,
+		 * the block won't have that flag set and so the lookaside file
+		 * won't be checked when the block is read. If we rewrite a
+		 * block that has lookaside records, we'll run this code which
+		 * cleans out any old records.
+		 */
+		WT_ERR(__wt_las_remove_block(
+		    session, cursor, bnd->addr.addr, bnd->addr.size));
+
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:

@@ -50,8 +50,8 @@ __las_build_prefix(WT_SESSION_IMPL *session,
  *	Remove all records matching a key prefix from the lookaside store.
  */
 int
-__wt_las_remove_block(
-    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
+__wt_las_remove_block(WT_SESSION_IMPL *session,
+    WT_CURSOR *cursor_arg, const uint8_t *addr, size_t addr_size)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_ITEM(klas);
@@ -63,13 +63,6 @@ __wt_las_remove_block(
 
 	cursor = NULL;
 
-	/*
-	 * Called whenever a block is freed; if the lookaside store isn't yet
-	 * open, there's no work to do.
-	 */
-	if (S2C(session)->las_cursor == 0)
-		return (0);
-
 	/* Build the unique file/address prefix. */
 	__las_build_prefix(session, addr, addr_size, prefix, &prefix_len);
 
@@ -79,10 +72,11 @@ __wt_las_remove_block(
 	klas->size = prefix_len;
 
 	/*
-	 * Open a lookaside table cursor and search for the matching prefix,
-	 * stepping through any matching records.
+	 * If not provided a lookaside file cursor, open one. Search for the
+	 * matching prefix and step through all matching records, removing them.
 	 */
-	WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
+	if ((cursor = cursor_arg) == NULL)
+		WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
 	cursor->set_key(cursor, klas);
 	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
 		ret = cursor->next(cursor);
@@ -101,7 +95,8 @@ __wt_las_remove_block(
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
+err:	if (cursor_arg == NULL)
+		WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
 
 	__wt_scr_free(session, &klas);
 	return (ret);
@@ -405,7 +400,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * the lookaside file.
 	 */
 	if (need_las_remove)
-		WT_ERR(__wt_las_remove_block(session, addr, addr_size));
+		WT_ERR(__wt_las_remove_block(session, NULL, addr, addr_size));
 
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 

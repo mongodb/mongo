@@ -108,9 +108,8 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
 	WT_TRET(wt_session->close(wt_session, NULL));
 
 	/*
-	 * Clear the references (this isn't just for clarity, the underlying
-	 * code uses the non-NULL cursor to determine if information in the
-	 * lookaside file needs to be updated as blocks are freed).
+	 * Clear the references, potentially used to determine if the lookaside
+	 * file is being used.
 	 */
 	conn->las_cursor = NULL;
 	conn->las_session = NULL;
