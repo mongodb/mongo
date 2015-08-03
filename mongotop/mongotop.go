@@ -34,6 +34,7 @@ func (mt *MongoTop) runDiff() (outDiff FormattableDiff, err error) {
 		return nil, err
 	}
 	defer session.Close()
+	session.SetSocketTimeout(0)
 
 	var currentServerStatus ServerStatus
 	var currentTop Top
