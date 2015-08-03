@@ -43,9 +43,10 @@ __insert_simple_func(WT_SESSION_IMPL *session,
 
 	/*
 	 * Update the skiplist elements referencing the new WT_INSERT item.
-	 * If we fail hooking into one of the upper levels in the skiplist,
-	 * just give up: we're not getting the benefit of the memory we
-	 * allocated, but we can't roll back.
+	 * If we fail connecting one of the upper levels in the skiplist,
+	 * return success: the levels we updated are correct and sufficient.
+	 * Even though we don't get the benefit of the memory we allocated,
+	 * we can't roll back.
 	 */
 	for (i = 0; i < skipdepth; i++)
 		if (!WT_ATOMIC_CAS8(*ins_stack[i], new_ins->next[i], new_ins))
@@ -69,9 +70,10 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 	 * Update the skiplist elements referencing the new WT_INSERT item.
 	 *
 	 * Confirm we are still in the expected position, and no item has been
-	 * added where our insert belongs.  If we fail hooking into one of the
-	 * upper levels in the skiplist, just give up: we're not getting the
-	 * benefit of the memory we allocated, but we can't roll back.
+	 * added where our insert belongs.  If we fail connecting one of the
+	 * upper levels in the skiplist, return success: the levels we updated
+	 * are correct and sufficient. Even though we don't get the benefit of
+	 * the memory we allocated, we can't roll back.
 	 */
 	for (i = 0; i < skipdepth; i++) {
 		if (!WT_ATOMIC_CAS8(*ins_stack[i], new_ins->next[i], new_ins))
