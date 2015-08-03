@@ -54,6 +54,7 @@ __insert_simple_func(WT_SESSION_IMPL *session,
 
 	return (0);
 }
+
 /*
  * __insert_serial_func --
  *	Worker function to add a WT_INSERT entry to a skiplist.
