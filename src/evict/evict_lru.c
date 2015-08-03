@@ -1245,6 +1245,9 @@ fast:		/* If the page can't be evicted, give up. */
 		WT_RET(__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "select: %p, size %" PRIu64, page, page->memory_footprint));
 	}
+	WT_RET_NOTFOUND_OK(ret);
+
+	*slotp += (u_int)(evict - start);
 
 	/*
 	 * If we happen to end up on the root page, clear it.  We have to track
@@ -1257,16 +1260,12 @@ fast:		/* If the page can't be evicted, give up. */
 	if ((ref = btree->evict_ref) != NULL && (__wt_ref_is_root(ref) ||
 	    ref->page->read_gen == WT_READGEN_OLDEST)) {
 		btree->evict_ref = NULL;
-		__wt_page_release(session, ref, WT_READ_NO_EVICT);
+		WT_RET(__wt_page_release(session, ref, WT_READ_NO_EVICT));
 	}
 
-	/* If the walk was interrupted by a locked page, that's okay. */
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-
-	*slotp += (u_int)(evict - start);
 	WT_STAT_FAST_CONN_INCRV(session, cache_eviction_walk, pages_walked);
-	return (ret);
+
+	return (0);
 }
 
 /*

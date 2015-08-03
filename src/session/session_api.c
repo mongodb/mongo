@@ -800,7 +800,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	WT_STAT_FAST_CONN_INCR(session, txn_commit);
 
 	txn = &session->txn;
-	if (F_ISSET(txn, WT_TXN_ERROR)) {
+	if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0) {
 		__wt_errx(session, "failed transaction requires rollback");
 		ret = EINVAL;
 	}
