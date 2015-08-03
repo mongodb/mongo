@@ -154,17 +154,16 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * This read lock can only be granted if the lock was last granted to
 	 * a reader and there are no readers or writers blocked on the lock,
 	 * that is, if this thread's ticket would be the next ticket granted.
-	 * Do the cheap check to see if this can possibly succeed.
+	 * Do the cheap test to see if this can possibly succeed (and confirm
+	 * the lock is in the correct state to grant this read lock).
 	 */
 	if (old.s.readers != old.s.users)
 		return (EBUSY);
 
 	/*
-	 * The old and new values for the lock: note the use of "users" instead
-	 * of "readers", this may not be the lock's current value, rather it's
-	 * the value the lock must have if we are to grant this read lock.
+	 * The replacement lock value is a result of allocating a new ticket and
+	 * incrementing the reader value to match it.
 	 */
-	old.s.readers = old.s.users;
 	new.s.readers = new.s.users = old.s.users + 1;
 	return (WT_ATOMIC_CAS8(l->u, old.u, new.u) ? 0 : EBUSY);
 }
@@ -260,17 +259,13 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * This write lock can only be granted if the lock was last granted to
 	 * a writer and there are no readers or writers blocked on the lock,
 	 * that is, if this thread's ticket would be the next ticket granted.
-	 * Do the cheap check to see if this can possibly succeed.
+	 * Do the cheap test to see if this can possibly succeed (and confirm
+	 * the lock is in the correct state to grant this write lock).
 	 */
 	if (old.s.writers != old.s.users)
 		return (EBUSY);
 
-	/*
-	 * The old and new values for the lock: note the use of "users" instead
-	 * of "writers", this may not be the lock's current value, rather it's
-	 * the value the lock must have if we are to grant this write lock.
-	 */
-	old.s.writers = new.s.writers = old.s.users;
+	/* The replacement lock value is a result of allocating a new ticket. */
 	++new.s.users;
 	return (WT_ATOMIC_CAS8(l->u, old.u, new.u) ? 0 : EBUSY);
 }
