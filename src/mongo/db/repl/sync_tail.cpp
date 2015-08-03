@@ -58,6 +58,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
@@ -70,14 +71,34 @@ using std::endl;
 
 namespace repl {
 #if defined(MONGO_PLATFORM_64)
-const int replWriterThreadCount = 16;
+int SyncTail::replWriterThreadCount = 16;
 const int replPrefetcherThreadCount = 16;
 #elif defined(MONGO_PLATFORM_32)
-const int replWriterThreadCount = 2;
+int SyncTail::replWriterThreadCount = 2;
 const int replPrefetcherThreadCount = 2;
 #else
 #error need to include something that defines MONGO_PLATFORM_XX
 #endif
+
+class ExportedWriterThreadCountParameter : public ExportedServerParameter<int> {
+public:
+    ExportedWriterThreadCountParameter()
+        : ExportedServerParameter<int>(ServerParameterSet::getGlobal(),
+                                       "replWriterThreadCount",
+                                       &SyncTail::replWriterThreadCount,
+                                       true,   // allowedToChangeAtStartup
+                                       false)  // allowedToChangeAtRuntime
+    {}
+
+    virtual Status validate(const int& potentialNewValue) {
+        if (potentialNewValue < 1 || potentialNewValue > 256) {
+            return Status(ErrorCodes::BadValue, "replWriterThreadCount must be between 1 and 256");
+        }
+        return Status::OK();
+    }
+
+} exportedWriterThreadCountParam;
+
 
 static Counter64 opsAppliedStats;
 

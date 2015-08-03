@@ -144,6 +144,13 @@ public:
     virtual bool shouldRetry(OperationContext* txn, const BSONObj& o);
     void setHostname(const std::string& hostname);
 
+    /**
+     * This variable determines the number of writer threads SyncTail will have. It has a default
+     * value, which varies based on architecture and can be overridden using the
+     * "replWriterThreadCount" server parameter.
+     */
+    static int replWriterThreadCount;
+
 protected:
     // Cap the batches using the limit on journal commits.
     // This works out to be 100 MB (64 bit) or 50 MB (32 bit)
