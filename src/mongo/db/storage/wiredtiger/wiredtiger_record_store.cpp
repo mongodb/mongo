@@ -1125,10 +1125,10 @@ WiredTigerRecoveryUnit* WiredTigerRecordStore::_getRecoveryUnit(OperationContext
 class WiredTigerRecordStore::NumRecordsChange : public RecoveryUnit::Change {
 public:
     NumRecordsChange(WiredTigerRecordStore* rs, int64_t diff) : _rs(rs), _diff(diff) {}
-    virtual void commit() {}
-    virtual void rollback() {
-        _rs->_numRecords.fetchAndAdd(-_diff);
+    virtual void commit() {
+        _rs->_changeNumRecordsCommit(_diff);
     }
+    virtual void rollback() {}
 
 private:
     WiredTigerRecordStore* _rs;
@@ -1137,6 +1137,9 @@ private:
 
 void WiredTigerRecordStore::_changeNumRecords(OperationContext* txn, int64_t diff) {
     txn->recoveryUnit()->registerChange(new NumRecordsChange(this, diff));
+}
+
+void WiredTigerRecordStore::_changeNumRecordsCommit(int64_t diff) {
     if (diff > 0) {
         if (_numRecords.fetchAndAdd(diff) < diff)
             _numRecords.store(diff);
@@ -1147,24 +1150,25 @@ void WiredTigerRecordStore::_changeNumRecords(OperationContext* txn, int64_t dif
 
 class WiredTigerRecordStore::DataSizeChange : public RecoveryUnit::Change {
 public:
-    DataSizeChange(WiredTigerRecordStore* rs, int amount) : _rs(rs), _amount(amount) {}
-    virtual void commit() {}
-    virtual void rollback() {
-        _rs->_increaseDataSize(NULL, -_amount);
+    DataSizeChange(WiredTigerRecordStore* rs, int64_t diff) : _rs(rs), _diff(diff) {}
+    virtual void commit() {
+        _rs->_increaseDataSizeCommit(_diff);
     }
+    virtual void rollback() {}
 
 private:
     WiredTigerRecordStore* _rs;
-    bool _amount;
+    int64_t _diff;
 };
 
-void WiredTigerRecordStore::_increaseDataSize(OperationContext* txn, int amount) {
-    if (txn)
-        txn->recoveryUnit()->registerChange(new DataSizeChange(this, amount));
+void WiredTigerRecordStore::_increaseDataSize(OperationContext* txn, int64_t diff) {
+    txn->recoveryUnit()->registerChange(new DataSizeChange(this, diff));
+}
 
-    if (_dataSize.fetchAndAdd(amount) < 0) {
-        if (amount > 0) {
-            _dataSize.store(amount);
+void WiredTigerRecordStore::_increaseDataSizeCommit(int64_t diff) {
+    if (_dataSize.fetchAndAdd(diff) < 0) {
+        if (diff > 0) {
+            _dataSize.store(diff);
         } else {
             _dataSize.store(0);
         }
