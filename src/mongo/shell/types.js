@@ -640,6 +640,8 @@ tojson = function(x, indent, nolint){
         return s;
     }
     case "function":
+        if (x === MinKey || x === MaxKey)
+            return x.tojson();
         return x.toString();
     default:
         throw Error( "tojson can't handle type " + (typeof x) );
@@ -668,11 +670,7 @@ tojsonObject = function(x, indent, nolint){
     }
 
     try {
-        // modify display of min/max key for spidermonkey
-        if (x.toString() == "[object MaxKey]")
-            return "{ $maxKey : 1 }";
-        if (x.toString() == "[object MinKey]")
-            return "{ $minKey : 1 }";
+        x.toString();
     }
     catch(e) {
         // toString not callable

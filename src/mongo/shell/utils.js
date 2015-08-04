@@ -412,6 +412,9 @@ shellPrintHelper = function (x) {
         return;
     }
 
+    if (x === MinKey || x === MaxKey)
+        return x.tojson();
+
     if (typeof x != "object")
         return print(x);
 
