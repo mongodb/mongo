@@ -100,6 +100,17 @@ env.CppUnitTest(
     ],
 )
 
+env.CppIntegrationTest(
+    target='network_interface_asio_integration_test',
+    source=[
+        'network_interface_asio_integration_test.cpp',
+    ],
+    LIBDEPS=[
+        'network_interface_asio',
+        '$BUILD_DIR/mongo/rpc/command_status',
+    ],
+)
+
 env.Library(
     target='network_interface_factory',
     source=[

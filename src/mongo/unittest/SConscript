@@ -19,6 +19,18 @@ env.Library("unittest_main", ['unittest_main.cpp'],
                 '$BUILD_DIR/mongo/base',
                  ])
 
+env.Library(target="integration_test_main",
+            source=[
+                'integration_test_main.cpp',
+            ],
+            LIBDEPS=[
+                'unittest',
+                '$BUILD_DIR/mongo/base',
+                '$BUILD_DIR/mongo/client/connection_string',
+                '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+            ],
+)
+
 env.Library("unittest_crutch", ['crutch.cpp'], LIBDEPS=['$BUILD_DIR/mongo/base'])
 
 
