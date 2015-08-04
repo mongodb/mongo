@@ -207,13 +207,6 @@ Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {
     }
 
     BSONObj responseObj(resultStatus.getValue());
-
-    auto cmdStatus = getStatusFromCommandResult(responseObj);
-
-    if (!cmdStatus.isOK()) {
-        return cmdStatus;
-    }
-
     auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj);
     return findAndModifyStatus.getStatus();
 }
@@ -246,14 +239,14 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(StringData lockID,
 
     BSONObj responseObj(resultStatus.getValue());
 
-    auto cmdStatus = getStatusFromCommandResult(responseObj);
-
-    if (!cmdStatus.isOK()) {
-        return cmdStatus;
-    }
-
     auto findAndModifyStatus = extractFindAndModifyNewObj(responseObj);
     if (!findAndModifyStatus.isOK()) {
+        if (findAndModifyStatus == ErrorCodes::DuplicateKey) {
+            // Another thread won the upsert race. Also see SERVER-14322.
+            return {ErrorCodes::LockStateChangeFailed,
+                    str::stream() << "duplicateKey error during upsert of lock: " << lockID};
+        }
+
         return findAndModifyStatus.getStatus();
     }
 

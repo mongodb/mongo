@@ -205,15 +205,15 @@ TEST_F(DistLockCatalogFixture, PingCommandError) {
 TEST_F(DistLockCatalogFixture, PingWriteError) {
     auto future = launchAsync([this] {
         auto status = catalog()->ping("abcd", Date_t::now());
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, status.code());
+        ASSERT_EQUALS(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
     onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         return fromjson(R"({
                 ok: 0,
-                code: 11000,
-                errmsg: "E11000 duplicate key error"
+                code: 13,
+                errmsg: "not authorized"
             })");
     });
 
@@ -443,18 +443,36 @@ TEST_F(DistLockCatalogFixture, GrabLockCommandError) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(DistLockCatalogFixture, GrabLockWriteError) {
+TEST_F(DistLockCatalogFixture, GrabLockDupKeyError) {
     auto future = launchAsync([this] {
         auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, status.code());
+        ASSERT_EQUALS(ErrorCodes::LockStateChangeFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
     onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         return fromjson(R"({
                 ok: 0,
-                code: 11000,
-                errmsg: "E11000 duplicate key error"
+                errmsg: "duplicate key error",
+                code: 11000
+            })");
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(DistLockCatalogFixture, GrabLockWriteError) {
+    auto future = launchAsync([this] {
+        auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
+        ASSERT_EQUALS(ErrorCodes::Unauthorized, status.code());
+        ASSERT_FALSE(status.reason().empty());
+    });
+
+    onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return fromjson(R"({
+                ok: 0,
+                code: 13,
+                errmsg: "not authorized"
             })");
     });
 
@@ -738,15 +756,15 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWriteError) {
     auto future = launchAsync([this] {
         auto status =
             catalog()->overtakeLock("", OID(), OID(), "", "", Date_t::now(), "").getStatus();
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, status.code());
+        ASSERT_EQUALS(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
     onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         return fromjson(R"({
                 ok: 0,
-                code: 11000,
-                errmsg: "E11000 duplicate key error"
+                code: 13,
+                errmsg: "not authorized"
             })");
     });
 
@@ -908,15 +926,15 @@ TEST_F(DistLockCatalogFixture, UnlockCommandError) {
 TEST_F(DistLockCatalogFixture, UnlockWriteError) {
     auto future = launchAsync([this] {
         auto status = catalog()->unlock(OID());
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, status.code());
+        ASSERT_EQUALS(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
     onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         return fromjson(R"({
                 ok: 0,
-                code: 11000,
-                errmsg: "E11000 duplicate key error"
+                code: 13,
+                errmsg: "not authorized"
             })");
     });
 
