@@ -35,8 +35,8 @@ functions:
           set -v
           chmod +x mongod
           chmod +x mongo
-          git clone https://github.com/mongodb/mongo-perf perf
-          cd perf
+          git clone https://github.com/mongodb/mongo-perf perf-3.0
+          cd perf-3.0
           git checkout r20150702
     - command: shell.exec
       params:
@@ -69,7 +69,7 @@ functions:
           set -e 
           set -v
           source ./venv/bin/activate
-          cd perf
+          cd perf-3.0
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
           ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
