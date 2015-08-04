@@ -297,6 +297,8 @@ tasks:
           - "./**.pdb"
           - "./**.msi"
           - "./etc/*san.suppressions"
+          - "./build/integration_tests/**"
+          - "./build/integration_tests.txt"
         exclude_files:
           - "*_test.pdb"
     - func: "upload debugsymbols"
@@ -606,6 +608,22 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=commands --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: integration_tests_standalone
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=integration_tests_standalone
+
+- <<: *task_template
+  name: integration_tests_replset
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=integration_tests_replset
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough
@@ -1595,6 +1613,8 @@ buildvariants:
   - name: gle_auth_basics_passthrough_WT
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: integration_tests_standalone
+  - name: integration_tests_replset
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -2429,6 +2449,8 @@ buildvariants:
   - name: disk
   - name: durability
   - name: failpoints
+  - name: integration_tests_standalone
+  - name: integration_tests_replset
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility

@@ -564,7 +564,13 @@ def decide_platform_tools():
 def variable_tools_converter(val):
     tool_list = shlex.split(val)
     return tool_list + [
-        "jsheader", "mergelib", "mongo_unittest", "textfile", "distsrc", "gziptool"
+        "distsrc",
+        "gziptool",
+        "jsheader",
+        "mergelib",
+        "mongo_integrationtest",
+        "mongo_unittest",
+        "textfile",
     ]
 
 def variable_distsrc_converter(val):
@@ -811,6 +817,8 @@ envDict = dict(BUILD_ROOT=buildDir,
                # TODO: Move unittests.txt to $BUILD_DIR, but that requires
                # changes to MCI.
                UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
+               INTEGRATION_TEST_ALIAS='integration_tests',
+               INTEGRATION_TEST_LIST='$BUILD_ROOT/integration_tests.txt',
                CONFIGUREDIR=sconsDataDir.Dir('sconf_temp'),
                CONFIGURELOG=sconsDataDir.File('config.log'),
                INSTALL_DIR=installDir,
@@ -2457,4 +2465,4 @@ env.Alias("distsrc", "distsrc-tgz")
 
 env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 
-env.Alias('all', ['core', 'tools', 'dbtest', 'unittests'])
+env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests'])
