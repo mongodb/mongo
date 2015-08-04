@@ -341,7 +341,8 @@ static int  __rec_split_row_promote(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_ITEM *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_BOUNDARY *, WT_ITEM *, int);
-static int  __rec_update_las(WT_SESSION_IMPL *, WT_RECONCILE *, WT_BOUNDARY *);
+static int  __rec_update_las(
+		WT_SESSION_IMPL *, WT_RECONCILE *, uint32_t, WT_BOUNDARY *);
 static int  __rec_write_init(WT_SESSION_IMPL *,
 		WT_REF *, uint32_t, WT_SALVAGE_COOKIE *, void *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
@@ -3145,7 +3146,8 @@ skip_check_complete:
 	 * this page, copy those updates into the database's lookaside store.
 	 */
 	if (!r->evict_skipped_updates && bnd->skip != NULL)
-		WT_ERR(__rec_update_las(session, r, bnd));
+		WT_WITHOUT_DHANDLE(session,
+		    ret = __rec_update_las(session, r, btree->id, bnd));
 
 done:
 err:	__wt_scr_free(session, &key);
@@ -3157,9 +3159,9 @@ err:	__wt_scr_free(session, &key);
  *	Copy a set of updates into the database's lookaside buffer.
  */
 static int
-__rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
+__rec_update_las(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, uint32_t btree_id, WT_BOUNDARY *bnd)
 {
-	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_DECL_ITEM(key);
 	WT_DECL_ITEM(klas);
@@ -3174,7 +3176,6 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 	uint8_t *counterp;
 	void *p;
 
-	btree = S2BT(session);
 	cursor = NULL;
 	page = r->page;
 	counter = 0;
@@ -3208,8 +3209,10 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 		 * block that has lookaside records, we'll run this code which
 		 * cleans out any old records.
 		 */
-		WT_ERR(__wt_las_remove_block(
-		    session, cursor, bnd->addr.addr, bnd->addr.size));
+		WT_WITHOUT_DHANDLE(session,
+		    ret = __wt_las_remove_block(
+		    session, cursor, btree_id, bnd->addr.addr, bnd->addr.size));
+		WT_ERR(ret);
 
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
@@ -3224,7 +3227,7 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 
 			*(char *)p = WT_LAS_RECONCILE_UPDATE;
 			p = (uint8_t *)p + sizeof(char);
-			memcpy(p, &btree->id, sizeof(uint32_t));
+			memcpy(p, &btree_id, sizeof(uint32_t));
 			p = (uint8_t *)p + sizeof(uint32_t);
 			*(uint8_t *)p = bnd->addr.size;
 			p = (uint8_t *)p + sizeof(uint8_t);
@@ -3261,7 +3264,7 @@ __rec_update_las(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 
 			*(char *)p = WT_LAS_RECONCILE_UPDATE;
 			p = (uint8_t *)p + sizeof(char);
-			memcpy(p, &btree->id, sizeof(uint32_t));
+			memcpy(p, &btree_id, sizeof(uint32_t));
 			p = (uint8_t *)p + sizeof(uint32_t);
 			*(uint8_t *)p = bnd->addr.size;
 			p = (uint8_t *)p + sizeof(uint8_t);
