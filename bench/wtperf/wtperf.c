@@ -507,10 +507,9 @@ worker(void *arg)
 		 * is 0, to avoid first time latency spikes.
 		 */
 		measure_latency =
-		    cfg->sample_interval != 0 && trk->ops != 0 && (
-		    trk->ops % cfg->sample_rate == 0);
-		if (measure_latency &&
-		    (ret = __wt_epoch(NULL, &start)) != 0) {
+		    cfg->sample_interval != 0 && trk != NULL &&
+		    trk->ops != 0 && (trk->ops % cfg->sample_rate == 0);
+		if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
@@ -874,10 +873,9 @@ populate_thread(void *arg)
 		cursor = cursors[op % cfg->table_count];
 		generate_key(cfg, key_buf, op);
 		measure_latency =
-		    cfg->sample_interval != 0 && trk->ops != 0 && (
-		    trk->ops % cfg->sample_rate == 0);
-		if (measure_latency &&
-		    (ret = __wt_epoch(NULL, &start)) != 0) {
+		    cfg->sample_interval != 0 &&
+		    trk->ops != 0 && (trk->ops % cfg->sample_rate == 0);
+		if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
@@ -995,10 +993,9 @@ populate_async(void *arg)
 	 * the time to process by workers.
 	 */
 	measure_latency =
-	    cfg->sample_interval != 0 && trk->ops != 0 && (
-	    trk->ops % cfg->sample_rate == 0);
-	if (measure_latency &&
-	    (ret = __wt_epoch(NULL, &start)) != 0) {
+	    cfg->sample_interval != 0 &&
+	    trk->ops != 0 && (trk->ops % cfg->sample_rate == 0);
+	if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
 		lprintf(cfg, ret, 0, "Get time call failed");
 		goto err;
 	}
@@ -1040,8 +1037,7 @@ populate_async(void *arg)
 		goto err;
 	if (measure_latency) {
 		if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-			lprintf(cfg, ret, 0,
-			    "Get time call failed");
+			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
 		++trk->latency_ops;
