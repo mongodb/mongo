@@ -344,7 +344,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         this.configRS.startSet(startOptions);
 
         var config = this.configRS.getReplSetConfig();
-        config.configServer = true;
+        config.configsvr = true;
         this.configRS.initiate(config);
 
         this.configRS.getMaster(); // Wait for master to be elected before starting mongos

@@ -25,14 +25,14 @@ var rs4 = new ReplSetTest({ 'name': 'admin', nodes: 3, startPort: 31209 });
 rs4.startSet();
 rs4.initiate();
 
-// replica set with configServer: true should *not* be allowed to be added as a shard
+// replica set with configsvr: true should *not* be allowed to be added as a shard
 var rs5 = new ReplSetTest({ name: 'csrs',
                             nodes: 3,
                             startPort: 31212,
                             nodeOptions: {configsvr: "", storageEngine: "wiredTiger" }});
 rs5.startSet();
 var conf = rs5.getReplSetConfig();
-conf.configServer = true;
+conf.configsvr = true;
 rs5.initiate(conf);
 
 

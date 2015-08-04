@@ -82,7 +82,7 @@ struct ServerGlobalParams {
     bool configsvr;  // --configsvr
     enum class ConfigServerMode {
         NONE,
-        SCC,
+        SCCC,
         CSRS,
     };
     ConfigServerMode configsvrMode;  // -- configsvrMode

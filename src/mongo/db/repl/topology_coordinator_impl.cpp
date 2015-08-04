@@ -1518,7 +1518,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
     }
 
     if (_rsConfig.isConfigServer()) {
-        response->append("configServer", true);
+        response->append("configsvr", true);
     }
 
     response->append("members", membersOut);

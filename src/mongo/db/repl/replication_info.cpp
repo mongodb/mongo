@@ -229,7 +229,7 @@ public:
 
         if (serverGlobalParams.configsvrMode == ServerGlobalParams::ConfigServerMode::CSRS) {
             result.append("configsvr", 1);
-        } else if (serverGlobalParams.configsvrMode == ServerGlobalParams::ConfigServerMode::SCC) {
+        } else if (serverGlobalParams.configsvrMode == ServerGlobalParams::ConfigServerMode::SCCC) {
             result.append("configsvr", 0);
         }
 

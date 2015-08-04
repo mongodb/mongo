@@ -723,7 +723,7 @@ TEST(ValidateForReconfig, CantRemoveConfigServer) {
     ReplicaSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
-                                        << "version" << 1 << "configServer" << true << "members"
+                                        << "version" << 1 << "configsvr" << true << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h0")
                                                       << BSON("_id" << 1 << "host"

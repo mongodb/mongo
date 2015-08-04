@@ -479,7 +479,7 @@ TEST(ReplicaSetConfig, ParseFailsWithNonBoolConfigServerField) {
                                << "rs0"
                                << "version" << 1 << "members"
                                << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                        << "localhost:12345")) << "configServer"
+                                                        << "localhost:12345")) << "configsvr"
                                << "no"));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
@@ -660,7 +660,7 @@ TEST(ReplicaSetConfig, ConfigServerField) {
     ReplicaSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version" << 1 << "configServer" << true << "members"
+                                     << "version" << 1 << "configsvr" << true << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_OK(config.validate());
@@ -668,7 +668,7 @@ TEST(ReplicaSetConfig, ConfigServerField) {
 
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
-                                     << "version" << 1 << "configServer" << false << "members"
+                                     << "version" << 1 << "configsvr" << false << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
     ASSERT_OK(config.validate());
@@ -978,7 +978,7 @@ TEST(ReplicaSetConfig, CheckConfigServerCantHaveArbiters) {
     ReplicaSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
-                                      << "version" << 1 << "configServer" << true << "members"
+                                      << "version" << 1 << "configsvr" << true << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")
                                                     << BSON("_id" << 1 << "host"

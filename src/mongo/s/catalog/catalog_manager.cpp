@@ -193,10 +193,10 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
     if (getStatusFromCommandResult(res).isOK()) {
         bool isConfigServer;
         Status status =
-            bsonExtractBooleanFieldWithDefault(res, "configServer", false, &isConfigServer);
+            bsonExtractBooleanFieldWithDefault(res, "configsvr", false, &isConfigServer);
         if (!status.isOK()) {
             return Status(status.code(),
-                          str::stream() << "replSetGetStatus returned invalid \"configServer\" "
+                          str::stream() << "replSetGetStatus returned invalid \"configsvr\" "
                                         << "field when attempting to add "
                                         << connectionString.toString()
                                         << " as a shard: " << status.reason());

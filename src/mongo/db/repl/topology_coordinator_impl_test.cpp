@@ -5085,7 +5085,7 @@ TEST_F(TopoCoordTest, ProcessDeclareElectionWinner) {
 TEST_F(TopoCoordTest, GetMemberStateConfigSvrInRSConfigButNotOnCmdLine) {
     updateConfig(BSON("_id"
                       << "rs0"
-                      << "version" << 1 << "configServer" << true << "members"
+                      << "version" << 1 << "configsvr" << true << "members"
                       << BSON_ARRAY(BSON("_id" << 10 << "host"
                                                << "hself")
                                     << BSON("_id" << 20 << "host"
@@ -5160,7 +5160,7 @@ TEST_F(TopoCoordTest, GetMemberStateValidConfigSvr) {
 
     updateConfig(BSON("_id"
                       << "rs0"
-                      << "version" << 1 << "configServer" << true << "members"
+                      << "version" << 1 << "configsvr" << true << "members"
                       << BSON_ARRAY(BSON("_id" << 10 << "host"
                                                << "hself")
                                     << BSON("_id" << 20 << "host"

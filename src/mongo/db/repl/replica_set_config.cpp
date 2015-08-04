@@ -45,7 +45,7 @@ const size_t ReplicaSetConfig::kMaxMembers;
 const size_t ReplicaSetConfig::kMaxVotingMembers;
 #endif
 
-const std::string ReplicaSetConfig::kConfigServerFieldName = "configServer";
+const std::string ReplicaSetConfig::kConfigServerFieldName = "configsvr";
 const std::string ReplicaSetConfig::kVersionFieldName = "version";
 const std::string ReplicaSetConfig::kMajorityWriteConcernModeName = "$majority";
 const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
@@ -535,7 +535,7 @@ BSONObj ReplicaSetConfig::toBSON() const {
     configBuilder.append(kIdFieldName, _replSetName);
     configBuilder.appendIntOrLL(kVersionFieldName, _version);
     if (_configServer) {
-        // Only include "configServer" field if true.
+        // Only include "configsvr" field if true
         configBuilder.append(kConfigServerFieldName, _configServer);
     }
 

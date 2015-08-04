@@ -432,8 +432,8 @@ Status addMongodOptions(moe::OptionSection* options) {
                                        "configsvrMode",
                                        moe::String,
                                        "Controls what config server protocol is in use. When set to"
-                                       " \"scc\" keeps server in legacy SyncClusterConnection mode "
-                                       "even when the service is running as a replSet")
+                                       " \"sccc\" keeps server in legacy SyncClusterConnection mode"
+                                       " even when the service is running as a replSet")
         .setSources(moe::SourceAllLegacy);
 
     sharding_options.addOptionChaining(
@@ -1198,7 +1198,7 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         params["sharding.clusterRole"].as<std::string>() == "configsvr") {
         serverGlobalParams.configsvr = true;
         serverGlobalParams.configsvrMode = replSettings.replSet.empty()
-            ? ServerGlobalParams::ConfigServerMode::SCC
+            ? ServerGlobalParams::ConfigServerMode::SCCC
             : ServerGlobalParams::ConfigServerMode::CSRS;
         mmapv1GlobalOptions.smallfiles = true;  // config server implies small files
 
@@ -1222,12 +1222,12 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
                           "Cannot set \"sharding.configsvrMode\" without "
                           "setting \"sharding.clusterRole\" to \"configsvr\"");
         }
-        if (params["sharding.configsvrMode"].as<std::string>() != "scc") {
+        if (params["sharding.configsvrMode"].as<std::string>() != "sccc") {
             return Status(ErrorCodes::BadValue,
                           "Bad value for sharding.configsvrMode.  "
-                          " Only supported value is \"scc\"");
+                          " Only supported value is \"sccc\"");
         }
-        serverGlobalParams.configsvrMode = ServerGlobalParams::ConfigServerMode::SCC;
+        serverGlobalParams.configsvrMode = ServerGlobalParams::ConfigServerMode::SCCC;
     }
 
     if (params.count("sharding.archiveMovedChunks")) {
