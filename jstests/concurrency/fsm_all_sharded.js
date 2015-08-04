@@ -14,6 +14,7 @@ var blacklist = [
     'distinct.js', // SERVER-13116 distinct isn't sharding aware
     'distinct_noindex.js', // SERVER-13116 distinct isn't sharding aware
     'distinct_projection.js', // SERVER-13116 distinct isn't sharding aware
+    'map_reduce_drop.js', // SERVER-19694 duplicate key exception on config.locks collection
     'yield_sort.js', // SERVER-17011 Cursor can return objects out of order if updated during query
     'yield_sort_merge.js', // SERVER-17011 also applies, since this query uses SORT stage,
                            // not SORT_MERGE stage in sharded environment
