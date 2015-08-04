@@ -404,11 +404,10 @@ typedef struct {
 /*
  * __wt_log_wrlsn --
  *	Process written log slots and attempt to coalesce them if the LSNs
- *	are contiguous.  Returns 1 if slots were freed, 0 if no slots were
- *	freed in the progress arg.  Must be called with the log slot lock held.
+ *	are contiguous.  Must be called with the log slot lock held.
  */
 int
-__wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i)
+__wt_log_wrlsn(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -419,11 +418,9 @@ __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i)
 	size_t written_i;
 	uint32_t i, save_i;
 
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	conn = S2C(session);
 	log = conn->log;
-	if (free_i != NULL)
-		*free_i = WT_SLOT_POOL;
-	__wt_spin_lock(session, &log->log_slot_lock);
 restart:
 	coalescing = NULL;
 	WT_INIT_LSN(&save_lsn);
@@ -437,9 +434,6 @@ restart:
 	while (i < WT_SLOT_POOL) {
 		save_i = i;
 		slot = &log->slot_pool[i++];
-		if (free_i != NULL && *free_i == WT_SLOT_POOL &&
-		    slot->slot_state == WT_LOG_SLOT_FREE)
-			*free_i = save_i;
 		if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
 			continue;
 		written[written_i].slot_index = save_i;
@@ -470,10 +464,7 @@ restart:
 			    &slot->slot_release_lsn) == 0 &&
 			    WT_LOG_CMP(&slot->slot_start_lsn,
 			    &slot->slot_end_lsn) == 0) {
-				WT_ERR(__wt_log_slot_free(session, slot));
-				if (free_i != NULL && *free_i == WT_SLOT_POOL &&
-				    slot->slot_state == WT_LOG_SLOT_FREE)
-					*free_i = save_i;
+				WT_RET(__wt_log_slot_free(session, slot));
 				continue;
 			}
 			if (coalescing != NULL) {
@@ -522,24 +513,19 @@ restart:
 				    &slot->slot_release_lsn) == 0);
 				log->write_start_lsn = slot->slot_start_lsn;
 				log->write_lsn = slot->slot_end_lsn;
-				WT_ERR(__wt_cond_signal(
+				WT_RET(__wt_cond_signal(
 				    session, log->log_write_cond));
 				WT_STAT_FAST_CONN_INCR(session, log_write_lsn);
 				/*
 				 * Signal the close thread if needed.
 				 */
 				if (F_ISSET(slot, WT_SLOT_CLOSEFH))
-					WT_ERR(__wt_cond_signal(
+					WT_RET(__wt_cond_signal(
 					    session, conn->log_file_cond));
 			}
-			WT_ERR(__wt_log_slot_free(session, slot));
-			if (free_i != NULL && *free_i == WT_SLOT_POOL &&
-			    slot->slot_state == WT_LOG_SLOT_FREE)
-				*free_i = save_i;
+			WT_RET(__wt_log_slot_free(session, slot));
 		}
 	}
-err:
-	__wt_spin_unlock(session, &log->log_slot_lock);
 	return (ret);
 }
 
@@ -553,9 +539,9 @@ __wt_log_force_write(WT_SESSION_IMPL *session, int new_slot)
 	WT_MYSLOT myslot;
 	int free_slot, release;
 
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	WT_RET(__wt_log_slot_join(session, 0, 0, &myslot));
-	WT_RET(__wt_log_slot_close(session,
-	    (wt_off_t)myslot.end_offset, &release));
+	WT_RET(__wt_log_slot_close(session, &release));
 	if (release) {
 		WT_RET(__wt_log_release(session, myslot.slot, &free_slot));
 		if (free_slot)
@@ -583,7 +569,9 @@ __log_wrlsn_server(void *arg)
 		/*
 		 * Write out any log record buffers.
 		 */
-		WT_ERR(__wt_log_wrlsn(session, NULL));
+		WT_WITH_SLOT_LOCK(session, conn->log,
+		    ret = __wt_log_wrlsn(session));
+		WT_ERR(ret);
 		WT_ERR(__wt_cond_wait(session, conn->log_wrlsn_cond, 10000));
 	}
 	/*
@@ -592,7 +580,8 @@ __log_wrlsn_server(void *arg)
 	 * XXX - Can any other log write get in at this point in the
 	 * connection close path??
 	 */
-	WT_ERR(__wt_log_wrlsn(session, NULL));
+	WT_WITH_SLOT_LOCK(session, conn->log, ret = __wt_log_wrlsn(session));
+	WT_ERR(ret);
 	if (0) {
 err:		__wt_err(session, ret, "log wrlsn server error");
 	}
@@ -610,12 +599,12 @@ __log_server(void *arg)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	u_int locked;
+	u_int arch_lock, dir_lock;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	locked = 0;
+	arch_lock = dir_lock = 0;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Slots depend on future activity.  Force out buffered
@@ -625,7 +614,11 @@ __log_server(void *arg)
 		 * in the case of a synchronous buffer.  We end up with a hang.
 		 */
 		WT_ERR(__wt_readlock(session, log->log_direct_lock));
-		WT_ERR(__wt_log_force_write(session, 1));
+		dir_lock = 1;
+		WT_WITH_SLOT_LOCK(session, log,
+		    ret = __wt_log_force_write(session, 1));
+		WT_ERR(ret);
+		dir_lock = 0;
 		WT_ERR(__wt_readunlock(session, log->log_direct_lock));
 		/*
 		 * Perform log pre-allocation.
@@ -639,11 +632,11 @@ __log_server(void *arg)
 		if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE)) {
 			if (__wt_try_writelock(
 			    session, log->log_archive_lock) == 0) {
-				locked = 1;
+				arch_lock = 1;
 				WT_ERR(__log_archive_once(session, 0));
 				WT_ERR(	__wt_writeunlock(
 				    session, log->log_archive_lock));
-				locked = 0;
+				arch_lock = 0;
 			} else
 				WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 				    "log_archive: Blocked due to open log "
@@ -656,7 +649,9 @@ __log_server(void *arg)
 	if (0) {
 err:		__wt_err(session, ret, "log server error");
 	}
-	if (locked)
+	if (dir_lock)
+		(void)__wt_readunlock(session, log->log_direct_lock);
+	if (arch_lock)
 		(void)__wt_writeunlock(session, log->log_archive_lock);
 	return (WT_THREAD_RET_VALUE);
 }

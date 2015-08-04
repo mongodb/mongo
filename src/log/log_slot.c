@@ -9,33 +9,22 @@
 #include "wt_internal.h"
 
 /*
- * This file implements the consolidated array algorithm as described in
- * the paper:
- * Scalability of write-ahead logging on multicore and multisocket hardware
- * by Ryan Johnson, Ippokratis Pandis, Radu Stoica, Manos Athanassoulis
- * and Anastasia Ailamaki.
- *
- * It appeared in The VLDB Journal, DOI 10.1007/s00778-011-0260-8 and can
- * be found at:
- * http://infoscience.epfl.ch/record/170505/files/aether-smpfulltext.pdf
- */
-
-/*
  * __wt_log_slot_close --
  *	Close out the current active slot.
  */
 int
-__wt_log_slot_close(WT_SESSION_IMPL *session, wt_off_t new_offset, int *rel)
+__wt_log_slot_close(WT_SESSION_IMPL *session, int *releasep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_LOGSLOT *current;
-	int64_t new_state, old_state;
+	int64_t end_offset, new_state, old_state;
 
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	conn = S2C(session);
 	log = conn->log;
-	if (rel != NULL)
-		*rel = 0;
+	if (releasep != NULL)
+		*releasep = 0;
 retry:
 	current = log->active_slot;
 	if (current == NULL)
@@ -58,16 +47,13 @@ retry:
 	 * Set the end LSN.
 	 */
 	WT_STAT_FAST_CONN_INCR(session, log_slot_closes);
-	if (WT_LOG_SLOT_DONE(new_state) && rel != NULL)
-		*rel = 1;
+	if (WT_LOG_SLOT_DONE(new_state) && releasep != NULL)
+		*releasep = 1;
 	current->slot_end_lsn = current->slot_start_lsn;
-	/*
-	 * XXX Calculate offset rather than passing it in.  We should be
-	 * able to do so although it may be a bit messy.
-	 */
-	current->slot_end_lsn.offset += new_offset;
+	end_offset = WT_LOG_SLOT_JOINED(old_state);
+	current->slot_end_lsn.offset += (wt_off_t)end_offset;
 	WT_STAT_FAST_CONN_INCRV(session,
-	    log_slot_consolidated, new_offset);
+	    log_slot_consolidated, end_offset);
 	/*
 	 * XXX Would like to change so one piece of code advances the LSN.
 	 */
@@ -81,9 +67,10 @@ retry:
  *	Switch out the current slot and set up a new one.
  */
 int
-__wt_log_slot_switch(WT_SESSION_IMPL *session, wt_off_t new_offset, int *rel)
+__wt_log_slot_switch(WT_SESSION_IMPL *session, int *releasep)
 {
-	WT_RET(__wt_log_slot_close(session, new_offset, rel));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+	WT_RET(__wt_log_slot_close(session, releasep));
 	WT_RET(__wt_log_slot_new(session));
 	return (0);
 }
@@ -100,6 +87,7 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 	WT_LOGSLOT *slot;
 	int32_t i;
 
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	conn = S2C(session);
 	log = conn->log;
 	if (!F_ISSET(log,  WT_LOG_FORCE_CONSOLIDATE))
@@ -111,10 +99,23 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 		/*
 		 * For now just restart at 0.  We could use log->pool_index
 		 * if that is inefficient.
+		 * XXX We're not guaranteed to be serial here.  We could
+		 * have more than one thread trying to set up a new active
+		 * slot, and both getting the same start LSN...
 		 */
 		for (i = 0; i < WT_SLOT_POOL; i++) {
 			slot = &log->slot_pool[i];
 			if (slot->slot_state == WT_LOG_SLOT_FREE) {
+				/*
+				 * Make sure that the next buffer size can
+				 * fit in the file.  Proactively switch if
+				 * it cannot.  This will reduce, but not
+				 * eliminate, log files that exceed the
+				 * maximum file size.
+				 *
+				 * We want to minimize the risk of an
+				 * ENOSPC error.
+				 */
 				WT_RET(__wt_log_acquire(session,
 				    log->slot_buf_size, slot));
 				/*

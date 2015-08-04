@@ -79,14 +79,15 @@
 #define	WT_LOG_SLOT_WRITTEN	-2	/* Slot data written, not processed */
 
 /*
- * If new slot states are added, adjust WT_LOG_SLOT_BITS accordingly for
- * how much of the top 32 bits we are using.
+ * If new slot states are added, adjust WT_LOG_SLOT_BITS and
+ * WT_LOG_SLOT_MASK_OFF accordingly for how much of the top 32
+ * bits we are using.
  */
 #define	WT_LOG_SLOT_BITS	2
+#define	WT_LOG_SLOT_MAXBITS	(32 - WT_LOG_SLOT_BITS)
 #define	WT_LOG_SLOT_CLOSE	0x4000000000000000	/* Force slot close */
 #define	WT_LOG_SLOT_RESERVED	0x8000000000000000	/* Reserved states */
 
-#define	WT_LOG_SLOT_MAXBITS	(32 - WT_LOG_SLOT_BITS)
 #define	WT_LOG_SLOT_MASK_OFF	0x3fffffffffffffff
 #define	WT_LOG_SLOT_MASK_ON	~(WT_LOG_SLOT_MASK_OFF)
 
@@ -103,7 +104,7 @@
 /* Slot is in use, no longer able to be joined */
 #define	WT_LOG_SLOT_CLOSED(state)					\
     (WT_LOG_SLOT_ACTIVE(state) &&					\
-    (FLD64_ISSET(state, WT_LOG_SLOT_CLOSE) &&			\
+    (FLD64_ISSET(state, WT_LOG_SLOT_CLOSE) &&				\
     !FLD64_ISSET(state, WT_LOG_SLOT_RESERVED)))
 /* Slot is in use, all data copied into buffer */
 #define	WT_LOG_SLOT_DONE(state)						\
@@ -112,7 +113,7 @@
 /* Slot is in use, more threads may join this slot */
 #define	WT_LOG_SLOT_OPEN(state)						\
     (WT_LOG_SLOT_ACTIVE(state) &&					\
-    !FLD64_ISSET((state), WT_LOG_SLOT_CLOSE) &&			\
+    !FLD64_ISSET((state), WT_LOG_SLOT_CLOSE) &&				\
      WT_LOG_SLOT_JOINED(state) < WT_LOG_SLOT_BUF_MAX)
 
 typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
@@ -135,6 +136,12 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 } WT_LOGSLOT;
 
 #define	WT_SLOT_INIT_FLAGS	(WT_SLOT_BUFFERED)
+
+#define	WT_WITH_SLOT_LOCK(session, log, op) do {			\
+	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));	\
+	WT_WITH_LOCK(session,						\
+	    &log->log_slot_lock, WT_SESSION_LOCKED_SLOT, op);		\
+} while (0)
 
 typedef struct {
 	WT_LOGSLOT	*slot;		/* Slot I'm using */
