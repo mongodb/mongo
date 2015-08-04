@@ -60,7 +60,9 @@ public:
     }
 
     void tearDown() override {
-        _net->shutdown();
+        if (!_net->inShutdown()) {
+            _net->shutdown();
+        }
     }
 
     NetworkInterface& net() {
@@ -220,6 +222,36 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
     ASSERT(callbackCalled);
     ASSERT_EQ(res.data, expectedCommandReply);
     ASSERT_EQ(res.metadata, expectedMetadata);
+}
+
+TEST_F(NetworkInterfaceASIOTest, setAlarm) {
+    stdx::promise<bool> nearFuture;
+    stdx::future<bool> executed = nearFuture.get_future();
+
+    // set a first alarm, to execute after "expiration"
+    Date_t expiration = net().now() + Milliseconds(100);
+    net().setAlarm(
+        expiration,
+        [this, expiration, &nearFuture]() { nearFuture.set_value(net().now() >= expiration); });
+
+    // wait enough time for first alarm to execute
+    auto status = executed.wait_for(Milliseconds(5000));
+
+    // assert that not only did it execute, but executed after "expiration"
+    ASSERT(status == stdx::future_status::ready);
+    ASSERT(executed.get());
+
+    // set an alarm for the future, kill interface, ensure it didn't execute
+    stdx::promise<bool> farFuture;
+    stdx::future<bool> executed2 = farFuture.get_future();
+
+    expiration = net().now() + Milliseconds(99999999);
+    net().setAlarm(expiration, [this, &farFuture]() { farFuture.set_value(true); });
+
+    net().shutdown();
+
+    status = executed2.wait_for(Milliseconds(0));
+    ASSERT(status == stdx::future_status::timeout);
 }
 
 }  // namespace

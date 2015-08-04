@@ -40,6 +40,8 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace executor {
@@ -141,7 +143,17 @@ void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbH
 }
 
 void NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>& action) {
-    MONGO_UNREACHABLE;
+    // "alarm" must stay alive until it expires, hence the shared_ptr.
+    auto alarm = std::make_shared<asio::steady_timer>(_io_service, when - now());
+    alarm->async_wait([alarm, this, action](std::error_code ec) {
+        if (!ec) {
+            return action();
+        } else if (ec != asio::error::operation_aborted) {
+            // When the network interface is shut down, it will cancel all pending
+            // alarms, raising an "operation_aborted" error here, which we ignore.
+            warning() << "setAlarm() received an error: " << ec.message();
+        }
+    });
 };
 
 bool NetworkInterfaceASIO::inShutdown() const {
