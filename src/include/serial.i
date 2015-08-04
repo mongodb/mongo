@@ -67,7 +67,7 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 
 	WT_UNUSED(session);
 
-        /* The cursor should be positioned. */
+	/* The cursor should be positioned. */
 	WT_ASSERT(session, ins_stack[0] != NULL);
 
 	/*
