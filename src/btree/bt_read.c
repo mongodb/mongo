@@ -153,6 +153,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref,
 	int exact, tret;
 	void *p;
 
+	WT_STAT_FAST_CONN_INCR(session, cache_read_lookaside);
+
 	*need_las_removep = 0;
 
 	cursor = NULL;

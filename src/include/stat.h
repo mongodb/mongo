@@ -185,6 +185,7 @@ struct __wt_connection_stats {
 	WT_STATS cache_pages_dirty;
 	WT_STATS cache_pages_inuse;
 	WT_STATS cache_read;
+	WT_STATS cache_read_lookaside;
 	WT_STATS cache_write;
 	WT_STATS cond_wait;
 	WT_STATS cursor_create;
@@ -232,6 +233,9 @@ struct __wt_connection_stats {
 	WT_STATS log_sync_dir;
 	WT_STATS log_write_lsn;
 	WT_STATS log_writes;
+	WT_STATS lookaside_cursor_insert;
+	WT_STATS lookaside_cursor_insert_bytes;
+	WT_STATS lookaside_cursor_remove;
 	WT_STATS lsm_checkpoint_throttle;
 	WT_STATS lsm_merge_throttle;
 	WT_STATS lsm_rows_merged;
@@ -253,6 +257,8 @@ struct __wt_connection_stats {
 	WT_STATS read_io;
 	WT_STATS rec_pages;
 	WT_STATS rec_pages_eviction;
+	WT_STATS rec_pages_lookaside;
+	WT_STATS rec_pages_restore;
 	WT_STATS rec_split_stashed_bytes;
 	WT_STATS rec_split_stashed_objects;
 	WT_STATS rwlock_read;

@@ -3067,8 +3067,10 @@ skip_check_complete:
 	 * If we found updates that weren't globally visible when reconciling
 	 * this page, note that in the page header.
 	 */
-	if (!r->evict_skipped_updates && bnd->skip != NULL)
+	if (!r->evict_skipped_updates && bnd->skip != NULL) {
 		F_SET(dsk, WT_PAGE_LAS_UPDATE);
+		WT_STAT_FAST_CONN_INCR(session, rec_pages_lookaside);
+	}
 
 	/*
 	 * If we had to skip updates in order to build this disk image, we can't
@@ -3076,6 +3078,8 @@ skip_check_complete:
 	 * disk image and the list of updates we skipped.
 	 */
 	if (r->evict_skipped_updates && bnd->skip != NULL) {
+		WT_STAT_FAST_CONN_INCR(session, rec_pages_restore);
+
 		/*
 		 * If the buffer is compressed (raw compression was configured),
 		 * we have to decompress it so we can instantiate it later. It's

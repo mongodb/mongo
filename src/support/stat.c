@@ -405,6 +405,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_app.desc =
 	    "cache: pages evicted by application threads";
 	stats->cache_read.desc = "cache: pages read into cache";
+	stats->cache_read_lookaside.desc =
+	    "cache: pages read into cache requiring lookaside entries";
 	stats->cache_eviction_fail.desc =
 	    "cache: pages selected for eviction unable to be evicted";
 	stats->cache_eviction_split.desc =
@@ -491,6 +493,12 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_slot_coalesced.desc = "log: written slots coalesced";
 	stats->log_close_yields.desc =
 	    "log: yields waiting for previous log file close";
+	stats->lookaside_cursor_insert_bytes.desc =
+	    "lookaside: lookaside table cursor-insert key and value bytes inserted";
+	stats->lookaside_cursor_insert.desc =
+	    "lookaside: lookaside table insert calls";
+	stats->lookaside_cursor_remove.desc =
+	    "lookaside: lookaside table remove calls";
 	stats->lsm_work_queue_app.desc =
 	    "LSM: application work units currently queued";
 	stats->lsm_work_queue_manager.desc =
@@ -508,6 +516,10 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->lsm_work_units_created.desc =
 	    "LSM: tree maintenance operations scheduled";
 	stats->lsm_work_queue_max.desc = "LSM: tree queue hit maximum";
+	stats->rec_pages_restore.desc =
+	    "reconciliation: page reconciliation block requires in-memory restoration";
+	stats->rec_pages_lookaside.desc =
+	    "reconciliation: page reconciliation block requires lookaside records";
 	stats->rec_pages.desc = "reconciliation: page reconciliation calls";
 	stats->rec_pages_eviction.desc =
 	    "reconciliation: page reconciliation calls for eviction";
@@ -596,6 +608,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cache_eviction_force_delete.v = 0;
 	stats->cache_eviction_app.v = 0;
 	stats->cache_read.v = 0;
+	stats->cache_read_lookaside.v = 0;
 	stats->cache_eviction_fail.v = 0;
 	stats->cache_eviction_split.v = 0;
 	stats->cache_eviction_walk.v = 0;
@@ -650,6 +663,9 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_compress_len.v = 0;
 	stats->log_slot_coalesced.v = 0;
 	stats->log_close_yields.v = 0;
+	stats->lookaside_cursor_insert_bytes.v = 0;
+	stats->lookaside_cursor_insert.v = 0;
+	stats->lookaside_cursor_remove.v = 0;
 	stats->lsm_rows_merged.v = 0;
 	stats->lsm_checkpoint_throttle.v = 0;
 	stats->lsm_merge_throttle.v = 0;
@@ -657,6 +673,8 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->lsm_work_units_done.v = 0;
 	stats->lsm_work_units_created.v = 0;
 	stats->lsm_work_queue_max.v = 0;
+	stats->rec_pages_restore.v = 0;
+	stats->rec_pages_lookaside.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
 	stats->page_busy_blocked.v = 0;

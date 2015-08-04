@@ -9,6 +9,36 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_las_stats_update --
+ *	Update the lookaside table statistics for return to the application.
+ */
+void
+__wt_las_stats_update(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CONNECTION_STATS *stats;
+
+	conn = S2C(session);
+	stats = &conn->stats;
+
+	/*
+	 * Lookaside table statistics are copied from the underlying lookaside
+	 * table data-source statistics. If there's no lookaside table (yet),
+	 * the values remain 0.
+	 */
+	session = conn->las_session;
+	if (session->dhandle == NULL)
+		return;
+
+	WT_STAT_SET(stats, lookaside_cursor_insert,
+	    WT_STAT(&session->dhandle->stats, cursor_insert));
+	WT_STAT_SET(stats, lookaside_cursor_insert_bytes,
+	    WT_STAT(&session->dhandle->stats, cursor_insert_bytes));
+	WT_STAT_SET(stats, lookaside_cursor_remove,
+	    WT_STAT(&session->dhandle->stats, cursor_remove));
+}
+
+/*
  * __las_drop --
  *	Discard the database's lookaside store.
  */
