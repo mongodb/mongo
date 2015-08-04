@@ -303,10 +303,10 @@ const StringMap<BSONObj::MatchType> queryOperatorMap{
     {"options", BSONObj::opOPTIONS},
     {"elemMatch", BSONObj::opELEM_MATCH},
     {"near", BSONObj::opNEAR},
+    {"nearSphere", BSONObj::opNEAR},
     {"geoNear", BSONObj::opNEAR},
     {"within", BSONObj::opWITHIN},
     {"geoWithin", BSONObj::opWITHIN},
-    {"maxDistance", BSONObj::opMAX_DISTANCE},
     {"geoIntersects", BSONObj::opGEO_INTERSECTS},
     {"bitsAllSet", BSONObj::opBITS_ALL_SET},
     {"bitsAllClear", BSONObj::opBITS_ALL_CLEAR},
@@ -323,12 +323,6 @@ int BSONElement::getGtLtOp(int def) const {
 
         StringMap<BSONObj::MatchType>::const_iterator queryOp = queryOperatorMap.find(opName);
         if (queryOp == queryOperatorMap.end()) {
-            // Need to handle $near separately because anything starting with $near should map to
-            // BSONObj::opNEAR.
-            if ("near" == opName.substr(0, 4)) {
-                return BSONObj::opNEAR;
-            }
-
             return def;
         }
         return queryOp->second;

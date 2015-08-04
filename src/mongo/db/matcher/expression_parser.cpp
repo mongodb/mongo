@@ -411,6 +411,9 @@ Status MatchExpressionParser::_parseSub(const char* name,
 
     level++;
 
+    // Special case parsing for geoNear. This is necessary in order to support query formats like
+    // {$near: <coords>, $maxDistance: <distance>}. No other query operators allow $-prefixed
+    // modifiers as sibling BSON elements.
     BSONObjIterator geoIt(sub);
     if (geoIt.more()) {
         BSONElement firstElt = geoIt.next();
@@ -420,9 +423,7 @@ Status MatchExpressionParser::_parseSub(const char* name,
             // from db/geo at this point, since it may not actually be linked in...
             if (mongoutils::str::equals(fieldName, "$near") ||
                 mongoutils::str::equals(fieldName, "$nearSphere") ||
-                mongoutils::str::equals(fieldName, "$geoNear") ||
-                mongoutils::str::equals(fieldName, "$maxDistance") ||
-                mongoutils::str::equals(fieldName, "$minDistance")) {
+                mongoutils::str::equals(fieldName, "$geoNear")) {
                 StatusWithMatchExpression s =
                     expressionParserGeoCallback(name, firstElt.getGtLtOp(), sub);
                 if (s.isOK()) {

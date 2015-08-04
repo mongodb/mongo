@@ -518,7 +518,6 @@ public:
         opELEM_MATCH = 0x12,
         opNEAR = 0x13,
         opWITHIN = 0x14,
-        opMAX_DISTANCE = 0x15,
         opGEO_INTERSECTS = 0x16,
         opBITS_ALL_SET = 0x17,
         opBITS_ALL_CLEAR = 0x18,

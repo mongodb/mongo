@@ -225,7 +225,6 @@ Document redactSafePortionDollarOps(BSONObj expr) {
 
             // These are never allowed
             case BSONObj::Equality:  // This actually means unknown
-            case BSONObj::opMAX_DISTANCE:
             case BSONObj::opNEAR:
             case BSONObj::NE:
             case BSONObj::opSIZE:
