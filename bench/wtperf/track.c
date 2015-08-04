@@ -98,6 +98,11 @@ sum_read_ops(CONFIG *cfg)
 	return (sum_ops(cfg, offsetof(CONFIG_THREAD, read)));
 }
 uint64_t
+sum_truncate_ops(CONFIG *cfg)
+{
+	return (sum_ops(cfg, offsetof(CONFIG_THREAD, truncate)));
+}
+uint64_t
 sum_update_ops(CONFIG *cfg)
 {
 	return (sum_ops(cfg, offsetof(CONFIG_THREAD, update)));

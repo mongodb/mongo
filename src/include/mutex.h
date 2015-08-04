@@ -24,24 +24,20 @@ struct __wt_condvar {
 
 /*
  * !!!
- * Don't touch this structure without understanding the read/write
- * locking functions.
+ * Don't modify this structure without understanding the read/write locking
+ * functions.
  */
-typedef union {			/* Read/write lock */
-#ifdef WORDS_BIGENDIAN
-	WiredTiger read/write locks require modification for big-endian systems.
-#else
+typedef union {				/* Read/write lock */
 	uint64_t u;
 	struct {
-		uint32_t us;
+		uint32_t wr;		/* Writers and readers */
 	} i;
 	struct {
-		uint16_t writers;
-		uint16_t readers;
-		uint16_t users;
-		uint16_t pad;
+		uint16_t writers;	/* Now serving for writers */
+		uint16_t readers;	/* Now serving for readers */
+		uint16_t users;		/* Next available ticket number */
+		uint16_t __notused;	/* Padding */
 	} s;
-#endif
 } wt_rwlock_t;
 
 /*

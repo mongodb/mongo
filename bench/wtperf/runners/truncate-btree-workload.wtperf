@@ -1,0 +1,9 @@
+# truncate workload. work phase
+conn_config="cache_size=2GB,checkpoint=(wait=60)"
+table_config="type=file"
+create=false
+report_interval=5
+run_time=500
+# Setup three threads to insert into the oplog
+# Setup one thread to be doing truncates from the oplog
+threads=((count=3,inserts=1,throttle=2000),(count=1,truncate=1,truncate_pct=10,truncate_count=50000))
