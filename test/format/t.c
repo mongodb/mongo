@@ -40,7 +40,7 @@ int
 main(int argc, char *argv[])
 {
 	time_t start;
-	int ch, reps, ret;
+	int ch, onerun, reps, ret;
 	const char *config, *home;
 
 	config = NULL;
@@ -64,11 +64,12 @@ main(int argc, char *argv[])
 
 	/* Set values from the command line. */
 	home = NULL;
+	onerun = 0;
 	while ((ch = __wt_getopt(
 	    g.progname, argc, argv, "1C:c:H:h:Llqrt:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
-			g.c_runs = 1;
+			onerun = 1;
 			break;
 		case 'C':			/* wiredtiger_open config */
 			g.config_open = __wt_optarg;
@@ -152,6 +153,13 @@ main(int argc, char *argv[])
 	 * makes sense when you're debugging, leave that semantic in place.
 	 */
 	if (g.replay && SINGLETHREADED)
+		g.c_runs = 1;
+
+	/*
+	 * Let the command line -1 flag override runs configured from other
+	 * sources.
+	 */
+	if (onerun)
 		g.c_runs = 1;
 
 	/*
