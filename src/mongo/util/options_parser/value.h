@@ -75,6 +75,7 @@ public:
     explicit Value(int val) : _intVal(val), _type(Int) {}
     explicit Value(long val) : _longVal(val), _type(Long) {}
     explicit Value(std::string val) : _stringVal(val), _type(String) {}
+    explicit Value(const char* val) : _stringVal(val), _type(String) {}
     explicit Value(unsigned long long val) : _unsignedLongLongVal(val), _type(UnsignedLongLong) {}
     explicit Value(unsigned val) : _unsignedVal(val), _type(Unsigned) {}
 
