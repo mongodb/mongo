@@ -125,7 +125,7 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 }
 
 /*
- 
+ * __wt_log_slot_init --
  *	Initialize the slot array.
  */
 int
