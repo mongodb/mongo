@@ -55,12 +55,13 @@ class ReplicaSetFixture(interface.ReplFixture):
                                                config.FIXTURE_SUBDIR)
 
         self.nodes = []
+        self.replset_name = None
 
     def setup(self):
-        replset_name = self.mongod_options.get("replSet", "rs")
+        self.replset_name = self.mongod_options.get("replSet", "rs")
 
         for i in xrange(self.num_nodes):
-            node = self._new_mongod(i, replset_name)
+            node = self._new_mongod(i, self.replset_name)
             node.setup()
             self.nodes.append(node)
 
@@ -74,12 +75,11 @@ class ReplicaSetFixture(interface.ReplFixture):
         # Initiate the replica set.
         members = []
         for (i, node) in enumerate(self.nodes):
-            conn_str = "localhost:%d" % (node.port)
-            member_info = {"_id": i, "host": conn_str}
+            member_info = {"_id": i, "host": node.get_connection_string()}
             if i > 0:
                 member_info["priority"] = 0
             members.append(member_info)
-        initiate_cmd_obj = {"replSetInitiate": {"_id": replset_name, "members": members}}
+        initiate_cmd_obj = {"replSetInitiate": {"_id": self.replset_name, "members": members}}
 
         client = utils.new_mongo_client(port=self.port)
         if self.auth_options is not None:
@@ -195,3 +195,10 @@ class ReplicaSetFixture(interface.ReplFixture):
             logger_name = "%s:secondary%s" % (self.logger.name, suffix)
 
         return logging.loggers.new_logger(logger_name, parent=self.logger)
+
+    def get_connection_string(self):
+        if self.replset_name is None:
+            raise ValueError("Must call setup() before calling get_connection_string()")
+
+        conn_strs = [node.get_connection_string() for node in self.nodes]
+        return self.replset_name + "/" + ",".join(conn_strs)

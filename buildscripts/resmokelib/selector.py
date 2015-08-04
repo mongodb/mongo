@@ -18,23 +18,22 @@ from . import utils
 from .utils import globstar
 from .utils import jscomment
 
-
-def filter_cpp_unit_tests(root="build/unittests.txt", include_files=None, exclude_files=None):
+def _filter_cpp_tests(kind, root, include_files, exclude_files):
     """
-    Filters out what C++ unit tests to run.
+    Generic filtering logic for C++ tests that are sourced from a list
+    of test executables.
     """
-
     include_files = utils.default_if_none(include_files, [])
     exclude_files = utils.default_if_none(exclude_files, [])
 
-    unit_tests = []
+    tests = []
     with open(root, "r") as fp:
-        for unit_test_path in fp:
-            unit_test_path = unit_test_path.rstrip()
-            unit_tests.append(unit_test_path)
+        for test_path in fp:
+            test_path = test_path.rstrip()
+            tests.append(test_path)
 
-    (remaining, included, _) = _filter_by_filename("C++ unit test",
-                                                   unit_tests,
+    (remaining, included, _) = _filter_by_filename(kind,
+                                                   tests,
                                                    include_files,
                                                    exclude_files)
 
@@ -42,7 +41,22 @@ def filter_cpp_unit_tests(root="build/unittests.txt", include_files=None, exclud
         return list(included)
     elif exclude_files:
         return list(remaining)
-    return unit_tests
+    return tests
+
+def filter_cpp_unit_tests(root="build/unittests.txt", include_files=None, exclude_files=None):
+    """
+    Filters out what C++ unit tests to run.
+    """
+    return _filter_cpp_tests("C++ unit test", root, include_files, exclude_files)
+
+
+def filter_cpp_integration_tests(root="build/integration_tests.txt",
+                                 include_files=None,
+                                 exclude_files=None):
+    """
+    Filters out what C++ integration tests to run.
+    """
+    return _filter_cpp_tests("C++ integration test", root, include_files, exclude_files)
 
 
 def filter_dbtests(binary=None, include_suites=None):

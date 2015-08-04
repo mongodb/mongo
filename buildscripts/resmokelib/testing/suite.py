@@ -16,7 +16,7 @@ class Suite(object):
     A suite of tests.
     """
 
-    TESTS_ORDER = ("cpp_unit_test", "db_test", "js_test", "mongos_test")
+    TESTS_ORDER = ("cpp_unit_test", "cpp_integration_test", "db_test", "js_test", "mongos_test")
 
     def __init__(self, suite_name, suite_config):
         """
@@ -54,8 +54,9 @@ class Suite(object):
             if not isinstance(mongos_options, dict):
                 raise TypeError("Expected dictionary of arguments to mongos")
             return [mongos_options]
-
-        if test_kind == "cpp_unit_test":
+        elif test_kind == "cpp_integration_test":
+            tests = _selector.filter_cpp_integration_tests(**test_info)
+        elif test_kind == "cpp_unit_test":
             tests = _selector.filter_cpp_unit_tests(**test_info)
         elif test_kind == "db_test":
             tests = _selector.filter_dbtests(**test_info)

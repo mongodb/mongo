@@ -152,6 +152,46 @@ class CPPUnitTestCase(TestCase):
                                     **self.program_options)
 
 
+class CPPIntegrationTestCase(TestCase):
+    """
+    A C++ integration test to execute.
+    """
+
+    def __init__(self,
+                 logger,
+                 program_executable,
+                 program_options=None):
+        """
+        Initializes the CPPIntegrationTestCase with the executable to run.
+        """
+
+        TestCase.__init__(self, logger, "Program", program_executable)
+
+        self.program_executable = program_executable
+        self.program_options = utils.default_if_none(program_options, {}).copy()
+
+    def configure(self, fixture):
+        TestCase.configure(self, fixture)
+
+        self.program_options["connectionString"] = self.fixture.get_connection_string()
+
+    def run_test(self):
+        try:
+            program = self._make_process()
+            self._execute(program)
+        except self.failureException:
+            raise
+        except:
+            self.logger.exception("Encountered an error running C++ integration test %s.",
+                                  self.basename())
+            raise
+
+    def _make_process(self):
+        return core.programs.generic_program(self.logger,
+                                             [self.program_executable],
+                                             **self.program_options)
+
+
 class DBTestCase(TestCase):
     """
     A dbtest to execute.
@@ -352,6 +392,7 @@ class MongosTestCase(TestCase):
 
 _TEST_CASES = {
     "cpp_unit_test": CPPUnitTestCase,
+    "cpp_integration_test": CPPIntegrationTestCase,
     "db_test": DBTestCase,
     "js_test": JSTestCase,
     "mongos_test": MongosTestCase,

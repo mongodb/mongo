@@ -60,6 +60,14 @@ class Fixture(object):
         """
         return True
 
+    def get_connection_string(self):
+        """
+        Returns the connection string for this fixture. This is NOT a
+        driver connection string, but a connection string of the format
+        expected by the mongo::ConnectionString class.
+        """
+        raise NotImplementedError("get_connection_string must be implemented by Fixture subclasses")
+
     def __str__(self):
         return "%s (Job #%d)" % (self.__class__.__name__, self.job_num)
 

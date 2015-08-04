@@ -212,11 +212,19 @@ def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **
     if config.STORAGE_ENGINE is not None:
         kwargs["storageEngine"] = config.STORAGE_ENGINE
 
-    for arg_name in kwargs:
-        arg_value = str(kwargs[arg_name])
-        args.append("--%s" % (arg_name))
-        if arg_value:
-            args.append(arg_value)
+    return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
+
+def generic_program(logger, args, process_kwargs=None, **kwargs):
+    """
+    Returns a Process instance that starts an arbitrary executable with
+    arguments constructed from 'kwargs'. The args parameter is an array
+    of strings containing the command to execute.
+    """
+
+    if not utils.is_string_list(args):
+        raise ValueError("The args parameter must be a list of command arguments")
+
+    _apply_kwargs(args, kwargs)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
     return _process.Process(logger, args, **process_kwargs)

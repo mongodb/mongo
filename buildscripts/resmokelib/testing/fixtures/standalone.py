@@ -143,3 +143,9 @@ class MongoDFixture(interface.Fixture):
 
     def is_running(self):
         return self.mongod is not None and self.mongod.poll() is None
+
+    def get_connection_string(self):
+        if self.mongod is None:
+            raise ValueError("Must call setup() before calling get_connection_string()")
+
+        return "localhost:%d" % self.port
