@@ -65,8 +65,6 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 {
 	u_int i;
 
-	WT_UNUSED(session);
-
 	/* The cursor should be positioned. */
 	WT_ASSERT(session, ins_stack[0] != NULL);
 
@@ -158,8 +156,8 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	    session, ins_head, ins_stack, new_ins, recnop, skipdepth);
 	WT_PAGE_UNLOCK(session, page);
 
-	/* Free unused memory on error. */
 	if (ret != 0) {
+		/* Free unused memory on error. */
 		__wt_free(session, new_ins);
 		return (ret);
 	}
