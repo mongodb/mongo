@@ -575,12 +575,10 @@ __log_wrlsn_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_LOG *log;
 	WT_SESSION_IMPL *session;
 
 	session = arg;
 	conn = S2C(session);
-	log = conn->log;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Write out any log record buffers.
@@ -591,7 +589,7 @@ __log_wrlsn_server(void *arg)
 	/*
 	 * On close we need to do this one more time because there could
 	 * be straggling log writes that need to be written.
-	 * XXX - Can any other log write get in here at this point in the
+	 * XXX - Can any other log write get in at this point in the
 	 * connection close path??
 	 */
 	WT_ERR(__wt_log_wrlsn(session, NULL));

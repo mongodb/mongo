@@ -57,10 +57,20 @@ retry:
 	 * We own the slot now.  No one else can join.
 	 * Set the end LSN.
 	 */
+	WT_STAT_FAST_CONN_INCR(session, log_slot_closes);
 	if (WT_LOG_SLOT_DONE(new_state) && rel != NULL)
 		*rel = 1;
 	current->slot_end_lsn = current->slot_start_lsn;
+	/*
+	 * XXX Calculate offset rather than passing it in.  We should be
+	 * able to do so although it may be a bit messy.
+	 */
 	current->slot_end_lsn.offset += new_offset;
+	WT_STAT_FAST_CONN_INCRV(session,
+	    log_slot_consolidated, new_offset);
+	/*
+	 * XXX Would like to change so one piece of code advances the LSN.
+	 */
 	log->alloc_lsn = current->slot_end_lsn;
 	WT_ASSERT(session, log->alloc_lsn.file >= log->write_lsn.file);
 	return (0);
@@ -111,6 +121,8 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 				 * We have a new, free slot to use.
 				 * Set it as the active slot.
 				 */
+				WT_STAT_FAST_CONN_INCR(session,
+				    log_slot_transitions);
 				log->active_slot = slot;
 				return (0);
 			}
@@ -134,7 +146,6 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	WT_LOGSLOT *slot;
 	int32_t i;
 
 	conn = S2C(session);
@@ -164,10 +175,10 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
 	    log_buffer_size, log->slot_buf_size * WT_SLOT_POOL);
+#if 0
 	/*
 	 * Set up the available slot from the pool the first time.
 	 */
-#if 0
 	slot = &log->slot_pool[0];
 	slot->slot_state = 0;
 	slot->slot_start_lsn = log->alloc_lsn;
@@ -205,7 +216,8 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 
 /*
  * __wt_log_slot_join --
- *	Join a consolidated logging slot.
+ *	Join a consolidated logging slot.  Must be called with
+ *	the read lock held.
  */
 int
 __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
@@ -221,14 +233,18 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	log = conn->log;
 
 	/*
-	 * Make sure the length cannot overflow.
+	 * Make sure the length cannot overflow.  The caller should not
+	 * even call this function if it doesn't fit but use direct
+	 * writes.
 	 */
 	WT_ASSERT(session, mysize < WT_LOG_SLOT_MAXIMUM);
 
 	/*
-	 * If we're doing direct writes, there may not be a slot active.
-	 * Verify we're from the worker thread.  There is nothing to do
-	 * so just return.
+	 * The worker thread is constantly trying to join and write out
+	 * the current buffered slot, even when direct writes are in
+	 * use.  If we're doing direct writes, there may not be a slot active.
+	 * Verify we're from the worker thread (passed in a size of 0).
+	 * There is nothing to do so just return.
 	 */
 	if (log->active_slot == NULL) {
 		WT_ASSERT(session, !F_ISSET(log,  WT_LOG_FORCE_CONSOLIDATE));
@@ -242,6 +258,10 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		WT_BARRIER();
 		slot = log->active_slot;
 		old_state = slot->slot_state;
+		/*
+		 * Try to join our size into the existing size and
+		 * atomically write it back into the state.
+		 */
 		flag_state = WT_LOG_SLOT_FLAGS(old_state);
 		released = WT_LOG_SLOT_RELEASED(old_state);
 		join_offset = WT_LOG_SLOT_JOINED(old_state);
@@ -256,12 +276,14 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		if (WT_LOG_SLOT_OPEN(old_state) &&
 		    WT_ATOMIC_CAS8(slot->slot_state, old_state, new_state))
 			break;
-		else
+		else {
 			/*
 			 * The slot is no longer open or we lost the race to
 			 * update it.  Yield and try again.
 			 */
+			WT_STAT_FAST_CONN_INCR(session, log_slot_races);
 			__wt_yield();
+		}
 	}
 	/*
 	 * We joined this slot.  Fill in our information to return to
@@ -282,7 +304,8 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 /*
  * __wt_log_slot_release --
  *	Each thread in a consolidated group releases its portion to
- *	signal it has completed writing its piece of the log.
+ *	signal it has completed copying its piece of the log into
+ *	the memory buffer.
  */
 int64_t
 __wt_log_slot_release(WT_LOGSLOT *slot, int64_t size)

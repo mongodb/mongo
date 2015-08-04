@@ -247,8 +247,6 @@ connection_stats = [
     LogStat('log_slot_joins', 'consolidated slot joins'),
     LogStat('log_slot_races', 'consolidated slot join races'),
     LogStat('log_slot_toobig', 'record size exceeded maximum'),
-    LogStat('log_slot_toosmall',
-        'failed to find a slot large enough for record'),
     LogStat('log_slot_transitions', 'consolidated slot join transitions'),
 
     ##########################################

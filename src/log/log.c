@@ -1136,14 +1136,8 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 */
 	WT_STAT_FAST_CONN_INCR(session, log_release_write_lsn);
 	while (WT_LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0) {
-		if (WT_LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) > 0) {
-			__wt_errx(session, "RELEASE: write_lsn %d/%lu",
-			    log->write_lsn.file, log->write_lsn.offset);
-			__wt_errx(session, "RELEASE: release_lsn %d/%lu",
-			    slot->slot_release_lsn.file,
-			    slot->slot_release_lsn.offset);
-			abort();
-		}
+		WT_ASSERT(session,
+		    WT_LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) <= 0);
 		if (++yield_count < 1000)
 			__wt_yield();
 		else
@@ -1633,14 +1627,8 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 */
 	WT_ASSERT(session, WT_LOG_CMP(&log->write_lsn, &log->alloc_lsn) == 0);
 	WT_RET(__wt_log_acquire(session, record->size, &tmp));
-	if (WT_LOG_CMP(&log->write_lsn, &tmp.slot_release_lsn) > 0) {
-		__wt_errx(session, "DIRECT: write_lsn %d/%lu",
-		    log->write_lsn.file, log->write_lsn.offset);
-		__wt_errx(session, "DIRECT: release_lsn %d/%lu",
-		    tmp.slot_release_lsn.file,
-		    tmp.slot_release_lsn.offset);
-		abort();
-	}
+	WT_ASSERT(session,
+	    WT_LOG_CMP(&log->write_lsn, &tmp.slot_release_lsn) <= 0);
 	tmp.slot_end_lsn.offset += record->size;
 	tmp.slot_direct_size = record->size;
 	WT_RET(__log_fill(session, &myslot, 1, record, lsnp));
