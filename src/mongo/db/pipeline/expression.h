@@ -639,12 +639,6 @@ public:
 };
 
 
-class ExpressionExp final : public ExpressionFixedArity<ExpressionExp, 1> {
-    Value evaluateInternal(Variables* vars) const final;
-    const char* getOpName() const final;
-};
-
-
 class ExpressionFieldPath final : public Expression {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
@@ -770,21 +764,6 @@ private:
 
     VariableMap _variables;
     boost::intrusive_ptr<Expression> _subExpression;
-};
-
-class ExpressionLn final : public ExpressionFixedArity<ExpressionLn, 1> {
-    Value evaluateInternal(Variables* vars) const final;
-    const char* getOpName() const final;
-};
-
-class ExpressionLog final : public ExpressionFixedArity<ExpressionLog, 2> {
-    Value evaluateInternal(Variables* vars) const final;
-    const char* getOpName() const final;
-};
-
-class ExpressionLog10 final : public ExpressionFixedArity<ExpressionLog10, 1> {
-    Value evaluateInternal(Variables* vars) const final;
-    const char* getOpName() const final;
 };
 
 class ExpressionMap final : public Expression {
@@ -1000,11 +979,6 @@ public:
     bool isAssociativeAndCommutative() const final {
         return true;
     }
-};
-
-class ExpressionPow final : public ExpressionFixedArity<ExpressionPow, 2> {
-    Value evaluateInternal(Variables* vars) const final;
-    const char* getOpName() const final;
 };
 
 
