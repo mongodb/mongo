@@ -73,7 +73,7 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	 * Configure the session:
 	 *	Don't tap for eviction.
 	 * Configure the session and file handles:
-	 *	Force discard on release.
+	 *	Force discard on release (must be last handle discarded).
 	 *	Flag as a lookaside handle (used, for example, to avoid writing
 	 *	lookaside records for the lookaside file during reconciliation).
 	 *	No checkpoints or logging.
@@ -107,10 +107,6 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
 	wt_session = &conn->las_session->iface;
 	WT_TRET(wt_session->close(wt_session, NULL));
 
-	/*
-	 * Clear the references, potentially used to determine if the lookaside
-	 * file is being used.
-	 */
 	conn->las_cursor = NULL;
 	conn->las_session = NULL;
 
