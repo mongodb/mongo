@@ -32,12 +32,15 @@ DBCollection.prototype.help = function () {
     var shortName = this.getName();
     print("DBCollection help");
     print("\tdb." + shortName + ".find().help() - show DBCursor help");
-    print("\tdb." + shortName + ".count()");
+    print("\tdb." + shortName + ".bulkWrite( operations, <optional params> ) - bulk execute write operations, optional parameters are: w, wtimeout, j");
+    print("\tdb." + shortName + ".count( query = {}, <optional params> ) - count the number of documents that matches the query, optional parameters are: limit, skip, hint, maxTimeMS");
     print("\tdb." + shortName + ".copyTo(newColl) - duplicates collection by copying all documents to newColl; no indexes are copied.");
     print("\tdb." + shortName + ".convertToCapped(maxBytes) - calls {convertToCapped:'" + shortName + "', size:maxBytes}} command");
     print("\tdb." + shortName + ".createIndex(keypattern[,options])");
     print("\tdb." + shortName + ".dataSize()");
-    print("\tdb." + shortName + ".distinct( key ) - e.g. db." + shortName + ".distinct( 'x' )");
+    print("\tdb." + shortName + ".deleteOne( filter, <optional params> ) - delete first matching document, optional parameters are: w, wtimeout, j");
+    print("\tdb." + shortName + ".deleteMany( filter, <optional params> ) - delete all matching documents, optional parameters are: w, wtimeout, j");
+    print("\tdb." + shortName + ".distinct( key, query, <optional params> ) - e.g. db." + shortName + ".distinct( 'x' ), optional parameters are: maxTimeMS");
     print("\tdb." + shortName + ".drop() drop the collection");
     print("\tdb." + shortName + ".dropIndex(index) - e.g. db." + shortName + ".dropIndex( \"indexName\" ) or db." + shortName + ".dropIndex( { \"indexKey\" : 1 } )");
     print("\tdb." + shortName + ".dropIndexes()");
@@ -51,15 +54,20 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".find(...).skip(n)");
     print("\tdb." + shortName + ".find(...).sort(...)");
     print("\tdb." + shortName + ".findOne([query])");
-    print("\tdb." + shortName + ".findAndModify( { update : ... , remove : bool [, query: {}, sort: {}, 'new': false] } )");
+    print("\tdb." + shortName + ".findOneAndDelete( filter, <optional params> ) - delete first matching document, optional parameters are: projection, sort, maxTimeMS");
+    print("\tdb." + shortName + ".findOneAndReplace( filter, replacement, <optional params> ) - replace first matching document, optional parameters are: projection, sort, maxTimeMS, upsert, returnNewDocument");
+    print("\tdb." + shortName + ".findOneAndUpdate( filter, update, <optional params> ) - update first matching document, optional parameters are: projection, sort, maxTimeMS, upsert, returnNewDocument");
     print("\tdb." + shortName + ".getDB() get DB object associated with collection");
     print("\tdb." + shortName + ".getPlanCache() get query plan cache associated with collection");
     print("\tdb." + shortName + ".getIndexes()");
     print("\tdb." + shortName + ".group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
     print("\tdb." + shortName + ".insert(obj)");
+    print("\tdb." + shortName + ".insertOne( obj, <optional params> ) - insert a document, optional parameters are: w, wtimeout, j");
+    print("\tdb." + shortName + ".insertMany( [objects], <optional params> ) - insert multiple documents, optional parameters are: w, wtimeout, j");
     print("\tdb." + shortName + ".mapReduce( mapFunction , reduceFunction , <optional params> )");
     print("\tdb." + shortName + ".aggregate( [pipeline], <optional params> ) - performs an aggregation on a collection; returns a cursor");
     print("\tdb." + shortName + ".remove(query)");
+    print("\tdb." + shortName + ".replaceOne( filter, replacement, <optional params> ) - replace the first matching document, optional parameters are: upsert, w, wtimeout, j");
     print("\tdb." + shortName + ".renameCollection( newName , <dropTarget> ) renames the collection.");
     print("\tdb." + shortName + ".runCommand( name , <options> ) runs a db command with the given name where the first param is the collection name");
     print("\tdb." + shortName + ".save(obj)");
@@ -70,7 +78,9 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".storageSize() - includes free space allocated to this collection");
     print("\tdb." + shortName + ".totalIndexSize() - size in bytes of all the indexes");
     print("\tdb." + shortName + ".totalSize() - storage allocated for all data and indexes");
-    print("\tdb." + shortName + ".update(query, object[, upsert_bool, multi_bool]) - instead of two flags, you can pass an object with fields: upsert, multi");
+    print("\tdb." + shortName + ".update( query, object[, upsert_bool, multi_bool] ) - instead of two flags, you can pass an object with fields: upsert, multi");
+    print("\tdb." + shortName + ".updateOne( filter, update, <optional params> ) - update the first matching document, optional parameters are: upsert, w, wtimeout, j");
+    print("\tdb." + shortName + ".updateMany( filter, update, <optional params> ) - update all matching documents, optional parameters are: upsert, w, wtimeout, j");
     print("\tdb." + shortName + ".validate( <full> ) - SLOW");;
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName + ".getShardDistribution() - prints statistics about data distribution in the cluster");
@@ -211,7 +221,7 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
         throw Error( "no object passed to insert!" );
 
     var flags = 0;
-    
+
     var wc = undefined;
     var allowDottedFields = false;
     if ( options === undefined ) {
@@ -223,7 +233,7 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
         } else {
             flags = options.ordered ? 0 : 1;
         }
-        
+
         if (options.writeConcern)
             wc = options.writeConcern;
         if (options.allowdotted)
@@ -231,7 +241,7 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
     } else {
         flags = options;
     }
-    
+
     // 1 = continueOnError, which is synonymous with unordered in the write commands/bulk-api
     var ordered = ((flags & 1) == 0);
 
@@ -516,7 +526,7 @@ DBCollection.prototype._genIndexName = function( keys ){
         var v = keys[k];
         if ( typeof v == "function" )
             continue;
-        
+
         if ( name.length > 0 )
             name += "_";
         name += k + "_";
@@ -656,8 +666,8 @@ DBCollection.prototype.findAndModify = function(args){
 }
 
 DBCollection.prototype.renameCollection = function( newName , dropTarget ){
-    return this._db._adminCommand( { renameCollection : this._fullName , 
-                                     to : this._db._name + "." + newName , 
+    return this._db._adminCommand( { renameCollection : this._fullName ,
+                                     to : this._db._name + "." + newName ,
                                      dropTarget : dropTarget } )
 }
 
@@ -934,10 +944,6 @@ DBCollection.prototype.getIndexKeys = function(){
 }
 
 
-DBCollection.prototype.count = function( x ){
-    return this.find( x ).count();
-}
-
 DBCollection.prototype.hashAllDocs = function() {
     var cmd = { dbhash : 1,
                 collections : [ this._shortName ] };
@@ -1113,36 +1119,48 @@ DBCollection.prototype.isCapped = function(){
     return ( e && e.options && e.options.capped ) ? true : false;
 }
 
-DBCollection.prototype._distinct = function( keyString , query ){
-    return this._dbReadCommand( { distinct : this._shortName , key : keyString , query : query || {} } );
-}
-
-DBCollection.prototype.distinct = function( keyString , query ){
-    keyStringType = typeof keyString;
-    if (keyStringType != "string")
-        throw Error("The first argument to the distinct command must be a string but was a " + keyStringType);
-    queryType = typeof query;
-    if (query != null && queryType != "object")
-        throw Error("The query argument to the distinct command must be a document but was a " + queryType);
-    var res = this._distinct( keyString , query );
-    if ( ! res.ok )
-        throw _getErrorWithCode(res, "distinct failed: " + tojson(res));
-    return res.values;
-}
-
-
-DBCollection.prototype.aggregate = function(pipeline, extraOpts) {
+//
+// CRUD specification aggregation cursor extension
+//
+DBCollection.prototype.aggregate = function(pipeline, aggregateOptions) {
     if (!(pipeline instanceof Array)) {
         // support legacy varargs form. (Also handles db.foo.aggregate())
         pipeline = argumentsToArray(arguments)
-        extraOpts = {}
-    }
-    else if (extraOpts === undefined) {
-        extraOpts = {};
+        aggregateOptions = {}
+    } else if (aggregateOptions === undefined) {
+        aggregateOptions = {};
     }
 
+    // Copy the aggregateOptions
+    var copy = Object.extend({}, aggregateOptions);
+
+    // Ensure handle crud API aggregateOptions
+    var keys = Object.keys(copy);
+
+    for (var i = 0; i < keys.length; i++) {
+        var name = keys[i];
+
+        if (name == 'batchSize') {
+            if (copy.cursor == null) {
+                copy.cursor = {};
+            }
+
+            copy.cursor.batchSize = copy['batchSize'];
+            delete copy['batchSize'];
+        } else if (name == 'useCursor') {
+            if (copy.cursor == null) {
+                copy.cursor = {};
+            }
+
+            delete copy['useCursor'];
+        }
+    }
+
+    // Assign the cleaned up options
+    aggregateOptions = copy;
+    // Create the initial command document
     var cmd = {pipeline: pipeline};
-    Object.extend(cmd, extraOpts);
+    Object.extend(cmd, aggregateOptions);
 
     if (!('cursor' in cmd)) {
         // implicitly use cursors
@@ -1163,26 +1181,27 @@ DBCollection.prototype.aggregate = function(pipeline, extraOpts) {
     var res = doAgg(cmd);
 
     if (!res.ok
-            && (res.code == 17020 || res.errmsg == "unrecognized field \"cursor")
-            && !("cursor" in extraOpts)) {
-        // If the command failed because cursors aren't supported and the user didn't explicitly
-        // request a cursor, try again without requesting a cursor.
-        delete cmd.cursor;
+        && (res.code == 17020 || res.errmsg == "unrecognized field \"cursor")
+        && !("cursor" in aggregateOptions)) {
+            // If the command failed because cursors aren't supported and the user didn't explicitly
+            // request a cursor, try again without requesting a cursor.
+            delete cmd.cursor;
 
-        res = doAgg(cmd);
+            res = doAgg(cmd);
 
-        if ('result' in res && !("cursor" in res)) {
-            // convert old-style output to cursor-style output
-            res.cursor = {ns: '', id: NumberLong(0)};
-            res.cursor.firstBatch = res.result;
-            delete res.result;
+            if ('result' in res && !("cursor" in res)) {
+                // convert old-style output to cursor-style output
+                res.cursor = {ns: '', id: NumberLong(0)};
+                res.cursor.firstBatch = res.result;
+                delete res.result;
+            }
         }
-    }
 
     assert.commandWorked(res, "aggregate failed");
 
-    if ("cursor" in res)
+    if ("cursor" in res) {
         return new DBCommandCursor(this._mongo, res);
+    }
 
     return res;
 }
@@ -1298,7 +1317,7 @@ DBCollection.autocomplete = function(obj){
 
 // Sharding additions
 
-/* 
+/*
 Usage :
 
 mongo <mongos>
@@ -1316,78 +1335,78 @@ true
 > var splitter = collection.getSplitKeysForChunks() // by default, the chunks are not split, the keys are just
                                                     // found.  A splitter function is returned which will actually
                                                     // do the splits.
-                                                    
+
 > splitter() // ! Actually executes the splits on the cluster !
-                                                    
+
 */
 
 DBCollection.prototype.getShardDistribution = function(){
 
    var stats = this.stats()
-   
+
    if( ! stats.sharded ){
        print( "Collection " + this + " is not sharded." )
        return
    }
-   
+
    var config = this.getMongo().getDB("config")
-       
+
    var numChunks = 0
-   
+
    for( var shard in stats.shards ){
-       
+
        var shardDoc = config.shards.findOne({ _id : shard })
-       
-       print( "\nShard " + shard + " at " + shardDoc.host ) 
-       
+
+       print( "\nShard " + shard + " at " + shardDoc.host )
+
        var shardStats = stats.shards[ shard ]
-               
+
        var chunks = config.chunks.find({ _id : sh._collRE( this ), shard : shard }).toArray()
-       
+
        numChunks += chunks.length
-       
+
        var estChunkData = shardStats.size / chunks.length
        var estChunkCount = Math.floor( shardStats.count / chunks.length )
-       
+
        print( " data : " + sh._dataFormat( shardStats.size ) +
               " docs : " + shardStats.count +
               " chunks : " +  chunks.length )
        print( " estimated data per chunk : " + sh._dataFormat( estChunkData ) )
        print( " estimated docs per chunk : " + estChunkCount )
-       
+
    }
-   
+
    print( "\nTotals" )
    print( " data : " + sh._dataFormat( stats.size ) +
           " docs : " + stats.count +
           " chunks : " +  numChunks )
    for( var shard in stats.shards ){
-   
+
        var shardStats = stats.shards[ shard ]
-       
+
        var estDataPercent = Math.floor( shardStats.size / stats.size * 10000 ) / 100
        var estDocPercent = Math.floor( shardStats.count / stats.count * 10000 ) / 100
-       
+
        print( " Shard " + shard + " contains " + estDataPercent + "% data, " + estDocPercent + "% docs in cluster, " +
               "avg obj size on shard : " + sh._dataFormat( stats.shards[ shard ].avgObjSize ) )
    }
-   
+
    print( "\n" )
-   
+
 }
 
 
 DBCollection.prototype.getSplitKeysForChunks = function( chunkSize ){
-       
+
    var stats = this.stats()
-   
+
    if( ! stats.sharded ){
        print( "Collection " + this + " is not sharded." )
        return
    }
-   
+
    var config = this.getMongo().getDB("config")
-   
+
    if( ! chunkSize ){
        chunkSize = config.settings.findOne({ _id : "chunksize" }).value
        print( "Chunk size not set, using default of " + chunkSize + "MB" )
@@ -1395,25 +1414,25 @@ DBCollection.prototype.getSplitKeysForChunks = function( chunkSize ){
    else{
        print( "Using chunk size of " + chunkSize + "MB" )
    }
-    
+
    var shardDocs = config.shards.find().toArray()
-   
+
    var allSplitPoints = {}
-   var numSplits = 0    
-   
+   var numSplits = 0
+
    for( var i = 0; i < shardDocs.length; i++ ){
-       
+
        var shardDoc = shardDocs[i]
        var shard = shardDoc._id
        var host = shardDoc.host
        var sconn = new Mongo( host )
-       
+
        var chunks = config.chunks.find({ _id : sh._collRE( this ), shard : shard }).toArray()
-       
+
        print( "\nGetting split points for chunks on shard " + shard + " at " + host )
-               
+
        var splitPoints = []
-       
+
        for( var j = 0; j < chunks.length; j++ ){
            var chunk = chunks[j]
            var result = sconn.getDB("admin").runCommand({ splitVector : this + "", min : chunk.min, max : chunk.max, maxChunkSize : chunkSize })
@@ -1423,39 +1442,39 @@ DBCollection.prototype.getSplitKeysForChunks = function( chunkSize ){
            }
            else{
                splitPoints = splitPoints.concat( result.splitKeys )
-               
+
                if( result.splitKeys.length > 0 )
                    print( " Added " + result.splitKeys.length + " split points for chunk " + sh._pchunk( chunk ) )
            }
        }
-       
+
        print( "Total splits for shard " + shard + " : " + splitPoints.length )
-       
+
        numSplits += splitPoints.length
        allSplitPoints[ shard ] = splitPoints
-       
+
    }
-   
+
    // Get most recent migration
    var migration = config.changelog.find({ what : /^move.*/ }).sort({ time : -1 }).limit( 1 ).toArray()
-   if( migration.length == 0 ) 
+   if( migration.length == 0 )
        print( "\nNo migrations found in changelog." )
    else {
        migration = migration[0]
        print( "\nMost recent migration activity was on " + migration.ns + " at " + migration.time )
    }
-   
-   var admin = this.getMongo().getDB("admin") 
+
+   var admin = this.getMongo().getDB("admin")
    var coll = this
    var splitFunction = function(){
-       
+
        // Turn off the balancer, just to be safe
        print( "Turning off balancer..." )
        config.settings.update({ _id : "balancer" }, { $set : { stopped : true } }, true )
        print( "Sleeping for 30s to allow balancers to detect change.  To be extra safe, check config.changelog" +
               " for recent migrations." )
        sleep( 30000 )
-              
+
        for( shard in allSplitPoints ){
            for( var i = 0; i < allSplitPoints[ shard ].length; i++ ){
                var splitKey = allSplitPoints[ shard ][i]
@@ -1463,21 +1482,21 @@ DBCollection.prototype.getSplitKeysForChunks = function( chunkSize ){
                printjson( admin.runCommand({ split : coll + "", middle : splitKey }) )
            }
        }
-       
+
        print( "Turning the balancer back on." )
        config.settings.update({ _id : "balancer" }, { $set : { stopped : false } } )
        sleep( 1 )
    }
-   
+
    splitFunction.getSplitPoints = function(){ return allSplitPoints; }
-   
+
    print( "\nGenerated " + numSplits + " split keys, run output function to perform splits.\n" +
-          " ex : \n" + 
+          " ex : \n" +
           "  > var splitter = <collection>.getSplitKeysForChunks()\n" +
           "  > splitter() // Execute splits on cluster !\n" )
-       
+
    return splitFunction
-   
+
 }
 
 DBCollection.prototype.setSlaveOk = function( value ) {
@@ -1529,6 +1548,117 @@ DBCollection.prototype.getWriteConcern = function() {
 DBCollection.prototype.unsetWriteConcern = function() {
     delete this._writeConcern;
 };
+
+//
+// CRUD specification read methods
+//
+
+/**
+* Count number of matching documents in the db to a query.
+*
+* @method
+* @param {object} query The query for the count.
+* @param {object} [options=null] Optional settings.
+* @param {number} [options.limit=null] The limit of documents to count.
+* @param {number} [options.skip=null] The number of documents to skip for the count.
+* @param {string|object} [options.hint=null] An index name hint or specification for the query.
+* @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
+* @return {number}
+*/
+DBCollection.prototype.count = function(query, options) {
+    var opts = Object.extend({}, options || {});
+
+    // Set parameters
+    var skip = (typeof opts.skip == 'number') ? opts.skip : null;
+    var limit = (typeof opts.limit == 'number') ? opts.limit : null;
+    var maxTimeMS = (typeof opts.maxTimeMS == 'number') ? opts.maxTimeMS : null;
+    var hint = opts.hint;
+
+    // Execute using command if we have passed in skip/limit or hint
+    if (skip != null || limit != null || hint != null || maxTimeMS != null) {
+        // Final query
+        var cmd = {
+            'count': this.getName(),
+            'query': query
+        };
+
+        // Add limit and skip if defined
+        if (typeof skip == 'number') {
+            cmd.skip = skip;
+        }
+
+        if (typeof limit == 'number') {
+            cmd.limit = limit;
+        }
+
+        if (hint) {
+            opts.hint = hint;
+        }
+
+        if (opts.maxTimeMS) {
+            cmd.maxTimeMS = opts.maxTimeMS;
+        }
+
+        // Run the command and return the result
+        var response = this.runReadCommand(cmd);
+        if (response.ok == 0) {
+            throw new Error("count failed: " + tojson(response));
+        }
+
+        return response.n;
+    }
+
+    // Return the result of the find
+    return this.find(query).count();
+}
+
+/**
+* The distinct command returns returns a list of distinct values for the given key across a collection.
+*
+* @method
+* @param {string} key Field of the document to find distinct values for.
+* @param {object} query The query for filtering the set of documents to which we apply the distinct filter.
+* @param {object} [options=null] Optional settings.
+* @param {number} [options.maxTimeMS=null] The maximum amount of time to allow the query to run.
+* @return {object}
+*/
+DBCollection.prototype.distinct = function(keyString, query, options){
+    var opts = Object.extend({}, options || {});
+    var keyStringType = typeof keyString;
+    var queryType = typeof query;
+
+    if (keyStringType != "string") {
+        throw new Error("The first argument to the distinct command must be a string but was a " + keyStringType);
+    }
+
+    if (query != null && queryType != "object") {
+        throw new Error("The query argument to the distinct command must be a document but was a " + queryType);
+    }
+
+    // Distinct command
+    var cmd = {
+        distinct : this.getName(),
+        key : keyString,
+        query : query || {}
+    };
+
+    // Set maxTimeMS if provided
+    if (opts.maxTimeMS) {
+        cmd.maxTimeMS = opts.maxTimeMS;
+    }
+
+    // Execute distinct command
+    var res = this.runReadCommand(cmd);
+    if (!res.ok) {
+        throw new Error("distinct failed: " + tojson(res));
+    }
+
+    return res.values;
+}
+
+DBCollection.prototype._distinct = function( keyString , query ){
+    return this._dbReadCommand( { distinct : this._shortName , key : keyString , query : query || {} } );
+}
 
 /**
  * PlanCache

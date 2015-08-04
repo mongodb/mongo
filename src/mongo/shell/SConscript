@@ -2,13 +2,14 @@
 
 Import("env")
 
-# if you add a file here, you need to add it in scripting/engine.cpp and shell/createCPPfromJavaScriptFiles.js as well
+# Files added here need to be added in scripting/engine.cpp and buildscripts/vcxproj.header as well.
 env.JSHeader(
     target="mongo.cpp",
     source=[
         "assert.js",
         "bulk_api.js",
         "collection.js",
+        "crud_api.js",
         "db.js",
         "explain_query.js",
         "explainable.js",
@@ -23,7 +24,8 @@ env.JSHeader(
     ],
 )
 
-# if you add a file here, you need to add it in shell/shell_utils.cpp and shell/createCPPfromJavaScriptFiles.js as well
+# Files added here need to be added in shell/shell_utils.cpp and buildscripts/vcxproj.header as
+# well.
 env.JSHeader(
     target="mongo-server.cpp",
     source=[

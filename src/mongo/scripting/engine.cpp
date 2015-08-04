@@ -271,6 +271,7 @@ ScriptingFunction Scope::createFunction(const char* code) {
 
 namespace JSFiles {
 extern const JSFile collection;
+extern const JSFile crud_api;
 extern const JSFile db;
 extern const JSFile explain_query;
 extern const JSFile explainable;
@@ -294,6 +295,7 @@ void Scope::execCoreFiles() {
     execSetup(JSFiles::query);
     execSetup(JSFiles::bulk_api);
     execSetup(JSFiles::collection);
+    execSetup(JSFiles::crud_api);
     execSetup(JSFiles::explain_query);
     execSetup(JSFiles::explainable);
     execSetup(JSFiles::upgrade_check);

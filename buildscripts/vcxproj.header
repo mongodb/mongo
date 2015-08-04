@@ -245,7 +245,7 @@
   <Target Name="MongoShell"
       BeforeTargets="ClCompile"
       Outputs="$(MongoShell)\mongo.cpp"
-      Inputs="$(MongoShell)\assert.js;$(MongoShell)\bulk_api.js;$(MongoShell)\collection.js;$(MongoShell)\db.js;$(MongoShell)\mongo.js;$(MongoShell)\mr.js;$(MongoShell)\query.js;$(MongoShell)\types.js;$(MongoShell)\upgrade_check.js;$(MongoShell)\utils.js;$(MongoShell)\utils_sh.js;$(MongoShell)\utils_auth.js" >
+      Inputs="$(MongoShell)\assert.js;$(MongoShell)\bulk_api.js;$(MongoShell)\collection.js;$(MongoShell)\crud_api.js;$(MongoShell)\db.js;$(MongoShell)\mongo.js;$(MongoShell)\mr.js;$(MongoShell)\query.js;$(MongoShell)\types.js;$(MongoShell)\upgrade_check.js;$(MongoShell)\utils.js;$(MongoShell)\utils_sh.js;$(MongoShell)\utils_auth.js" >
 
-      <Exec Command="python site_scons\site_tools\jstoh.py $(MongoShell)\mongo.cpp $(MongoShell)\assert.js $(MongoShell)\bulk_api.js $(MongoShell)\collection.js $(MongoShell)\db.js $(MongoShell)\mongo.js $(MongoShell)\mr.js $(MongoShell)\query.js $(MongoShell)\types.js $(MongoShell)\upgrade_check.js $(MongoShell)\utils.js $(MongoShell)\utils_sh.js $(MongoShell)\utils_auth.js" />
+      <Exec Command="python site_scons\site_tools\jstoh.py $(MongoShell)\mongo.cpp $(MongoShell)\assert.js $(MongoShell)\bulk_api.js $(MongoShell)\collection.js $(MongoShell)\crud_api.js $(MongoShell)\db.js $(MongoShell)\mongo.js $(MongoShell)\mr.js $(MongoShell)\query.js $(MongoShell)\types.js $(MongoShell)\upgrade_check.js $(MongoShell)\utils.js $(MongoShell)\utils_sh.js $(MongoShell)\utils_auth.js" />
   </Target>

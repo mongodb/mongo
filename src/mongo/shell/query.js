@@ -2,12 +2,12 @@
 
 if ( typeof DBQuery == "undefined" ){
     DBQuery = function( mongo , db , collection , ns , query , fields , limit , skip , batchSize , options ){
-        
+
         this._mongo = mongo; // 0
         this._db = db; // 1
         this._collection = collection; // 2
         this._ns = ns; // 3
-        
+
         this._query = query || {}; // 4
         this._fields = fields; // 5
         this._limit = limit || 0; // 6
@@ -44,7 +44,7 @@ DBQuery.prototype.help = function () {
     print("\t.returnKey()")
     print("\t.maxScan(n)")
     print("\t.readPref(mode, tagset)")
-    
+
     print("\nCursor methods");
     print("\t.toArray() - iterates through docs and returns an array of the results")
     print("\t.forEach( func )")
@@ -59,8 +59,8 @@ DBQuery.prototype.help = function () {
 }
 
 DBQuery.prototype.clone = function(){
-    var q =  new DBQuery( this._mongo , this._db , this._collection , this._ns , 
-        this._query , this._fields , 
+    var q =  new DBQuery( this._mongo , this._db , this._collection , this._ns ,
+        this._query , this._fields ,
         this._limit , this._skip , this._batchSize , this._options );
     q._special = this._special;
     return q;
@@ -69,7 +69,7 @@ DBQuery.prototype.clone = function(){
 DBQuery.prototype._ensureSpecial = function(){
     if ( this._special )
         return;
-    
+
     var n = { query : this._query };
     this._query = n;
     this._special = true;
@@ -259,13 +259,13 @@ DBQuery.prototype.hasNext = function(){
 
 DBQuery.prototype.next = function(){
     this._exec();
-    
+
     var o = this._cursor.hasNext();
     if ( o )
         this._cursorSeen++;
     else
         throw Error( "error hasNext: " + o );
-    
+
     var ret = this._cursor.next();
     if ( ret.$err ) {
         throw _getErrorWithCode(ret, "error: " + tojson( ret ));
@@ -294,7 +294,7 @@ DBQuery.prototype.readOnly = function(){
 DBQuery.prototype.toArray = function(){
     if ( this._arr )
         return this._arr;
-    
+
     var a = [];
     while ( this.hasNext() )
         a.push( this.next() );
@@ -351,7 +351,7 @@ DBQuery.prototype.countReturn = function(){
 
     if ( this._limit > 0 && this._limit < c )
         return this._limit;
-    
+
     return c;
 }
 
@@ -419,11 +419,11 @@ DBQuery.prototype.maxTimeMS = function( maxTimeMS ) {
 
 /**
  * Sets the read preference for this cursor.
- * 
+ *
  * @param mode {string} read preference mode to use.
  * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
  *     Note that this object only keeps a shallow copy of this array.
- * 
+ *
  * @return this cursor
  */
 DBQuery.prototype.readPref = function( mode, tagSet ) {
@@ -504,7 +504,7 @@ DBQuery.prototype.shellPrint = function(){
     catch ( e ){
         print( e );
     }
-    
+
 }
 
 /**
@@ -516,6 +516,108 @@ DBQuery.prototype.getQueryPlan = function() {
 
 DBQuery.prototype.toString = function(){
     return "DBQuery: " + this._ns + " -> " + tojson( this._query );
+}
+
+//
+// CRUD specification find cursor extension
+//
+
+/**
+* Get partial results from a mongos if some shards are down (instead of throwing an error).
+*
+* @method
+* @see http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#op-query
+* @return {DBQuery}
+*/
+DBQuery.prototype.allowPartialResults = function() {
+    this._checkModify();
+    this.addOption(DBQuery.Option.partial);
+    return this;
+}
+
+/**
+* The server normally times out idle cursors after an inactivity period (10 minutes)
+* to prevent excess memory use. Set this option to prevent that.
+*
+* @method
+* @see http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#op-query
+* @return {DBQuery}
+*/
+DBQuery.prototype.noCursorTimeout = function() {
+    this._checkModify();
+    this.addOption(DBQuery.Option.noTimeout);
+    return this;
+}
+
+/**
+* Internal replication use only - driver should not set
+*
+* @method
+* @see http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#op-query
+* @return {DBQuery}
+*/
+DBQuery.prototype.oplogReplay = function() {
+    this._checkModify();
+    this.addOption(DBQuery.Option.oplogReplay);
+    return this;
+}
+
+/**
+* Limits the fields to return for all matching documents.
+*
+* @method
+* @see http://docs.mongodb.org/manual/tutorial/project-fields-from-query-results/
+* @param {object} document Document specifying the projection of the resulting documents.
+* @return {DBQuery}
+*/
+DBQuery.prototype.projection = function(document) {
+    this._checkModify();
+    this._fields = document;
+    return this;
+}
+
+/**
+* Specify cursor as a tailable cursor, allowing to specify if it will use awaitData
+*
+* @method
+* @see http://docs.mongodb.org/manual/tutorial/create-tailable-cursor/
+* @param {boolean} [awaitData=true] cursor blocks for a few seconds to wait for data if no documents found.
+* @return {DBQuery}
+*/
+DBQuery.prototype.tailable = function(awaitData) {
+    this._checkModify();
+    this.addOption(DBQuery.Option.tailable);
+
+    // Set await data if either specifically set or not specified
+    if (awaitData || awaitData == null) {
+        this.addOption(DBQuery.Option.awaitData);
+    }
+
+    return this;
+}
+
+/**
+* Specify a document containing modifiers for the query.
+*
+* @method
+* @see http://docs.mongodb.org/manual/reference/operator/query-modifier/
+* @param {object} document A document containing modifers to apply to the cursor.
+* @return {DBQuery}
+*/
+DBQuery.prototype.modifiers = function(document) {
+    this._checkModify();
+
+    for(var name in document) {
+        if(name[0] != '$') {
+            throw new Error('All modifiers must start with a $ such as $maxScan or $returnKey');
+        }
+    }
+
+    for(var name in document) {
+        this._addSpecial(name, document[name]);
+    }
+
+    return this;
 }
 
 DBQuery.shellBatchSize = 20;
