@@ -44,9 +44,10 @@ const Client::Decoration<ReplClientInfo> ReplClientInfo::forClient =
     Client::declareDecoration<ReplClientInfo>();
 
 long long ReplClientInfo::getTerm() {
-    if (_cachedTerm == kUninitializedTerm) {
-        _cachedTerm = getGlobalReplicationCoordinator()->getTerm();
-    }
+    // TODO(siyuan): fix term caching SERVER-19786
+    // if (_cachedTerm == kUninitializedTerm) {
+    _cachedTerm = getGlobalReplicationCoordinator()->getTerm();
+    //}
     return _cachedTerm;
 }
 

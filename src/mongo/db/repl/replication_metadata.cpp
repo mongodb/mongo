@@ -33,6 +33,7 @@
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/metadata.h"
 
 namespace mongo {
 namespace repl {
@@ -56,30 +57,38 @@ const std::string kLegalReplicationMetadataFieldNames[] = {
 }  // namespace
 
 Status ReplicationMetadata::initialize(const BSONObj& metadataObj) {
-    Status status = bsonCheckOnlyHasFields(
-        "ReplicationMetadata", metadataObj, kLegalReplicationMetadataFieldNames);
+    BSONElement replMetadataElement;
+
+    Status status = bsonExtractTypedField(
+        metadataObj, rpc::kReplicationMetadataFieldName, Object, &replMetadataElement);
+    if (!status.isOK())
+        return status;
+    BSONObj replMetadataObj = replMetadataElement.Obj();
+
+    status = bsonCheckOnlyHasFields(
+        "ReplicationMetadata", replMetadataObj, kLegalReplicationMetadataFieldNames);
     if (!status.isOK())
         return status;
 
-    status = bsonExtractIntegerField(metadataObj, kConfigVersionFieldName, &_configVersion);
+    status = bsonExtractIntegerField(replMetadataObj, kConfigVersionFieldName, &_configVersion);
     if (!status.isOK())
         return status;
 
-    status = bsonExtractIntegerField(metadataObj, kPrimaryIndexFieldName, &_primaryIndex);
+    status = bsonExtractIntegerField(replMetadataObj, kPrimaryIndexFieldName, &_primaryIndex);
     if (!status.isOK())
         return status;
 
-    status = bsonExtractIntegerField(metadataObj, kTermFieldName, &_term);
+    status = bsonExtractIntegerField(replMetadataObj, kTermFieldName, &_term);
     if (!status.isOK())
         return status;
 
     // extracting the lastOpCommitted is a bit of a process
     Timestamp ts;
-    status = bsonExtractTimestampField(metadataObj, kLastOpCommittedTimestampFieldName, &ts);
+    status = bsonExtractTimestampField(replMetadataObj, kLastOpCommittedTimestampFieldName, &ts);
     if (!status.isOK())
         return status;
     long long term;
-    status = bsonExtractIntegerField(metadataObj, kLastOpCommittedTermFieldName, &term);
+    status = bsonExtractIntegerField(replMetadataObj, kLastOpCommittedTermFieldName, &term);
     if (!status.isOK())
         return status;
     _lastOpCommitted = OpTime(ts, term);

@@ -55,6 +55,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
@@ -2349,17 +2350,20 @@ TEST_F(ReplCoordTest, MetadataWrongConfigVersion) {
 
     // lower configVersion
     ReplicationMetadata metadata;
-    metadata.initialize(BSON("lastOpCommittedTimestamp" << Timestamp(10, 0) << "lastOpCommittedTerm"
-                                                        << 2 << "configVersion" << 1
-                                                        << "primaryIndex" << 2 << "term" << 2));
+    metadata.initialize(BSON(rpc::kReplicationMetadataFieldName << BSON(
+                                 "lastOpCommittedTimestamp"
+                                 << Timestamp(10, 0) << "lastOpCommittedTerm" << 2
+                                 << "configVersion" << 1 << "primaryIndex" << 2 << "term" << 2)));
     getReplCoord()->processReplicationMetadata(metadata);
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 
     // higher configVersion
     ReplicationMetadata metadata2;
-    metadata2.initialize(BSON("lastOpCommittedTimestamp"
-                              << Timestamp(10, 0) << "lastOpCommittedTerm" << 2 << "configVersion"
-                              << 100 << "primaryIndex" << 2 << "term" << 2));
+    metadata2.initialize(
+        BSON(rpc::kReplicationMetadataFieldName
+             << BSON("lastOpCommittedTimestamp" << Timestamp(10, 0) << "lastOpCommittedTerm" << 2
+                                                << "configVersion" << 100 << "primaryIndex" << 2
+                                                << "term" << 2)));
     getReplCoord()->processReplicationMetadata(metadata2);
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 }
@@ -2390,25 +2394,28 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
 
     // higher OpTime, should change
     ReplicationMetadata metadata;
-    metadata.initialize(BSON("lastOpCommittedTimestamp" << Timestamp(10, 0) << "lastOpCommittedTerm"
-                                                        << 1 << "configVersion" << 2
-                                                        << "primaryIndex" << 2 << "term" << 1));
+    metadata.initialize(BSON(rpc::kReplicationMetadataFieldName << BSON(
+                                 "lastOpCommittedTimestamp"
+                                 << Timestamp(10, 0) << "lastOpCommittedTerm" << 1
+                                 << "configVersion" << 2 << "primaryIndex" << 2 << "term" << 1)));
     getReplCoord()->processReplicationMetadata(metadata);
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getLastCommittedOpTime());
-    ASSERT_EQUALS(time, getReplCoord()->getCurrentCommittedSnapshot_forTest());
+    ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1),
+                  getReplCoord()->getCurrentCommittedSnapshot_forTest());
 
     // lower OpTime, should not change
     ReplicationMetadata metadata2;
-    metadata2.initialize(BSON("lastOpCommittedTimestamp" << Timestamp(9, 0) << "lastOpCommittedTerm"
-                                                         << 1 << "configVersion" << 2
-                                                         << "primaryIndex" << 2 << "term" << 1));
+    metadata2.initialize(BSON(rpc::kReplicationMetadataFieldName << BSON(
+                                  "lastOpCommittedTimestamp"
+                                  << Timestamp(9, 0) << "lastOpCommittedTerm" << 1
+                                  << "configVersion" << 2 << "primaryIndex" << 2 << "term" << 1)));
     getReplCoord()->processReplicationMetadata(metadata2);
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getLastCommittedOpTime());
 }
 
 TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
-    // Ensure that the term and PrimaryId are updated if and only if the term is greater than our
-    // current term.
+    // Ensure that the term is updated if and only if the term is greater than our current term.
+    // Ensure that currentPrimaryIndex is never altered by ReplicationMetadata.
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version" << 2 << "members"
@@ -2428,33 +2435,36 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
 
     // higher term, should change
     ReplicationMetadata metadata;
-    metadata.initialize(BSON("lastOpCommittedTimestamp" << Timestamp(10, 0) << "lastOpCommittedTerm"
-                                                        << 3 << "configVersion" << 2
-                                                        << "primaryIndex" << 2 << "term" << 3));
+    metadata.initialize(BSON(rpc::kReplicationMetadataFieldName << BSON(
+                                 "lastOpCommittedTimestamp"
+                                 << Timestamp(10, 0) << "lastOpCommittedTerm" << 3
+                                 << "configVersion" << 2 << "primaryIndex" << 2 << "term" << 3)));
     getReplCoord()->processReplicationMetadata(metadata);
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 3), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
-    ASSERT_EQUALS(2, getTopoCoord().getCurrentPrimaryIndex());
+    ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
 
     // lower term, should not change
     ReplicationMetadata metadata2;
-    metadata2.initialize(BSON("lastOpCommittedTimestamp"
-                              << Timestamp(11, 0) << "lastOpCommittedTerm" << 3 << "configVersion"
-                              << 2 << "primaryIndex" << 1 << "term" << 2));
+    metadata2.initialize(BSON(rpc::kReplicationMetadataFieldName << BSON(
+                                  "lastOpCommittedTimestamp"
+                                  << Timestamp(11, 0) << "lastOpCommittedTerm" << 3
+                                  << "configVersion" << 2 << "primaryIndex" << 1 << "term" << 2)));
     getReplCoord()->processReplicationMetadata(metadata2);
     ASSERT_EQUALS(OpTime(Timestamp(11, 0), 3), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
-    ASSERT_EQUALS(2, getTopoCoord().getCurrentPrimaryIndex());
+    ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
 
     // same term, should not change
     ReplicationMetadata metadata3;
-    metadata3.initialize(BSON("lastOpCommittedTimestamp"
-                              << Timestamp(11, 0) << "lastOpCommittedTerm" << 3 << "configVersion"
-                              << 2 << "primaryIndex" << 1 << "term" << 3));
+    metadata3.initialize(BSON(rpc::kReplicationMetadataFieldName << BSON(
+                                  "lastOpCommittedTimestamp"
+                                  << Timestamp(11, 0) << "lastOpCommittedTerm" << 3
+                                  << "configVersion" << 2 << "primaryIndex" << 1 << "term" << 3)));
     getReplCoord()->processReplicationMetadata(metadata3);
     ASSERT_EQUALS(OpTime(Timestamp(11, 0), 3), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
-    ASSERT_EQUALS(2, getTopoCoord().getCurrentPrimaryIndex());
+    ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
 }
 
 TEST_F(ReplCoordTest, SnapshotCommitting) {

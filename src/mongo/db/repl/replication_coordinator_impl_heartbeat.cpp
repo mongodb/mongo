@@ -130,8 +130,10 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         resp = cbData.response.getValue().data;
         responseStatus = hbResponse.initialize(resp, _topCoord->getTerm());
         ReplicationMetadata replMetadata;
-        replMetadata.initialize(cbData.response.getValue().metadata);
-        _processReplicationMetadata_incallback(replMetadata);
+        auto metadataStatus = replMetadata.initialize(cbData.response.getValue().metadata);
+        if (metadataStatus.isOK()) {
+            _processReplicationMetadata_incallback(replMetadata);
+        }
     }
     const Date_t now = _replExecutor.now();
     const OpTime lastApplied = getMyLastOptime();  // Locks and unlocks _mutex.

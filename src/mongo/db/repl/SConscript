@@ -400,12 +400,13 @@ env.Library('replica_set_messages',
                 'last_vote.cpp',
             ],
             LIBDEPS=[
-                'read_concern_args',
                 '$BUILD_DIR/mongo/base',
                 '$BUILD_DIR/mongo/bson/util/bson_extract',
-                '$BUILD_DIR/mongo/util/net/hostandport',
                 '$BUILD_DIR/mongo/db/common',
+                '$BUILD_DIR/mongo/rpc/metadata',
+                '$BUILD_DIR/mongo/util/net/hostandport',
                 'optime',
+                'read_concern_args',
             ])
 
 env.CppUnitTest('replica_set_config_test',

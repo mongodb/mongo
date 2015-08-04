@@ -16,7 +16,10 @@ replTest.initiate({"_id": name,
                    "members": [
                        { "_id": 0, "host": nodes[0] },
                        { "_id": 1, "host": nodes[1], priority: 0 },
-                       { "_id": 2, "host": nodes[2], arbiterOnly: true }]
+                       { "_id": 2, "host": nodes[2], arbiterOnly: true }],
+                   "settings": {
+                       "protocolVersion": 1
+                   }
                   });
 
 // Get connections and collection.
@@ -34,11 +37,20 @@ if (!db.serverStatus().storageEngine.supportsCommittedReads) {
 // Do a write, wait for it to replicate, and ensure it is visible.
 assert.writeOK(db.foo.save({_id: 1, state: 0}, {writeConcern: {w: "majority", wtimeout: 60*1000}}));
 
+secondary.setSlaveOk();
+// Timeout is based on heartbeat timeout.
+assert.commandWorked(secondary.getDB(name).foo.runCommand(
+            'find', {"readConcern": {"level": "majority"}, "maxTimeMS": 10 * 1000}));
+
 // Disable snapshotting via failpoint
 secondary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'});
 
 // Resync to drop any existing snapshots
 secondary.adminCommand({resync: 1});
+    
+// Ensure maxTimeMS times out while waiting for this snapshot
+assert.commandFailed(secondary.getDB(name).foo.runCommand(
+            'find', {"readConcern": {"level": "majority"}, "maxTimeMS": 1000}));
 
 // Reconfig to make the secondary the primary
 var config = primary.getDB("local").system.replset.findOne();

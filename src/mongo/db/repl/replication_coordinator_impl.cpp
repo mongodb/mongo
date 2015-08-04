@@ -1619,9 +1619,7 @@ void ReplicationCoordinatorImpl::_processReplicationMetadata_incallback(
         return;
     }
     _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
-    if (_updateTerm_incallback(replMetadata.getTerm(), nullptr)) {
-        _topCoord->setPrimaryIndex(replMetadata.getPrimaryIndex());
-    }
+    _updateTerm_incallback(replMetadata.getTerm(), nullptr);
 }
 
 bool ReplicationCoordinatorImpl::getMaintenanceMode() {
@@ -2570,10 +2568,7 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     OpTime committedOpTime =
         votingNodesOpTimes[votingNodesOpTimes.size() - _rsConfig.getMajorityVoteCount()];
 
-    // This check is performed to ensure we do not commit an OpTime from a previous term.
-    if (committedOpTime >= _firstOpTimeOfMyTerm) {
-        _setLastCommittedOpTime_inlock(committedOpTime);
-    }
+    _setLastCommittedOpTime_inlock(committedOpTime);
 }
 
 void ReplicationCoordinatorImpl::_setLastCommittedOpTime(const OpTime& committedOpTime) {
@@ -2584,6 +2579,11 @@ void ReplicationCoordinatorImpl::_setLastCommittedOpTime(const OpTime& committed
 void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& committedOpTime) {
     if (committedOpTime <= _lastCommittedOpTime)
         return;  // This may have come from an out-of-order heartbeat. Ignore it.
+
+    // This check is performed to ensure primaries do not commit an OpTime from a previous term.
+    if (_getMemberState_inlock().primary() && committedOpTime < _firstOpTimeOfMyTerm) {
+        return;
+    }
 
     _lastCommittedOpTime = committedOpTime;
 
@@ -2722,10 +2722,9 @@ void ReplicationCoordinatorImpl::prepareReplResponseMetadata(BSONObjBuilder* obj
 
 void ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish(
     const ReplicationExecutor::CallbackArgs& cbData, BSONObjBuilder* objBuilder) {
-    BSONObjBuilder replObj(objBuilder->subobjStart(rpc::kReplicationMetadataFieldName));
-    _topCoord->prepareReplResponseMetadata(&replObj, getLastCommittedOpTime());
-    replObj.done();
+    _topCoord->prepareReplResponseMetadata(objBuilder, getLastCommittedOpTime());
 }
+
 bool ReplicationCoordinatorImpl::isV1ElectionProtocol() {
     return getConfig().getProtocolVersion() == 1;
 }

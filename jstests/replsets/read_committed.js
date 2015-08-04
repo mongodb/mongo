@@ -12,15 +12,15 @@ var conns = replTest.startSet();
 replTest.initiate({"_id": name,
                    "members": [
                        { "_id": 0, "host": nodes[0] },
-                       { "_id": 1, "host": nodes[1] },
+                       { "_id": 1, "host": nodes[1], priority: 0 },
                        { "_id": 2, "host": nodes[2], arbiterOnly: true}]
                   });
 
 // Get connections and collection.
-var master = replTest.getMaster();
-var slave = replTest.liveNodes.slaves[0];
-var slaveId = replTest.getNodeId(slave);
-var db = master.getDB(name);
+var primary = replTest.getPrimary();
+var secondary = replTest.liveNodes.slaves[0];
+var secondaryId = replTest.getNodeId(secondary);
+var db = primary.getDB(name);
 var t = db[name];
 
 if (!db.serverStatus().storageEngine.supportsCommittedReads) {
@@ -46,7 +46,7 @@ assert.writeOK(t.save({_id: 1, state: 0}, {writeConcern: {w: "majority", wtimeou
 assert.eq(doDirtyRead(), 0);
 assert.eq(doCommittedRead(), 0);
 
-replTest.stop(slaveId);
+replTest.stop(secondaryId);
 
 // Do a write and ensure it is only visible to dirty reads
 assert.writeOK(t.save({_id: 1, state: 1}));
@@ -59,11 +59,10 @@ sleep(1000);
 assert.eq(doCommittedRead(), 0);
 
 // Restart the node and ensure the committed view is updated.
-replTest.restart(slaveId);
-db.getLastError("majority", 60*1000);
+replTest.restart(secondaryId);
+db.getLastError("majority", 60 * 1000);
 assert.eq(doDirtyRead(), 1);
 assert.eq(doCommittedRead(), 1);
 
-// Disable snapshots via failpoint and see the maxTimeMS works properly
 
 }());
