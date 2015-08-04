@@ -1967,28 +1967,36 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
                                                           BSONObjBuilder* resultObj) {
     log() << "replSetInitiate admin command received from client";
 
+    // Skip config state changes if server is not running with replication enabled.
     const auto replEnabled = _settings.usingReplSets();
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    if (!replEnabled) {
-        return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
-    }
+    if (replEnabled) {
+        while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
+            _rsConfigStateChange.wait(lk);
+        }
 
-    while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
-        _rsConfigStateChange.wait(lk);
-    }
-
-    if (_rsConfigState != kConfigUninitialized) {
+        if (_rsConfigState != kConfigUninitialized) {
+            resultObj->append("info",
+                              "try querying local.system.replset to see current configuration");
+            return Status(ErrorCodes::AlreadyInitialized, "already initialized");
+        }
+        invariant(!_rsConfig.isInitialized());
+        _setConfigState_inlock(kConfigInitiating);
+    } else if (_externalState->loadLocalConfigDocument(txn).isOK()) {
         resultObj->append("info", "try querying local.system.replset to see current configuration");
         return Status(ErrorCodes::AlreadyInitialized, "already initialized");
     }
-    invariant(!_rsConfig.isInitialized());
-    _setConfigState_inlock(kConfigInitiating);
+
     ScopeGuard configStateGuard = MakeGuard(
         lockAndCall,
         &lk,
         stdx::bind(
             &ReplicationCoordinatorImpl::_setConfigState_inlock, this, kConfigUninitialized));
     lk.unlock();
+
+    if (!replEnabled) {
+        configStateGuard.Dismiss();
+    }
 
     ReplicaSetConfig newConfig;
     Status status = newConfig.initialize(configObj);
@@ -1997,7 +2005,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
         ;
     }
-    if (newConfig.getReplSetName() != _settings.ourSetName()) {
+    if (replEnabled && newConfig.getReplSetName() != _settings.ourSetName()) {
         str::stream errmsg;
         errmsg << "Attempting to initiate a replica set with name " << newConfig.getReplSetName()
                << ", but command line reports " << _settings.ourSetName() << "; rejecting";
@@ -2012,14 +2020,25 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         return Status(ErrorCodes::InvalidReplicaSetConfig, myIndex.getStatus().reason());
     }
 
+    if (!replEnabled && newConfig.getNumMembers() != 1) {
+        str::stream errmsg;
+        errmsg << "When replication is not enabled (no --replSet option) you can only specify one "
+               << "member in the config. " << newConfig.getNumMembers() << " members found in"
+               << "configuration: " << newConfig.toBSON();
+        error() << std::string(errmsg);
+        return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
+    }
+
     log() << "replSetInitiate config object with " << newConfig.getNumMembers()
           << " members parses ok";
 
-    status = checkQuorumForInitiate(&_replExecutor, newConfig, myIndex.getValue());
+    if (replEnabled) {
+        status = checkQuorumForInitiate(&_replExecutor, newConfig, myIndex.getValue());
 
-    if (!status.isOK()) {
-        error() << "replSetInitiate failed; " << status;
-        return status;
+        if (!status.isOK()) {
+            error() << "replSetInitiate failed; " << status;
+            return status;
+        }
     }
 
     status = _externalState->storeLocalConfigDocument(txn, newConfig.toBSON());
@@ -2028,23 +2047,30 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         return status;
     }
 
-    CBHStatus cbh =
-        _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetInitiate,
-                                              this,
-                                              stdx::placeholders::_1,
-                                              newConfig,
-                                              myIndex.getValue()));
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return status;
+    if (replEnabled) {
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetInitiate,
+                       this,
+                       stdx::placeholders::_1,
+                       newConfig,
+                       myIndex.getValue()));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return status;
+        }
+        configStateGuard.Dismiss();
+        fassert(18654, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
     }
-    configStateGuard.Dismiss();
-    fassert(18654, cbh.getStatus());
-    _replExecutor.wait(cbh.getValue());
 
     // Create the oplog with the first entry, and start repl threads.
+    // If the node is running with replication enabled, we
+    // want initiateOplog() to eventually update the replication coordinator's
+    // last op time.
     const auto updateReplOpTime = replEnabled;
     _externalState->initiateOplog(txn, updateReplOpTime);
-    _externalState->startThreads(&_replExecutor);
+    if (replEnabled) {
+        _externalState->startThreads(&_replExecutor);
+    }
 
     return Status::OK();
 }
