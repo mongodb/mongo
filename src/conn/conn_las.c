@@ -151,8 +151,8 @@ __wt_las_cursor(
 	if (conn->las_cursor == NULL)
 		WT_ERR(__wt_las_create(session));
 
-	/* Eviction worker threads get their own lookaside file cursors. */
-	if (F_ISSET(session, WT_SESSION_EVICTION_WORKER)) {
+	/* Eviction threads get their own lookaside file cursors. */
+	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR)) {
 		if (session->las_cursor == NULL)
 			WT_ERR(
 			    __las_cursor_create(session, &session->las_cursor));

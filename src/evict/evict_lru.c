@@ -229,8 +229,14 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 		WT_ERR(__wt_open_internal_session(conn,
 		    "eviction-worker", 1, 0, &workers[i].session));
 		workers[i].id = i;
+
+		/*
+		 * Eviction worker threads get their own lookaside file cursor.
+		 * Eviction worker threads may be called upon to perform slow
+		 * operations for the block manager.
+		 */
 		F_SET(workers[i].session,
-		    WT_SESSION_EVICTION_WORKER | WT_SESSION_CAN_WAIT);
+		    WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_CAN_WAIT);
 
 		if (i < conn->evict_workers_min) {
 			++conn->evict_workers;
@@ -260,7 +266,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 
 	/* We need a session handle because we're reading/writing pages. */
 	WT_RET(__wt_open_internal_session(
-	    conn, "eviction-server", 0, 0, &conn->evict_session));
+	    conn, "eviction-server", 1, 0, &conn->evict_session));
 	session = conn->evict_session;
 
 	/*
@@ -276,6 +282,9 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 		WT_RET(__evict_workers_resize(session));
 	else
 		F_SET(session, WT_SESSION_CAN_WAIT);
+
+	/* The eviction server gets its own lookaside file cursor. */
+	F_SET(session, WT_SESSION_LOOKASIDE_CURSOR);
 
 	/*
 	 * Start the primary eviction server thread after the worker threads
