@@ -215,7 +215,7 @@ struct Cloner::Fun {
                 msgasserted(28531, ss);
             }
 
-            dassert(collection);
+            verify(collection);
             ++numSeen;
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 if (_mayBeInterrupted) {
