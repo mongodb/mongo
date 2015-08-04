@@ -122,7 +122,7 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	int32_t	 slot_error;		/* Error value */
 	wt_off_t slot_start_offset;	/* Starting file offset */
 	WT_LSN	 slot_release_lsn;	/* Slot release LSN */
-	WT_LSN	 slot_start_lsn;		/* Slot starting LSN */
+	WT_LSN	 slot_start_lsn;	/* Slot starting LSN */
 	WT_LSN	 slot_end_lsn;		/* Slot ending LSN */
 	WT_FH	*slot_fh;		/* File handle for this group */
 	WT_ITEM  slot_buf;		/* Buffer for grouped writes */
