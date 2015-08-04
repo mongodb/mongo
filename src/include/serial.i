@@ -30,6 +30,32 @@ __page_write_gen_wrapped_check(WT_PAGE *page)
 }
 
 /*
+ * __insert_simple_func --
+ *	Worker function to add a WT_INSERT entry to the middle of a skiplist.
+ */
+static inline int
+__insert_simple_func(WT_SESSION_IMPL *session,
+    WT_INSERT ***ins_stack, WT_INSERT *new_ins, u_int skipdepth)
+{
+	u_int i;
+
+	WT_UNUSED(session);
+
+	/*
+	 * Update the skiplist elements referencing the new WT_INSERT item.
+	 * If we fail connecting one of the upper levels in the skiplist,
+	 * return success: the levels we updated are correct and sufficient.
+	 * Even though we don't get the benefit of the memory we allocated,
+	 * we can't roll back.
+	 */
+	for (i = 0; i < skipdepth; i++)
+		if (!WT_ATOMIC_CAS8(*ins_stack[i], new_ins->next[i], new_ins))
+			return (i == 0 ? WT_RESTART : 0);
+
+	return (0);
+}
+
+/*
  * __insert_serial_func --
  *	Worker function to add a WT_INSERT entry to a skiplist.
  */
@@ -42,31 +68,20 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 	WT_UNUSED(session);
 
 	/*
-	 * Confirm we are still in the expected position, and no item has been
-	 * added where our insert belongs.  Take extra care at the beginning
-	 * and end of the list (at each level): retry if we race there.
+	 * Update the skiplist elements referencing the new WT_INSERT item.
 	 *
-	 * !!!
-	 * Note the test for ins_stack[0] == NULL: that's the test for an
-	 * uninitialized cursor, ins_stack[0] is cleared as part of
-	 * initializing a cursor for a search.
+	 * Confirm we are still in the expected position, and no item has been
+	 * added where our insert belongs.  If we fail connecting one of the
+	 * upper levels in the skiplist, return success: the levels we updated
+	 * are correct and sufficient. Even though we don't get the benefit of
+	 * the memory we allocated, we can't roll back.
 	 */
 	for (i = 0; i < skipdepth; i++) {
-		if (ins_stack[i] == NULL ||
-		    *ins_stack[i] != new_ins->next[i])
-			return (WT_RESTART);
-		if (new_ins->next[i] == NULL &&
-		    ins_head->tail[i] != NULL &&
-		    ins_stack[i] != &ins_head->tail[i]->next[i])
-			return (WT_RESTART);
-	}
-
-	/* Update the skiplist elements referencing the new WT_INSERT item. */
-	for (i = 0; i < skipdepth; i++) {
+		if (!WT_ATOMIC_CAS8(*ins_stack[i], new_ins->next[i], new_ins))
+			return (i == 0 ? WT_RESTART : 0);
 		if (ins_head->tail[i] == NULL ||
 		    ins_stack[i] == &ins_head->tail[i]->next[i])
 			ins_head->tail[i] = new_ins;
-		*ins_stack[i] = new_ins;
 	}
 
 	return (0);
@@ -128,11 +143,18 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
 
-	/* Clear references to memory we now own. */
-	*new_insp = NULL;
+	/* !!!
+	 * Test for an uninitialized cursor, ins_stack[0] is cleared as part of
+	 * initializing a cursor for a search.
+	 */
+	if (ins_stack[0] == NULL)
+		return (WT_RESTART);
 
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
+
+	/* Clear references to memory we now own and must free on error. */
+	*new_insp = NULL;
 
 	/* Acquire the page's spinlock, call the worker function. */
 	WT_PAGE_LOCK(session, page);
@@ -171,21 +193,39 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 {
 	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
+	int simple;
+	u_int i;
 
-	/* Clear references to memory we now own. */
-	*new_insp = NULL;
+	/* !!!
+	 * Test for an uninitialized cursor, ins_stack[0] is cleared as part of
+	 * initializing a cursor for a search.
+	 */
+	if (ins_stack[0] == NULL)
+		return (WT_RESTART);
 
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
 
-	/* Acquire the page's spinlock, call the worker function. */
-	WT_PAGE_LOCK(session, page);
-	ret = __insert_serial_func(
-	    session, ins_head, ins_stack, new_ins, skipdepth);
-	WT_PAGE_UNLOCK(session, page);
+	/* Clear references to memory we now own and must free on error. */
+	*new_insp = NULL;
 
-	/* Free unused memory on error. */
+	simple = 1;
+	for (i = 0; i < skipdepth; i++)
+		if (new_ins->next[i] == NULL)
+			simple = 0;
+
+	if (simple)
+		ret = __insert_simple_func(
+		    session, ins_stack, new_ins, skipdepth);
+	else {
+		WT_PAGE_LOCK(session, page);
+		ret = __insert_serial_func(
+		    session, ins_head, ins_stack, new_ins, skipdepth);
+		WT_PAGE_UNLOCK(session, page);
+	}
+
 	if (ret != 0) {
+		/* Free unused memory on error. */
 		__wt_free(session, new_ins);
 		return (ret);
 	}
@@ -215,17 +255,15 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_DECL_RET;
 	WT_UPDATE *obsolete, *upd = *updp;
 
-	/* Clear references to memory we now own. */
-	*updp = NULL;
-
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
 
+	/* Clear references to memory we now own and must free on error. */
+	*updp = NULL;
+
 	/*
 	 * Swap the update into place.  If that fails, a new update was added
-	 * after our search, we raced.  Check if our update is still permitted,
-	 * and if it is, do a full-barrier to ensure the update's next pointer
-	 * is set before we update the linked list and try again.
+	 * after our search, we raced.  Check if our update is still permitted.
 	 */
 	while (!WT_ATOMIC_CAS8(*srch_upd, upd->next, upd)) {
 		if ((ret = __wt_txn_update_check(
@@ -234,7 +272,6 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 			__wt_free(session, upd);
 			return (ret);
 		}
-		WT_WRITE_BARRIER();
 	}
 
 	/*
