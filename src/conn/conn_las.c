@@ -26,8 +26,7 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	 * table data-source statistics. If there's no lookaside table (yet),
 	 * the values remain 0.
 	 */
-	session = conn->las_session;
-	if (session->dhandle == NULL)
+	if ((session = conn->las_session) == NULL || session->dhandle == NULL)
 		return;
 
 	WT_STAT_SET(stats, lookaside_cursor_insert,
