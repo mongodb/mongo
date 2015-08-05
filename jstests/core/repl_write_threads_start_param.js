@@ -10,14 +10,16 @@
     // too low a count
     clearRawMongoProgramOutput();
     var mongo = MongoRunner.runMongod({setParameter: 'replWriterThreadCount=0'});
-    assert(rawMongoProgramOutput().match("replWriterThreadCount must be between 1 and 256"),
-            "mongod started with too low a value for replWriterThreadCount");
+    assert.soon(function() {
+        return rawMongoProgramOutput().match("replWriterThreadCount must be between 1 and 256");
+    }, "mongod started with too low a value for replWriterThreadCount");
 
     // too high a count
     clearRawMongoProgramOutput();
     mongo = MongoRunner.runMongod({setParameter: 'replWriterThreadCount=257'});
-    assert(rawMongoProgramOutput().match("replWriterThreadCount must be between 1 and 256"),
-            "mongod started with too high a value for replWriterThreadCount");
+    assert.soon(function() {
+        return rawMongoProgramOutput().match("replWriterThreadCount must be between 1 and 256");
+    }, "mongod started with too high a value for replWriterThreadCount");
 
     // proper count
     clearRawMongoProgramOutput();
