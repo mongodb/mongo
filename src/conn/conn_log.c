@@ -418,9 +418,9 @@ __wt_log_wrlsn(WT_SESSION_IMPL *session)
 	size_t written_i;
 	uint32_t i, save_i;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	conn = S2C(session);
 	log = conn->log;
+	__wt_spin_lock(session, &log->log_writelsn_lock);
 restart:
 	coalescing = NULL;
 	WT_INIT_LSN(&save_lsn);
@@ -464,7 +464,7 @@ restart:
 			    &slot->slot_release_lsn) == 0 &&
 			    WT_LOG_CMP(&slot->slot_start_lsn,
 			    &slot->slot_end_lsn) == 0) {
-				WT_RET(__wt_log_slot_free(session, slot));
+				WT_ERR(__wt_log_slot_free(session, slot));
 				continue;
 			}
 			if (coalescing != NULL) {
@@ -513,19 +513,20 @@ restart:
 				    &slot->slot_release_lsn) == 0);
 				log->write_start_lsn = slot->slot_start_lsn;
 				log->write_lsn = slot->slot_end_lsn;
-				WT_RET(__wt_cond_signal(
+				WT_ERR(__wt_cond_signal(
 				    session, log->log_write_cond));
 				WT_STAT_FAST_CONN_INCR(session, log_write_lsn);
 				/*
 				 * Signal the close thread if needed.
 				 */
 				if (F_ISSET(slot, WT_SLOT_CLOSEFH))
-					WT_RET(__wt_cond_signal(
+					WT_ERR(__wt_cond_signal(
 					    session, conn->log_file_cond));
 			}
-			WT_RET(__wt_log_slot_free(session, slot));
+			WT_ERR(__wt_log_slot_free(session, slot));
 		}
 	}
+err:	__wt_spin_unlock(session, &log->log_writelsn_lock);
 	return (ret);
 }
 
@@ -569,9 +570,7 @@ __log_wrlsn_server(void *arg)
 		/*
 		 * Write out any log record buffers.
 		 */
-		WT_WITH_SLOT_LOCK(session, conn->log,
-		    ret = __wt_log_wrlsn(session));
-		WT_ERR(ret);
+		WT_ERR(__wt_log_wrlsn(session));
 		WT_ERR(__wt_cond_wait(session, conn->log_wrlsn_cond, 10000));
 	}
 	/*
@@ -580,7 +579,7 @@ __log_wrlsn_server(void *arg)
 	 * XXX - Can any other log write get in at this point in the
 	 * connection close path??
 	 */
-	WT_WITH_SLOT_LOCK(session, conn->log, ret = __wt_log_wrlsn(session));
+	WT_ERR(__wt_log_wrlsn(session));
 	WT_ERR(ret);
 	if (0) {
 err:		__wt_err(session, ret, "log wrlsn server error");
@@ -685,6 +684,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_spin_init(session, &log->log_lock, "log"));
 	WT_RET(__wt_spin_init(session, &log->log_slot_lock, "log slot"));
 	WT_RET(__wt_spin_init(session, &log->log_sync_lock, "log sync"));
+	WT_RET(__wt_spin_init(session, &log->log_writelsn_lock, "log write LSN"));
 	WT_RET(__wt_rwlock_alloc(session,
 	    &log->log_archive_lock, "log archive lock"));
 	WT_RET(__wt_rwlock_alloc(session,
@@ -859,6 +859,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);
+	__wt_spin_destroy(session, &conn->log->log_writelsn_lock);
 	__wt_free(session, conn->log_path);
 	__wt_free(session, conn->log);
 	return (ret);
