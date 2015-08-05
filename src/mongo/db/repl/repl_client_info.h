@@ -59,16 +59,6 @@ public:
         return _remoteId;
     }
 
-    // If we haven't cached a term from replication coordinator, get the current term
-    // and cache it during the life cycle of this client.
-    //
-    // Used by logOp() to attach the current term to each log entries. Assume we don't change
-    // the term since caching it. This is true for write commands, since we acquire the
-    // global lock (IX) for write commands and stepping down also needs that lock (S).
-    // Stepping down will kill all user operations, so there is no write after stepping down
-    // in the case of yielding.
-    long long getTerm();
-
     /**
      * Use this to set the LastOp to the latest known OpTime in the oplog.
      * This is necessary when doing no-op writes, as we need to set the client's lastOp to a proper
@@ -81,7 +71,6 @@ private:
 
     OpTime _lastOp = OpTime();
     OID _remoteId = OID();
-    long long _cachedTerm = kUninitializedTerm;
 };
 
 }  // namespace repl

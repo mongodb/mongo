@@ -2201,10 +2201,6 @@ long long TopologyCoordinatorImpl::getTerm() {
     return _term;
 }
 
-void TopologyCoordinatorImpl::incrementTerm() {
-    _term++;
-}
-
 void TopologyCoordinatorImpl::voteForMyselfV1() {
     _lastVote.setTerm(_term);
     _lastVote.setCandidateId(_selfConfig().getId());

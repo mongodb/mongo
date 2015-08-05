@@ -215,7 +215,6 @@ public:
                                             const OpTime& lastAppliedOpTime);
     virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
     virtual void loadLastVote(const LastVote& lastVote);
-    virtual void incrementTerm();
     virtual void voteForMyselfV1();
     virtual long long getTerm();
     virtual void prepareForStepDown();

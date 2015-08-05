@@ -1116,6 +1116,9 @@ private:
     // there is one.
     // When engaged, this must be <= _lastCommittedOpTime and < _uncommittedSnapshots.front().
     boost::optional<SnapshotInfo> _currentCommittedSnapshot;  // (M)
+
+    // The cached current term. It's in sync with the term in topology coordinator.
+    long long _cachedTerm = OpTime::kProtocolVersionV0Term;  // (M)
 };
 
 }  // namespace repl

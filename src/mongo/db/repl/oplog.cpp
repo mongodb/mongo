@@ -147,22 +147,24 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
                                            const char* opstr) {
     synchronizeOnCappedInFlightResource(txn->lockState());
 
+    long long hashNew = 0;
+    long long term = OpTime::kProtocolVersionV0Term;
+
+    // Fetch term out of the newOpMutex.
+    if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
+        replCoord->isV1ElectionProtocol()) {
+        // Current term. If we're not a replset of pv=1, it remains kOldProtocolVersionTerm.
+        term = replCoord->getTerm();
+    }
+
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
     Timestamp ts = getNextGlobalTimestamp();
     newTimestampNotifier.notify_all();
 
     fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(txn, ts));
 
-    long long hashNew = 0;
-    long long term = OpTime::kProtocolVersionV0Term;
-
-    // Set hash and term if we're in replset mode, otherwise they remain 0 in master/slave.
+    // Set hash if we're in replset mode, otherwise it remains 0 in master/slave.
     if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet) {
-        // Current term. If we're not a replset of pv=1, it remains kOldProtocolVersionTerm.
-        if (replCoord->isV1ElectionProtocol()) {
-            term = ReplClientInfo::forClient(txn->getClient()).getTerm();
-        }
-
         hashNew = hashGenerator.nextInt64();
     }
 

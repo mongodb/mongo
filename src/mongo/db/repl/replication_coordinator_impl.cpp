@@ -2840,15 +2840,8 @@ void ReplicationCoordinatorImpl::_summarizeAsHtml_finish(const CallbackArgs& cbD
 }
 
 long long ReplicationCoordinatorImpl::getTerm() {
-    long long term = OpTime::kDefaultTerm;
-    CBHStatus cbh = _replExecutor.scheduleWork(stdx::bind(
-        &ReplicationCoordinatorImpl::_getTerm_helper, this, stdx::placeholders::_1, &term));
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return term;
-    }
-    fassert(28660, cbh.getStatus());
-    _replExecutor.wait(cbh.getValue());
-    return term;
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _cachedTerm;
 }
 
 void ReplicationCoordinatorImpl::_getTerm_helper(const ReplicationExecutor::CallbackArgs& cbData,
@@ -2923,6 +2916,10 @@ void ReplicationCoordinatorImpl::_updateTerm_helper(const ReplicationExecutor::C
 
 bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term, Handle* cbHandle) {
     bool updated = _topCoord->updateTerm(term);
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _cachedTerm = _topCoord->getTerm();
+    }
 
     if (updated && getMemberState().primary()) {
         log() << "stepping down from primary, because a new term has begun";

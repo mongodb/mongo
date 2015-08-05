@@ -183,7 +183,7 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     }
 
     log() << "dry election run succeeded, running for election";
-    _topCoord->incrementTerm();
+    _updateTerm_incallback(originalTerm + 1, nullptr);
     // Secure our vote for ourself first
     _topCoord->voteForMyselfV1();
     // TODO(siyuan): SERVER-19764 store the vote in persistent storage.

@@ -327,11 +327,6 @@ public:
     virtual bool voteForMyself(Date_t now) = 0;
 
     /**
-     * Increase the term.
-     */
-    virtual void incrementTerm() = 0;
-
-    /**
      * Set lastVote to be for ourself in this term.
      */
     virtual void voteForMyselfV1() = 0;

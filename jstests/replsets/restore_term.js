@@ -27,6 +27,11 @@ checkTerm(primary, 1);
 assert.writeOK(primaryColl.insert({x: 1}, {writeConcern: {w: "majority"}}));
 checkTerm(primary, 1);
 
+// Check that the insert op has the initial term.
+var latestOp = getLatestOp(primary);
+assert.eq(latestOp.op, "i");
+assert.eq(latestOp.t, NumberLong(1));
+
 // Step down to increase the term.
 try {
     var res = primary.adminCommand({replSetStepDown: 0});
