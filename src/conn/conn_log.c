@@ -434,6 +434,9 @@ restart:
 	while (i < WT_SLOT_POOL) {
 		save_i = i;
 		slot = &log->slot_pool[i++];
+		if (!FLD64_ISSET(slot->slot_state, WT_LOG_SLOT_RESERVED))
+			WT_ASSERT(session,
+			    slot->slot_release_lsn.file >= log->write_lsn.file);
 		if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
 			continue;
 		written[written_i].slot_index = save_i;
@@ -581,10 +584,14 @@ __log_wrlsn_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_LOG *log;
 	WT_SESSION_IMPL *session;
+	int dir_lock;
 
 	session = arg;
 	conn = S2C(session);
+	log = conn->log;
+	dir_lock = 0;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Write out any log record buffers.
@@ -598,11 +605,18 @@ __log_wrlsn_server(void *arg)
 	 * XXX - Can any other log write get in at this point in the
 	 * connection close path??
 	 */
+	WT_ERR(__wt_writelock(session, log->log_direct_lock));
+	dir_lock = 1;
+	WT_ERR(__wt_log_force_write(session, 0, 0));
+	F_CLR(log, WT_LOG_FORCE_CONSOLIDATE);
+	dir_lock = 0;
+	WT_ERR(__wt_writeunlock(session, log->log_direct_lock));
 	WT_ERR(__wt_log_wrlsn(session));
-	WT_ERR(ret);
 	if (0) {
 err:		__wt_err(session, ret, "log wrlsn server error");
 	}
+	if (dir_lock)
+		(void)__wt_writeunlock(session, log->log_direct_lock);
 	return (WT_THREAD_RET_VALUE);
 }
 

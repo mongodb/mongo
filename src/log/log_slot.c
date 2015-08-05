@@ -78,6 +78,7 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, int *releasep)
 /*
  * __wt_log_slot_new --
  *	Find a free slot and switch it as the new active slot.
+ *	Must be called holding the slot lock.
  */
 int
 __wt_log_slot_new(WT_SESSION_IMPL *session)
@@ -92,6 +93,15 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 	log = conn->log;
 	if (!F_ISSET(log,  WT_LOG_FORCE_CONSOLIDATE))
 		return (0);
+	/*
+	 * Although this function is single threaded, multiple threads could
+	 * be trying to set a new active slot sequentially.  If we find an
+	 * active slot that is valid, return.
+	 */
+	if ((slot = log->active_slot) != NULL &&
+	    WT_LOG_SLOT_OPEN(slot->slot_state))
+		return (0);
+
 	/*
 	 * Keep trying until we can find a free slot.
 	 */
@@ -177,6 +187,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
 	    log_buffer_size, log->slot_buf_size * WT_SLOT_POOL);
+#if 0
 	F_SET(log,  WT_LOG_FORCE_CONSOLIDATE);
 	/*
 	 * Set up the available slot from the pool the first time.
@@ -188,6 +199,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	slot->slot_release_lsn = log->alloc_lsn;
 	slot->slot_fh = log->log_fh;
 	log->active_slot = slot;
+#endif
 
 	if (0) {
 err:		while (--i >= 0)
