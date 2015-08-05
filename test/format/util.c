@@ -186,7 +186,7 @@ val_gen(WT_RAND_STATE *rnd, uint8_t *val, size_t *sizep, uint64_t keyno)
 	 * Start the data with a 10-digit number.
 	 *
 	 * For row and non-repeated variable-length column-stores, change the
-	 * leading number to ensure every data item is unique.  For repeated
+	 * leading number to ensure every data item is unique.	For repeated
 	 * variable-length column-stores (that is, to test run-length encoding),
 	 * use the same data value all the time.
 	 */
@@ -366,6 +366,13 @@ rng(WT_RAND_STATE *rnd)
 {
 	char buf[64];
 	uint32_t r;
+
+	/*
+	 * Threaded operations have their own RNG information, otherwise we
+	 * use the default.
+	 */
+	if (rnd == NULL)
+		rnd = &g.rnd;
 
 	/*
 	 * We can entirely reproduce a run based on the random numbers used
