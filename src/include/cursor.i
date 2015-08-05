@@ -187,6 +187,12 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 	if (reenter)
 		WT_RET(__curfile_leave(cbt));
 
+	/*
+	 * Any old insert position is now invalid.  We rely on this being
+	 * cleared to detect if a new skiplist is installed after a search.
+	 */
+	cbt->ins_stack[0] = NULL;
+
 	/* If the transaction is idle, check that the cache isn't full. */
 	WT_RET(__wt_txn_idle_cache_check(session));
 
