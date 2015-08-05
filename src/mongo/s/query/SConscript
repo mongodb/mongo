@@ -10,6 +10,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/s/coreshard",
         "cluster_client_cursor",
+        "cluster_cursor_manager",
     ],
 )
 
@@ -75,5 +76,24 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/query/lite_parsed_query",
         "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
         "async_results_merger",
+    ],
+)
+
+env.Library(
+    target="cluster_cursor_manager",
+    source=[
+        "cluster_cursor_manager.cpp",
+    ],
+    LIBDEPS=[],
+)
+
+env.CppUnitTest(
+    target="cluster_cursor_manager_test",
+    source=[
+        "cluster_cursor_manager_test.cpp",
+    ],
+    LIBDEPS=[
+        "cluster_client_cursor_mock",
+        "cluster_cursor_manager",
     ],
 )

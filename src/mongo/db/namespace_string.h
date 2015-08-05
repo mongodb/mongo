@@ -102,6 +102,12 @@ public:
         return _ns.size();
     }
 
+    struct Hasher {
+        size_t operator()(const NamespaceString& nss) const {
+            return std::hash<std::string>()(nss._ns);
+        }
+    };
+
     //
     // The following methods assume isValid() is true for this NamespaceString.
     //
