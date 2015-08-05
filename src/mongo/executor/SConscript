@@ -51,6 +51,39 @@ env.Library('network_interface_mock',
                 'task_executor_interface',
             ])
 
+env.Library(
+    target='connection_pool',
+    source=[
+       'connection_pool.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+    ],
+)
+
+env.CppUnitTest(
+    target='connection_pool_test',
+    source=[
+        'connection_pool_test.cpp',
+        'connection_pool_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'connection_pool',
+    ],
+)
+
+env.CppIntegrationTest(
+    target='connection_pool_asio_integration_test',
+    source=[
+        'connection_pool_asio_integration_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/rpc/command_status',
+        'network_interface_asio',
+    ],
+)
+
 env.CppUnitTest(
     target='network_interface_mock_test',
     source=[
@@ -76,6 +109,7 @@ env.Library(
         'async_secure_stream_factory.cpp',
         'async_stream.cpp',
         'async_stream_factory.cpp',
+        'connection_pool_asio.cpp',
         'network_interface_asio.cpp',
         'network_interface_asio_auth.cpp',
         'network_interface_asio_command.cpp',
@@ -88,6 +122,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/third_party/shim_asio',
+        'connection_pool',
         'downconvert_find_and_getmore_commands',
         'network_interface',
         'task_executor_interface',

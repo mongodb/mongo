@@ -87,6 +87,10 @@ void AsyncSecureStream::_handleHandshake(std::error_code ec, const std::string& 
     _userHandler(make_error_code(certStatus.getStatus().code()));
 }
 
+void AsyncSecureStream::cancel() {
+    _stream.lowest_layer().cancel();
+}
+
 }  // namespace executor
 }  // namespace mongo
 

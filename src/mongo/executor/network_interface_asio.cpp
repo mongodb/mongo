@@ -36,6 +36,7 @@
 
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/async_stream_factory.h"
+#include "mongo/executor/connection_pool_asio.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -47,18 +48,22 @@ namespace mongo {
 namespace executor {
 
 NetworkInterfaceASIO::NetworkInterfaceASIO(
-    std::unique_ptr<AsyncStreamFactoryInterface> streamFactory)
-    : NetworkInterfaceASIO(std::move(streamFactory), nullptr) {}
+    std::unique_ptr<AsyncStreamFactoryInterface> streamFactory, Options options)
+    : NetworkInterfaceASIO(std::move(streamFactory), nullptr, std::move(options)) {}
 
 NetworkInterfaceASIO::NetworkInterfaceASIO(
     std::unique_ptr<AsyncStreamFactoryInterface> streamFactory,
-    std::unique_ptr<NetworkConnectionHook> networkConnectionHook)
-    : _io_service(),
+    std::unique_ptr<NetworkConnectionHook> networkConnectionHook,
+    Options options)
+    : _options(std::move(options)),
+      _io_service(),
       _hook(std::move(networkConnectionHook)),
       _resolver(_io_service),
       _state(State::kReady),
       _streamFactory(std::move(streamFactory)),
-      _isExecutorRunnable(false) {}
+      _isExecutorRunnable(false),
+      _connectionPool(stdx::make_unique<connection_pool_asio::ASIOImpl>(this),
+                      _options.connectionPoolOptions) {}
 
 std::string NetworkInterfaceASIO::getDiagnosticString() {
     str::stream output;
@@ -126,16 +131,62 @@ Date_t NetworkInterfaceASIO::now() {
 void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                         const RemoteCommandRequest& request,
                                         const RemoteCommandCompletionFn& onFinish) {
-    auto ownedOp = stdx::make_unique<AsyncOp>(this, cbHandle, request, onFinish, now());
-
-    AsyncOp* op = ownedOp.get();
-
     {
         stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
-        _inProgress.emplace(op, std::move(ownedOp));
+        _inGetConnection.push_back(cbHandle);
     }
 
-    asio::post(_io_service, [this, op]() { _startCommand(op); });
+    auto startTime = now();
+
+    auto nextStep = [this, startTime, cbHandle, request, onFinish](
+        StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+
+        if (!swConn.isOK()) {
+            {
+                stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+
+                auto& v = _inGetConnection;
+                auto iter = std::find(v.begin(), v.end(), cbHandle);
+                if (iter != v.end())
+                    v.erase(iter);
+            }
+
+            onFinish(swConn.getStatus());
+            return;
+        }
+
+        auto conn = static_cast<connection_pool_asio::ASIOConnection*>(swConn.getValue().get());
+
+        auto ownedOp = conn->releaseAsyncOp();
+        AsyncOp* op = ownedOp.get();
+
+        {
+            stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+
+            auto iter = std::find(_inGetConnection.begin(), _inGetConnection.end(), cbHandle);
+
+            // If we didn't find the request, we've been canceled
+            if (iter == _inGetConnection.end())
+                return;
+
+            _inGetConnection.erase(iter);
+            _inProgress.emplace(op, std::move(ownedOp));
+        }
+
+        op->_cbHandle = cbHandle;
+        op->_request = request;
+        op->_onFinish = onFinish;
+        op->_connectionPoolHandle = std::move(swConn.getValue());
+        op->_start = startTime;
+
+        _beginCommunication(op);
+    };
+
+    // TODO: thread some higher level timeout through, rather than 10 seconds,
+    // once we make timeouts pervasive in this api.
+    asio::post(
+        _io_service,
+        [this, request, nextStep] { _connectionPool.get(request.target, Seconds(10), nextStep); });
 }
 
 void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {

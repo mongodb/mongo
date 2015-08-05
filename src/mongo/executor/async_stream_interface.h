@@ -58,6 +58,8 @@ public:
 
     virtual void read(asio::mutable_buffer buf, StreamHandler&& readHandler) = 0;
 
+    virtual void cancel() = 0;
+
 protected:
     AsyncStreamInterface() = default;
 };

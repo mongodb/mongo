@@ -114,6 +114,14 @@ void AsyncMockStreamFactory::MockStream::write(asio::const_buffer buf,
     _io_service->post([writeHandler, size] { writeHandler(std::error_code(), size); });
 }
 
+void AsyncMockStreamFactory::MockStream::cancel() {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    log() << "cancel() for: " << _target;
+
+    // TODO: do we actually need to mock cancel?
+    // We may want a cancel queue the same way we have read and write queues
+}
+
 void AsyncMockStreamFactory::MockStream::read(asio::mutable_buffer buf,
                                               StreamHandler&& readHandler) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);

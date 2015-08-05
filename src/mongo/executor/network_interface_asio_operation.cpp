@@ -30,9 +30,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/executor/network_interface_asio.h"
+
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/async_stream_interface.h"
+#include "mongo/executor/connection_pool_asio.h"
 #include "mongo/executor/downconvert_find_and_getmore_commands.h"
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/rpc/factory.h"
@@ -75,7 +78,8 @@ NetworkInterfaceASIO::AsyncOp::AsyncOp(NetworkInterfaceASIO* const owner,
       _request(request),
       _onFinish(onFinish),
       _start(now),
-      _canceled(0) {}
+      _canceled(0),
+      _inSetup(true) {}
 
 void NetworkInterfaceASIO::AsyncOp::cancel() {
     // An operation may be in mid-flight when it is canceled, so we

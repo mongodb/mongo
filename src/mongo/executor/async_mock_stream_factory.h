@@ -82,6 +82,8 @@ public:
 
         StreamState waitUntilBlocked();
 
+        void cancel() override;
+
         std::vector<uint8_t> popWrite();
         void pushRead(std::vector<uint8_t> toRead);
 

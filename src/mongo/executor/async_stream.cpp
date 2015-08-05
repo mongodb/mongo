@@ -56,5 +56,9 @@ void AsyncStream::read(asio::mutable_buffer buffer, StreamHandler&& streamHandle
     asio::async_read(_stream, asio::buffer(buffer), std::move(streamHandler));
 }
 
+void AsyncStream::cancel() {
+    _stream.cancel();
+}
+
 }  // namespace executor
 }  // namespace mongo
