@@ -328,7 +328,8 @@ bool GeoMatchExpression::matchesSingleElement(const BSONElement& e) const {
         return false;
 
     GeometryContainer geometry;
-    if (!geometry.parseFromStorage(e).isOK())
+
+    if (!geometry.parseFromStorage(e, _canSkipValidation).isOK())
         return false;
 
     // Never match big polygon
@@ -380,6 +381,7 @@ std::unique_ptr<MatchExpression> GeoMatchExpression::shallowClone() const {
     std::unique_ptr<GeoMatchExpression> next = stdx::make_unique<GeoMatchExpression>();
     next->init(path(), NULL, _rawObj);
     next->_query = _query;
+    next->_canSkipValidation = _canSkipValidation;
     if (getTag()) {
         next->setTag(getTag()->clone());
     }

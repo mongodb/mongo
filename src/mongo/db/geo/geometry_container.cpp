@@ -36,8 +36,6 @@ namespace mongo {
 
 using mongoutils::str::equals;
 
-GeometryContainer::GeometryContainer() {}
-
 bool GeometryContainer::isSimpleContainer() const {
     return NULL != _point || NULL != _line || NULL != _polygon;
 }
@@ -864,7 +862,7 @@ bool GeometryContainer::intersects(const S2Polygon& otherPolygon) const {
     return false;
 }
 
-Status GeometryContainer::parseFromGeoJSON(const BSONObj& obj) {
+Status GeometryContainer::parseFromGeoJSON(const BSONObj& obj, bool skipValidation) {
     GeoParser::GeoJSONType type = GeoParser::parseGeoJSONType(obj);
 
     if (GeoParser::GEOJSON_UNKNOWN == type) {
@@ -879,10 +877,10 @@ Status GeometryContainer::parseFromGeoJSON(const BSONObj& obj) {
         status = GeoParser::parseGeoJSONPoint(obj, _point.get());
     } else if (GeoParser::GEOJSON_LINESTRING == type) {
         _line.reset(new LineWithCRS());
-        status = GeoParser::parseGeoJSONLine(obj, _line.get());
+        status = GeoParser::parseGeoJSONLine(obj, skipValidation, _line.get());
     } else if (GeoParser::GEOJSON_POLYGON == type) {
         _polygon.reset(new PolygonWithCRS());
-        status = GeoParser::parseGeoJSONPolygon(obj, _polygon.get());
+        status = GeoParser::parseGeoJSONPolygon(obj, skipValidation, _polygon.get());
     } else if (GeoParser::GEOJSON_MULTI_POINT == type) {
         _multiPoint.reset(new MultiPointWithCRS());
         status = GeoParser::parseMultiPoint(obj, _multiPoint.get());
@@ -891,19 +889,19 @@ Status GeometryContainer::parseFromGeoJSON(const BSONObj& obj) {
         }
     } else if (GeoParser::GEOJSON_MULTI_LINESTRING == type) {
         _multiLine.reset(new MultiLineWithCRS());
-        status = GeoParser::parseMultiLine(obj, _multiLine.get());
+        status = GeoParser::parseMultiLine(obj, skipValidation, _multiLine.get());
         for (size_t i = 0; i < _multiLine->lines.size(); ++i) {
             regions.push_back(_multiLine->lines[i]);
         }
     } else if (GeoParser::GEOJSON_MULTI_POLYGON == type) {
         _multiPolygon.reset(new MultiPolygonWithCRS());
-        status = GeoParser::parseMultiPolygon(obj, _multiPolygon.get());
+        status = GeoParser::parseMultiPolygon(obj, skipValidation, _multiPolygon.get());
         for (size_t i = 0; i < _multiPolygon->polygons.size(); ++i) {
             regions.push_back(_multiPolygon->polygons[i]);
         }
     } else if (GeoParser::GEOJSON_GEOMETRY_COLLECTION == type) {
         _geometryCollection.reset(new GeometryCollection());
-        status = GeoParser::parseGeometryCollection(obj, _geometryCollection.get());
+        status = GeoParser::parseGeometryCollection(obj, skipValidation, _geometryCollection.get());
 
         // Add regions
         for (size_t i = 0; i < _geometryCollection->points.size(); ++i) {
@@ -1014,7 +1012,7 @@ Status GeometryContainer::parseFromQuery(const BSONElement& elem) {
 //
 // "elem" is the element that contains geo data. e.g. "location": [1, 2]
 // We need the type information to determine whether it's legacy point.
-Status GeometryContainer::parseFromStorage(const BSONElement& elem) {
+Status GeometryContainer::parseFromStorage(const BSONElement& elem, bool skipValidation) {
     if (!elem.isABSONObj()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "geo element must be an array or object: " << elem);
@@ -1034,7 +1032,7 @@ Status GeometryContainer::parseFromStorage(const BSONElement& elem) {
     } else {
         // GeoJSON
         // { location: { type: "Point", coordinates: [...] } }
-        status = parseFromGeoJSON(elem.Obj());
+        status = parseFromGeoJSON(elem.Obj(), skipValidation);
     }
     if (!status.isOK())
         return status;

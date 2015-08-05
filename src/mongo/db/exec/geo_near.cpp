@@ -78,7 +78,10 @@ struct StoredGeometry {
             return NULL;
 
         unique_ptr<StoredGeometry> stored(new StoredGeometry);
-        if (!stored->geometry.parseFromStorage(element).isOK())
+
+        // GeoNear stage can only be run with an existing index
+        // Therefore, it is always safe to skip geometry validation
+        if (!stored->geometry.parseFromStorage(element, true).isOK())
             return NULL;
         stored->element = element;
         return stored.release();

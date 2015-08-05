@@ -99,27 +99,31 @@ TEST(GeoParser, parseGeoJSONLine) {
     LineWithCRS polyline;
 
     ASSERT_OK(GeoParser::parseGeoJSONLine(
-        fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4]]}"), &polyline));
+        fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4]]}"), false, &polyline));
     ASSERT_OK(GeoParser::parseGeoJSONLine(
-        fromjson("{'type':'LineString', 'coordinates':[[0,-90], [0,90]]}"), &polyline));
+        fromjson("{'type':'LineString', 'coordinates':[[0,-90], [0,90]]}"), false, &polyline));
     ASSERT_OK(GeoParser::parseGeoJSONLine(
-        fromjson("{'type':'LineString', 'coordinates':[[180,-90], [-180,90]]}"), &polyline));
+        fromjson("{'type':'LineString', 'coordinates':[[180,-90], [-180,90]]}"), false, &polyline));
     ASSERT_NOT_OK(GeoParser::parseGeoJSONLine(
-        fromjson("{'type':'LineString', 'coordinates':[[180.1,-90], [-180.1,90]]}"), &polyline));
+        fromjson("{'type':'LineString', 'coordinates':[[180.1,-90], [-180.1,90]]}"),
+        false,
+        &polyline));
     ASSERT_NOT_OK(GeoParser::parseGeoJSONLine(
-        fromjson("{'type':'LineString', 'coordinates':[[0,-91], [0,90]]}"), &polyline));
+        fromjson("{'type':'LineString', 'coordinates':[[0,-91], [0,90]]}"), false, &polyline));
     ASSERT_NOT_OK(GeoParser::parseGeoJSONLine(
-        fromjson("{'type':'LineString', 'coordinates':[[0,-90], [0,91]]}"), &polyline));
+        fromjson("{'type':'LineString', 'coordinates':[[0,-90], [0,91]]}"), false, &polyline));
     ASSERT_OK(GeoParser::parseGeoJSONLine(
-        fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4], [5,6]]}"), &polyline));
+        fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4], [5,6]]}"), false, &polyline));
     ASSERT_NOT_OK(GeoParser::parseGeoJSONLine(
-        fromjson("{'type':'LineString', 'coordinates':[[1,2]]}"), &polyline));
+        fromjson("{'type':'LineString', 'coordinates':[[1,2]]}"), false, &polyline));
     ASSERT_NOT_OK(GeoParser::parseGeoJSONLine(
-        fromjson("{'type':'LineString', 'coordinates':[['chicken','little']]}"), &polyline));
+        fromjson("{'type':'LineString', 'coordinates':[['chicken','little']]}"), false, &polyline));
     ASSERT_NOT_OK(GeoParser::parseGeoJSONLine(
-        fromjson("{'type':'LineString', 'coordinates':[1,2, 3, 4]}"), &polyline));
+        fromjson("{'type':'LineString', 'coordinates':[1,2, 3, 4]}"), false, &polyline));
     ASSERT_OK(GeoParser::parseGeoJSONLine(
-        fromjson("{'type':'LineString', 'coordinates':[[1,2, 3], [3,4, 5], [5,6]]}"), &polyline));
+        fromjson("{'type':'LineString', 'coordinates':[[1,2, 3], [3,4, 5], [5,6]]}"),
+        false,
+        &polyline));
 }
 
 TEST(GeoParser, parseGeoJSONPolygon) {
@@ -127,37 +131,44 @@ TEST(GeoParser, parseGeoJSONPolygon) {
 
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]] ]}"),
+        false,
         &polygon));
     // No out of bounds points
     ASSERT_NOT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,91],[0,5],[0,0]] ]}"),
+        false,
         &polygon));
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[180,0],[5,5],[0,5],[0,0]] ]}"),
+        false,
         &polygon));
     ASSERT_NOT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[181,0],[5,5],[0,5],[0,0]] ]}"),
+        false,
         &polygon));
     // And one with a hole.
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson(
             "{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]],"
             " [[1,1],[4,1],[4,4],[1,4],[1,1]] ]}"),
+        false,
         &polygon));
     // Latitudes must be OK
     ASSERT_NOT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson(
             "{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,91],[0,91],[0,0]],"
             " [[1,1],[4,1],[4,4],[1,4],[1,1]] ]}"),
+        false,
         &polygon));
     // First point must be the same as the last.
     ASSERT_NOT_OK(GeoParser::parseGeoJSONPolygon(
-        fromjson("{'type':'Polygon', 'coordinates':[ [[1,2],[3,4],[5,6]] ]}"), &polygon));
+        fromjson("{'type':'Polygon', 'coordinates':[ [[1,2],[3,4],[5,6]] ]}"), false, &polygon));
     // Extra elements are allowed
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson(
             "{'type':'Polygon', 'coordinates':[ [[0,0,0,0],[5,0,0],[5,5,1],"
             " [0,5],[0,0]] ]}"),
+        false,
         &polygon));
 
     // Test functionality of polygon
@@ -168,6 +179,7 @@ TEST(GeoParser, parseGeoJSONPolygon) {
     PolygonWithCRS polygonA;
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]] ]}"),
+        false,
         &polygonA));
     ASSERT_TRUE(polygonA.s2Polygon->Contains(point.point));
 
@@ -176,6 +188,7 @@ TEST(GeoParser, parseGeoJSONPolygon) {
         fromjson(
             "{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]],"
             " [[1,1],[1,4],[4,4],[4,1],[1,1]] ]}"),
+        false,
         &polygonB));
     // We removed this in the hole.
     ASSERT_FALSE(polygonB.s2Polygon->Contains(point.point));
@@ -185,6 +198,7 @@ TEST(GeoParser, parseGeoJSONPolygon) {
     PolygonWithCRS polygonC;
     ASSERT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[0,5],[5,5],[5,0],[0,0]] ]}"),
+        false,
         &polygonC));
     ASSERT_TRUE(polygonC.s2Polygon->Contains(point.point));
 
@@ -193,6 +207,7 @@ TEST(GeoParser, parseGeoJSONPolygon) {
         fromjson(
             "{'type':'Polygon', 'coordinates':[ [[0,0],[0,5],[5,5],[5,0],[0,0]],"
             " [[1,1],[1,4],[4,4],[4,1],[1,1]] ]}"),
+        false,
         &polygonD));
     // Also removed in the loop.
     ASSERT_FALSE(polygonD.s2Polygon->Contains(point.point));
@@ -205,6 +220,7 @@ TEST(GeoParser, parseGeoJSONPolygon) {
     PolygonWithCRS polygonBad;
     ASSERT_NOT_OK(GeoParser::parseGeoJSONPolygon(
         fromjson("{'type':'Polygon', 'coordinates':[[ [0,0], [0,0], [5,5], [5,5], [0,0] ]]}"),
+        false,
         &polygonBad));
 }
 
@@ -231,21 +247,21 @@ TEST(GeoParser, parseGeoJSONCRS) {
         "[[0,0],[5,0],[5,5],[0,5],[0,0]],"
         " [[1,1],[1,4],[4,4],[4,1],[1,1]] ]," +
         goodCRS1 + "}");
-    ASSERT_OK(GeoParser::parseGeoJSONPolygon(polygon1, &polygon));
+    ASSERT_OK(GeoParser::parseGeoJSONPolygon(polygon1, false, &polygon));
     BSONObj polygon2 = fromjson(
         "{'type':'Polygon', 'coordinates':[ "
         "[[0,0],[5,0],[5,5],[0,5],[0,0]],"
         " [[1,1],[1,4],[4,4],[4,1],[1,1]] ]," +
         badCRS2 + "}");
-    ASSERT_NOT_OK(GeoParser::parseGeoJSONPolygon(polygon2, &polygon));
+    ASSERT_NOT_OK(GeoParser::parseGeoJSONPolygon(polygon2, false, &polygon));
 
     LineWithCRS line;
     BSONObj line1 =
         fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4], [5,6]]," + goodCRS2 + "}");
-    ASSERT_OK(GeoParser::parseGeoJSONLine(line1, &line));
+    ASSERT_OK(GeoParser::parseGeoJSONLine(line1, false, &line));
     BSONObj line2 =
         fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4], [5,6]]," + badCRS1 + "}");
-    ASSERT_NOT_OK(GeoParser::parseGeoJSONLine(line2, &line));
+    ASSERT_NOT_OK(GeoParser::parseGeoJSONLine(line2, false, &line));
 }
 
 TEST(GeoParser, parseLegacyPoint) {
@@ -311,6 +327,7 @@ TEST(GeoParser, parseMultiLine) {
         fromjson(
             "{'type':'MultiLineString','coordinates':[ [[1,1],[2,2],[3,3]],"
             "[[4,5],[6,7]]]}"),
+        false,
         &ml));
     ASSERT_EQUALS(ml.lines.size(), (size_t)2);
 
@@ -318,28 +335,30 @@ TEST(GeoParser, parseMultiLine) {
         GeoParser::parseMultiLine(fromjson(
                                       "{'type':'MultiLineString','coordinates':[ [[1,1],[2,2]],"
                                       "[[4,5],[6,7]]]}"),
+                                  false,
                                   &ml));
     ASSERT_EQUALS(ml.lines.size(), (size_t)2);
 
     ASSERT_OK(GeoParser::parseMultiLine(
-        fromjson("{'type':'MultiLineString','coordinates':[ [[1,1],[2,2]]]}"), &ml));
+        fromjson("{'type':'MultiLineString','coordinates':[ [[1,1],[2,2]]]}"), false, &ml));
     ASSERT_EQUALS(ml.lines.size(), (size_t)1);
 
     ASSERT_OK(
         GeoParser::parseMultiLine(fromjson(
                                       "{'type':'MultiLineString','coordinates':[ [[1,1],[2,2]],"
                                       "[[2,2],[1,1]]]}"),
+                                  false,
                                   &ml));
     ASSERT_EQUALS(ml.lines.size(), (size_t)2);
 
     ASSERT_NOT_OK(GeoParser::parseMultiLine(
-        fromjson("{'type':'MultiLineString','coordinates':[ [[1,1]]]}"), &ml));
+        fromjson("{'type':'MultiLineString','coordinates':[ [[1,1]]]}"), false, &ml));
     ASSERT_NOT_OK(GeoParser::parseMultiLine(
-        fromjson("{'type':'MultiLineString','coordinates':[ [[1,1]],[[1,2],[3,4]]]}"), &ml));
+        fromjson("{'type':'MultiLineString','coordinates':[ [[1,1]],[[1,2],[3,4]]]}"), false, &ml));
     ASSERT_NOT_OK(GeoParser::parseMultiLine(
-        fromjson("{'type':'MultiLineString','coordinates':[ [[181,1],[2,2]]]}"), &ml));
+        fromjson("{'type':'MultiLineString','coordinates':[ [[181,1],[2,2]]]}"), false, &ml));
     ASSERT_NOT_OK(GeoParser::parseMultiLine(
-        fromjson("{'type':'MultiLineString','coordinates':[ [[181,1],[2,-91]]]}"), &ml));
+        fromjson("{'type':'MultiLineString','coordinates':[ [[181,1],[2,-91]]]}"), false, &ml));
 }
 
 TEST(GeoParser, parseMultiPolygon) {
@@ -352,6 +371,7 @@ TEST(GeoParser, parseMultiPolygon) {
             "[[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]],"
             "[[100.2, 0.2], [100.8, 0.2], [100.8, 0.8], [100.2, 0.8], [100.2, 0.2]]]"
             "]}"),
+        false,
         &mp));
     ASSERT_EQUALS(mp.polygons.size(), (size_t)2);
 
@@ -361,6 +381,7 @@ TEST(GeoParser, parseMultiPolygon) {
             "[[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]],"
             "[[100.2, 0.2], [100.8, 0.2], [100.8, 0.8], [100.2, 0.8], [100.2, 0.2]]]"
             "]}"),
+        false,
         &mp));
     ASSERT_EQUALS(mp.polygons.size(), (size_t)1);
 }
@@ -373,7 +394,7 @@ TEST(GeoParser, parseGeometryCollection) {
             "{ 'type': 'Point','coordinates': [100.0,0.0]},"
             "{ 'type': 'LineString', 'coordinates': [ [101.0, 0.0], [102.0, 1.0] ]}"
             "]}");
-        ASSERT_OK(GeoParser::parseGeometryCollection(obj, &gc));
+        ASSERT_OK(GeoParser::parseGeometryCollection(obj, false, &gc));
         ASSERT_FALSE(gc.supportsContains());
     }
 
@@ -388,7 +409,7 @@ TEST(GeoParser, parseGeometryCollection) {
             "]}");
 
         mongo::GeometryCollection gc;
-        ASSERT_OK(GeoParser::parseGeometryCollection(obj, &gc));
+        ASSERT_OK(GeoParser::parseGeometryCollection(obj, false, &gc));
         ASSERT_TRUE(gc.supportsContains());
     }
 
@@ -403,7 +424,7 @@ TEST(GeoParser, parseGeometryCollection) {
             "]}"
             "]}");
         mongo::GeometryCollection gc;
-        ASSERT_NOT_OK(GeoParser::parseGeometryCollection(obj, &gc));
+        ASSERT_NOT_OK(GeoParser::parseGeometryCollection(obj, false, &gc));
     }
 
     {
@@ -418,7 +439,7 @@ TEST(GeoParser, parseGeometryCollection) {
             "]}");
 
         mongo::GeometryCollection gc;
-        ASSERT_OK(GeoParser::parseGeometryCollection(obj, &gc));
+        ASSERT_OK(GeoParser::parseGeometryCollection(obj, false, &gc));
         ASSERT_TRUE(gc.supportsContains());
     }
 }

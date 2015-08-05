@@ -39,6 +39,15 @@ class Collection;
 class QueryPlannerAnalysis {
 public:
     /**
+     * Checks solution nodes for geo match expressions to apply an optimization.
+     *
+     * If a geo match expression is on a field with a corresponding 2dsphere index we can
+     * skip expensive validation of geometries in the matcher, since those geometries were
+     * validated when they were indexed.
+     */
+    static void analyzeGeo(const QueryPlannerParams& params, QuerySolutionNode* solnRoot);
+
+    /**
      * Takes an index key pattern and returns an object describing the "maximal sort" that this
      * index can provide.  Returned object is in normalized sort form (all elements have value 1
      * or -1).

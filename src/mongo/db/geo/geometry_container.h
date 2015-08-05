@@ -43,7 +43,7 @@ public:
     /**
      * Creates an empty geometry container which may then be loaded from BSON or directly.
      */
-    GeometryContainer();
+    GeometryContainer() = default;
 
     /**
      * Loads an empty GeometryContainer from query.
@@ -53,7 +53,7 @@ public:
     /**
      * Loads an empty GeometryContainer from stored geometry.
      */
-    Status parseFromStorage(const BSONElement& elem);
+    Status parseFromStorage(const BSONElement& elem, bool skipValidation = false);
 
     /**
      * Is the geometry any of {Point, Line, Polygon}?
@@ -126,7 +126,7 @@ public:
 private:
     class R2BoxRegion;
 
-    Status parseFromGeoJSON(const BSONObj& obj);
+    Status parseFromGeoJSON(const BSONObj& obj, bool skipValidation = false);
 
     // Does 'this' intersect with the provided type?
     bool intersects(const S2Cell& otherPoint) const;

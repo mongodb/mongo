@@ -27,6 +27,7 @@ env.Library(
         "index_bounds",
         "lite_parsed_query",
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/index/expression_params",
         "$BUILD_DIR/mongo/db/matcher/expression_algo",
         "$BUILD_DIR/mongo/db/matcher/expressions",
         "$BUILD_DIR/mongo/db/matcher/expressions_text",

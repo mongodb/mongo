@@ -170,7 +170,9 @@ static Status isLoopClosed(const vector<S2Point>& loop, const BSONElement loopEl
     return Status::OK();
 }
 
-static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem, S2Polygon* out) {
+static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
+                                             bool skipValidation,
+                                             S2Polygon* out) {
     if (Array != elem.type()) {
         return BAD_VALUE("Polygon coordinates must be an array");
     }
@@ -212,7 +214,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem, S2Polygon*
         // 2. All vertices must be unit length. Guaranteed by parsePoints().
         // 3. Loops are not allowed to have any duplicate vertices.
         // 4. Non-adjacent edges are not allowed to intersect.
-        if (!loop->IsValid(&err)) {
+        if (!skipValidation && !loop->IsValid(&err)) {
             return BAD_VALUE("Loop is not valid: " << coordinateElt.toString(false) << " " << err);
         }
         // If the loop is more than one hemisphere, invert it.
@@ -237,7 +239,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem, S2Polygon*
     // 1. If a loop contains an edge AB, then no other loop may contain AB or BA.
     // 2. No loop covers more than half of the sphere.
     // 3. No two loops cross.
-    if (!S2Polygon::IsValid(loops.vector(), &err))
+    if (!skipValidation && !S2Polygon::IsValid(loops.vector(), &err))
         return BAD_VALUE("Polygon isn't valid: " << err << " " << elem.toString(false));
 
     // Given all loops are valid / normalized and S2Polygon::IsValid() above returns true.
@@ -245,6 +247,9 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem, S2Polygon*
 
     // Transfer ownership of the loops and clears loop vector.
     out->Init(&loops.mutableVector());
+
+    if (skipValidation)
+        return Status::OK();
 
     // Check if every loop of this polygon shares at most one vertex with
     // its parent loop.
@@ -365,20 +370,25 @@ static Status parseGeoJSONCRS(const BSONObj& obj, CRS* crs, bool allowStrictSphe
 // Parse "coordinates" field of GeoJSON LineString
 // e.g. "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
 // Or a line in "coordinates" field of GeoJSON MultiLineString
-static Status parseGeoJSONLineCoordinates(const BSONElement& elem, S2Polyline* out) {
+static Status parseGeoJSONLineCoordinates(const BSONElement& elem,
+                                          bool skipValidation,
+                                          S2Polyline* out) {
     vector<S2Point> vertices;
     Status status = parseArrayOfCoordinates(elem, &vertices);
     if (!status.isOK())
         return status;
 
     eraseDuplicatePoints(&vertices);
-    if (vertices.size() < 2)
-        return BAD_VALUE(
-            "GeoJSON LineString must have at least 2 vertices: " << elem.toString(false));
+    if (!skipValidation) {
+        if (vertices.size() < 2)
+            return BAD_VALUE(
+                "GeoJSON LineString must have at least 2 vertices: " << elem.toString(false));
 
-    string err;
-    if (!S2Polyline::IsValid(vertices, &err))
-        return BAD_VALUE("GeoJSON LineString is not valid: " << err << " " << elem.toString(false));
+        string err;
+        if (!S2Polyline::IsValid(vertices, &err))
+            return BAD_VALUE("GeoJSON LineString is not valid: " << err << " "
+                                                                 << elem.toString(false));
+    }
     out->Init(vertices);
     return Status::OK();
 }
@@ -470,7 +480,7 @@ Status GeoParser::parseGeoJSONPoint(const BSONObj& obj, PointWithCRS* out) {
 }
 
 // { "type": "LineString", "coordinates": [ [100.0, 0.0], [101.0, 1.0] ] }
-Status GeoParser::parseGeoJSONLine(const BSONObj& obj, LineWithCRS* out) {
+Status GeoParser::parseGeoJSONLine(const BSONObj& obj, bool skipValidation, LineWithCRS* out) {
     Status status = Status::OK();
     // "crs"
     status = parseGeoJSONCRS(obj, &out->crs);
@@ -478,14 +488,16 @@ Status GeoParser::parseGeoJSONLine(const BSONObj& obj, LineWithCRS* out) {
         return status;
 
     // "coordinates"
-    status = parseGeoJSONLineCoordinates(obj[GEOJSON_COORDINATES], &out->line);
+    status = parseGeoJSONLineCoordinates(obj[GEOJSON_COORDINATES], skipValidation, &out->line);
     if (!status.isOK())
         return status;
 
     return Status::OK();
 }
 
-Status GeoParser::parseGeoJSONPolygon(const BSONObj& obj, PolygonWithCRS* out) {
+Status GeoParser::parseGeoJSONPolygon(const BSONObj& obj,
+                                      bool skipValidation,
+                                      PolygonWithCRS* out) {
     const BSONElement coordinates = obj[GEOJSON_COORDINATES];
 
     Status status = Status::OK();
@@ -497,7 +509,7 @@ Status GeoParser::parseGeoJSONPolygon(const BSONObj& obj, PolygonWithCRS* out) {
     // "coordinates"
     if (out->crs == SPHERE) {
         out->s2Polygon.reset(new S2Polygon());
-        status = parseGeoJSONPolygonCoordinates(coordinates, out->s2Polygon.get());
+        status = parseGeoJSONPolygonCoordinates(coordinates, skipValidation, out->s2Polygon.get());
     } else if (out->crs == STRICT_SPHERE) {
         out->bigPolygon.reset(new BigSimplePolygon());
         status = parseBigSimplePolygonCoordinates(coordinates, out->bigPolygon.get());
@@ -527,7 +539,7 @@ Status GeoParser::parseMultiPoint(const BSONObj& obj, MultiPointWithCRS* out) {
     return Status::OK();
 }
 
-Status GeoParser::parseMultiLine(const BSONObj& obj, MultiLineWithCRS* out) {
+Status GeoParser::parseMultiLine(const BSONObj& obj, bool skipValidation, MultiLineWithCRS* out) {
     Status status = Status::OK();
     status = parseGeoJSONCRS(obj, &out->crs);
     if (!status.isOK())
@@ -545,7 +557,7 @@ Status GeoParser::parseMultiLine(const BSONObj& obj, MultiLineWithCRS* out) {
     // Iterate array
     while (it.more()) {
         lines.push_back(new S2Polyline());
-        status = parseGeoJSONLineCoordinates(it.next(), lines.back());
+        status = parseGeoJSONLineCoordinates(it.next(), skipValidation, lines.back());
         if (!status.isOK())
             return status;
     }
@@ -555,7 +567,9 @@ Status GeoParser::parseMultiLine(const BSONObj& obj, MultiLineWithCRS* out) {
     return Status::OK();
 }
 
-Status GeoParser::parseMultiPolygon(const BSONObj& obj, MultiPolygonWithCRS* out) {
+Status GeoParser::parseMultiPolygon(const BSONObj& obj,
+                                    bool skipValidation,
+                                    MultiPolygonWithCRS* out) {
     Status status = Status::OK();
     status = parseGeoJSONCRS(obj, &out->crs);
     if (!status.isOK())
@@ -572,7 +586,7 @@ Status GeoParser::parseMultiPolygon(const BSONObj& obj, MultiPolygonWithCRS* out
     // Iterate array
     while (it.more()) {
         polygons.push_back(new S2Polygon());
-        status = parseGeoJSONPolygonCoordinates(it.next(), polygons.back());
+        status = parseGeoJSONPolygonCoordinates(it.next(), skipValidation, polygons.back());
         if (!status.isOK())
             return status;
     }
@@ -650,7 +664,9 @@ Status GeoParser::parseCenterSphere(const BSONObj& obj, CapWithCRS* out) {
 //      }
 //    ]
 //  }
-Status GeoParser::parseGeometryCollection(const BSONObj& obj, GeometryCollection* out) {
+Status GeoParser::parseGeometryCollection(const BSONObj& obj,
+                                          bool skipValidation,
+                                          GeometryCollection* out) {
     BSONElement coordElt = obj.getFieldDotted(GEOJSON_GEOMETRIES);
     if (Array != coordElt.type())
         return BAD_VALUE("GeometryCollection geometries must be an array");
@@ -679,19 +695,20 @@ Status GeoParser::parseGeometryCollection(const BSONObj& obj, GeometryCollection
             status = parseGeoJSONPoint(geoObj, &out->points.back());
         } else if (GEOJSON_LINESTRING == type) {
             out->lines.mutableVector().push_back(new LineWithCRS());
-            status = parseGeoJSONLine(geoObj, out->lines.vector().back());
+            status = parseGeoJSONLine(geoObj, skipValidation, out->lines.vector().back());
         } else if (GEOJSON_POLYGON == type) {
             out->polygons.mutableVector().push_back(new PolygonWithCRS());
-            status = parseGeoJSONPolygon(geoObj, out->polygons.vector().back());
+            status = parseGeoJSONPolygon(geoObj, skipValidation, out->polygons.vector().back());
         } else if (GEOJSON_MULTI_POINT == type) {
             out->multiPoints.mutableVector().push_back(new MultiPointWithCRS());
             status = parseMultiPoint(geoObj, out->multiPoints.mutableVector().back());
         } else if (GEOJSON_MULTI_LINESTRING == type) {
             out->multiLines.mutableVector().push_back(new MultiLineWithCRS());
-            status = parseMultiLine(geoObj, out->multiLines.mutableVector().back());
+            status = parseMultiLine(geoObj, skipValidation, out->multiLines.mutableVector().back());
         } else if (GEOJSON_MULTI_POLYGON == type) {
             out->multiPolygons.mutableVector().push_back(new MultiPolygonWithCRS());
-            status = parseMultiPolygon(geoObj, out->multiPolygons.mutableVector().back());
+            status = parseMultiPolygon(
+                geoObj, skipValidation, out->multiPolygons.mutableVector().back());
         } else {
             // Should not reach here.
             invariant(false);

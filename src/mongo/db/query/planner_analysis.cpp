@@ -30,9 +30,13 @@
 
 #include "mongo/db/query/planner_analysis.h"
 
+#include <set>
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/s2_indexing_params.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/util/log.h"
@@ -254,9 +258,59 @@ bool hasNode(QuerySolutionNode* root, StageType type) {
     return false;
 }
 
+void geoSkipValidationOn(const std::set<StringData>& twoDSphereFields,
+                         QuerySolutionNode* solnRoot) {
+    // If there is a GeoMatchExpression in the tree on a field with a 2dsphere index,
+    // we can skip validation since it was validated on insertion. This only applies to
+    // 2dsphere index version >= 3.
+    //
+    // This does not mean that there is necessarily an IXSCAN using this 2dsphere index,
+    // only that there exists a 2dsphere index on this field.
+    MatchExpression* expr = solnRoot->filter.get();
+    if (expr) {
+        StringData nodeField = expr->path();
+        if (expr->matchType() == MatchExpression::GEO &&
+            twoDSphereFields.find(nodeField) != twoDSphereFields.end()) {
+            GeoMatchExpression* gme = static_cast<GeoMatchExpression*>(expr);
+            gme->setCanSkipValidation(true);
+        }
+    }
+
+    for (QuerySolutionNode* child : solnRoot->children) {
+        geoSkipValidationOn(twoDSphereFields, child);
+    }
+}
+
 }  // namespace
 
 // static
+void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,
+                                      QuerySolutionNode* solnRoot) {
+    // Get field names of all 2dsphere indexes with version >= 3.
+    std::set<StringData> twoDSphereFields;
+    for (const IndexEntry& indexEntry : params.indices) {
+        if (indexEntry.type != IndexType::INDEX_2DSPHERE) {
+            continue;
+        }
+
+        S2IndexingParams params;
+        ExpressionParams::parse2dsphereParams(indexEntry.infoObj, &params);
+
+        if (params.indexVersion < S2_INDEX_VERSION_3) {
+            continue;
+        }
+
+        for (auto elt : indexEntry.keyPattern) {
+            if (elt.type() == BSONType::String && elt.String() == "2dsphere") {
+                twoDSphereFields.insert(elt.fieldName());
+            }
+        }
+    }
+    if (twoDSphereFields.size() > 0) {
+        geoSkipValidationOn(twoDSphereFields, solnRoot);
+    }
+}
+
 BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
     BSONObjBuilder sortBob;
     BSONObjIterator kpIt(indexKeyPattern);
@@ -533,6 +587,8 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
     soln->indexFilterApplied = params.indexFiltersApplied;
 
     solnRoot->computeProperties();
+
+    analyzeGeo(params, solnRoot);
 
     // solnRoot finds all our results.  Let's see what transformations we must perform to the
     // data.
