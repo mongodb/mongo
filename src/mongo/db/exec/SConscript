@@ -66,6 +66,7 @@ env.Library(
         "shard_filter.cpp",
         "skip.cpp",
         "sort.cpp",
+        "sort_key_generator.cpp",
         "stagedebug_cmd.cpp",
         "subplan.cpp",
         "text.cpp",
