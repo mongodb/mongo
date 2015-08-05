@@ -218,6 +218,7 @@ void BackgroundSync::producerThread(executor::TaskExecutor* taskExecutor) {
             fassertFailed(28546);
         }
     }
+    stop();
 }
 
 void BackgroundSync::_producerThread(executor::TaskExecutor* taskExecutor) {
