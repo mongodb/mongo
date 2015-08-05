@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
@@ -38,9 +39,6 @@ namespace mongo {
 class Collection;
 class CursorManager;
 class RecoveryUnit;
-
-typedef long long CursorId; /* passed to the client so it can send back on getMore */
-static const CursorId INVALID_CURSOR_ID = -1;  // But see SERVER-5726.
 
 /**
  * ClientCursor is a wrapper that represents a cursorid from our database application's

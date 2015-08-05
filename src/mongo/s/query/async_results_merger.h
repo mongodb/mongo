@@ -35,7 +35,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/clientcursor.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/stdx/mutex.h"

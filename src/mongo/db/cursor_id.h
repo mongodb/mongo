@@ -28,35 +28,8 @@
 
 #pragma once
 
-#include <vector>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/cursor_id.h"
-
 namespace mongo {
 
-template <typename T>
-class StatusWith;
-class CanonicalQuery;
-class OperationContext;
-struct ReadPreferenceSetting;
-
-/**
- * Methods for running find and getMore operations across a sharded cluster.
- */
-class ClusterFind {
-public:
-    /**
-     * Runs query 'query', targeting remote hosts according to the read preference in 'readPref'.
-     *
-     * On success, fills out 'results' with the first batch of query results and returns the cursor
-     * id which the caller can use on subsequent getMore operations. If no cursor needed to be saved
-     * (e.g. the cursor was exhausted without need for a getMore), returns a cursor id of 0.
-     */
-    static StatusWith<CursorId> runQuery(OperationContext* txn,
-                                         const CanonicalQuery& query,
-                                         const ReadPreferenceSetting& readPref,
-                                         std::vector<BSONObj>* results);
-};
+using CursorId = long long;
 
 }  // namespace mongo

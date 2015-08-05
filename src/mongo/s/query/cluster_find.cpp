@@ -38,6 +38,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"

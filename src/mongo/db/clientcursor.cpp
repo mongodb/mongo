@@ -154,7 +154,6 @@ ClientCursor::~ClientCursor() {
 
     // defensive:
     _cursorManager = NULL;
-    _cursorid = INVALID_CURSOR_ID;
     _pos = -2;
     _isNoTimeout = false;
 }
