@@ -58,6 +58,14 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="cluster_client_cursor_mock",
+    source=[
+        "cluster_client_cursor_mock.cpp",
+    ],
+    LIBDEPS=[],
+)
+
 env.CppUnitTest(
     target="async_results_merger_test",
     source=[
