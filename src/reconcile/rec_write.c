@@ -56,7 +56,7 @@ typedef struct {
 	 * the page is read back into memory.
 	 *
 	 * Saving/restoring updates is configured from outside of reconciliation
-	 * (the WT_SKIP_UPDATE_RESTORE flag).  Writing not-yet-visible updates
+	 * (the WT_EVICT_UPDATE_RESTORE flag).  Writing not-yet-visible updates
 	 * is always possible and is preferable to saving/restoring updates --
 	 * the decision is made once we determine if we had to skip updates to
 	 * write the page.
@@ -1053,7 +1053,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * many smaller pages). If not configured to save/restore the
 		 * updates, fail eviction.
 		 */
-		if (!F_ISSET(r, WT_SKIP_UPDATE_RESTORE))
+		if (!F_ISSET(r, WT_EVICT_UPDATE_RESTORE))
 			return (EBUSY);
 		r->evict_skipped_updates = 1;
 
@@ -1120,6 +1120,14 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * work.
 		 */
 		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
+			return (EBUSY);
+
+		/*
+		 * Lookaside file eviction is only configured when eviction is
+		 * getting aggressive. If not configured for the lookaside file,
+		 * fail eviction.
+		 */
+		if (!F_ISSET(r, WT_EVICT_LOOKASIDE))
 			return (EBUSY);
 
 		/*
@@ -4195,7 +4203,7 @@ record_loop:	/*
 				 * Write a placeholder.
 				 */
 				 WT_ASSERT(session,
-				     F_ISSET(r, WT_SKIP_UPDATE_RESTORE));
+				     F_ISSET(r, WT_EVICT_UPDATE_RESTORE));
 
 				data = "@";
 				size = 1;
@@ -4821,7 +4829,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				 * Assert the case.
 				 */
 				WT_ASSERT(session,
-				    F_ISSET(r, WT_SKIP_UPDATE_RESTORE));
+				    F_ISSET(r, WT_EVICT_UPDATE_RESTORE));
 
 				/*
 				 * If the key is also a removed overflow item,
