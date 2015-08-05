@@ -953,7 +953,7 @@ void SnapshotThread::run() {
                 continue;
             }
 
-            SnapshotName name(0); // assigned real value in block.
+            SnapshotName name(0);  // assigned real value in block.
             {
                 // Make sure there are no in-flight capped inserts while we create our snapshot.
                 Lock::ResourceLock cappedInsertLock(
