@@ -165,7 +165,7 @@ TEST_F(ConfigUpgradeTests, EmptyVersion) {
 
     // Zero version (no version doc)
     VersionType oldVersion;
-    Status status = getConfigVersion(grid.catalogManager(&_txn), &oldVersion);
+    Status status = getConfigVersion(grid.catalogManager(&_txn).get(), &oldVersion);
     ASSERT(status.isOK());
 
     ASSERT_EQUALS(oldVersion.getMinCompatibleVersion(), 0);
@@ -185,7 +185,7 @@ TEST_F(ConfigUpgradeTests, ClusterIDVersion) {
     newVersion.clear();
 
     // Current Version w/o clusterId (invalid!)
-    Status status = getConfigVersion(grid.catalogManager(&_txn), &newVersion);
+    Status status = getConfigVersion(grid.catalogManager(&_txn).get(), &newVersion);
     ASSERT(!status.isOK());
 
     newVersion.clear();
@@ -201,7 +201,7 @@ TEST_F(ConfigUpgradeTests, ClusterIDVersion) {
     newVersion.clear();
 
     // Current version w/ clusterId (valid!)
-    status = getConfigVersion(grid.catalogManager(&_txn), &newVersion);
+    status = getConfigVersion(grid.catalogManager(&_txn).get(), &newVersion);
     ASSERT(status.isOK());
 
     ASSERT_EQUALS(newVersion.getMinCompatibleVersion(), MIN_COMPATIBLE_CONFIG_VERSION);
@@ -219,7 +219,7 @@ TEST_F(ConfigUpgradeTests, InitialUpgrade) {
     VersionType version;
     string errMsg;
     bool result = checkAndUpgradeConfigVersion(
-        grid.catalogManager(&_txn), false, &versionOld, &version, &errMsg);
+        grid.catalogManager(&_txn).get(), false, &versionOld, &version, &errMsg);
 
     ASSERT(result);
     ASSERT_EQUALS(versionOld.getCurrentVersion(), 0);
@@ -242,7 +242,7 @@ TEST_F(ConfigUpgradeTests, BadVersionUpgrade) {
     VersionType version;
     string errMsg;
     bool result = checkAndUpgradeConfigVersion(
-        grid.catalogManager(&_txn), false, &versionOld, &version, &errMsg);
+        grid.catalogManager(&_txn).get(), false, &versionOld, &version, &errMsg);
 
     ASSERT(!result);
 }
@@ -257,11 +257,11 @@ TEST_F(ConfigUpgradeTests, CheckMongoVersion) {
     storeShardsAndPings(5, 10);  // 5 shards, 10 pings
 
     // Our version is >= 2.2, so this works
-    Status status = checkClusterMongoVersions(grid.catalogManager(&_txn), "2.2");
+    Status status = checkClusterMongoVersions(grid.catalogManager(&_txn).get(), "2.2");
     ASSERT(status.isOK());
 
     // Our version is < 9.9, so this doesn't work (until we hit v99.99)
-    status = checkClusterMongoVersions(grid.catalogManager(&_txn), "99.99");
+    status = checkClusterMongoVersions(grid.catalogManager(&_txn).get(), "99.99");
     ASSERT(status.code() == ErrorCodes::RemoteValidationError);
 }
 

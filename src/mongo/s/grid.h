@@ -33,6 +33,7 @@
 
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/rwlock.h"
 
 namespace mongo {
 
@@ -53,6 +54,8 @@ class StatusWith;
  */
 class Grid {
 public:
+    class CatalogManagerGuard;
+
     Grid();
 
     /**
@@ -93,9 +96,7 @@ public:
      */
     bool getConfigShouldBalance(OperationContext* txn) const;
 
-    CatalogManager* catalogManager(OperationContext* txn) {
-        return _catalogManager.get();
-    }
+    Grid::CatalogManagerGuard catalogManager(OperationContext* txn);
 
     CatalogCache* catalogCache() {
         return _catalogCache.get();
@@ -125,6 +126,50 @@ private:
 
     // can 'localhost' be used in shard addresses?
     bool _allowLocalShard;
+
+    /**
+     * Protects access to _catalogManager.
+     * All normal accessors of the current CatalogManager will go through Grid::CatalogManagerGuard,
+     * which always takes the lock in shared mode.  In order to swap the active catalog manager,
+     * the lock must be held in exclusive mode.
+     * TODO(SERVER-19875) Use a new lock manager resource for this instead.
+     */
+    RWLock _catalogManagerLock;
+};
+
+/**
+ * Guard object that protects access to the current active CatalogManager to enable switching the
+ * active catalog manager at runtime.
+ * Note: Never contstruct a CatalogManagerGuard directly, they should only be given out by calling
+ * grid.catalogManager().
+ */
+class Grid::CatalogManagerGuard {
+    MONGO_DISALLOW_COPYING(CatalogManagerGuard);
+
+public:
+    CatalogManagerGuard(OperationContext* txn, Grid* grid);
+    ~CatalogManagerGuard();
+
+    CatalogManager* operator->() const;
+
+    explicit operator bool() const;
+
+    CatalogManager* get() const;
+
+#if defined(_MSC_VER) && _MSC_VER < 1900
+    CatalogManagerGuard(CatalogManagerGuard&& other) : _grid(other._grid) {}
+
+    CatalogManagerGuard& operator=(CatalogManagerGuard&& other) {
+        _grid = other._grid;
+        return *this;
+    }
+#else
+    CatalogManagerGuard(CatalogManagerGuard&& other) = default;
+    CatalogManagerGuard& operator=(CatalogManagerGuard&& other) = default;
+#endif
+
+private:
+    Grid* _grid;
 };
 
 extern Grid grid;

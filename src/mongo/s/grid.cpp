@@ -44,7 +44,7 @@ namespace mongo {
 // Global grid instance
 Grid grid;
 
-Grid::Grid() : _allowLocalShard(true) {}
+Grid::Grid() : _allowLocalShard(true), _catalogManagerLock("CatalogManagerLock") {}
 
 void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
                 std::unique_ptr<ShardRegistry> shardRegistry,
@@ -129,6 +129,30 @@ void Grid::clearForUnitTests() {
     _shardRegistry.reset();
 
     _cursorManager.reset();
+}
+
+Grid::CatalogManagerGuard Grid::catalogManager(OperationContext* txn) {
+    return Grid::CatalogManagerGuard(txn, this);
+}
+
+Grid::CatalogManagerGuard::CatalogManagerGuard(OperationContext* txn, Grid* grid) : _grid(grid) {
+    _grid->_catalogManagerLock.lock_shared();
+}
+
+Grid::CatalogManagerGuard::~CatalogManagerGuard() {
+    _grid->_catalogManagerLock.unlock_shared();
+}
+
+CatalogManager* Grid::CatalogManagerGuard::operator->() const {
+    return get();
+}
+
+Grid::CatalogManagerGuard::operator bool() const {
+    return get();
+}
+
+CatalogManager* Grid::CatalogManagerGuard::get() const {
+    return _grid->_catalogManager.get();
 }
 
 }  // namespace mongo

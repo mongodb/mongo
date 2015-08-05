@@ -545,20 +545,26 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
     shared_ptr<CollectionMetadata> remoteMetadata(remoteMetadataRaw);
 
     Timer refreshTimer;
-    Status status = mdLoader.makeCollectionMetadata(grid.catalogManager(txn),
-                                                    ns,
-                                                    getShardName(),
-                                                    fullReload ? NULL : beforeMetadata.get(),
-                                                    remoteMetadataRaw);
-    long long refreshMillis = refreshTimer.millis();
+    long long refreshMillis;
 
-    if (status.code() == ErrorCodes::NamespaceNotFound) {
-        remoteMetadata.reset();
-        remoteMetadataRaw = NULL;
-    } else if (!status.isOK()) {
-        warning() << "could not remotely refresh metadata for " << ns << causedBy(status.reason());
+    {
+        auto catalogManagerGuard = grid.catalogManager(txn);
+        Status status = mdLoader.makeCollectionMetadata(catalogManagerGuard.get(),
+                                                        ns,
+                                                        getShardName(),
+                                                        fullReload ? NULL : beforeMetadata.get(),
+                                                        remoteMetadataRaw);
+        refreshMillis = refreshTimer.millis();
 
-        return status;
+        if (status.code() == ErrorCodes::NamespaceNotFound) {
+            remoteMetadata.reset();
+            remoteMetadataRaw = NULL;
+        } else if (!status.isOK()) {
+            warning() << "could not remotely refresh metadata for " << ns
+                      << causedBy(status.reason());
+
+            return status;
+        }
     }
 
     ChunkVersion remoteShardVersion;
@@ -623,7 +629,7 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
         // Resolve newer pending chunks with the remote metadata, finish construction
         //
 
-        status = mdLoader.promotePendingChunks(afterMetadata.get(), remoteMetadataRaw);
+        Status status = mdLoader.promotePendingChunks(afterMetadata.get(), remoteMetadataRaw);
 
         if (!status.isOK()) {
             warning() << "remote metadata for " << ns
