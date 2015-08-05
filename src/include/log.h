@@ -186,7 +186,7 @@ typedef struct {
 	WT_SPINLOCK      log_lock;      /* Locked: Logging fields */
 	WT_SPINLOCK      log_slot_lock; /* Locked: Consolidation array */
 	WT_SPINLOCK      log_sync_lock; /* Locked: Single-thread fsync */
-	WT_SPINLOCK      log_writelsn_lock; /* Locked: Single-thread write LSN */
+	WT_SPINLOCK      log_writelsn_lock; /* Locked: write LSN */
 
 	WT_RWLOCK	 *log_archive_lock;	/* Archive and log cursors */
 	WT_RWLOCK	 *log_direct_lock;	/* Direct and buffered writes */

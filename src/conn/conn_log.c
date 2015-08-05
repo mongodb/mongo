@@ -531,11 +531,12 @@ err:	__wt_spin_unlock(session, &log->log_writelsn_lock);
 }
 
 /*
- * __wt_log_force_write --
+ * __log_force_write_locked --
  *	Force a switch and release and write of the current slot.
+ *	Must be called with the slot lock held.
  */
-int
-__wt_log_force_write(WT_SESSION_IMPL *session, int new_slot)
+static int
+__log_force_write_internal(WT_SESSION_IMPL *session, int new_slot)
 {
 	WT_MYSLOT myslot;
 	int free_slot, release;
@@ -551,6 +552,24 @@ __wt_log_force_write(WT_SESSION_IMPL *session, int new_slot)
 	if (new_slot)
 		WT_RET(__wt_log_slot_new(session));
 	return (0);
+}
+
+/*
+ * __wt_log_force_write --
+ *	Force a switch and release and write of the current slot.
+ *	Wrapper function that takes the lock.
+ */
+int
+__wt_log_force_write(WT_SESSION_IMPL *session, int new_slot, int locked)
+{
+	WT_DECL_RET;
+
+	if (locked)
+		ret = __log_force_write_internal(session, new_slot);
+	else
+		WT_WITH_SLOT_LOCK(session, S2C(session)->log,
+		    ret = __log_force_write_internal(session, new_slot));
+	return (ret);
 }
 
 /*
@@ -614,9 +633,7 @@ __log_server(void *arg)
 		 */
 		WT_ERR(__wt_readlock(session, log->log_direct_lock));
 		dir_lock = 1;
-		WT_WITH_SLOT_LOCK(session, log,
-		    ret = __wt_log_force_write(session, 1));
-		WT_ERR(ret);
+		WT_ERR(__wt_log_force_write(session, 1, 0));
 		dir_lock = 0;
 		WT_ERR(__wt_readunlock(session, log->log_direct_lock));
 		/*
@@ -684,7 +701,8 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_spin_init(session, &log->log_lock, "log"));
 	WT_RET(__wt_spin_init(session, &log->log_slot_lock, "log slot"));
 	WT_RET(__wt_spin_init(session, &log->log_sync_lock, "log sync"));
-	WT_RET(__wt_spin_init(session, &log->log_writelsn_lock, "log write LSN"));
+	WT_RET(__wt_spin_init(session, &log->log_writelsn_lock,
+	    "log write LSN"));
 	WT_RET(__wt_rwlock_alloc(session,
 	    &log->log_archive_lock, "log archive lock"));
 	WT_RET(__wt_rwlock_alloc(session,

@@ -1625,7 +1625,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * Join the existing slot to force it out.
 	 */
 	if (F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE))
-		WT_RET(__wt_log_force_write(session, 0));
+		WT_RET(__wt_log_force_write(session, 0, 1));
 	/*
 	 * Set up the temporary slot with the correct LSN information.
 	 * Set our size in the slot for release.
@@ -1903,11 +1903,8 @@ use_slots:
 		if (conn->log_wrlsn_cond != NULL) {
 			WT_ERR(__wt_cond_signal(session, conn->log_cond));
 			__wt_yield();
-		} else {
-			WT_WITH_SLOT_LOCK(session, log,
-			    ret = __wt_log_force_write(session, 1));
-			WT_ERR(ret);
-		}
+		} else
+			WT_ERR(__wt_log_force_write(session, 1, 0));
 	}
 	WT_ERR(__wt_readunlock(session, log->log_direct_lock));
 	locked = WT_NOT_LOCKED;
