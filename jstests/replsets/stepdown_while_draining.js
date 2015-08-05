@@ -29,6 +29,7 @@ load("jstests/replsets/rslib.js");
                       });
 
     var primary = replTest.getPrimary();
+    replTest.awaitReplication();
     var config = primary.getDB("local").system.replset.findOne();
     conns[1].getDB("admin").runCommand({configureFailPoint: 'stepDownWhileDrainingFailPoint',
                                         mode: 'alwaysOn'});
