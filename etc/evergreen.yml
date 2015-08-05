@@ -377,6 +377,14 @@ tasks:
           curl --silent --max-time 600 http://boxes.10gen.com/build/node-v0.12.4-linux-x64.tar.gz --output node.tar.gz
           ${decompress} node.tar.gz
     - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          cp mongodb*/bin/mongod .
+    - command: shell.exec
       type: test
       params:
         working_dir: src/jstestfuzz
