@@ -47,6 +47,10 @@ __insert_simple_func(WT_SESSION_IMPL *session,
 	 * return success: the levels we updated are correct and sufficient.
 	 * Even though we don't get the benefit of the memory we allocated,
 	 * we can't roll back.
+	 *
+	 * All structure setup must be flushed before the structure is entered
+	 * into the list. We need a write barrier here, our callers depend on
+	 * it.
 	 */
 	for (i = 0; i < skipdepth; i++)
 		if (!WT_ATOMIC_CAS8(*ins_stack[i], new_ins->next[i], new_ins))
@@ -65,7 +69,8 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 {
 	u_int i;
 
-	WT_UNUSED(session);
+	/* The cursor should be positioned. */
+	WT_ASSERT(session, ins_stack[0] != NULL);
 
 	/*
 	 * Update the skiplist elements referencing the new WT_INSERT item.
@@ -75,6 +80,10 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 	 * upper levels in the skiplist, return success: the levels we updated
 	 * are correct and sufficient. Even though we don't get the benefit of
 	 * the memory we allocated, we can't roll back.
+	 *
+	 * All structure setup must be flushed before the structure is entered
+	 * into the list. We need a write barrier here, our callers depend on
+	 * it.
 	 */
 	for (i = 0; i < skipdepth; i++) {
 		if (!WT_ATOMIC_CAS8(*ins_stack[i], new_ins->next[i], new_ins))
@@ -143,13 +152,6 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
 
-	/* !!!
-	 * Test for an uninitialized cursor, ins_stack[0] is cleared as part of
-	 * initializing a cursor for a search.
-	 */
-	if (ins_stack[0] == NULL)
-		return (WT_RESTART);
-
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
 
@@ -162,8 +164,8 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	    session, ins_head, ins_stack, new_ins, recnop, skipdepth);
 	WT_PAGE_UNLOCK(session, page);
 
-	/* Free unused memory on error. */
 	if (ret != 0) {
+		/* Free unused memory on error. */
 		__wt_free(session, new_ins);
 		return (ret);
 	}
@@ -195,13 +197,6 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_DECL_RET;
 	int simple;
 	u_int i;
-
-	/* !!!
-	 * Test for an uninitialized cursor, ins_stack[0] is cleared as part of
-	 * initializing a cursor for a search.
-	 */
-	if (ins_stack[0] == NULL)
-		return (WT_RESTART);
 
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
@@ -262,6 +257,10 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	*updp = NULL;
 
 	/*
+	 * All structure setup must be flushed before the structure is entered
+	 * into the list. We need a write barrier here, our callers depend on
+	 * it.
+	 *
 	 * Swap the update into place.  If that fails, a new update was added
 	 * after our search, we raced.  Check if our update is still permitted.
 	 */
