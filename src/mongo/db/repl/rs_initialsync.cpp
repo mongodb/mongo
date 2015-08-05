@@ -279,33 +279,6 @@ bool _initialSyncApplyOplog(OperationContext* ctx, repl::SyncTail& syncer, Oplog
     return true;
 }
 
-void _tryToApplyOpWithRetry(OperationContext* txn, SyncTail* init, const BSONObj& op) {
-    try {
-        if (!SyncTail::syncApply(txn, op, false).isOK()) {
-            bool retry;
-            {
-                ScopedTransaction transaction(txn, MODE_X);
-                Lock::GlobalWrite lk(txn->lockState());
-                retry = init->shouldRetry(txn, op);
-            }
-
-            if (retry) {
-                // retry
-                if (!SyncTail::syncApply(txn, op, false).isOK()) {
-                    uasserted(28542,
-                              str::stream() << "During initial sync, failed to apply op: " << op);
-                }
-            }
-            // If shouldRetry() returns false, fall through.
-            // This can happen if the document that was moved and missed by Cloner
-            // subsequently got deleted and no longer exists on the Sync Target at all
-        }
-    } catch (const DBException& e) {
-        error() << "exception: " << causedBy(e) << " on: " << op.toString();
-        uasserted(28541, str::stream() << "During initial sync, failed to apply op: " << op);
-    }
-}
-
 /**
  * Do the initial sync for this member.  There are several steps to this process:
  *
@@ -396,12 +369,8 @@ Status _initialSync() {
 
     log() << "initial sync data copy, starting syncup";
 
-    // prime oplog
-    _tryToApplyOpWithRetry(&txn, &init, lastOp);
-    std::deque<BSONObj> ops;
-    ops.push_back(lastOp);
-
-    OpTime lastOptime = writeOpsToOplog(&txn, ops);
+    // prime oplog, but don't need to actually apply the op as the cloned data already reflects it.
+    OpTime lastOptime = writeOpsToOplog(&txn, {lastOp});
     ReplClientInfo::forClient(txn.getClient()).setLastOp(lastOptime);
     replCoord->setMyLastOptime(lastOptime);
     setNewTimestamp(lastOptime.getTimestamp());
