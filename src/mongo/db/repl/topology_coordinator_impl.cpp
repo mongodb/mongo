@@ -249,6 +249,11 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
 
             const MemberConfig& itMemberConfig(_rsConfig.getMemberAt(itIndex));
 
+            // Candidate must be a voter if we are a voter
+            if (_selfConfig().isVoter() && !itMemberConfig.isVoter()) {
+                continue;
+            }
+
             // Candidate must build indexes if we build indexes, to be considered.
             if (_selfConfig().shouldBuildIndexes()) {
                 if (!itMemberConfig.shouldBuildIndexes()) {
@@ -397,6 +402,13 @@ void TopologyCoordinatorImpl::prepareSyncFromResponse(const ReplicationExecutor:
         *result = Status(ErrorCodes::InvalidOptions,
                          str::stream() << "Cannot sync from \"" << target.toString()
                                        << "\" because it does not build indexes");
+        return;
+    }
+
+    if (selfConfig.isVoter() && !targetConfig->isVoter()) {
+        *result = Status(ErrorCodes::InvalidOptions,
+                         str::stream() << "Cannot sync from \"" << target.toString()
+                                       << "\" because it is not a voter");
         return;
     }
 
@@ -2116,7 +2128,7 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
          ++it) {
         const int itIndex = indexOfIterator(_hbdata, it);
         const MemberConfig& candidateConfig = _rsConfig.getMemberAt(itIndex);
-        if (it->up() &&
+        if (it->up() && (candidateConfig.isVoter() || !_selfConfig().isVoter()) &&
             (candidateConfig.shouldBuildIndexes() || !_selfConfig().shouldBuildIndexes()) &&
             it->getState().readable() && !_memberIsBlacklisted(candidateConfig, now) &&
             goalSecs < it->getOpTime().getSecs()) {

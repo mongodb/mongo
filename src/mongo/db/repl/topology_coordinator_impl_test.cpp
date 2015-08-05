@@ -30,6 +30,7 @@
 
 #include <iostream>
 
+#include "mongo/bson/json.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -107,6 +108,11 @@ protected:
     int getCurrentPrimaryIndex() {
         return getTopoCoord().getCurrentPrimaryIndex();
     }
+
+    HostAndPort getCurrentPrimaryHost() {
+        return _currentConfig.getMemberAt(getTopoCoord().getCurrentPrimaryIndex()).getHostAndPort();
+    }
+
     // Update config and set selfIndex
     // If "now" is passed in, set _now to now+1
     void updateConfig(BSONObj cfg,
@@ -127,6 +133,8 @@ protected:
             getTopoCoord().updateConfig(config, selfIndex, now, lastOp);
             _now = now + Milliseconds(1);
         }
+
+        _currentConfig = config;
     }
 
     HeartbeatResponseAction receiveUpHeartbeat(const HostAndPort& member,
@@ -206,6 +214,7 @@ private:
 private:
     unique_ptr<TopologyCoordinatorImpl> _topo;
     unique_ptr<ReplicationExecutor::CallbackArgs> _cbData;
+    ReplicaSetConfig _currentConfig;
     Date_t _now;
     int _selfIndex;
 };
@@ -418,13 +427,8 @@ TEST_F(TopoCoordTest, ChooseSyncSourceCandidates) {
     getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
     ASSERT_EQUALS(HostAndPort("h5"), getTopoCoord().getSyncSourceAddress());
 
-    // h5 goes down; should choose h3
+    // h5 goes down; should not choose h3 since it can't vote
     receiveDownHeartbeat(HostAndPort("h5"), "rs0", OpTime());
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
-
-    // h3 goes down; no sync source candidates remain
-    receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime());
     getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 }
@@ -482,6 +486,41 @@ TEST_F(TopoCoordTest, ChooseSyncSourceChainingNotAllowed) {
     // and the primary (h3) being behind our most recently applied optime
     getTopoCoord().chooseNewSyncSource(now()++, Timestamp(10, 0));
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+}
+
+TEST_F(TopoCoordTest, ChooseSyncSourceWrtVoters) {
+    updateConfig(fromjson(
+                     "{_id:'rs0', version:1, members:["
+                     "{_id:10, host:'hself'}, "
+                     "{_id:20, host:'h2', votes:0}, "
+                     "{_id:30, host:'h3'} "
+                     "]}"),
+                 0);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    HostAndPort h2("h2"), h3("h3");
+    Timestamp t1(1, 0), t5(5, 0), t10(10, 0), t15(15, 0);
+    OpTime ot1(t1, 0), ot5(t5, 0), ot10(t10, 0), ot15(t15, 0);
+    Milliseconds hbRTT100(100), hbRTT300(300);
+
+    heartbeatFromMember(h2, "rs0", MemberState::RS_SECONDARY, ot5, hbRTT100);
+    heartbeatFromMember(h2, "rs0", MemberState::RS_SECONDARY, ot5, hbRTT100);
+    heartbeatFromMember(h3, "rs0", MemberState::RS_SECONDARY, ot1, hbRTT300);
+    heartbeatFromMember(h3, "rs0", MemberState::RS_SECONDARY, ot1, hbRTT300);
+
+    // Should choose h3 as it is a voter
+    auto newSource = getTopoCoord().chooseNewSyncSource(now()++, Timestamp());
+    ASSERT_EQUALS(h3, newSource);
+
+    // Can't choose h2 as it is not a voter
+    newSource = getTopoCoord().chooseNewSyncSource(now()++, t10);
+    ASSERT_EQUALS(HostAndPort(), newSource);
+
+    // Should choose h3 as it is a voter, and ahead
+    heartbeatFromMember(h3, "rs0", MemberState::RS_SECONDARY, ot5, hbRTT300);
+    newSource = getTopoCoord().chooseNewSyncSource(now()++, t1);
+    ASSERT_EQUALS(h3, newSource);
 }
 
 TEST_F(TopoCoordTest, EmptySyncSourceOnPrimary) {
@@ -921,6 +960,27 @@ TEST_F(TopoCoordTest, PrepareSyncFromResponse) {
     ASSERT_EQUALS(HostAndPort("h6"), syncSource);
 }
 
+TEST_F(TopoCoordTest, PrepareSyncFromResponseVoters) {
+    OpTime staleOpTime(Timestamp(1, 1), 0);
+    OpTime ourOpTime(Timestamp(staleOpTime.getSecs() + 11, 1), 0);
+
+    Status result = Status::OK();
+    BSONObjBuilder response;
+
+    // Test trying to sync from another node
+    updateConfig(fromjson(
+                     "{_id:'rs0', version:1, members:["
+                     "{_id:0, host:'self'},"
+                     "{_id:1, host:'h1'},"
+                     "{_id:2, host:'h2', votes:0}"
+                     "]}"),
+                 0);
+
+    getTopoCoord().prepareSyncFromResponse(
+        cbData(), HostAndPort("h2"), ourOpTime, &response, &result);
+    ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
+    ASSERT_EQUALS("Cannot sync from \"h2:27017\" because it is not a voter", result.reason());
+}
 TEST_F(TopoCoordTest, ReplSetGetStatus) {
     // This test starts by configuring a TopologyCoordinator as a member of a 4 node replica
     // set, with each node in a different state.
