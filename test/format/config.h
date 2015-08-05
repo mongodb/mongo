@@ -61,7 +61,7 @@ typedef struct {
  * Get a random value between a config min/max pair (inclusive for both min
  * and max).
  */
-#define	CONF_RAND(cp)	MMRAND((cp)->min, (cp)->maxrand)
+#define	CONF_RAND(cp)	mmrand(NULL, (cp)->min, (cp)->maxrand)
 
 static CONFIG c[] = {
 	{ "abort",

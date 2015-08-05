@@ -103,7 +103,7 @@ corrupt(void)
 found:	if (fstat(fd, &sb) == -1)
 		die(errno, "salvage-corrupt: fstat");
 
-	offset = MMRAND(0, sb.st_size);
+	offset = mmrand(NULL, 0, sb.st_size);
 	len = (size_t)(20 + (sb.st_size / 100) * 2);
 	(void)snprintf(buf, sizeof(buf), "%s/slvg.corrupt", g.home);
 	if ((fp = fopen(buf, "w")) == NULL)

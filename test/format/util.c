@@ -47,7 +47,7 @@ kv_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
 		max = KILOBYTE(100);
 	} else if (keyno % 20 != 0 && max > min + 20)
 		max = min + 20;
-	return (MMRAND(min, max));
+	return (mmrand(rnd, min, max));
 }
 
 void
@@ -66,7 +66,7 @@ key_len_setup(void)
 	 */
 	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
 		g.key_rand_len[i] =
-		    kv_len((uint64_t)i, g.c_key_min, g.c_key_max);
+		    kv_len(NULL, (uint64_t)i, g.c_key_min, g.c_key_max);
 }
 
 void
@@ -85,17 +85,16 @@ key_gen_setup(uint8_t **keyp)
 	*keyp = key;
 }
 
-void
-key_gen(uint8_t *key, size_t *sizep, uint64_t keyno, int insert)
+static void
+key_gen_common(uint8_t *key, size_t *sizep, uint64_t keyno, int suffix)
 {
-	int len, suffix;
+	int len;
 
 	/*
 	 * The key always starts with a 10-digit string (the specified cnt)
 	 * followed by two digits, a random number between 1 and 15 if it's
 	 * an insert, otherwise 00.
 	 */
-	suffix = insert ? (int)MMRAND(1, 15) : 0;
 	len = sprintf((char *)key, "%010" PRIu64 ".%02d", keyno, suffix);
 
 	/*
@@ -147,8 +146,8 @@ val_gen_setup(WT_RAND_STATE *rnd, uint8_t **valp)
 
 	*valp = val;
 
-	val_dup_data_len =
-	    kv_len((uint64_t)MMRAND(1, 20), g.c_value_min, g.c_value_max);
+	val_dup_data_len = kv_len(rnd,
+	    (uint64_t)mmrand(rnd, 1, 20), g.c_value_min, g.c_value_max);
 }
 
 void
@@ -160,13 +159,13 @@ val_gen(WT_RAND_STATE *rnd, uint8_t *val, size_t *sizep, uint64_t keyno)
 	 */
 	if (g.type == FIX) {
 		switch (g.c_bitcnt) {
-		case 8: val[0] = MMRAND(1, 0xff); break;
-		case 7: val[0] = MMRAND(1, 0x7f); break;
-		case 6: val[0] = MMRAND(1, 0x3f); break;
-		case 5: val[0] = MMRAND(1, 0x1f); break;
-		case 4: val[0] = MMRAND(1, 0x0f); break;
-		case 3: val[0] = MMRAND(1, 0x07); break;
-		case 2: val[0] = MMRAND(1, 0x03); break;
+		case 8: val[0] = mmrand(rnd, 1, 0xff); break;
+		case 7: val[0] = mmrand(rnd, 1, 0x7f); break;
+		case 6: val[0] = mmrand(rnd, 1, 0x3f); break;
+		case 5: val[0] = mmrand(rnd, 1, 0x1f); break;
+		case 4: val[0] = mmrand(rnd, 1, 0x0f); break;
+		case 3: val[0] = mmrand(rnd, 1, 0x07); break;
+		case 2: val[0] = mmrand(rnd, 1, 0x03); break;
 		case 1: val[0] = 1; break;
 		}
 		*sizep = 1;
@@ -192,14 +191,15 @@ val_gen(WT_RAND_STATE *rnd, uint8_t *val, size_t *sizep, uint64_t keyno)
 	 * use the same data value all the time.
 	 */
 	if ((g.type == ROW || g.type == VAR) &&
-	    g.c_repeat_data_pct != 0 && MMRAND(1, 100) < g.c_repeat_data_pct) {
+	    g.c_repeat_data_pct != 0 &&
+	    mmrand(rnd, 1, 100) < g.c_repeat_data_pct) {
 		(void)strcpy((char *)val, "DUPLICATEV");
 		val[10] = '/';
 		*sizep = val_dup_data_len;
 	} else {
 		(void)sprintf((char *)val, "%010" PRIu64, keyno);
 		val[10] = '/';
-		*sizep = kv_len(keyno, g.c_value_min, g.c_value_max);
+		*sizep = kv_len(rnd, keyno, g.c_value_min, g.c_value_max);
 	}
 }
 
@@ -380,7 +380,7 @@ rng(WT_RAND_STATE *rnd)
 	 * threaded operation order can't be replayed.
 	 */
 	if (g.rand_log_stop)
-		return ((uint32_t)rand());
+		return (__wt_random(rnd));
 
 	if (g.replay) {
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
@@ -396,7 +396,8 @@ rng(WT_RAND_STATE *rnd)
 		return ((uint32_t)strtoul(buf, NULL, 10));
 	}
 
-	r = (uint32_t)rand();
+	r = __wt_random(rnd);
+
 	fprintf(g.rand_log, "%" PRIu32 "\n", r);
 	return (r);
 }

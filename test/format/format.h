@@ -54,8 +54,7 @@
 #include "windows_shim.h"
 #endif
 
-#include <wiredtiger.h>
-#include <wiredtiger_ext.h>
+#include <wt_internal.h>
 
 #ifdef BDB
 #include <db.h>
@@ -102,9 +101,6 @@ extern WT_EXTENSION_API *wt_api;
 #define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)(mask)))
 #define	F_ISSET(p, mask)	((p)->flags & ((uint32_t)(mask)))
 #define	F_SET(p, mask)		((p)->flags |= ((uint32_t)(mask)))
-
-/* Get a random value between a min/max pair. */
-#define	MMRAND(min, max)	(rng() % (((max) + 1) - (min)) + (min))
 
 #define	WT_NAME	"wt"				/* Object name */
 
@@ -308,8 +304,6 @@ void	 key_gen(uint8_t *, size_t *, uint64_t);
 void	 key_gen_insert(WT_RAND_STATE *, uint8_t *, size_t *, uint64_t);
 void	 key_gen_setup(uint8_t **);
 void	 key_len_setup(void);
-void	 key_gen_setup(uint8_t **);
-void	 key_gen(uint8_t *, size_t *, uint64_t, int);
 void	 path_setup(const char *);
 uint32_t rng(WT_RAND_STATE *);
 void	 track(const char *, uint64_t, TINFO *);

@@ -147,7 +147,7 @@ bdb_read(uint64_t keyno, void *valuep, size_t *valuesizep, int *notfoundp)
 	size_t size;
 	int ret;
 
-	key_gen(keybuf, &size, keyno, 0);
+	key_gen(keybuf, &size, keyno);
 	key.data = keybuf;
 	key.size = (uint32_t)size;
 
@@ -193,7 +193,7 @@ bdb_remove(uint64_t keyno, int *notfoundp)
 	size_t size;
 	int ret;
 
-	key_gen(keybuf, &size, keyno, 0);
+	key_gen(keybuf, &size, keyno);
 	key.data = keybuf;
 	key.size = (uint32_t)size;
 

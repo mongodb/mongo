@@ -60,7 +60,7 @@ wts_load(void)
 
 	/* Set up the default key buffer. */
 	key_gen_setup(&keybuf);
-	val_gen_setup(&valbuf);
+	val_gen_setup(NULL, &valbuf);
 
 	for (;;) {
 		if (++g.key_cnt > g.c_rows) {
@@ -72,9 +72,9 @@ wts_load(void)
 		if (g.key_cnt % 100 == 0)
 			track("bulk load", g.key_cnt, NULL);
 
-		key_gen(keybuf, &key.size, (uint64_t)g.key_cnt, 0);
+		key_gen(keybuf, &key.size, (uint64_t)g.key_cnt);
 		key.data = keybuf;
-		value_gen(valbuf, &value.size, (uint64_t)g.key_cnt);
+		val_gen(NULL, valbuf, &value.size, (uint64_t)g.key_cnt);
 		value.data = valbuf;
 
 		switch (g.type) {
