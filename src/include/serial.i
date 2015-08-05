@@ -47,6 +47,10 @@ __insert_simple_func(WT_SESSION_IMPL *session,
 	 * return success: the levels we updated are correct and sufficient.
 	 * Even though we don't get the benefit of the memory we allocated,
 	 * we can't roll back.
+	 *
+	 * All structure setup must be flushed before the structure is entered
+	 * into the list. We need a write barrier here, our callers depend on
+	 * it.
 	 */
 	for (i = 0; i < skipdepth; i++)
 		if (!WT_ATOMIC_CAS8(*ins_stack[i], new_ins->next[i], new_ins))
@@ -76,6 +80,10 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 	 * upper levels in the skiplist, return success: the levels we updated
 	 * are correct and sufficient. Even though we don't get the benefit of
 	 * the memory we allocated, we can't roll back.
+	 *
+	 * All structure setup must be flushed before the structure is entered
+	 * into the list. We need a write barrier here, our callers depend on
+	 * it.
 	 */
 	for (i = 0; i < skipdepth; i++) {
 		if (!WT_ATOMIC_CAS8(*ins_stack[i], new_ins->next[i], new_ins))
@@ -249,6 +257,10 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	*updp = NULL;
 
 	/*
+	 * All structure setup must be flushed before the structure is entered
+	 * into the list. We need a write barrier here, our callers depend on
+	 * it.
+	 *
 	 * Swap the update into place.  If that fails, a new update was added
 	 * after our search, we raced.  Check if our update is still permitted.
 	 */
