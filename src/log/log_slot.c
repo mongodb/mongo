@@ -187,7 +187,6 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
 	    log_buffer_size, log->slot_buf_size * WT_SLOT_POOL);
-#if 0
 	F_SET(log,  WT_LOG_FORCE_CONSOLIDATE);
 	/*
 	 * Set up the available slot from the pool the first time.
@@ -199,7 +198,6 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	slot->slot_release_lsn = log->alloc_lsn;
 	slot->slot_fh = log->log_fh;
 	log->active_slot = slot;
-#endif
 
 	if (0) {
 err:		while (--i >= 0)
