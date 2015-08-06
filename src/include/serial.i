@@ -95,7 +95,6 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 		if (old_ins != new_ins->next[i] ||
 		    !WT_ATOMIC_CAS8(*ins_stack[i], old_ins, new_ins))
 			return (i == 0 ? WT_RESTART : 0);
-		}
 		if (ins_head->tail[i] == NULL ||
 		    ins_stack[i] == &ins_head->tail[i]->next[i])
 			ins_head->tail[i] = new_ins;
