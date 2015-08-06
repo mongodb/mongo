@@ -809,6 +809,7 @@ minorp
 minprefix
 mkdir
 mmap
+mmrand
 mnt
 msecs
 msg

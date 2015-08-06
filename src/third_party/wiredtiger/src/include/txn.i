@@ -170,7 +170,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 * Eviction only sees globally visible updates, or if there is a
 	 * checkpoint transaction running, use its transaction.
 	 */
-	if (txn->isolation == TXN_ISO_EVICTION)
+	if (txn->isolation == WT_ISO_EVICTION)
 		return (__wt_txn_visible_all(session, id));
 
 	/*
@@ -183,7 +183,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 * Metadata updates use non-transactional techniques (such as the
 	 * schema and metadata locks) to protect access to in-flight updates.
 	 */
-	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED ||
+	if (txn->isolation == WT_ISO_READ_UNCOMMITTED ||
 	    session->dhandle == session->meta_dhandle)
 		return (1);
 
@@ -192,7 +192,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 		return (1);
 
 	/*
-	 * TXN_ISO_SNAPSHOT, TXN_ISO_READ_COMMITTED: the ID is visible if it is
+	 * WT_ISO_SNAPSHOT, WT_ISO_READ_COMMITTED: the ID is visible if it is
 	 * not the result of a concurrent transaction, that is, if was
 	 * committed before the snapshot was taken.
 	 *
@@ -222,19 +222,19 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->isolation = session->isolation;
 	txn->txn_logsync = S2C(session)->txn_logsync;
 
-        if (cfg != NULL)
-                WT_RET(__wt_txn_config(session, cfg));
+	if (cfg != NULL)
+		WT_RET(__wt_txn_config(session, cfg));
 
 	F_SET(txn, TXN_RUNNING);
-	if (txn->isolation == TXN_ISO_SNAPSHOT) {
+	if (txn->isolation == WT_ISO_SNAPSHOT) {
 		if (session->ncursors > 0)
 			WT_RET(__wt_session_copy_values(session));
 
-                /*
-                 * We're about to allocate a snapshot: if we need to block for
-                 * eviction, it's better to do it beforehand.
-                 */
-                WT_RET(__wt_cache_full_check(session));
+		/*
+		 * We're about to allocate a snapshot: if we need to block for
+		 * eviction, it's better to do it beforehand.
+		 */
+		WT_RET(__wt_cache_full_check(session));
 		__wt_txn_get_snapshot(session);
 	}
 	return (0);
@@ -385,7 +385,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (txn->isolation == TXN_ISO_SNAPSHOT)
+	if (txn->isolation == WT_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 			if (upd->txnid != WT_TXN_ABORTED) {
 				WT_STAT_FAST_DATA_INCR(
@@ -411,7 +411,7 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 
 	/* Release the snap_min ID we put in the global table. */
 	if (!F_ISSET(txn, TXN_RUNNING) ||
-	    txn->isolation != TXN_ISO_SNAPSHOT)
+	    txn->isolation != WT_ISO_SNAPSHOT)
 		__wt_txn_release_snapshot(session);
 }
 
@@ -446,12 +446,12 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	 * further forward, so that once a read-uncommitted cursor is
 	 * positioned on a value, it can't be freed.
 	 */
-	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED &&
+	if (txn->isolation == WT_ISO_READ_UNCOMMITTED &&
 	    !F_ISSET(txn, TXN_HAS_ID) &&
 	    TXNID_LT(txn_state->snap_min, txn_global->last_running))
 		txn_state->snap_min = txn_global->last_running;
 
-	if (txn->isolation != TXN_ISO_READ_UNCOMMITTED &&
+	if (txn->isolation != WT_ISO_READ_UNCOMMITTED &&
 	    !F_ISSET(txn, TXN_HAS_SNAPSHOT))
 		__wt_txn_get_snapshot(session);
 }

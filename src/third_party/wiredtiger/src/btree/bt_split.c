@@ -178,7 +178,7 @@ __split_should_deepen(
 
 	btree = S2BT(session);
 	page = ref->page;
-	pindex = WT_INTL_INDEX_COPY(page);
+	pindex = WT_INTL_INDEX_GET_SAFE(page);
 
 	/*
 	 * Deepen the tree if the page's memory footprint is larger than the
@@ -393,7 +393,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	parent_incr = parent_decr = 0;
 	panic = 0;
 
-	pindex = WT_INTL_INDEX_COPY(parent);
+	pindex = WT_INTL_INDEX_GET_SAFE(parent);
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_deepen);
@@ -491,7 +491,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 		 * to change.
 		 */
 		child_incr = 0;
-		child_pindex = WT_INTL_INDEX_COPY(child);
+		child_pindex = WT_INTL_INDEX_GET_SAFE(child);
 		for (child_refp = child_pindex->index, j = 0; j < slots; ++j) {
 			WT_ERR(__split_ref_deepen_move(session,
 			    parent, *parent_refp, &parent_decr, &child_incr));
@@ -518,7 +518,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 	 * footprint.  From now on we've modified the parent page, attention
 	 * needs to be paid.
 	 */
-	WT_ASSERT(session, WT_INTL_INDEX_COPY(parent) == pindex);
+	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
 	WT_INTL_INDEX_SET(parent, alloc_index);
 	split_gen = WT_ATOMIC_ADD8(S2C(session)->split_gen, 1);
 	panic = 1;
@@ -567,7 +567,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t children)
 			 */
 			if (child_ref->home == parent) {
 				child_ref->home = child;
-				child_ref->ref_hint = 0;
+				child_ref->pindex_hint = 0;
 			}
 		} WT_INTL_FOREACH_END;
 	}
@@ -825,11 +825,11 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	for (;;) {
 		parent = ref->home;
-		F_CAS_ATOMIC(parent, WT_PAGE_SPLITTING, ret);
+		F_CAS_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED, ret);
 		if (ret == 0) {
 			if (parent == ref->home)
 				break;
-			F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+			F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
 			continue;
 		}
 		__wt_yield();
@@ -847,7 +847,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 		hazard = 1;
 	}
 
-	pindex = WT_INTL_INDEX_COPY(parent);
+	pindex = WT_INTL_INDEX_GET_SAFE(parent);
 	parent_entries = pindex->entries;
 
 	/*
@@ -906,7 +906,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * Update the parent page's index: this update makes the split visible
 	 * to threads descending the tree.
 	 */
-	WT_ASSERT(session, WT_INTL_INDEX_COPY(parent) == pindex);
+	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
 	WT_INTL_INDEX_SET(parent, alloc_index);
 	split_gen = WT_ATOMIC_ADD8(S2C(session)->split_gen, 1);
 	alloc_index = NULL;
@@ -1037,7 +1037,7 @@ err:	if (!complete)
 			if (next_ref->state == WT_REF_SPLIT)
 				next_ref->state = WT_REF_DELETED;
 		}
-	F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+	F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
 
 	if (hazard)
 		WT_TRET(__wt_hazard_clear(session, parent));

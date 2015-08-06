@@ -53,7 +53,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * any blocks we don't want as we process the file.
 	 */
 	WT_RET(__wt_block_insert_ext(
-	    session, &block->live.alloc, allocsize, len - allocsize));
+	    session, block, &block->live.alloc, allocsize, len - allocsize));
 
 	return (0);
 }

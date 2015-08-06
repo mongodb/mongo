@@ -369,7 +369,7 @@ __log_wrlsn_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	WT_LOG_WRLSN_ENTRY written[SLOT_POOL];
+	WT_LOG_WRLSN_ENTRY written[WT_SLOT_POOL];
 	WT_LOGSLOT *slot;
 	WT_SESSION_IMPL *session;
 	size_t written_i;
@@ -392,7 +392,7 @@ __log_wrlsn_server(void *arg)
 		 * Walk the array once saving any slots that are in the
 		 * WT_LOG_SLOT_WRITTEN state.
 		 */
-		while (i < SLOT_POOL) {
+		while (i < WT_SLOT_POOL) {
 			save_i = i;
 			slot = &log->slot_pool[i++];
 			if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
@@ -433,7 +433,7 @@ __log_wrlsn_server(void *arg)
 				/*
 				 * Signal the close thread if needed.
 				 */
-				if (F_ISSET(slot, SLOT_CLOSEFH))
+				if (F_ISSET(slot, WT_SLOT_CLOSEFH))
 					WT_ERR(__wt_cond_signal(session,
 					    conn->log_file_cond));
 				WT_ERR(__wt_log_slot_free(session, slot));
@@ -541,9 +541,9 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	    &log->log_archive_lock, "log archive lock"));
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize =
-		    WT_MAX((uint32_t)conn->buffer_alignment, LOG_ALIGN);
+		    WT_MAX((uint32_t)conn->buffer_alignment, WT_LOG_ALIGN);
 	else
-		log->allocsize = LOG_ALIGN;
+		log->allocsize = WT_LOG_ALIGN;
 	WT_INIT_LSN(&log->alloc_lsn);
 	WT_INIT_LSN(&log->ckpt_lsn);
 	WT_INIT_LSN(&log->first_lsn);

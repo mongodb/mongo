@@ -422,8 +422,17 @@ struct __wt_page {
 	/*
 	 * Macros to copy/set the index because the name is obscured to ensure
 	 * the field isn't read multiple times.
+	 *
+	 * There are two versions of WT_INTL_INDEX_GET because the session split
+	 * generation is usually set, but it's not always required: for example,
+	 * if a page is locked for splitting, or being created or destroyed.
 	 */
-#define	WT_INTL_INDEX_COPY(page)	((page)->u.intl.__index)
+#define	WT_INTL_INDEX_GET_SAFE(page)					\
+	((page)->u.intl.__index)
+#define	WT_INTL_INDEX_GET(session, page, pindex) do {			\
+	WT_ASSERT(session, session->split_gen != 0);			\
+	(pindex) = WT_INTL_INDEX_GET_SAFE(page);			\
+} while (0)
 #define	WT_INTL_INDEX_SET(page, v) do {					\
 	WT_WRITE_BARRIER();						\
 	((page)->u.intl.__index) = (v);					\
@@ -439,7 +448,7 @@ struct __wt_page {
 	WT_PAGE_INDEX *__pindex;					\
 	WT_REF **__refp;						\
 	uint32_t __entries;						\
-	for (__pindex = WT_INTL_INDEX_COPY(page),			\
+	for (__pindex = WT_INTL_INDEX_GET_SAFE(page),			\
 	    __refp = __pindex->index,					\
 	    __entries = __pindex->entries; __entries > 0; --__entries) {\
 		(ref) = *__refp++;
@@ -541,7 +550,7 @@ struct __wt_page {
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
 #define	WT_PAGE_SCANNING	0x10	/* Obsolete updates are being scanned */
 #define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
-#define	WT_PAGE_SPLITTING	0x40	/* An internal page is growing */
+#define	WT_PAGE_SPLIT_LOCKED	0x40	/* An internal page is growing */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	/*
@@ -672,7 +681,7 @@ struct __wt_ref {
 	 * up our slot in the page's index structure.
 	 */
 	WT_PAGE * volatile home;	/* Reference page */
-	uint32_t ref_hint;		/* Reference page index hint */
+	uint32_t pindex_hint;		/* Reference page index hint */
 
 	volatile WT_PAGE_STATE state;	/* Page state */
 

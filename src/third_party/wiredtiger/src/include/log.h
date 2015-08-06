@@ -11,8 +11,8 @@
 #define	WT_LOG_TMPNAME	"WiredTigerTmplog"	/* Log temporary name */
 
 /* Logging subsystem declarations. */
-#define	LOG_ALIGN		128
-#define	WT_LOG_SLOT_BUF_INIT_SIZE	64 * 1024
+#define	WT_LOG_ALIGN			128
+#define	WT_LOG_SLOT_BUF_SIZE		256 * 1024
 
 #define	WT_INIT_LSN(l)	do {						\
 	(l)->file = 1;							\
@@ -81,7 +81,7 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	volatile int64_t slot_state;	/* Slot state */
 	uint64_t slot_group_size;	/* Group size */
 	int32_t	 slot_error;		/* Error value */
-#define	SLOT_INVALID_INDEX	0xffffffff
+#define	WT_SLOT_INVALID_INDEX	0xffffffff
 	uint32_t slot_index;		/* Active slot index */
 	wt_off_t slot_start_offset;	/* Starting file offset */
 	WT_LSN	slot_release_lsn;	/* Slot release LSN */
@@ -91,15 +91,14 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	WT_ITEM slot_buf;		/* Buffer for grouped writes */
 	int32_t	slot_churn;		/* Active slots are scarce. */
 
-#define	SLOT_BUF_GROW	0x01			/* Grow buffer on release */
-#define	SLOT_BUFFERED	0x02			/* Buffer writes */
-#define	SLOT_CLOSEFH	0x04			/* Close old fh on release */
-#define	SLOT_SYNC	0x08			/* Needs sync on release */
-#define	SLOT_SYNC_DIR	0x10			/* Directory sync on release */
+#define	WT_SLOT_BUFFERED	0x01		/* Buffer writes */
+#define	WT_SLOT_CLOSEFH		0x02		/* Close old fh on release */
+#define	WT_SLOT_SYNC		0x04		/* Needs sync on release */
+#define	WT_SLOT_SYNC_DIR	0x08		/* Directory sync on release */
 	uint32_t flags;			/* Flags */
 } WT_LOGSLOT;
 
-#define	SLOT_INIT_FLAGS	(SLOT_BUFFERED)
+#define	WT_SLOT_INIT_FLAGS	(WT_SLOT_BUFFERED)
 
 typedef struct {
 	WT_LOGSLOT	*slot;
@@ -150,16 +149,17 @@ typedef struct {
 
 	/*
 	 * Consolidation array information
-	 * SLOT_ACTIVE must be less than SLOT_POOL.
+	 * WT_SLOT_ACTIVE must be less than WT_SLOT_POOL.
 	 * Our testing shows that the more consolidation we generate the
 	 * better the performance we see which equates to an active slot
 	 * slot count of one.
 	 */
-#define	SLOT_ACTIVE	1
-#define	SLOT_POOL	128
+#define	WT_SLOT_ACTIVE	1
+#define	WT_SLOT_POOL	128
 	uint32_t	 pool_index;		/* Global pool index */
-	WT_LOGSLOT	*slot_array[SLOT_ACTIVE];	/* Active slots */
-	WT_LOGSLOT	 slot_pool[SLOT_POOL];	/* Pool of all slots */
+	WT_LOGSLOT	*slot_array[WT_SLOT_ACTIVE];	/* Active slots */
+	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
+	size_t		 slot_buf_size;		/* Buffer size for slots */
 
 #define	WT_LOG_FORCE_CONSOLIDATE	0x01	/* Disable direct writes */
 	uint32_t	 flags;

@@ -196,7 +196,7 @@ restart:	page = current->page;
 			break;
 
 		WT_ASSERT(session, session->split_gen != 0);
-		pindex = WT_INTL_INDEX_COPY(page);
+		WT_INTL_INDEX_GET(session, page, pindex);
 
 		/*
 		 * Fast-path internal pages with one child, a common case for
@@ -489,9 +489,9 @@ restart:
 			break;
 
 		WT_ASSERT(session, session->split_gen != 0);
-		pindex = WT_INTL_INDEX_COPY(page);
+		WT_INTL_INDEX_GET(session, page, pindex);
 		descent = pindex->index[
-		    __wt_random(session->rnd) % pindex->entries];
+		    __wt_random(&session->rnd) % pindex->entries];
 
 		/*
 		 * Swap the parent page for the child page; return on error,
@@ -524,9 +524,9 @@ restart:
 		cbt->ref = current;
 		cbt->compare = 0;
 		WT_ASSERT(session, session->split_gen != 0);
-		pindex = WT_INTL_INDEX_COPY(btree->root.page);
+		WT_INTL_INDEX_GET(session, btree->root.page, pindex);
 		cbt->slot = pindex->entries < 2 ?
-		    __wt_random(session->rnd) % page->pg_row_entries : 0;
+		    __wt_random(&session->rnd) % page->pg_row_entries : 0;
 
 		return (__wt_row_leaf_key(session,
 		    page, page->pg_row_d + cbt->slot, &cbt->search_key, 0));

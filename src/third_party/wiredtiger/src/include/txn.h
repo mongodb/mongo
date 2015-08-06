@@ -63,10 +63,10 @@ struct __wt_txn_global {
 };
 
 typedef enum __wt_txn_isolation {
-	TXN_ISO_EVICTION,		/* Internal: eviction context */
-	TXN_ISO_READ_UNCOMMITTED,
-	TXN_ISO_READ_COMMITTED,
-	TXN_ISO_SNAPSHOT
+	WT_ISO_EVICTION,		/* Internal: eviction context */
+	WT_ISO_READ_UNCOMMITTED,
+	WT_ISO_READ_COMMITTED,
+	WT_ISO_SNAPSHOT
 } WT_TXN_ISOLATION;
 
 /*

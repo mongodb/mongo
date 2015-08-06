@@ -56,7 +56,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	 */
 	WT_ASSERT(session, !__wt_page_is_modified(page));
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
-	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_SPLITTING));
+	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_LOCKED));
 
 #ifdef HAVE_DIAGNOSTIC
 	{
@@ -210,7 +210,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	__wt_free_ref_index(session, page, WT_INTL_INDEX_COPY(page), 0);
+	__wt_free_ref_index(session, page, WT_INTL_INDEX_GET_SAFE(page), 0);
 }
 
 /*

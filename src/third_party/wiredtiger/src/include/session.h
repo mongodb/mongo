@@ -146,9 +146,9 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	 * to clear everything but the fields that persist.
 	 */
 #define	WT_SESSION_CLEAR_SIZE(s)					\
-	(WT_PTRDIFF(&(s)->rnd[0], s))
+	(WT_PTRDIFF(&(s)->rnd, s))
 
-	uint32_t rnd[2];		/* Random number generation state */
+	WT_RAND_STATE rnd;		/* Random number generation state */
 
 					/* Hashed handle reference list array */
 	SLIST_HEAD(__dhandles_hash, __wt_data_handle_cache) *dhhash;

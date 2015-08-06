@@ -132,10 +132,11 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	hard_limit = F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH) ? 1 : 0;
 
 	if (have_primary) {
+		WT_ENTER_PAGE_INDEX(session);
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
-		    ovfl = __wt_btree_size_overflow(
-		    session, hard_limit ?
+		    ovfl = __wt_btree_lsm_size(session, hard_limit ?
 		    2 * lsm_tree->chunk_size : lsm_tree->chunk_size));
+		WT_LEAVE_PAGE_INDEX(session);
 
 		/* If there was no overflow, we're done. */
 		if (!ovfl)
@@ -206,7 +207,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 			if (clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
 				goto open;
 
-			if (session->txn.isolation == TXN_ISO_SNAPSHOT)
+			if (session->txn.isolation == WT_ISO_SNAPSHOT)
 				__wt_txn_cursor_op(session);
 
 			/*
@@ -219,7 +220,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 			 * conflict.
 			 */
 			clsm->nupdates = 1;
-			if (session->txn.isolation == TXN_ISO_SNAPSHOT &&
+			if (session->txn.isolation == WT_ISO_SNAPSHOT &&
 			    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
 				WT_ASSERT(session,
 				    F_ISSET(&session->txn, TXN_HAS_SNAPSHOT));
@@ -245,7 +246,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 		 *   - a read operation and the cursor is open for reading.
 		 */
 		if ((!update ||
-		    session->txn.isolation != TXN_ISO_SNAPSHOT ||
+		    session->txn.isolation != WT_ISO_SNAPSHOT ||
 		    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) &&
 		    ((update && clsm->primary_chunk != NULL) ||
 		    (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
@@ -417,7 +418,7 @@ __clsm_open_cursors(
 	 * Ensure that any snapshot update has cursors on the right set of
 	 * chunks to guarantee visibility is correct.
 	 */
-	if (update && txn->isolation == TXN_ISO_SNAPSHOT)
+	if (update && txn->isolation == WT_ISO_SNAPSHOT)
 		F_SET(clsm, WT_CLSM_OPEN_SNAPSHOT);
 
 	/*
@@ -1533,9 +1534,11 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	if (bulk && (ret == EBUSY || (ret == 0 &&  lsm_tree->nchunks > 1)))
 		WT_ERR_MSG(session, EINVAL,
 		    "bulk-load is only supported on newly created LSM trees");
-	WT_ASSERT(session, !bulk || lsm_tree->exclusive);
 	/* Flag any errors from the tree get. */
-	WT_RET(ret);
+	WT_ERR(ret);
+
+	/* Make sure we have exclusive access if and only if we want it */
+	WT_ASSERT(session, !bulk || lsm_tree->exclusive);
 
 	WT_ERR(__wt_calloc_one(session, &clsm));
 

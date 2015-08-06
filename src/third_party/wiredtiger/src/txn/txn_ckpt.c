@@ -358,10 +358,10 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	u_int i;
 
 	conn = S2C(session);
+	txn = &session->txn;
 	txn_global = &conn->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
 	saved_isolation = session->isolation;
-	txn = &session->txn;
 	full = idle = logging = tracking = 0;
 
 	/* Ensure the metadata table is open before taking any locks. */
@@ -372,6 +372,9 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * kind of checkpoint this is.
 	 */
 	WT_RET(__checkpoint_apply_all(session, cfg, NULL, &full));
+
+	/* Configure logging only if doing a full checkpoint. */
+	logging = FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED);
 
 	/*
 	 * Get a list of handles we want to flush; this may pull closed objects
@@ -400,7 +403,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    "starting write leaves", &verb_timer));
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
-	session->isolation = txn->isolation = TXN_ISO_READ_COMMITTED;
+	session->isolation = txn->isolation = WT_ISO_READ_COMMITTED;
 	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
 
 	/*
@@ -421,7 +424,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	tracking = 1;
 
 	/* Tell logging that we are about to start a database checkpoint. */
-	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && full)
+	if (full && logging)
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
@@ -491,11 +494,9 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_state->id = txn_state->snap_min = WT_TXN_NONE;
 
 	/* Tell logging that we have started a database checkpoint. */
-	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) && full) {
+	if (full && logging)
 		WT_ERR(__wt_txn_checkpoint_log(
 		    session, full, WT_TXN_LOG_CKPT_START, NULL));
-		logging = 1;
-	}
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint));
 
@@ -531,22 +532,29 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_txn_commit(session, NULL));
 
 	/*
-	 * Disable metadata tracking during the metadata checkpoint.
-	 *
-	 * We don't lock old checkpoints in the metadata file: there is no way
-	 * to open one.  We are holding other handle locks, it is not safe to
-	 * lock conn->spinlock.
+	 * Ensure that the metadata changes are durable before the checkpoint
+	 * is resolved. Do this by either checkpointing the metadata or syncing
+	 * the log file.
+	 * Recovery relies on the checkpoint LSN in the metadata only being
+	 * updated by full checkpoints so only checkpoint the metadata for
+	 * full or non-logged checkpoints.
 	 */
-	session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
-	saved_meta_next = session->meta_track_next;
-	session->meta_track_next = NULL;
-	WT_WITH_DHANDLE(session,
-	    session->meta_dhandle, ret = __wt_checkpoint(session, cfg));
-	session->meta_track_next = saved_meta_next;
-	WT_ERR(ret);
+	if (full || !logging) {
+		session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
+		/* Disable metadata tracking during the metadata checkpoint. */
+		saved_meta_next = session->meta_track_next;
+		session->meta_track_next = NULL;
+		WT_WITH_DHANDLE(session,
+		    session->meta_dhandle, ret = __wt_checkpoint(session, cfg));
+		session->meta_track_next = saved_meta_next;
+		WT_ERR(ret);
 
-	WT_ERR(__checkpoint_verbose_track(session,
-	    "metadata sync completed", &verb_timer));
+		WT_ERR(__checkpoint_verbose_track(session,
+		    "metadata sync completed", &verb_timer));
+	} else
+		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		    ret = __wt_txn_checkpoint_log(session,
+		    0, WT_TXN_LOG_CKPT_SYNC, NULL));
 
 	if (full) {
 		WT_ERR(__wt_epoch(session, &stop));
@@ -566,7 +574,7 @@ err:	/*
 	 * overwritten the checkpoint, so what ends up on disk is not
 	 * consistent.
 	 */
-	session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, 0, ret != 0));
 
@@ -585,8 +593,8 @@ err:	/*
 	 * Tell logging that we have finished a database checkpoint.  Do not
 	 * write a log record if the database was idle.
 	 */
-	if (logging) {
-		if (ret == 0 && full &&
+	if (full && logging) {
+		if (ret == 0 &&
 		    F_ISSET((WT_BTREE *)session->meta_dhandle->handle,
 		    WT_BTREE_SKIP_CKPT))
 			idle = 1;
@@ -1170,19 +1178,21 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 	}
 
 	/*
-	 * If closing a modified file, checkpoint the file and optionally flush
-	 * the writes (the checkpoint call will discard the blocks, there's no
-	 * additional step needed).
-	 *
 	 * We should already have the schema lock unless we're finishing a bulk
 	 * load -- the only other paths to closing files (sweep and LSM) have
 	 * already checked for read-only trees.
 	 */
-	if (!final)
-		WT_ASSERT(session,
-		    bulk || F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session,
+	    final || bulk || F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
-	need_tracking = !bulk && !final && !WT_META_TRACKING(session);
+	/*
+	 * Turn on metadata tracking if:
+	 * - The session is not already doing metadata tracking.
+	 * - The file was bulk loaded.
+	 * - The close is not during connection close.
+	 */
+	need_tracking = !WT_META_TRACKING(session) && !bulk && !final;
+
 	if (need_tracking)
 		WT_RET(__wt_meta_track_on(session));
 

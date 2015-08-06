@@ -59,7 +59,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 
 	WT_ASSERT(session,
 	    txn_state->snap_min == WT_TXN_NONE ||
-	    session->txn.isolation == TXN_ISO_READ_UNCOMMITTED ||
+	    session->txn.isolation == WT_ISO_READ_UNCOMMITTED ||
 	    !__wt_txn_visible_all(session, txn_state->snap_min));
 
 	txn_state->snap_min = WT_TXN_NONE;
@@ -87,20 +87,6 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	txn_global = &conn->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
 
-	current_id = snap_min = txn_global->current;
-	prev_oldest_id = txn_global->oldest_id;
-
-	/* For pure read-only workloads, avoid scanning. */
-	if (prev_oldest_id == current_id) {
-		txn_state->snap_min = current_id;
-		__txn_sort_snapshot(session, 0, current_id);
-
-		/* Check that the oldest ID has not moved in the meantime. */
-		if (prev_oldest_id == txn_global->oldest_id &&
-		    txn_global->scan_count == 0)
-			return;
-	}
-
 	/*
 	 * We're going to scan.  Increment the count of scanners to prevent the
 	 * oldest ID from moving forwards.  Spin if the count is negative,
@@ -112,9 +98,21 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	} while (count < 0 ||
 	    !WT_ATOMIC_CAS4(txn_global->scan_count, count, count + 1));
 
-	/* The oldest ID cannot change until the scan count goes to zero. */
-	prev_oldest_id = txn_global->oldest_id;
 	current_id = snap_min = txn_global->current;
+	prev_oldest_id = txn_global->oldest_id;
+
+	/* For pure read-only workloads, avoid scanning. */
+	if (prev_oldest_id == current_id) {
+		txn_state->snap_min = current_id;
+		__txn_sort_snapshot(session, 0, current_id);
+
+		/* Check that the oldest ID has not moved in the meantime. */
+		if (prev_oldest_id == txn_global->oldest_id) {
+			WT_ASSERT(session, txn_global->scan_count > 0);
+			(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
+			return;
+		}
+	}
 
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -299,9 +297,9 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.len != 0)
 		txn->isolation =
 		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
-		    TXN_ISO_SNAPSHOT :
+		    WT_ISO_SNAPSHOT :
 		    WT_STRING_MATCH("read-committed", cval.str, cval.len) ?
-		    TXN_ISO_READ_COMMITTED : TXN_ISO_READ_UNCOMMITTED;
+		    WT_ISO_READ_COMMITTED : WT_ISO_READ_UNCOMMITTED;
 
 	/*
 	 * The default sync setting is inherited from the connection, but can
@@ -333,6 +331,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
+	int was_oldest;
 
 	txn = &session->txn;
 	WT_ASSERT(session, txn->mod_count == 0);
@@ -340,6 +339,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 
 	txn_global = &S2C(session)->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
+	was_oldest = 0;
 
 	/* Clear the transaction's ID from the global table. */
 	if (WT_SESSION_IS_CHECKPOINT(session)) {
@@ -353,6 +353,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 		    txn->id != WT_TXN_NONE);
 		WT_PUBLISH(txn_state->id, WT_TXN_NONE);
+
+		/* Quick check for the oldest transaction. */
+		was_oldest = (txn->id == txn_global->last_running);
 		txn->id = WT_TXN_NONE;
 	}
 
@@ -369,7 +372,16 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	 */
 	__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, TXN_ERROR | TXN_HAS_ID | TXN_RUNNING);
+	/* Ensure the transaction flags are cleared on exit */
+	txn->flags = 0;
+
+	/*
+	 * When the oldest transaction in the system completes, bump the oldest
+	 * ID.  This is racy and so not guaranteed, but in practice it keeps
+	 * the oldest ID from falling too far behind.
+	 */
+	if (was_oldest)
+		__wt_txn_update_oldest(session, 1);
 }
 
 /*
