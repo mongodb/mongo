@@ -2735,12 +2735,11 @@ void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestI
         }
 
         fassert(28709, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
 
         BSONObjBuilder metadataBuilder(builder->subobjStart(rpc::kReplicationMetadataFieldName));
         metadata.writeToMetadata(builder);
         metadataBuilder.doneFast();
-
-        _replExecutor.wait(cbh.getValue());
     }
 }
 
