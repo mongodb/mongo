@@ -196,8 +196,8 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 	bytes_max = conn->cache_size + 1;
 
 	/*
-         * Calculate the cache full percentage; anything over the trigger means
-         * we involve the application thread.
+	 * Calculate the cache full percentage; anything over the trigger means
+	 * we involve the application thread.
 	 */
 	pct_full = (u_int)((100 * bytes_inuse) / bytes_max);
 	if (pct_fullp != NULL)
