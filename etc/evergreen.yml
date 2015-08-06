@@ -1679,6 +1679,7 @@ buildvariants:
   run_on:
   - rhel55
   - rhel55-test
+  batchtime: 1440 # 1 day
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -1757,6 +1758,7 @@ buildvariants:
   run_on:
   - rhel55
   - rhel55-test
+  batchtime: 1440 # 1 day
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -1814,6 +1816,7 @@ buildvariants:
   run_on:
   - rhel55
   - rhel55-test
+  batchtime: 1440 # 1 day
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -1860,6 +1863,7 @@ buildvariants:
   modules: ~
   run_on:
   - ubuntu1204-test
+  batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags ssl"
     push_path: linux
@@ -1955,6 +1959,7 @@ buildvariants:
   modules: ~
   run_on:
   - ubuntu1404-test
+  batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags ssl"
     push_path: linux
@@ -2065,6 +2070,7 @@ buildvariants:
   - name: compile
     distros:
     - linux-64-amzn-build
+  - name: lint
   - name: aggregation_auth
   - name: audit
   - name: audit_WT
@@ -2072,8 +2078,10 @@ buildvariants:
   - name: auth_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
   - name: failpoints_auth
   - name: jsCore_auth
+  - name: jsCore_WT_ese
   - name: jstestfuzz
   - name: mmap
   - name: noPassthrough
@@ -2082,10 +2090,14 @@ buildvariants:
   - name: noPassthroughWithMongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
+  - name: replica_sets_WT_ese
   - name: replicasets_auth
   - name: replication_auth
+  - name: rlp
+  - name: rlp_WT
   - name: sasl
   - name: sharding_auth
+  - name: sharding_WT_ese
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -2105,6 +2117,7 @@ buildvariants:
   modules: ~
   run_on:
   - linux-64-amzn-test
+  batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags 'ssl'"
     push_path: linux
@@ -2200,6 +2213,7 @@ buildvariants:
   modules: ~
   run_on:
   - rhel55-32
+  batchtime: 1440 # 1 day
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go32 PATH=/opt/go32/bin:$PATH
@@ -2229,6 +2243,7 @@ buildvariants:
   modules: ~
   run_on:
   - rhel55
+  batchtime: 1440 # 1 day
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -2262,6 +2277,7 @@ buildvariants:
   modules: ~
   run_on:
   - windows-64-vs2013-test
+  batchtime: 1440 # 1 day
   expansions:
     exe: ".exe"
     push_path: win32
@@ -2349,6 +2365,7 @@ buildvariants:
   modules: ~
   run_on:
   - windows-64-vs2013-test
+  batchtime: 1440 # 1 day
   expansions:
     exe: ".exe"
     push_path: win32
@@ -2375,6 +2392,18 @@ buildvariants:
   - name: disk
   - name: durability
   - name: failpoints
+  - name: gle_auth
+  - name: gle_auth_WT
+  - name: gle_auth_write_cmd
+  - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
@@ -2537,6 +2566,7 @@ buildvariants:
   modules: ~
   run_on:
   - windows-64-vs2013-test
+  batchtime: 1440 # 1 day
   expansions:
     exe: ".exe"
     gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"'
@@ -2616,6 +2646,7 @@ buildvariants:
   modules: ~
   run_on:
   - windows-32
+  batchtime: 1440 # 1 day
   expansions:
     exe: ".exe"
     gorootvars: GOARCH=386
@@ -2652,6 +2683,7 @@ buildvariants:
   modules: ~
   run_on:
   - osx-108
+  batchtime: 1440 # 1 day
   expansions:
     push_path: osx
     push_bucket: downloads.mongodb.org
@@ -2733,6 +2765,7 @@ buildvariants:
   modules: ~
   run_on:
   - osx-108
+  batchtime: 1440 # 1 day
   expansions:
     push_path: osx
     push_bucket: downloads.mongodb.org
@@ -2862,6 +2895,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel55-test
+  batchtime: 1440 # 1 day
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -2878,7 +2912,6 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
-  - name: lint
   - name: audit
   - name: audit_WT
   - name: dbtest
@@ -2903,6 +2936,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel62-test
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
@@ -2923,16 +2957,10 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
-  - name: ese_WT
-  - name: jsCore_WT_ese
   - name: jstestfuzz
-  - name: replica_sets_WT_ese
-  - name: sharding_WT_ese
   - name: mmap
   - name: jsCore_auth
   - name: replicasets_auth
-  - name: rlp
-  - name: rlp_WT
   - name: sasl
   - name: sharding_auth
   - name: snmp
@@ -2949,6 +2977,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel70
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
@@ -2986,6 +3015,7 @@ buildvariants:
   run_on:
   - rhel55
   - rhel55-test
+  batchtime: 1440 # 1 day
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -3083,6 +3113,7 @@ buildvariants:
   modules: ~
   run_on:
   - rhel62-test
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
@@ -3179,6 +3210,7 @@ buildvariants:
   modules: ~
   run_on:
   - rhel70
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
@@ -3280,6 +3312,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1204-test
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
@@ -3319,6 +3352,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1404-test
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
@@ -3362,6 +3396,7 @@ buildvariants:
   - enterprise
   run_on:
   - suse11-test
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
@@ -3400,6 +3435,7 @@ buildvariants:
   modules: ~
   run_on:
   - suse11-test
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
@@ -3574,6 +3610,7 @@ buildvariants:
   - enterprise
   run_on:
   - debian71-test
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
@@ -3612,6 +3649,7 @@ buildvariants:
   modules: ~
   run_on:
   - debian71-test
+  batchtime: 1440 # 1 day
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
@@ -3713,6 +3751,7 @@ buildvariants:
   - rocksdb
   run_on:
   - ubuntu1404-test
+  batchtime: 1440 # 1 day
   expansions:
     build_rocksdb: true
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ VARIANT_DIR=release
@@ -3772,7 +3811,7 @@ buildvariants:
   run_on:
   - ubuntu1410-build
   stepback: false
-  batchtime: 1440 # 3.5 days
+  batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags 'ssl'"
     asan_symbolizer: ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-3.5
@@ -3859,6 +3898,7 @@ buildvariants:
   run_on:
   - ubuntu1410-test
   stepback: false
+  batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags 'ssl'"
     compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --libc++ --ssl -j$(grep -c ^processor /proc/cpuinfo) VARIANT_DIR=build --distmod=ubuntu1410-clang
@@ -3955,6 +3995,7 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   stepback: false
+  batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags ssl"
     compile_flags: --ssl --distmod=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
@@ -3996,6 +4037,7 @@ buildvariants:
   run_on:
   - windows-64-vs2013-test
   stepback: false
+  batchtime: 1440 # 1 day
   expansions:
     exe: ".exe"
     gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"'
