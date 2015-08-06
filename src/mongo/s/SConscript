@@ -155,6 +155,7 @@ env.CppUnitTest(
         'cluster_ops',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/range_arithmetic',
+        '$BUILD_DIR/mongo/db/service_context',
     ]
 )
 

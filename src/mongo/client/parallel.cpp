@@ -60,13 +60,13 @@ using std::vector;
 
 LabeledLevel pc("pcursor", 2);
 
-void ParallelSortClusteredCursor::init() {
+void ParallelSortClusteredCursor::init(OperationContext* txn) {
     if (_didInit)
         return;
     _didInit = true;
 
     if (!_qSpec.isEmpty()) {
-        fullInit();
+        fullInit(txn);
     } else {
         // You can only get here by using the legacy constructor
         // TODO: Eliminate this
@@ -494,9 +494,9 @@ string ParallelSortClusteredCursor::toString() const {
     return str::stream() << "PCursor : " << toBSON();
 }
 
-void ParallelSortClusteredCursor::fullInit() {
-    startInit();
-    finishInit();
+void ParallelSortClusteredCursor::fullInit(OperationContext* txn) {
+    startInit(txn);
+    finishInit(txn);
 }
 
 void ParallelSortClusteredCursor::_markStaleNS(const NamespaceString& staleNS,
@@ -520,10 +520,11 @@ void ParallelSortClusteredCursor::_markStaleNS(const NamespaceString& staleNS,
     forceReload = tries > 2;
 }
 
-void ParallelSortClusteredCursor::_handleStaleNS(const NamespaceString& staleNS,
+void ParallelSortClusteredCursor::_handleStaleNS(OperationContext* txn,
+                                                 const NamespaceString& staleNS,
                                                  bool forceReload,
                                                  bool fullReload) {
-    auto status = grid.catalogCache()->getDatabase(staleNS.db().toString());
+    auto status = grid.catalogCache()->getDatabase(txn, staleNS.db().toString());
     if (!status.isOK()) {
         warning() << "cannot reload database info for stale namespace " << staleNS.ns();
         return;
@@ -532,7 +533,7 @@ void ParallelSortClusteredCursor::_handleStaleNS(const NamespaceString& staleNS,
     shared_ptr<DBConfig> config = status.getValue();
 
     // Reload db if needed, make sure it works
-    if (fullReload && !config->reload()) {
+    if (fullReload && !config->reload(txn)) {
         // We didn't find the db after reload, the db may have been dropped, reset this ptr
         config.reset();
     }
@@ -541,7 +542,7 @@ void ParallelSortClusteredCursor::_handleStaleNS(const NamespaceString& staleNS,
         warning() << "cannot reload database info for stale namespace " << staleNS.ns();
     } else {
         // Reload chunk manager, potentially forcing the namespace
-        config->getChunkManagerIfExists(staleNS.ns(), true, forceReload);
+        config->getChunkManagerIfExists(txn, staleNS.ns(), true, forceReload);
     }
 }
 
@@ -626,7 +627,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(PCStatePtr state,
     }
 }
 
-void ParallelSortClusteredCursor::startInit() {
+void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
     const bool returnPartial = (_qSpec.options() & QueryOption_PartialResults);
     const NamespaceString nss(!_cInfo.isEmpty() ? _cInfo.versionedNS : _qSpec.ns());
 
@@ -649,7 +650,7 @@ void ParallelSortClusteredCursor::startInit() {
     {
         shared_ptr<DBConfig> config;
 
-        auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+        auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
         if (status.getStatus().code() != ErrorCodes::DatabaseNotFound) {
             config = uassertStatusOK(status);
             config->getChunkManagerOrPrimary(nss.ns(), manager, primary);
@@ -850,10 +851,10 @@ void ParallelSortClusteredCursor::startInit() {
                 warning() << "versioned ns " << nss.ns() << " doesn't match stale config namespace "
                           << staleNS;
 
-            _handleStaleNS(staleNS, forceReload, fullReload);
+            _handleStaleNS(txn, staleNS, forceReload, fullReload);
 
             // Restart with new chunk manager
-            startInit();
+            startInit(txn);
             return;
         } catch (SocketException& e) {
             warning() << "socket exception when initializing on " << shardId
@@ -924,7 +925,7 @@ void ParallelSortClusteredCursor::startInit() {
     }
 }
 
-void ParallelSortClusteredCursor::finishInit() {
+void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
     bool returnPartial = (_qSpec.options() & QueryOption_PartialResults);
     bool specialVersion = _cInfo.versionedNS.size() > 0;
     string ns = specialVersion ? _cInfo.versionedNS : _qSpec.ns();
@@ -1070,13 +1071,13 @@ void ParallelSortClusteredCursor::finishInit() {
                     warning() << "versioned ns " << ns << " doesn't match stale config namespace "
                               << staleNS;
 
-                _handleStaleNS(staleNS, forceReload, fullReload);
+                _handleStaleNS(txn, staleNS, forceReload, fullReload);
             }
         }
 
         // Re-establish connections we need to
-        startInit();
-        finishInit();
+        startInit(txn);
+        finishInit(txn);
         return;
     }
 

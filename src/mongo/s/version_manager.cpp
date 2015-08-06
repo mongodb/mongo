@@ -187,7 +187,7 @@ DBClientBase* getVersionable(DBClientBase* conn) {
  * Eventually this should go completely away, but for now many commands rely on unversioned but
  * mongos-specific behavior on mongod (auditing and replication information in commands)
  */
-bool initShardVersionEmptyNS(DBClientBase* conn_in) {
+bool initShardVersionEmptyNS(OperationContext* txn, DBClientBase* conn_in) {
     bool ok;
     BSONObj result;
     DBClientBase* conn = NULL;
@@ -214,7 +214,7 @@ bool initShardVersionEmptyNS(DBClientBase* conn_in) {
 
         ok = setShardVersion(*conn,
                              "",
-                             grid.catalogManager()->connectionString().toString(),
+                             grid.catalogManager(txn)->connectionString().toString(),
                              ChunkVersion(),
                              NULL,
                              true,
@@ -273,7 +273,8 @@ bool initShardVersionEmptyNS(DBClientBase* conn_in) {
  *
  * @return true if we contacted the remote host
  */
-bool checkShardVersion(DBClientBase* conn_in,
+bool checkShardVersion(OperationContext* txn,
+                       DBClientBase* conn_in,
                        const string& ns,
                        ChunkManagerPtr refManager,
                        bool authoritative,
@@ -282,10 +283,10 @@ bool checkShardVersion(DBClientBase* conn_in,
 
     // Empty namespaces are special - we require initialization but not versioning
     if (ns.size() == 0) {
-        return initShardVersionEmptyNS(conn_in);
+        return initShardVersionEmptyNS(txn, conn_in);
     }
 
-    auto status = grid.catalogCache()->getDatabase(nsToDatabase(ns));
+    auto status = grid.catalogCache()->getDatabase(txn, nsToDatabase(ns));
     if (!status.isOK()) {
         return false;
     }
@@ -300,7 +301,7 @@ bool checkShardVersion(DBClientBase* conn_in,
     ShardPtr primary;
     ChunkManagerPtr manager;
     if (authoritative)
-        conf->getChunkManagerIfExists(ns, true);
+        conf->getChunkManagerIfExists(txn, ns, true);
 
     conf->getChunkManagerOrPrimary(ns, manager, primary);
 
@@ -372,7 +373,7 @@ bool checkShardVersion(DBClientBase* conn_in,
     BSONObj result;
     if (setShardVersion(*conn,
                         ns,
-                        grid.catalogManager()->connectionString().toString(),
+                        grid.catalogManager(txn)->connectionString().toString(),
                         version,
                         manager.get(),
                         authoritative,
@@ -390,7 +391,7 @@ bool checkShardVersion(DBClientBase* conn_in,
     if (!authoritative) {
         // use the original connection and get a fresh versionable connection
         // since conn can be invalidated (or worse, freed) after the failure
-        checkShardVersion(conn_in, ns, refManager, 1, tryNumber + 1);
+        checkShardVersion(txn, conn_in, ns, refManager, 1, tryNumber + 1);
         return true;
     }
 
@@ -400,10 +401,10 @@ bool checkShardVersion(DBClientBase* conn_in,
                       << ", connection state indicates significant version changes";
 
             // reload db
-            conf->reload();
+            conf->reload(txn);
         } else {
             // reload config
-            conf->getChunkManager(ns, true);
+            conf->getChunkManager(txn, ns, true);
         }
     }
 
@@ -414,7 +415,7 @@ bool checkShardVersion(DBClientBase* conn_in,
         sleepmillis(10 * tryNumber);
         // use the original connection and get a fresh versionable connection
         // since conn can be invalidated (or worse, freed) after the failure
-        checkShardVersion(conn_in, ns, refManager, true, tryNumber + 1);
+        checkShardVersion(txn, conn_in, ns, refManager, true, tryNumber + 1);
         return true;
     }
 
@@ -443,13 +444,13 @@ bool VersionManager::isVersionableCB(DBClientBase* conn) {
     return conn->type() == ConnectionString::MASTER || conn->type() == ConnectionString::SET;
 }
 
-bool VersionManager::forceRemoteCheckShardVersionCB(const string& ns) {
+bool VersionManager::forceRemoteCheckShardVersionCB(OperationContext* txn, const string& ns) {
     const NamespaceString nss(ns);
 
     // This will force the database catalog entry to be reloaded
     grid.catalogCache()->invalidate(nss.db().toString());
 
-    auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+    auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
     if (!status.isOK()) {
         return false;
     }
@@ -461,7 +462,7 @@ bool VersionManager::forceRemoteCheckShardVersionCB(const string& ns) {
         return false;
     }
 
-    ChunkManagerPtr manager = conf->getChunkManagerIfExists(ns, true, true);
+    ChunkManagerPtr manager = conf->getChunkManagerIfExists(txn, ns, true, true);
     if (!manager) {
         return false;
     }
@@ -469,18 +470,20 @@ bool VersionManager::forceRemoteCheckShardVersionCB(const string& ns) {
     return true;
 }
 
-bool VersionManager::checkShardVersionCB(DBClientBase* conn_in,
+bool VersionManager::checkShardVersionCB(OperationContext* txn,
+                                         DBClientBase* conn_in,
                                          const string& ns,
                                          bool authoritative,
                                          int tryNumber) {
-    return checkShardVersion(conn_in, ns, nullptr, authoritative, tryNumber);
+    return checkShardVersion(txn, conn_in, ns, nullptr, authoritative, tryNumber);
 }
 
-bool VersionManager::checkShardVersionCB(ShardConnection* conn_in,
+bool VersionManager::checkShardVersionCB(OperationContext* txn,
+                                         ShardConnection* conn_in,
                                          bool authoritative,
                                          int tryNumber) {
     return checkShardVersion(
-        conn_in->get(), conn_in->getNS(), conn_in->getManager(), authoritative, tryNumber);
+        txn, conn_in->get(), conn_in->getNS(), conn_in->getManager(), authoritative, tryNumber);
 }
 
 }  // namespace mongo

@@ -212,7 +212,7 @@ public:
         }
 
         // Ensure the input database exists
-        auto status = grid.catalogCache()->getDatabase(dbname);
+        auto status = grid.catalogCache()->getDatabase(txn, dbname);
         if (!status.isOK()) {
             return appendCommandStatus(result, status.getStatus());
         }
@@ -222,7 +222,7 @@ public:
         shared_ptr<DBConfig> confOut;
         if (customOutDB) {
             // Create the output database implicitly, since we have a custom output requested
-            confOut = uassertStatusOK(grid.implicitCreateDb(outDB));
+            confOut = uassertStatusOK(grid.implicitCreateDb(txn, outDB));
         } else {
             confOut = confIn;
         }
@@ -301,7 +301,7 @@ public:
             // TODO: take distributed lock to prevent split / migration?
 
             try {
-                Strategy::commandOp(dbname, shardedCommand, 0, fullns, q, &mrCommandResults);
+                Strategy::commandOp(txn, dbname, shardedCommand, 0, fullns, q, &mrCommandResults);
             } catch (DBException& e) {
                 e.addContext(str::stream() << "could not run map command on all shards for ns "
                                            << fullns << " and query " << q);
@@ -422,7 +422,7 @@ public:
             // Create the sharded collection if needed
             if (!confOut->isSharded(finalColLong)) {
                 // Enable sharding on db
-                confOut->enableSharding();
+                confOut->enableSharding(txn);
 
                 // Shard collection according to split points
                 vector<BSONObj> sortedSplitPts;
@@ -444,7 +444,7 @@ public:
 
                 BSONObj sortKey = BSON("_id" << 1);
                 ShardKeyPattern sortKeyPattern(sortKey);
-                Status status = grid.catalogManager()->shardCollection(
+                Status status = grid.catalogManager(txn)->shardCollection(
                     txn, finalColLong, sortKeyPattern, true, sortedSplitPts, outShardIds);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
@@ -454,7 +454,7 @@ public:
             map<BSONObj, int> chunkSizes;
             {
                 // Take distributed lock to prevent split / migration.
-                auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
+                auto scopedDistLock = grid.catalogManager(txn)->getDistLockManager()->lock(
                     finalColLong,
                     "mr-post-process",
                     stdx::chrono::milliseconds(-1),  // retry indefinitely
@@ -469,7 +469,7 @@ public:
 
                 try {
                     Strategy::commandOp(
-                        outDB, finalCmdObj, 0, finalColLong, BSONObj(), &mrCommandResults);
+                        txn, outDB, finalCmdObj, 0, finalColLong, BSONObj(), &mrCommandResults);
                     ok = true;
                 } catch (DBException& e) {
                     e.addContext(str::stream() << "could not run final reduce on all shards for "
@@ -511,19 +511,19 @@ public:
             }
 
             // Do the splitting round
-            ChunkManagerPtr cm = confOut->getChunkManagerIfExists(finalColLong);
+            ChunkManagerPtr cm = confOut->getChunkManagerIfExists(txn, finalColLong);
             for (const auto& chunkSize : chunkSizes) {
                 BSONObj key = chunkSize.first;
                 const int size = chunkSize.second;
                 invariant(size < std::numeric_limits<int>::max());
 
                 // key reported should be the chunk's minimum
-                ChunkPtr c = cm->findIntersectingChunk(key);
+                ChunkPtr c = cm->findIntersectingChunk(txn, key);
                 if (!c) {
                     warning() << "Mongod reported " << size << " bytes inserted for key " << key
                               << " but can't find chunk";
                 } else {
-                    c->splitIfShould(size);
+                    c->splitIfShould(txn, size);
                 }
             }
         }

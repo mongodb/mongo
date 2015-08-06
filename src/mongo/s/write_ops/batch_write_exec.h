@@ -43,6 +43,7 @@ namespace mongo {
 
 class BatchWriteExecStats;
 class MultiCommandDispatch;
+class OperationContext;
 
 /**
  * The BatchWriteExec is able to execute client batch write requests, resulting in a batch
@@ -71,7 +72,8 @@ public:
      *
      * This function does not throw, any errors are reported via the clientResponse.
      */
-    void executeBatch(const BatchedCommandRequest& clientRequest,
+    void executeBatch(OperationContext* txn,
+                      const BatchedCommandRequest& clientRequest,
                       BatchedCommandResponse* clientResponse);
 
     const BatchWriteExecStats& getStats();

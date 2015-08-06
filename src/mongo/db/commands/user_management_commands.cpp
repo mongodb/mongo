@@ -154,7 +154,8 @@ Status getCurrentUserRoles(OperationContext* txn,
  * same database as the role it is being added to (or that the role being added to is from the
  * "admin" database.
  */
-Status checkOkayToGrantRolesToRole(const RoleName& role,
+Status checkOkayToGrantRolesToRole(OperationContext* txn,
+                                   const RoleName& role,
                                    const std::vector<RoleName> rolesToAdd,
                                    AuthorizationManager* authzManager) {
     for (std::vector<RoleName>::const_iterator it = rolesToAdd.begin(); it != rolesToAdd.end();
@@ -174,7 +175,7 @@ Status checkOkayToGrantRolesToRole(const RoleName& role,
         }
 
         BSONObj roleToAddDoc;
-        Status status = authzManager->getRoleDescription(roleToAdd, false, &roleToAddDoc);
+        Status status = authzManager->getRoleDescription(txn, roleToAdd, false, &roleToAddDoc);
         if (status == ErrorCodes::RoleNotFound) {
             return Status(ErrorCodes::RoleNotFound,
                           "Cannot grant nonexistent role " + roleToAdd.toString());
@@ -725,7 +726,7 @@ public:
         // Role existence has to be checked after acquiring the update lock
         for (size_t i = 0; i < args.roles.size(); ++i) {
             BSONObj ignored;
-            status = authzManager->getRoleDescription(args.roles[i], false, &ignored);
+            status = authzManager->getRoleDescription(txn, args.roles[i], false, &ignored);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -842,7 +843,7 @@ public:
         if (args.hasRoles) {
             for (size_t i = 0; i < args.roles.size(); ++i) {
                 BSONObj ignored;
-                status = authzManager->getRoleDescription(args.roles[i], false, &ignored);
+                status = authzManager->getRoleDescription(txn, args.roles[i], false, &ignored);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }
@@ -1077,7 +1078,7 @@ public:
         for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
             RoleName& roleName = *it;
             BSONObj roleDoc;
-            status = authzManager->getRoleDescription(roleName, false, &roleDoc);
+            status = authzManager->getRoleDescription(txn, roleName, false, &roleDoc);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1157,7 +1158,7 @@ public:
         for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
             RoleName& roleName = *it;
             BSONObj roleDoc;
-            status = authzManager->getRoleDescription(roleName, false, &roleDoc);
+            status = authzManager->getRoleDescription(txn, roleName, false, &roleDoc);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1381,7 +1382,7 @@ public:
         }
 
         // Role existence has to be checked after acquiring the update lock
-        status = checkOkayToGrantRolesToRole(args.roleName, args.roles, authzManager);
+        status = checkOkayToGrantRolesToRole(txn, args.roleName, args.roles, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1471,13 +1472,13 @@ public:
 
         // Role existence has to be checked after acquiring the update lock
         BSONObj ignored;
-        status = authzManager->getRoleDescription(args.roleName, false, &ignored);
+        status = authzManager->getRoleDescription(txn, args.roleName, false, &ignored);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
         if (args.hasRoles) {
-            status = checkOkayToGrantRolesToRole(args.roleName, args.roles, authzManager);
+            status = checkOkayToGrantRolesToRole(txn, args.roleName, args.roles, authzManager);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -1568,7 +1569,7 @@ public:
         }
 
         BSONObj roleDoc;
-        status = authzManager->getRoleDescription(roleName, true, &roleDoc);
+        status = authzManager->getRoleDescription(txn, roleName, true, &roleDoc);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1680,7 +1681,7 @@ public:
         }
 
         BSONObj roleDoc;
-        status = authzManager->getRoleDescription(roleName, true, &roleDoc);
+        status = authzManager->getRoleDescription(txn, roleName, true, &roleDoc);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1798,13 +1799,13 @@ public:
 
         // Role existence has to be checked after acquiring the update lock
         BSONObj roleDoc;
-        status = authzManager->getRoleDescription(roleName, false, &roleDoc);
+        status = authzManager->getRoleDescription(txn, roleName, false, &roleDoc);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
         // Check for cycles
-        status = checkOkayToGrantRolesToRole(roleName, rolesToAdd, authzManager);
+        status = checkOkayToGrantRolesToRole(txn, roleName, rolesToAdd, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1897,7 +1898,7 @@ public:
         }
 
         BSONObj roleDoc;
-        status = authzManager->getRoleDescription(roleName, false, &roleDoc);
+        status = authzManager->getRoleDescription(txn, roleName, false, &roleDoc);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1991,7 +1992,7 @@ public:
         }
 
         BSONObj roleDoc;
-        status = authzManager->getRoleDescription(roleName, false, &roleDoc);
+        status = authzManager->getRoleDescription(txn, roleName, false, &roleDoc);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2262,7 +2263,7 @@ public:
         if (args.allForDB) {
             std::vector<BSONObj> rolesDocs;
             status = getGlobalAuthorizationManager()->getRoleDescriptionsForDB(
-                dbname, args.showPrivileges, args.showBuiltinRoles, &rolesDocs);
+                txn, dbname, args.showPrivileges, args.showBuiltinRoles, &rolesDocs);
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -2274,7 +2275,7 @@ public:
             for (size_t i = 0; i < args.roleNames.size(); ++i) {
                 BSONObj roleDetails;
                 status = getGlobalAuthorizationManager()->getRoleDescription(
-                    args.roleNames[i], args.showPrivileges, &roleDetails);
+                    txn, args.roleNames[i], args.showPrivileges, &roleDetails);
                 if (status.code() == ErrorCodes::RoleNotFound) {
                     continue;
                 }

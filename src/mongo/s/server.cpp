@@ -130,10 +130,11 @@ public:
     virtual void process(Message& m, AbstractMessagingPort* p) {
         verify(p);
         Request r(m, p);
+        auto txn = cc().makeOperationContext();
 
         try {
             r.init();
-            r.process();
+            r.process(txn.get());
         } catch (const AssertionException& ex) {
             LOG(ex.isUserAssertion() ? 1 : 0) << "Assertion failed"
                                               << " while processing " << opToString(m.operation())
@@ -169,8 +170,13 @@ public:
 void start(const MessageServer::Options& opts) {
     balancer.go();
     cursorCache.startTimeoutThread();
+
     UserCacheInvalidator cacheInvalidatorThread(getGlobalAuthorizationManager());
-    cacheInvalidatorThread.go();
+    {
+        auto txn = cc().makeOperationContext();
+        cacheInvalidatorThread.initialize(txn.get());
+        cacheInvalidatorThread.go();
+    }
 
     PeriodicTask::startRunningPeriodicTasks();
 
@@ -190,13 +196,14 @@ DBClientBase* createDirectClient(OperationContext* txn) {
 
 using namespace mongo;
 
-static Status initializeSharding(bool doUpgrade) {
+static Status initializeSharding(OperationContext* txn, bool doUpgrade) {
     Status status = initializeGlobalShardingState(mongosGlobalParams.configdbs);
     if (!status.isOK()) {
         return status;
     }
 
-    status = grid.catalogManager()->checkAndUpgrade(!doUpgrade);
+    auto catalogManager = grid.catalogManager(txn);
+    status = catalogManager->checkAndUpgrade(!doUpgrade);
     if (!status.isOK()) {
         return status;
     }
@@ -205,7 +212,7 @@ static Status initializeSharding(bool doUpgrade) {
         return Status::OK();
     }
 
-    status = grid.catalogManager()->startup();
+    status = catalogManager->startup();
     if (!status.isOK()) {
         return status;
     }
@@ -231,16 +238,19 @@ static ExitCode runMongosServer(bool doUpgrade) {
         dbexit(EXIT_BADOPTIONS);
     }
 
-    Status status = initializeSharding(doUpgrade);
-    if (!status.isOK()) {
-        error() << "Error initializing sharding system: " << status;
-        return EXIT_SHARDING_ERROR;
-    }
-    if (doUpgrade) {
-        return EXIT_CLEAN;
-    }
+    {
+        auto txn = cc().makeOperationContext();
+        Status status = initializeSharding(txn.get(), doUpgrade);
+        if (!status.isOK()) {
+            error() << "Error initializing sharding system: " << status;
+            return EXIT_SHARDING_ERROR;
+        }
+        if (doUpgrade) {
+            return EXIT_CLEAN;
+        }
 
-    ConfigServer::reloadSettings();
+        ConfigServer::reloadSettings(txn.get());
+    }
 
 #if !defined(_WIN32)
     mongo::signalForkSuccess();
@@ -255,7 +265,7 @@ static ExitCode runMongosServer(bool doUpgrade) {
         web.detach();
     }
 
-    status = getGlobalAuthorizationManager()->initialize(NULL);
+    Status status = getGlobalAuthorizationManager()->initialize(NULL);
     if (!status.isOK()) {
         error() << "Initializing authorization data failed: " << status;
         return EXIT_SHARDING_ERROR;
@@ -434,7 +444,19 @@ void mongo::signalShutdown() {
 
 void mongo::exitCleanly(ExitCode code) {
     // TODO: do we need to add anything?
-    grid.catalogManager()->shutDown();
+    {
+        Client& client = cc();
+        ServiceContext::UniqueOperationContext uniqueTxn;
+        OperationContext* txn = client.getOperationContext();
+        if (!txn) {
+            uniqueTxn = client.makeOperationContext();
+            txn = uniqueTxn.get();
+        }
+
+        auto catalogMgr = grid.catalogManager(txn);
+        catalogMgr->shutDown();
+    }
+
     mongo::dbexit(code);
 }
 

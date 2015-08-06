@@ -37,12 +37,15 @@ namespace mongo {
 
 class ClusterWriterStats;
 class BatchWriteExecStats;
+class OperationContext;
 
 class ClusterWriter {
 public:
     ClusterWriter(bool autoSplit, int timeoutMillis);
 
-    void write(const BatchedCommandRequest& request, BatchedCommandResponse* response);
+    void write(OperationContext* txn,
+               const BatchedCommandRequest& request,
+               BatchedCommandResponse* response);
 
     const ClusterWriterStats& getStats();
 
@@ -73,7 +76,8 @@ private:
  *
  * Note: response can be NULL if you don't care about the write statistics.
  */
-Status clusterCreateIndex(const std::string& ns,
+Status clusterCreateIndex(OperationContext* txn,
+                          const std::string& ns,
                           BSONObj keys,
                           bool unique,
                           BatchedCommandResponse* response);

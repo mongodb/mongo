@@ -84,11 +84,11 @@ bool ShardingState::enabled() {
     return _enabled;
 }
 
-string ShardingState::getConfigServer() {
+string ShardingState::getConfigServer(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_enabled);
 
-    return grid.catalogManager()->connectionString().toString();
+    return grid.catalogManager(txn)->connectionString().toString();
 }
 
 string ShardingState::getShardName() {
@@ -545,7 +545,7 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
     shared_ptr<CollectionMetadata> remoteMetadata(remoteMetadataRaw);
 
     Timer refreshTimer;
-    Status status = mdLoader.makeCollectionMetadata(grid.catalogManager(),
+    Status status = mdLoader.makeCollectionMetadata(grid.catalogManager(txn),
                                                     ns,
                                                     getShardName(),
                                                     fullReload ? NULL : beforeMetadata.get(),
@@ -738,7 +738,7 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
     return Status::OK();
 }
 
-void ShardingState::appendInfo(BSONObjBuilder& builder) {
+void ShardingState::appendInfo(OperationContext* txn, BSONObjBuilder& builder) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     builder.appendBool("enabled", _enabled);
@@ -746,7 +746,7 @@ void ShardingState::appendInfo(BSONObjBuilder& builder) {
         return;
     }
 
-    builder.append("configServer", grid.catalogManager()->connectionString().toString());
+    builder.append("configServer", grid.catalogManager(txn)->connectionString().toString());
     builder.append("shardName", _shardName);
 
     BSONObjBuilder versionB(builder.subobjStart("versions"));

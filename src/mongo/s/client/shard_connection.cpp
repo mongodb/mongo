@@ -278,7 +278,7 @@ public:
         }
     }
 
-    void checkVersions(const string& ns) {
+    void checkVersions(OperationContext* txn, const string& ns) {
         vector<ShardId> all;
         grid.shardRegistry()->getAllShardIds(&all);
 
@@ -301,7 +301,7 @@ public:
                     s->created++;  // After, so failed creation doesn't get counted
                 }
 
-                versionManager.checkShardVersionCB(s->avail, ns, false, 1);
+                versionManager.checkShardVersionCB(txn, s->avail, ns, false, 1);
             } catch (const DBException& ex) {
                 warning() << "problem while initially checking shard versions on"
                           << " " << shardId << causedBy(ex);
@@ -450,7 +450,10 @@ void ShardConnection::_finishInit() {
     _finishedInit = true;
 
     if (versionManager.isVersionableCB(_conn)) {
-        _setVersion = versionManager.checkShardVersionCB(this, false, 1);
+        auto& client = cc();
+        auto txn = client.getOperationContext();
+        invariant(txn);
+        _setVersion = versionManager.checkShardVersionCB(txn, this, false, 1);
     } else {
         // Make sure we didn't specify a manager for a non-versionable connection (i.e. config)
         verify(!_manager);
@@ -488,8 +491,8 @@ void ShardConnection::sync() {
     ClientConnections::threadInstance()->sync();
 }
 
-void ShardConnection::checkMyConnectionVersions(const string& ns) {
-    ClientConnections::threadInstance()->checkVersions(ns);
+void ShardConnection::checkMyConnectionVersions(OperationContext* txn, const string& ns) {
+    ClientConnections::threadInstance()->checkVersions(txn, ns);
 }
 
 void ShardConnection::releaseMyConnections() {

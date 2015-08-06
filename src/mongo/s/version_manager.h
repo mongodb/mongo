@@ -33,6 +33,7 @@
 namespace mongo {
 
 class DBClientBase;
+class OperationContext;
 class ShardConnection;
 
 
@@ -41,9 +42,9 @@ public:
     VersionManager() {}
 
     bool isVersionableCB(DBClientBase*);
-    bool forceRemoteCheckShardVersionCB(const std::string&);
-    bool checkShardVersionCB(DBClientBase*, const std::string&, bool, int);
-    bool checkShardVersionCB(ShardConnection*, bool, int);
+    bool forceRemoteCheckShardVersionCB(OperationContext* txn, const std::string&);
+    bool checkShardVersionCB(OperationContext*, DBClientBase*, const std::string&, bool, int);
+    bool checkShardVersionCB(OperationContext*, ShardConnection*, bool, int);
     void resetShardVersionCB(DBClientBase*);
 };
 

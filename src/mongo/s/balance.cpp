@@ -80,7 +80,8 @@ Balancer::Balancer() : _balancedLastTime(0), _policy(new BalancerPolicy()) {}
 
 Balancer::~Balancer() = default;
 
-int Balancer::_moveChunks(const vector<shared_ptr<MigrateInfo>>& candidateChunks,
+int Balancer::_moveChunks(OperationContext* txn,
+                          const vector<shared_ptr<MigrateInfo>>& candidateChunks,
                           const WriteConcernOptions* writeConcern,
                           bool waitForDelete) {
     int movedCount = 0;
@@ -89,7 +90,7 @@ int Balancer::_moveChunks(const vector<shared_ptr<MigrateInfo>>& candidateChunks
         // If the balancer was disabled since we started this round, don't start new chunks
         // moves.
         const auto balSettingsResult =
-            grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
+            grid.catalogManager(txn)->getGlobalSettings(SettingsType::BalancerDocKey);
 
         const bool isBalSettingsAbsent =
             balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
@@ -121,25 +122,25 @@ int Balancer::_moveChunks(const vector<shared_ptr<MigrateInfo>>& candidateChunks
         const NamespaceString nss(migrateInfo->ns);
 
         try {
-            auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+            auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
             fassert(28628, status.getStatus());
 
             shared_ptr<DBConfig> cfg = status.getValue();
 
             // NOTE: We purposely do not reload metadata here, since _doBalanceRound already
             // tried to do so once.
-            shared_ptr<ChunkManager> cm = cfg->getChunkManager(migrateInfo->ns);
+            shared_ptr<ChunkManager> cm = cfg->getChunkManager(txn, migrateInfo->ns);
             invariant(cm);
 
-            ChunkPtr c = cm->findIntersectingChunk(migrateInfo->chunk.min);
+            ChunkPtr c = cm->findIntersectingChunk(txn, migrateInfo->chunk.min);
 
             if (c->getMin().woCompare(migrateInfo->chunk.min) ||
                 c->getMax().woCompare(migrateInfo->chunk.max)) {
                 // Likely a split happened somewhere, so force reload the chunk manager
-                cm = cfg->getChunkManager(migrateInfo->ns, true);
+                cm = cfg->getChunkManager(txn, migrateInfo->ns, true);
                 invariant(cm);
 
-                c = cm->findIntersectingChunk(migrateInfo->chunk.min);
+                c = cm->findIntersectingChunk(txn, migrateInfo->chunk.min);
 
                 if (c->getMin().woCompare(migrateInfo->chunk.min) ||
                     c->getMax().woCompare(migrateInfo->chunk.max)) {
@@ -151,7 +152,8 @@ int Balancer::_moveChunks(const vector<shared_ptr<MigrateInfo>>& candidateChunks
             }
 
             BSONObj res;
-            if (c->moveAndCommit(migrateInfo->to,
+            if (c->moveAndCommit(txn,
+                                 migrateInfo->to,
                                  Chunk::MaxChunkSize,
                                  writeConcern,
                                  waitForDelete,
@@ -167,20 +169,20 @@ int Balancer::_moveChunks(const vector<shared_ptr<MigrateInfo>>& candidateChunks
 
             if (res["chunkTooBig"].trueValue()) {
                 // Reload just to be safe
-                cm = cfg->getChunkManager(migrateInfo->ns);
+                cm = cfg->getChunkManager(txn, migrateInfo->ns);
                 invariant(cm);
 
-                c = cm->findIntersectingChunk(migrateInfo->chunk.min);
+                c = cm->findIntersectingChunk(txn, migrateInfo->chunk.min);
 
                 log() << "performing a split because migrate failed for size reasons";
 
-                Status status = c->split(Chunk::normal, NULL, NULL);
+                Status status = c->split(txn, Chunk::normal, NULL, NULL);
                 log() << "split results: " << status;
 
                 if (!status.isOK()) {
                     log() << "marking chunk as jumbo: " << c->toString();
 
-                    c->markAsJumbo();
+                    c->markAsJumbo(txn);
 
                     // We increment moveCount so we do another round right away
                     movedCount++;
@@ -195,7 +197,7 @@ int Balancer::_moveChunks(const vector<shared_ptr<MigrateInfo>>& candidateChunks
     return movedCount;
 }
 
-void Balancer::_ping(bool waiting) {
+void Balancer::_ping(OperationContext* txn, bool waiting) {
     MongosType mType;
     mType.setName(_myid);
     mType.setPing(jsTime());
@@ -203,12 +205,12 @@ void Balancer::_ping(bool waiting) {
     mType.setWaiting(waiting);
     mType.setMongoVersion(versionString);
 
-    grid.catalogManager()->update(MongosType::ConfigNS,
-                                  BSON(MongosType::name(_myid)),
-                                  BSON("$set" << mType.toBSON()),
-                                  true,
-                                  false,
-                                  NULL);
+    grid.catalogManager(txn)->update(MongosType::ConfigNS,
+                                     BSON(MongosType::name(_myid)),
+                                     BSON("$set" << mType.toBSON()),
+                                     true,
+                                     false,
+                                     NULL);
 }
 
 bool Balancer::_checkOIDs() {
@@ -282,11 +284,12 @@ void warnOnMultiVersion(const ShardInfoMap& shardInfo) {
     }
 }
 
-void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks) {
+void Balancer::_doBalanceRound(OperationContext* txn,
+                               vector<shared_ptr<MigrateInfo>>* candidateChunks) {
     invariant(candidateChunks);
 
     vector<CollectionType> collections;
-    Status collsStatus = grid.catalogManager()->getCollections(nullptr, &collections);
+    Status collsStatus = grid.catalogManager(txn)->getCollections(nullptr, &collections);
     if (!collsStatus.isOK()) {
         warning() << "Failed to retrieve the set of collections during balancing round "
                   << collsStatus;
@@ -304,7 +307,7 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
     //
     // TODO: skip unresponsive shards and mark information as stale.
     ShardInfoMap shardInfo;
-    Status loadStatus = DistributionStatus::populateShardInfoMap(&shardInfo);
+    Status loadStatus = DistributionStatus::populateShardInfoMap(txn, &shardInfo);
     if (!loadStatus.isOK()) {
         warning() << "failed to load shard metadata" << causedBy(loadStatus);
         return;
@@ -328,10 +331,10 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
         }
 
         std::vector<ChunkType> allNsChunks;
-        grid.catalogManager()->getChunks(BSON(ChunkType::ns(nss.ns())),
-                                         BSON(ChunkType::min() << 1),
-                                         boost::none,  // all chunks
-                                         &allNsChunks);
+        grid.catalogManager(txn)->getChunks(BSON(ChunkType::ns(nss.ns())),
+                                            BSON(ChunkType::min() << 1),
+                                            boost::none,  // all chunks
+                                            &allNsChunks);
 
         set<BSONObj> allChunkMinimums;
         map<string, vector<ChunkType>> shardToChunksMap;
@@ -362,7 +365,8 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
 
         {
             vector<TagsType> collectionTags;
-            uassertStatusOK(grid.catalogManager()->getTagsForCollection(nss.ns(), &collectionTags));
+            uassertStatusOK(
+                grid.catalogManager(txn)->getTagsForCollection(nss.ns(), &collectionTags));
             for (const auto& tt : collectionTags) {
                 ranges.push_back(
                     TagRange(tt.getMinKey().getOwned(), tt.getMaxKey().getOwned(), tt.getTag()));
@@ -372,7 +376,7 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
             }
         }
 
-        auto statusGetDb = grid.catalogCache()->getDatabase(nss.db().toString());
+        auto statusGetDb = grid.catalogCache()->getDatabase(txn, nss.db().toString());
         if (!statusGetDb.isOK()) {
             warning() << "could not load db config to balance collection [" << nss.ns()
                       << "]: " << statusGetDb.getStatus();
@@ -383,7 +387,7 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
 
         // This line reloads the chunk manager once if this process doesn't know the collection
         // is sharded yet.
-        shared_ptr<ChunkManager> cm = cfg->getChunkManagerIfExists(nss.ns(), true);
+        shared_ptr<ChunkManager> cm = cfg->getChunkManagerIfExists(txn, nss.ns(), true);
         if (!cm) {
             warning() << "could not load chunks to balance " << nss.ns() << " collection";
             continue;
@@ -405,12 +409,12 @@ void Balancer::_doBalanceRound(vector<shared_ptr<MigrateInfo>>* candidateChunks)
             log() << "nss: " << nss.ns() << " need to split on " << min
                   << " because there is a range there";
 
-            ChunkPtr c = cm->findIntersectingChunk(min);
+            ChunkPtr c = cm->findIntersectingChunk(txn, min);
 
             vector<BSONObj> splitPoints;
             splitPoints.push_back(min);
 
-            Status status = c->multiSplit(splitPoints, NULL);
+            Status status = c->multiSplit(txn, splitPoints, NULL);
             if (!status.isOK()) {
                 error() << "split failed: " << status;
             } else {
@@ -479,6 +483,8 @@ void Balancer::run() {
     const int sleepTime = 10;
 
     while (!inShutdown()) {
+        auto txn = cc().makeOperationContext();
+
         Timer balanceRoundTimer;
         ActionLogType actionLog;
 
@@ -487,7 +493,7 @@ void Balancer::run() {
 
         try {
             // ping has to be first so we keep things in the config server in sync
-            _ping();
+            _ping(txn.get());
 
             BSONObj balancerResult;
 
@@ -495,10 +501,10 @@ void Balancer::run() {
             Shard::reloadShardInfo();
 
             // refresh chunk size (even though another balancer might be active)
-            Chunk::refreshChunkSize();
+            Chunk::refreshChunkSize(txn.get());
 
             auto balSettingsResult =
-                grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
+                grid.catalogManager(txn.get())->getGlobalSettings(SettingsType::BalancerDocKey);
             const bool isBalSettingsAbsent =
                 balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
             if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
@@ -514,7 +520,7 @@ void Balancer::run() {
                 LOG(1) << "skipping balancing round because balancing is disabled";
 
                 // Ping again so scripts can determine if we're active without waiting
-                _ping(true);
+                _ping(txn.get(), true);
 
                 sleepsecs(sleepTime);
                 continue;
@@ -523,14 +529,14 @@ void Balancer::run() {
             uassert(13258, "oids broken after resetting!", _checkOIDs());
 
             {
-                auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(
+                auto scopedDistLock = grid.catalogManager(txn.get())->getDistLockManager()->lock(
                     "balancer", "doing balance round");
 
                 if (!scopedDistLock.isOK()) {
                     LOG(1) << "skipping balancing round" << causedBy(scopedDistLock.getStatus());
 
                     // Ping again so scripts can determine if we're active without waiting
-                    _ping(true);
+                    _ping(txn.get(), true);
 
                     sleepsecs(sleepTime);  // no need to wake up soon
                     continue;
@@ -550,14 +556,14 @@ void Balancer::run() {
                        << (writeConcern.get() ? writeConcern->toBSON().toString() : "default");
 
                 vector<shared_ptr<MigrateInfo>> candidateChunks;
-                _doBalanceRound(&candidateChunks);
+                _doBalanceRound(txn.get(), &candidateChunks);
 
                 if (candidateChunks.size() == 0) {
                     LOG(1) << "no need to move any chunk";
                     _balancedLastTime = 0;
                 } else {
                     _balancedLastTime =
-                        _moveChunks(candidateChunks, writeConcern.get(), waitForDelete);
+                        _moveChunks(txn.get(), candidateChunks, writeConcern.get(), waitForDelete);
                 }
 
                 actionLog.setDetails(boost::none,
@@ -566,13 +572,13 @@ void Balancer::run() {
                                      _balancedLastTime);
                 actionLog.setTime(jsTime());
 
-                grid.catalogManager()->logAction(actionLog);
+                grid.catalogManager(txn.get())->logAction(actionLog);
 
                 LOG(1) << "*** end of balancing round";
             }
 
             // Ping again so scripts can determine if we're active without waiting
-            _ping(true);
+            _ping(txn.get(), true);
 
             sleepsecs(_balancedLastTime ? sleepTime / 10 : sleepTime);
         } catch (std::exception& e) {
@@ -585,7 +591,7 @@ void Balancer::run() {
             actionLog.setDetails(string(e.what()), balanceRoundTimer.millis(), 0, 0);
             actionLog.setTime(jsTime());
 
-            grid.catalogManager()->logAction(actionLog);
+            grid.catalogManager(txn.get())->logAction(actionLog);
 
             // Sleep a fair amount before retrying because of the error
             sleepsecs(sleepTime);

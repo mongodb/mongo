@@ -324,15 +324,15 @@ private:
         }
 
         if (ShardingState::get(txn)->enabled()) {
-            if (configdb == ShardingState::get(txn)->getConfigServer())
+            if (configdb == ShardingState::get(txn)->getConfigServer(txn))
                 return true;
 
             result.append("configdb",
-                          BSON("stored" << ShardingState::get(txn)->getConfigServer() << "given"
+                          BSON("stored" << ShardingState::get(txn)->getConfigServer(txn) << "given"
                                         << configdb));
 
             errmsg = str::stream() << "mongos specified a different config database string : "
-                                   << "stored : " << ShardingState::get(txn)->getConfigServer()
+                                   << "stored : " << ShardingState::get(txn)->getConfigServer(txn)
                                    << " vs given : " << configdb;
             return false;
         }

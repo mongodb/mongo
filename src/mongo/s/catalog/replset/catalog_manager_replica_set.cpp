@@ -209,13 +209,13 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
     }
 
     shared_ptr<ChunkManager> manager(new ChunkManager(ns, fieldsAndOrder, unique));
-    manager->createFirstChunks(dbPrimaryShardId, &initPoints, &initShardIds);
-    manager->loadExistingRanges(nullptr);
+    manager->createFirstChunks(txn, dbPrimaryShardId, &initPoints, &initShardIds);
+    manager->loadExistingRanges(txn, nullptr);
 
     CollectionInfo collInfo;
     collInfo.useChunkManager(manager);
-    collInfo.save(ns);
-    manager->reload(true);
+    collInfo.save(txn, ns);
+    manager->reload(txn, true);
 
     // Tell the primary mongod to refresh its data
     // TODO:  Think the real fix here is for mongos to just

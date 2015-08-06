@@ -273,10 +273,10 @@ void DistributionStatus::dump() const {
     }
 }
 
-Status DistributionStatus::populateShardInfoMap(ShardInfoMap* shardInfo) {
+Status DistributionStatus::populateShardInfoMap(OperationContext* txn, ShardInfoMap* shardInfo) {
     try {
         vector<ShardType> shards;
-        Status status = grid.catalogManager()->getAllShards(&shards);
+        Status status = grid.catalogManager(txn)->getAllShards(&shards);
         if (!status.isOK()) {
             return status;
         }

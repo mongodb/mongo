@@ -1627,7 +1627,7 @@ public:
                 result.append("result", config.outputOptions.collectionName);
         }
 
-        auto status = grid.catalogCache()->getDatabase(dbname);
+        auto status = grid.catalogCache()->getDatabase(txn, dbname);
         if (!status.isOK()) {
             return appendCommandStatus(result, status.getStatus());
         }
@@ -1636,7 +1636,7 @@ public:
 
         vector<ChunkPtr> chunks;
         if (confOut->isSharded(config.outputOptions.finalNamespace)) {
-            ChunkManagerPtr cm = confOut->getChunkManager(config.outputOptions.finalNamespace);
+            ChunkManagerPtr cm = confOut->getChunkManager(txn, config.outputOptions.finalNamespace);
 
             // Fetch result from other shards 1 chunk at a time. It would be better to do
             // just one big $or query, but then the sorting would not be efficient.
@@ -1670,7 +1670,7 @@ public:
             BSONObj sortKey = BSON("_id" << 1);
             ParallelSortClusteredCursor cursor(
                 servers, inputNS, Query(query).sort(sortKey), QueryOption_NoCursorTimeout);
-            cursor.init();
+            cursor.init(txn);
             int chunkSize = 0;
 
             while (cursor.more() || !values.empty()) {

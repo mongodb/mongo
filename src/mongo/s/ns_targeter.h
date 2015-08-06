@@ -40,6 +40,7 @@
 
 namespace mongo {
 
+class OperationContext;
 struct ShardEndpoint;
 
 /**
@@ -81,14 +82,17 @@ public:
      *
      * Returns !OK with message if document could not be targeted for other reasons.
      */
-    virtual Status targetInsert(const BSONObj& doc, ShardEndpoint** endpoint) const = 0;
+    virtual Status targetInsert(OperationContext* txn,
+                                const BSONObj& doc,
+                                ShardEndpoint** endpoint) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard update.
      *
      * Returns OK and fills the endpoints; returns a status describing the error otherwise.
      */
-    virtual Status targetUpdate(const BatchedUpdateDocument& updateDoc,
+    virtual Status targetUpdate(OperationContext* txn,
+                                const BatchedUpdateDocument& updateDoc,
                                 std::vector<ShardEndpoint*>* endpoints) const = 0;
 
     /**
@@ -96,7 +100,8 @@ public:
      *
      * Returns OK and fills the endpoints; returns a status describing the error otherwise.
      */
-    virtual Status targetDelete(const BatchedDeleteDocument& deleteDoc,
+    virtual Status targetDelete(OperationContext* txn,
+                                const BatchedDeleteDocument& deleteDoc,
                                 std::vector<ShardEndpoint*>* endpoints) const = 0;
 
     /**
@@ -141,7 +146,7 @@ public:
      * NOTE: This function may block for shared resources or network calls.
      * Returns !OK with message if could not refresh
      */
-    virtual Status refreshIfNeeded(bool* wasChanged) = 0;
+    virtual Status refreshIfNeeded(OperationContext* txn, bool* wasChanged) = 0;
 };
 
 /**

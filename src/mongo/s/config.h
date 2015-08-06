@@ -48,7 +48,7 @@ struct CollectionInfo {
         _dropped = false;
     }
 
-    CollectionInfo(const CollectionType& in);
+    CollectionInfo(OperationContext* txn, const CollectionType& in);
     ~CollectionInfo();
 
     bool isSharded() const {
@@ -61,7 +61,7 @@ struct CollectionInfo {
 
     void resetCM(ChunkManager* cm);
 
-    void shard(ChunkManager* cm);
+    void shard(OperationContext* txn, ChunkManager* cm);
 
     void unshard();
 
@@ -73,7 +73,7 @@ struct CollectionInfo {
         return _dropped;
     }
 
-    void save(const std::string& ns);
+    void save(OperationContext* txn, const std::string& ns);
 
     void useChunkManager(std::shared_ptr<ChunkManager> manager);
 
@@ -125,12 +125,12 @@ public:
      */
     void invalidateNs(const std::string& ns);
 
-    void enableSharding();
+    void enableSharding(OperationContext* txn);
 
     /**
        @return true if there was sharding info to remove
      */
-    bool removeSharding(const std::string& ns);
+    bool removeSharding(OperationContext* txn, const std::string& ns);
 
     /**
      * @return whether or not the 'ns' collection is partitioned
@@ -143,10 +143,12 @@ public:
                                   std::shared_ptr<ChunkManager>& manager,
                                   std::shared_ptr<Shard>& primary);
 
-    std::shared_ptr<ChunkManager> getChunkManager(const std::string& ns,
+    std::shared_ptr<ChunkManager> getChunkManager(OperationContext* txn,
+                                                  const std::string& ns,
                                                   bool reload = false,
                                                   bool forceReload = false);
-    std::shared_ptr<ChunkManager> getChunkManagerIfExists(const std::string& ns,
+    std::shared_ptr<ChunkManager> getChunkManagerIfExists(OperationContext* txn,
+                                                          const std::string& ns,
                                                           bool reload = false,
                                                           bool forceReload = false);
 
@@ -155,10 +157,10 @@ public:
      */
     const ShardId& getShardId(const std::string& ns);
 
-    void setPrimary(const std::string& s);
+    void setPrimary(OperationContext* txn, const std::string& s);
 
-    bool load();
-    bool reload();
+    bool load(OperationContext* txn);
+    bool reload(OperationContext* txn);
 
     bool dropDatabase(OperationContext*, std::string& errmsg);
 
@@ -173,9 +175,9 @@ protected:
                                  std::set<ShardId>& shardIds,
                                  std::string& errmsg);
 
-    bool _load();
+    bool _load(OperationContext* txn);
 
-    void _save(bool db = true, bool coll = true);
+    void _save(OperationContext* txn, bool db = true, bool coll = true);
 
     // Name of the database which this entry caches
     const std::string _name;
@@ -198,7 +200,7 @@ protected:
 
 class ConfigServer {
 public:
-    static void reloadSettings();
+    static void reloadSettings(OperationContext* txn);
 
     static void replicaSetChange(const std::string& setName,
                                  const std::string& newConnectionString);

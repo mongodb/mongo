@@ -158,11 +158,12 @@ public:
             bb.append(temp.obj());
         }
 
+        auto catalogManager = grid.catalogManager(txn);
         {
             // get config db from the config servers
             BSONObjBuilder builder;
 
-            if (!grid.catalogManager()->runReadCommand("config", BSON("dbstats" << 1), &builder)) {
+            if (!catalogManager->runReadCommand("config", BSON("dbstats" << 1), &builder)) {
                 bb.append(BSON("name"
                                << "config"));
             } else {
@@ -183,7 +184,7 @@ public:
             // get admin db from the config servers
             BSONObjBuilder builder;
 
-            if (!grid.catalogManager()->runReadCommand("admin", BSON("dbstats" << 1), &builder)) {
+            if (!catalogManager->runReadCommand("admin", BSON("dbstats" << 1), &builder)) {
                 bb.append(BSON("name"
                                << "admin"));
             } else {

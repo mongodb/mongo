@@ -60,16 +60,17 @@ void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
     _cursorManager = stdx::make_unique<ClusterCursorManager>();
 }
 
-StatusWith<std::shared_ptr<DBConfig>> Grid::implicitCreateDb(const std::string& dbName) {
-    auto status = catalogCache()->getDatabase(dbName);
+StatusWith<std::shared_ptr<DBConfig>> Grid::implicitCreateDb(OperationContext* txn,
+                                                             const std::string& dbName) {
+    auto status = catalogCache()->getDatabase(txn, dbName);
     if (status.isOK()) {
         return status;
     }
 
     if (status == ErrorCodes::DatabaseNotFound) {
-        auto statusCreateDb = catalogManager()->createDatabase(dbName);
+        auto statusCreateDb = catalogManager(txn)->createDatabase(dbName);
         if (statusCreateDb.isOK() || statusCreateDb == ErrorCodes::NamespaceExists) {
-            return catalogCache()->getDatabase(dbName);
+            return catalogCache()->getDatabase(txn, dbName);
         }
 
         return statusCreateDb;
@@ -103,8 +104,9 @@ bool Grid::shouldBalance(const SettingsType& balancerSettings) const {
     return true;
 }
 
-bool Grid::getConfigShouldBalance() const {
-    auto balSettingsResult = grid.catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey);
+bool Grid::getConfigShouldBalance(OperationContext* txn) const {
+    auto balSettingsResult =
+        grid.catalogManager(txn)->getGlobalSettings(SettingsType::BalancerDocKey);
     if (!balSettingsResult.isOK()) {
         warning() << balSettingsResult.getStatus();
         return false;

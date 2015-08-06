@@ -120,7 +120,7 @@ public:
                 Status(ErrorCodes::InvalidNamespace, "invalid collection namespace [" + ns + "]"));
         }
 
-        auto config = uassertStatusOK(grid.catalogCache()->getDatabase(nsStr.db().toString()));
+        auto config = uassertStatusOK(grid.catalogCache()->getDatabase(txn, nsStr.db().toString()));
         if (!config->isShardingEnabled()) {
             return appendCommandStatus(
                 result,
@@ -324,7 +324,7 @@ public:
             // 5. If no useful index exists, and collection empty, create one on proposedKey.
             //    Only need to call ensureIndex on primary shard, since indexes get copied to
             //    receiving shard whenever a migrate occurs.
-            Status status = clusterCreateIndex(ns, proposedKey, careAboutUnique, NULL);
+            Status status = clusterCreateIndex(txn, ns, proposedKey, careAboutUnique, NULL);
             if (!status.isOK()) {
                 errmsg = str::stream() << "ensureIndex failed to create index on "
                                        << "primary shard: " << status.reason();
@@ -397,7 +397,7 @@ public:
 
         audit::logShardCollection(ClientBasic::getCurrent(), ns, proposedKey, careAboutUnique);
 
-        Status status = grid.catalogManager()->shardCollection(
+        Status status = grid.catalogManager(txn)->shardCollection(
             txn, ns, proposedShardKey, careAboutUnique, initSplits, std::set<ShardId>{});
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
@@ -409,7 +409,7 @@ public:
         if (isHashedShardKey && isEmpty) {
             // Reload the new config info.  If we created more than one initial chunk, then
             // we need to move them around to balance.
-            ChunkManagerPtr chunkManager = config->getChunkManager(ns, true);
+            ChunkManagerPtr chunkManager = config->getChunkManager(txn, ns, true);
             ChunkMap chunkMap = chunkManager->getChunkMap();
 
             // 2. Move and commit each "big chunk" to a different shard.
@@ -431,7 +431,7 @@ public:
                 BSONObj moveResult;
                 WriteConcernOptions noThrottle;
                 if (!chunk->moveAndCommit(
-                        to->getId(), Chunk::MaxChunkSize, &noThrottle, true, 0, moveResult)) {
+                        txn, to->getId(), Chunk::MaxChunkSize, &noThrottle, true, 0, moveResult)) {
                     warning() << "couldn't move chunk " << chunk->toString() << " to shard " << *to
                               << " while sharding collection " << ns << "."
                               << " Reason: " << moveResult;
@@ -443,17 +443,17 @@ public:
             }
 
             // Reload the config info, after all the migrations
-            chunkManager = config->getChunkManager(ns, true);
+            chunkManager = config->getChunkManager(txn, ns, true);
 
             // 3. Subdivide the big chunks by splitting at each of the points in "allSplits"
             //    that we haven't already split by.
-            ChunkPtr currentChunk = chunkManager->findIntersectingChunk(allSplits[0]);
+            ChunkPtr currentChunk = chunkManager->findIntersectingChunk(txn, allSplits[0]);
 
             vector<BSONObj> subSplits;
             for (unsigned i = 0; i <= allSplits.size(); i++) {
                 if (i == allSplits.size() || !currentChunk->containsKey(allSplits[i])) {
                     if (!subSplits.empty()) {
-                        Status status = currentChunk->multiSplit(subSplits, NULL);
+                        Status status = currentChunk->multiSplit(txn, subSplits, NULL);
                         if (!status.isOK()) {
                             warning() << "couldn't split chunk " << currentChunk->toString()
                                       << " while sharding collection " << ns << causedBy(status);
@@ -463,7 +463,7 @@ public:
                     }
 
                     if (i < allSplits.size()) {
-                        currentChunk = chunkManager->findIntersectingChunk(allSplits[i]);
+                        currentChunk = chunkManager->findIntersectingChunk(txn, allSplits[i]);
                     }
                 } else {
                     BSONObj splitPoint(allSplits[i]);
@@ -479,7 +479,7 @@ public:
 
             // Proactively refresh the chunk manager. Not really necessary, but this way it's
             // immediately up-to-date the next time it's used.
-            config->getChunkManager(ns, true);
+            config->getChunkManager(txn, ns, true);
         }
 
         return true;

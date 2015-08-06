@@ -69,7 +69,7 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        result.append("configserver", grid.catalogManager()->connectionString().toString());
+        result.append("configserver", grid.catalogManager(txn)->connectionString().toString());
         result.append("isdbgrid", 1);
         return true;
     }

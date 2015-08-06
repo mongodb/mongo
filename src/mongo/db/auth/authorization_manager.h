@@ -232,7 +232,10 @@ public:
      *
      * If the role does not exist, returns ErrorCodes::RoleNotFound.
      */
-    Status getRoleDescription(const RoleName& roleName, bool showPrivileges, BSONObj* result);
+    Status getRoleDescription(OperationContext* txn,
+                              const RoleName& roleName,
+                              bool showPrivileges,
+                              BSONObj* result);
 
     /**
      * Writes into "result" documents describing the roles that are defined on the given
@@ -247,7 +250,8 @@ public:
      * the document will contain a "warnings" array, with std::string messages describing
      * inconsistencies.
      */
-    Status getRoleDescriptionsForDB(const std::string dbname,
+    Status getRoleDescriptionsForDB(OperationContext* txn,
+                                    const std::string dbname,
                                     bool showPrivileges,
                                     bool showBuiltinRoles,
                                     std::vector<BSONObj>* result);

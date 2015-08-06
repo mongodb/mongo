@@ -62,7 +62,8 @@ BSONObj RunOnAllShardsCommand::specialErrorHandler(const std::string& server,
     return originalResult;
 }
 
-void RunOnAllShardsCommand::getShardIds(const std::string& db,
+void RunOnAllShardsCommand::getShardIds(OperationContext* txn,
+                                        const std::string& db,
                                         BSONObj& cmdObj,
                                         std::vector<ShardId>& shardIds) {
     grid.shardRegistry()->getAllShardIds(&shardIds);
@@ -77,11 +78,11 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
     LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj;
 
     if (_implicitCreateDb) {
-        uassertStatusOK(grid.implicitCreateDb(dbName));
+        uassertStatusOK(grid.implicitCreateDb(txn, dbName));
     }
 
     std::vector<ShardId> shardIds;
-    getShardIds(dbName, cmdObj, shardIds);
+    getShardIds(txn, dbName, cmdObj, shardIds);
 
     std::list<std::shared_ptr<Future::CommandResult>> futures;
     for (const ShardId& shardId : shardIds) {
@@ -108,7 +109,7 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
          ++futuresit, ++shardIdsIt) {
         std::shared_ptr<Future::CommandResult> res = *futuresit;
 
-        if (res->join()) {
+        if (res->join(txn)) {
             // success :)
             BSONObj result = res->result();
             results.emplace_back(*shardIdsIt, result);

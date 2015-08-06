@@ -114,7 +114,7 @@ public:
         // Flush all cached information. This can't be perfect, but it's better than nothing.
         grid.catalogCache()->invalidate(dbname);
 
-        auto status = grid.catalogCache()->getDatabase(dbname);
+        auto status = grid.catalogCache()->getDatabase(txn, dbname);
         if (!status.isOK()) {
             return appendCommandStatus(result, status.getStatus());
         }
@@ -147,8 +147,9 @@ public:
               << " to: " << toShard->toString();
 
         string whyMessage(str::stream() << "Moving primary shard of " << dbname);
+        auto catalogManager = grid.catalogManager(txn);
         auto scopedDistLock =
-            grid.catalogManager()->getDistLockManager()->lock(dbname + "-movePrimary", whyMessage);
+            catalogManager->getDistLockManager()->lock(dbname + "-movePrimary", whyMessage);
 
         if (!scopedDistLock.isOK()) {
             return appendCommandStatus(result, scopedDistLock.getStatus());
@@ -161,7 +162,7 @@ public:
         BSONObj moveStartDetails =
             _buildMoveEntry(dbname, fromShard->toString(), toShard->toString(), shardedColls);
 
-        grid.catalogManager()->logChange(
+        catalogManager->logChange(
             txn->getClient()->clientAddress(true), "movePrimary.start", dbname, moveStartDetails);
 
         BSONArrayBuilder barr;
@@ -189,7 +190,7 @@ public:
 
         ScopedDbConnection fromconn(fromShard->getConnString());
 
-        config->setPrimary(toShard->getConnString().toString());
+        config->setPrimary(txn, toShard->getConnString().toString());
 
         if (shardedColls.empty()) {
             // TODO: Collections can be created in the meantime, and we should handle in the future.
@@ -240,7 +241,7 @@ public:
         BSONObj moveFinishDetails =
             _buildMoveEntry(dbname, oldPrimary, toShard->toString(), shardedColls);
 
-        grid.catalogManager()->logChange(
+        catalogManager->logChange(
             txn->getClient()->clientAddress(true), "movePrimary", dbname, moveFinishDetails);
         return true;
     }

@@ -93,7 +93,8 @@ static bool isShardMetadataChanging(const vector<ShardError*>& staleErrors) {
 // This only applies when no writes are occurring and metadata is not changing on reload
 static const int kMaxRoundsWithoutProgress(5);
 
-void BatchWriteExec::executeBatch(const BatchedCommandRequest& clientRequest,
+void BatchWriteExec::executeBatch(OperationContext* txn,
+                                  const BatchedCommandRequest& clientRequest,
                                   BatchedCommandResponse* clientResponse) {
     LOG(4) << "starting execution of write batch of size "
            << static_cast<int>(clientRequest.sizeWriteOps()) << " for " << clientRequest.getNS()
@@ -139,7 +140,8 @@ void BatchWriteExec::executeBatch(const BatchedCommandRequest& clientRequest,
         // If we've already had a targeting error, we've refreshed the metadata once and can
         // record target errors definitively.
         bool recordTargetErrors = refreshedTargeter;
-        Status targetStatus = batchOp.targetBatch(*_targeter, recordTargetErrors, &childBatches);
+        Status targetStatus =
+            batchOp.targetBatch(txn, *_targeter, recordTargetErrors, &childBatches);
         if (!targetStatus.isOK()) {
             // Don't do anything until a targeter refresh
             _targeter->noteCouldNotTarget();
@@ -316,7 +318,7 @@ void BatchWriteExec::executeBatch(const BatchedCommandRequest& clientRequest,
         //
 
         bool targeterChanged = false;
-        Status refreshStatus = _targeter->refreshIfNeeded(&targeterChanged);
+        Status refreshStatus = _targeter->refreshIfNeeded(txn, &targeterChanged);
 
         if (!refreshStatus.isOK()) {
             // It's okay if we can't refresh, we'll just record errors for the ops if

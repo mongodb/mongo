@@ -102,7 +102,7 @@ public:
                      BSONObjBuilder& result) {
         const string fullns = parseNs(dbname, cmdObj);
 
-        auto status = grid.catalogCache()->getDatabase(dbname);
+        auto status = grid.catalogCache()->getDatabase(txn, dbname);
         if (!status.isOK()) {
             return appendEmptyResultSet(result, status.getStatus(), fullns);
         }
@@ -137,7 +137,7 @@ public:
         // If the first $match stage is an exact match on the shard key, we only have to send it
         // to one shard, so send the command to that shard.
         BSONObj firstMatchQuery = pipeline->getInitialQuery();
-        ChunkManagerPtr chunkMgr = conf->getChunkManager(fullns);
+        ChunkManagerPtr chunkMgr = conf->getChunkManager(txn, fullns);
         BSONObj shardKeyMatches = uassertStatusOK(
             chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(firstMatchQuery));
 
@@ -173,7 +173,8 @@ public:
         // Run the command on the shards
         // TODO need to make sure cursors are killed if a retry is needed
         vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(dbname, shardedCommand, options, fullns, shardQuery, &shardResults);
+        Strategy::commandOp(
+            txn, dbname, shardedCommand, options, fullns, shardQuery, &shardResults);
 
         if (pipeline->isExplain()) {
             // This must be checked before we start modifying result.

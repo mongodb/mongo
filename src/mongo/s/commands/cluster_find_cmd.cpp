@@ -130,7 +130,8 @@ public:
         Timer timer;
 
         vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(dbname,
+        Strategy::commandOp(txn,
+                            dbname,
                             explainCmdBob.obj(),
                             lpq->getOptions(),
                             fullns,

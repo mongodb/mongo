@@ -40,6 +40,7 @@ class BSONObj;
 class CatalogCache;
 class CatalogManager;
 class DBConfig;
+class OperationContext;
 class SettingsType;
 class ShardRegistry;
 template <typename T>
@@ -68,7 +69,8 @@ public:
     /**
      * Implicitly creates the specified database as non-sharded.
      */
-    StatusWith<std::shared_ptr<DBConfig>> implicitCreateDb(const std::string& dbName);
+    StatusWith<std::shared_ptr<DBConfig>> implicitCreateDb(OperationContext* txn,
+                                                           const std::string& dbName);
 
     /**
      * @return true if shards and config servers are allowed to use 'localhost' in address
@@ -89,11 +91,12 @@ public:
     /**
      * Returns true if the config server settings indicate that the balancer should be active.
      */
-    bool getConfigShouldBalance() const;
+    bool getConfigShouldBalance(OperationContext* txn) const;
 
-    CatalogManager* catalogManager() {
+    CatalogManager* catalogManager(OperationContext* txn) {
         return _catalogManager.get();
     }
+
     CatalogCache* catalogCache() {
         return _catalogCache.get();
     }

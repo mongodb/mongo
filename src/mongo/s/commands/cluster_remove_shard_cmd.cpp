@@ -94,14 +94,15 @@ public:
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
 
+        auto catalogManager = grid.catalogManager(txn);
         StatusWith<ShardDrainingStatus> removeShardResult =
-            grid.catalogManager()->removeShard(txn, s->getId());
+            catalogManager->removeShard(txn, s->getId());
         if (!removeShardResult.isOK()) {
             return appendCommandStatus(result, removeShardResult.getStatus());
         }
 
         vector<string> databases;
-        grid.catalogManager()->getDatabasesForShard(s->getId(), &databases);
+        catalogManager->getDatabasesForShard(s->getId(), &databases);
 
         // Get BSONObj containing:
         // 1) note about moving or dropping databases in a shard
@@ -131,10 +132,10 @@ public:
                 break;
             case ShardDrainingStatus::ONGOING: {
                 vector<ChunkType> chunks;
-                Status status = grid.catalogManager()->getChunks(BSON(ChunkType::shard(s->getId())),
-                                                                 BSONObj(),
-                                                                 boost::none,  // return all
-                                                                 &chunks);
+                Status status = catalogManager->getChunks(BSON(ChunkType::shard(s->getId())),
+                                                          BSONObj(),
+                                                          boost::none,  // return all
+                                                          &chunks);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }

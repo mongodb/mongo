@@ -94,7 +94,7 @@ public:
                 result, Status(ErrorCodes::InvalidNamespace, "no namespace specified"));
         }
 
-        auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+        auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
         if (!status.isOK()) {
             return appendCommandStatus(result, status.getStatus());
         }
@@ -106,7 +106,7 @@ public:
                 Status(ErrorCodes::NamespaceNotSharded, "ns [" + nss.ns() + " is not sharded."));
         }
 
-        ChunkManagerPtr cm = config->getChunkManagerIfExists(nss.ns());
+        ChunkManagerPtr cm = config->getChunkManagerIfExists(txn, nss.ns());
         if (!cm) {
             errmsg = "no chunk manager?";
             return false;

@@ -67,10 +67,12 @@ public:
     virtual Status getUserDescription(OperationContext* txn,
                                       const UserName& userName,
                                       BSONObj* result);
-    virtual Status getRoleDescription(const RoleName& roleName,
+    virtual Status getRoleDescription(OperationContext* txn,
+                                      const RoleName& roleName,
                                       bool showPrivileges,
                                       BSONObj* result);
-    virtual Status getRoleDescriptionsForDB(const std::string dbname,
+    virtual Status getRoleDescriptionsForDB(OperationContext* txn,
+                                            const std::string dbname,
                                             bool showPrivileges,
                                             bool showBuiltinRoles,
                                             std::vector<BSONObj>* result);

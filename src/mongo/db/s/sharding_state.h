@@ -72,7 +72,7 @@ public:
 
     bool enabled();
 
-    std::string getConfigServer();
+    std::string getConfigServer(OperationContext* txn);
     std::string getShardName();
 
     // Initialize sharding state and begin authenticating outgoing connections and handling
@@ -149,7 +149,7 @@ public:
                               const std::string& ns,
                               ChunkVersion* latestShardVersion);
 
-    void appendInfo(BSONObjBuilder& b);
+    void appendInfo(OperationContext* txn, BSONObjBuilder& b);
 
     // querying support
 

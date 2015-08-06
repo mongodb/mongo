@@ -38,6 +38,7 @@
 namespace mongo {
 
 class ChunkManager;
+class OperationContext;
 
 struct ChunkInfo {
     const BSONObj min;
@@ -199,7 +200,7 @@ public:
      * Retrieves shard metadata information from the config server as well as some stats
      * from the shards.
      */
-    static Status populateShardInfoMap(ShardInfoMap* shardInfo);
+    static Status populateShardInfoMap(OperationContext* txn, ShardInfoMap* shardInfo);
 
     /**
      * Note: jumbo and versions are not set.

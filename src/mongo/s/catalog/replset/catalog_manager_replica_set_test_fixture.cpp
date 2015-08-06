@@ -130,7 +130,7 @@ void CatalogManagerReplSetTestFixture::shutdownExecutor() {
 }
 
 CatalogManagerReplicaSet* CatalogManagerReplSetTestFixture::catalogManager() const {
-    auto cm = dynamic_cast<CatalogManagerReplicaSet*>(grid.catalogManager());
+    auto cm = dynamic_cast<CatalogManagerReplicaSet*>(grid.catalogManager(_opCtx.get()));
     invariant(cm);
 
     return cm;

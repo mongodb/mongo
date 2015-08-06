@@ -34,16 +34,18 @@
 
 namespace mongo {
 
+class OperationContext;
+
 /**
  * Legacy interface for processing client read/write/cmd requests.
  */
 class Strategy {
 public:
-    static void queryOp(Request& r);
+    static void queryOp(OperationContext* txn, Request& r);
 
-    static void getMore(Request& r);
+    static void getMore(OperationContext* txn, Request& r);
 
-    static void writeOp(int op, Request& r);
+    static void writeOp(OperationContext* txn, int op, Request& r);
 
     struct CommandResult {
         ShardId shardTargetId;
@@ -60,7 +62,8 @@ public:
      * TODO: Replace these methods and all other methods of command dispatch with a more general
      * command op framework.
      */
-    static void commandOp(const std::string& db,
+    static void commandOp(OperationContext* txn,
+                          const std::string& db,
                           const BSONObj& command,
                           int options,
                           const std::string& versionedNS,
@@ -76,7 +79,8 @@ public:
      * On success, fills in 'shardResult' with output from the namespace's primary shard. This
      * output may itself indicate an error status on the shard.
      */
-    static Status commandOpUnsharded(const std::string& db,
+    static Status commandOpUnsharded(OperationContext* txn,
+                                     const std::string& db,
                                      const BSONObj& command,
                                      int options,
                                      const std::string& versionedNS,
@@ -87,10 +91,10 @@ public:
      *
      * DEPRECATED: should not be used by new code.
      */
-    static void clientCommandOp(Request& r);
+    static void clientCommandOp(OperationContext* txn, Request& r);
 
 protected:
-    static bool handleSpecialNamespaces(Request& r, QueryMessage& q);
+    static bool handleSpecialNamespaces(OperationContext* txn, Request& r, QueryMessage& q);
 };
 
 }  // namespace mongo

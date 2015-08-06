@@ -172,7 +172,7 @@ ChunkManager::ChunkManager(const CollectionType& coll)
     _version = ChunkVersion::fromBSON(coll.toBSON());
 }
 
-void ChunkManager::loadExistingRanges(const ChunkManager* oldManager) {
+void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager* oldManager) {
     int tries = 3;
 
     while (tries--) {
@@ -182,7 +182,7 @@ void ChunkManager::loadExistingRanges(const ChunkManager* oldManager) {
 
         Timer t;
 
-        bool success = _load(chunkMap, shardIds, &shardVersions, oldManager);
+        bool success = _load(txn, chunkMap, shardIds, &shardVersions, oldManager);
         if (success) {
             log() << "ChunkManager: time to load chunks for " << _ns << ": " << t.millis() << "ms"
                   << " sequenceNumber: " << _sequenceNumber << " version: " << _version.toString()
@@ -215,7 +215,8 @@ void ChunkManager::loadExistingRanges(const ChunkManager* oldManager) {
                               << " after 3 attempts. Please try again.");
 }
 
-bool ChunkManager::_load(ChunkMap& chunkMap,
+bool ChunkManager::_load(OperationContext* txn,
+                         ChunkMap& chunkMap,
                          set<ShardId>& shardIds,
                          ShardVersionMap* shardVersions,
                          const ChunkManager* oldManager) {
@@ -262,7 +263,7 @@ bool ChunkManager::_load(ChunkMap& chunkMap,
 
     std::vector<ChunkType> chunks;
     uassertStatusOK(
-        grid.catalogManager()->getChunks(diffQuery.query, diffQuery.sort, boost::none, &chunks));
+        grid.catalogManager(txn)->getChunks(diffQuery.query, diffQuery.sort, boost::none, &chunks));
 
     int diffsApplied = differ.calculateConfigDiff(chunks);
     if (diffsApplied > 0) {
@@ -317,12 +318,12 @@ bool ChunkManager::_load(ChunkMap& chunkMap,
     }
 }
 
-shared_ptr<ChunkManager> ChunkManager::reload(bool force) const {
+shared_ptr<ChunkManager> ChunkManager::reload(OperationContext* txn, bool force) const {
     const NamespaceString nss(_ns);
-    auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+    auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
     shared_ptr<DBConfig> config = uassertStatusOK(status);
 
-    return config->getChunkManager(getns(), force);
+    return config->getChunkManager(txn, getns(), force);
 }
 
 void ChunkManager::_printChunks() const {
@@ -385,7 +386,8 @@ void ChunkManager::calcInitSplitsAndShards(const ShardId& primaryShardId,
     }
 }
 
-void ChunkManager::createFirstChunks(const ShardId& primaryShardId,
+void ChunkManager::createFirstChunks(OperationContext* txn,
+                                     const ShardId& primaryShardId,
                                      const vector<BSONObj>* initPoints,
                                      const set<ShardId>* initShardIds) {
     // TODO distlock?
@@ -417,7 +419,7 @@ void ChunkManager::createFirstChunks(const ShardId& primaryShardId,
 
         BSONObj chunkObj = chunkBuilder.obj();
 
-        Status result = grid.catalogManager()->update(
+        Status result = grid.catalogManager(txn)->update(
             ChunkType::ConfigNS, BSON(ChunkType::name(temp.genID())), chunkObj, true, false, NULL);
 
         version.incMinor();
@@ -433,7 +435,7 @@ void ChunkManager::createFirstChunks(const ShardId& primaryShardId,
     _version = ChunkVersion(0, 0, version.epoch());
 }
 
-ChunkPtr ChunkManager::findIntersectingChunk(const BSONObj& shardKey) const {
+ChunkPtr ChunkManager::findIntersectingChunk(OperationContext* txn, const BSONObj& shardKey) const {
     {
         BSONObj chunkMin;
         ChunkPtr chunk;
@@ -454,7 +456,7 @@ ChunkPtr ChunkManager::findIntersectingChunk(const BSONObj& shardKey) const {
             log() << *chunk;
             log() << shardKey;
 
-            reload();
+            reload(txn);
             msgasserted(13141, "Chunk map pointed to incorrect chunk");
         }
     }

@@ -34,6 +34,7 @@
 namespace mongo {
 
 class ChunkManager;
+class OperationContext;
 struct WriteConcernOptions;
 
 /**
@@ -126,7 +127,7 @@ public:
      * then we check the real size, and if its too big, we split
      * @return if something was split
      */
-    bool splitIfShould(long dataWritten) const;
+    bool splitIfShould(OperationContext* txn, long dataWritten) const;
 
     /**
      * Splits this chunk at a non-specificed split key to be chosen by the
@@ -138,7 +139,10 @@ public:
      *
      * @throws UserException
      */
-    Status split(SplitPointMode mode, size_t* resultingSplits, BSONObj* res) const;
+    Status split(OperationContext* txn,
+                 SplitPointMode mode,
+                 size_t* resultingSplits,
+                 BSONObj* res) const;
 
     /**
      * Splits this chunk at the given key (or keys)
@@ -148,7 +152,9 @@ public:
      *
      * @throws UserException
      */
-    Status multiSplit(const std::vector<BSONObj>& splitPoints, BSONObj* res) const;
+    Status multiSplit(OperationContext* txn,
+                      const std::vector<BSONObj>& splitPoints,
+                      BSONObj* res) const;
 
     /**
      * Asks the mongod holding this chunk to find a key that approximately divides this chunk in two
@@ -184,7 +190,8 @@ public:
      * @param res the object containing details about the migrate execution
      * @return true if move was successful
      */
-    bool moveAndCommit(const ShardId& to,
+    bool moveAndCommit(OperationContext* txn,
+                       const ShardId& to,
                        long long chunkSize,
                        const WriteConcernOptions* writeConcern,
                        bool waitForDelete,
@@ -201,7 +208,7 @@ public:
      * marks this chunk as a jumbo chunk
      * that means the chunk will be inelligble for migrates
      */
-    void markAsJumbo() const;
+    void markAsJumbo(OperationContext* txn) const;
 
     bool isJumbo() const {
         return _jumbo;
@@ -210,7 +217,7 @@ public:
     /**
      * Attempt to refresh maximum chunk size from config.
      */
-    static void refreshChunkSize();
+    static void refreshChunkSize(OperationContext* txn);
 
     /**
      * sets MaxChunkSize

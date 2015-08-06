@@ -53,7 +53,8 @@ using std::shared_ptr;
 using std::string;
 using mongoutils::str::stream;
 
-static Status runApplyOpsCmd(const std::vector<ChunkType>&,
+static Status runApplyOpsCmd(OperationContext* txn,
+                             const std::vector<ChunkType>&,
                              const ChunkVersion&,
                              const ChunkVersion&);
 
@@ -70,7 +71,8 @@ bool mergeChunks(OperationContext* txn,
     // Get the distributed lock
     string whyMessage = stream() << "merging chunks in " << nss.ns() << " from " << minKey << " to "
                                  << maxKey;
-    auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(nss.ns(), whyMessage);
+    auto scopedDistLock =
+        grid.catalogManager(txn)->getDistLockManager()->lock(nss.ns(), whyMessage);
 
     if (!scopedDistLock.isOK()) {
         *errMsg = stream() << "could not acquire collection lock for " << nss.ns()
@@ -229,7 +231,7 @@ bool mergeChunks(OperationContext* txn,
     //
     // Run apply ops command
     //
-    Status applyOpsStatus = runApplyOpsCmd(chunksToMerge, shardVersion, mergeVersion);
+    Status applyOpsStatus = runApplyOpsCmd(txn, chunksToMerge, shardVersion, mergeVersion);
     if (!applyOpsStatus.isOK()) {
         warning() << applyOpsStatus;
         return false;
@@ -253,8 +255,8 @@ bool mergeChunks(OperationContext* txn,
 
     BSONObj mergeLogEntry = buildMergeLogEntry(chunksToMerge, shardVersion, mergeVersion);
 
-    grid.catalogManager()->logChange(
-        txn->getClient()->clientAddress(true), "merge", nss.ns(), mergeLogEntry);
+    grid.catalogManager(txn)
+        ->logChange(txn->getClient()->clientAddress(true), "merge", nss.ns(), mergeLogEntry);
 
     return true;
 }
@@ -330,7 +332,8 @@ BSONArray buildOpPrecond(const string& ns,
     return preCond.arr();
 }
 
-Status runApplyOpsCmd(const std::vector<ChunkType>& chunksToMerge,
+Status runApplyOpsCmd(OperationContext* txn,
+                      const std::vector<ChunkType>& chunksToMerge,
                       const ChunkVersion& currShardVersion,
                       const ChunkVersion& newMergedVersion) {
     BSONArrayBuilder updatesB;
@@ -354,6 +357,6 @@ Status runApplyOpsCmd(const std::vector<ChunkType>& chunksToMerge,
     }
 
     BSONArray preCond = buildOpPrecond(firstChunk.getNS(), firstChunk.getShard(), currShardVersion);
-    return grid.catalogManager()->applyChunkOpsDeprecated(updatesB.arr(), preCond);
+    return grid.catalogManager(txn)->applyChunkOpsDeprecated(updatesB.arr(), preCond);
 }
 }

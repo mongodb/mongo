@@ -81,7 +81,8 @@ public:
                                         const BSONObj& originalResult) const;
 
     // The default implementation uses all shards.
-    virtual void getShardIds(const std::string& db,
+    virtual void getShardIds(OperationContext* txn,
+                             const std::string& db,
                              BSONObj& cmdObj,
                              std::vector<ShardId>& shardIds);
 

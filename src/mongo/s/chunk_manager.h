@@ -42,6 +42,7 @@ class CanonicalQuery;
 class ChunkManager;
 class CollectionType;
 struct QuerySolutionNode;
+class OperationContext;
 
 typedef std::shared_ptr<ChunkManager> ChunkManagerPtr;
 
@@ -159,12 +160,13 @@ public:
     //
 
     // Creates new chunks based on info in chunk manager
-    void createFirstChunks(const ShardId& primaryShardId,
+    void createFirstChunks(OperationContext* txn,
+                           const ShardId& primaryShardId,
                            const std::vector<BSONObj>* initPoints,
                            const std::set<ShardId>* initShardIds);
 
     // Loads existing ranges based on info in chunk manager
-    void loadExistingRanges(const ChunkManager* oldManager);
+    void loadExistingRanges(OperationContext* txn, const ChunkManager* oldManager);
 
 
     // Helpers for load
@@ -190,7 +192,7 @@ public:
      * when the shard key is {a : "hashed"}, you can call
      *  findIntersectingChunk() on {a : hash("foo") }
      */
-    ChunkPtr findIntersectingChunk(const BSONObj& shardKey) const;
+    ChunkPtr findIntersectingChunk(OperationContext* txn, const BSONObj& shardKey) const;
 
     void getShardIdsForQuery(std::set<ShardId>& shardIds, const BSONObj& query) const;
     void getAllShardIds(std::set<ShardId>* all) const;
@@ -238,11 +240,13 @@ public:
 
     int getCurrentDesiredChunkSize() const;
 
-    std::shared_ptr<ChunkManager> reload(bool force = true) const;  // doesn't modify self!
+    std::shared_ptr<ChunkManager> reload(OperationContext* txn,
+                                         bool force = true) const;  // doesn't modify self!
 
 private:
     // returns true if load was consistent
-    bool _load(ChunkMap& chunks,
+    bool _load(OperationContext* txn,
+               ChunkMap& chunks,
                std::set<ShardId>& shardIds,
                ShardVersionMap* shardVersions,
                const ChunkManager* oldManager);

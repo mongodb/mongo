@@ -116,7 +116,7 @@ public:
                     result, Status(ErrorCodes::InvalidNamespace, "no namespace specified"));
             }
 
-            auto status = grid.catalogCache()->getDatabase(nss.db().toString());
+            auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
             if (!status.isOK()) {
                 return appendCommandStatus(result, status.getStatus());
             }
@@ -125,7 +125,7 @@ public:
         }
 
         if (!config->isSharded(nss.ns())) {
-            config->reload();
+            config->reload(txn);
 
             if (!config->isSharded(nss.ns())) {
                 return appendCommandStatus(result,
@@ -164,7 +164,7 @@ public:
         }
 
         // This refreshes the chunk metadata if stale.
-        ChunkManagerPtr info = config->getChunkManager(nss.ns(), true);
+        ChunkManagerPtr info = config->getChunkManager(txn, nss.ns(), true);
         ChunkPtr chunk;
 
         if (!find.isEmpty()) {
@@ -181,7 +181,7 @@ public:
                 return false;
             }
 
-            chunk = info->findIntersectingChunk(shardKey);
+            chunk = info->findIntersectingChunk(txn, shardKey);
             verify(chunk.get());
         } else {
             // Bounds
@@ -197,7 +197,7 @@ public:
             BSONObj minKey = info->getShardKeyPattern().normalizeShardKey(bounds[0].Obj());
             BSONObj maxKey = info->getShardKeyPattern().normalizeShardKey(bounds[1].Obj());
 
-            chunk = info->findIntersectingChunk(minKey);
+            chunk = info->findIntersectingChunk(txn, minKey);
             verify(chunk.get());
 
             if (chunk->getMin().woCompare(minKey) != 0 || chunk->getMax().woCompare(maxKey) != 0) {
@@ -238,7 +238,8 @@ public:
         }
 
         BSONObj res;
-        if (!chunk->moveAndCommit(to->getId(),
+        if (!chunk->moveAndCommit(txn,
+                                  to->getId(),
                                   maxChunkSizeBytes,
                                   writeConcern.get(),
                                   cmdObj["_waitForDelete"].trueValue(),

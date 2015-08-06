@@ -144,7 +144,8 @@ void Command::execCommandClientBasic(OperationContext* txn,
     appendCommandStatus(result, ok, errmsg);
 }
 
-void Command::runAgainstRegistered(const char* ns,
+void Command::runAgainstRegistered(OperationContext* txn,
+                                   const char* ns,
                                    BSONObj& jsobj,
                                    BSONObjBuilder& anObjBuilder,
                                    int queryOptions) {
@@ -165,8 +166,7 @@ void Command::runAgainstRegistered(const char* ns,
         return;
     }
 
-    auto txn = cc().makeOperationContext();
-    execCommandClientBasic(txn.get(), c, cc(), queryOptions, ns, jsobj, anObjBuilder);
+    execCommandClientBasic(txn, c, cc(), queryOptions, ns, jsobj, anObjBuilder);
 }
 
 void Command::registerError(OperationContext* txn, const DBException& exception) {}

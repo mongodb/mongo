@@ -1159,7 +1159,16 @@ void exitCleanly(ExitCode code) {
     getGlobalServiceContext()->setKillAllOperations();
 
     repl::getGlobalReplicationCoordinator()->shutdown();
-    auto catalogMgr = grid.catalogManager();
+
+    Client& client = cc();
+    ServiceContext::UniqueOperationContext uniqueTxn;
+    OperationContext* txn = client.getOperationContext();
+    if (!txn) {
+        uniqueTxn = client.makeOperationContext();
+        txn = uniqueTxn.get();
+    }
+
+    auto catalogMgr = grid.catalogManager(txn);
     if (catalogMgr) {
         catalogMgr->shutDown();
     }

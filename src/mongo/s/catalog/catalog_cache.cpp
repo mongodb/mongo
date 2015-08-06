@@ -46,7 +46,8 @@ CatalogCache::CatalogCache(CatalogManager* catalogManager) : _catalogManager(cat
     invariant(_catalogManager);
 }
 
-StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(const string& dbName) {
+StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn,
+                                                           const string& dbName) {
     stdx::lock_guard<stdx::mutex> guard(_mutex);
 
     ShardedDatabasesMap::iterator it = _databases.find(dbName);
@@ -61,7 +62,7 @@ StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(const string& dbName)
     }
 
     shared_ptr<DBConfig> db = std::make_shared<DBConfig>(dbName, status.getValue());
-    db->load();
+    db->load(txn);
 
     invariant(_databases.insert(std::make_pair(dbName, db)).second);
 

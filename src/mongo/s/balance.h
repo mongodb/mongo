@@ -37,6 +37,7 @@ namespace mongo {
 
 class BalancerPolicy;
 struct MigrateInfo;
+class OperationContext;
 struct WriteConcernOptions;
 
 /**
@@ -92,7 +93,8 @@ private:
      * @param candidateChunks (IN/OUT) filled with candidate chunks, one per collection, that could
      *                          possibly be moved
      */
-    void _doBalanceRound(std::vector<std::shared_ptr<MigrateInfo>>* candidateChunks);
+    void _doBalanceRound(OperationContext* txn,
+                         std::vector<std::shared_ptr<MigrateInfo>>* candidateChunks);
 
     /**
      * Issues chunk migration request, one at a time.
@@ -102,14 +104,15 @@ private:
      * @param waitForDelete wait for deletes to complete after each chunk move
      * @return number of chunks effectively moved
      */
-    int _moveChunks(const std::vector<std::shared_ptr<MigrateInfo>>& candidateChunks,
+    int _moveChunks(OperationContext* txn,
+                    const std::vector<std::shared_ptr<MigrateInfo>>& candidateChunks,
                     const WriteConcernOptions* writeConcern,
                     bool waitForDelete);
 
     /**
      * Marks this balancer as being live on the config server(s).
      */
-    void _ping(bool waiting = false);
+    void _ping(OperationContext* txn, bool waiting = false);
 
     /**
      * @return true if all the servers listed in configdb as being shards are reachable and are

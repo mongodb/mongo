@@ -120,7 +120,7 @@ bool ClusterPlanCacheCmd::run(OperationContext* txn,
     // Targeted shard commands are generally data-dependent but plan cache
     // commands are tied to query shape (data has no effect on query shape).
     vector<Strategy::CommandResult> results;
-    Strategy::commandOp(dbName, cmdObj, options, nss.ns(), BSONObj(), &results);
+    Strategy::commandOp(txn, dbName, cmdObj, options, nss.ns(), BSONObj(), &results);
 
     // Set value of first shard result's "ok" field.
     bool clusterCmdResult = true;

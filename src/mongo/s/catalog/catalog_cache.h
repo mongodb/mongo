@@ -39,6 +39,7 @@ namespace mongo {
 
 class CatalogManager;
 class DBConfig;
+class OperationContext;
 template <typename T>
 class StatusWith;
 
@@ -63,7 +64,8 @@ public:
      * @param dbname The name of the database (must not contain dots, etc).
      * @return The database if it exists, NULL otherwise.
      */
-    StatusWith<std::shared_ptr<DBConfig>> getDatabase(const std::string& dbName);
+    StatusWith<std::shared_ptr<DBConfig>> getDatabase(OperationContext* txn,
+                                                      const std::string& dbName);
 
     /**
      * Removes the database information for the specified name from the cache, so that the

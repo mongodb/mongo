@@ -154,7 +154,8 @@ public:
         }
 
         vector<Strategy::CommandResult> countResult;
-        Strategy::commandOp(dbname, countCmdBuilder.done(), options, fullns, filter, &countResult);
+        Strategy::commandOp(
+            txn, dbname, countCmdBuilder.done(), options, fullns, filter, &countResult);
 
         long long total = 0;
         BSONObjBuilder shardSubTotal(result.subobjStart("shards"));
@@ -212,7 +213,8 @@ public:
         Timer timer;
 
         vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(dbname, explainCmdBob.obj(), 0, fullns, targetingQuery, &shardResults);
+        Strategy::commandOp(
+            txn, dbname, explainCmdBob.obj(), 0, fullns, targetingQuery, &shardResults);
 
         long long millisElapsed = timer.millis();
 

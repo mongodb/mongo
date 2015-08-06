@@ -88,7 +88,7 @@ void Future::CommandResult::init() {
     }
 }
 
-bool Future::CommandResult::join(int maxRetries) {
+bool Future::CommandResult::join(OperationContext* txn, int maxRetries) {
     if (_done) {
         return _ok;
     }
@@ -129,7 +129,7 @@ bool Future::CommandResult::join(int maxRetries) {
             }
 
             if (i >= maxRetries / 2) {
-                if (!versionManager.forceRemoteCheckShardVersionCB(staleNS)) {
+                if (!versionManager.forceRemoteCheckShardVersionCB(txn, staleNS)) {
                     error() << "Future::spawnCommand (part 2) no config detected" << causedBy(e);
                     throw e;
                 }
@@ -141,7 +141,7 @@ bool Future::CommandResult::join(int maxRetries) {
                 warning() << "no collection namespace in stale config exception "
                           << "for lazy command " << _cmd << ", could not refresh " << staleNS;
             } else {
-                versionManager.checkShardVersionCB(_conn, staleNS, false, 1);
+                versionManager.checkShardVersionCB(txn, _conn, staleNS, false, 1);
             }
 
             LOG(i > 1 ? 0 : 1) << "retrying lazy command" << causedBy(e);

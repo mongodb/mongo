@@ -104,7 +104,7 @@ public:
             return false;
         }
 
-        Status status = grid.catalogManager()->enableSharding(dbname);
+        Status status = grid.catalogManager(txn)->enableSharding(dbname);
         if (status.isOK()) {
             audit::logEnableSharding(ClientBasic::getCurrent(), dbname);
         }

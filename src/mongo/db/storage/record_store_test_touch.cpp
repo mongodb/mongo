@@ -51,7 +51,8 @@ TEST(RecordStoreTestHarness, TouchEmpty) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        unique_ptr<OperationContext> opCtx(
+            harnessHelper->newOperationContext(harnessHelper->client()));
         {
             BSONObjBuilder stats;
             Status status = rs->touch(opCtx.get(), &stats);
@@ -93,7 +94,8 @@ TEST(RecordStoreTestHarness, TouchNonEmpty) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        unique_ptr<OperationContext> opCtx(
+            harnessHelper->newOperationContext(harnessHelper->client()));
         {
             BSONObjBuilder stats;
             // XXX does not verify the collection was loaded into cache
@@ -116,7 +118,8 @@ TEST(RecordStoreTestHarness, TouchEmptyWithNullStats) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        unique_ptr<OperationContext> opCtx(
+            harnessHelper->newOperationContext(harnessHelper->client()));
         Status status = rs->touch(opCtx.get(), NULL /* stats output */);
         ASSERT(status.isOK() || status.code() == ErrorCodes::CommandNotSupported);
     }
@@ -155,7 +158,8 @@ TEST(RecordStoreTestHarness, TouchNonEmptyWithNullStats) {
     }
 
     {
-        unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+        unique_ptr<OperationContext> opCtx(
+            harnessHelper->newOperationContext(harnessHelper->client()));
         // XXX does not verify the collection was loaded into cache
         // (even if supported by storage engine)
         Status status = rs->touch(opCtx.get(), NULL /* stats output */);

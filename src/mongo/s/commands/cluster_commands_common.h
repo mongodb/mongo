@@ -74,7 +74,7 @@ public:
            blocks until command is done
            returns ok()
          */
-        bool join(int maxRetries = 1);
+        bool join(OperationContext* txn, int maxRetries = 1);
 
     private:
         CommandResult(const std::string& server,

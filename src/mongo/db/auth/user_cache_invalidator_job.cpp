@@ -88,10 +88,10 @@ public:
 
 } exportedIntervalParam;
 
-StatusWith<OID> getCurrentCacheGeneration() {
+StatusWith<OID> getCurrentCacheGeneration(OperationContext* txn) {
     try {
         BSONObjBuilder result;
-        const bool ok = grid.catalogManager()->runUserManagementReadCommand(
+        const bool ok = grid.catalogManager(txn)->runUserManagementReadCommand(
             "admin", BSON("_getUserCacheGeneration" << 1), &result);
         if (!ok) {
             return Command::getStatusFromCommandResult(result.obj());
@@ -107,8 +107,10 @@ StatusWith<OID> getCurrentCacheGeneration() {
 }  // namespace
 
 UserCacheInvalidator::UserCacheInvalidator(AuthorizationManager* authzManager)
-    : _authzManager(authzManager) {
-    StatusWith<OID> currentGeneration = getCurrentCacheGeneration();
+    : _authzManager(authzManager) {}
+
+void UserCacheInvalidator::initialize(OperationContext* txn) {
+    StatusWith<OID> currentGeneration = getCurrentCacheGeneration(txn);
     if (currentGeneration.isOK()) {
         _previousCacheGeneration = currentGeneration.getValue();
         return;
@@ -145,7 +147,8 @@ void UserCacheInvalidator::run() {
             break;
         }
 
-        StatusWith<OID> currentGeneration = getCurrentCacheGeneration();
+        auto txn = cc().makeOperationContext();
+        StatusWith<OID> currentGeneration = getCurrentCacheGeneration(txn.get());
         if (!currentGeneration.isOK()) {
             if (currentGeneration.getStatus().code() == ErrorCodes::CommandNotFound) {
                 warning() << "_getUserCacheGeneration command not found on config server(s), "

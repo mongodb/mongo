@@ -82,7 +82,7 @@ public:
                            BSONObjBuilder* out) const {
         const string ns = parseNsCollectionRequired(dbName, cmdObj);
 
-        auto status = grid.catalogCache()->getDatabase(dbName);
+        auto status = grid.catalogCache()->getDatabase(txn, dbName);
         uassertStatusOK(status);
 
         shared_ptr<DBConfig> conf = status.getValue();
@@ -92,7 +92,7 @@ public:
         if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
             shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
         } else {
-            shared_ptr<ChunkManager> chunkMgr = _getChunkManager(conf, ns);
+            shared_ptr<ChunkManager> chunkMgr = _getChunkManager(txn, conf, ns);
 
             const BSONObj query = cmdObj.getObjectField("query");
 
@@ -102,7 +102,7 @@ public:
             }
 
             BSONObj shardKey = status.getValue();
-            ChunkPtr chunk = chunkMgr->findIntersectingChunk(shardKey);
+            ChunkPtr chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
 
             shard = grid.shardRegistry()->getShard(chunk->getShardId());
         }
@@ -145,12 +145,12 @@ public:
 
         // findAndModify should only be creating database if upsert is true, but this would
         // require that the parsing be pulled into this function.
-        auto conf = uassertStatusOK(grid.implicitCreateDb(dbName));
+        auto conf = uassertStatusOK(grid.implicitCreateDb(txn, dbName));
         if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
             return _runCommand(conf, conf->getPrimaryId(), ns, cmdObj, result);
         }
 
-        shared_ptr<ChunkManager> chunkMgr = _getChunkManager(conf, ns);
+        shared_ptr<ChunkManager> chunkMgr = _getChunkManager(txn, conf, ns);
 
         const BSONObj query = cmdObj.getObjectField("query");
 
@@ -161,13 +161,13 @@ public:
         }
 
         BSONObj shardKey = status.getValue();
-        ChunkPtr chunk = chunkMgr->findIntersectingChunk(shardKey);
+        ChunkPtr chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
 
         bool ok = _runCommand(conf, chunk->getShardId(), ns, cmdObj, result);
         if (ok) {
             // check whether split is necessary (using update object for size heuristic)
             if (Chunk::ShouldAutoSplit) {
-                chunk->splitIfShould(cmdObj.getObjectField("update").objsize());
+                chunk->splitIfShould(txn, cmdObj.getObjectField("update").objsize());
             }
         }
 
@@ -175,8 +175,10 @@ public:
     }
 
 private:
-    shared_ptr<ChunkManager> _getChunkManager(shared_ptr<DBConfig> conf, const string& ns) const {
-        shared_ptr<ChunkManager> chunkMgr = conf->getChunkManager(ns);
+    shared_ptr<ChunkManager> _getChunkManager(OperationContext* txn,
+                                              shared_ptr<DBConfig> conf,
+                                              const string& ns) const {
+        shared_ptr<ChunkManager> chunkMgr = conf->getChunkManager(txn, ns);
         massert(13002, "shard internal error chunk manager should never be null", chunkMgr);
 
         return chunkMgr;

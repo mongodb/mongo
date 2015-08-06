@@ -80,7 +80,7 @@ void Request::init() {
     _didInit = true;
 }
 
-void Request::process(int attempt) {
+void Request::process(OperationContext* txn, int attempt) {
     init();
     int op = _m.operation();
     verify(op > dbMsg);
@@ -108,15 +108,15 @@ void Request::process(int attempt) {
                                   << ") for $cmd type ns - can only be 1 or -1",
                     n == 1 || n == -1);
 
-            Strategy::clientCommandOp(*this);
+            Strategy::clientCommandOp(txn, *this);
         } else {
-            Strategy::queryOp(*this);
+            Strategy::queryOp(txn, *this);
         }
     } else if (op == dbGetMore) {
-        Strategy::getMore(*this);
+        Strategy::getMore(txn, *this);
         globalOpCounters.gotOp(op, iscmd);
     } else {
-        Strategy::writeOp(op, *this);
+        Strategy::writeOp(txn, op, *this);
         // globalOpCounters are handled by write commands.
     }
 

@@ -200,7 +200,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                                            std::vector<BSONObj>* results) {
     invariant(results);
 
-    auto dbConfig = grid.catalogCache()->getDatabase(query.nss().db().toString());
+    auto dbConfig = grid.catalogCache()->getDatabase(txn, query.nss().db().toString());
     if (!dbConfig.isOK()) {
         return dbConfig.getStatus();
     }
@@ -229,7 +229,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                << retries << " of " << kMaxStaleConfigRetries << ": " << status.reason();
 
         invariant(chunkManager);
-        chunkManager = chunkManager->reload();
+        chunkManager = chunkManager->reload(txn);
     }
 
     return {ErrorCodes::StaleShardVersion,

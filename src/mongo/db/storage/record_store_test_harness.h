@@ -57,7 +57,7 @@ public:
     }
 
     std::unique_ptr<OperationContext> newOperationContext() {
-        return newOperationContext(client());
+        return newOperationContext(nullptr);
     }
 
     /**

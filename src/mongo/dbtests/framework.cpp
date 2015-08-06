@@ -70,11 +70,15 @@ int runDbTests(int argc, char** argv) {
     ShardingState::get(getGlobalServiceContext())->initialize("$dummy:10000");
 
     // Note: ShardingState::initialize also initializes the distLockMgr.
-    auto distLockMgr =
-        dynamic_cast<LegacyDistLockManager*>(grid.catalogManager()->getDistLockManager());
-    if (distLockMgr) {
-        distLockMgr->enablePinger(false);
+    {
+        auto txn = cc().makeOperationContext();
+        auto distLockMgr = dynamic_cast<LegacyDistLockManager*>(
+            grid.catalogManager(txn.get())->getDistLockManager());
+        if (distLockMgr) {
+            distLockMgr->enablePinger(false);
+        }
     }
+
 
     int ret = unittest::Suite::run(frameworkGlobalParams.suites,
                                    frameworkGlobalParams.filter,

@@ -54,9 +54,20 @@ public:
     OperationContextNoop(Client* client, unsigned int opId, Locker* locker, RecoveryUnit* ru)
         : OperationContext(client, opId, locker), _recoveryUnit(ru) {
         _locker.reset(lockState());
+
+        if (client) {
+            stdx::lock_guard<Client> lk(*client);
+            client->setOperationContext(this);
+        }
     }
 
-    virtual ~OperationContextNoop() = default;
+    virtual ~OperationContextNoop() {
+        auto client = getClient();
+        if (client) {
+            stdx::lock_guard<Client> lk(*client);
+            client->resetOperationContext();
+        }
+    }
 
     virtual RecoveryUnit* recoveryUnit() const override {
         return _recoveryUnit.get();

@@ -103,7 +103,8 @@ public:
      *
      * If the role does not exist, returns ErrorCodes::RoleNotFound.
      */
-    virtual Status getRoleDescription(const RoleName& roleName,
+    virtual Status getRoleDescription(OperationContext* txn,
+                                      const RoleName& roleName,
                                       bool showPrivileges,
                                       BSONObj* result) = 0;
 
@@ -120,7 +121,8 @@ public:
      * the document will contain a "warnings" array, with std::string messages describing
      * inconsistencies.
      */
-    virtual Status getRoleDescriptionsForDB(const std::string dbname,
+    virtual Status getRoleDescriptionsForDB(OperationContext* txn,
+                                            const std::string dbname,
                                             bool showPrivileges,
                                             bool showBuiltinRoles,
                                             std::vector<BSONObj>* result) = 0;

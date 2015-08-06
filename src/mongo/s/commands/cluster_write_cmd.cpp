@@ -120,7 +120,7 @@ public:
         BatchItemRef targetingBatchItem(&request, 0);
         vector<Strategy::CommandResult> shardResults;
         Status status =
-            _commandOpWrite(dbname, explainCmdBob.obj(), targetingBatchItem, &shardResults);
+            _commandOpWrite(txn, dbname, explainCmdBob.obj(), targetingBatchItem, &shardResults);
         if (!status.isOK()) {
             return status;
         }
@@ -153,7 +153,7 @@ public:
                 response.setErrCode(ErrorCodes::FailedToParse);
                 response.setErrMessage(errmsg);
             } else {
-                writer.write(request, &response);
+                writer.write(txn, request, &response);
             }
 
             dassert(response.isValid(NULL));
@@ -222,7 +222,8 @@ private:
      *
      * Does *not* retry or retarget if the metadata is stale.
      */
-    static Status _commandOpWrite(const std::string& dbName,
+    static Status _commandOpWrite(OperationContext* txn,
+                                  const std::string& dbName,
                                   const BSONObj& command,
                                   BatchItemRef targetingBatchItem,
                                   std::vector<Strategy::CommandResult>* results) {
@@ -231,7 +232,7 @@ private:
 
         ChunkManagerTargeter targeter(
             NamespaceString(targetingBatchItem.getRequest()->getTargetingNS()));
-        Status status = targeter.init();
+        Status status = targeter.init(txn);
         if (!status.isOK())
             return status;
 
@@ -240,17 +241,17 @@ private:
 
         if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
             ShardEndpoint* endpoint;
-            Status status = targeter.targetInsert(targetingBatchItem.getDocument(), &endpoint);
+            Status status = targeter.targetInsert(txn, targetingBatchItem.getDocument(), &endpoint);
             if (!status.isOK())
                 return status;
             endpoints.push_back(endpoint);
         } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
-            Status status = targeter.targetUpdate(*targetingBatchItem.getUpdate(), &endpoints);
+            Status status = targeter.targetUpdate(txn, *targetingBatchItem.getUpdate(), &endpoints);
             if (!status.isOK())
                 return status;
         } else {
             invariant(targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete);
-            Status status = targeter.targetDelete(*targetingBatchItem.getDelete(), &endpoints);
+            Status status = targeter.targetDelete(txn, *targetingBatchItem.getDelete(), &endpoints);
             if (!status.isOK())
                 return status;
         }

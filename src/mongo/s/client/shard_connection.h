@@ -103,7 +103,7 @@ public:
     }
 
     /** checks all of my thread local connections for the version of this ns */
-    static void checkMyConnectionVersions(const std::string& ns);
+    static void checkMyConnectionVersions(OperationContext* txn, const std::string& ns);
 
     /**
      * Returns all the current sharded connections to the pool.

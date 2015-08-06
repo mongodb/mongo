@@ -150,7 +150,7 @@ public:
         ShardingState* shardingState = ShardingState::get(txn);
 
         if (shardingState->enabled()) {
-            result.append("configServer", shardingState->getConfigServer());
+            result.append("configServer", shardingState->getConfigServer(txn));
         } else {
             result.append("configServer", "");
         }
@@ -213,7 +213,7 @@ public:
         Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
         OldClientContext ctx(txn, dbname);
 
-        ShardingState::get(txn)->appendInfo(result);
+        ShardingState::get(txn)->appendInfo(txn, result);
         return true;
     }
 

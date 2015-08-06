@@ -433,7 +433,7 @@ public:
 
         string whyMessage(str::stream() << "migrating chunk [" << minKey << ", " << maxKey
                                         << ") in " << ns);
-        auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(ns, whyMessage);
+        auto scopedDistLock = grid.catalogManager(txn)->getDistLockManager()->lock(ns, whyMessage);
 
         if (!scopedDistLock.isOK()) {
             errmsg = stream() << "could not acquire collection lock for " << ns
@@ -447,8 +447,8 @@ public:
         BSONObj chunkInfo =
             BSON("min" << min << "max" << max << "from" << fromShardName << "to" << toShardName);
 
-        grid.catalogManager()->logChange(
-            txn->getClient()->clientAddress(true), "moveChunk.start", ns, chunkInfo);
+        grid.catalogManager(txn)
+            ->logChange(txn->getClient()->clientAddress(true), "moveChunk.start", ns, chunkInfo);
 
         // Always refresh our metadata remotely
         ChunkVersion origShardVersion;
@@ -578,7 +578,7 @@ public:
             recvChunkStartBuilder.append("max", max);
             recvChunkStartBuilder.append("shardKeyPattern", shardKeyPattern);
             recvChunkStartBuilder.append("configServer",
-                                         ShardingState::get(txn)->getConfigServer());
+                                         ShardingState::get(txn)->getConfigServer(txn));
             recvChunkStartBuilder.append("secondaryThrottle", isSecondaryThrottle);
 
             // Follow the same convention in moveChunk.
@@ -898,11 +898,11 @@ public:
                 }
 
                 applyOpsStatus =
-                    grid.catalogManager()->applyChunkOpsDeprecated(updates.arr(), preCond.arr());
+                    grid.catalogManager(txn)->applyChunkOpsDeprecated(updates.arr(), preCond.arr());
 
                 if (MONGO_FAIL_POINT(failMigrationApplyOps)) {
                     throw SocketException(SocketException::RECV_ERROR,
-                                          ShardingState::get(txn)->getConfigServer());
+                                          ShardingState::get(txn)->getConfigServer(txn));
                 }
             } catch (const DBException& ex) {
                 warning() << ex << migrateLog;
@@ -950,11 +950,11 @@ public:
                 // we assume that if that mod made it to the config, the applyOps was successful
                 try {
                     std::vector<ChunkType> newestChunk;
-                    Status status = grid.catalogManager()->getChunks(
-                        BSON(ChunkType::ns(ns)),
-                        BSON(ChunkType::DEPRECATED_lastmod() << -1),
-                        1,
-                        &newestChunk);
+                    Status status = grid.catalogManager(txn)
+                                        ->getChunks(BSON(ChunkType::ns(ns)),
+                                                    BSON(ChunkType::DEPRECATED_lastmod() << -1),
+                                                    1,
+                                                    &newestChunk);
                     uassertStatusOK(status);
 
                     ChunkVersion checkVersion;
@@ -989,7 +989,7 @@ public:
                 commitInfo.appendElements(res["counts"].Obj());
             }
 
-            grid.catalogManager()->logChange(
+            grid.catalogManager(txn)->logChange(
                 txn->getClient()->clientAddress(true), "moveChunk.commit", ns, commitInfo.obj());
         }
 

@@ -44,6 +44,7 @@
 
 namespace mongo {
 
+class OperationContext;
 class TargetedWriteBatch;
 struct ShardError;
 struct ShardWCError;
@@ -105,7 +106,8 @@ public:
      *
      * Returned TargetedWriteBatches are owned by the caller.
      */
-    Status targetBatch(const NSTargeter& targeter,
+    Status targetBatch(OperationContext* txn,
+                       const NSTargeter& targeter,
                        bool recordTargetErrors,
                        std::vector<TargetedWriteBatch*>* targetedBatches);
 

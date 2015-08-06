@@ -38,6 +38,7 @@ namespace mongo {
 
 class ChunkManager;
 struct ChunkVersion;
+class OperationContext;
 class Shard;
 
 struct TargeterStats {
@@ -62,19 +63,21 @@ public:
      *
      * Returns !OK if the information could not be initialized.
      */
-    Status init();
+    Status init(OperationContext* txn);
 
     const NamespaceString& getNS() const;
 
     // Returns ShardKeyNotFound if document does not have a full shard key.
-    Status targetInsert(const BSONObj& doc, ShardEndpoint** endpoint) const;
+    Status targetInsert(OperationContext* txn, const BSONObj& doc, ShardEndpoint** endpoint) const;
 
     // Returns ShardKeyNotFound if the update can't be targeted without a shard key.
-    Status targetUpdate(const BatchedUpdateDocument& updateDoc,
+    Status targetUpdate(OperationContext* txn,
+                        const BatchedUpdateDocument& updateDoc,
                         std::vector<ShardEndpoint*>* endpoints) const;
 
     // Returns ShardKeyNotFound if the delete can't be targeted without a shard key.
-    Status targetDelete(const BatchedDeleteDocument& deleteDoc,
+    Status targetDelete(OperationContext* txn,
+                        const BatchedDeleteDocument& deleteDoc,
                         std::vector<ShardEndpoint*>* endpoints) const;
 
     Status targetCollection(std::vector<ShardEndpoint*>* endpoints) const;
@@ -94,7 +97,7 @@ public:
      *
      * Also see NSTargeter::refreshIfNeeded().
      */
-    Status refreshIfNeeded(bool* wasChanged);
+    Status refreshIfNeeded(OperationContext* txn, bool* wasChanged);
 
     /**
      * Returns the stats. Note that the returned stats object is still owned by this targeter.
@@ -118,7 +121,7 @@ private:
     /**
      * Performs an actual refresh from the config server.
      */
-    Status refreshNow(RefreshType refreshType);
+    Status refreshNow(OperationContext* txn, RefreshType refreshType);
 
     /**
      * Returns a vector of ShardEndpoints where a document might need to be placed.
@@ -140,7 +143,8 @@ private:
      * Also has the side effect of updating the chunks stats with an estimate of the amount of
      * data targeted at this shard key.
      */
-    Status targetShardKey(const BSONObj& doc,
+    Status targetShardKey(OperationContext* txn,
+                          const BSONObj& doc,
                           long long estDataSize,
                           ShardEndpoint** endpoint) const;
 

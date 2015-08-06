@@ -74,7 +74,7 @@ public:
                      std::string& errmsg,
                      BSONObjBuilder& result) {
         std::vector<ShardType> shards;
-        Status status = grid.catalogManager()->getAllShards(&shards);
+        Status status = grid.catalogManager(txn)->getAllShards(&shards);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }

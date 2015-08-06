@@ -603,7 +603,7 @@ public:
         // Initialize our current shard name in the shard state if needed
         shardingState->gotShardName(shardName);
 
-        auto configLocStatus = ConnectionString::parse(shardingState->getConfigServer());
+        auto configLocStatus = ConnectionString::parse(shardingState->getConfigServer(txn));
         if (!configLocStatus.isOK()) {
             warning() << configLocStatus.getStatus();
             return false;
@@ -617,7 +617,7 @@ public:
 
         string whyMessage(str::stream() << "splitting chunk [" << minKey << ", " << maxKey
                                         << ") in " << ns);
-        auto scopedDistLock = grid.catalogManager()->getDistLockManager()->lock(ns, whyMessage);
+        auto scopedDistLock = grid.catalogManager(txn)->getDistLockManager()->lock(ns, whyMessage);
 
         if (!scopedDistLock.isOK()) {
             errmsg = str::stream() << "could not acquire collection lock for " << ns
@@ -787,7 +787,7 @@ public:
         // 4. apply the batch of updates to remote and local metadata
         //
         Status applyOpsStatus =
-            grid.catalogManager()->applyChunkOpsDeprecated(updates.arr(), preCond.arr());
+            grid.catalogManager(txn)->applyChunkOpsDeprecated(updates.arr(), preCond.arr());
         if (!applyOpsStatus.isOK()) {
             return appendCommandStatus(result, applyOpsStatus);
         }
@@ -824,8 +824,8 @@ public:
             appendShortVersion(logDetail.subobjStart("left"), *newChunks[0]);
             appendShortVersion(logDetail.subobjStart("right"), *newChunks[1]);
 
-            grid.catalogManager()->logChange(
-                txn->getClient()->clientAddress(true), "split", ns, logDetail.obj());
+            grid.catalogManager(txn)
+                ->logChange(txn->getClient()->clientAddress(true), "split", ns, logDetail.obj());
         } else {
             BSONObj beforeDetailObj = logDetail.obj();
             BSONObj firstDetailObj = beforeDetailObj.getOwned();
@@ -838,7 +838,7 @@ public:
                 chunkDetail.append("of", newChunksSize);
                 appendShortVersion(chunkDetail.subobjStart("chunk"), *newChunks[i]);
 
-                grid.catalogManager()->logChange(
+                grid.catalogManager(txn)->logChange(
                     txn->getClient()->clientAddress(true), "multi-split", ns, chunkDetail.obj());
             }
         }

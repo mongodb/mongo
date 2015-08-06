@@ -111,7 +111,7 @@ protected:
         ShardKeyPattern shardKeyPattern(BSON(keyName << 1));
         ChunkManager manager(_collName, shardKeyPattern, false);
 
-        manager.createFirstChunks(_shardId, &splitKeys, NULL);
+        manager.createFirstChunks(&_txn, _shardId, &splitKeys, NULL);
     }
 };
 
@@ -181,7 +181,7 @@ TEST_F(ChunkManagerTests, Basic) {
     collType.setDropped(false);
 
     ChunkManager manager(collType);
-    manager.loadExistingRanges(nullptr);
+    manager.loadExistingRanges(&_txn, nullptr);
 
     ASSERT(manager.getVersion().epoch() == version.epoch());
     ASSERT(manager.getVersion().minorVersion() == (numChunks - 1));
@@ -196,7 +196,7 @@ TEST_F(ChunkManagerTests, Basic) {
 
     // Make new manager load chunk diff
     ChunkManager newManager(manager.getns(), manager.getShardKeyPattern(), manager.isUnique());
-    newManager.loadExistingRanges(&manager);
+    newManager.loadExistingRanges(&_txn, &manager);
 
     ASSERT(newManager.getVersion().toLong() == laterVersion.toLong());
     ASSERT(newManager.getVersion().epoch() == laterVersion.epoch());
