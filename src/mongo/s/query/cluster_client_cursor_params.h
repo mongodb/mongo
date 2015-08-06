@@ -60,9 +60,6 @@ struct ClusterClientCursorParams {
     // The sort specification. Leave empty if there is no sort.
     BSONObj sort;
 
-    // The projection specification. Leave empty if there is no projection.
-    BSONObj projection;
-
     // The number of results to skip. Optional. Should not be forwarded to the remote hosts in
     // 'cmdObj'.
     boost::optional<long long> skip;

@@ -78,7 +78,6 @@ protected:
 
         params = ClusterClientCursorParams(_nss);
         params.sort = lpq->getSort();
-        params.projection = lpq->getProj();
         params.limit = lpq->getLimit();
         params.batchSize = getMoreBatchSize ? getMoreBatchSize : lpq->getBatchSize();
         params.skip = lpq->getSkip();

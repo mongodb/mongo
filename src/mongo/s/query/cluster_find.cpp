@@ -116,9 +116,9 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         }
     }
 
-    // TODO: handle other query options (projection).
     ClusterClientCursorParams params(query.nss());
     params.batchSize = query.getParsed().getBatchSize();
+    params.limit = query.getParsed().getLimit();
     params.sort = query.getParsed().getSort();
     params.skip = query.getParsed().getSkip();
 
@@ -148,24 +148,46 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         params.remotes[i].cmdObj = cmdBuilder.obj();
     }
 
-    ClusterClientCursorImpl ccc(shardRegistry->getExecutor(), params);
+    auto ccc =
+        stdx::make_unique<ClusterClientCursorImpl>(shardRegistry->getExecutor(), std::move(params));
 
-    // TODO: this should implement the batching logic rather than fully exhausting the cursor. It
-    // should allocate a cursor id and save the ClusterClientCursor rather than always returning a
-    // cursor id of 0.
-    StatusWith<boost::optional<BSONObj>> nextObj(boost::none);
-    while ((nextObj = ccc.next()).isOK()) {
-        if (!nextObj.getValue()) {
+    // Register the cursor with the cursor manager.
+    auto cursorManager = grid.getCursorManager();
+    const auto cursorType = chunkManager ? ClusterCursorManager::CursorType::NamespaceSharded
+                                         : ClusterCursorManager::CursorType::NamespaceNotSharded;
+    const auto cursorLifetime = query.getParsed().isNoCursorTimeout()
+        ? ClusterCursorManager::CursorLifetime::Immortal
+        : ClusterCursorManager::CursorLifetime::Mortal;
+    auto pinnedCursor =
+        cursorManager->registerCursor(std::move(ccc), query.nss(), cursorType, cursorLifetime);
+
+    auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
+    int bytesBuffered = 0;
+    while (!FindCommon::enoughForFirstBatch(query.getParsed(), results->size(), bytesBuffered)) {
+        auto next = pinnedCursor.next();
+        if (!next.isOK()) {
+            return next.getStatus();
+        }
+
+        if (!next.getValue()) {
+            // We reached end-of-stream.
+            cursorState = ClusterCursorManager::CursorState::Exhausted;
             break;
         }
-        results->emplace_back(std::move(*nextObj.getValue()));
+
+        // Add doc to the batch.
+        bytesBuffered += next.getValue()->objsize();
+        results->push_back(std::move(*next.getValue()));
     }
 
-    if (!nextObj.isOK()) {
-        return nextObj.getStatus();
-    }
+    CursorId idToReturn = (cursorState == ClusterCursorManager::CursorState::Exhausted)
+        ? CursorId(0)
+        : pinnedCursor.getCursorId();
 
-    return CursorId(0);
+    // Transfer ownership of the cursor back to the cursor manager.
+    pinnedCursor.returnCursor(cursorState);
+
+    return idToReturn;
 }
 
 }  // namespace

@@ -73,7 +73,7 @@ public:
      * Constructs a new AsyncResultsMerger. The TaskExecutor* and ClusterClientCursorParams& must
      * remain valid for the lifetime of the ARM.
      */
-    AsyncResultsMerger(executor::TaskExecutor* executor, const ClusterClientCursorParams& params);
+    AsyncResultsMerger(executor::TaskExecutor* executor, ClusterClientCursorParams params);
 
     /**
      * In order to be destroyed, either
@@ -247,7 +247,7 @@ private:
     // Not owned here.
     executor::TaskExecutor* _executor;
 
-    const ClusterClientCursorParams& _params;
+    ClusterClientCursorParams _params;
 
     // Must be acquired before accessing any data members (other than _params, which is read-only).
     // Must also be held when calling any of the '_inlock()' helper functions.

@@ -45,8 +45,7 @@ public:
     /**
      * Constructs a cluster client cursor.
      */
-    ClusterClientCursorImpl(executor::TaskExecutor* executor,
-                            const ClusterClientCursorParams& params);
+    ClusterClientCursorImpl(executor::TaskExecutor* executor, ClusterClientCursorParams params);
 
     StatusWith<boost::optional<BSONObj>> next() final;
 
@@ -57,7 +56,7 @@ private:
      * Constructs the pipeline of MergerPlanStages which will be used to answer the query.
      */
     std::unique_ptr<RouterExecStage> buildMergerPlan(executor::TaskExecutor* executor,
-                                                     const ClusterClientCursorParams& params);
+                                                     ClusterClientCursorParams params);
 
     // The root stage of the pipeline used to return the result set, merged from the remote nodes.
     std::unique_ptr<RouterExecStage> _root;

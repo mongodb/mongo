@@ -43,7 +43,7 @@ namespace mongo {
  */
 class RouterStageMerge final : public RouterExecStage {
 public:
-    RouterStageMerge(executor::TaskExecutor* executor, const ClusterClientCursorParams& params);
+    RouterStageMerge(executor::TaskExecutor* executor, ClusterClientCursorParams params);
 
     StatusWith<boost::optional<BSONObj>> next() final;
 

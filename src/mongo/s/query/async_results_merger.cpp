@@ -43,9 +43,11 @@
 namespace mongo {
 
 AsyncResultsMerger::AsyncResultsMerger(executor::TaskExecutor* executor,
-                                       const ClusterClientCursorParams& params)
-    : _executor(executor), _params(params), _mergeQueue(MergingComparator(_remotes, _params.sort)) {
-    for (const auto& remote : params.remotes) {
+                                       ClusterClientCursorParams params)
+    : _executor(executor),
+      _params(std::move(params)),
+      _mergeQueue(MergingComparator(_remotes, _params.sort)) {
+    for (const auto& remote : _params.remotes) {
         _remotes.emplace_back(remote);
     }
 }
