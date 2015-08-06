@@ -177,7 +177,7 @@ TEST(MemberConfig, ParseVotes) {
     ASSERT_TRUE(mc.isVoter());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 0),
+                                       << "votes" << 0 << "priority" << 0),
                             &tagConfig));
     ASSERT_FALSE(mc.isVoter());
 
@@ -291,7 +291,7 @@ TEST(MemberConfig, ValidateVotes) {
 
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 0),
+                                       << "votes" << 0 << "priority" << 0),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_FALSE(mc.isVoter());
@@ -306,14 +306,14 @@ TEST(MemberConfig, ValidateVotes) {
 
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << 0.5),
+                                       << "votes" << 0.5 << "priority" << 0),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_FALSE(mc.isVoter());
 
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
-                                       << "votes" << -0.5),
+                                       << "votes" << -0.5 << "priority" << 0),
                             &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_FALSE(mc.isVoter());
@@ -432,10 +432,11 @@ TEST(MemberConfig, ValidateArbiterVotesRelationship) {
                             &tagConfig));
     ASSERT_OK(mc.validate());
 
-    ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
-                                       << "h"
-                                       << "votes" << 0 << "arbiterOnly" << false),
-                            &tagConfig));
+    ASSERT_OK(
+        mc.initialize(BSON("_id" << 0 << "host"
+                                 << "h"
+                                 << "votes" << 0 << "priority" << 0 << "arbiterOnly" << false),
+                      &tagConfig));
     ASSERT_OK(mc.validate());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"

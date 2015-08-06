@@ -252,14 +252,20 @@ Status MemberConfig::validate() const {
                                     << durationCount<Seconds>(_slaveDelay)
                                     << " seconds is out of range");
     }
-    if (_slaveDelay > Seconds(0) && _priority != 0) {
-        return Status(ErrorCodes::BadValue, "slaveDelay requires priority be zero");
-    }
-    if (_hidden && _priority != 0) {
-        return Status(ErrorCodes::BadValue, "priority must be 0 when hidden=true");
-    }
-    if (!_buildIndexes && _priority != 0) {
-        return Status(ErrorCodes::BadValue, "priority must be 0 when buildIndexes=false");
+    // Check for additional electable requirements, when priority is non zero
+    if (_priority != 0) {
+        if (_votes == 0) {
+            return Status(ErrorCodes::BadValue, "priority must be 0 when non-voting (votes:0)");
+        }
+        if (_slaveDelay > Seconds(0)) {
+            return Status(ErrorCodes::BadValue, "priority must be 0 when slaveDelay is used");
+        }
+        if (_hidden) {
+            return Status(ErrorCodes::BadValue, "priority must be 0 when hidden=true");
+        }
+        if (!_buildIndexes) {
+            return Status(ErrorCodes::BadValue, "priority must be 0 when buildIndexes=false");
+        }
     }
     return Status::OK();
 }

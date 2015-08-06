@@ -492,7 +492,7 @@ TEST_F(TopoCoordTest, ChooseSyncSourceWrtVoters) {
     updateConfig(fromjson(
                      "{_id:'rs0', version:1, members:["
                      "{_id:10, host:'hself'}, "
-                     "{_id:20, host:'h2', votes:0}, "
+                     "{_id:20, host:'h2', votes:0, priority:0}, "
                      "{_id:30, host:'h3'} "
                      "]}"),
                  0);
@@ -972,7 +972,7 @@ TEST_F(TopoCoordTest, PrepareSyncFromResponseVoters) {
                      "{_id:'rs0', version:1, members:["
                      "{_id:0, host:'self'},"
                      "{_id:1, host:'h1'},"
-                     "{_id:2, host:'h2', votes:0}"
+                     "{_id:2, host:'h2', votes:0, priority:0}"
                      "]}"),
                  0);
 
@@ -2918,19 +2918,22 @@ TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityOfVotersUp) 
                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                << "host1:27017")
                                     << BSON("_id" << 1 << "host"
-                                                  << "host2:27017") << BSON("_id" << 2 << "host"
-                                                                                  << "host3:27017"
-                                                                                  << "votes" << 0)
+                                                  << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"
+                                                  << "votes" << 0 << "priority" << 0)
                                     << BSON("_id" << 3 << "host"
                                                   << "host4:27017"
-                                                  << "votes" << 0) << BSON("_id" << 4 << "host"
-                                                                                 << "host5:27017"
-                                                                                 << "votes" << 0)
+                                                  << "votes" << 0 << "priority" << 0)
+                                    << BSON("_id" << 4 << "host"
+                                                  << "host5:27017"
+                                                  << "votes" << 0 << "priority" << 0)
                                     << BSON("_id" << 5 << "host"
                                                   << "host6:27017"
-                                                  << "votes" << 0) << BSON("_id" << 6 << "host"
-                                                                                 << "host7:27017"))
-                      << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+                                                  << "votes" << 0 << "priority" << 0)
+                                    << BSON("_id" << 6 << "host"
+                                                  << "host7:27017")) << "settings"
+                      << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);

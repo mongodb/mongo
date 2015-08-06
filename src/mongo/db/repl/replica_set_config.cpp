@@ -117,9 +117,11 @@ Status ReplicaSetConfig::initialize(const BSONObj& cfg) {
                                         << typeName(memberElement.type()));
         }
         _members.resize(_members.size() + 1);
-        status = _members.back().initialize(memberElement.Obj(), &_tagConfig);
+        const auto& memberBSON = memberElement.Obj();
+        status = _members.back().initialize(memberBSON, &_tagConfig);
         if (!status.isOK())
-            return status;
+            return Status(ErrorCodes::InvalidReplicaSetConfig,
+                          str::stream() << status.toString() << " for member:" << memberBSON);
     }
 
     //

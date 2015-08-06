@@ -1977,7 +1977,7 @@ TEST_F(ReplCoordTest, AwaitReplicationMajority) {
                                                                          << "_id" << 2)
                                           << BSON("host"
                                                   << "node4:12345"
-                                                  << "_id" << 3 << "votes" << 0)
+                                                  << "_id" << 3 << "votes" << 0 << "priority" << 0)
                                           << BSON("host"
                                                   << "node5:12345"
                                                   << "_id" << 4 << "arbiterOnly" << true))),
@@ -2027,7 +2027,7 @@ TEST_F(ReplCoordTest, LastCommittedOpTime) {
                                                                          << "_id" << 2)
                                           << BSON("host"
                                                   << "node4:12345"
-                                                  << "_id" << 3 << "votes" << 0)
+                                                  << "_id" << 3 << "votes" << 0 << "priority" << 0)
                                           << BSON("host"
                                                   << "node5:12345"
                                                   << "_id" << 4 << "arbiterOnly" << true))),
