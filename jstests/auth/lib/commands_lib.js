@@ -1080,7 +1080,6 @@ var authCommandsLib = {
         {
             testname: "find",
             command: {find: "foo"},
-            skipSharded: true, // TODO: remove when find command is implemented in mongos
             testcases: [
                 {
                     runOnDb: firstDbName,
@@ -1270,7 +1269,6 @@ var authCommandsLib = {
         {
             testname: "getMore",
             command: {getMore: NumberLong("1"), collection: "foo"},
-            skipSharded: true, // TODO: remove when getMore command is implemented in mongos
             testcases: [
                 {
                     runOnDb: firstDbName,
