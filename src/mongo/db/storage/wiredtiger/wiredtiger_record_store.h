@@ -231,7 +231,7 @@ private:
     void _setId(RecordId loc);
     bool cappedAndNeedDelete() const;
     void _changeNumRecords(OperationContext* txn, int64_t diff);
-    void _increaseDataSize(OperationContext* txn, int amount);
+    void _increaseDataSize(OperationContext* txn, int64_t amount);
     RecordData _getData(const WiredTigerCursor& cursor) const;
     StatusWith<RecordId> extractAndCheckLocForOplog(const char* data, int len);
     void _oplogSetStartHack(WiredTigerRecoveryUnit* wru) const;
