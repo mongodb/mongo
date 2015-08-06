@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/audit.h"
@@ -54,6 +55,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_find.h"
 #include "mongo/s/request.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/version_manager.h"
@@ -71,6 +73,12 @@ using std::set;
 using std::string;
 using std::stringstream;
 using std::vector;
+
+
+namespace {
+// A spigot to enable the ClusterClientCursor codepath
+MONGO_EXPORT_SERVER_PARAMETER(useClusterClientCursor, bool, false);
+}  // namespace
 
 static bool _isSystemIndexes(const char* ns) {
     return nsToCollectionSubstring(ns) == "system.indexes";
@@ -165,6 +173,62 @@ void Strategy::queryOp(Request& r) {
         uasserted(18526,
                   string("the 'exhaust' query option is invalid for mongos queries: ") + q.ns +
                       " " + q.query.toString());
+    }
+
+    // Spigot which controls whether OP_QUERY style find on mongos uses the new ClusterClientCursor
+    // code path.
+    // TODO: Delete the spigot and always use the new code.
+    if (useClusterClientCursor) {
+        auto txn = cc().makeOperationContext();
+
+        ReadPreferenceSetting readPreference(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
+
+        BSONElement rpElem;
+        auto readPrefExtractStatus = bsonExtractTypedField(
+            q.query, LiteParsedQuery::kFindCommandReadPrefField, mongo::Object, &rpElem);
+
+        if (readPrefExtractStatus.isOK()) {
+            auto parsedRps = ReadPreferenceSetting::fromBSON(rpElem.Obj());
+            uassertStatusOK(parsedRps.getStatus());
+            readPreference = parsedRps.getValue();
+        } else if (readPrefExtractStatus != ErrorCodes::NoSuchKey) {
+            uassertStatusOK(readPrefExtractStatus);
+        }
+
+        auto canonicalQuery = CanonicalQuery::canonicalize(q);
+        uassertStatusOK(canonicalQuery.getStatus());
+
+        // Do the work to generate the first batch of results. This blocks waiting to get responses
+        // from the shard(s).
+        std::vector<BSONObj> batch;
+
+        // 0 means the cursor is exhausted and
+        // otherwise we assume that a cursor with the returned id can be retrieved via the
+        // ClusterCursorManager
+        auto cursorId =
+            ClusterFind::runQuery(txn.get(), *canonicalQuery.getValue(), readPreference, &batch);
+        uassertStatusOK(cursorId.getStatus());
+
+        // Build the response document.
+        // TODO: this constant should be shared between mongos and mongod, and should
+        // not be inside ShardedClientCursor.
+        BufBuilder buffer(ShardedClientCursor::INIT_REPLY_BUFFER_SIZE);
+
+        int numResults = 0;
+        for (const auto& obj : batch) {
+            buffer.appendBuf((void*)obj.objdata(), obj.objsize());
+            numResults++;
+        }
+
+        replyToQuery(0,  // query result flags
+                     r.p(),
+                     r.m(),
+                     buffer.buf(),
+                     buffer.len(),
+                     numResults,
+                     0,  // startingFrom
+                     cursorId.getValue());
+        return;
     }
 
     QuerySpec qSpec((string)q.ns, q.query, q.fields, q.ntoskip, q.ntoreturn, q.queryOptions);
