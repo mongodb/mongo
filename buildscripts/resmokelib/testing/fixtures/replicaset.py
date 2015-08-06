@@ -29,7 +29,8 @@ class ReplicaSetFixture(interface.ReplFixture):
                  dbpath_prefix=None,
                  preserve_dbpath=False,
                  num_nodes=2,
-                 auth_options=None):
+                 auth_options=None,
+                 replset_config_options=None):
 
         interface.ReplFixture.__init__(self, logger, job_num)
 
@@ -38,6 +39,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.preserve_dbpath = preserve_dbpath
         self.num_nodes = num_nodes
         self.auth_options = auth_options
+        self.replset_config_options = utils.default_if_none(replset_config_options, {})
 
         # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
@@ -85,6 +87,9 @@ class ReplicaSetFixture(interface.ReplFixture):
             auth_db.authenticate(self.auth_options["username"],
                                  password=self.auth_options["password"],
                                  mechanism=self.auth_options["authenticationMechanism"])
+
+        if self.replset_config_options.get("configsvr", False):
+            initiate_cmd_obj["replSetInitiate"]["configsvr"] = True
 
         self.logger.info("Issuing replSetInitiate command...")
         client.admin.command(initiate_cmd_obj)

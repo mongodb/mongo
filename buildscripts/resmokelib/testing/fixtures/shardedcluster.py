@@ -177,14 +177,16 @@ class ShardedClusterFixture(interface.Fixture):
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "config")
         mongod_options["replSet"] = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
         mongod_options["set_parameters"]["enableReplSnapshotThread"] = 1
+        mongod_options["storageEngine"] = "wiredTiger"
 
         return replicaset.ReplicaSetFixture(mongod_logger,
                                             self.job_num,
                                             mongod_executable=self.mongod_executable,
                                             mongod_options=mongod_options,
                                             preserve_dbpath=self.preserve_dbpath,
-                                            num_nodes=1,
-                                            auth_options=self.auth_options)
+                                            num_nodes=2,
+                                            auth_options=self.auth_options,
+                                            replset_config_options={"configsvr": True})
 
     def _new_shard(self, index):
         """
