@@ -1630,7 +1630,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * Set up the temporary slot with the correct LSN information.
 	 * Set our size in the slot for release.
 	 */
-	WT_ASSERT(session, WT_LOG_CMP(&log->write_lsn, &log->alloc_lsn) == 0);
+	WT_ASSERT(session, WT_LOG_CMP(&log->write_lsn, &log->alloc_lsn) <= 0);
 	WT_RET(__wt_log_acquire(session, record->size, &tmp));
 	WT_ASSERT(session,
 	    WT_LOG_CMP(&log->write_lsn, &tmp.slot_release_lsn) <= 0);
