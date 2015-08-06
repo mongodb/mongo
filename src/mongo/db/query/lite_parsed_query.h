@@ -135,13 +135,6 @@ public:
     static bool isTextScoreMeta(BSONElement elt);
 
     /**
-     * Helper function to identify recordId projection.
-     *
-     * Example: {a: {$meta: "recordId"}}.
-     */
-    static bool isRecordIdMeta(BSONElement elt);
-
-    /**
      * Helper function to validate a sort object.
      * Returns true if each element satisfies one of:
      * 1. a number with value 1

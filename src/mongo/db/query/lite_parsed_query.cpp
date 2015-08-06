@@ -687,35 +687,6 @@ bool LiteParsedQuery::isTextScoreMeta(BSONElement elt) {
 }
 
 // static
-bool LiteParsedQuery::isRecordIdMeta(BSONElement elt) {
-    // elt must be foo: {$meta: "recordId"}
-    if (mongo::Object != elt.type()) {
-        return false;
-    }
-    BSONObj metaObj = elt.Obj();
-    BSONObjIterator metaIt(metaObj);
-    // must have exactly 1 element
-    if (!metaIt.more()) {
-        return false;
-    }
-    BSONElement metaElt = metaIt.next();
-    if (!str::equals("$meta", metaElt.fieldName())) {
-        return false;
-    }
-    if (mongo::String != metaElt.type()) {
-        return false;
-    }
-    if (LiteParsedQuery::metaRecordId != metaElt.valuestr()) {
-        return false;
-    }
-    // must have exactly 1 element
-    if (metaIt.more()) {
-        return false;
-    }
-    return true;
-}
-
-// static
 bool LiteParsedQuery::isValidSortOrder(const BSONObj& sortObj) {
     BSONObjIterator i(sortObj);
     while (i.more()) {
