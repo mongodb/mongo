@@ -92,7 +92,7 @@ class test_cursor_random(wttest.WiredTigerTestCase):
 
     # Check that next_random works in the presence of a larger set of values,
     # where the values are in a disk format page.
-    def test_cursor_random_multiple_page_records(self):
+    def cursor_random_multiple_page_records(self, reopen):
         uri = self.type + 'random'
         if self.type == 'file:':
             simple_populate(self, uri,
@@ -103,10 +103,10 @@ class test_cursor_random(wttest.WiredTigerTestCase):
                 'allocation_size=512,leaf_page_max=512,key_format=' +\
                 self.fmt, 10000)
 
-        # Close the connection so everything is forced to disk (otherwise the
-        # values are on an insert list and the underlying engine doesn't make
-        # random selections, it selects the middle of the list.
-        self.reopen_conn()
+        # Optionally close the connection so everything is forced to disk,
+        # insert lists are an entirely different path in the code.
+        if reopen:
+            self.reopen_conn()
 
         cursor = self.session.open_cursor(uri, None, "next_random=true")
         last = ''
@@ -120,6 +120,10 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         self.assertLess(match, 5,
             'next_random did not return random records, too many matches found')
 
+    def test_cursor_random_multiple_page_records_reopen(self):
+        self.cursor_random_multiple_page_records(1)
+    def test_cursor_random_multiple_page_records(self):
+        self.cursor_random_multiple_page_records(0)
 
 # Check that opening a random cursor on column-store returns not-supported.
 class test_cursor_random_column(wttest.WiredTigerTestCase):
