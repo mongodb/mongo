@@ -148,7 +148,8 @@ StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& option
 }
 
 // static
-StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string& extraConfig,
+StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string& sysIndexConfig,
+                                                              const std::string& collIndexConfig,
                                                               const IndexDescriptor& desc) {
     str::stream ss;
 
@@ -164,7 +165,8 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     ss << "block_compressor=" << wiredTigerGlobalOptions.indexBlockCompressor << ",";
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getOpenConfig(desc.parentNS());
-    ss << extraConfig;
+    ss << sysIndexConfig << ",";
+    ss << collIndexConfig << ",";
 
     // Validate configuration object.
     // Raise an error about unrecognized fields that may be introduced in newer versions of

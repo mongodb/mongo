@@ -602,6 +602,14 @@ Status userCreateNS(OperationContext* txn,
     if (!status.isOK())
         return status;
 
+    if (auto indexOptions = collectionOptions.indexOptionDefaults["storageEngine"]) {
+        status = validateStorageOptions(indexOptions.Obj(),
+                                        &StorageEngine::Factory::validateIndexStorageOptions);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     invariant(db->createCollection(txn, ns, collectionOptions, createDefaultIndexes));
 
     return Status::OK();

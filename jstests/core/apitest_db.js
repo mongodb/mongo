@@ -65,6 +65,55 @@ assert.eq('test', collectionInfos[0].name, "'test' collection not created");
 assert.docEq(validStorageEngineOptions, collectionInfos[0].options.storageEngine,
              'storage engine options not found in listCommands result');
 
+// The indexOptionDefaults must be a document that contains only a storageEngine field.
+db.idxOptions.drop();
+assert.commandFailed(db.createCollection('idxOptions', {indexOptionDefaults: 'not a document'}));
+assert.commandFailed(db.createCollection('idxOptions', {
+    indexOptionDefaults: {unknownOption: true}
+}), 'created a collection with an unknown option to indexOptionDefaults');
+assert.commandWorked(db.createCollection('idxOptions', {indexOptionDefaults: {}}),
+                     'should have been able to specify an empty object for indexOptionDefaults');
+assert(db.idxOptions.drop());
+assert.commandWorked(db.createCollection('idxOptions', {
+    indexOptionDefaults: {storageEngine: {}}
+}), 'should have been able to configure zero storage engines');
+assert(db.idxOptions.drop());
+
+// The storageEngine subdocument must configure only registered storage engines.
+assert.commandFailed(db.createCollection('idxOptions', {
+    indexOptionDefaults: {storageEngine: {unknownStorageEngine: {}}}
+}), 'configured an unregistered storage engine');
+
+// The storageEngine subdocument must contain valid storage engine options.
+assert.commandFailed(db.createCollection('idxOptions', {
+    indexOptionDefaults: {storageEngine: invalidStorageEngineOptions}
+}), 'configured a storage engine with invalid options');
+
+// Tests that a non-active storage engine can be configured so long as it is registered.
+if (db.serverBuildInfo().bits === 64) {
+    // wiredTiger is not a registered storage engine on 32-bit systems.
+    var indexOptions = {storageEngine: {}};
+    if (storageEngineName === 'wiredTiger') {
+        indexOptions.storageEngine.mmapv1 = {};
+    } else {
+        indexOptions.storageEngine.wiredTiger = {};
+    }
+    assert.commandWorked(db.createCollection('idxOptions', {indexOptionDefaults: indexOptions}),
+                         'should have been able to configure a non-active storage engine');
+    assert(db.idxOptions.drop());
+}
+
+// Tests that the indexOptionDefaults are retrievable from the collection options.
+assert.commandWorked(db.createCollection('idxOptions', {
+    indexOptionDefaults: {storageEngine: validStorageEngineOptions}
+}));
+
+var collectionInfos = db.getCollectionInfos({name: 'idxOptions'});
+assert.eq(1, collectionInfos.length, "'idxOptions' collection not created");
+assert.docEq({storageEngine: validStorageEngineOptions},
+             collectionInfos[0].options.indexOptionDefaults,
+             'indexOptionDefaults were not applied: ' + tojson(collectionInfos));
+
 dd( "e" );
 
 /*

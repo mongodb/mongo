@@ -54,14 +54,16 @@ public:
      * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
      * Configuration string is constructed from:
      *     built-in defaults
-     *     'extraConfig'
+     *     'sysIndexConfig'
+     *     'collIndexConfig'
      *     storageEngine.wiredTiger.configString in index descriptor's info object.
      * Performs simple validation on the supplied parameters.
      * Returns error status if validation fails.
      * Note that even if this function returns an OK status, WT_SESSION:create() may still
      * fail with the constructed configuration string.
      */
-    static StatusWith<std::string> generateCreateString(const std::string& extraConfig,
+    static StatusWith<std::string> generateCreateString(const std::string& sysIndexConfig,
+                                                        const std::string& collIndexConfig,
                                                         const IndexDescriptor& desc);
 
     /**

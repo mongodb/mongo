@@ -74,7 +74,7 @@ public:
 
         IndexDescriptor desc(NULL, "", spec);
 
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", desc);
+        StatusWith<std::string> result = WiredTigerIndex::generateCreateString("", "", desc);
         ASSERT_OK(result.getStatus());
 
         string uri = "table:" + ns;

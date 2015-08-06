@@ -98,6 +98,9 @@ struct CollectionOptions {
     // Storage engine collection options. Always owned or empty.
     BSONObj storageEngine;
 
+    // Default options for indexes created on the collection. Always owned or empty.
+    BSONObj indexOptionDefaults;
+
     // Always owned or empty.
     BSONObj validator;
     std::string validationAction;
