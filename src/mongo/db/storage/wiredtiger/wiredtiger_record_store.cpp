@@ -599,8 +599,8 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
         if (!lock.try_lock()) {
             Date_t before = Date_t::now();
             (void)lock.try_lock_for(boost::chrono::milliseconds(200));  // NOLINT
-            auto delay = boost::chrono::milliseconds(
-                durationCount<Milliseconds>(Date_t::now() - before));  // NOLINT
+            auto delay = boost::chrono::milliseconds(                   // NOLINT
+                durationCount<Milliseconds>(Date_t::now() - before));
             _cappedSleep.fetchAndAdd(1);
             _cappedSleepMS.fetchAndAdd(delay.count());
         }
@@ -615,8 +615,8 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn,
             // Don't wait forever: we're in a transaction, we could block eviction.
             Date_t before = Date_t::now();
             bool gotLock = lock.try_lock_for(boost::chrono::milliseconds(200));  // NOLINT
-            auto delay = boost::chrono::milliseconds(
-                durationCount<Milliseconds>(Date_t::now() - before));  // NOLINT
+            auto delay = boost::chrono::milliseconds(                            // NOLINT
+                durationCount<Milliseconds>(Date_t::now() - before));
             _cappedSleep.fetchAndAdd(1);
             _cappedSleepMS.fetchAndAdd(delay.count());
             if (!gotLock)
