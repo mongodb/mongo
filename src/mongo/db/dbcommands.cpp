@@ -85,6 +85,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/request_interface.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -106,6 +107,17 @@ using std::ostringstream;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
+
+// This is a special flag that allows for testing of snapshot behavior by skipping the replication
+// related checks and isolating the storage/query side of snapshotting.
+bool testingSnapshotBehaviorInIsolation = false;
+ExportedServerParameter<bool> TestingSnapshotBehaviorInIsolation(
+    ServerParameterSet::getGlobal(),
+    "testingSnapshotBehaviorInIsolation",
+    &testingSnapshotBehaviorInIsolation,
+    true,
+    false);
+
 
 class CmdShutdownMongoD : public CmdShutdown {
 public:
@@ -1291,13 +1303,16 @@ bool Command::run(OperationContext* txn,
                 return false;
             }
         } else {
-            // wait for readConcern to be satisfied
-            auto readConcernResult = replCoord->waitUntilOpTime(txn, readConcern);
-            readConcernResult.appendInfo(&replyBuilderBob);
-            if (!readConcernResult.getStatus().isOK()) {
-                replyBuilder->setMetadata(rpc::makeEmptyMetadata())
-                    .setCommandReply(readConcernResult.getStatus(), replyBuilderBob.done());
-                return false;
+            // Skip waiting for the OpTime when testing snapshot behavior.
+            if (!testingSnapshotBehaviorInIsolation) {
+                // Wait for readConcern to be satisfied.
+                auto readConcernResult = replCoord->waitUntilOpTime(txn, readConcern);
+                readConcernResult.appendInfo(&replyBuilderBob);
+                if (!readConcernResult.getStatus().isOK()) {
+                    replyBuilder->setMetadata(rpc::makeEmptyMetadata())
+                        .setCommandReply(readConcernResult.getStatus(), replyBuilderBob.done());
+                    return false;
+                }
             }
             if (readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
                 Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
