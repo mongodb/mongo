@@ -468,8 +468,8 @@ void syncFixUp(OperationContext* txn,
                 removeSaver.reset(new Helpers::RemoveSaver("rollback", "", *it));
 
             // perform a collection scan and write all documents in the collection to disk
-            std::unique_ptr<PlanExecutor> exec(
-                InternalPlanner::collectionScan(txn, *it, db->getCollection(*it)));
+            std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
+                txn, *it, db->getCollection(*it), PlanExecutor::YIELD_MANUAL));
             BSONObj curObj;
             PlanExecutor::ExecState execState;
             while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, NULL))) {

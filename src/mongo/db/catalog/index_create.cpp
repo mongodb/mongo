@@ -230,8 +230,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
 
     unsigned long long n = 0;
 
-    unique_ptr<PlanExecutor> exec(
-        InternalPlanner::collectionScan(_txn, _collection->ns().ns(), _collection));
+    unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
+        _txn, _collection->ns().ns(), _collection, PlanExecutor::YIELD_MANUAL));
     if (_buildInBackground) {
         invariant(_allowInterruption);
         exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);

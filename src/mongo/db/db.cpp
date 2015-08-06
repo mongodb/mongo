@@ -343,7 +343,8 @@ static void repairDatabasesAndCheckVersion() {
         const string systemIndexes = db->name() + ".system.indexes";
 
         Collection* coll = db->getCollection(systemIndexes);
-        unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(&txn, systemIndexes, coll));
+        unique_ptr<PlanExecutor> exec(
+            InternalPlanner::collectionScan(&txn, systemIndexes, coll, PlanExecutor::YIELD_MANUAL));
 
         BSONObj index;
         PlanExecutor::ExecState state;

@@ -269,7 +269,7 @@ void ReplSource::loadAll(OperationContext* txn, SourceVector& v) {
         // add if missing
         int n = 0;
         unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-            txn, localSources, ctx.db()->getCollection(localSources)));
+            txn, localSources, ctx.db()->getCollection(localSources), PlanExecutor::YIELD_MANUAL));
         BSONObj obj;
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
@@ -309,8 +309,8 @@ void ReplSource::loadAll(OperationContext* txn, SourceVector& v) {
         }
     }
 
-    unique_ptr<PlanExecutor> exec(
-        InternalPlanner::collectionScan(txn, localSources, ctx.db()->getCollection(localSources)));
+    unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
+        txn, localSources, ctx.db()->getCollection(localSources), PlanExecutor::YIELD_MANUAL));
     BSONObj obj;
     PlanExecutor::ExecState state;
     while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {

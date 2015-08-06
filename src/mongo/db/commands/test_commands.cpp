@@ -197,7 +197,7 @@ public:
         RecordId end;
         {
             std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-                txn, nss.ns(), collection, InternalPlanner::BACKWARD));
+                txn, nss.ns(), collection, PlanExecutor::YIELD_MANUAL, InternalPlanner::BACKWARD));
             // We remove 'n' elements so the start is one past that
             for (int i = 0; i < n + 1; ++i) {
                 PlanExecutor::ExecState state = exec->getNext(NULL, &end);

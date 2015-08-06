@@ -150,8 +150,14 @@ public:
             max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
         }
 
-        unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(
-            txn, collection, idx, min, max, false, InternalPlanner::FORWARD));
+        unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
+                                                                 collection,
+                                                                 idx,
+                                                                 min,
+                                                                 max,
+                                                                 false,  // endKeyInclusive
+                                                                 PlanExecutor::YIELD_MANUAL,
+                                                                 InternalPlanner::FORWARD));
         exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
         // Find the 'missingField' value used to represent a missing document field in a key of
@@ -395,8 +401,14 @@ public:
             long long currCount = 0;
             long long numChunks = 0;
 
-            unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(
-                txn, collection, idx, min, max, false, InternalPlanner::FORWARD));
+            unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
+                                                                     collection,
+                                                                     idx,
+                                                                     min,
+                                                                     max,
+                                                                     false,  // endKeyInclusive
+                                                                     PlanExecutor::YIELD_MANUAL,
+                                                                     InternalPlanner::FORWARD));
 
             BSONObj currKey;
             PlanExecutor::ExecState state = exec->getNext(&currKey, NULL);
@@ -457,8 +469,14 @@ public:
                 log() << "splitVector doing another cycle because of force, keyCount now: "
                       << keyCount << endl;
 
-                exec = InternalPlanner::indexScan(
-                    txn, collection, idx, min, max, false, InternalPlanner::FORWARD);
+                exec = InternalPlanner::indexScan(txn,
+                                                  collection,
+                                                  idx,
+                                                  min,
+                                                  max,
+                                                  false,  // endKeyInclusive
+                                                  PlanExecutor::YIELD_MANUAL,
+                                                  InternalPlanner::FORWARD);
 
                 exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
                 state = exec->getNext(&currKey, NULL);
@@ -905,8 +923,13 @@ private:
         BSONObj newmin = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMin(), false));
         BSONObj newmax = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMax(), true));
 
-        unique_ptr<PlanExecutor> exec(
-            InternalPlanner::indexScan(txn, collection, idx, newmin, newmax, false));
+        unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
+                                                                 collection,
+                                                                 idx,
+                                                                 newmin,
+                                                                 newmax,
+                                                                 false,  // endKeyInclusive
+                                                                 PlanExecutor::YIELD_MANUAL));
 
         // check if exactly one document found
         if (PlanExecutor::ADVANCED == exec->getNext(NULL, NULL)) {

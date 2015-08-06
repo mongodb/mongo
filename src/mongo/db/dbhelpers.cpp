@@ -193,7 +193,8 @@ RecordId Helpers::findById(OperationContext* txn, Collection* collection, const 
 
 bool Helpers::getSingleton(OperationContext* txn, const char* ns, BSONObj& result) {
     AutoGetCollectionForRead ctx(txn, ns);
-    unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn, ns, ctx.getCollection()));
+    unique_ptr<PlanExecutor> exec(
+        InternalPlanner::collectionScan(txn, ns, ctx.getCollection(), PlanExecutor::YIELD_MANUAL));
     PlanExecutor::ExecState state = exec->getNext(&result, NULL);
 
     CurOp::get(txn)->done();
@@ -208,7 +209,7 @@ bool Helpers::getSingleton(OperationContext* txn, const char* ns, BSONObj& resul
 bool Helpers::getLast(OperationContext* txn, const char* ns, BSONObj& result) {
     AutoGetCollectionForRead autoColl(txn, ns);
     unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-        txn, ns, autoColl.getCollection(), InternalPlanner::BACKWARD));
+        txn, ns, autoColl.getCollection(), PlanExecutor::YIELD_MANUAL, InternalPlanner::BACKWARD));
     PlanExecutor::ExecState state = exec->getNext(&result, NULL);
 
     if (PlanExecutor::ADVANCED == state) {
@@ -353,6 +354,7 @@ long long Helpers::removeRange(OperationContext* txn,
                                            min,
                                            max,
                                            maxInclusive,
+                                           PlanExecutor::YIELD_MANUAL,
                                            InternalPlanner::FORWARD,
                                            InternalPlanner::IXSCAN_FETCH));
             exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
@@ -519,8 +521,13 @@ Status Helpers::getLocsInRange(OperationContext* txn,
     bool isLargeChunk = false;
     long long docCount = 0;
 
-    unique_ptr<PlanExecutor> exec(
-        InternalPlanner::indexScan(txn, collection, idx, min, max, false));
+    unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
+                                                             collection,
+                                                             idx,
+                                                             min,
+                                                             max,
+                                                             false,  // endKeyInclusive
+                                                             PlanExecutor::YIELD_MANUAL));
     // we can afford to yield here because any change to the base data that we might miss  is
     // already being queued and will be migrated in the 'transferMods' stage
     exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);

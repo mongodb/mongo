@@ -101,11 +101,13 @@ std::string DBHashCmd::hashCollection(OperationContext* opCtx,
                                           desc,
                                           BSONObj(),
                                           BSONObj(),
-                                          false,
+                                          false,  // endKeyInclusive
+                                          PlanExecutor::YIELD_MANUAL,
                                           InternalPlanner::FORWARD,
                                           InternalPlanner::IXSCAN_FETCH);
     } else if (collection->isCapped()) {
-        exec = InternalPlanner::collectionScan(opCtx, fullCollectionName, collection);
+        exec = InternalPlanner::collectionScan(
+            opCtx, fullCollectionName, collection, PlanExecutor::YIELD_MANUAL);
     } else {
         log() << "can't find _id index for: " << fullCollectionName << endl;
         return "no _id _index";

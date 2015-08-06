@@ -364,8 +364,13 @@ bool MigrationSourceManager::storeCurrentLocs(OperationContext* txn,
         max = Helpers::toKeyFormat(kp.extendRangeBound(_max, false));
     }
 
-    unique_ptr<PlanExecutor> exec(
-        InternalPlanner::indexScan(txn, collection, idx, min, max, false));
+    unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
+                                                             collection,
+                                                             idx,
+                                                             min,
+                                                             max,
+                                                             false,  // endKeyInclusive
+                                                             PlanExecutor::YIELD_MANUAL));
 
     // We can afford to yield here because any change to the base data that we might miss is already
     // being queued and will migrate in the 'transferMods' stage.

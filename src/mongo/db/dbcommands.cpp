@@ -766,7 +766,7 @@ public:
                 result.append("millis", timer.millis());
                 return 1;
             }
-            exec = InternalPlanner::collectionScan(txn, ns, collection);
+            exec = InternalPlanner::collectionScan(txn, ns, collection, PlanExecutor::YIELD_MANUAL);
         } else if (min.isEmpty() || max.isEmpty()) {
             errmsg = "only one of min or max specified";
             return false;
@@ -790,7 +790,13 @@ public:
             min = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
             max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
 
-            exec = InternalPlanner::indexScan(txn, collection, idx, min, max, false);
+            exec = InternalPlanner::indexScan(txn,
+                                              collection,
+                                              idx,
+                                              min,
+                                              max,
+                                              false,  // endKeyInclusive
+                                              PlanExecutor::YIELD_MANUAL);
         }
 
         long long avgObjSize = collection->dataSize(txn) / collection->numRecords(txn);

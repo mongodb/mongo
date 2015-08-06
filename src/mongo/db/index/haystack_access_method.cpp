@@ -104,8 +104,13 @@ void HaystackAccessMethod::searchCommand(OperationContext* txn,
             unordered_set<RecordId, RecordId::Hasher> thisPass;
 
 
-            unique_ptr<PlanExecutor> exec(
-                InternalPlanner::indexScan(txn, collection, _descriptor, key, key, true));
+            unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
+                                                                     collection,
+                                                                     _descriptor,
+                                                                     key,
+                                                                     key,
+                                                                     true,  // endKeyInclusive
+                                                                     PlanExecutor::YIELD_MANUAL));
             PlanExecutor::ExecState state;
             RecordId loc;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(NULL, &loc))) {

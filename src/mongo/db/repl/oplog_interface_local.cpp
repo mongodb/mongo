@@ -63,6 +63,7 @@ OplogIteratorLocal::OplogIteratorLocal(OperationContext* txn, const std::string&
       _exec(InternalPlanner::collectionScan(txn,
                                             collectionName,
                                             _ctx.db()->getCollection(collectionName),
+                                            PlanExecutor::YIELD_MANUAL,
                                             InternalPlanner::BACKWARD)) {}
 
 StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {
