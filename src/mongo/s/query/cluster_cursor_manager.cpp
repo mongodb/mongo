@@ -297,6 +297,32 @@ void ClusterCursorManager::reapZombieCursors() {
     }
 }
 
+ClusterCursorManager::Stats ClusterCursorManager::stats() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    Stats stats;
+
+    for (auto& nsContainerPair : _namespaceToContainerMap) {
+        for (auto& cursorIdEntryPair : nsContainerPair.second.entryMap) {
+            const CursorEntry& entry = cursorIdEntryPair.second;
+
+            if (entry.getKillPending()) {
+                continue;
+            }
+            switch (entry.getCursorType()) {
+                case CursorType::NamespaceNotSharded:
+                    ++stats.cursorsNotSharded;
+                    break;
+                case CursorType::NamespaceSharded:
+                    ++stats.cursorsSharded;
+                    break;
+            }
+        }
+    }
+
+    return stats;
+}
+
 boost::optional<NamespaceString> ClusterCursorManager::getNamespaceForCursorId(
     CursorId cursorId) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);

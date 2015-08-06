@@ -62,7 +62,6 @@ class StatusWith;
  *
  * TODO: Add maxTimeMS support.  SERVER-19410.
  * TODO: Add method "size_t killCursorsIdleSince(Date_t)".  SERVER-18774.
- * TODO: Add method "ClusterCursorManagerStats stats() const".  SERVER-19405.
  * TODO: Add method "size_t killCursorsOnNamespace(const NamespaceString& nss)" for
  *       dropCollection()?
  */
@@ -71,7 +70,7 @@ class ClusterCursorManager {
 
 public:
     //
-    // Enum declarations, for use with public methods below.
+    // Enum/struct declarations, for use with public methods below.
     //
 
     enum class CursorType {
@@ -96,6 +95,14 @@ public:
 
         // Represents an exhausted cursor.
         Exhausted,
+    };
+
+    struct Stats {
+        // Count of open cursors registered with CursorType::NamespaceSharded.
+        size_t cursorsSharded = 0;
+
+        // Count of open cursors registered with CursorType::NamespaceNotSharded.
+        size_t cursorsNotSharded = 0;
     };
 
     /**
@@ -255,6 +262,13 @@ public:
      * Can block.
      */
     void reapZombieCursors();
+
+    /**
+     * Returns the number of open cursors on a ClusterCursorManager, broken down by type.
+     *
+     * Does not block.
+     */
+    Stats stats() const;
 
     /**
      * Returns the namespace associated with the given cursor id, by examining the 'namespace
