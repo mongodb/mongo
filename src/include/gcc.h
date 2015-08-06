@@ -120,7 +120,7 @@ static inline int
 	 */
 	return (__sync_val_compare_and_swap(vp, old, new) == old);
 #else
-	return (__sync_bool_compare_and_swap(vp, old, new);
+	return (__sync_bool_compare_and_swap(vp, old, new));
 #endif
 }
 
@@ -155,7 +155,7 @@ static inline int
 	 */
 	return (__sync_val_compare_and_swap(vp, old, new) == old);
 #else
-	return (__sync_bool_compare_and_swap(vp, old, new);
+	return (__sync_bool_compare_and_swap(vp, old, new));
 #endif
 }
 
@@ -190,7 +190,7 @@ static inline int
 	 */
 	return (__sync_val_compare_and_swap(vp, old, new) == old);
 #else
-	return (__sync_bool_compare_and_swap(vp, old, new);
+	return (__sync_bool_compare_and_swap(vp, old, new));
 #endif
 }
 
@@ -225,7 +225,7 @@ static inline int
 	 */
 	return (__sync_val_compare_and_swap(vp, old, new) == old);
 #else
-	return (__sync_bool_compare_and_swap(vp, old, new);
+	return (__sync_bool_compare_and_swap(vp, old, new));
 #endif
 }
 
@@ -260,7 +260,7 @@ static inline int
 	 */
 	return (__sync_val_compare_and_swap(vp, old, new) == old);
 #else
-	return (__sync_bool_compare_and_swap(vp, old, new);
+	return (__sync_bool_compare_and_swap(vp, old, new));
 #endif
 }
 
@@ -295,7 +295,7 @@ static inline int
 	 */
 	return (__sync_val_compare_and_swap(vp, old, new) == old);
 #else
-	return (__sync_bool_compare_and_swap(vp, old, new);
+	return (__sync_bool_compare_and_swap(vp, old, new));
 #endif
 }
 static inline int
@@ -309,7 +309,7 @@ static inline int
 	 */
 	return (__sync_val_compare_and_swap((void **)vp, old, new) == old);
 #else
-	return (__sync_bool_compare_and_swap((void **)vp, old, new);
+	return (__sync_bool_compare_and_swap((void **)vp, old, new));
 #endif
 }
 
