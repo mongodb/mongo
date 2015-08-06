@@ -364,8 +364,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/*
-	 * Make sure we have a local copy of the sweep key, and don't leave the
-	 * cursor positioned.
+	 * Make sure we have a local copy of the sweep key, we're not going to
+	 * keep the cursor positioned.
 	 */
 	if (!WT_DATA_IN_ITEM(key))
 		WT_ERR(__wt_buf_set(session, key, key->data, key->size));
