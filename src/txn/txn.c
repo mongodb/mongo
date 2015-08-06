@@ -208,7 +208,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	WT_SESSION_IMPL *oldest_session;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
-	uint64_t current_id, id, oldest_id, prev_oldest_id, snap_min;
+	uint64_t current_id, id, last_running, oldest_id, prev_oldest_id;
 	uint32_t i, session_cnt;
 	int32_t count;
 	int last_running_moved;
@@ -216,7 +216,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 
-	current_id = snap_min = txn_global->current;
+	current_id = last_running = txn_global->current;
 	oldest_session = NULL;
 	prev_oldest_id = txn_global->oldest_id;
 
@@ -241,7 +241,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 
 	/* The oldest ID cannot change until the scan count goes to zero. */
 	prev_oldest_id = txn_global->oldest_id;
-	current_id = oldest_id = snap_min = txn_global->current;
+	current_id = oldest_id = last_running = txn_global->current;
 
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -256,8 +256,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		 */
 		if ((id = s->id) != WT_TXN_NONE &&
 		    WT_TXNID_LE(prev_oldest_id, id) &&
-		    WT_TXNID_LT(id, snap_min))
-			snap_min = id;
+		    WT_TXNID_LT(id, last_running))
+			last_running = id;
 
 		/*
 		 * !!!
@@ -274,8 +274,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		}
 	}
 
-	if (WT_TXNID_LT(snap_min, oldest_id))
-		oldest_id = snap_min;
+	if (WT_TXNID_LT(last_running, oldest_id))
+		oldest_id = last_running;
 
 	/* The oldest ID can't move past any named snapshots. */
 	if ((id = txn_global->nsnap_oldest_id) != WT_TXN_NONE &&
@@ -283,7 +283,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		oldest_id = id;
 
 	/* Update the last running ID. */
-	last_running_moved = WT_TXNID_LT(txn_global->last_running, snap_min);
+	last_running_moved =
+	    WT_TXNID_LT(txn_global->last_running, last_running);
 
 	/* Update the oldest ID. */
 	if ((WT_TXNID_LT(prev_oldest_id, oldest_id) || last_running_moved) &&
@@ -291,15 +292,15 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 			if ((id = s->id) != WT_TXN_NONE &&
-			    WT_TXNID_LT(id, snap_min))
-				oldest_id = id;
+			    WT_TXNID_LT(id, last_running))
+				last_running = id;
 			if ((id = s->snap_min) != WT_TXN_NONE &&
 			    WT_TXNID_LT(id, oldest_id))
 				oldest_id = id;
 		}
 
-		if (WT_TXNID_LT(snap_min, oldest_id))
-			oldest_id = snap_min;
+		if (WT_TXNID_LT(last_running, oldest_id))
+			oldest_id = last_running;
 
 #ifdef HAVE_DIAGNOSTIC
 		/*
@@ -313,10 +314,11 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		WT_ASSERT(session,
 		    id == WT_TXN_NONE || !WT_TXNID_LT(id, oldest_id));
 #endif
-		if (WT_TXNID_LT(txn_global->last_running, snap_min))
-			txn_global->last_running = snap_min;
+		if (WT_TXNID_LT(txn_global->last_running, last_running))
+			txn_global->last_running = last_running;
 		if (WT_TXNID_LT(txn_global->oldest_id, oldest_id))
 			txn_global->oldest_id = oldest_id;
+		WT_ASSERT(session, txn_global->scan_count == -1);
 		txn_global->scan_count = 0;
 	} else {
 		if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
