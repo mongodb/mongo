@@ -52,7 +52,7 @@ public:
     void startThreads(executor::TaskExecutor* taskExecutor) override;
     virtual void startMasterSlave(OperationContext* txn);
     virtual void shutdown();
-    virtual void initiateOplog(OperationContext* txn);
+    virtual void initiateOplog(OperationContext* txn, bool updateReplOpTime);
     virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext* txn);

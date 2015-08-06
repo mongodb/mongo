@@ -89,8 +89,9 @@ public:
 
     /**
      * Creates the oplog and writes the first entry.
+     * Sets replCoord last optime if 'updateReplOpTime' is true.
      */
-    virtual void initiateOplog(OperationContext* txn) = 0;
+    virtual void initiateOplog(OperationContext* txn, bool updateReplOpTime) = 0;
 
     /**
      * Writes a message about our transition to primary to the oplog.

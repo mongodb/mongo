@@ -1967,8 +1967,9 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
                                                           BSONObjBuilder* resultObj) {
     log() << "replSetInitiate admin command received from client";
 
+    const auto replEnabled = _settings.usingReplSets();
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    if (!_settings.usingReplSets()) {
+    if (!replEnabled) {
         return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
     }
 
@@ -2040,12 +2041,12 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
     fassert(18654, cbh.getStatus());
     _replExecutor.wait(cbh.getValue());
 
-    if (status.isOK()) {
-        // Create the oplog with the first entry, and start repl threads.
-        _externalState->initiateOplog(txn);
-        _externalState->startThreads(&_replExecutor);
-    }
-    return status;
+    // Create the oplog with the first entry, and start repl threads.
+    const auto updateReplOpTime = replEnabled;
+    _externalState->initiateOplog(txn, updateReplOpTime);
+    _externalState->startThreads(&_replExecutor);
+
+    return Status::OK();
 }
 
 void ReplicationCoordinatorImpl::_finishReplSetInitiate(

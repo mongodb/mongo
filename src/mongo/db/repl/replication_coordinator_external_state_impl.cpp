@@ -128,7 +128,8 @@ void ReplicationCoordinatorExternalStateImpl::shutdown() {
     }
 }
 
-void ReplicationCoordinatorExternalStateImpl::initiateOplog(OperationContext* txn) {
+void ReplicationCoordinatorExternalStateImpl::initiateOplog(OperationContext* txn,
+                                                            bool updateReplOpTime) {
     createOplog(txn);
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
