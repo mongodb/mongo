@@ -283,7 +283,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		oldest_id = id;
 
 	/* Update the last running ID. */
-	last_running_moved = WT_TXNID_LT(txn_global->last_running, last_running);
+	last_running_moved =
+	    WT_TXNID_LT(txn_global->last_running, last_running);
 
 	/* Update the oldest ID. */
 	if ((WT_TXNID_LT(prev_oldest_id, oldest_id) || last_running_moved) &&
