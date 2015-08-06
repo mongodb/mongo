@@ -158,9 +158,9 @@ __wt_block_configure_first_fit(WT_BLOCK *block, int on)
 	 * as long as any operation wants it.
 	 */
 	if (on)
-		(void)WT_ATOMIC_ADD4(block->allocfirst, 1);
+		(void)__wt_atomic_add4(&block->allocfirst, 1);
 	else
-		(void)WT_ATOMIC_SUB4(block->allocfirst, 1);
+		(void)__wt_atomic_sub4(&block->allocfirst, 1);
 }
 
 /*

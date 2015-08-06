@@ -69,16 +69,18 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	*skipp = 0;
 
 	/* If we have a clean page in memory, attempt to evict it. */
-	if (ref->state == WT_REF_MEM &&
-	    WT_ATOMIC_CAS4(ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
+	if (ref->state == WT_REF_MEM && __wt_atomic_cas4(
+	    (uint32_t *)&ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 		if (__wt_page_is_modified(ref->page)) {
 			WT_PUBLISH(ref->state, WT_REF_MEM);
 			return (0);
 		}
 
-		(void)WT_ATOMIC_ADD4(S2BT(session)->evict_busy, 1);
+		(void)__wt_atomic_add4(
+		    (uint32_t *)&S2BT(session)->evict_busy, 1);
 		ret = __wt_evict_page(session, ref);
-		(void)WT_ATOMIC_SUB4(S2BT(session)->evict_busy, 1);
+		(void)__wt_atomic_sub4(
+		    (uint32_t *)&S2BT(session)->evict_busy, 1);
 		WT_RET_BUSY_OK(ret);
 	}
 
@@ -92,8 +94,8 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	 * in the page.  While that's a huge amount of work to no purpose, it's
 	 * unclear optimizing for overlapping range deletes is worth the effort.
 	 */
-	if (ref->state != WT_REF_DISK ||
-	    !WT_ATOMIC_CAS4(ref->state, WT_REF_DISK, WT_REF_LOCKED))
+	if (ref->state != WT_REF_DISK || !__wt_atomic_cas4(
+	    (uint32_t *)&ref->state, WT_REF_DISK, WT_REF_LOCKED))
 		return (0);
 
 	/*
@@ -176,8 +178,8 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 			 * If the page is still "deleted", it's as we left it,
 			 * reset the state.
 			 */
-			if (WT_ATOMIC_CAS4(
-			    ref->state, WT_REF_DELETED, WT_REF_DISK))
+			if (__wt_atomic_cas4((uint32_t *)&ref->state,
+			    WT_REF_DELETED, WT_REF_DISK))
 				return;
 			break;
 		case WT_REF_LOCKED:
@@ -242,7 +244,8 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (ref->page_del == NULL)
 		return (1);
 
-	if (!WT_ATOMIC_CAS4(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+	if (!__wt_atomic_cas4(
+	    (uint32_t *)&ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		return (0);
 
 	skip = (ref->page_del == NULL ||
