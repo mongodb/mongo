@@ -47,6 +47,7 @@ const char* gitVersion();
 const char* distName();
 void printGitVersion();
 std::vector<std::string> compiledModules();
+void printCompiledModules();
 
 // Checks whether another version is the same major version as us
 bool isSameMajorVersion(const char* version);

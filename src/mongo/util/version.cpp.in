@@ -73,6 +73,20 @@ namespace mongo {
         return modules_list;
     }
 
+    void printCompiledModules() {
+        stringstream ss;
+        ss << "modules: ";
+        auto modules_list = compiledModules();
+        if (modules_list.size() == 0) {
+            ss << "none";
+        } else {
+            for (const auto& m: modules_list) {
+                ss << m << " ";
+            }
+        }
+        log() << ss.str();
+    }
+
     bool isSameMajorVersion(const char* version) {
         int major = -1, minor = -1;
         pcrecpp::RE ver_regex("^(\\d+)\\.(\\d+)\\.");

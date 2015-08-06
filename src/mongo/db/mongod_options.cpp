@@ -583,6 +583,7 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
         log() << mongodVersion() << endl;
         printGitVersion();
         printOpenSSLVersion();
+        printCompiledModules();
         return false;
     }
     if (params.count("sysinfo") && params["sysinfo"].as<bool>() == true) {
