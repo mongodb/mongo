@@ -46,6 +46,9 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         '(method=none,enabled)',
         '(enabled=false)'
     ]
+    sync_list = [
+        '(method=dsync,enabled)',
+    ]
 
     types = [
         ('row', dict(tabletype='row',
@@ -55,11 +58,18 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         ('fix', dict(tabletype='fix',
                     create_params = 'key_format=r,value_format=8t')),
     ]
+    types = [
+        ('row', dict(tabletype='row',
+                    create_params = 'key_format=i,value_format=i')),
+    ]
     op1s = [
         ('insert', dict(op1=('insert', 6))),
         ('update', dict(op1=('update', 2))),
         ('remove', dict(op1=('remove', 2))),
         ('trunc-stop', dict(op1=('stop', 2))),
+    ]
+    op1s = [
+        ('insert', dict(op1=('insert', 6))),
     ]
     txn1s = [('t1c', dict(txn1='commit')), ('t1r', dict(txn1='rollback'))]
 
@@ -113,6 +123,7 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         # If we are backing up a target, assume the directory exists.
         # We just use the wt backup command.
         # A future test extension could also use a cursor.
+        self.runWt(['-h', self.home, 'printlog'], outfilename='printlog.out')
         cmd = '-h ' + self.home + ' backup '
         if backup_uri != None:
             cmd += '-t ' + backup_uri + ' '
@@ -121,8 +132,10 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
             os.mkdir(self.backup_dir)
 
         cmd += self.backup_dir
+        print "WT command" + cmd
         self.runWt(cmd.split())
         self.exception='false'
+        print "Open backup dir"
         backup_conn_params = 'log=(enabled,file_max=%s)' % self.logmax
         backup_conn = wiredtiger_open(self.backup_dir, backup_conn_params)
         try:

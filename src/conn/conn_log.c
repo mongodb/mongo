@@ -434,7 +434,7 @@ restart:
 	while (i < WT_SLOT_POOL) {
 		save_i = i;
 		slot = &log->slot_pool[i++];
-		if (!FLD64_ISSET(slot->slot_state, WT_LOG_SLOT_RESERVED))
+		if (slot->slot_state == 0)
 			WT_ASSERT(session,
 			    slot->slot_release_lsn.file >= log->write_lsn.file);
 		if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
