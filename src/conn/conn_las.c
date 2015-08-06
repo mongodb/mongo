@@ -294,9 +294,9 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	key = &conn->las_sweep_key;
 
 	/*
-	 * Position the cursor using the key from the last call unless starting
-	 * a new sweep; we don't care if we're before or after the key, roughly
-	 * in the same spot is fine.
+	 * If we're not starting a new sweep, position the cursor using the key
+	 * from the last call (we don't care if we're before or after the key,
+	 * just roughly in the same spot is fine).
 	 */
 	if (conn->las_sweep_call != 0 && key->data != NULL) {
 		cursor->set_key(cursor, key);
@@ -306,15 +306,15 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	/*
 	 * The sweep server wakes up every 10 seconds (by default), it's a slow
 	 * moving thread. Try to review the entire lookaside file once every 5
-	 * minutes, or once every 30 calls.
+	 * minutes, or every 30 calls.
 	 *
 	 * The reason is because the lookaside file exists because we're seeing
 	 * cache/eviction pressure (it allows us to trade performance and disk
-	 * space for cache space), so it's likely lookaside blocks are being
+	 * space for cache space), and it's likely lookaside blocks are being
 	 * evicted, and reading them back in doesn't help things. A trickier,
-	 * but possibly better alternative, might be to review all lookaside
-	 * blocks in the cache in order to  get rid of them, and slowly review
-	 * lookaside blocks that have been evicted.
+	 * but possibly better, alternative might be to review all lookaside
+	 * blocks in the cache in order to get rid of them, and slowly review
+	 * lookaside blocks that have already been evicted.
 	 *
 	 * We can't know for sure how many records are in the lookaside file,
 	 * the cursor insert and remove statistics aren't updated atomically.
@@ -336,19 +336,17 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 
 		switch (((uint8_t *)key->data)[0]) {
 		case WT_LAS_RECONCILE_UPDATE:
-			if (!__las_sweep_reconcile(session, key))
-				continue;
+			if (__las_sweep_reconcile(session, key))
+				WT_ERR_NOTFOUND_OK(cursor->remove(cursor));
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
-
-		WT_ERR_NOTFOUND_OK(cursor->remove(cursor));
 	}
 
 	/*
 	 * When reaching the lookaside file end or the target number of calls,
 	 * adjust the row count. Decrease/increase the row count depending on
-	 * if the number of calls is less/more than the target,
+	 * if the number of calls is less/more than the target.
 	 */
 	if (ret == WT_NOTFOUND ||
 	    conn->las_sweep_call > WT_SWEEP_LOOKASIDE_PASS_TARGET) {
@@ -357,9 +355,9 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 			conn->las_sweep_cnt -= WT_SWEEP_LOOKASIDE_MIN_CNT;
 		if (conn->las_sweep_call > WT_SWEEP_LOOKASIDE_PASS_TARGET)
 			conn->las_sweep_cnt += WT_SWEEP_LOOKASIDE_MIN_CNT;
-		if (ret == WT_NOTFOUND)
-			conn->las_sweep_call = 0;
 	}
+	if (ret == WT_NOTFOUND)
+		conn->las_sweep_call = 0;
 
 	WT_ERR_NOTFOUND_OK(ret);
 
