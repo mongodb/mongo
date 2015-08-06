@@ -110,6 +110,7 @@ void ReplCoordElectV1Test::simulateSuccessfulDryRun() {
         net->runReadyNetworkOperations();
     }
     net->exitNetwork();
+    getReplCoord()->waitForElectionDryRunFinish_forTest();
 }
 
 TEST_F(ReplCoordElectV1Test, ElectTooSoon) {
@@ -159,6 +160,10 @@ TEST_F(ReplCoordElectV1Test, ElectTwoNodesWithOneZeroVoter) {
     net->scheduleResponse(noi, net->now(), ResponseStatus(ErrorCodes::OperationFailed, "timeout"));
     net->runReadyNetworkOperations();
     net->exitNetwork();
+
+    // _startElectSelfV1 is called synchronously in the processing of HB response, so election
+    // finished event has been set.
+    getReplCoord()->waitForElectionFinish_forTest();
 
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
@@ -220,6 +225,14 @@ TEST_F(ReplCoordElectV1Test, ElectManyNodesSuccess) {
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     startCapturingLogMessages();
     simulateSuccessfulV1Election();
+    getReplCoord()->waitForElectionFinish_forTest();
+
+    // Check last vote
+    auto lastVote = getExternalState()->loadLocalLastVoteDocument(nullptr);
+    ASSERT(lastVote.isOK());
+    ASSERT_EQ(1, lastVote.getValue().getCandidateId());
+    ASSERT_EQ(1, lastVote.getValue().getTerm());
+
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("election succeeded"));
 }
@@ -310,6 +323,7 @@ TEST_F(ReplCoordElectV1Test, ElectStaleTermInDryRun) {
         net->runReadyNetworkOperations();
     }
     net->exitNetwork();
+    getReplCoord()->waitForElectionFinish_forTest();
     stopCapturingLogMessages();
     ASSERT_EQUALS(
         1, countLogLinesContaining("not running for primary, we have been superceded already"));
@@ -509,6 +523,8 @@ TEST_F(ReplCoordElectV1Test, ElectNotEnoughVotes) {
         net->runReadyNetworkOperations();
     }
     net->exitNetwork();
+
+    getReplCoord()->waitForElectionFinish_forTest();
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countLogLinesContaining("not becoming primary, we received insufficient votes"));
@@ -556,6 +572,8 @@ TEST_F(ReplCoordElectV1Test, ElectStaleTerm) {
         net->runReadyNetworkOperations();
     }
     net->exitNetwork();
+
+    getReplCoord()->waitForElectionFinish_forTest();
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countLogLinesContaining("not becoming primary, we have been superceded already"));
@@ -585,6 +603,7 @@ TEST_F(ReplCoordElectV1Test, ElectTermChangeDuringDryRun) {
     // update to a future term before dry run completes
     getReplCoord()->updateTerm(1000);
     simulateSuccessfulDryRun();
+    getReplCoord()->waitForElectionFinish_forTest();
     stopCapturingLogMessages();
     ASSERT_EQUALS(
         1, countLogLinesContaining("not running for primary, we have been superceded already"));
@@ -634,6 +653,7 @@ TEST_F(ReplCoordElectV1Test, ElectTermChangeDuringActualElection) {
         net->runReadyNetworkOperations();
     }
     net->exitNetwork();
+    getReplCoord()->waitForElectionFinish_forTest();
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
                   countLogLinesContaining("not becoming primary, we have been superceded already"));

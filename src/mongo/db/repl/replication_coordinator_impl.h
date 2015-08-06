@@ -305,6 +305,19 @@ public:
 
     bool updateTerm_forTest(long long term);
 
+    /**
+     * If called after _startElectSelfV1(), blocks until all asynchronous
+     * activities associated with election complete.
+     */
+    void waitForElectionFinish_forTest();
+
+    /**
+     * If called after _startElectSelfV1(), blocks until all asynchronous
+     * activities associated with election dry run complete, including writing
+     * last vote and scheduling the real election.
+     */
+    void waitForElectionDryRunFinish_forTest();
+
 private:
     struct SnapshotInfo {
         OpTime opTime;
@@ -329,6 +342,9 @@ private:
             return std::tie(opTime, name) >= std::tie(other.opTime, other.name);
         }
     };
+
+    class LoseElectionGuardV1;
+    class LoseElectionDryRunGuardV1;
 
     ReplicationCoordinatorImpl(const ReplSettings& settings,
                                ReplicationCoordinatorExternalState* externalState,
@@ -762,6 +778,8 @@ private:
      * For V1 (raft) style elections the election path is:
      *      _startElectSelfV1()
      *      _onDryRunComplete()
+     *      _writeLastVoteForMyElection()
+     *      _startVoteRequester()
      *      _onVoteRequestComplete()
      *      _onElectionWinnerDeclarerComplete()
      */
@@ -787,6 +805,18 @@ private:
      * changed, do not run for election.
      */
     void _onDryRunComplete(long long originalTerm);
+
+    /**
+     * Writes the last vote in persistent storage after completing dry run successfully.
+     * This job will be scheduled to run in DB worker threads.
+     */
+    void _writeLastVoteForMyElection(LastVote lastVote,
+                                     const ReplicationExecutor::CallbackArgs& cbData);
+
+    /**
+     * Starts VoteRequester to run the real election when last vote write has completed.
+     */
+    void _startVoteRequester(long long newTerm);
 
     /**
      * Callback called when the VoteRequester has completed; checks the results and
@@ -1079,6 +1109,10 @@ private:
     // Event that the election code will signal when the in-progress election completes.
     // Unspecified value when _freshnessChecker is NULL.
     ReplicationExecutor::EventHandle _electionFinishedEvent;  // (X)
+
+    // Event that the election code will signal when the in-progress election dry run completes,
+    // which includes writing the last vote and scheduling the real election.
+    ReplicationExecutor::EventHandle _electionDryRunFinishedEvent;  // (X)
 
     // Whether we slept last time we attempted an election but possibly tied with other nodes.
     bool _sleptLastElection;  // (X)

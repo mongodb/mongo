@@ -3023,5 +3023,17 @@ void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {
     _externalState->dropAllSnapshots();
 }
 
+void ReplicationCoordinatorImpl::waitForElectionFinish_forTest() {
+    if (_electionFinishedEvent.isValid()) {
+        _replExecutor.waitForEvent(_electionFinishedEvent);
+    }
+}
+
+void ReplicationCoordinatorImpl::waitForElectionDryRunFinish_forTest() {
+    if (_electionDryRunFinishedEvent.isValid()) {
+        _replExecutor.waitForEvent(_electionDryRunFinishedEvent);
+    }
+}
+
 }  // namespace repl
 }  // namespace mongo

@@ -43,32 +43,24 @@
 namespace mongo {
 namespace repl {
 
-namespace {
-class LoseElectionGuardV1 {
+class ReplicationCoordinatorImpl::LoseElectionGuardV1 {
     MONGO_DISALLOW_COPYING(LoseElectionGuardV1);
 
 public:
-    LoseElectionGuardV1(TopologyCoordinator* topCoord,
-                        ReplicationExecutor* executor,
-                        std::unique_ptr<VoteRequester>* voteRequester,
-                        std::unique_ptr<ElectionWinnerDeclarer>* electionWinnerDeclarer,
-                        ReplicationExecutor::EventHandle* electionFinishedEvent)
-        : _topCoord(topCoord),
-          _executor(executor),
-          _voteRequester(voteRequester),
-          _electionWinnerDeclarer(electionWinnerDeclarer),
-          _electionFinishedEvent(electionFinishedEvent),
-          _dismissed(false) {}
+    LoseElectionGuardV1(ReplicationCoordinatorImpl* replCoord) : _replCoord(replCoord) {}
 
-    ~LoseElectionGuardV1() {
+    virtual ~LoseElectionGuardV1() {
         if (_dismissed) {
             return;
         }
-        _topCoord->processLoseElection();
-        _electionWinnerDeclarer->reset(nullptr);
-        _voteRequester->reset(nullptr);
-        if (_electionFinishedEvent->isValid()) {
-            _executor->signalEvent(*_electionFinishedEvent);
+        _replCoord->_topCoord->processLoseElection();
+        _replCoord->_electionWinnerDeclarer.reset(nullptr);
+        _replCoord->_voteRequester.reset(nullptr);
+        if (_isDryRun && _replCoord->_electionDryRunFinishedEvent.isValid()) {
+            _replCoord->_replExecutor.signalEvent(_replCoord->_electionDryRunFinishedEvent);
+        }
+        if (_replCoord->_electionFinishedEvent.isValid()) {
+            _replCoord->_replExecutor.signalEvent(_replCoord->_electionFinishedEvent);
         }
     }
 
@@ -76,16 +68,22 @@ public:
         _dismissed = true;
     }
 
-private:
-    TopologyCoordinator* const _topCoord;
-    ReplicationExecutor* const _executor;
-    std::unique_ptr<VoteRequester>* const _voteRequester;
-    std::unique_ptr<ElectionWinnerDeclarer>* const _electionWinnerDeclarer;
-    const ReplicationExecutor::EventHandle* _electionFinishedEvent;
-    bool _dismissed;
+protected:
+    ReplicationCoordinatorImpl* const _replCoord;
+    bool _isDryRun = false;
+    bool _dismissed = false;
 };
 
-}  // namespace
+class ReplicationCoordinatorImpl::LoseElectionDryRunGuardV1 : public LoseElectionGuardV1 {
+    MONGO_DISALLOW_COPYING(LoseElectionDryRunGuardV1);
+
+public:
+    LoseElectionDryRunGuardV1(ReplicationCoordinatorImpl* replCoord)
+        : LoseElectionGuardV1(replCoord) {
+        _isDryRun = true;
+    }
+};
+
 
 void ReplicationCoordinatorImpl::_startElectSelfV1() {
     invariant(!_electionWinnerDeclarer);
@@ -115,11 +113,15 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
     }
     fassert(28642, finishEvh.getStatus());
     _electionFinishedEvent = finishEvh.getValue();
-    LoseElectionGuardV1 lossGuard(_topCoord.get(),
-                                  &_replExecutor,
-                                  &_voteRequester,
-                                  &_electionWinnerDeclarer,
-                                  &_electionFinishedEvent);
+
+    const StatusWith<ReplicationExecutor::EventHandle> dryRunFinishEvh = _replExecutor.makeEvent();
+    if (dryRunFinishEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(28767, dryRunFinishEvh.getStatus());
+    _electionDryRunFinishedEvent = dryRunFinishEvh.getValue();
+
+    LoseElectionDryRunGuardV1 lossGuard(this);
 
 
     invariant(_rsConfig.getMemberAt(_selfIndex).isElectable());
@@ -158,11 +160,7 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
 void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     invariant(_voteRequester);
     invariant(!_electionWinnerDeclarer);
-    LoseElectionGuardV1 lossGuard(_topCoord.get(),
-                                  &_replExecutor,
-                                  &_voteRequester,
-                                  &_electionWinnerDeclarer,
-                                  &_electionFinishedEvent);
+    LoseElectionDryRunGuardV1 lossGuard(this);
 
     if (_topCoord->getTerm() != originalTerm) {
         log() << "not running for primary, we have been superceded already";
@@ -186,10 +184,59 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     _updateTerm_incallback(originalTerm + 1, nullptr);
     // Secure our vote for ourself first
     _topCoord->voteForMyselfV1();
-    // TODO(siyuan): SERVER-19764 store the vote in persistent storage.
+
+    // Store the vote in persistent storage.
+    LastVote lastVote;
+    lastVote.setTerm(originalTerm + 1);
+    lastVote.setCandidateId(getMyId());
+
+    auto cbStatus = _replExecutor.scheduleDBWork(
+        [this, lastVote](const ReplicationExecutor::CallbackArgs& cbData) {
+            _writeLastVoteForMyElection(lastVote, cbData);
+        });
+    if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(28769, cbStatus.getStatus());
+    lossGuard.dismiss();
+}
+
+void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
+    LastVote lastVote, const ReplicationExecutor::CallbackArgs& cbData) {
+    invariant(_voteRequester);
+    invariant(!_electionWinnerDeclarer);
+    LoseElectionDryRunGuardV1 lossGuard(this);
+
+    if (cbData.status == ErrorCodes::CallbackCanceled) {
+        return;
+    }
+    invariant(cbData.txn);
+
+    Status status = _externalState->storeLocalLastVoteDocument(cbData.txn, lastVote);
+    if (!status.isOK()) {
+        error() << "failed to store LastVote document when voting for myself: " << status;
+        return;
+    }
+
+    auto cbStatus = _replExecutor.scheduleWork(
+        [this, lastVote](const ReplicationExecutor::CallbackArgs& cbData) {
+            _startVoteRequester(lastVote.getTerm());
+        });
+    if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(28768, cbStatus.getStatus());
+
+    _replExecutor.signalEvent(_electionDryRunFinishedEvent);
+    lossGuard.dismiss();
+}
+
+void ReplicationCoordinatorImpl::_startVoteRequester(long long newTerm) {
+    invariant(_voteRequester);
+    invariant(!_electionWinnerDeclarer);
+    LoseElectionGuardV1 lossGuard(this);
 
     _voteRequester.reset(new VoteRequester);
-
     StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
         &_replExecutor,
         _rsConfig,
@@ -197,22 +244,19 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
         _topCoord->getTerm(),
         false,
         getMyLastOptime(),
-        stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete, this, originalTerm + 1));
+        stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete, this, newTerm));
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
     }
     fassert(28643, nextPhaseEvh.getStatus());
+
     lossGuard.dismiss();
 }
 
 void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) {
     invariant(_voteRequester);
     invariant(!_electionWinnerDeclarer);
-    LoseElectionGuardV1 lossGuard(_topCoord.get(),
-                                  &_replExecutor,
-                                  &_voteRequester,
-                                  &_electionWinnerDeclarer,
-                                  &_electionFinishedEvent);
+    LoseElectionGuardV1 lossGuard(this);
 
     if (_topCoord->getTerm() != originalTerm) {
         log() << "not becoming primary, we have been superceded already";
@@ -244,11 +288,7 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
 }
 
 void ReplicationCoordinatorImpl::_onElectionWinnerDeclarerComplete() {
-    LoseElectionGuardV1 lossGuard(_topCoord.get(),
-                                  &_replExecutor,
-                                  &_voteRequester,
-                                  &_electionWinnerDeclarer,
-                                  &_electionFinishedEvent);
+    LoseElectionGuardV1 lossGuard(this);
 
     invariant(_voteRequester);
     invariant(_electionWinnerDeclarer);
