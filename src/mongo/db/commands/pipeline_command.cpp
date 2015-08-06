@@ -48,7 +48,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/cursor_responses.h"
-#include "mongo/db/query/find_constants.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/stdx/memory.h"
@@ -86,7 +86,7 @@ static bool handleCursorCommand(OperationContext* txn,
 
     // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
     BSONArrayBuilder resultsArray;
-    const int byteLimit = MaxBytesToReturnToClientAtOnce;
+    const int byteLimit = FindCommon::kMaxBytesToReturnToClientAtOnce;
     BSONObj next;
     for (int objCount = 0; objCount < batchSize; objCount++) {
         // The initial getNext() on a PipelineProxyStage may be very expensive so we don't

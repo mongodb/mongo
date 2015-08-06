@@ -46,6 +46,7 @@
 #include "mongo/db/query/cursor_responses.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharding_state.h"
@@ -312,7 +313,7 @@ public:
         BSONObj obj;
         PlanExecutor::ExecState state;
         long long numResults = 0;
-        while (!enoughForFirstBatch(pq, numResults, firstBatch.len()) &&
+        while (!FindCommon::enoughForFirstBatch(pq, numResults, firstBatch.len()) &&
                PlanExecutor::ADVANCED == (state = cursorExec->getNext(&obj, NULL))) {
             // If adding this object will cause us to exceed the BSON size limit, then we stash
             // it for later.

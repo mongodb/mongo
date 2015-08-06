@@ -31,10 +31,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/namespace_string.h"
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/stringutils.h"
 

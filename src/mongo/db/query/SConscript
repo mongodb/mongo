@@ -22,10 +22,6 @@ env.Library(
         "query_solution.cpp",
     ],
     LIBDEPS=[
-        "explain_common",
-        "command_request_response",
-        "index_bounds",
-        "lite_parsed_query",
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/index/expression_params",
         "$BUILD_DIR/mongo/db/matcher/expression_algo",
@@ -33,6 +29,9 @@ env.Library(
         "$BUILD_DIR/mongo/db/matcher/expressions_text",
         "$BUILD_DIR/mongo/db/index_names",
         "$BUILD_DIR/mongo/db/server_parameters",
+        "command_request_response",
+        "index_bounds",
+        "query_common",
     ],
 )
 
@@ -53,6 +52,19 @@ env.Library(
         "query_planner",
         "query_planner_test_lib",
         "$BUILD_DIR/mongo/db/exec/exec"
+    ],
+)
+
+# Shared mongod/mongos query code.
+env.Library(
+    target="query_common",
+    source=[
+        "find_common.cpp",
+        "explain_common.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "lite_parsed_query",
     ],
 )
 
@@ -88,16 +100,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/matcher/expressions_geo",
         "$BUILD_DIR/mongo/db/mongohasher",
         "$BUILD_DIR/mongo/db/server_parameters",
-    ],
-)
-
-env.Library(
-    target="explain_common",
-    source=[
-        "explain_common.cpp"
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 

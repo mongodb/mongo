@@ -32,6 +32,7 @@ env.Library(
         'cluster_get_last_error_cmd.cpp',
         'cluster_get_prev_error_cmd.cpp',
         'cluster_get_shard_version_cmd.cpp',
+        'cluster_getmore_cmd.cpp',
         'cluster_index_filter_cmd.cpp',
         'cluster_is_db_grid_cmd.cpp',
         'cluster_is_master_cmd.cpp',

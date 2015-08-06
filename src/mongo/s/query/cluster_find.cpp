@@ -39,12 +39,15 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_common.h"
+#include "mongo/db/query/getmore_request.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
@@ -210,6 +213,46 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
     return {ErrorCodes::StaleShardVersion,
             str::stream() << "Retried " << kMaxStaleConfigRetries
                           << " times without establishing shard version."};
+}
+
+StatusWith<GetMoreResponse> ClusterFind::runGetMore(OperationContext* txn,
+                                                    const GetMoreRequest& request) {
+    auto cursorManager = grid.getCursorManager();
+
+    auto pinnedCursor = cursorManager->checkOutCursor(request.nss, request.cursorid);
+    if (!pinnedCursor.isOK()) {
+        return pinnedCursor.getStatus();
+    }
+    invariant(request.cursorid == pinnedCursor.getValue().getCursorId());
+
+    std::vector<BSONObj> batch;
+    int bytesBuffered = 0;
+    long long batchSize = request.batchSize.value_or(0);
+    auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
+    while (!FindCommon::enoughForGetMore(batchSize, batch.size(), bytesBuffered)) {
+        auto next = pinnedCursor.getValue().next();
+        if (!next.isOK()) {
+            return next.getStatus();
+        }
+
+        if (!next.getValue()) {
+            // We reached end-of-stream.
+            cursorState = ClusterCursorManager::CursorState::Exhausted;
+            break;
+        }
+
+        // Add doc to the batch.
+        bytesBuffered += next.getValue()->objsize();
+        batch.push_back(std::move(*next.getValue()));
+    }
+
+    // Transfer ownership of the cursor back to the cursor manager.
+    pinnedCursor.getValue().returnCursor(cursorState);
+
+    CursorId idToReturn = (cursorState == ClusterCursorManager::CursorState::Exhausted)
+        ? CursorId(0)
+        : request.cursorid;
+    return GetMoreResponse(request.nss, idToReturn, std::move(batch));
 }
 
 }  // namespace mongo

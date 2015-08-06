@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,10 +26,30 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/query/find_common.h"
+
+#include "mongo/db/query/lite_parsed_query.h"
+
 namespace mongo {
 
-// We cut off further objects once we cross this threshold; thus, you might get
-// a little bit more than this, it is a threshold rather than a limit.
-extern const int32_t MaxBytesToReturnToClientAtOnce;
+bool FindCommon::enoughForFirstBatch(const LiteParsedQuery& pq,
+                                     long long numDocs,
+                                     int bytesBuffered) {
+    if (!pq.getBatchSize()) {
+        // If there is no batch size, we stop generating additional results as soon as we have
+        // either 101 documents or at least 1MB of data.
+        return (bytesBuffered > 1024 * 1024) || numDocs >= LiteParsedQuery::kDefaultBatchSize;
+    }
+
+    // If there is a batch size, we add results until either satisfying this batch size or exceeding
+    // the 4MB size threshold.
+    return numDocs >= *pq.getBatchSize() || bytesBuffered > kMaxBytesToReturnToClientAtOnce;
+}
+
+bool FindCommon::enoughForGetMore(long long ntoreturn, long long numDocs, int bytesBuffered) {
+    return (ntoreturn && numDocs >= ntoreturn) || (bytesBuffered > kMaxBytesToReturnToClientAtOnce);
+}
 
 }  // namespace mongo

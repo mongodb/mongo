@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -90,14 +91,18 @@ public:
      */
     bool getConfigShouldBalance() const;
 
-    CatalogManager* catalogManager() const {
+    CatalogManager* catalogManager() {
         return _catalogManager.get();
     }
-    CatalogCache* catalogCache() const {
+    CatalogCache* catalogCache() {
         return _catalogCache.get();
     }
-    ShardRegistry* shardRegistry() const {
+    ShardRegistry* shardRegistry() {
         return _shardRegistry.get();
+    }
+
+    ClusterCursorManager* getCursorManager() {
+        return _cursorManager.get();
     }
 
     /**
@@ -113,6 +118,7 @@ private:
     std::unique_ptr<CatalogManager> _catalogManager;
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
+    std::unique_ptr<ClusterCursorManager> _cursorManager;
 
     // can 'localhost' be used in shard addresses?
     bool _allowLocalShard;

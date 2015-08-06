@@ -122,6 +122,8 @@ void Grid::clearForUnitTests() {
 
     _shardRegistry->shutdown();
     _shardRegistry.reset();
+
+    _cursorManager.reset();
 }
 
 }  // namespace mongo

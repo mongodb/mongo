@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/query/getmore_response.h"
 
 namespace mongo {
 
@@ -39,6 +40,7 @@ template <typename T>
 class StatusWith;
 class CanonicalQuery;
 class OperationContext;
+struct GetMoreRequest;
 struct ReadPreferenceSetting;
 
 /**
@@ -61,6 +63,12 @@ public:
                                          const CanonicalQuery& query,
                                          const ReadPreferenceSetting& readPref,
                                          std::vector<BSONObj>* results);
+
+    /**
+     * Executes the getMore request 'request', and on success returns a GetMoreResponse.
+     */
+    static StatusWith<GetMoreResponse> runGetMore(OperationContext* txn,
+                                                  const GetMoreRequest& request);
 };
 
 }  // namespace mongo

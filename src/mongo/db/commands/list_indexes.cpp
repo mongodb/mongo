@@ -42,7 +42,7 @@
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/cursor_responses.h"
-#include "mongo/db/query/find_constants.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/memory.h"
@@ -180,7 +180,7 @@ public:
 
         BSONArrayBuilder firstBatch;
 
-        const int byteLimit = MaxBytesToReturnToClientAtOnce;
+        const int byteLimit = FindCommon::kMaxBytesToReturnToClientAtOnce;
         for (long long objCount = 0; objCount < batchSize && firstBatch.len() < byteLimit;
              objCount++) {
             BSONObj next;

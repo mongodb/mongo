@@ -37,7 +37,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/query/find_constants.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/d_state.h"
 
@@ -109,7 +109,7 @@ void DocumentSourceCursor::loadBatch() {
 
         memUsageBytes += _currentBatch.back().getApproximateSize();
 
-        if (memUsageBytes > MaxBytesToReturnToClientAtOnce) {
+        if (memUsageBytes > FindCommon::kMaxBytesToReturnToClientAtOnce) {
             // End this batch and prepare PlanExecutor for yielding.
             _exec->saveState();
             return;

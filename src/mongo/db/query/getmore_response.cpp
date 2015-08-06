@@ -49,8 +49,8 @@ const char kBatchFieldAlt[] = "firstBatch";
 
 GetMoreResponse::GetMoreResponse(NamespaceString namespaceString,
                                  CursorId id,
-                                 const std::vector<BSONObj>& objs)
-    : nss(std::move(namespaceString)), cursorId(id), batch(objs) {}
+                                 std::vector<BSONObj> objs)
+    : nss(std::move(namespaceString)), cursorId(id), batch(std::move(objs)) {}
 
 StatusWith<GetMoreResponse> GetMoreResponse::parseFromBSON(const BSONObj& cmdResponse) {
     Status cmdStatus = getStatusFromCommandResult(cmdResponse);
@@ -112,8 +112,8 @@ StatusWith<GetMoreResponse> GetMoreResponse::parseFromBSON(const BSONObj& cmdRes
     return {{NamespaceString(fullns), cursorId, batch}};
 }
 
-BSONObj GetMoreResponse::toBSON() const {
-    BSONObjBuilder cursorBuilder;
+void GetMoreResponse::toBSON(BSONObjBuilder* builder) const {
+    BSONObjBuilder cursorBuilder(builder->subobjStart(kCursorField));
 
     cursorBuilder.append(kIdField, cursorId);
     cursorBuilder.append(kNsField, nss.ns());
@@ -124,9 +124,14 @@ BSONObj GetMoreResponse::toBSON() const {
     }
     batchBuilder.doneFast();
 
+    cursorBuilder.doneFast();
+
+    builder->append("ok", 1.0);
+}
+
+BSONObj GetMoreResponse::toBSON() const {
     BSONObjBuilder builder;
-    builder.append(kCursorField, cursorBuilder.obj());
-    builder.append("ok", 1.0);
+    toBSON(&builder);
     return builder.obj();
 }
 

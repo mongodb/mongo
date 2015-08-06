@@ -8,9 +8,9 @@ env.Library(
         "cluster_find.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_common',
         "$BUILD_DIR/mongo/s/coreshard",
         "cluster_client_cursor",
-        "cluster_cursor_manager",
     ],
 )
 

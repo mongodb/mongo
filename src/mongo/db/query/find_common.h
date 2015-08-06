@@ -26,37 +26,38 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <vector>
-
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/namespace_string.h"
-
 namespace mongo {
 
-struct GetMoreResponse {
-    /**
-     * Constructs from values for each of the fields.
-     */
-    GetMoreResponse(NamespaceString namspaceString, CursorId id, std::vector<BSONObj> objs);
+class LiteParsedQuery;
+
+/**
+ * Suite of find/getMore related functions used in both the mongod and mongos query paths.
+ */
+class FindCommon {
+public:
+    // The size threshold at which we stop adding result documents to a getMore response or a find
+    // response that has a batchSize set (i.e. once the sum of the document sizes in bytes exceeds
+    // this value, no further documents are added).
+    static const int kMaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
 
     /**
-     * Constructs a GetMoreResponse from the command BSON response.
+     * Returns true if enough results have been prepared to stop adding more to the first batch.
+     *
+     * If 'pq' does not have a batchSize, the default batchSize is respected.
      */
-    static StatusWith<GetMoreResponse> parseFromBSON(const BSONObj& cmdResponse);
+    static bool enoughForFirstBatch(const LiteParsedQuery& pq,
+                                    long long numDocs,
+                                    int bytesBuffered);
 
     /**
-     * Converts this response to its raw BSON representation.
+     * Returns true if enough results have been prepared to stop adding more to a getMore batch.
+     *
+     * An 'ntoreturn' value of zero is interpreted as the absence of a batchSize; in this case,
+     * returns true only once the size threshold is exceeded. If 'ntoreturn' is positive, returns
+     * true once either are added until we have either satisfied the batch size or exceeded the size
+     * threshold.
      */
-    BSONObj toBSON() const;
-    void toBSON(BSONObjBuilder* builder) const;
-
-    const NamespaceString nss;
-    const CursorId cursorId;
-    const std::vector<BSONObj> batch;
+    static bool enoughForGetMore(long long ntoreturn, long long numDocs, int bytesBuffered);
 };
 
 }  // namespace mongo

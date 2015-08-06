@@ -194,6 +194,22 @@ TEST(GetMoreResponseTest, toBSON) {
     ASSERT_EQ(responseObj, expectedResponse);
 }
 
+TEST(GetMoreResponseTest, toBSONWithBuilder) {
+    std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
+    GetMoreResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
+
+    BSONObjBuilder builder;
+    response.toBSON(&builder);
+    BSONObj responseObj = builder.obj();
+
+    BSONObj expectedResponse = BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "testdb.testcoll"
+                              << "nextBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+                 << "ok" << 1.0);
+    ASSERT_EQ(responseObj, expectedResponse);
+}
+
 }  // namespace
 
 }  // namespace mongo

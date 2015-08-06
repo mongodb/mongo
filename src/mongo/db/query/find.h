@@ -42,20 +42,6 @@ class NamespaceString;
 class OperationContext;
 
 /**
- * Returns true if enough results have been prepared to stop adding more to the first batch.
- *
- * Should be called *after* adding to the result set rather than before.
- */
-bool enoughForFirstBatch(const LiteParsedQuery& pq, long long numDocs, int bytesBuffered);
-
-/**
- * Returns true if enough results have been prepared to stop adding more to a getMore batch.
- *
- * Should be called *after* adding to the result set rather than before.
- */
-bool enoughForGetMore(long long ntoreturn, long long numDocs, int bytesBuffered);
-
-/**
  * Whether or not the ClientCursor* is tailable.
  */
 bool isCursorTailable(const ClientCursor* cursor);
