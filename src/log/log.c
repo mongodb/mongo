@@ -241,6 +241,11 @@ __wt_log_get_all_files(WT_SESSION_IMPL *session,
 	log = S2C(session)->log;
 
 	*maxid = 0;
+	/*
+	 * These may be files needed by backup.  Force the current slot
+	 * to get written to the file.
+	 */
+	WT_RET(__wt_log_force_write(session, 1, 0));
 	WT_RET(__log_get_files(session, WT_LOG_FILENAME, &files, &count));
 
 	/* Filter out any files that are below the checkpoint LSN. */
