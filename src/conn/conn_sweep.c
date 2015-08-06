@@ -267,7 +267,8 @@ __sweep_server(void *arg)
 		/*
 		 * Sweep the lookaside file.
 		 */
-		WT_ERR(__wt_las_sweep(session));
+		WT_SAVE_DHANDLE(session, ret = __wt_las_sweep(session));
+		WT_ERR(ret);
 
 		/*
 		 * Mark handles with a time of death, and report whether any
@@ -396,5 +397,9 @@ __wt_sweep_destroy(WT_SESSION_IMPL *session)
 
 		conn->sweep_session = NULL;
 	}
+
+	/* Discard any saved lookaside key. */
+	__wt_buf_free(session, &conn->las_sweep_key);
+
 	return (ret);
 }

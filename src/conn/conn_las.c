@@ -268,14 +268,19 @@ __las_sweep_reconcile(WT_SESSION_IMPL *session, WT_ITEM *key)
 int
 __wt_las_sweep(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
-	WT_DECL_ITEM(klas);
 	WT_DECL_RET;
+	WT_ITEM *key;
+	uint64_t cnt;
+	int notused;
+
+	conn = S2C(session);
 
 	/*
 	 * If the lookaside file isn't yet open, there's no work to do.
 	 */
-	if (S2C(session)->las_cursor == NULL)
+	if (conn->las_cursor == NULL)
 		return (0);
 
 	/*
@@ -284,26 +289,54 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 */
 	if (session->las_cursor == NULL)
 		WT_RET(__las_cursor_create(session, &session->las_cursor));
+
 	cursor = session->las_cursor;
+	key = &conn->las_sweep_key;
 
 	/*
-	 * KEITH
-	 * There's some tuning questions: we should track the total number of
-	 * records in the lookaside file, and only sweep if there are enough
-	 * records to make sweeping worthwhile, and only sweep part of the file
-	 * if there are too many to sweep at once. We might also want to sweep
-	 * the records in the cache more frequently, and out-of-cache records
-	 * less frequently.
+	 * Position the cursor using the key from the last call unless starting
+	 * a new sweep; we don't care if we're before or after the key, roughly
+	 * in the same spot is fine.
 	 */
-	WT_ERR(__wt_scr_alloc(session, 0, &klas));
+	if (conn->las_sweep_call != 0 && key->data != NULL) {
+		cursor->set_key(cursor, key);
+		WT_ERR(cursor->search_near(cursor, &notused));
+	}
+
+	/*
+	 * The sweep server wakes up every 10 seconds (by default), it's a slow
+	 * moving thread. Try to review the entire lookaside file once every 5
+	 * minutes, or once every 30 calls.
+	 *
+	 * The reason is because the lookaside file exists because we're seeing
+	 * cache/eviction pressure (it allows us to trade performance and disk
+	 * space for cache space), so it's likely lookaside blocks are being
+	 * evicted, and reading them back in doesn't help things. A trickier,
+	 * but possibly better alternative, might be to review all lookaside
+	 * blocks in the cache in order to  get rid of them, and slowly review
+	 * lookaside blocks that have been evicted.
+	 *
+	 * We can't know for sure how many records are in the lookaside file,
+	 * the cursor insert and remove statistics aren't updated atomically.
+	 * Start with reviewing 100 rows, and if it takes more than the target
+	 * number of calls to finish, increase the number of rows checked on
+	 * each call; if it takes less than the target calls to finish, then
+	 * decrease the number of rows reviewed on each call (but never less
+	 * than 100).
+	 */
+#define	WT_SWEEP_LOOKASIDE_MIN_CNT	100
+#define	WT_SWEEP_LOOKASIDE_PASS_TARGET	 30
+	++conn->las_sweep_call;
+	if ((cnt = conn->las_sweep_cnt) < WT_SWEEP_LOOKASIDE_MIN_CNT)
+		cnt = conn->las_sweep_cnt = WT_SWEEP_LOOKASIDE_MIN_CNT;
 
 	/* Walk the file. */
-	while ((ret = cursor->next(cursor)) == 0) {
-		WT_ERR(cursor->get_key(cursor, klas));
+	for (; cnt > 0 && (ret = cursor->next(cursor)) == 0; --cnt) {
+		WT_ERR(cursor->get_key(cursor, key));
 
-		switch (((uint8_t *)klas->data)[0]) {
+		switch (((uint8_t *)key->data)[0]) {
 		case WT_LAS_RECONCILE_UPDATE:
-			if (!__las_sweep_reconcile(session, klas))
+			if (!__las_sweep_reconcile(session, key))
 				continue;
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
@@ -311,11 +344,37 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 
 		WT_ERR_NOTFOUND_OK(cursor->remove(cursor));
 	}
+
+	/*
+	 * When reaching the lookaside file end or the target number of calls,
+	 * adjust the row count. Decrease/increase the row count depending on
+	 * if the number of calls is less/more than the target,
+	 */
+	if (ret == WT_NOTFOUND ||
+	    conn->las_sweep_call > WT_SWEEP_LOOKASIDE_PASS_TARGET) {
+		if (conn->las_sweep_call < WT_SWEEP_LOOKASIDE_PASS_TARGET &&
+		    conn->las_sweep_cnt > WT_SWEEP_LOOKASIDE_MIN_CNT)
+			conn->las_sweep_cnt -= WT_SWEEP_LOOKASIDE_MIN_CNT;
+		if (conn->las_sweep_call > WT_SWEEP_LOOKASIDE_PASS_TARGET)
+			conn->las_sweep_cnt += WT_SWEEP_LOOKASIDE_MIN_CNT;
+		if (ret == WT_NOTFOUND)
+			conn->las_sweep_call = 0;
+	}
+
 	WT_ERR_NOTFOUND_OK(ret);
 
-	/* Don't leave the cursor positioned. */
-err:	WT_TRET(cursor->reset(cursor));
+	/*
+	 * Make sure we have a local copy of the sweep key, and don't leave the
+	 * cursor positioned.
+	 */
+	if (!WT_DATA_IN_ITEM(key))
+		WT_ERR(__wt_buf_set(session, key, key->data, key->size));
 
-	__wt_scr_free(session, &klas);
+	if (0) {
+err:		__wt_buf_free(session, key);
+	}
+
+	WT_TRET(cursor->reset(cursor));
+
 	return (ret);
 }

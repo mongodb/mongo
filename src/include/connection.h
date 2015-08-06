@@ -356,12 +356,16 @@ struct __wt_connection_impl {
 
 	/*
 	 * Shared lookaside lock, session and cursor, used by threads accessing
-	 * the lookaside table (other than eviction worker threads, which have
-	 * their own lookaside table cursors).
+	 * the lookaside table (other than eviction server and worker threads
+	 * and the sweep thread, all of which have their own lookaside cursors).
 	 */
 	WT_SPINLOCK	 las_lock;	/* Lookaside file spinlock */
 	WT_SESSION_IMPL *las_session;	/* Lookaside file session */
 	WT_CURSOR	*las_cursor;	/* Lookaside file cursor */
+
+	WT_ITEM		 las_sweep_key;	/* Sweep server's saved key */
+	int		 las_sweep_call;/* Sweep server's call count */
+	uint64_t	 las_sweep_cnt;	/* Sweep server's per-call row count */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;
