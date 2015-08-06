@@ -231,7 +231,19 @@ void CurOp::reportState(BSONObjBuilder* builder) {
         builder->append("microsecs_running", static_cast<long long int>(elapsedMicros()));
     }
 
-    builder->append("op", opToString(_op));
+    const char* opName;
+    if (_command && _command->name == "find") {
+        // If the operation is a find command, we report "op" as "query", for consistency with
+        // OP_QUERY legacy find operations.
+        opName = opToString(dbQuery);
+    } else if (_command && _command->name == "getMore") {
+        // If the operation is a getMore command, we report "op" as "getmore", for consistency
+        // with OP_GET_MORE legacy find operations.
+        opName = opToString(dbGetMore);
+    } else {
+        opName = opToString(_op);
+    }
+    builder->append("op", opName);
 
     builder->append("ns", _ns);
 
