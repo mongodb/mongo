@@ -959,7 +959,7 @@ void WiredTigerRecordStore::_changeNumRecords(OperationContext* txn, int64_t dif
 
 class WiredTigerRecordStore::DataSizeChange : public RecoveryUnit::Change {
 public:
-    DataSizeChange(WiredTigerRecordStore* rs, int amount) : _rs(rs), _amount(amount) {}
+    DataSizeChange(WiredTigerRecordStore* rs, int64_t amount) : _rs(rs), _amount(amount) {}
     virtual void commit() {}
     virtual void rollback() {
         _rs->_increaseDataSize(NULL, -_amount);
@@ -967,10 +967,10 @@ public:
 
 private:
     WiredTigerRecordStore* _rs;
-    int _amount;
+    int64_t _amount;
 };
 
-void WiredTigerRecordStore::_increaseDataSize(OperationContext* txn, int amount) {
+void WiredTigerRecordStore::_increaseDataSize(OperationContext* txn, int64_t amount) {
     if (txn)
         txn->recoveryUnit()->registerChange(new DataSizeChange(this, amount));
 
