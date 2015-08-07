@@ -300,7 +300,12 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 */
 	if (conn->las_sweep_call != 0 && key->data != NULL) {
 		cursor->set_key(cursor, key);
-		WT_ERR(cursor->search_near(cursor, &notused));
+		if ((ret =
+		    cursor->search_near(cursor, &notused)) == WT_NOTFOUND) {
+			WT_ERR(cursor->reset(cursor));
+			return (0);
+		}
+		WT_ERR_NOTFOUND_OK(ret);
 	}
 
 	/*
