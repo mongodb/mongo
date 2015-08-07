@@ -277,7 +277,7 @@ typedef struct {
 
 	WT_SALVAGE_COOKIE *salvage;	/* If it's a salvage operation */
 
-	int tested_ref_state;		/* Debugging information */
+	uint32_t tested_ref_state;	/* Debugging information */
 } WT_RECONCILE;
 
 static void __rec_bnd_cleanup(WT_SESSION_IMPL *, WT_RECONCILE *, int);
