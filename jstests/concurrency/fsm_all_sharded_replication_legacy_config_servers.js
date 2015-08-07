@@ -19,6 +19,11 @@ var blacklist = [
     'yield_sort_merge.js', // SERVER-17011 also applies, since this query uses SORT stage,
                            // not SORT_MERGE stage in sharded environment
 
+    // Disabled due to SERVER-17397, 'Drops of sharded namespaces may not fully succeed'.
+    // This bug is problematic for these workloads because they reuse dropped namespaces:
+    'drop_database.js',
+    'map_reduce_drop.js',
+
     // Disabled due to MongoDB restrictions and/or workload restrictions
 
     // These workloads sometimes trigger 'Could not lock auth data update lock'
