@@ -133,8 +133,8 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	do {
 		if ((count = txn_global->scan_count) < 0)
 			WT_PAUSE();
-	} while (count < 0 || !__wt_atomic_casi4(
-	    (int32_t *)&txn_global->scan_count, count, count + 1));
+	} while (count < 0 ||
+	    !__wt_atomic_casiv4(&txn_global->scan_count, count, count + 1));
 
 	current_id = snap_min = txn_global->current;
 	prev_oldest_id = txn_global->oldest_id;
@@ -147,8 +147,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 		/* Check that the oldest ID has not moved in the meantime. */
 		if (prev_oldest_id == txn_global->oldest_id) {
 			WT_ASSERT(session, txn_global->scan_count > 0);
-			(void)__wt_atomic_subi4(
-			    (int32_t *)&txn_global->scan_count, 1);
+			(void)__wt_atomic_subiv4(&txn_global->scan_count, 1);
 			return;
 		}
 	}
@@ -184,7 +183,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	txn_state->snap_min = snap_min;
 
 	WT_ASSERT(session, txn_global->scan_count > 0);
-	(void)__wt_atomic_subi4((int32_t *)&txn_global->scan_count, 1);
+	(void)__wt_atomic_subiv4(&txn_global->scan_count, 1);
 
 	__txn_sort_snapshot(session, n, current_id);
 }
@@ -237,8 +236,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	do {
 		if ((count = txn_global->scan_count) < 0)
 			WT_PAUSE();
-	} while (count < 0 || !__wt_atomic_casi4(
-	    (int32_t *)&txn_global->scan_count, count, count + 1));
+	} while (count < 0 ||
+	    !__wt_atomic_casiv4(&txn_global->scan_count, count, count + 1));
 
 	/* The oldest ID cannot change until the scan count goes to zero. */
 	prev_oldest_id = txn_global->oldest_id;
@@ -289,7 +288,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 
 	/* Update the oldest ID. */
 	if ((WT_TXNID_LT(prev_oldest_id, oldest_id) || last_running_moved) &&
-	    __wt_atomic_casi4((int32_t *)&txn_global->scan_count, 1, -1)) {
+	    __wt_atomic_casiv4(&txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 			if ((id = s->id) != WT_TXN_NONE &&
@@ -334,7 +333,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 			    oldest_session->txn.snap_min);
 		}
 		WT_ASSERT(session, txn_global->scan_count > 0);
-		(void)__wt_atomic_subi4((int32_t *)&txn_global->scan_count, 1);
+		(void)__wt_atomic_subiv4(&txn_global->scan_count, 1);
 	}
 }
 

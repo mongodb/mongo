@@ -89,228 +89,63 @@
  * swap) operations.
  */
 
-static inline uint8_t
- __wt_atomic_add1(uint8_t *vp, uint8_t v)
-{
-	return (__sync_add_and_fetch(vp, v));
-}
-static inline uint8_t
- __wt_atomic_fetch_add1(uint8_t *vp, uint8_t v)
-{
-	return (__sync_fetch_and_add(vp, v));
-}
-static inline uint8_t
- __wt_atomic_store1(uint8_t *vp, uint8_t v)
-{
-	return (__sync_lock_test_and_set(vp, v));
-}
-static inline uint8_t
- __wt_atomic_sub1(uint8_t *vp, uint8_t v)
-{
-	return (__sync_sub_and_fetch(vp, v));
-}
-static inline int
- __wt_atomic_cas1(uint8_t *vp, uint8_t old, uint8_t new)
-{
 #ifdef __clang__
-	/*
-	 * We avoid __sync_bool_compare_and_swap with due to problems with
-	 * optimization with some versions of clang.
-	 * See http://llvm.org/bugs/show_bug.cgi?id=21499 for details.
-	 */
-	return (__sync_val_compare_and_swap(vp, old, new) == old);
+/*
+ * We avoid __sync_bool_compare_and_swap with due to problems with optimization
+ * with some versions of clang. See http://llvm.org/bugs/show_bug.cgi?id=21499
+ * for details.
+ */
+#define	WT_ATOMIC_CAS	__sync_val_compare_and_swap
 #else
-	return (__sync_bool_compare_and_swap(vp, old, new));
+#define	WT_ATOMIC_CAS	__sync_bool_compare_and_swap
 #endif
+
+#define	WT_ATOMIC_FUNC(name, ret, type)					\
+static inline ret							\
+__wt_atomic_add##name(type *vp, type v)					\
+{									\
+	return (__sync_add_and_fetch(vp, v));				\
+}									\
+static inline ret							\
+__wt_atomic_fetch_add##name(type *vp, type v)				\
+{									\
+	return (__sync_fetch_and_add(vp, v));				\
+}									\
+static inline ret							\
+__wt_atomic_store##name(type *vp, type v)				\
+{									\
+	return (__sync_lock_test_and_set(vp, v));			\
+}									\
+static inline ret							\
+__wt_atomic_sub##name(type *vp, type v)					\
+{									\
+	return (__sync_sub_and_fetch(vp, v));				\
+}									\
+static inline int							\
+__wt_atomic_cas##name(type *vp, type old, type new)			\
+{									\
+	return (WT_ATOMIC_CAS(vp, old, new) == old);			\
 }
 
-static inline uint16_t
- __wt_atomic_add2(uint16_t *vp, uint16_t v)
-{
-	return (__sync_add_and_fetch(vp, v));
-}
-static inline uint16_t
- __wt_atomic_fetch_add2(uint16_t *vp, uint16_t v)
-{
-	return (__sync_fetch_and_add(vp, v));
-}
-static inline uint16_t
- __wt_atomic_store2(uint16_t *vp, uint16_t v)
-{
-	return (__sync_lock_test_and_set(vp, v));
-}
-static inline uint16_t
- __wt_atomic_sub2(uint16_t *vp, uint16_t v)
-{
-	return (__sync_sub_and_fetch(vp, v));
-}
-static inline int
- __wt_atomic_cas2(uint16_t *vp, uint16_t old, uint16_t new)
-{
-#ifdef __clang__
-	/*
-	 * We avoid __sync_bool_compare_and_swap with due to problems with
-	 * optimization with some versions of clang.
-	 * See http://llvm.org/bugs/show_bug.cgi?id=21499 for details.
-	 */
-	return (__sync_val_compare_and_swap(vp, old, new) == old);
-#else
-	return (__sync_bool_compare_and_swap(vp, old, new));
-#endif
-}
+WT_ATOMIC_FUNC(1, uint8_t, uint8_t)
+WT_ATOMIC_FUNC(2, uint16_t, uint16_t)
+WT_ATOMIC_FUNC(4, uint32_t, uint32_t)
+WT_ATOMIC_FUNC(v4, uint32_t, volatile uint32_t)
+WT_ATOMIC_FUNC(i4, int32_t, int32_t)
+WT_ATOMIC_FUNC(iv4, int32_t, volatile int32_t)
+WT_ATOMIC_FUNC(8, uint64_t, uint64_t)
+WT_ATOMIC_FUNC(v8, uint64_t, volatile uint64_t)
+WT_ATOMIC_FUNC(i8, int64_t, int64_t)
+WT_ATOMIC_FUNC(iv8, int64_t, volatile int64_t)
 
-static inline int32_t
- __wt_atomic_addi4(int32_t *vp, int32_t v)
-{
-	return (__sync_add_and_fetch(vp, v));
-}
-static inline int32_t
- __wt_atomic_fetch_addi4(int32_t *vp, int32_t v)
-{
-	return (__sync_fetch_and_add(vp, v));
-}
-static inline int32_t
- __wt_atomic_storei4(int32_t *vp, int32_t v)
-{
-	return (__sync_lock_test_and_set(vp, v));
-}
-static inline int32_t
- __wt_atomic_subi4(int32_t *vp, int32_t v)
-{
-	return (__sync_sub_and_fetch(vp, v));
-}
+/*
+ * __wt_atomic_cas_ptr --
+ *	Pointer compare and swap.
+ */
 static inline int
- __wt_atomic_casi4(int32_t *vp, int32_t old, int32_t new)
+__wt_atomic_cas_ptr(void *vp, void *old, void *new)
 {
-#ifdef __clang__
-	/*
-	 * We avoid __sync_bool_compare_and_swap with clang due to problems with
-	 * optimization in some versions of clang.
-	 * See http://llvm.org/bugs/show_bug.cgi?id=21499 for details.
-	 */
-	return (__sync_val_compare_and_swap(vp, old, new) == old);
-#else
-	return (__sync_bool_compare_and_swap(vp, old, new));
-#endif
-}
-
-static inline uint32_t
- __wt_atomic_add4(uint32_t *vp, uint32_t v)
-{
-	return (__sync_add_and_fetch(vp, v));
-}
-static inline uint32_t
- __wt_atomic_fetch_add4(uint32_t *vp, uint32_t v)
-{
-	return (__sync_fetch_and_add(vp, v));
-}
-static inline uint32_t
- __wt_atomic_store4(uint32_t *vp, uint32_t v)
-{
-	return (__sync_lock_test_and_set(vp, v));
-}
-static inline uint32_t
- __wt_atomic_sub4(uint32_t *vp, uint32_t v)
-{
-	return (__sync_sub_and_fetch(vp, v));
-}
-static inline int
- __wt_atomic_cas4(uint32_t *vp, uint32_t old, uint32_t new)
-{
-#ifdef __clang__
-	/*
-	 * We avoid __sync_bool_compare_and_swap with clang due to problems with
-	 * optimization in some versions of clang.
-	 * See http://llvm.org/bugs/show_bug.cgi?id=21499 for details.
-	 */
-	return (__sync_val_compare_and_swap(vp, old, new) == old);
-#else
-	return (__sync_bool_compare_and_swap(vp, old, new));
-#endif
-}
-
-static inline int64_t
- __wt_atomic_addi8(int64_t *vp, int64_t v)
-{
-	return (__sync_add_and_fetch(vp, v));
-}
-static inline int64_t
- __wt_atomic_fetch_addi8(int64_t *vp, int64_t v)
-{
-	return (__sync_fetch_and_add(vp, v));
-}
-static inline int64_t
- __wt_atomic_storei8(int64_t *vp, int64_t v)
-{
-	return (__sync_lock_test_and_set(vp, v));
-}
-static inline int64_t
- __wt_atomic_subi8(int64_t *vp, int64_t v)
-{
-	return (__sync_sub_and_fetch(vp, v));
-}
-static inline int
- __wt_atomic_casi8(int64_t *vp, int64_t old, int64_t new)
-{
-#ifdef __clang__
-	/*
-	 * We avoid __sync_bool_compare_and_swap with due to problems with
-	 * optimization with some versions of clang.
-	 * See http://llvm.org/bugs/show_bug.cgi?id=21499 for details.
-	 */
-	return (__sync_val_compare_and_swap(vp, old, new) == old);
-#else
-	return (__sync_bool_compare_and_swap(vp, old, new));
-#endif
-}
-
-static inline uint64_t
- __wt_atomic_add8(uint64_t *vp, uint64_t v)
-{
-	return (__sync_add_and_fetch(vp, v));
-}
-static inline uint64_t
- __wt_atomic_fetch_add8(uint64_t *vp, uint64_t v)
-{
-	return (__sync_fetch_and_add(vp, v));
-}
-static inline uint64_t
- __wt_atomic_store8(uint64_t *vp, uint64_t v)
-{
-	return (__sync_lock_test_and_set(vp, v));
-}
-static inline uint64_t
- __wt_atomic_sub8(uint64_t *vp, uint64_t v)
-{
-	return (__sync_sub_and_fetch(vp, v));
-}
-static inline int
- __wt_atomic_cas8(uint64_t *vp, uint64_t old, uint64_t new)
-{
-#ifdef __clang__
-	/*
-	 * We avoid __sync_bool_compare_and_swap with due to problems with
-	 * optimization with some versions of clang.
-	 * See http://llvm.org/bugs/show_bug.cgi?id=21499 for details.
-	 */
-	return (__sync_val_compare_and_swap(vp, old, new) == old);
-#else
-	return (__sync_bool_compare_and_swap(vp, old, new));
-#endif
-}
-static inline int
- __wt_atomic_cas_ptr(void *vp, void *old, void *new)
-{
-#ifdef __clang__
-	/*
-	 * We avoid __sync_bool_compare_and_swap with due to problems with
-	 * optimization with some versions of clang.
-	 * See http://llvm.org/bugs/show_bug.cgi?id=21499 for details.
-	 */
-	return (__sync_val_compare_and_swap((void **)vp, old, new) == old);
-#else
-	return (__sync_bool_compare_and_swap((void **)vp, old, new));
-#endif
+	return (WT_ATOMIC_CAS((void **)vp, old, new) == old);
 }
 
 /* Compile read-write barrier */
