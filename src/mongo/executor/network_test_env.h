@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <tuple>
 #include <type_traits>
 #include <vector>
 
@@ -135,6 +136,11 @@ public:
 
     using OnFindCommandFunction =
         stdx::function<StatusWith<std::vector<BSONObj>>(const RemoteCommandRequest&)>;
+    // Function that accepts a find request and returns a tuple of resulting documents and response
+    // metadata.
+    using OnFindCommandWithMetadataFunction =
+        stdx::function<StatusWith<std::tuple<std::vector<BSONObj>, BSONObj>>(
+            const RemoteCommandRequest&)>;
 
     /**
      * Create a new environment based on the given network.
@@ -149,6 +155,7 @@ public:
     void onCommand(OnCommandFunction func);
     void onCommandWithMetadata(OnCommandWithMetadataFunction func);
     void onFindCommand(OnFindCommandFunction func);
+    void onFindWithMetadataCommand(OnFindCommandWithMetadataFunction func);
 
 private:
     // Task executor used for running asynchronous operations.

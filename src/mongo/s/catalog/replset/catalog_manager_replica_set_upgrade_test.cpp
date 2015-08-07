@@ -53,12 +53,15 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
 
     auto future = launchAsync([this] { ASSERT_OK(catalogManager()->checkAndUpgrade(true)); });
 
-    onFindCommand([](const RemoteCommandRequest& request) {
+    onFindCommand([this](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
-        ASSERT_EQ(BSON("find"
-                       << "version"),
-                  request.cmdObj);
+
+        const auto& findCmd = request.cmdObj;
+        ASSERT_EQ("version", findCmd["find"].str());
+        checkReadConcern(findCmd, Timestamp(0, 0), 0);
 
         BSONObj versionDoc(fromjson(R"({
                 _id: 1,

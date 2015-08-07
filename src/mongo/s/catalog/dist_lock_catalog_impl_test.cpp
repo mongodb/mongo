@@ -38,6 +38,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/find_and_modify_request.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -59,6 +60,7 @@ using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
+using repl::ReadConcernArgs;
 
 namespace {
 
@@ -132,6 +134,12 @@ private:
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<DistLockCatalogImpl> _distLockCatalog;
 };
+
+void checkReadConcern(const BSONObj& findCmd) {
+    auto readConcernElem = findCmd[ReadConcernArgs::kReadConcernFieldName];
+    ASSERT_EQ(Object, readConcernElem.type());
+    ASSERT_EQ(BSON(ReadConcernArgs::kLevelFieldName << "majority"), readConcernElem.Obj());
+}
 
 TEST_F(DistLockCatalogFixture, BasicPing) {
     auto future = launchAsync([this] {
@@ -1291,28 +1299,29 @@ TEST_F(DistLockCatalogFixture, BasicGetPing) {
         ASSERT_EQUALS(ping, pingDoc.getPing());
     });
 
-    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<vector<BSONObj>> {
-        ASSERT_EQUALS(dummyHost, request.target);
-        ASSERT_EQUALS("config", request.dbname);
+    onFindCommand(
+        [](const RemoteCommandRequest& request) {
+            ASSERT_EQUALS(dummyHost, request.target);
+            ASSERT_EQUALS("config", request.dbname);
 
-        BSONObj expectedCmd(fromjson(R"({
-            find: "lockpings",
-            filter: { _id: "test" },
-            limit: 1
-        })"));
+            const auto& findCmd = request.cmdObj;
+            ASSERT_EQUALS("lockpings", findCmd["find"].str());
+            ASSERT_EQUALS(BSON("_id"
+                               << "test"),
+                          findCmd["filter"].Obj());
+            ASSERT_EQUALS(1, findCmd["limit"].numberLong());
+            checkReadConcern(findCmd);
 
-        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+            BSONObj pingDoc(fromjson(R"({
+                _id: "test",
+                ping: { $date: "2015-05-26T13:06:27.293Z" }
+            })"));
 
-        BSONObj pingDoc(fromjson(R"({
-            _id: "test",
-            ping: { $date: "2015-05-26T13:06:27.293Z" }
-        })"));
+            std::vector<BSONObj> result;
+            result.push_back(pingDoc);
 
-        std::vector<BSONObj> result;
-        result.push_back(pingDoc);
-
-        return result;
-    });
+            return result;
+        });
 
     future.timed_get(kFutureTimeout);
 }
@@ -1382,13 +1391,11 @@ TEST_F(DistLockCatalogFixture, BasicGetLockByTS) {
         ASSERT_EQUALS(dummyHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
 
-        BSONObj expectedCmd(fromjson(R"({
-            find: "locks",
-            filter: { ts: ObjectId("555f99712c99a78c5b083358") },
-            limit: 1
-        })"));
-
-        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+        const auto& findCmd = request.cmdObj;
+        ASSERT_EQUALS("locks", findCmd["find"].str());
+        ASSERT_EQUALS(BSON("ts" << OID("555f99712c99a78c5b083358")), findCmd["filter"].Obj());
+        ASSERT_EQUALS(1, findCmd["limit"].numberLong());
+        checkReadConcern(findCmd);
 
         BSONObj lockDoc(fromjson(R"({
             _id: "test",
@@ -1464,28 +1471,29 @@ TEST_F(DistLockCatalogFixture, BasicGetLockByName) {
         ASSERT_EQUALS(ts, lockDoc.getLockID());
     });
 
-    onFindCommand([](const RemoteCommandRequest& request) -> StatusWith<vector<BSONObj>> {
-        ASSERT_EQUALS(dummyHost, request.target);
-        ASSERT_EQUALS("config", request.dbname);
+    onFindCommand(
+        [](const RemoteCommandRequest& request) {
+            ASSERT_EQUALS(dummyHost, request.target);
+            ASSERT_EQUALS("config", request.dbname);
 
-        BSONObj expectedCmd(fromjson(R"({
-            find: "locks",
-            filter: { _id: "abc" },
-            limit: 1
-        })"));
+            const auto& findCmd = request.cmdObj;
+            ASSERT_EQUALS("locks", findCmd["find"].str());
+            ASSERT_EQUALS(BSON("_id"
+                               << "abc"),
+                          findCmd["filter"].Obj());
+            ASSERT_EQUALS(1, findCmd["limit"].numberLong());
+            checkReadConcern(findCmd);
 
-        ASSERT_EQUALS(expectedCmd, request.cmdObj);
+            BSONObj lockDoc(fromjson(R"({
+                _id: "abc",
+                state: 2,
+                ts: ObjectId("555f99712c99a78c5b083358")
+            })"));
 
-        BSONObj lockDoc(fromjson(R"({
-            _id: "abc",
-            state: 2,
-            ts: ObjectId("555f99712c99a78c5b083358")
-        })"));
-
-        std::vector<BSONObj> result;
-        result.push_back(lockDoc);
-        return result;
-    });
+            std::vector<BSONObj> result;
+            result.push_back(lockDoc);
+            return result;
+        });
 
     future.timed_get(kFutureTimeout);
 }

@@ -972,8 +972,7 @@ void CatalogManagerLegacy::writeConfigServerDirect(const BatchedCommandRequest& 
     exec.executeBatch(request, response);
 }
 
-Status CatalogManagerLegacy::_checkDbDoesNotExist(const std::string& dbName,
-                                                  DatabaseType* db) const {
+Status CatalogManagerLegacy::_checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) {
     ScopedDbConnection conn(_configServerConnectionString, 30);
 
     BSONObjBuilder b;
@@ -1008,7 +1007,7 @@ Status CatalogManagerLegacy::_checkDbDoesNotExist(const std::string& dbName,
     return Status::OK();
 }
 
-StatusWith<string> CatalogManagerLegacy::_generateNewShardName() const {
+StatusWith<string> CatalogManagerLegacy::_generateNewShardName() {
     BSONObj o;
     {
         ScopedDbConnection conn(_configServerConnectionString, 30);

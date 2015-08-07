@@ -168,11 +168,11 @@ DistLockManager* CatalogManagerMock::getDistLockManager() const {
     return _mockDistLockMgr.get();
 }
 
-Status CatalogManagerMock::_checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const {
+Status CatalogManagerMock::_checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) {
     return Status::OK();
 }
 
-StatusWith<std::string> CatalogManagerMock::_generateNewShardName() const {
+StatusWith<std::string> CatalogManagerMock::_generateNewShardName() {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

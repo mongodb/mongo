@@ -214,6 +214,7 @@ TEST_F(AddShardTest, AddShardStandalone) {
     // in the previous call, in the config server metadata
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, configHost);
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
@@ -223,16 +224,22 @@ TEST_F(AddShardTest, AddShardStandalone) {
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB1")));
 
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+
         return vector<BSONObj>{};
     });
 
-    onFindCommand([](const RemoteCommandRequest& request) {
+    onFindCommand([this](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB2")));
+
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
 
         return vector<BSONObj>{};
     });
@@ -321,6 +328,7 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
     // in the previous call, in the config server metadata
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, configHost);
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
@@ -330,16 +338,22 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB1")));
 
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+
         return vector<BSONObj>{};
     });
 
-    onFindCommand([](const RemoteCommandRequest& request) {
+    onFindCommand([this](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB2")));
+
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
 
         return vector<BSONObj>{};
     });
@@ -350,12 +364,15 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
     existingShard.setMaxSizeMB(100);
 
     // New name is being generated for the new shard
-    onFindCommand([&existingShard](const RemoteCommandRequest& request) {
+    onFindCommand([this, &existingShard](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
         ASSERT_EQ(query->ns(), ShardType::ConfigNS);
+
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
 
         return vector<BSONObj>{existingShard.toBSON()};
     });

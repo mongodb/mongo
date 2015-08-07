@@ -80,6 +80,8 @@ public:
     void expectGetDatabase(const DatabaseType& expectedDb) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
 
@@ -90,6 +92,8 @@ public:
             ASSERT_EQ(BSON(DatabaseType::name(expectedDb.getName())), query->getFilter());
             ASSERT_EQ(BSONObj(), query->getSort());
             ASSERT_EQ(1, query->getLimit().get());
+
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
 
             return vector<BSONObj>{expectedDb.toBSON()};
         });
@@ -146,6 +150,8 @@ public:
     void expectReloadChunks(const std::string& ns, const vector<ChunkType>& chunks) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
 
@@ -159,6 +165,8 @@ public:
             ASSERT_EQ(expectedQuery, query->getFilter());
             ASSERT_EQ(expectedSort, query->getSort());
             ASSERT_FALSE(query->getLimit().is_initialized());
+
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
 
             vector<BSONObj> chunksToReturn;
 
@@ -202,6 +210,8 @@ public:
     void expectReloadCollection(const CollectionType& collection) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
 
@@ -217,6 +227,8 @@ public:
             }
             ASSERT_EQ(BSONObj(), query->getSort());
 
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+
             return vector<BSONObj>{collection.toBSON()};
         });
     }
@@ -224,6 +236,8 @@ public:
     void expectLoadNewestChunk(const string& ns, const ChunkType& chunk) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
+            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
 
@@ -236,6 +250,8 @@ public:
             ASSERT_EQ(expectedQuery, query->getFilter());
             ASSERT_EQ(expectedSort, query->getSort());
             ASSERT_EQ(1, query->getLimit().get());
+
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
 
             return vector<BSONObj>{chunk.toBSON()};
         });

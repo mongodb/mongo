@@ -128,9 +128,9 @@ public:
     Status checkAndUpgrade(bool checkOnly) override;
 
 private:
-    Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const override;
+    Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) override;
 
-    StatusWith<std::string> _generateNewShardName() const override;
+    StatusWith<std::string> _generateNewShardName() override;
 
     bool _runReadCommand(const std::string& dbname,
                          const BSONObj& cmdObj,
@@ -151,6 +151,12 @@ private:
 
     StatusWith<BSONObj> _runCommandOnConfigWithNotMasterRetries(const std::string& dbName,
                                                                 BSONObj cmdObj);
+
+    StatusWith<std::vector<BSONObj>> _exhaustiveFindOnConfig(const HostAndPort& host,
+                                                             const NamespaceString& nss,
+                                                             const BSONObj& query,
+                                                             const BSONObj& sort,
+                                                             boost::optional<long long> limit);
 
     /**
      * Appends a read committed read concern to the request object.

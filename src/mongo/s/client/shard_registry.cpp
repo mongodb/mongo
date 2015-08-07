@@ -269,28 +269,43 @@ shared_ptr<Shard> ShardRegistry::_findUsingLookUp(const ShardId& shardId) {
     return nullptr;
 }
 
-StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort& host,
-                                                               const NamespaceString& nss,
-                                                               const BSONObj& query,
-                                                               const BSONObj& sort,
-                                                               boost::optional<long long> limit) {
+StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFind(
+    const HostAndPort& host,
+    const NamespaceString& nss,
+    const BSONObj& query,
+    const BSONObj& sort,
+    boost::optional<long long> limit,
+    boost::optional<repl::ReadConcernArgs> readConcern,
+    const BSONObj& metadata) {
     // If for some reason the callback never gets invoked, we will return this status
     Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
-    vector<BSONObj> results;
+    QueryResponse response;
 
-    auto fetcherCallback = [&status, &results](const Fetcher::QueryResponseStatus& dataStatus,
-                                               Fetcher::NextAction* nextAction) {
+    auto fetcherCallback = [&status, &response](const Fetcher::QueryResponseStatus& dataStatus,
+                                                Fetcher::NextAction* nextAction) {
 
         // Throw out any accumulated results on error
         if (!dataStatus.isOK()) {
             status = dataStatus.getStatus();
-            results.clear();
+            response.docs.clear();
             return;
         }
 
         auto& data = dataStatus.getValue();
+        if (auto replField = data.otherFields.metadata[rpc::kReplicationMetadataFieldName]) {
+            auto replParseStatus = rpc::ReplSetMetadata::readFromMetadata(replField.Obj());
+
+            if (!replParseStatus.isOK()) {
+                status = replParseStatus.getStatus();
+                response.docs.clear();
+                return;
+            }
+
+            response.opTime = replParseStatus.getValue().getLastCommittedOptime();
+        }
+
         for (const BSONObj& doc : data.documents) {
-            results.push_back(std::move(doc.getOwned()));
+            response.docs.push_back(std::move(doc.getOwned()));
         }
 
         status = Status::OK();
@@ -304,7 +319,16 @@ StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort
                                               boost::none,  // skip
                                               limit);
 
-    QueryFetcher fetcher(_executor.get(), host, nss, lpq->asFindCommand(), fetcherCallback);
+    BSONObjBuilder findCmdBuilder;
+    lpq->asFindCommand(&findCmdBuilder);
+
+    if (readConcern) {
+        BSONObjBuilder builder;
+        readConcern->appendInfo(&findCmdBuilder);
+    }
+
+    QueryFetcher fetcher(
+        _executor.get(), host, nss, findCmdBuilder.done(), fetcherCallback, metadata);
 
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
@@ -317,7 +341,7 @@ StatusWith<std::vector<BSONObj>> ShardRegistry::exhaustiveFind(const HostAndPort
         return status;
     }
 
-    return results;
+    return response;
 }
 
 StatusWith<BSONObj> ShardRegistry::runCommand(const HostAndPort& host,

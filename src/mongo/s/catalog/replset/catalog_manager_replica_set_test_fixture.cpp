@@ -189,6 +189,11 @@ void CatalogManagerReplSetTestFixture::onFindCommand(NetworkTestEnv::OnFindComma
     _networkTestEnv->onFindCommand(func);
 }
 
+void CatalogManagerReplSetTestFixture::onFindWithMetadataCommand(
+    NetworkTestEnv::OnFindCommandWithMetadataFunction func) {
+    _networkTestEnv->onFindWithMetadataCommand(func);
+}
+
 void CatalogManagerReplSetTestFixture::setupShards(const std::vector<ShardType>& shards) {
     auto future = launchAsync([this] { shardRegistry()->reload(); });
 
@@ -198,7 +203,7 @@ void CatalogManagerReplSetTestFixture::setupShards(const std::vector<ShardType>&
 }
 
 void CatalogManagerReplSetTestFixture::expectGetShards(const std::vector<ShardType>& shards) {
-    onFindCommand([&shards](const RemoteCommandRequest& request) {
+    onFindCommand([this, &shards](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
 
@@ -211,6 +216,8 @@ void CatalogManagerReplSetTestFixture::expectGetShards(const std::vector<ShardTy
         ASSERT_EQ(query->getFilter(), BSONObj());
         ASSERT_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().is_initialized());
+
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
 
         vector<BSONObj> shardsToReturn;
 

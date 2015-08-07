@@ -96,6 +96,8 @@ protected:
     void onCommand(executor::NetworkTestEnv::OnCommandFunction func);
     void onCommandWithMetadata(executor::NetworkTestEnv::OnCommandWithMetadataFunction func);
     void onFindCommand(executor::NetworkTestEnv::OnFindCommandFunction func);
+    void onFindWithMetadataCommand(
+        executor::NetworkTestEnv::OnFindCommandWithMetadataFunction func);
 
     /**
      * Setup the shard registry to contain the given shards until the next reload.

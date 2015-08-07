@@ -3,8 +3,10 @@
 // of the config replset config during startup.
 
 var configRS = new ReplSetTest({name: "configRS", nodes: 1, useHostName: true});
-configRS.startSet();
-configRS.initiate();
+configRS.startSet({ configsvr: '', storageEngine: 'wiredTiger' });
+var replConfig = configRS.getReplSetConfig();
+replConfig.configsvr = true;
+configRS.initiate(replConfig);
 
 // Build a seed list for the config servers to pass to mongos that uses "localhost" for the
 // hostnames even though the replica set config uses the hostname.

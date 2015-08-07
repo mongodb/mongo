@@ -36,6 +36,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/mutex.h"
 
@@ -69,6 +70,11 @@ class ShardRegistry {
 public:
     struct CommandResponse {
         BSONObj response;
+        repl::OpTime opTime;
+    };
+
+    struct QueryResponse {
+        std::vector<BSONObj> docs;
         repl::OpTime opTime;
     };
 
@@ -150,11 +156,13 @@ public:
      *
      * Note: should never be used outside of CatalogManagerReplicaSet or DistLockCatalogImpl.
      */
-    StatusWith<std::vector<BSONObj>> exhaustiveFind(const HostAndPort& host,
-                                                    const NamespaceString& nss,
-                                                    const BSONObj& query,
-                                                    const BSONObj& sort,
-                                                    boost::optional<long long> limit);
+    StatusWith<QueryResponse> exhaustiveFind(const HostAndPort& host,
+                                             const NamespaceString& nss,
+                                             const BSONObj& query,
+                                             const BSONObj& sort,
+                                             boost::optional<long long> limit,
+                                             boost::optional<repl::ReadConcernArgs> readConcern,
+                                             const BSONObj& metadata);
 
     /**
      * Runs a command against the specified host and returns the result.  It is the responsibility

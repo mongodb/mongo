@@ -122,9 +122,9 @@ public:
     Status checkAndUpgrade(bool checkOnly) override;
 
 private:
-    Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const override;
+    Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) override;
 
-    StatusWith<std::string> _generateNewShardName() const override;
+    StatusWith<std::string> _generateNewShardName() override;
 
     std::unique_ptr<DistLockManagerMock> _mockDistLockMgr;
 };

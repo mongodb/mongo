@@ -430,12 +430,12 @@ private:
      *  NamespaceExists if it exists with the same casing
      *  DatabaseDifferCase if it exists under different casing.
      */
-    virtual Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) const = 0;
+    virtual Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) = 0;
 
     /**
      * Generates a unique name to be given to a newly added shard.
      */
-    virtual StatusWith<std::string> _generateNewShardName() const = 0;
+    virtual StatusWith<std::string> _generateNewShardName() = 0;
 };
 
 }  // namespace mongo

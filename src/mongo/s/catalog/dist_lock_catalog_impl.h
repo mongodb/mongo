@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <vector>
+
 #include "mongo/bson/oid.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -37,6 +40,8 @@
 
 namespace mongo {
 
+struct HostAndPort;
+class NamespaceString;
 class RemoteCommandTargeter;
 class ShardRegistry;
 
@@ -77,6 +82,12 @@ public:
 
 private:
     RemoteCommandTargeter* _targeter();
+
+    StatusWith<std::vector<BSONObj>> _findOnConfig(const HostAndPort& host,
+                                                   const NamespaceString& nss,
+                                                   const BSONObj& query,
+                                                   const BSONObj& sort,
+                                                   boost::optional<long long> limit);
 
     ShardRegistry* _client;
 
