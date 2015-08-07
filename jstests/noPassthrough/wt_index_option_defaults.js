@@ -14,6 +14,14 @@
         return;
     }
 
+    // Skip this test when 'wiredTigerIndexConfigString' is already set in TestData.
+    // TODO: This test can be enabled when MongoRunner supports combining WT config strings with
+    // commas.
+    if (jsTest.options().wiredTigerIndexConfigString) {
+        jsTest.log('Skipping test because system-wide defaults for index options are already set');
+        return;
+    }
+
     // Use different values for the same configuration string key to test that index-specific
     // options override collection-wide options, and that collection-wide options override
     // system-wide options.
