@@ -124,7 +124,8 @@ public:
         }
 
         for (auto&& ns : pipeline->getInvolvedCollections()) {
-            uassert(28769, str::stream() << ns.ns() << " cannot be sharded", !conf->isSharded(ns.ns()));
+            uassert(
+                28769, str::stream() << ns.ns() << " cannot be sharded", !conf->isSharded(ns.ns()));
         }
 
         if (!conf->isSharded(fullns)) {
