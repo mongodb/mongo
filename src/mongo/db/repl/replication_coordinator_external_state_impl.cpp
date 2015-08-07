@@ -130,16 +130,34 @@ void ReplicationCoordinatorExternalStateImpl::shutdown() {
 
 void ReplicationCoordinatorExternalStateImpl::initiateOplog(OperationContext* txn,
                                                             bool updateReplOpTime) {
-    createOplog(txn);
+    createOplog(txn, rsOplogName, true);
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction scopedXact(txn, MODE_X);
         Lock::GlobalWrite globalWrite(txn->lockState());
 
         WriteUnitOfWork wuow(txn);
-        getGlobalServiceContext()->getOpObserver()->onOpMessage(txn,
-                                                                BSON("msg"
-                                                                     << "initiating set"));
+
+        const auto msgObj = BSON("msg"
+                                 << "initiating set");
+        if (updateReplOpTime) {
+            getGlobalServiceContext()->getOpObserver()->onOpMessage(txn, msgObj);
+        } else {
+            // 'updateReplOpTime' is false when called from the replSetInitiate command when the
+            // server is running with replication disabled. We bypass onOpMessage to invoke _logOp
+            // directly so that we can override the replication mode and keep _logO from updating
+            // the replication coordinator's op time (illegal operation when replication is not
+            // enabled).
+            repl::_logOp(txn,
+                         "n",
+                         "",
+                         msgObj,
+                         nullptr,
+                         false,
+                         rsOplogName,
+                         ReplicationCoordinator::modeReplSet,
+                         updateReplOpTime);
+        }
         wuow.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "initiate oplog entry", "local.oplog.rs");
