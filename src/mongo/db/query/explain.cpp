@@ -279,6 +279,27 @@ void Explain::statsToBSON(const PlanStageStats& stats,
             bob->appendNumber("nWouldDelete", spec->docsDeleted);
             bob->appendNumber("nInvalidateSkips", spec->nInvalidateSkips);
         }
+    } else if (STAGE_DISTINCT_SCAN == stats.stageType) {
+        DistinctScanStats* spec = static_cast<DistinctScanStats*>(stats.specific.get());
+
+        bob->append("keyPattern", spec->keyPattern);
+        bob->append("indexName", spec->indexName);
+        bob->appendBool("isMultiKey", spec->isMultiKey);
+        bob->appendBool("isUnique", spec->isUnique);
+        bob->appendBool("isSparse", spec->isSparse);
+        bob->appendBool("isPartial", spec->isPartial);
+        bob->append("indexVersion", spec->indexVersion);
+        bob->append("direction", spec->direction > 0 ? "forward" : "backward");
+
+        if ((topLevelBob->len() + spec->indexBounds.objsize()) > kMaxStatsBSONSize) {
+            bob->append("warning", "index bounds omitted due to BSON size limit");
+        } else {
+            bob->append("indexBounds", spec->indexBounds);
+        }
+
+        if (verbosity >= ExplainCommon::EXEC_STATS) {
+            bob->appendNumber("keysExamined", spec->keysExamined);
+        }
     } else if (STAGE_FETCH == stats.stageType) {
         FetchStats* spec = static_cast<FetchStats*>(stats.specific.get());
         if (verbosity >= ExplainCommon::EXEC_STATS) {

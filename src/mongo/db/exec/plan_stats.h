@@ -276,22 +276,32 @@ struct DeleteStats : public SpecificStats {
 };
 
 struct DistinctScanStats : public SpecificStats {
-    DistinctScanStats() : keysExamined(0), indexVersion(0) {}
-
     SpecificStats* clone() const final {
         DistinctScanStats* specific = new DistinctScanStats(*this);
+        // BSON objects have to be explicitly copied.
         specific->keyPattern = keyPattern.getOwned();
+        specific->indexBounds = indexBounds.getOwned();
         return specific;
     }
 
     // How many keys did we look at while distinct-ing?
-    size_t keysExamined;
-
-    std::string indexName;
+    size_t keysExamined = 0;
 
     BSONObj keyPattern;
 
-    int indexVersion;
+    // Properties of the index used for the distinct scan.
+    std::string indexName;
+    int indexVersion = 0;
+    bool isMultiKey = false;
+    bool isPartial = false;
+    bool isSparse = false;
+    bool isUnique = false;
+
+    // >1 if we're traversing the index forwards and <1 if we're traversing it backwards.
+    int direction = 1;
+
+    // A BSON representation of the distinct scan's index bounds.
+    BSONObj indexBounds;
 };
 
 struct FetchStats : public SpecificStats {

@@ -63,6 +63,17 @@
     assert(planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
     assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 
+    // Check that the DISTINCT_SCAN stage has the correct stats.
+    var stage = getPlanStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN");
+    assert.eq({a: 1}, stage.keyPattern);
+    assert.eq("a_1", stage.indexName);
+    assert.eq(false, stage.isMultiKey);
+    assert.eq(false, stage.isUnique);
+    assert.eq(false, stage.isSparse);
+    assert.eq(false, stage.isPartial);
+    assert.eq(1, stage.indexVersion);
+    assert("indexBounds" in stage);
+
     assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
     assert.eq([1], coll.distinct('a', {a: 1}));

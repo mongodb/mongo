@@ -3,32 +3,39 @@
 // scan or whether the plan is covered (index only).
 
 /**
- * Given the root stage of explain's BSON representation of a query plan ('root'),
- * returns true if the plan has a stage called 'stage'.
+ * Given the root stage of explain's JSON representation of a query plan ('root'), returns the
+ * subdocument with its stage as 'stage'. Returns null if the plan does not have such a stage.
  */
-function planHasStage(root, stage) {
+function getPlanStage(root, stage) {
     if (root.stage === stage) {
-        return true;
-    }
-    else if ("inputStage" in root) {
-        return planHasStage(root.inputStage, stage);
-    }
-    else if ("inputStages" in root) {
+        return root;
+    } else if ("inputStage" in root) {
+        return getPlanStage(root.inputStage, stage);
+    } else if ("inputStages" in root) {
         for (var i = 0; i < root.inputStages.length; i++) {
-            if (planHasStage(root.inputStages[i], stage)) {
-                return true;
+            var stage = getPlanStage(root.inputStages[i], stage);
+            if (stage !== null) {
+                return stage;
             }
         }
-    }
-    else if ("shards" in root) {
+    } else if ("shards" in root) {
         for (var i = 0; i < root.shards.length; i++) {
-            if (planHasStage(root.shards[i].winningPlan, stage)) {
-                return true;
+            var stage = getPlanStage(root.shards[i].winningPlan, stage);
+            if (stage !== null) {
+                return stage;
             }
         }
     }
 
-    return false;
+    return null;
+}
+
+/**
+ * Given the root stage of explain's BSON representation of a query plan ('root'),
+ * returns true if the plan has a stage called 'stage'.
+ */
+function planHasStage(root, stage) {
+    return getPlanStage(root, stage) !== null;
 }
 
 /**
