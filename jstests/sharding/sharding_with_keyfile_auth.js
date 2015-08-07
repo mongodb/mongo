@@ -15,7 +15,9 @@ var st = new ShardingTest({ name : myTestName ,
 var configs = st._configServers
 var mongoses = st._mongos
 
-mongoses[0].getDB( "admin" ).createUser({ user: "root", pwd: "pass", roles: ["root"] });
+var createUserWC = st.configRS == null ? null : { w: st.configRS.numNodes };
+
+mongoses[0].getDB("admin").createUser({ user: "root", pwd: "pass", roles: ["root"] }, createUserWC);
 
 for( var i = 0; i < configs.length; i++ ){
     var confAdmin = configs[i].getDB( "admin" );

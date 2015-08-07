@@ -184,7 +184,7 @@ class ShardedClusterFixture(interface.Fixture):
                                             mongod_executable=self.mongod_executable,
                                             mongod_options=mongod_options,
                                             preserve_dbpath=self.preserve_dbpath,
-                                            num_nodes=2,
+                                            num_nodes=3,
                                             auth_options=self.auth_options,
                                             replset_config_options={"configsvr": True})
 
