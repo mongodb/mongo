@@ -804,7 +804,7 @@ OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
 
 ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext* txn,
                                                                 const ReadConcernArgs& settings) {
-    const auto& ts = settings.getOpTime();
+    const auto ts = settings.getOpTime();
     // Note that if 'settings' has no explicit after-optime, 'ts' will be the earliest
     // possible optime, which means the comparisons with 'ts' below are always false.  This is
     // intentional.

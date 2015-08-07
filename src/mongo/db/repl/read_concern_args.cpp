@@ -55,18 +55,18 @@ const string ReadConcernArgs::kOpTimestampFieldName("ts");
 const string ReadConcernArgs::kOpTermFieldName("term");
 const string ReadConcernArgs::kLevelFieldName("level");
 
-ReadConcernArgs::ReadConcernArgs()
-    : ReadConcernArgs(OpTime(), ReadConcernLevel::kLocalReadConcern) {}
+ReadConcernArgs::ReadConcernArgs() = default;
 
-ReadConcernArgs::ReadConcernArgs(OpTime opTime, ReadConcernLevel level)
-    : _opTime(std::move(opTime)), _level(level) {}
+ReadConcernArgs::ReadConcernArgs(boost::optional<OpTime> opTime,
+                                 boost::optional<ReadConcernLevel> level)
+    : _opTime(std::move(opTime)), _level(std::move(level)) {}
 
 ReadConcernLevel ReadConcernArgs::getLevel() const {
-    return _level;
+    return _level.value_or(ReadConcernLevel::kLocalReadConcern);
 }
 
-const OpTime& ReadConcernArgs::getOpTime() const {
-    return _opTime;
+OpTime ReadConcernArgs::getOpTime() const {
+    return _opTime.value_or(OpTime());
 }
 
 Status ReadConcernArgs::initialize(const BSONObj& cmdObj) {
@@ -123,9 +123,7 @@ Status ReadConcernArgs::initialize(const BSONObj& cmdObj) {
                           str::stream() << kReadConcernFieldName << '.' << kLevelFieldName
                                         << " must be either \"local\" or \"majority\"");
         }
-    } else if (readCommittedStatus == ErrorCodes::NoSuchKey) {
-        _level = ReadConcernLevel::kLocalReadConcern;
-    } else {
+    } else if (readCommittedStatus != ErrorCodes::NoSuchKey) {
         return readCommittedStatus;
     }
 
@@ -135,30 +133,34 @@ Status ReadConcernArgs::initialize(const BSONObj& cmdObj) {
 void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) {
     BSONObjBuilder rcBuilder(builder->subobjStart(kReadConcernFieldName));
 
-    string levelName;
-    switch (_level) {
-        case ReadConcernLevel::kLocalReadConcern:
-            levelName = kLocalReadConcernStr;
-            break;
+    if (_level) {
+        string levelName;
+        switch (_level.get()) {
+            case ReadConcernLevel::kLocalReadConcern:
+                levelName = kLocalReadConcernStr;
+                break;
 
-        case ReadConcernLevel::kMajorityReadConcern:
-            levelName = kMajorityReadConcernStr;
-            break;
+            case ReadConcernLevel::kMajorityReadConcern:
+                levelName = kMajorityReadConcernStr;
+                break;
 
-        case ReadConcernLevel::kLinearizableReadConcern:
-            levelName = kLinearizableReadConcernStr;
-            break;
+            case ReadConcernLevel::kLinearizableReadConcern:
+                levelName = kLinearizableReadConcernStr;
+                break;
 
-        default:
-            fassert(28754, false);
+            default:
+                fassert(28754, false);
+        }
+
+        rcBuilder.append(kLevelFieldName, levelName);
     }
 
-    rcBuilder.append(kLevelFieldName, levelName);
-
-    BSONObjBuilder afterBuilder(rcBuilder.subobjStart(kOpTimeFieldName));
-    afterBuilder.append(kOpTimestampFieldName, _opTime.getTimestamp());
-    afterBuilder.append(kOpTermFieldName, _opTime.getTerm());
-    afterBuilder.done();
+    if (_opTime) {
+        BSONObjBuilder afterBuilder(rcBuilder.subobjStart(kOpTimeFieldName));
+        afterBuilder.append(kOpTimestampFieldName, _opTime->getTimestamp());
+        afterBuilder.append(kOpTermFieldName, _opTime->getTerm());
+        afterBuilder.done();
+    }
 
     rcBuilder.done();
 }

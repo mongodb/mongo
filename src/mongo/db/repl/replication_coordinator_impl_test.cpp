@@ -83,6 +83,10 @@ struct OpTimeWithTermZero {
         return OpTime(timestamp, 0);
     }
 
+    operator boost::optional<OpTime>() const {
+        return OpTime(timestamp, 0);
+    }
+
     Timestamp timestamp;
 };
 
