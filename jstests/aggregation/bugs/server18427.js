@@ -5,6 +5,7 @@ load('jstests/aggregation/extras/utils.js');
 
 (function() {
     'use strict';
+
     var coll = db.log_exponential_expressions;
     coll.drop();
     assert.writeOK(coll.insert({_id: 0}));
