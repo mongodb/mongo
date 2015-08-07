@@ -281,6 +281,12 @@ var runner = (function() {
 
         if (workerErrs.length > 0) {
             var stackTraces = workerErrs.map(function(e) {
+                if (e.err && e.stack) {
+                    // Prepend the error message to the stack trace because it
+                    // isn't automatically included in SpiderMonkey stack traces
+                    // (see: SERVER-18781).
+                    return e.err + '\n\n' + e.stack;
+                }
                 return e.stack || e.err;
             });
 
