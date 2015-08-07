@@ -300,12 +300,11 @@ public:
             configObj = cmdObj["replSetInitiate"].Obj();
         }
 
-        std::string replSetString = getGlobalReplicationCoordinator()->getSettings().replSet;
+        std::string replSetString = ReplicationCoordinator::get(txn)->getSettings().replSet;
         if (replSetString.empty()) {
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::NoReplicationEnabled,
-                                              "This node was not started with the replSet "
-                                              "option"));
+            return appendCommandStatus(
+                result,
+                ReplicationCoordinator::get(txn)->processReplSetInitiate(txn, configObj, &result));
         }
 
         if (configObj.isEmpty()) {
