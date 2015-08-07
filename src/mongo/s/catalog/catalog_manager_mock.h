@@ -41,7 +41,7 @@ public:
     CatalogManagerMock();
     ~CatalogManagerMock();
 
-    ConnectionString connectionString() const override;
+    ConnectionString connectionString() override;
 
     Status startup() override;
 
@@ -117,7 +117,7 @@ public:
     void writeConfigServerDirect(const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;
 
-    DistLockManager* getDistLockManager() const override;
+    DistLockManager* getDistLockManager() override;
 
     Status checkAndUpgrade(bool checkOnly) override;
 

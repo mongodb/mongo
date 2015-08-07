@@ -49,7 +49,7 @@ CatalogManagerMock::CatalogManagerMock() {
 }
 CatalogManagerMock::~CatalogManagerMock() = default;
 
-ConnectionString CatalogManagerMock::connectionString() const {
+ConnectionString CatalogManagerMock::connectionString() {
     return kConfigHost;
 }
 
@@ -164,7 +164,7 @@ StatusWith<SettingsType> CatalogManagerMock::getGlobalSettings(const string& key
 void CatalogManagerMock::writeConfigServerDirect(const BatchedCommandRequest& request,
                                                  BatchedCommandResponse* response) {}
 
-DistLockManager* CatalogManagerMock::getDistLockManager() const {
+DistLockManager* CatalogManagerMock::getDistLockManager() {
     return _mockDistLockMgr.get();
 }
 

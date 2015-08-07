@@ -124,7 +124,7 @@ Status CatalogManagerReplicaSet::startup() {
     return Status::OK();
 }
 
-ConnectionString CatalogManagerReplicaSet::connectionString() const {
+ConnectionString CatalogManagerReplicaSet::connectionString() {
     return _configServerConnectionString;
 }
 
@@ -780,7 +780,7 @@ Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(const BSONArray& update
     return Status::OK();
 }
 
-DistLockManager* CatalogManagerReplicaSet::getDistLockManager() const {
+DistLockManager* CatalogManagerReplicaSet::getDistLockManager() {
     invariant(_distLockManager);
     return _distLockManager.get();
 }

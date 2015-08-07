@@ -87,7 +87,7 @@ public:
     /**
      * Retrieves the connection string for the catalog manager's backing server.
      */
-    virtual ConnectionString connectionString() const = 0;
+    virtual ConnectionString connectionString() = 0;
 
     /**
      * Performs implementation-specific startup tasks. Must be run after the catalog manager
@@ -351,7 +351,7 @@ public:
      * The returned reference is valid only as long as the catalog manager is valid and should not
      * be cached.
      */
-    virtual DistLockManager* getDistLockManager() const = 0;
+    virtual DistLockManager* getDistLockManager() = 0;
 
     /**
      * Creates a new database entry for the specified database name in the configuration

@@ -248,7 +248,7 @@ Status CatalogManagerLegacy::_startConfigServerChecker() {
     return Status::OK();
 }
 
-ConnectionString CatalogManagerLegacy::connectionString() const {
+ConnectionString CatalogManagerLegacy::connectionString() {
     return _configServerConnectionString;
 }
 
@@ -1043,7 +1043,7 @@ size_t CatalogManagerLegacy::_getShardCount(const BSONObj& query) const {
     return shardCount;
 }
 
-DistLockManager* CatalogManagerLegacy::getDistLockManager() const {
+DistLockManager* CatalogManagerLegacy::getDistLockManager() {
     invariant(_distLockManager);
     return _distLockManager.get();
 }

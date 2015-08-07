@@ -53,7 +53,7 @@ public:
 
     Status startup() override;
 
-    ConnectionString connectionString() const override;
+    ConnectionString connectionString() override;
 
     void shutDown() override;
 
@@ -120,7 +120,7 @@ public:
     void writeConfigServerDirect(const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;
 
-    DistLockManager* getDistLockManager() const override;
+    DistLockManager* getDistLockManager() override;
 
     Status checkAndUpgrade(bool checkOnly) override;
 
