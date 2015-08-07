@@ -32,6 +32,13 @@
 
 namespace mongo {
 
+namespace {
+
+const char kTermFieldName[] = "term";
+const char kTimestampFieldName[] = "ts";
+
+}  // namespace
+
 Status bsonExtractField(const BSONObj& object, StringData fieldName, BSONElement* outElement) {
     BSONElement element = object.getField(fieldName);
     if (element.eoo())
@@ -95,6 +102,25 @@ Status bsonExtractStringField(const BSONObj& object, StringData fieldName, std::
     if (!status.isOK())
         return status;
     *out = element.str();
+    return Status::OK();
+}
+
+Status bsonExtractOpTimeField(const BSONObj& object, StringData fieldName, repl::OpTime* out) {
+    BSONElement element;
+    Status status = bsonExtractTypedField(object, fieldName, Object, &element);
+    if (!status.isOK())
+        return status;
+
+    BSONObj opTimeObj = element.Obj();
+    Timestamp ts;
+    status = bsonExtractTimestampField(opTimeObj, kTimestampFieldName, &ts);
+    if (!status.isOK())
+        return status;
+    long long term;
+    status = bsonExtractIntegerField(opTimeObj, kTermFieldName, &term);
+    if (!status.isOK())
+        return status;
+    *out = repl::OpTime(ts, term);
     return Status::OK();
 }
 

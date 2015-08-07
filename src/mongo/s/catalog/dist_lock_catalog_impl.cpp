@@ -41,7 +41,7 @@
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
@@ -59,7 +59,7 @@ namespace {
 const char kCmdResponseWriteConcernField[] = "writeConcernError";
 const char kFindAndModifyResponseResultDocField[] = "value";
 const char kLocalTimeField[] = "localTime";
-const BSONObj kReplMetadata = BSON(rpc::kReplicationMetadataFieldName << 1);
+const BSONObj kReplMetadata = BSON(rpc::kReplSetMetadataFieldName << 1);
 const ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly, TagSet());
 
 /**

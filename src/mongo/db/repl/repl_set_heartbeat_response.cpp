@@ -221,18 +221,8 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
         _opTimeSet = true;
         _opTime = OpTime(Timestamp(opTimeElement.date()), term);
     } else if (opTimeElement.type() == Object) {
-        BSONObj opTime = opTimeElement.Obj();
-        Timestamp ts;
-        Status status = bsonExtractTimestampField(opTime, kTimestampFieldName, &ts);
-        if (!status.isOK())
-            return status;
-        long long extractedTerm;
-        status = bsonExtractIntegerField(opTime, kTermFieldName, &extractedTerm);
-        if (!status.isOK())
-            return status;
-
+        Status status = bsonExtractOpTimeField(doc, kOpTimeFieldName, &_opTime);
         _opTimeSet = true;
-        _opTime = OpTime(ts, extractedTerm);
         // since a v1 OpTime was in the response, the member must be part of a replset
         _isReplSet = true;
     } else {

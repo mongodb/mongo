@@ -112,7 +112,8 @@ TEST(ReadAfterParse, NoOpTimeTS) {
         readAfterOpTime.initialize(BSON("find"
                                         << "test" << ReadConcernArgs::kReadConcernFieldName
                                         << BSON(ReadConcernArgs::kOpTimeFieldName
-                                                << BSON(ReadConcernArgs::kOpTermFieldName << 2)))));
+                                                << BSON(ReadConcernArgs::kOpTimestampFieldName
+                                                        << 2)))));
 }
 
 TEST(ReadAfterParse, NoOpTimeTerm) {

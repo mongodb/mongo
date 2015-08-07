@@ -44,6 +44,7 @@
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/type_changelog.h"
@@ -325,7 +326,7 @@ void CatalogManagerReplSetTestFixture::expectUpdateCollection(const HostAndPort&
                                                               const CollectionType& coll) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(expectedHost, request.target);
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
         ASSERT_EQUALS("config", request.dbname);
 
         BatchedUpdateRequest actualBatchedUpdate;

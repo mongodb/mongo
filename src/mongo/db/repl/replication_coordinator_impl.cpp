@@ -59,7 +59,6 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config_checks.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/replication_metadata.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -1604,10 +1603,9 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result)
     result->append("config", _rsConfig.toBSON());
 }
 
-void ReplicationCoordinatorImpl::processReplicationMetadata(
-    const ReplicationMetadata& replMetadata) {
+void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {
     CBHStatus cbh = _replExecutor.scheduleWork(
-        stdx::bind(&ReplicationCoordinatorImpl::_processReplicationMetadata_helper,
+        stdx::bind(&ReplicationCoordinatorImpl::_processReplSetMetadata_helper,
                    this,
                    stdx::placeholders::_1,
                    replMetadata));
@@ -1618,17 +1616,17 @@ void ReplicationCoordinatorImpl::processReplicationMetadata(
     _replExecutor.wait(cbh.getValue());
 }
 
-void ReplicationCoordinatorImpl::_processReplicationMetadata_helper(
-    const ReplicationExecutor::CallbackArgs& cbData, const ReplicationMetadata& replMetadata) {
+void ReplicationCoordinatorImpl::_processReplSetMetadata_helper(
+    const ReplicationExecutor::CallbackArgs& cbData, const rpc::ReplSetMetadata& replMetadata) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
 
-    _processReplicationMetadata_incallback(replMetadata);
+    _processReplSetMetadata_incallback(replMetadata);
 }
 
-void ReplicationCoordinatorImpl::_processReplicationMetadata_incallback(
-    const ReplicationMetadata& replMetadata) {
+void ReplicationCoordinatorImpl::_processReplSetMetadata_incallback(
+    const rpc::ReplSetMetadata& replMetadata) {
     if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
         return;
     }
@@ -2748,7 +2746,7 @@ void ReplicationCoordinatorImpl::_processReplSetDeclareElectionWinner_finish(
 
 void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestInterface& request,
                                                              BSONObjBuilder* builder) {
-    if (request.getMetadata().hasField(rpc::kReplicationMetadataFieldName)) {
+    if (request.getMetadata().hasField(rpc::kReplSetMetadataFieldName)) {
         rpc::ReplSetMetadata metadata;
 
         CBHStatus cbh = _replExecutor.scheduleWork(
@@ -2764,9 +2762,7 @@ void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestI
         fassert(28709, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
 
-        BSONObjBuilder metadataBuilder(builder->subobjStart(rpc::kReplicationMetadataFieldName));
         metadata.writeToMetadata(builder);
-        metadataBuilder.doneFast();
     }
 }
 

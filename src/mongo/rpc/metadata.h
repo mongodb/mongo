@@ -57,8 +57,6 @@ class OperationContext;
  */
 namespace rpc {
 
-extern const char kReplicationMetadataFieldName[];
-
 /**
  * Returns an empty metadata object.
  */

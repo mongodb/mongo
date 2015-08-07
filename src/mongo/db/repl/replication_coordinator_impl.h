@@ -192,7 +192,7 @@ public:
 
     virtual void processReplSetGetConfig(BSONObjBuilder* result) override;
 
-    virtual void processReplicationMetadata(const ReplicationMetadata& replMetadata) override;
+    virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) override;
 
     virtual Status setMaintenanceMode(bool activate) override;
 
@@ -942,13 +942,13 @@ private:
     bool _updateTerm_incallback(long long term, Handle* cbHandle);
 
     /**
-     * Callback that processes the ReplicationMetadata returned from a command run against another
+     * Callback that processes the ReplSetMetadata returned from a command run against another
      * replica set member and updates protocol version 1 information (most recent optime that is
      * committed, member id of the current PRIMARY, the current config version and the current term)
      */
-    void _processReplicationMetadata_helper(const ReplicationExecutor::CallbackArgs& cbData,
-                                            const ReplicationMetadata& replMetadata);
-    void _processReplicationMetadata_incallback(const ReplicationMetadata& replMetadata);
+    void _processReplSetMetadata_helper(const ReplicationExecutor::CallbackArgs& cbData,
+                                        const rpc::ReplSetMetadata& replMetadata);
+    void _processReplSetMetadata_incallback(const rpc::ReplSetMetadata& replMetadata);
 
     /**
      * Blesses a snapshot to be used for new committed reads.

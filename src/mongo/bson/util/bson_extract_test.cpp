@@ -30,6 +30,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -81,6 +82,33 @@ TEST(ExtractBSON, ExtractStringFieldWithDefault) {
     ASSERT_EQUALS(std::string("hello"), s);
     ASSERT_OK(bsonExtractStringFieldWithDefault(obj, "c", "default", &s));
     ASSERT_EQUALS(std::string("default"), s);
+}
+
+TEST(ExtractBSON, ExtractOpTimeField) {
+    // Outer object cases.
+    BSONObj obj = BSON("a" << BSON("ts" << Timestamp(10, 0) << "term" << 2) << "b"
+                           << "notAnObj");
+    repl::OpTime opTime;
+    ASSERT_OK(bsonExtractOpTimeField(obj, "a", &opTime));
+    ASSERT(repl::OpTime(Timestamp(10, 0), 2) == opTime);
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractOpTimeField(obj, "b", &opTime));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractOpTimeField(obj, "c", &opTime));
+
+    // Missing timestamp field.
+    obj = BSON("a" << BSON("ts"
+                           << "notATimestamp"
+                           << "term" << 2));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractOpTimeField(obj, "a", &opTime));
+    // Wrong typed timestamp field.
+    obj = BSON("a" << BSON("term" << 2));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractOpTimeField(obj, "a", &opTime));
+    // Missing term field.
+    obj = BSON("a" << BSON("ts" << Timestamp(10, 0) << "term"
+                                << "notANumber"));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractOpTimeField(obj, "a", &opTime));
+    // Wrong typed term field.
+    obj = BSON("a" << BSON("ts" << Timestamp(10, 0)));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractOpTimeField(obj, "a", &opTime));
 }
 
 TEST(ExtractBSON, ExtractBooleanFieldWithDefault) {

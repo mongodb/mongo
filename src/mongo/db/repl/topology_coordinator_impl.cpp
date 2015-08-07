@@ -2161,8 +2161,12 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
 
 void TopologyCoordinatorImpl::prepareReplResponseMetadata(rpc::ReplSetMetadata* metadata,
                                                           const OpTime& lastCommittedOpTime) const {
-    *metadata = rpc::ReplSetMetadata(
-        _term, lastCommittedOpTime, _rsConfig.getConfigVersion(), _currentPrimaryIndex);
+    // TODO(dannenberg): change the third arg to be the lastOpTimeVisible.
+    *metadata = rpc::ReplSetMetadata(_term,
+                                     lastCommittedOpTime,
+                                     lastCommittedOpTime,
+                                     _rsConfig.getConfigVersion(),
+                                     _currentPrimaryIndex);
 }
 
 void TopologyCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {

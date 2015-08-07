@@ -48,7 +48,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_actionlog.h"
@@ -92,7 +92,7 @@ namespace {
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::PrimaryOnly, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
-const BSONObj kReplMetadata(BSON(rpc::kReplicationMetadataFieldName << 1));
+const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
 const int kInitialSSVRetries = 3;
 const int kActionLogCollectionSize = 1024 * 1024 * 2;
 const int kChangeLogCollectionSize = 1024 * 1024 * 10;
@@ -1125,6 +1125,7 @@ bool CatalogManagerReplicaSet::_runReadCommand(const std::string& dbname,
 
     auto resultStatus = _runCommandOnConfig(target.getValue(), dbname, cmdObj);
     if (!resultStatus.isOK()) {
+        log() << "DANNENPRINT: " << resultStatus.getStatus();
         return Command::appendCommandStatus(*result, resultStatus.getStatus());
     }
 

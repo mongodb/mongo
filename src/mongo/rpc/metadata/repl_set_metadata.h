@@ -37,14 +37,17 @@ class BSONObjBuilder;
 
 namespace rpc {
 
+extern const char kReplSetMetadataFieldName[];
+
 /**
  * Represents the metadata information for $replData.
  */
 class ReplSetMetadata {
 public:
-    ReplSetMetadata();
+    ReplSetMetadata() = default;
     ReplSetMetadata(long long term,
                     repl::OpTime committedOpTime,
+                    repl::OpTime visibleOpTime,
                     long long configVersion,
                     int currentPrimaryIndex);
 
@@ -52,8 +55,8 @@ public:
      * format:
      * {
      *     term: 0,
-     *     lastOpCommittedTimestamp: 0,
-     *     lastOpCommittedTerm: 0,
+     *     lastOpCommitted: {ts: Timestamp(0, 0), term: 0}
+     *     lastOpVisible: {ts: Timestamp(0, 0), term: 0}
      *     configVersion: 0,
      *     primaryIndex: 0
      * }
@@ -61,13 +64,49 @@ public:
     static StatusWith<ReplSetMetadata> readFromMetadata(const BSONObj& doc);
     Status writeToMetadata(BSONObjBuilder* builder) const;
 
-    const repl::OpTime& getLastCommittedOptime() const;
+    /**
+     * Returns the OpTime of the most recent operation with which the client intereacted.
+     */
+    repl::OpTime getLastOpVisible() const {
+        return _lastOpVisible;
+    }
+
+    /**
+     * Returns the OpTime of the most recently committed op of which the sender was aware.
+     */
+    repl::OpTime getLastOpCommitted() const {
+        return _lastOpCommitted;
+    }
+
+    /**
+     * Returns the ReplSetConfig version number of the sender.
+     */
+    long long getConfigVersion() const {
+        return _configVersion;
+    }
+
+    /**
+     * Returns the index of the current primary from the perspective of the sender.
+     */
+    long long getPrimaryIndex() const {
+        return _currentPrimaryIndex;
+    }
+
+    /**
+     * Returns the current term from the perspective of the sender.
+     */
+    long long getTerm() const {
+        return _currentTerm;
+    }
 
 private:
-    long long _currentTerm = 0;
-    repl::OpTime _committedOpTime;
-    long long _configVersion = 0;
-    int _currentPrimaryIndex = 0;
+    repl::OpTime _lastOpCommitted =
+        repl::OpTime(Timestamp(0, 0), repl::OpTime::kProtocolVersionV0Term);
+    repl::OpTime _lastOpVisible =
+        repl::OpTime(Timestamp(0, 0), repl::OpTime::kProtocolVersionV0Term);
+    long long _currentTerm = -1;
+    long long _configVersion = -1;
+    int _currentPrimaryIndex = -1;
 };
 
 }  // namespace rpc

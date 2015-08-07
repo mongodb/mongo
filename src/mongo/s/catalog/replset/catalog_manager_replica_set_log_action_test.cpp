@@ -34,6 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/type_actionlog.h"
@@ -61,7 +62,7 @@ public:
         onCommand([&response](const RemoteCommandRequest& request) {
             ASSERT_EQUALS("config", request.dbname);
 
-            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
             BSONObj expectedCreateCmd = BSON("create" << ActionLogType::ConfigNS << "capped" << true
                                                       << "size" << 1024 * 1024 * 2);
@@ -75,7 +76,7 @@ public:
         onCommand([&expectedActionLog](const RemoteCommandRequest& request) {
             ASSERT_EQUALS("config", request.dbname);
 
-            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
             BatchedInsertRequest actualBatchedInsert;
             std::string errmsg;

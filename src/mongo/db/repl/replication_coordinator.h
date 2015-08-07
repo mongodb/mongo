@@ -54,6 +54,7 @@ namespace rpc {
 
 class ReplSetMetadata;
 class RequestInterface;
+class ReplSetMetadata;
 
 }  // namespace rpc
 
@@ -75,7 +76,6 @@ class ReplSetHtmlSummary;
 class ReplSetRequestVotesArgs;
 class ReplSetRequestVotesResponse;
 class ReplicaSetConfig;
-class ReplicationMetadata;
 class UpdatePositionArgs;
 
 /**
@@ -413,14 +413,14 @@ public:
     virtual void processReplSetGetConfig(BSONObjBuilder* result) = 0;
 
     /**
-     * Processes the ReplicationMetadata returned from a command run against another replica set
+     * Processes the ReplSetMetadata returned from a command run against another replica set
      * member and updates protocol version 1 information (most recent optime that is committed,
      * member id of the current PRIMARY, the current config version and the current term).
      *
      * TODO(dannenberg): Move this method to be testing only if it does not end up being used
      * to process the find and getmore metadata responses from the DataReplicator.
      */
-    virtual void processReplicationMetadata(const ReplicationMetadata& replMetadata) = 0;
+    virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) = 0;
 
     /**
      * Toggles maintenanceMode to the value expressed by 'activate'

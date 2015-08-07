@@ -43,9 +43,9 @@
 #include "mongo/db/repl/replica_set_config_checks.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/replication_metadata.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
@@ -88,7 +88,7 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::Callbac
     }
 
     const RemoteCommandRequest request(
-        target, "admin", heartbeatObj, BSON(rpc::kReplicationMetadataFieldName << 1), timeout);
+        target, "admin", heartbeatObj, BSON(rpc::kReplSetMetadataFieldName << 1), timeout);
     const ReplicationExecutor::RemoteCommandCallbackFn callback =
         stdx::bind(&ReplicationCoordinatorImpl::_handleHeartbeatResponse,
                    this,
@@ -129,10 +129,10 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     if (responseStatus.isOK()) {
         resp = cbData.response.getValue().data;
         responseStatus = hbResponse.initialize(resp, _topCoord->getTerm());
-        ReplicationMetadata replMetadata;
-        auto metadataStatus = replMetadata.initialize(cbData.response.getValue().metadata);
-        if (metadataStatus.isOK()) {
-            _processReplicationMetadata_incallback(replMetadata);
+        StatusWith<rpc::ReplSetMetadata> replMetadata =
+            rpc::ReplSetMetadata::readFromMetadata(cbData.response.getValue().metadata);
+        if (replMetadata.isOK()) {
+            _processReplSetMetadata_incallback(replMetadata.getValue());
         }
     }
     const Date_t now = _replExecutor.now();

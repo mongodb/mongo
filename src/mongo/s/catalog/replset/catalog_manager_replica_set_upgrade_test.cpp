@@ -32,6 +32,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
@@ -54,7 +55,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
     auto future = launchAsync([this] { ASSERT_OK(catalogManager()->checkAndUpgrade(true)); });
 
     onFindCommand([this](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
@@ -154,7 +155,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
         ASSERT_EQ("admin", request.dbname);
         ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
 
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         return fromjson(R"({
                     databases: [
@@ -169,7 +170,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
 
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         BatchedUpdateRequest actualBatchedUpdate;
         std::string errmsg;
@@ -217,7 +218,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfigWithAdmin
         ASSERT_EQ("admin", request.dbname);
         ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
 
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         return fromjson(R"({
                     databases: [
@@ -233,7 +234,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfigWithAdmin
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
 
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         BatchedUpdateRequest actualBatchedUpdate;
         std::string errmsg;
@@ -266,7 +267,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeWriteError) {
         ASSERT_EQ("admin", request.dbname);
         ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
 
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         return fromjson(R"({
                     databases: [
@@ -309,7 +310,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocNonEmptyConfigServer
         ASSERT_EQ("admin", request.dbname);
         ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
 
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         return fromjson(R"({
                     databases: [

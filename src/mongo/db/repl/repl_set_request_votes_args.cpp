@@ -91,18 +91,9 @@ Status ReplSetRequestVotesArgs::initialize(const BSONObj& argsObj) {
     if (!status.isOK())
         return status;
 
-    // extracting the lastCommittedOp is a bit of a process
-    BSONObj lastCommittedOp = argsObj[kLastCommittedOpFieldName].Obj();
-    Timestamp ts;
-    status = bsonExtractTimestampField(lastCommittedOp, kOpTimeFieldName, &ts);
+    status = bsonExtractOpTimeField(argsObj, kLastCommittedOpFieldName, &_lastCommittedOp);
     if (!status.isOK())
         return status;
-    long long term;
-    status = bsonExtractIntegerField(lastCommittedOp, kTermFieldName, &term);
-    if (!status.isOK())
-        return status;
-    _lastCommittedOp = OpTime(lastCommittedOp[kOpTimeFieldName].timestamp(),
-                              lastCommittedOp[kTermFieldName].Long());
 
     return Status::OK();
 }

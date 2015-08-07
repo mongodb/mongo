@@ -292,8 +292,9 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFind(
         }
 
         auto& data = dataStatus.getValue();
-        if (auto replField = data.otherFields.metadata[rpc::kReplicationMetadataFieldName]) {
-            auto replParseStatus = rpc::ReplSetMetadata::readFromMetadata(replField.Obj());
+        if (data.otherFields.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
+            auto replParseStatus =
+                rpc::ReplSetMetadata::readFromMetadata(data.otherFields.metadata);
 
             if (!replParseStatus.isOK()) {
                 status = replParseStatus.getStatus();
@@ -301,7 +302,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFind(
                 return;
             }
 
-            response.opTime = replParseStatus.getValue().getLastCommittedOptime();
+            response.opTime = replParseStatus.getValue().getLastOpCommitted();
         }
 
         for (const BSONObj& doc : data.documents) {
@@ -386,15 +387,15 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithMetadata
     CommandResponse cmdResponse;
     cmdResponse.response = response.data;
 
-    if (auto replField = response.metadata[rpc::kReplicationMetadataFieldName]) {
-        auto replParseStatus = rpc::ReplSetMetadata::readFromMetadata(replField.Obj());
+    if (response.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
+        auto replParseStatus = rpc::ReplSetMetadata::readFromMetadata(response.metadata);
 
         if (!replParseStatus.isOK()) {
             return replParseStatus.getStatus();
         }
 
         // TODO: SERVER-19734 use config server snapshot time.
-        cmdResponse.opTime = replParseStatus.getValue().getLastCommittedOptime();
+        cmdResponse.opTime = replParseStatus.getValue().getLastOpCommitted();
     }
 
     return cmdResponse;

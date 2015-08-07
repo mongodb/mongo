@@ -82,32 +82,14 @@ Status ReadConcernArgs::initialize(const BSONObj& cmdObj) {
     }
 
     BSONObj readConcernObj = readConcernElem.Obj();
-    BSONElement opTimeElem;
-    auto opTimeStatus =
-        bsonExtractTypedField(readConcernObj, kOpTimeFieldName, Object, &opTimeElem);
 
-    if (opTimeStatus.isOK()) {
-        BSONObj opTimeObj = opTimeElem.Obj();
-        BSONElement timestampElem;
-
-        Timestamp timestamp;
-        auto timestampStatus =
-            bsonExtractTimestampField(opTimeObj, kOpTimestampFieldName, &timestamp);
-
-        if (!timestampStatus.isOK()) {
-            return timestampStatus;
+    if (readConcernObj.hasField(kOpTimeFieldName)) {
+        OpTime opTime;
+        auto opTimeStatus = bsonExtractOpTimeField(readConcernObj, kOpTimeFieldName, &opTime);
+        if (!opTimeStatus.isOK()) {
+            return opTimeStatus;
         }
-
-        long long termNumber;
-        auto termStatus = bsonExtractIntegerField(opTimeObj, kOpTermFieldName, &termNumber);
-
-        if (!termStatus.isOK()) {
-            return termStatus;
-        }
-
-        _opTime = OpTime(timestamp, termNumber);
-    } else if (opTimeStatus != ErrorCodes::NoSuchKey) {
-        return opTimeStatus;
+        _opTime = opTime;
     }
 
     std::string levelString;

@@ -36,6 +36,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/type_changelog.h"
@@ -122,7 +123,7 @@ protected:
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), DatabaseType::ConfigNS);
 
-            ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
             BatchedUpdateRequest actualBatchedUpdate;
             std::string errmsg;
@@ -214,7 +215,7 @@ TEST_F(AddShardTest, AddShardStandalone) {
     // in the previous call, in the config server metadata
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, configHost);
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
@@ -232,7 +233,7 @@ TEST_F(AddShardTest, AddShardStandalone) {
     onFindCommand([this](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
@@ -328,7 +329,7 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
     // in the previous call, in the config server metadata
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, configHost);
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
@@ -344,7 +345,7 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
     });
 
     onFindCommand([this](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
@@ -365,7 +366,7 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
 
     // New name is being generated for the new shard
     onFindCommand([this, &existingShard](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(BSON(rpc::kReplicationMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));

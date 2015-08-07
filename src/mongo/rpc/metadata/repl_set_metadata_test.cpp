@@ -38,16 +38,22 @@ using repl::OpTime;
 
 TEST(ReplResponseMetadataTest, Roundtrip) {
     OpTime opTime(Timestamp(1234, 100), 5);
-    ReplSetMetadata metadata(3, opTime, 6, 12);
+    OpTime opTime2(Timestamp(7777, 100), 6);
+    ReplSetMetadata metadata(3, opTime, opTime2, 6, 12);
 
-    ASSERT_EQ(opTime, metadata.getLastCommittedOptime());
+    ASSERT_EQ(opTime, metadata.getLastOpCommitted());
+    ASSERT_EQ(opTime2, metadata.getLastOpVisible());
 
     BSONObjBuilder builder;
     metadata.writeToMetadata(&builder);
 
-    BSONObj expectedObj(BSON("term" << 3 << "lastOpCommittedTimestamp" << opTime.getTimestamp()
-                                    << "lastOpCommittedTerm" << opTime.getTerm() << "configVersion"
-                                    << 6 << "primaryIndex" << 12));
+    BSONObj expectedObj(
+        BSON(kReplSetMetadataFieldName
+             << BSON("term" << 3 << "lastOpCommitted"
+                            << BSON("ts" << opTime.getTimestamp() << "term" << opTime.getTerm())
+                            << "lastOpVisible"
+                            << BSON("ts" << opTime2.getTimestamp() << "term" << opTime2.getTerm())
+                            << "configVersion" << 6 << "primaryIndex" << 12)));
 
     BSONObj serializedObj = builder.obj();
     ASSERT_EQ(expectedObj, serializedObj);
@@ -56,7 +62,8 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
     ASSERT_OK(cloneStatus.getStatus());
 
     const auto& clonedMetadata = cloneStatus.getValue();
-    ASSERT_EQ(opTime, clonedMetadata.getLastCommittedOptime());
+    ASSERT_EQ(opTime, clonedMetadata.getLastOpCommitted());
+    ASSERT_EQ(opTime2, clonedMetadata.getLastOpVisible());
 
     BSONObjBuilder clonedBuilder;
     clonedMetadata.writeToMetadata(&clonedBuilder);

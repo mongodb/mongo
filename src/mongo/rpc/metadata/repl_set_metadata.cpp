@@ -28,6 +28,7 @@
 
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 
+#include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/metadata.h"
@@ -37,80 +38,87 @@ namespace rpc {
 
 using repl::OpTime;
 
+const char kReplSetMetadataFieldName[] = "$replData";
+
 namespace {
 
-const char kTermField[] = "term";
-const char kLastCommittedTSField[] = "lastOpCommittedTimestamp";
-const char kLastCommittedTermField[] = "lastOpCommittedTerm";
-const char kLastCommittedConfigVersionField[] = "configVersion";
-const char kLastCommittedPrimaryIndexField[] = "primaryIndex";
+const char kLastOpCommittedFieldName[] = "lastOpCommitted";
+const char kLastOpVisibleFieldName[] = "lastOpVisible";
+const char kConfigVersionFieldName[] = "configVersion";
+const char kPrimaryIndexFieldName[] = "primaryIndex";
+const char kTimestampFieldName[] = "ts";
+const char kTermFieldName[] = "term";
 
 }  // unnamed namespace
 
-ReplSetMetadata::ReplSetMetadata() = default;
-
 ReplSetMetadata::ReplSetMetadata(long long term,
                                  OpTime committedOpTime,
+                                 OpTime visibleOpTime,
                                  long long configVersion,
                                  int currentPrimaryIndex)
-    : _currentTerm(term),
-      _committedOpTime(std::move(committedOpTime)),
+    : _lastOpCommitted(std::move(committedOpTime)),
+      _lastOpVisible(std::move(visibleOpTime)),
+      _currentTerm(term),
       _configVersion(configVersion),
       _currentPrimaryIndex(currentPrimaryIndex) {}
 
-StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& doc) {
-    long long term = 0;
-    auto termStatus = bsonExtractIntegerField(doc, kTermField, &term);
+StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& metadataObj) {
+    BSONElement replMetadataElement;
 
-    if (!termStatus.isOK()) {
-        return termStatus;
-    }
+    Status status = bsonExtractTypedField(
+        metadataObj, rpc::kReplSetMetadataFieldName, Object, &replMetadataElement);
+    if (!status.isOK())
+        return status;
+    BSONObj replMetadataObj = replMetadataElement.Obj();
 
-    Timestamp timestamp;
-    auto timestampStatus = bsonExtractTimestampField(doc, kLastCommittedTSField, &timestamp);
+    long long configVersion;
+    status = bsonExtractIntegerField(replMetadataObj, kConfigVersionFieldName, &configVersion);
+    if (!status.isOK())
+        return status;
 
-    if (!timestampStatus.isOK()) {
-        return timestampStatus;
-    }
+    long long primaryIndex;
+    status = bsonExtractIntegerField(replMetadataObj, kPrimaryIndexFieldName, &primaryIndex);
+    if (!status.isOK())
+        return status;
 
-    long long termNumber = 0;
-    auto commtedTermStatus = bsonExtractIntegerField(doc, kLastCommittedTermField, &termNumber);
+    long long term;
+    status = bsonExtractIntegerField(replMetadataObj, kTermFieldName, &term);
+    if (!status.isOK())
+        return status;
 
-    if (!commtedTermStatus.isOK()) {
-        return commtedTermStatus;
-    }
+    repl::OpTime lastOpCommitted;
+    status = bsonExtractOpTimeField(replMetadataObj, kLastOpCommittedFieldName, &lastOpCommitted);
+    if (!status.isOK())
+        return status;
 
-    long long configVersion = 0;
-    auto configVersionStatus =
-        bsonExtractIntegerField(doc, kLastCommittedConfigVersionField, &configVersion);
+    repl::OpTime lastOpVisible;
+    status = bsonExtractOpTimeField(replMetadataObj, kLastOpVisibleFieldName, &lastOpVisible);
+    if (!status.isOK())
+        return status;
 
-    if (!configVersionStatus.isOK()) {
-        return configVersionStatus;
-    }
-
-    long long primaryIndex = 0;
-    auto primaryIndexStatus =
-        bsonExtractIntegerField(doc, kLastCommittedPrimaryIndexField, &primaryIndex);
-
-    if (!primaryIndexStatus.isOK()) {
-        return primaryIndexStatus;
-    }
-
-    return ReplSetMetadata(term, OpTime(timestamp, termNumber), configVersion, primaryIndex);
+    return ReplSetMetadata(term, lastOpCommitted, lastOpVisible, configVersion, primaryIndex);
 }
 
 Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
-    builder->append(kTermField, _currentTerm);
-    builder->append(kLastCommittedTSField, _committedOpTime.getTimestamp());
-    builder->append(kLastCommittedTermField, _committedOpTime.getTerm());
-    builder->append(kLastCommittedConfigVersionField, _configVersion);
-    builder->append(kLastCommittedPrimaryIndexField, _currentPrimaryIndex);
+    BSONObjBuilder replMetadataBuilder(builder->subobjStart(kReplSetMetadataFieldName));
+    replMetadataBuilder.append(kTermFieldName, _currentTerm);
+
+    BSONObjBuilder lastOpCommittedBuilder(
+        replMetadataBuilder.subobjStart(kLastOpCommittedFieldName));
+    lastOpCommittedBuilder.append(kTimestampFieldName, _lastOpCommitted.getTimestamp());
+    lastOpCommittedBuilder.append(kTermFieldName, _lastOpCommitted.getTerm());
+    lastOpCommittedBuilder.doneFast();
+
+    BSONObjBuilder lastOpVisibleBuilder(replMetadataBuilder.subobjStart(kLastOpVisibleFieldName));
+    lastOpVisibleBuilder.append(kTimestampFieldName, _lastOpVisible.getTimestamp());
+    lastOpVisibleBuilder.append(kTermFieldName, _lastOpVisible.getTerm());
+    lastOpVisibleBuilder.doneFast();
+
+    replMetadataBuilder.append(kConfigVersionFieldName, _configVersion);
+    replMetadataBuilder.append(kPrimaryIndexFieldName, _currentPrimaryIndex);
+    replMetadataBuilder.doneFast();
 
     return Status::OK();
-}
-
-const OpTime& ReplSetMetadata::getLastCommittedOptime() const {
-    return _committedOpTime;
 }
 
 }  // namespace rpc
