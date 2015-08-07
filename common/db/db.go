@@ -75,8 +75,8 @@ type Oplog struct {
 	Version   int                 `bson:"v"`
 	Operation string              `bson:"op"`
 	Namespace string              `bson:"ns"`
-	Object    bson.M              `bson:"o"`
-	Query     bson.M              `bson:"o2"`
+	Object    bson.D              `bson:"o"`
+	Query     bson.D              `bson:"o2"`
 }
 
 // Returns a session connected to the database server for which the
