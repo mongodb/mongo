@@ -1116,18 +1116,18 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 */
 	if (!skipped) {
 		/*
-		 * Saving lookaside file updates into the lookaside file won't
-		 * work.
-		 */
-		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
-			return (EBUSY);
-
-		/*
 		 * Lookaside file eviction is only configured when eviction is
 		 * getting aggressive. If not configured for the lookaside file,
 		 * fail eviction.
 		 */
 		if (!F_ISSET(r, WT_EVICT_LOOKASIDE))
+			return (EBUSY);
+
+		/*
+		 * Saving lookaside file updates into the lookaside file won't
+		 * work.
+		 */
+		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
 			return (EBUSY);
 
 		/*
