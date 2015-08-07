@@ -647,7 +647,6 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
 	case WT_NOTFOUND:
 		if (notfound_err)
 			return (WT_NOTFOUND);
-		ret = 0;
 		break;
 	default:
 		die(ret, "read_row: read row %" PRIu64, keyno);
