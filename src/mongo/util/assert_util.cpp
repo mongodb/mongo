@@ -148,9 +148,10 @@ NOINLINE_DECL void verifyFailed(const char* expr, const char* file, unsigned lin
 
 NOINLINE_DECL void invariantFailed(const char* expr, const char* file, unsigned line) {
     log() << "Invariant failure " << expr << ' ' << file << ' ' << dec << line << endl;
+    logContext();
     breakpoint();
     log() << "\n\n***aborting after invariant() failure\n\n" << endl;
-    std::abort();
+    quickExit(EXIT_ABRUPT);
 }
 
 NOINLINE_DECL void invariantOKFailed(const char* expr,
@@ -167,9 +168,10 @@ NOINLINE_DECL void invariantOKFailed(const char* expr,
 
 NOINLINE_DECL void fassertFailed(int msgid) {
     log() << "Fatal Assertion " << msgid << endl;
+    logContext();
     breakpoint();
     log() << "\n\n***aborting after fassert() failure\n\n" << endl;
-    std::abort();
+    quickExit(EXIT_ABRUPT);
 }
 
 NOINLINE_DECL void fassertFailedNoTrace(int msgid) {
