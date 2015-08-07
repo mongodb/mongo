@@ -962,7 +962,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		else {
 			if (incr) {
 				WT_ASSERT(session, dhandle->session_inuse > 0);
-				(void)__wt_atomic_sub4(
+				(void)__wt_atomic_subi4(
 				    &dhandle->session_inuse, 1);
 				incr = 0;
 			}

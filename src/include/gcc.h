@@ -95,9 +95,11 @@
  * with some versions of clang. See http://llvm.org/bugs/show_bug.cgi?id=21499
  * for details.
  */
-#define	WT_ATOMIC_CAS	__sync_val_compare_and_swap
+#define	WT_ATOMIC_CAS(ptr, oldval, newval)				\
+	(__sync_val_compare_and_swap(ptr, oldval, newval) == oldval)
 #else
-#define	WT_ATOMIC_CAS	__sync_bool_compare_and_swap
+#define	WT_ATOMIC_CAS(ptr, oldval, newval)				\
+	__sync_bool_compare_and_swap(ptr, oldval, newval)
 #endif
 
 #define	WT_ATOMIC_FUNC(name, ret, type)					\
@@ -124,7 +126,7 @@ __wt_atomic_sub##name(type *vp, type v)					\
 static inline int							\
 __wt_atomic_cas##name(type *vp, type old, type new)			\
 {									\
-	return (WT_ATOMIC_CAS(vp, old, new) == old);			\
+	return (WT_ATOMIC_CAS(vp, old, new));				\
 }
 
 WT_ATOMIC_FUNC(1, uint8_t, uint8_t)
@@ -145,7 +147,7 @@ WT_ATOMIC_FUNC(iv8, int64_t, volatile int64_t)
 static inline int
 __wt_atomic_cas_ptr(void *vp, void *old, void *new)
 {
-	return (WT_ATOMIC_CAS((void **)vp, old, new) == old);
+	return (WT_ATOMIC_CAS((void **)vp, old, new));
 }
 
 /* Compile read-write barrier */
