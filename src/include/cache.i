@@ -137,7 +137,8 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 static inline int
 __wt_eviction_aggressive(WT_SESSION_IMPL *session)
 {
-	return (1);
+	return (FLD_ISSET(
+	    S2C(session)->cache->state, WT_EVICT_PASS_AGGRESSIVE) ? 1 : 0);
 }
 
 /*
