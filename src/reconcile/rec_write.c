@@ -1154,7 +1154,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * I'm pretty sure this is wrong for fixed-width column store,
 		 * vpack is NULL. Can we fake one?
 		 */
-		if (vpack == NULL)
+		if (vpack == NULL || vpack->type == WT_CELL_DEL)
 			WT_RET(__wt_update_alloc(
 			    session, NULL, &append, &notused));
 		else {
