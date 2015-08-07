@@ -41,7 +41,6 @@ class PlanExecutor;
 struct DeleteStageParams {
     DeleteStageParams()
         : isMulti(false),
-          shouldCallLogOp(false),
           fromMigrate(false),
           isExplain(false),
           returnDeleted(false),
@@ -50,9 +49,6 @@ struct DeleteStageParams {
     // Should we delete all documents returned from the child (a "multi delete"), or at most one
     // (a "single delete")?
     bool isMulti;
-
-    // Should we write each delete to the oplog?
-    bool shouldCallLogOp;
 
     // Is this delete part of a migrate operation that is essentially like a no-op
     // when the cluster is observed by an external client.
@@ -73,8 +69,8 @@ struct DeleteStageParams {
  * document was requested to be returned, then ADVANCED is returned after deleting a document.
  * Otherwise, NEED_TIME is returned after deleting a document.
  *
- * Callers of work() must be holding a write lock (and, for shouldCallLogOp=true deletes,
- * callers must have had the replication coordinator approve the write).
+ * Callers of work() must be holding a write lock (and, for replicated deletes, callers must have
+ * had the replication coordinator approve the write).
  */
 class DeleteStage final : public PlanStage {
     MONGO_DISALLOW_COPYING(DeleteStage);

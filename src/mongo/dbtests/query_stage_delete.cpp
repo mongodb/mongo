@@ -142,7 +142,6 @@ public:
         // Configure the delete stage.
         DeleteStageParams deleteStageParams;
         deleteStageParams.isMulti = true;
-        deleteStageParams.shouldCallLogOp = false;
 
         WorkingSet ws;
         DeleteStage deleteStage(&_txn,

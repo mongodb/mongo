@@ -179,17 +179,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
             // Do the write, unless this is an explain.
             if (!_params.isExplain) {
                 WriteUnitOfWork wunit(getOpCtx());
-
-                const bool deleteCappedOK = false;
-                const bool deleteNoWarn = false;
-                BSONObj deletedId;
-
-                _collection->deleteDocument(getOpCtx(),
-                                            rloc,
-                                            deleteCappedOK,
-                                            deleteNoWarn,
-                                            _params.shouldCallLogOp ? &deletedId : NULL);
-
+                _collection->deleteDocument(getOpCtx(), rloc);
                 wunit.commit();
             }
 
@@ -260,7 +250,7 @@ void DeleteStage::doRestoreState() {
     const NamespaceString& ns(_collection->ns());
     massert(28537,
             str::stream() << "Demoted from primary while removing from " << ns.ns(),
-            !_params.shouldCallLogOp ||
+            !getOpCtx()->writesAreReplicated() ||
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns));
 }
 

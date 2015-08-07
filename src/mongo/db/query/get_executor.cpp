@@ -827,8 +827,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* txn,
 
     // If this is a user-issued update, then we want to return an error: you cannot perform
     // writes on a secondary. If this is an update to a secondary from the replication system,
-    // however, then we make an exception and let the write proceed. In this case,
-    // shouldCallLogOp() will be false.
+    // however, then we make an exception and let the write proceed.
     bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
         !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
 

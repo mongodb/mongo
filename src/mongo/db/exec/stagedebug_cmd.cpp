@@ -93,7 +93,7 @@ using stdx::make_unique;
  * node -> {skip: {args: {node: node, num: posint}}}
  * node -> {sort: {args: {node: node, pattern: objWithSortCriterion }}}
  * node -> {mergeSort: {args: {nodes: [node, node], pattern: objWithSortCriterion}}}
- * node -> {delete: {args: {node: node, isMulti: bool, shouldCallLogOp: bool}}}
+ * node -> {delete: {args: {node: node, isMulti: bool}}}
  *
  * Forthcoming Nodes:
  *
@@ -460,9 +460,6 @@ public:
             uassert(18638,
                     "isMulti argument must be provided to delete",
                     nodeArgs["isMulti"].type() == Bool);
-            uassert(18639,
-                    "shouldCallLogOp argument must be provided to delete",
-                    nodeArgs["shouldCallLogOp"].type() == Bool);
             PlanStage* subNode =
                 parseQuery(txn, collection, nodeArgs["node"].Obj(), workingSet, exprs);
             uassert(28734,
@@ -470,7 +467,6 @@ public:
                     NULL != subNode);
             DeleteStageParams params;
             params.isMulti = nodeArgs["isMulti"].Bool();
-            params.shouldCallLogOp = nodeArgs["shouldCallLogOp"].Bool();
             return new DeleteStage(txn, params, workingSet, collection, subNode);
         } else {
             return NULL;
