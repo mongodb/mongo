@@ -3956,7 +3956,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded_WT
   - name: replicasets_WT
-  - name: replicasets_auth
+  #- name: replicasets_auth
   - name: replication_WT
   - name: replication_auth
   - name: sharding_WT
