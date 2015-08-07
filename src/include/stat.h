@@ -334,6 +334,7 @@ struct __wt_dsrc_stats {
 	WT_STATS cache_inmem_split;
 	WT_STATS cache_overflow_value;
 	WT_STATS cache_read;
+	WT_STATS cache_read_lookaside;
 	WT_STATS cache_read_overflow;
 	WT_STATS cache_write;
 	WT_STATS compress_raw_fail;
@@ -372,6 +373,7 @@ struct __wt_dsrc_stats {
 	WT_STATS rec_page_match;
 	WT_STATS rec_pages;
 	WT_STATS rec_pages_eviction;
+	WT_STATS rec_pages_lookaside;
 	WT_STATS rec_prefix_compression;
 	WT_STATS rec_suffix_compression;
 	WT_STATS session_compact;

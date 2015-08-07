@@ -62,6 +62,8 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->cache_eviction_deepen.desc =
 	    "cache: page split during eviction deepened the tree";
 	stats->cache_read.desc = "cache: pages read into cache";
+	stats->cache_read_lookaside.desc =
+	    "cache: pages read into cache requiring lookaside entries";
 	stats->cache_eviction_split.desc =
 	    "cache: pages split during eviction";
 	stats->cache_write.desc = "cache: pages written from cache";
@@ -130,6 +132,8 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->rec_overflow_value.desc =
 	    "reconciliation: overflow values written";
 	stats->rec_page_match.desc = "reconciliation: page checksum matches";
+	stats->rec_pages_lookaside.desc =
+	    "reconciliation: page reconciliation block requires lookaside records";
 	stats->rec_pages.desc = "reconciliation: page reconciliation calls";
 	stats->rec_pages_eviction.desc =
 	    "reconciliation: page reconciliation calls for eviction";
@@ -183,6 +187,7 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->cache_overflow_value.v = 0;
 	stats->cache_eviction_deepen.v = 0;
 	stats->cache_read.v = 0;
+	stats->cache_read_lookaside.v = 0;
 	stats->cache_eviction_split.v = 0;
 	stats->cache_write.v = 0;
 	stats->cache_eviction_clean.v = 0;
@@ -228,6 +233,7 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 	stats->rec_multiblock_max.v = 0;
 	stats->rec_overflow_value.v = 0;
 	stats->rec_page_match.v = 0;
+	stats->rec_pages_lookaside.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
 	stats->rec_page_delete.v = 0;
@@ -282,6 +288,7 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	p->cache_overflow_value.v += c->cache_overflow_value.v;
 	p->cache_eviction_deepen.v += c->cache_eviction_deepen.v;
 	p->cache_read.v += c->cache_read.v;
+	p->cache_read_lookaside.v += c->cache_read_lookaside.v;
 	p->cache_eviction_split.v += c->cache_eviction_split.v;
 	p->cache_write.v += c->cache_write.v;
 	p->cache_eviction_clean.v += c->cache_eviction_clean.v;
@@ -329,6 +336,7 @@ __wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 	    p->rec_multiblock_max.v = c->rec_multiblock_max.v;
 	p->rec_overflow_value.v += c->rec_overflow_value.v;
 	p->rec_page_match.v += c->rec_page_match.v;
+	p->rec_pages_lookaside.v += c->rec_pages_lookaside.v;
 	p->rec_pages.v += c->rec_pages.v;
 	p->rec_pages_eviction.v += c->rec_pages_eviction.v;
 	p->rec_page_delete.v += c->rec_page_delete.v;

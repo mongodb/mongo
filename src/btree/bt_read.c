@@ -153,8 +153,6 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref,
 	int exact, tret;
 	void *p;
 
-	WT_STAT_FAST_CONN_INCR(session, cache_read_lookaside);
-
 	*need_las_removep = 0;
 
 	cursor = NULL;
@@ -461,6 +459,9 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 		/* Instantiate updates from the database's lookaside file. */
 		dsk = tmp.data;
 		if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE)) {
+			WT_STAT_FAST_CONN_INCR(session, cache_read_lookaside);
+			WT_STAT_FAST_DATA_INCR(session, cache_read_lookaside);
+
 			read_dhandle = session->dhandle;
 			WT_WITHOUT_DHANDLE(session, ret =
 			    __las_page_instantiate(session, ref, read_dhandle,

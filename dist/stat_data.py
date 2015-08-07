@@ -471,6 +471,8 @@ dsrc_stats = [
     CacheStat('cache_overflow_value',
         'overflow values cached in memory', 'no_scale'),
     CacheStat('cache_read', 'pages read into cache'),
+    CacheStat('cache_read_lookaside',
+        'pages read into cache requiring lookaside entries'),
     CacheStat('cache_read_overflow', 'overflow pages read into cache'),
     CacheStat('cache_write', 'pages written from cache'),
 
@@ -507,6 +509,8 @@ dsrc_stats = [
     RecStat('rec_multiblock_leaf', 'leaf page multi-block writes'),
     RecStat('rec_multiblock_max',
         'maximum blocks required for a page', 'max_aggregate,no_scale'),
+    RecStat('rec_pages_lookaside',
+        'page reconciliation block requires lookaside records'),
 
     ##########################################
     # Transaction statistics

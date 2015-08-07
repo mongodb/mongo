@@ -3078,6 +3078,7 @@ skip_check_complete:
 	if (!r->evict_skipped_updates && bnd->skip != NULL) {
 		F_SET(dsk, WT_PAGE_LAS_UPDATE);
 		WT_STAT_FAST_CONN_INCR(session, rec_pages_lookaside);
+		WT_STAT_FAST_DATA_INCR(session, rec_pages_lookaside);
 	}
 
 	/*
