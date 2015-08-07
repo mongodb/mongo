@@ -30,6 +30,7 @@
 
 #include "mongo/executor/async_secure_stream_factory.h"
 
+#include "mongo/config.h"
 #include "mongo/executor/async_secure_stream.h"
 #include "mongo/executor/async_stream.h"
 #include "mongo/stdx/memory.h"

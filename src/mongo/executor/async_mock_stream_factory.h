@@ -96,8 +96,8 @@ private:
     void _createStream(const HostAndPort& host, MockStream* stream);
     void _destroyStream(const HostAndPort& host);
 
-    std::mutex _factoryMutex;
-    std::condition_variable _factoryCv;
+    stdx::mutex _factoryMutex;
+    stdx::condition_variable _factoryCv;
 
     std::unordered_map<HostAndPort, MockStream*> _streams;
 };

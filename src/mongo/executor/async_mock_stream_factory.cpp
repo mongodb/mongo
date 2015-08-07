@@ -165,7 +165,7 @@ void AsyncMockStreamFactory::MockStream::unblock() {
     _unblock_inlock(&lk);
 }
 
-void AsyncMockStreamFactory::MockStream::_unblock_inlock(std::unique_lock<stdx::mutex>* lk) {
+void AsyncMockStreamFactory::MockStream::_unblock_inlock(stdx::unique_lock<stdx::mutex>* lk) {
     log() << "unblocking stream for: " << _target;
     invariant(_blocked);
     _blocked = false;
