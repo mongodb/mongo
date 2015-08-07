@@ -310,6 +310,8 @@ void	 config_file(const char *);
 void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
+void	*dmalloc(size_t);
+char	*dstrdup(const char *);
 void	 fclose_and_clear(FILE **);
 void	 key_gen(uint8_t *, size_t *, uint64_t);
 void	 key_gen_insert(WT_RAND_STATE *, uint8_t *, size_t *, uint64_t);

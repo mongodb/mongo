@@ -506,6 +506,7 @@ dlh
 dll
 dlopen
 dlsym
+dmalloc
 dmsg
 doxgen
 doxygen
@@ -515,6 +516,7 @@ dsk
 dsrc
 dst
 dstlen
+dstrdup
 dsync
 dumpcmp
 dumpfile
