@@ -500,11 +500,17 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 			    (UINT64_MAX - cache->cp_saved_app_waits) + tmp;
 		cache->cp_saved_app_waits = tmp;
 
-		/* Calculate the weighted pressure for this member */
-		cache->cp_pass_pressure =
-		    (app_evicts * WT_CACHE_POOL_APP_EVICT_MULTIPLIER) +
+		/* Calculate the weighted pressure for this member. */
+		tmp = (app_evicts * WT_CACHE_POOL_APP_EVICT_MULTIPLIER) +
 		    (app_waits * WT_CACHE_POOL_APP_WAIT_MULTIPLIER) +
 		    (reads * WT_CACHE_POOL_READ_MULTIPLIER);
+
+		/* Weight smaller caches higher. */
+		tmp *= (double)(cp->currently_used - entry->cache_size) /
+		    cp->currently_used;
+
+		/* Smooth over history. */
+		cache->cp_pass_pressure = (9 * cache->cp_pass_pressure + tmp) / 10;
 
 		if (cache->cp_pass_pressure > highest)
 			highest = cache->cp_pass_pressure;
@@ -542,6 +548,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 	*adjustedp = 0;
 	cp = __wt_process.cache_pool;
 	grow = 0;
+	pool_full = (cp->currently_used >= cp->size);
 	/* Highest as a percentage, avoid 0 */
 	highest_percentile = (highest / 100) + 1;
 
@@ -549,14 +556,13 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		WT_RET(__wt_verbose(session,
 		    WT_VERB_SHARED_CACHE, "Cache pool distribution: "));
 		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
-		    "\t" "cache_size, pressure, skips: "));
+		    "\t" "cache (MB), pressure, skips, busy, %% full:"));
 	}
 
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
 		cache = entry->cache;
 		reserved = cache->cp_reserved;
 		adjustment = 0;
-		pool_full = (cp->currently_used >= cp->size);
 
 		/*
 		 * The read pressure is calculated as a percentage of how
@@ -566,15 +572,15 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 * assigned.
 		 */
 		pressure = cache->cp_pass_pressure / highest_percentile;
-		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
-		    "\t%" PRIu64 ", %" PRIu64 ", %" PRIu32,
-		    entry->cache_size, pressure, cache->cp_skip_count));
-
 		busy = __wt_eviction_needed(entry->default_session, &pct_full);
 
+		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
+		    "\t%5" PRIu64 ", %3" PRIu64 ", %2" PRIu32 ", %d, %2u",
+		    entry->cache_size >> 20, pressure, cache->cp_skip_count,
+		    busy, pct_full));
+
 		/* Allow to stabilize after changes. */
-		if (cache->cp_skip_count > 0 &&
-		    (busy || --cache->cp_skip_count > 0))
+		if (cache->cp_skip_count > 0 && --cache->cp_skip_count > 0)
 			continue;
 
 		/*
@@ -583,7 +589,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 *  - it's the first time we've seen this member, or
 		 *  - the reserved size has been adjusted
 		 */
-		if (!pool_full && entry->cache_size < reserved) {
+		if (entry->cache_size < reserved) {
 			grow = 1;
 			adjustment = reserved - entry->cache_size;
 		/*
@@ -607,22 +613,24 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 			if (entry->cache_size > smallest)
 				adjustment = WT_MIN(cp->chunk,
 				    (entry->cache_size - smallest) / 2);
+			adjustment =
+			    WT_MIN(adjustment, entry->cache_size - reserved);
 		/*
 		 * Conditions for increasing the amount of resources for an
 		 * entry:
 		 *  - there is space available in the pool
+		 *  - the connection is using enough cache to require eviction
 		 *  - there was some activity across the pool
 		 *  - this entry is using less than the entire cache pool
-		 *  - the connection is using enough cache to require eviction
 		 *  - additional cache would benefit the connection OR
 		 *  - the pool is less than half distributed
 		 */
-		} else if (!pool_full && entry->cache_size < cp->size &&
-		    pct_full >= cache->eviction_target &&
+		} else if (!pool_full && busy &&
 		    (pressure > bump_threshold ||
 		    cp->currently_used < cp->size * 0.5)) {
 			grow = 1;
-			adjustment = cp->chunk;
+			adjustment =
+			    WT_MIN(cp->chunk, cp->size - cp->currently_used);
 		}
 		/*
 		 * Bounds checking: don't go over the pool size or under the
@@ -635,10 +643,6 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 * connection's cache.  This should reduce cache sizes
 		 * gradually without stalling application threads.
 		 */
-		if (adjustment > 0)
-			adjustment = grow ?
-			    WT_MIN(adjustment, cp->size - cp->currently_used) :
-			    WT_MIN(adjustment, entry->cache_size - reserved);
 		if (adjustment > 0) {
 			*adjustedp = 1;
 			if (grow) {
