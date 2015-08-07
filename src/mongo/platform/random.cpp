@@ -40,6 +40,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
+#include <limits>
 
 #include "mongo/platform/basic.h"
 
@@ -91,6 +92,15 @@ int64_t PseudoRandom::nextInt64() {
     int64_t a = nextInt32();
     int64_t b = nextInt32();
     return (a << 32) | b;
+}
+
+double PseudoRandom::nextCanonicalDouble() {
+    double result;
+    do {
+        auto generated = static_cast<uint64_t>(nextInt64());
+        result = static_cast<double>(generated) / std::numeric_limits<uint64_t>::max();
+    } while (result == 1.0);
+    return result;
 }
 
 // --- SecureRandom ----

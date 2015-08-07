@@ -452,18 +452,18 @@ TEST(MetaFields, RandValBasics) {
 
     // Setting the random value field should work as expected.
     MutableDocument docBuilder;
-    docBuilder.setRandMetaField(1);
+    docBuilder.setRandMetaField(1.0);
     Document doc = docBuilder.freeze();
     ASSERT_TRUE(doc.hasRandMetaField());
     ASSERT_EQ(1, doc.getRandMetaField());
 
     // Setting the random value twice should keep the second value.
     MutableDocument docBuilder2;
-    docBuilder2.setRandMetaField(1);
-    docBuilder2.setRandMetaField(2);
+    docBuilder2.setRandMetaField(1.0);
+    docBuilder2.setRandMetaField(2.0);
     Document doc2 = docBuilder2.freeze();
     ASSERT_TRUE(doc2.hasRandMetaField());
-    ASSERT_EQ(2, doc2.getRandMetaField());
+    ASSERT_EQ(2.0, doc2.getRandMetaField());
 }
 
 class SerializationTest : public unittest::Test {
@@ -493,7 +493,7 @@ protected:
 TEST_F(SerializationTest, MetaSerializationNoVals) {
     MutableDocument docBuilder;
     docBuilder.setTextScore(10.0);
-    docBuilder.setRandMetaField(20);
+    docBuilder.setRandMetaField(20.0);
     assertRoundTrips(docBuilder.freeze());
 }
 
@@ -501,14 +501,14 @@ TEST_F(SerializationTest, MetaSerializationWithVals) {
     // Same as above test, but add a non-meta field as well.
     MutableDocument docBuilder(DOC("foo" << 10));
     docBuilder.setTextScore(10.0);
-    docBuilder.setRandMetaField(20);
+    docBuilder.setRandMetaField(20.0);
     assertRoundTrips(docBuilder.freeze());
 }
 
 TEST(MetaFields, ToAndFromBson) {
     MutableDocument docBuilder;
     docBuilder.setTextScore(10.0);
-    docBuilder.setRandMetaField(20);
+    docBuilder.setRandMetaField(20.0);
     Document doc = docBuilder.freeze();
     BSONObj obj = doc.toBsonWithMetaData();
     ASSERT_EQ(10.0, obj[Document::metaFieldTextScore].Double());

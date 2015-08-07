@@ -62,6 +62,7 @@ class ExpressionFieldPath;
 class ExpressionObject;
 class DocumentSourceLimit;
 class PlanExecutor;
+class RecordCursor;
 
 /**
  * Registers a DocumentSource to have the name 'key'. When a stage with name '$key' is found,
@@ -917,19 +918,75 @@ public:
     const char* getSourceName() const final;
     Value serialize(bool explain = false) const final;
 
+    GetDepsReturn getDependencies(DepsTracker* deps) const final {
+        return SEE_NEXT;
+    }
+
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
+
+    long long getSampleSize() const {
+        return _size;
+    }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:
     explicit DocumentSourceSample(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
     long long _size;
 
-    // When no storage engine optimizations are available, $sample uses a $sort stage to randomly
-    // sort the documents.
+    // Uses a $sort stage to randomly sort the documents.
     boost::intrusive_ptr<DocumentSourceSort> _sortStage;
+};
+
+/**
+ * This class is not a registered stage, it is only used as an optimized replacement for $sample
+ * when the storage engine allows us to use a random cursor.
+ */
+class DocumentSourceSampleFromRandomCursor final : public DocumentSource {
+public:
+    boost::optional<Document> getNext() final;
+    const char* getSourceName() const final;
+    Value serialize(bool explain = false) const final;
+    GetDepsReturn getDependencies(DepsTracker* deps) const final;
+
+    static boost::intrusive_ptr<DocumentSourceSampleFromRandomCursor> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        long long size,
+        std::string idField,
+        long long collectionSize);
+
+private:
+    DocumentSourceSampleFromRandomCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         long long size,
+                                         std::string idField,
+                                         long long collectionSize);
+
+    /**
+     * Keep asking for documents from the random cursor until it yields a new document. Errors if a
+     * a document is encountered without a value for '_idField', or if the random cursor keeps
+     * returning duplicate elements.
+     */
+    boost::optional<Document> getNextNonDuplicateDocument();
+
+    long long _size;
+
+    // The field to use as the id of a document. Usually '_id', but 'ts' for the oplog.
+    std::string _idField;
+
+    // Keeps track of the documents that have been returned, since a random cursor is allowed to
+    // return duplicates.
+    ValueSet _seenDocs;
+
+    // The approximate number of documents in the collection (includes orphans).
+    const long long _nDocsInColl;
+
+    // The value to be assigned to the randMetaField of outcoming documents. Each call to getNext()
+    // will decrement this value by an amount scaled by _nDocsInColl as an attempt to appear as if
+    // the documents were produced by a top-k random sort.
+    double _randMetaFieldVal = 1.0;
 };
 
 class DocumentSourceLimit final : public DocumentSource, public SplittableDocumentSource {

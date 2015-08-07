@@ -31,6 +31,8 @@
 #include <boost/intrusive_ptr.hpp>
 #include <memory>
 
+#include "mongo/bson/bsonobj.h"
+
 namespace mongo {
 class Collection;
 class DocumentSourceCursor;
@@ -102,6 +104,19 @@ private:
         const BSONObj& queryObj,
         BSONObj* sortObj,
         BSONObj* projectionObj);
+
+    /**
+     * Creates a DocumentSourceCursor from the given PlanExecutor and adds it to the front of the
+     * Pipeline.
+     */
+    static std::shared_ptr<PlanExecutor> addCursorSource(
+        const boost::intrusive_ptr<Pipeline>& pipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        std::shared_ptr<PlanExecutor> exec,
+        DepsTracker deps,
+        const BSONObj& queryObj = BSONObj(),
+        const BSONObj& sortObj = BSONObj(),
+        const BSONObj& projectionObj = BSONObj());
 };
 
 }  // namespace mongo

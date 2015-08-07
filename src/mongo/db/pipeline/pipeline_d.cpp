@@ -34,6 +34,10 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/exec/multi_iterator.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -41,9 +45,11 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -91,9 +97,46 @@ private:
     intrusive_ptr<ExpressionContext> _ctx;
     DBDirectClient _client;
 };
+
+/**
+ * Returns a PlanExecutor which uses a random cursor to sample documents if successful. Returns {}
+ * if the storage engine doesn't support random cursors, or if 'sampleSize' is a large enough
+ * percentage of the collection.
+ */
+shared_ptr<PlanExecutor> createRandomCursorExecutor(Collection* collection,
+                                                    OperationContext* txn,
+                                                    long long sampleSize,
+                                                    long long numRecords) {
+    double kMaxSampleRatioForRandCursor = 0.05;
+    if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100)
+        return {};
+
+    // Attempt to get a random cursor from the storage engine.
+    auto randCursor = collection->getRecordStore()->getRandomCursor(txn);
+
+    if (!randCursor)
+        return {};
+
+    auto ws = stdx::make_unique<WorkingSet>();
+    auto stage = stdx::make_unique<MultiIteratorStage>(txn, ws.get(), collection);
+    stage->addIterator(std::move(randCursor));
+
+    // If we're in a sharded environment, we need to filter out documents we don't own.
+    if (ShardingState::get(getGlobalServiceContext())
+            ->needCollectionMetadata(txn->getClient(), txn->getNS())) {
+        auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
+            txn,
+            ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(txn->getNS()),
+            ws.get(),
+            stage.release());
+        return uassertStatusOK(PlanExecutor::make(
+            txn, std::move(ws), std::move(shardFilterStage), collection, PlanExecutor::YIELD_AUTO));
+    }
+
+    return uassertStatusOK(PlanExecutor::make(
+        txn, std::move(ws), std::move(stage), collection, PlanExecutor::YIELD_AUTO));
 }
 
-namespace {
 StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     OperationContext* txn,
     Collection* collection,
@@ -126,9 +169,6 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
     Collection* collection,
     const intrusive_ptr<Pipeline>& pPipeline,
     const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    // get the full "namespace" name
-    const string& fullName = pExpCtx->ns.ns();
-
     // We will be modifying the source vector as we go.
     Pipeline::SourceContainer& sources = pPipeline->sources;
 
@@ -141,17 +181,36 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
         }
     }
 
-    if (!sources.empty() && sources.front()->isValidInitialSource()) {
-        if (dynamic_cast<DocumentSourceMergeCursors*>(sources.front().get())) {
-            // Enable the hooks for setting up authentication on the subsequent internal
-            // connections we are going to create. This would normally have been done
-            // when SetShardVersion was called, but since SetShardVersion is never called
-            // on secondaries, this is needed.
-            ShardedConnectionInfo::addHook();
+    if (!sources.empty()) {
+        if (sources.front()->isValidInitialSource()) {
+            if (dynamic_cast<DocumentSourceMergeCursors*>(sources.front().get())) {
+                // Enable the hooks for setting up authentication on the subsequent internal
+                // connections we are going to create. This would normally have been done
+                // when SetShardVersion was called, but since SetShardVersion is never called
+                // on secondaries, this is needed.
+                ShardedConnectionInfo::addHook();
+            }
+            return std::shared_ptr<PlanExecutor>();  // don't need a cursor
         }
-        return std::shared_ptr<PlanExecutor>();  // don't need a cursor
-    }
 
+        // Optimize an initial $sample stage if possible.
+        if (auto sampleStage = dynamic_cast<DocumentSourceSample*>(sources.front().get())) {
+            const long long sampleSize = sampleStage->getSampleSize();
+            const long long numRecords = collection->getRecordStore()->numRecords(txn);
+            auto exec = createRandomCursorExecutor(collection, txn, sampleSize, numRecords);
+            if (exec) {
+                // Replace $sample stage with $sampleFromRandomCursor stage.
+                sources.pop_front();
+                std::string idString = collection->ns().isOplog() ? "ts" : "_id";
+                sources.emplace_front(DocumentSourceSampleFromRandomCursor::create(
+                    pExpCtx, sampleSize, idString, numRecords));
+
+                const BSONObj initialQuery;
+                return addCursorSource(
+                    pPipeline, pExpCtx, exec, pPipeline->getDependencies(initialQuery));
+            }
+        }
+    }
 
     // Look for an initial match. This works whether we got an initial query or not.
     // If not, it results in a "{}" query, which will be what we want in that case.
@@ -188,35 +247,7 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
     auto exec = prepareExecutor(
         txn, collection, pPipeline, pExpCtx, sortStage, deps, queryObj, &sortObj, &projForQuery);
 
-    // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved. We
-    // deregister the PlanExecutor so that it can be registered with ClientCursor.
-    exec->deregisterExec();
-    exec->saveState();
-
-    // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.
-    intrusive_ptr<DocumentSourceCursor> pSource =
-        DocumentSourceCursor::create(fullName, exec, pExpCtx);
-
-    // Note the query, sort, and projection for explain.
-    pSource->setQuery(queryObj);
-    pSource->setSort(sortObj);
-    if (!projForQuery.isEmpty()) {
-        pSource->setProjection(projForQuery, boost::none);
-    } else {
-        // There may be fewer dependencies now if the sort was covered.
-        if (!sortObj.isEmpty()) {
-            deps = pPipeline->getDependencies(queryObj);
-        }
-
-        pSource->setProjection(deps.toProjection(), deps.toParsedDeps());
-    }
-
-    while (!sources.empty() && pSource->coalesce(sources.front())) {
-        sources.pop_front();
-    }
-
-    pPipeline->addInitialSource(pSource);
-    return exec;
+    return addCursorSource(pPipeline, pExpCtx, exec, deps, queryObj, sortObj, projForQuery);
 }
 
 std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
@@ -309,6 +340,49 @@ std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
     // If this doesn't work, nothing will.
     return uassertStatusOK(attemptToGetExecutor(
         txn, collection, expCtx, queryObj, *projectionObj, *sortObj, plannerOpts));
+}
+
+shared_ptr<PlanExecutor> PipelineD::addCursorSource(const intrusive_ptr<Pipeline>& pipeline,
+                                                    const intrusive_ptr<ExpressionContext>& expCtx,
+                                                    shared_ptr<PlanExecutor> exec,
+                                                    DepsTracker deps,
+                                                    const BSONObj& queryObj,
+                                                    const BSONObj& sortObj,
+                                                    const BSONObj& projectionObj) {
+    // Get the full "namespace" name.
+    const string& fullName = expCtx->ns.ns();
+
+    // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.
+    intrusive_ptr<DocumentSourceCursor> pSource =
+        DocumentSourceCursor::create(fullName, exec, expCtx);
+
+    // Note the query, sort, and projection for explain.
+    pSource->setQuery(queryObj);
+    pSource->setSort(sortObj);
+
+    if (!projectionObj.isEmpty()) {
+        pSource->setProjection(projectionObj, boost::none);
+    } else {
+        // There may be fewer dependencies now if the sort was covered.
+        if (!sortObj.isEmpty()) {
+            deps = pipeline->getDependencies(queryObj);
+        }
+
+        pSource->setProjection(deps.toProjection(), deps.toParsedDeps());
+    }
+
+    while (!pipeline->sources.empty() && pSource->coalesce(pipeline->sources.front())) {
+        pipeline->sources.pop_front();
+    }
+
+    pipeline->addInitialSource(pSource);
+
+    // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved. We
+    // deregister the PlanExecutor so that it can be registered with ClientCursor.
+    exec->deregisterExec();
+    exec->saveState();
+
+    return exec;
 }
 
 }  // namespace mongo

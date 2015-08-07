@@ -49,6 +49,11 @@ public:
     int64_t nextInt64();
 
     /**
+     * Returns a random number in the range [0, 1).
+     */
+    double nextCanonicalDouble();
+
+    /**
      * @return a number between 0 and max
      */
     int32_t nextInt32(int32_t max) {

@@ -108,6 +108,7 @@ docSourceEnv.Library(
         'document_source_project.cpp',
         'document_source_redact.cpp',
         'document_source_sample.cpp',
+        'document_source_sample_from_random_cursor.cpp',
         'document_source_skip.cpp',
         'document_source_sort.cpp',
         'document_source_unwind.cpp',

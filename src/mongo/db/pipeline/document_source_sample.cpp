@@ -30,8 +30,6 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
-#include <vector>
-
 #include "mongo/db/client.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
@@ -61,8 +59,7 @@ boost::optional<Document> DocumentSourceSample::getNext() {
         PseudoRandom& prng = pExpCtx->opCtx->getClient()->getPrng();
         while (boost::optional<Document> next = pSource->getNext()) {
             MutableDocument doc(std::move(*next));
-            // Add random metadata field.
-            doc.setRandMetaField(prng.nextInt64());
+            doc.setRandMetaField(prng.nextCanonicalDouble());
             _sortStage->loadDocument(doc.freeze());
         }
         _sortStage->loadingDone();

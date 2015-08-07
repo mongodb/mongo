@@ -309,7 +309,8 @@ public:
     }
 
     ~RandomCursor() {
-        detachFromOperationContext();
+        if (_cursor)
+            detachFromOperationContext();
     }
 
     boost::optional<Record> next() final {

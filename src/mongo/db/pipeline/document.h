@@ -205,7 +205,7 @@ public:
     bool hasRandMetaField() const {
         return storage().hasRandMetaField();
     }
-    int64_t getRandMetaField() const {
+    double getRandMetaField() const {
         return storage().getRandMetaField();
     }
 
@@ -429,7 +429,7 @@ public:
         storage().setTextScore(score);
     }
 
-    void setRandMetaField(int64_t val) {
+    void setRandMetaField(double val) {
         storage().setRandMetaField(val);
     }
 
