@@ -928,7 +928,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_UPDATE *append, *upd, *upd_list;
 	size_t notused;
 	uint64_t max_txn, min_txn, txnid;
-	int append_value, skipped;
+	int append_origv, skipped;
 
 	*updp = NULL;
 
@@ -1045,7 +1045,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * First, if there are uncommitted updates, we can evict most of the
 	 * page and create a new, smaller page with just the skipped updates.
 	 */
-	append_value = 0;
+	append_origv = 0;
 	if (skipped) {
 		/*
 		 * The save/restore eviction path is only configured if forcibly
@@ -1105,7 +1105,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		if (vpack != NULL &&
 		    vpack->raw == WT_CELL_VALUE_OVFL_RM &&
 		    !__wt_txn_visible_all(session, min_txn))
-			append_value = 1;
+			append_origv = 1;
 	}
 
 	/*
@@ -1136,7 +1136,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * globally visible, readers require the page's original value.
 		 */
 		if (!__wt_txn_visible_all(session, min_txn))
-			append_value = 1;
+			append_origv = 1;
 	}
 
 	/*
@@ -1144,7 +1144,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * append it to the end of the update list with a transaction ID that
 	 * guarantees its visibility.
 	 */
-	if (append_value) {
+	if (append_origv) {
 		/*
 		 * If we don't have a value cell, it's an insert/append list
 		 * key/value pair which simply doesn't exist for some reader;
