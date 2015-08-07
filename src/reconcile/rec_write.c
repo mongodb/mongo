@@ -679,6 +679,35 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	/* Remember the configuration. */
 	r->ref = ref;
 	r->page = page;
+
+	/*
+	 * Lookaside file eviction is configured when eviction gets aggressive,
+	 * adjust the flags for cases we don't support.
+	 */
+	if (LF_ISSET(WT_EVICT_LOOKASIDE)) {
+		/*
+		 * Saving lookaside file updates into the lookaside file won't
+		 * work.
+		 */
+		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
+			LF_CLR(WT_EVICT_LOOKASIDE);
+
+		/*
+		 * We don't yet support fixed-length column-store combined with
+		 * the lookaside file. It's not hard to do, but the underlying
+		 * function that reviews which updates can be written to the
+		 * evicted page and which updates need to be written to the
+		 * lookaside file needs access to the original value from the
+		 * page being evicted, and there's no code path for that in the
+		 * case of fixed-length column-store objects. (Row-store and
+		 * variable-width column-store objects provide a reference to
+		 * the unpacked on-page cell for this purpose, but there isn't
+		 * an on-page cell for fixed-length column-store objects.) For
+		 * now, turn it off.
+		 */
+		if (page->type == WT_PAGE_COL_FIX)
+			LF_CLR(WT_EVICT_LOOKASIDE);
+	}
 	r->flags = flags;
 
 	/* Track if the page can be marked clean. */
@@ -1124,13 +1153,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			return (EBUSY);
 
 		/*
-		 * Saving lookaside file updates into the lookaside file won't
-		 * work.
-		 */
-		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
-			return (EBUSY);
-
-		/*
 		 * If at least one update is globally visible, copy the update
 		 * list and ignore the current on-page value. If no update is
 		 * globally visible, readers require the page's original value.
@@ -1149,10 +1171,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * If we don't have a value cell, it's an insert/append list
 		 * key/value pair which simply doesn't exist for some reader;
 		 * place a deleted record at the end of the update list.
-		 *
-		 * KEITH:
-		 * I'm pretty sure this is wrong for fixed-width column store,
-		 * vpack is NULL. Can we fake one?
 		 */
 		if (vpack == NULL || vpack->type == WT_CELL_DEL)
 			WT_RET(__wt_update_alloc(
