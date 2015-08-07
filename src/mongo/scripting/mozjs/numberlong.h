@@ -54,9 +54,10 @@ struct NumberLongInfo : public BaseInfo {
         MONGO_DEFINE_JS_FUNCTION(toNumber);
         MONGO_DEFINE_JS_FUNCTION(toString);
         MONGO_DEFINE_JS_FUNCTION(valueOf);
+        MONGO_DEFINE_JS_FUNCTION(compare);
     };
 
-    static const JSFunctionSpec methods[4];
+    static const JSFunctionSpec methods[5];
 
     static const char* const className;
 

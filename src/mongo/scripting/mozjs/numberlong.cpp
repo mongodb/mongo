@@ -42,10 +42,11 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec NumberLongInfo::methods[4] = {
+const JSFunctionSpec NumberLongInfo::methods[5] = {
     MONGO_ATTACH_JS_FUNCTION(toNumber),
     MONGO_ATTACH_JS_FUNCTION(toString),
     MONGO_ATTACH_JS_FUNCTION(valueOf),
+    MONGO_ATTACH_JS_FUNCTION(compare),
     JS_FS_END,
 };
 
@@ -102,6 +103,25 @@ void NumberLongInfo::Functions::toString(JSContext* cx, JS::CallArgs args) {
         ss << "NumberLong(" << val << ")";
 
     ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
+}
+
+void NumberLongInfo::Functions::compare(JSContext* cx, JS::CallArgs args) {
+    uassert(ErrorCodes::BadValue, "NumberLong.compare() needs 1 argument", args.length() == 1);
+    uassert(ErrorCodes::BadValue,
+            "NumberLong.compare() argument must be an object",
+            args.get(0).isObject());
+
+    long long thisVal = NumberLongInfo::ToNumberLong(cx, args.thisv());
+    long long otherVal = NumberLongInfo::ToNumberLong(cx, args.get(0));
+
+    int comparison = 0;
+    if (thisVal < otherVal) {
+        comparison = -1;
+    } else if (thisVal > otherVal) {
+        comparison = 1;
+    }
+
+    args.rval().setDouble(comparison);
 }
 
 void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {

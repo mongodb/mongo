@@ -61,3 +61,32 @@ assert.doesNotThrow.automsg( function() { new NumberLong(NumberInt(1)); } );
 // get a truncated value (SERVER-9973)
 n = new NumberLong(NumberLong( "11111111111111111" ));
 assert.eq.automsg("n.toString()", "'NumberLong(\"11111111111111111\")'");
+
+//
+// Test NumberLong.compare()
+//
+
+var left = new NumberLong("0");
+var right = new NumberLong("0");
+assert.eq(left.compare(right), 0);
+assert.eq(right.compare(left), 0);
+
+left = new NumberLong("20");
+right = new NumberLong("10");
+assert.gt(left.compare(right), 0);
+assert.lt(right.compare(left), 0);
+
+left = new NumberLong("-9223372036854775808");
+right = new NumberLong("9223372036854775807");
+assert.lt(left.compare(right), 0);
+assert.gt(right.compare(left), 0);
+assert.eq(left.compare(left), 0);
+assert.eq(right.compare(right), 0);
+
+// Bad input to .compare().
+assert.throws(function() { NumberLong("0").compare(); });
+assert.throws(function() { NumberLong("0").compare(null); });
+assert.throws(function() { NumberLong("0").compare(undefined); });
+assert.throws(function() { NumberLong("0").compare(3); });
+assert.throws(function() { NumberLong("0").compare("foo"); });
+assert.throws(function() { NumberLong("0").compare(NumberLong("0"), 3); });

@@ -642,7 +642,7 @@ function DBCommandCursor(mongo, cmdResult, batchSize) {
 
     if (mongo.useReadCommands()) {
         this._useReadCommands = true;
-        this._cursorid = cmdResult.cursor.id.toNumber();
+        this._cursorid = cmdResult.cursor.id;
         this._batchSize = batchSize;
 
         this._ns = cmdResult.cursor.ns;
@@ -665,7 +665,7 @@ DBCommandCursor.prototype = {};
 DBCommandCursor.prototype._runGetMoreCommand = function() {
     // Construct the getMore command.
     var getMoreCmd = {
-        getMore: NumberLong(this._cursorid.toString()),
+        getMore: this._cursorid,
         collection: this._collName
     };
 
@@ -682,11 +682,12 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
                     this._ns + " != " + cmdRes.cursor.ns);
     }
 
-    if (cmdRes.cursor.id.toNumber() === 0) {
-        this._cursorid = 0;
+    if (!cmdRes.cursor.id.compare(NumberLong("0"))) {
+        this._cursorid = NumberLong("0");
     }
-    else if (this._cursorid !== cmdRes.cursor.id.toNumber()) {
-        throw Error("unexpected cursor id: " + this._cursorid + " != " + cmdRes.cursor.id);
+    else if (this._cursorid.compare(cmdRes.cursor.id)) {
+        throw Error("unexpected cursor id: " +
+                    this._cursorid.toString() + " != " + cmdRes.cursor.id.toString());
     }
 
     // Successfully retrieved the next batch.
@@ -697,7 +698,7 @@ DBCommandCursor.prototype._hasNextUsingCommands = function() {
     assert(this._useReadCommands);
 
     if (!this._batch.length) {
-        if (this._cursorid === 0) {
+        if (!this._cursorid.compare(NumberLong("0"))) {
             return false;
         }
 
