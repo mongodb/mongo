@@ -325,15 +325,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref,
 	}
 
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
-
-	/*
-	 * KEITH: don't release the page, we don't have a hazard pointer on it;
-	 * why is this is necessary, why doesn't __split_multi_inmem have the
-	 * same problem?
-	 */
-	cbt.ref = NULL;
-
-	WT_WITH_DHANDLE(session, read_dhandle, tret = __wt_btcur_close(&cbt));
+	WT_WITH_DHANDLE(
+	    session, read_dhandle, tret = __wt_btcur_close(&cbt, 1));
 	WT_TRET(tret);
 
 	/*

@@ -759,7 +759,7 @@ __split_multi_inmem(
 	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
 err:	/* Free any resources that may have been cached in the cursor. */
-	WT_TRET(__wt_btcur_close(&cbt));
+	WT_TRET(__wt_btcur_close(&cbt, 1));
 
 	__wt_scr_free(session, &key);
 	return (ret);

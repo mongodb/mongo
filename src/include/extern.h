@@ -103,7 +103,7 @@ extern int __wt_btcur_equals( WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, in
 extern int __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop);
 extern void __wt_btcur_init(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern void __wt_btcur_open(WT_CURSOR_BTREE *cbt);
-extern int __wt_btcur_close(WT_CURSOR_BTREE *cbt);
+extern int __wt_btcur_close(WT_CURSOR_BTREE *cbt, int lowlevel);
 extern int __wt_debug_set_verbose(WT_SESSION_IMPL *session, const char *v);
 extern int __wt_debug_addr_print( WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size);
 extern int __wt_debug_addr(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size, const char *ofile);

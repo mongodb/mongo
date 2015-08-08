@@ -369,7 +369,7 @@ __curfile_close(WT_CURSOR *cursor)
 		__wt_buf_free(session, &cbulk->last);
 	}
 
-	WT_TRET(__wt_btcur_close(cbt));
+	WT_TRET(__wt_btcur_close(cbt, 0));
 	if (cbt->btree != NULL) {
 		/* Increment the data-source's in-use counter. */
 		__wt_cursor_dhandle_decr_use(session);
