@@ -1165,8 +1165,12 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 	btree = S2BT(session);
 	bulk = F_ISSET(btree, WT_BTREE_BULK) ? 1 : 0;
 
-	/* If the handle is already dead, force the discard. */
-	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
+	/*
+	 * If the handle is already dead or the file isn't durable, force the
+	 * discard.
+	 */
+	if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT) ||
+	    F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
 		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE));
 
 	/*
