@@ -77,9 +77,14 @@ saslClientEnv.Library(
     target='sasl_client',
     source=saslClientSource,
     LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/crypto/scramauth',
+        '$BUILD_DIR/mongo/executor/remote_command',
         '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/util/md5',
+        '$BUILD_DIR/mongo/util/net/hostandport',
     ],
     SYSLIBDEPS=saslLibs
 )
