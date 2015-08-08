@@ -654,13 +654,13 @@ Status applyOperation_inlock(OperationContext* txn,
         // 2. If okay, commit
         // 3. If not, do update (and commit)
         // 4. If both !Ok, return status
-        StatusWith<RecordId> status{ErrorCodes::NotYetInitialized, ""};
+        Status status{ErrorCodes::NotYetInitialized, ""};
         {
             WriteUnitOfWork wuow(txn);
             try {
                 status = collection->insertDocument(txn, o, true);
             } catch (DBException dbe) {
-                status = StatusWith<RecordId>(dbe.toStatus());
+                status = dbe.toStatus();
             }
             if (status.isOK()) {
                 wuow.commit();
@@ -668,8 +668,8 @@ Status applyOperation_inlock(OperationContext* txn,
         }
         // Now see if we need to do an update, based on duplicate _id index key
         if (!status.isOK()) {
-            if (status.getStatus().code() != ErrorCodes::DuplicateKey) {
-                return status.getStatus();
+            if (status.code() != ErrorCodes::DuplicateKey) {
+                return status;
             }
 
             // Do update on DuplicateKey errors.

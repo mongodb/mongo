@@ -401,10 +401,9 @@ Status MMAPV1Engine::repairDatabase(OperationContext* txn,
                 BSONObj doc = record->data.releaseToBson();
 
                 WriteUnitOfWork wunit(txn);
-                StatusWith<RecordId> result =
-                    tempCollection->insertDocument(txn, doc, &indexer, false);
-                if (!result.isOK())
-                    return result.getStatus();
+                Status status = tempCollection->insertDocument(txn, doc, &indexer, false);
+                if (!status.isOK())
+                    return status;
 
                 wunit.commit();
                 txn->checkForInterrupt();

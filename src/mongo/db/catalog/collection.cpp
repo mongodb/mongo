@@ -278,9 +278,7 @@ StatusWithMatchExpression Collection::parseValidator(const BSONObj& validator) c
     return statusWithMatcher;
 }
 
-StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
-                                                const DocWriter* doc,
-                                                bool enforceQuota) {
+Status Collection::insertDocument(OperationContext* txn, const DocWriter* doc, bool enforceQuota) {
     invariant(!_validator || documentValidationDisabled(txn));
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
     invariant(!_indexCatalog.haveAnyIndexes());  // eventually can implement, just not done
@@ -290,7 +288,7 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
 
     StatusWith<RecordId> loc = _recordStore->insertRecord(txn, doc, _enforceQuota(enforceQuota));
     if (!loc.isOK())
-        return loc;
+        return loc.getStatus();
 
     // we cannot call into the OpObserver here because the document being written is not present
     // fortunately, this is currently only used for adding entries to the oplog.
@@ -302,13 +300,13 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
         _cappedNotifier->notifyOfInsert();
     }
 
-    return StatusWith<RecordId>(loc);
+    return loc.getStatus();
 }
 
-StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
-                                                const BSONObj& docToInsert,
-                                                bool enforceQuota,
-                                                bool fromMigrate) {
+Status Collection::insertDocument(OperationContext* txn,
+                                  const BSONObj& docToInsert,
+                                  bool enforceQuota,
+                                  bool fromMigrate) {
     {
         auto status = checkValidation(txn, docToInsert);
         if (!status.isOK())
@@ -319,19 +317,18 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
 
     if (_indexCatalog.findIdIndex(txn)) {
         if (docToInsert["_id"].eoo()) {
-            return StatusWith<RecordId>(ErrorCodes::InternalError,
-                                        str::stream()
-                                            << "Collection::insertDocument got "
-                                               "document without _id for ns:" << _ns.ns());
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Collection::insertDocument got "
+                                           "document without _id for ns:" << _ns.ns());
         }
     }
 
     if (_mustTakeCappedLockOnInsert)
         synchronizeOnCappedInFlightResource(txn->lockState());
 
-    StatusWith<RecordId> res = _insertDocument(txn, docToInsert, enforceQuota);
+    Status status = _insertDocument(txn, docToInsert, enforceQuota);
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
-    if (res.isOK()) {
+    if (status.isOK()) {
         getGlobalServiceContext()->getOpObserver()->onInsert(txn, ns(), docToInsert, fromMigrate);
 
         // If there is a notifier object and another thread is waiting on it, then we notify
@@ -342,13 +339,13 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
         }
     }
 
-    return res;
+    return status;
 }
 
-StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
-                                                const BSONObj& doc,
-                                                MultiIndexBlock* indexBlock,
-                                                bool enforceQuota) {
+Status Collection::insertDocument(OperationContext* txn,
+                                  const BSONObj& doc,
+                                  MultiIndexBlock* indexBlock,
+                                  bool enforceQuota) {
     {
         auto status = checkValidation(txn, doc);
         if (!status.isOK())
@@ -364,11 +361,11 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
         _recordStore->insertRecord(txn, doc.objdata(), doc.objsize(), _enforceQuota(enforceQuota));
 
     if (!loc.isOK())
-        return loc;
+        return loc.getStatus();
 
     Status status = indexBlock->insert(doc, loc.getValue());
     if (!status.isOK())
-        return StatusWith<RecordId>(status);
+        return status;
 
     getGlobalServiceContext()->getOpObserver()->onInsert(txn, ns(), doc);
 
@@ -379,12 +376,12 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
         _cappedNotifier->notifyOfInsert();
     }
 
-    return loc;
+    return loc.getStatus();
 }
 
-StatusWith<RecordId> Collection::_insertDocument(OperationContext* txn,
-                                                 const BSONObj& docToInsert,
-                                                 bool enforceQuota) {
+Status Collection::_insertDocument(OperationContext* txn,
+                                   const BSONObj& docToInsert,
+                                   bool enforceQuota) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
     // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
@@ -394,16 +391,16 @@ StatusWith<RecordId> Collection::_insertDocument(OperationContext* txn,
     StatusWith<RecordId> loc = _recordStore->insertRecord(
         txn, docToInsert.objdata(), docToInsert.objsize(), _enforceQuota(enforceQuota));
     if (!loc.isOK())
-        return loc;
+        return loc.getStatus();
 
     invariant(RecordId::min() < loc.getValue());
     invariant(loc.getValue() < RecordId::max());
 
     Status s = _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
     if (!s.isOK())
-        return StatusWith<RecordId>(s);
+        return s;
 
-    return loc;
+    return Status::OK();
 }
 
 Status Collection::aboutToDeleteCapped(OperationContext* txn,

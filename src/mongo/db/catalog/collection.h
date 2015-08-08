@@ -223,23 +223,21 @@ public:
      *
      * If enforceQuota is false, quotas will be ignored.
      */
-    StatusWith<RecordId> insertDocument(OperationContext* txn,
-                                        const BSONObj& doc,
-                                        bool enforceQuota,
-                                        bool fromMigrate = false);
+    Status insertDocument(OperationContext* txn,
+                          const BSONObj& doc,
+                          bool enforceQuota,
+                          bool fromMigrate = false);
 
     /**
      * Callers must ensure no document validation is performed for this collection when calling
      * this method.
      */
-    StatusWith<RecordId> insertDocument(OperationContext* txn,
-                                        const DocWriter* doc,
-                                        bool enforceQuota);
+    Status insertDocument(OperationContext* txn, const DocWriter* doc, bool enforceQuota);
 
-    StatusWith<RecordId> insertDocument(OperationContext* txn,
-                                        const BSONObj& doc,
-                                        MultiIndexBlock* indexBlock,
-                                        bool enforceQuota);
+    Status insertDocument(OperationContext* txn,
+                          const BSONObj& doc,
+                          MultiIndexBlock* indexBlock,
+                          bool enforceQuota);
 
     /**
      * updates the document @ oldLocation with newDoc
@@ -380,9 +378,7 @@ private:
      *  - some user error checks
      *  - adjust padding
      */
-    StatusWith<RecordId> _insertDocument(OperationContext* txn,
-                                         const BSONObj& doc,
-                                         bool enforceQuota);
+    Status _insertDocument(OperationContext* txn, const BSONObj& doc, bool enforceQuota);
 
     bool _enforceQuota(bool userEnforeQuota) const;
 
