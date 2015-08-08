@@ -13,12 +13,6 @@ source_files = [
     'strcasestr.cpp',
 ]
 
-if GetOption('experimental-decimal-support') == 'on':
-    lib_deps.append('$BUILD_DIR/third_party/shim_intel_decimal128')
-    source_files.append('decimal128.cpp')
-else:
-    source_files.append('decimal128_dummy.cpp')
-
 env.Library(target='platform',
             source=source_files,
             LIBDEPS=lib_deps
@@ -31,4 +25,4 @@ env.CppUnitTest('process_id_test', 'process_id_test.cpp', LIBDEPS=['platform'])
 env.CppUnitTest('random_test', 'random_test.cpp', LIBDEPS=['$BUILD_DIR/mongo/base'])
 
 if GetOption('experimental-decimal-support') == 'on':
-    env.CppUnitTest('decimal128_test', 'decimal128_test.cpp', LIBDEPS=['platform'])
+    env.CppUnitTest('decimal128_test', 'decimal128_test.cpp', LIBDEPS=['$BUILD_DIR/mongo/base'])
