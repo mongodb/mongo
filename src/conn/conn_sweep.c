@@ -30,13 +30,27 @@ __sweep_mark(WT_SESSION_IMPL *session, int *dead_handlesp)
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (WT_IS_METADATA(dhandle))
 			continue;
-		if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
+		/*
+		 * If we see any handles that are already closed, or marked
+		 * dead, flag them for cleanup.  Don't count handles open
+		 * exclusive: they are either locks or in transition.
+		 */
+		if (!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN) ||
+		    F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
 			++*dead_handlesp;
 			continue;
 		}
+		if (conn->sweep_idle_time == 0)
+			continue;
+		/*
+		 * There are some internal increments of the in-use count such
+		 * as eviction.  Don't keep handles alive because of them, but
+		 * if we see multiple cursors open, clear the time of death.
+		 */
+		if (dhandle->session_inuse > 1)
+			dhandle->timeofdeath = 0;
 		if (dhandle->session_inuse != 0 ||
-		    now <= dhandle->timeofdeath + conn->sweep_idle_time ||
-		    conn->sweep_idle_time == 0)
+		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
 			continue;
 		if (dhandle->timeofdeath == 0) {
 			dhandle->timeofdeath = now;
@@ -141,7 +155,7 @@ __sweep_expire(WT_SESSION_IMPL *session)
 		if (WT_IS_METADATA(dhandle))
 			continue;
 		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
-		    F_ISSET(dhandle, WT_DHANDLE_DEAD))
+		    F_ISSET(dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_EXCLUSIVE))
 			continue;
 		if (dhandle->session_inuse != 0 ||
 		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
@@ -206,9 +220,8 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 		dhandle_next = SLIST_NEXT(dhandle, l);
 		if (WT_IS_METADATA(dhandle))
 			continue;
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
-		    dhandle->session_inuse != 0 ||
-		    dhandle->session_ref != 0)
+		if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN) ||
+		    dhandle->session_inuse != 0 || dhandle->session_ref != 0)
 			continue;
 
 		/* Make sure we get exclusive access. */
@@ -221,7 +234,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 		 * If there are no longer any references to the handle in any
 		 * sessions, attempt to discard it.
 		 */
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
+		if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN) ||
 		    dhandle->session_inuse != 0 || dhandle->session_ref != 0) {
 			WT_RET(__wt_writeunlock(session, dhandle->rwlock));
 			continue;
