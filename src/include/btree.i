@@ -931,9 +931,6 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * let the threads continue before doing eviction.
 	 *
 	 * Ignore anything other than large, dirty row-store leaf pages.
-	 *
-	 * XXX KEITH
-	 * Need a better test for append-only workloads.
 	 */
 	if (page->type != WT_PAGE_ROW_LEAF ||
 	    page->memory_footprint < btree->maxmempage ||
