@@ -79,6 +79,7 @@ env.Library(
         "scoped_timer",
         "working_set",
         "$BUILD_DIR/mongo/base",
+        '$BUILD_DIR/third_party/s2/s2',
     ],
 )
 

@@ -85,6 +85,7 @@ env.Library(
     LIBDEPS=[
         'document_range',
         'metadata',
+        '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )

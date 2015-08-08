@@ -64,7 +64,9 @@ env.Library(
     source=[
         "cluster_client_cursor_mock.cpp",
     ],
-    LIBDEPS=[],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
 )
 
 env.CppUnitTest(
@@ -84,7 +86,9 @@ env.Library(
     source=[
         "cluster_cursor_manager.cpp",
     ],
-    LIBDEPS=[],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
 )
 
 env.CppUnitTest(
