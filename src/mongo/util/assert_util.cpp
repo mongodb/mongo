@@ -83,7 +83,7 @@ string DBException::toString() const {
 }
 
 void DBException::traceIfNeeded(const DBException& e) {
-    if (traceExceptions && !inShutdown()) {
+    if (traceExceptions) {
         warning() << "DBException thrown" << causedBy(e) << endl;
         printStackTrace();
     }
