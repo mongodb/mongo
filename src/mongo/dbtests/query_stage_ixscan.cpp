@@ -66,7 +66,7 @@ public:
 
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_txn);
-        ASSERT_OK(_coll->insertDocument(&_txn, doc, false));
+        ASSERT_OK(_coll->insertDocument(&_txn, doc, false).getStatus());
         wunit.commit();
     }
 

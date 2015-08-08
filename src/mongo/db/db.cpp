@@ -237,7 +237,7 @@ static void logStartup() {
         collection = db->getCollection(ns);
     }
     invariant(collection);
-    uassertStatusOK(collection->insertDocument(&txn, o, false));
+    uassertStatusOK(collection->insertDocument(&txn, o, false).getStatus());
     wunit.commit();
 }
 

@@ -803,10 +803,11 @@ bool SyncTail::shouldRetry(OperationContext* txn, const BSONObj& o) {
             Collection* const coll = db->getOrCreateCollection(txn, nss.toString());
             invariant(coll);
 
-            Status status = coll->insertDocument(txn, missingObj, true);
-            uassert(15917,
-                    str::stream() << "failed to insert missing doc: " << status.toString(),
-                    status.isOK());
+            StatusWith<RecordId> result = coll->insertDocument(txn, missingObj, true);
+            uassert(
+                15917,
+                str::stream() << "failed to insert missing doc: " << result.getStatus().toString(),
+                result.isOK());
 
             LOG(1) << "inserted missing doc: " << missingObj.toString() << endl;
 

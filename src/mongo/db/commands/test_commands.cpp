@@ -100,11 +100,12 @@ public:
                 return false;
             }
         }
-        Status status = collection->insertDocument(txn, obj, false);
+        StatusWith<RecordId> res = collection->insertDocument(txn, obj, false);
+        Status status = res.getStatus();
         if (status.isOK()) {
             wunit.commit();
         }
-        return appendCommandStatus(result, status);
+        return appendCommandStatus(result, res.getStatus());
     }
 };
 

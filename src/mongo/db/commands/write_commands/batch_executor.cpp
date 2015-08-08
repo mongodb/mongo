@@ -1084,10 +1084,10 @@ static void singleInsert(OperationContext* txn,
     dassert(txn->lockState()->isCollectionLockedForMode(insertNS, MODE_IX));
 
     WriteUnitOfWork wunit(txn);
-    Status status = collection->insertDocument(txn, docToInsert, true);
+    StatusWith<RecordId> status = collection->insertDocument(txn, docToInsert, true);
 
     if (!status.isOK()) {
-        result->setError(toWriteError(status));
+        result->setError(toWriteError(status.getStatus()));
     } else {
         result->getStats().n = 1;
         wunit.commit();

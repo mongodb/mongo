@@ -694,7 +694,7 @@ void State::insert(const string& ns, const BSONObj& o) {
         b.appendElements(o);
         BSONObj bo = b.obj();
 
-        uassertStatusOK(coll->insertDocument(_txn, bo, true));
+        uassertStatusOK(coll->insertDocument(_txn, bo, true).getStatus());
         wuow.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "M/R insert", ns);
@@ -713,7 +713,7 @@ void State::_insertToInc(BSONObj& o) {
         bool shouldReplicateWrites = _txn->writesAreReplicated();
         _txn->setReplicatedWrites(false);
         ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, _txn, shouldReplicateWrites);
-        uassertStatusOK(coll->insertDocument(_txn, o, true, false));
+        uassertStatusOK(coll->insertDocument(_txn, o, true, false).getStatus());
         wuow.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "M/R insertToInc", _config.incLong);
