@@ -213,6 +213,8 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 	fh = *fhp;
 	*fhp = NULL;
 
+	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: close", fh->name));
+
 	__wt_spin_lock(session, &conn->fh_lock);
 	if (fh == NULL || fh->ref == 0 || --fh->ref > 0) {
 		__wt_spin_unlock(session, &conn->fh_lock);
