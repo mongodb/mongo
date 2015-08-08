@@ -130,7 +130,14 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
 	if (conn->las_session == NULL)
 		return (0);
 
-	/* Force discard on release (must be last handle discarded). */
+	/*
+	 * Force discard on release (must be last handle discarded).
+	 *
+	 * KEITH:
+	 * There's a problem, if WT_DHANDLE_DISCARD_FORCE isn't set on the
+	 * lookaside data handle here, we will drop core removing the data
+	 * handle from the connection session's hash list.
+	 */
 	F_SET(conn->las_session->dhandle, WT_DHANDLE_DISCARD_FORCE);
 
 	/* Close the session, closing the open cursor. */
@@ -140,14 +147,7 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
 	conn->las_cursor = NULL;
 	conn->las_session = NULL;
 
-	/*
-	 * Discard any incarnation of the file.
-	 *
-	 * KEITH: I'm not sure about this: if WT_DHANDLE_DISCARD_FORCE isn't set
-	 * on the lookaside data handle, we drop core removing the Btree handle
-	 * from the connection session's hash list. We want to forcibly discard
-	 * the file, but I'm concerned I'm using sessions in some illegal way.
-	 */
+	/* Discard any incarnation of the file. */
 	WT_TRET(__las_drop(session));
 
 	return (ret);
