@@ -90,6 +90,11 @@ __wt_las_remove_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor_arg,
 		    memcmp(klas->data, prefix, prefix_len) != 0)
 			break;
 
+		/*
+		 * Cursor opened overwrite=true: it won't return WT_NOTFOUND
+		 * if another thread removes the record before we do, and the
+		 * cursor remains positioned in that case.
+		 */
 		WT_ERR(cursor->remove(cursor));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
