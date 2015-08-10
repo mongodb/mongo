@@ -239,7 +239,6 @@ extern int __wt_conn_dhandle_discard(WT_SESSION_IMPL *session);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern void __wt_las_stats_update(WT_SESSION_IMPL *session);
-extern int __wt_las_create(WT_SESSION_IMPL *session);
 extern int __wt_las_destroy(WT_SESSION_IMPL *session);
 extern int __wt_las_cursor( WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t *saved_flagsp);
 extern int __wt_las_cursor_close( 	WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t saved_flags);

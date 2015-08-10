@@ -65,11 +65,11 @@ __las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 }
 
 /*
- * __wt_las_create --
+ * __las_create --
  *	Initialize the database's lookaside store.
  */
-int
-__wt_las_create(WT_SESSION_IMPL *session)
+static int
+__las_create(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -179,7 +179,7 @@ __wt_las_cursor(
 
 	/* On the first access, create the shared lookaside store and cursor. */
 	if (conn->las_cursor == NULL)
-		WT_ERR(__wt_las_create(session));
+		WT_ERR(__las_create(session));
 
 	/* Eviction threads get their own lookaside file cursors. */
 	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR)) {
