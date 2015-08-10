@@ -998,7 +998,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 */
 		if (F_ISSET(r, WT_EVICTING)) {
 			/*
-		 	 * Eviction can write any committed update.
+			 * Eviction can write any committed update.
 			 *
 			 * When reconciling for eviction, track whether any
 			 * uncommitted updates are found.
@@ -1010,8 +1010,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 				skipped = 1;
 		} else {
 			/*
-		 	 * Checkpoint can only write updates visible as of its
-		 	 * snapshot.
+			 * Checkpoint can only write updates visible as of its
+			 * snapshot.
 			 *
 			 * When reconciling for a checkpoint, track whether any
 			 * updates were skipped on the way to finding the first
