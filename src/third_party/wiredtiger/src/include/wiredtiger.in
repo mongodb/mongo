@@ -1619,8 +1619,9 @@ struct __wt_connection {
 	 * handles open before the file manager will look for handles to close.,
 	 * a string; default \c 250.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_idle_time, amount of time in
-	 * seconds a file handle needs to be idle before attempting to close
-	 * it., an integer between 1 and 100000; default \c 30.}
+	 * seconds a file handle needs to be idle before attempting to close it.
+	 * A setting of 0 means that idle handles are not closed., an integer
+	 * between 0 and 100000; default \c 30.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_scan_interval, interval in
 	 * seconds at which to check for files that are inactive and close
 	 * them., an integer between 1 and 100000; default \c 10.}
@@ -1993,8 +1994,9 @@ struct __wt_connection {
  * before the file manager will look for handles to close., a string; default \c
  * 250.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_idle_time, amount of time in
- * seconds a file handle needs to be idle before attempting to close it., an
- * integer between 1 and 100000; default \c 30.}
+ * seconds a file handle needs to be idle before attempting to close it.  A
+ * setting of 0 means that idle handles are not closed., an integer between 0
+ * and 100000; default \c 30.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;close_scan_interval, interval in seconds at
  * which to check for files that are inactive and close them., an integer
  * between 1 and 100000; default \c 10.}

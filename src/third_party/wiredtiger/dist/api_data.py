@@ -374,7 +374,8 @@ connection_runtime_config = [
         type='category', subconfig=[
         Config('close_idle_time', '30', r'''
             amount of time in seconds a file handle needs to be idle
-            before attempting to close it''', min=1, max=100000),
+            before attempting to close it. A setting of 0 means that idle
+            handles are not closed''', min=0, max=100000),
         Config('close_handle_minimum', '250', r'''
             number of handles open before the file manager will look for handles
             to close'''),
