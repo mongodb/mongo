@@ -315,13 +315,14 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
             inputNs.isValid());
 
     std::vector<Privilege> privileges;
-    privileges.push_back(Privilege(inputResource, ActionType::find));
+    Privilege::addPrivilegeToPrivilegeVector(&privileges,
+                                             Privilege(inputResource, ActionType::find));
 
     BSONObj pipeline = cmdObj.getObjectField("pipeline");
     BSONForEach(stageElem, pipeline) {
         BSONObj stage = stageElem.embeddedObjectUserCheck();
         StringData stageName = stage.firstElementFieldName();
-        if (stageName == "$out") {
+        if (stageName == "$out" && stage.firstElementType() == String) {
             NamespaceString outputNs(db, stage.firstElement().str());
             uassert(17139,
                     mongoutils::str::stream() << "Invalid $out target namespace, " << outputNs.ns(),
@@ -333,14 +334,12 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
             if (shouldBypassDocumentValidationForCommand(cmdObj)) {
                 actions.addAction(ActionType::bypassDocumentValidation);
             }
-            privileges.push_back(Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
-        } else if (stageName == "$lookUp") {
-            NamespaceString fromNs(db, stage.firstElement()["from"].String());
-            uassert(28768,
-                    mongoutils::str::stream() << "Invalid from namespace, " << fromNs.ns(),
-                    fromNs.isValid());
-
-            privileges.push_back(
+            Privilege::addPrivilegeToPrivilegeVector(
+                &privileges, Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
+        } else if (stageName == "$lookUp" && stage.firstElementType() == Object) {
+            NamespaceString fromNs(db, stage.firstElement()["from"].str());
+            Privilege::addPrivilegeToPrivilegeVector(
+                &privileges,
                 Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
         }
     }
