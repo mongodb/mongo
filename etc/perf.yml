@@ -38,7 +38,7 @@ functions:
           chmod +x mongo
           git clone https://github.com/mongodb/mongo-perf perf
           cd perf
-          git checkout r20150702
+          git checkout r20150814
     - command: shell.exec
       params:
         background: true
@@ -169,6 +169,18 @@ tasks:
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
     - func: "analyze"
+- name: where
+  depends_on:
+  - name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "where"
+        includeFilter2 : "core regression" 
+        excludeFilter : "single_threaded"
+        threads : "1 2 4 8"
+    - func: "analyze"
 - name: update
   depends_on:
   - name: compile
@@ -247,6 +259,7 @@ buildvariants:
     distros:
     - rhel55
   - name: query
+  - name: where
   - name: update
   - name: insert
   - name: geo
@@ -269,6 +282,7 @@ buildvariants:
     distros:
     - rhel55
   - name: query
+  - name: where
   - name: update
   - name: insert
   - name: geo
