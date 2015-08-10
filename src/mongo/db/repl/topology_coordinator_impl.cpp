@@ -868,8 +868,7 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinatorImpl::prepare
 
     const Milliseconds timeoutPeriod(_rsConfig.isInitialized()
                                          ? _rsConfig.getHeartbeatTimeoutPeriodMillis()
-                                         : Milliseconds(durationCount<Seconds>(
-                                               ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod)));
+                                         : ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod);
     const Milliseconds timeout(timeoutPeriod - alreadyElapsed);
     return std::make_pair(hbArgs, timeout);
 }
