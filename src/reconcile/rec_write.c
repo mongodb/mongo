@@ -994,30 +994,39 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			r->first_dirty_txn = txnid;
 
 		/*
-		 * Find the first update we can use: eviction can write any
-		 * committed update, checkpoint can only write updates that
-		 * are visible as of the snapshot
-		 *
-		 * When reconciling for eviction, track whether any uncommitted
-		 * updates were found.
-		 *
-		 * When reconciling for a checkpoint, track whether any updates
-		 * were skipped on the way to finding the first visible update;
-		 *
-		 * KEITH: I think this is wrong, we're ignoring we can't write
-		 * updates committed more recently than in-progress checkpoints.
+		 * Find the first update we can use.
 		 */
 		if (F_ISSET(r, WT_EVICTING)) {
+			/*
+		 	 * Eviction can write any committed update.
+			 *
+			 * When reconciling for eviction, track whether any
+			 * uncommitted updates are found.
+			 */
 			if (__wt_txn_committed(session, txnid)) {
 				if (*updp == NULL)
 					*updp = upd;
 			} else
 				skipped = 1;
-		} else if (*updp == NULL) {
-			if (__wt_txn_visible(session, txnid))
-				*updp = upd;
-			else
-				skipped = 1;
+		} else {
+			/*
+		 	 * Checkpoint can only write updates visible as of its
+		 	 * snapshot.
+			 *
+			 * When reconciling for a checkpoint, track whether any
+			 * updates were skipped on the way to finding the first
+			 * visible update.
+			 *
+			 * KEITH: I think this may be wrong, we aren't checking
+			 * that we can't write updates committed more recently
+			 * than in-progress checkpoints.
+			 */
+			if (*updp == NULL) {
+				if (__wt_txn_visible(session, txnid))
+					*updp = upd;
+				else
+					skipped = 1;
+			}
 		}
 	}
 
