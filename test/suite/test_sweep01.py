@@ -174,9 +174,9 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print "ref1: " + str(ref1) + " ref2: " + str(ref2)
             print "XX: nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
         self.assertEqual(nfile2 < nfile1, True)
-        # The only files that should be left is the metadata, the lock file
-        # and the active file.
-        if (nfile2 != 3):
+        # The only files that should be left are the metadata, the lookaside
+        # file, the lock file, and the active file.
+        if (nfile2 != 4):
             print "close1: " + str(close1) + " close2: " + str(close2)
             print "sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
             print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
@@ -184,7 +184,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print "tod1: " + str(tod1) + " tod2: " + str(tod2)
             print "ref1: " + str(ref1) + " ref2: " + str(ref2)
             print "XX2: nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
-        self.assertEqual(nfile2 == 3, True)
+        self.assertEqual(nfile2 == 4, True)
 
 if __name__ == '__main__':
     wttest.run()
