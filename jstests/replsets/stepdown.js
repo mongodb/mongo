@@ -10,20 +10,40 @@ var errorWasDueToConnectionFailure = function(error) {
     return error.message === "error doing query: failed";
 };
 
-var replTest = new ReplSetTest({ name: 'testSet', nodes: 2, nodeOptions: {verbose: 1} });
+var replTest = new ReplSetTest({
+    name : 'testSet',
+    nodes : {
+        "n0" : {
+            rsConfig : {
+                priority : 2
+            }
+        },
+        "n1" : {},
+        "n2" : {
+            rsConfig : {
+                votes : 1,
+                priority : 0
+            }
+        }
+    },
+    nodeOptions : {
+        verbose : 1
+    }
+});
 var nodes = replTest.startSet();
 replTest.initiate();
 var master = replTest.getMaster();
 
 // do a write
 print("\ndo a write");
-master.getDB("foo").bar.insert({x:1});
+assert.writeOK(master.getDB("foo").bar.insert({x:1}));
 replTest.awaitReplication();
 
-// lock secondary
-print("\nlock secondary");
-var locked = replTest.liveNodes.slaves[0];
-printjson( locked.getDB("admin").runCommand({fsync : 1, lock : 1}) );
+// lock secondaries
+print("\nlock secondaries");
+replTest.liveNodes.slaves.forEach(function(slave) {
+    printjson(assert.commandWorked(slave.getDB("admin").runCommand({fsync : 1, lock : 1})));
+});
 
 print("\nwaiting 11ish seconds");
 
@@ -31,48 +51,32 @@ sleep(2000);
 
 for (var i = 0; i < 11; i++) {
     // do another write
-    master.getDB("foo").bar.insert({x:i});
+    assert.writeOK(master.getDB("foo").bar.insert({x:i}));
     sleep(1000);
 }
 
 print("\n do stepdown that should not work");
 
 // this should fail, so we don't need to try/catch
-var result = master.getDB("admin").runCommand({replSetStepDown: 10});
-printjson(result);
-assert.eq(result.ok, 0);
+printjson(assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown: 10})));
 
 print("\n do stepdown that should work");
-var threw = false;
-try {
-    master.getDB("admin").runCommand({replSetStepDown: 50, force : true});
-}
-catch (e) {
-    print(e);
-    threw = true;
-}
-assert(threw);
+assert.throws(function() {
+    assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown:50, force:true}))
+});
 
-var r2 = master.getDB("admin").runCommand({ismaster : 1});
+var r2 = assert.commandWorked(master.getDB("admin").runCommand({ismaster : 1}));
 assert.eq(r2.ismaster, false);
 assert.eq(r2.secondary, true);
 
 print("\nunlock");
-printjson(locked.getDB("admin").fsyncUnlock());
+replTest.liveNodes.slaves.forEach(function(slave) {
+    printjson(assert.commandWorked(slave.getDB("admin").fsyncUnlock()));
+});
 
 print("\nreset stepped down time");
-master.getDB("admin").runCommand({replSetFreeze:0});
+assert.commandWorked(master.getDB("admin").runCommand({replSetFreeze:0}));
 master = replTest.getMaster();
-
-print("\nmake 1 config with priorities");
-var config = master.getDB("local").system.replset.findOne();
-print("\nmake 2");
-config.version++;
-config.members[0].priority = 2;
-config.members[1].priority = 1;
-// make sure 1 can stay master once 0 is down
-config.members[0].votes = 0;
-reconfig(replTest, config);
 
 print("\nawait");
 replTest.awaitSecondaryNodes(90000);
@@ -114,27 +118,10 @@ assert.soon(function() {
 
 // Add arbiter for shutdown tests
 replTest.add();
-
-config.version++;
-config.members.push({_id: 2,
-                     host: getHostName()+":"+replTest.ports[replTest.ports.length-1],
-                     arbiterOnly:true});
-try {
-    reconfig(replTest, config);
-} catch (x) {
-    // SERVER-16878 Print the last few oplog entries of the secondary to aid debugging
-    var oplog1 = replTest.nodes[1].getDB('local').oplog.rs.find().sort({'$natural':-1}).limit(3);
-    print("Node 1 oplog: " + tojson(oplog1.toArray()));
-
-    throw x;
-}
-
-
 print("\ncheck shutdown command");
 
 master = replTest.liveNodes.master;
 var slave = replTest.liveNodes.slaves[0];
-var slaveId = replTest.getNodeId(slave);
 
 try {
     slave.adminCommand({shutdown :1});

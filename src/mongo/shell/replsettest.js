@@ -20,6 +20,9 @@
  *            <any string>: replica member option Object. @see MongoRunner.runMongod
  *            <any string2>: and so on...
  *          }
+ *          If object has a special "rsConfig" field then those options will be used for each
+ *          replica set member config options when used to initialize the replica set, or
+ *          building the config with getReplSetConfig()
  * 
  *        Format for Array:
  *           An array of replica member option Object. @see MongoRunner.runMongod
@@ -150,16 +153,22 @@ ReplSetTest.prototype.getReplSetConfig = function() {
     cfg['_id']  = this.name;
     cfg.members = [];
 
-    for(i=0; i<this.ports.length; i++) {
+    for (i=0; i<this.ports.length; i++) {
         member = {};
         member['_id']  = i;
 
         var port = this.ports[i];
 
         member['host'] = this.host + ":" + port;
-        if( this.nodeOptions[ "n" + i ] && this.nodeOptions[ "n" + i ].arbiter )
-            member['arbiterOnly'] = true
-            
+        var nodeOpts = this.nodeOptions[ "n" + i ];
+        if (nodeOpts) {
+            if (nodeOpts.arbiter) {
+                member['arbiterOnly'] = true;
+            }
+            if (nodeOpts.rsConfig) {
+                Object.extend(member, nodeOpts.rsConfig);
+            }
+        }
         cfg.members.push(member);
     }
 
@@ -671,6 +680,7 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
     
     options = Object.merge( defaults, options )
     options = Object.merge( options, this.nodeOptions[ "n" + n ] )
+    delete options.rsConfig;
 
     options.restart = options.restart || restart
 
