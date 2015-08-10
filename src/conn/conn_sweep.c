@@ -271,10 +271,13 @@ __sweep_server(void *arg)
 		WT_ERR(__wt_seconds(session, &now));
 
 		/*
-		 * Sweep the lookaside file.
+		 * Sweep the lookaside file. If the lookaside hasn't yet been
+		 * written, there's no work to do.
 		 */
-		WT_SAVE_DHANDLE(session, ret = __wt_las_sweep(session));
-		WT_ERR(ret);
+		if (__wt_las_is_written(session)) {
+			WT_SAVE_DHANDLE(session, ret = __wt_las_sweep(session));
+			WT_ERR(ret);
+		}
 
 		/*
 		 * Mark handles with a time of death, and report whether any

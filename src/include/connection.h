@@ -362,6 +362,7 @@ struct __wt_connection_impl {
 	WT_SPINLOCK	 las_lock;	/* Lookaside file spinlock */
 	WT_SESSION_IMPL *las_session;	/* Lookaside file session */
 	WT_CURSOR	*las_cursor;	/* Lookaside file cursor */
+	int		 las_written;	/* Lookaside file has been written */
 
 	WT_ITEM		 las_sweep_key;	/* Sweep server's saved key */
 	int		 las_sweep_call;/* Sweep server's call count */

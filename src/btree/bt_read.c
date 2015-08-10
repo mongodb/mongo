@@ -454,9 +454,15 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 		if (previous_state == WT_REF_DELETED)
 			WT_ERR(__wt_delete_page_instantiate(session, ref));
 
-		/* Instantiate updates from the database's lookaside file. */
+		/*
+		 * Instantiate updates from the database's lookaside file. The
+		 * flag might have been set a long time ago, and we only care
+		 * if the lookaside file is currently active, check that before
+		 * doing any work.
+		 */
 		dsk = tmp.data;
-		if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE)) {
+		if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE) &&
+		    __wt_las_is_written(session)) {
 			WT_STAT_FAST_CONN_INCR(session, cache_read_lookaside);
 			WT_STAT_FAST_DATA_INCR(session, cache_read_lookaside);
 

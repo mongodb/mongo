@@ -3221,6 +3221,12 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	counter = 0;
 	counterp = NULL;		/* [-Werror=maybe-uninitialized] */
 
+	/*
+	 * We're writing lookaside records: start instantiating them on pages
+	 * we read (with the right flag set), and start sweeping the file.
+	 */
+	__wt_las_set_written(session);
+
 	WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key));

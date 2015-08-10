@@ -65,25 +65,24 @@ __las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 }
 
 /*
- * __las_create --
+ * __wt_las_create --
  *	Initialize the database's lookaside store.
  */
-static int
-__las_create(WT_SESSION_IMPL *session)
+int
+__wt_las_create(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
 	conn = S2C(session);
 
-	/* Lock the lookaside file and check if we won the race. */
-	__wt_spin_lock(session, &conn->las_lock);
-	if (conn->las_cursor != NULL) {
-		__wt_spin_unlock(session, &conn->las_lock);
-		return (0);
-	}
-
-	/* Open an internal session, used for the shared lookaside cursor. */
+	/*
+	 * Done at startup: we cannot do it on demand because we require the
+	 * schema lock to create and drop the file, and it may not always be
+	 * available.
+	 *
+	 * Open an internal session, used for the shared lookaside cursor.
+	 */
 	WT_ERR(__wt_open_internal_session(
 	    conn, "lookaside file", 1, 1, &conn->las_session));
 	session = conn->las_session;
@@ -154,6 +153,30 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_las_set_written --
+ *	Flag that the lookaside file has been written.
+ */
+void
+__wt_las_set_written(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+	if (conn->las_written == 0)
+		conn->las_written = 1;
+}
+
+/*
+ * __wt_las_is_written --
+ *	Return if the lookaside file has been written.
+ */
+int
+__wt_las_is_written(WT_SESSION_IMPL *session)
+{
+	return (S2C(session)->las_written);
+}
+
+/*
  * __wt_las_cursor --
  *	Return a lookaside cursor.
  */
@@ -176,10 +199,6 @@ __wt_las_cursor(
 	 */
 	saved_flags = session->flags;
 	F_SET(session, WT_SESSION_NO_EVICTION);
-
-	/* On the first access, create the shared lookaside store and cursor. */
-	if (conn->las_cursor == NULL)
-		WT_ERR(__las_create(session));
 
 	/* Eviction threads get their own lookaside file cursors. */
 	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR)) {
@@ -276,12 +295,6 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	int notused;
 
 	conn = S2C(session);
-
-	/*
-	 * If the lookaside file isn't yet open, there's no work to do.
-	 */
-	if (conn->las_cursor == NULL)
-		return (0);
 
 	/*
 	 * If the sweep thread does not yet have a lookaside file cursor,
