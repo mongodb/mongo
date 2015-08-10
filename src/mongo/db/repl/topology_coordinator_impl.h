@@ -232,6 +232,9 @@ public:
     virtual long long getTerm();
     virtual void prepareForStepDown();
     virtual void setPrimaryIndex(long long primaryIndex);
+    virtual HeartbeatResponseAction setMemberAsDown(Date_t now,
+                                                    const int memberIndex,
+                                                    const OpTime& myLastOpApplied);
 
     ////////////////////////////////////////////////////////////
     //
@@ -330,9 +333,10 @@ private:
     const MemberConfig* _currentPrimaryMember() const;
 
     /**
-     * Performs updating "_hbdata" and "_currentPrimaryIndex" for processHeartbeatResponse().
+     * Performs updating "_currentPrimaryIndex" for processHeartbeatResponse(), and determines if an
+     * election should commence.
      */
-    HeartbeatResponseAction _updateHeartbeatDataImpl(int updatedConfigIndex,
+    HeartbeatResponseAction _updatePrimaryFromHBData(int updatedConfigIndex,
                                                      const MemberState& originalState,
                                                      Date_t now,
                                                      const OpTime& lastOpApplied);

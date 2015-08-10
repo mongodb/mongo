@@ -321,6 +321,14 @@ public:
         const OpTime& myLastOpApplied) = 0;
 
     /**
+     * Marks a member has down from our persepctive and returns a HeartbeatResponseAction, which
+     * will be StepDownSelf if we can no longer see a majority of the nodes.
+     */
+    virtual HeartbeatResponseAction setMemberAsDown(Date_t now,
+                                                    const int memberIndex,
+                                                    const OpTime& myLastOpApplied) = 0;
+
+    /**
      * If getRole() == Role::candidate and this node has not voted too recently, updates the
      * lastVote tracker and returns true.  Otherwise, returns false.
      */

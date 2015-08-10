@@ -651,6 +651,7 @@ void ReplicationCoordinatorImpl::_addSlaveInfo_inlock(const SlaveInfo& slaveInfo
 void ReplicationCoordinatorImpl::_updateSlaveInfoOptime_inlock(SlaveInfo* slaveInfo,
                                                                const OpTime& opTime) {
     slaveInfo->opTime = opTime;
+    slaveInfo->lastUpdate = _replExecutor.now();
 
     _updateLastCommittedOpTime_inlock();
     // Wake up any threads waiting for replication that now have their replication
@@ -933,6 +934,11 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
     if (slaveInfo->opTime < args.ts) {
         _updateSlaveInfoOptime_inlock(slaveInfo, args.ts);
     }
+
+    // Update liveness for this node.
+    slaveInfo->lastUpdate = _replExecutor.now();
+    slaveInfo->down = false;
+    _cancelAndRescheduleLivenessUpdate_inlock(args.memberId);
     return Status::OK();
 }
 
@@ -1494,24 +1500,23 @@ bool ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(BSONObjBuil
     cmdBuilder->append("replSetUpdatePosition", 1);
     // create an array containing objects each member connected to us and for ourself
     BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
+    const Date_t now = _replExecutor.now();
     {
-        for (SlaveInfoVector::const_iterator itr = _slaveInfo.begin(); itr != _slaveInfo.end();
-             ++itr) {
+        for (SlaveInfoVector::iterator itr = _slaveInfo.begin(); itr != _slaveInfo.end(); ++itr) {
             if (itr->opTime.isNull()) {
                 // Don't include info on members we haven't heard from yet.
                 continue;
             }
+            // Don't include members we think are down.
+            if (!itr->self && itr->down) {
+                continue;
+            }
+
             BSONObjBuilder entry(arrayBuilder.subobjStart());
             entry.append("_id", itr->rid);
             entry.append("optime", itr->opTime.getTimestamp());
             entry.append("memberId", itr->memberId);
             entry.append("cfgver", _rsConfig.getConfigVersion());
-            // SERVER-14550 Even though the "config" field isn't used on the other end in 3.0,
-            // we need to keep sending it for 2.6 compatibility.
-            // TODO(spencer): Remove this after 3.0 is released.
-            const MemberConfig* member = _rsConfig.findMemberByID(itr->memberId);
-            fassert(18651, member);
-            entry.append("config", member->toBSON(_rsConfig.getTagConfig()));
         }
     }
     return true;
@@ -2304,6 +2309,8 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& n
         log() << "This node is not a member of the config";
     }
 
+    _externalState->setForwardSlaveProgressKeepAliveInterval(_rsConfig.getElectionTimeoutPeriod() /
+                                                             2);
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
     _updateSlaveInfoFromConfig_inlock();
     if (_selfIndex >= 0) {
@@ -2786,8 +2793,13 @@ void ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish(
     _topCoord->prepareReplResponseMetadata(metadata, lastVisibleOpTime, getLastCommittedOpTime());
 }
 
+bool ReplicationCoordinatorImpl::_isV1ElectionProtocol_inlock() {
+    return _rsConfig.getProtocolVersion() == 1;
+}
+
 bool ReplicationCoordinatorImpl::isV1ElectionProtocol() {
-    return getConfig().getProtocolVersion() == 1;
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _isV1ElectionProtocol_inlock();
 }
 
 Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
@@ -3057,6 +3069,12 @@ void ReplicationCoordinatorImpl::waitForElectionFinish_forTest() {
 void ReplicationCoordinatorImpl::waitForElectionDryRunFinish_forTest() {
     if (_electionDryRunFinishedEvent.isValid()) {
         _replExecutor.waitForEvent(_electionDryRunFinishedEvent);
+    }
+}
+
+void ReplicationCoordinatorImpl::waitForStepDownFinish_forTest() {
+    if (_stepDownFinishedEvent.isValid()) {
+        _replExecutor.waitForEvent(_stepDownFinishedEvent);
     }
 }
 

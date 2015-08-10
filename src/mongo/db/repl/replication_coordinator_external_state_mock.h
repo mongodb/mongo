@@ -58,6 +58,7 @@ public:
     virtual void initiateOplog(OperationContext* txn, bool updateReplOpTime);
     virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();
+    virtual void setForwardSlaveProgressKeepAliveInterval(Milliseconds keepAliveInterval);
     virtual OID ensureMe(OperationContext*);
     virtual bool isSelf(const HostAndPort& host);
     virtual HostAndPort getClientHostAndPort(const OperationContext* txn);

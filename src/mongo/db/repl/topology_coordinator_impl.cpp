@@ -67,6 +67,10 @@ int indexOfIterator(const std::vector<T>& vec, typename std::vector<T>::const_it
     return static_cast<int>(it - vec.begin());
 }
 
+// Interval between the time the last heartbeat from a node was received successfully, or
+// the time when we gave up retrying, and when the next heartbeat should be sent to a target.
+const auto kHeartbeatInterval = Seconds{2};
+
 // Maximum number of retries for a failed heartbeat.
 const int kMaxHeartbeatRetries = 2;
 
@@ -948,6 +952,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
         nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
         return nextAction;
     }
+
     invariant(memberIndex != _selfIndex);
 
     MemberHeartbeatData& hbData = _hbdata[memberIndex];
@@ -975,13 +980,23 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
         hbData.setUpValues(now, member.getHostAndPort(), hbr);
     }
     HeartbeatResponseAction nextAction =
-        _updateHeartbeatDataImpl(memberIndex, originalState, now, myLastOpApplied);
+        _updatePrimaryFromHBData(memberIndex, originalState, now, myLastOpApplied);
 
     nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
     return nextAction;
 }
 
-HeartbeatResponseAction TopologyCoordinatorImpl::_updateHeartbeatDataImpl(
+HeartbeatResponseAction TopologyCoordinatorImpl::setMemberAsDown(Date_t now,
+                                                                 const int memberIndex,
+                                                                 const OpTime& myLastOpApplied) {
+    invariant(memberIndex != _selfIndex);
+    MemberHeartbeatData& hbData = _hbdata[memberIndex];
+    hbData.setDownValues(now, "no response within election timeout period");
+
+    return _updatePrimaryFromHBData(memberIndex, MemberState(), now, myLastOpApplied);
+}
+
+HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(
     int updatedConfigIndex,
     const MemberState& originalState,
     Date_t now,

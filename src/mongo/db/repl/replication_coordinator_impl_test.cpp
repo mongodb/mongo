@@ -2714,6 +2714,148 @@ TEST_F(ReplCoordTest, MoveOpTimeForward) {
     getReplCoord()->setMyLastOptimeForward(time2);
     ASSERT_EQUALS(time3, getReplCoord()->getMyLastOptime());
 }
+
+TEST_F(ReplCoordTest, LivenessForwardingForChainedMember) {
+    assertStartSuccess(
+        BSON("_id"
+             << "mySet"
+             << "version" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "test1:1234")
+                           << BSON("_id" << 1 << "host"
+                                         << "test2:1234") << BSON("_id" << 2 << "host"
+                                                                        << "test3:1234"))
+             << "settings" << BSON("protocolVersion" << 1 << "electionTimeoutMillis" << 2000
+                                                     << "heartbeatIntervalMillis" << 40000)),
+        HostAndPort("test1", 1234));
+    OpTime optime(Timestamp(100, 2), 0);
+    getReplCoord()->setMyLastOptime(optime);
+    ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime));
+
+    // Check that we have two entries in our UpdatePosition (us and node 1).
+    BSONObjBuilder cmdBuilder;
+    getReplCoord()->prepareReplSetUpdatePositionCommand(&cmdBuilder);
+    BSONObj cmd = cmdBuilder.done();
+    std::set<long long> memberIds;
+    BSONForEach(entryElement, cmd["optimes"].Obj()) {
+        BSONObj entry = entryElement.Obj();
+        long long memberId = entry["memberId"].Number();
+        memberIds.insert(memberId);
+        ASSERT_EQUALS(optime.getTimestamp(), entry["optime"].timestamp());
+    }
+    ASSERT_EQUALS(2U, memberIds.size());
+
+    // Advance the clock far enough to cause the other node to be marked as DOWN.
+    const Date_t startDate = getNet()->now();
+    const Date_t endDate = startDate + Milliseconds(2000);
+    getNet()->enterNetwork();
+    while (getNet()->now() < endDate) {
+        getNet()->runUntil(endDate);
+        if (getNet()->now() < endDate) {
+            getNet()->blackHole(getNet()->getNextReadyRequest());
+        }
+    }
+    getNet()->exitNetwork();
+
+    // Check there is one entry in our UpdatePosition, since we shouldn't forward for a DOWN node.
+    BSONObjBuilder cmdBuilder2;
+    getReplCoord()->prepareReplSetUpdatePositionCommand(&cmdBuilder2);
+    BSONObj cmd2 = cmdBuilder2.done();
+    std::set<long long> memberIds2;
+    BSONForEach(entryElement, cmd2["optimes"].Obj()) {
+        BSONObj entry = entryElement.Obj();
+        long long memberId = entry["memberId"].Number();
+        memberIds2.insert(memberId);
+        ASSERT_EQUALS(optime.getTimestamp(), entry["optime"].timestamp());
+    }
+    ASSERT_EQUALS(1U, memberIds2.size());
+}
+
+TEST_F(ReplCoordTest, LivenessElectionTimeout) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1) << BSON("host"
+                                                                         << "node3:12345"
+                                                                         << "_id" << 2)
+                                          << BSON("host"
+                                                  << "node4:12345"
+                                                  << "_id" << 3) << BSON("host"
+                                                                         << "node5:12345"
+                                                                         << "_id" << 4))
+                            << "settings"
+                            << BSON("protocolVersion" << 1 << "electionTimeoutMillis" << 2000
+                                                      << "heartbeatIntervalMillis" << 40000)),
+                       HostAndPort("node1", 12345));
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    OpTime startingOpTime = OpTime(Timestamp(100, 1), 0);
+    getReplCoord()->setMyLastOptime(startingOpTime);
+
+    // Receive notification that every node is up.
+    UpdatePositionArgs args;
+    ASSERT_OK(args.initialize(
+        BSON("replSetUpdatePosition"
+             << 1 << "optimes" << BSON_ARRAY(BSON("cfgver" << 2 << "memberId" << 1 << "optime"
+                                                           << startingOpTime.getTimestamp())
+                                             << BSON("cfgver" << 2 << "memberId" << 2 << "optime"
+                                                              << startingOpTime.getTimestamp())
+                                             << BSON("cfgver" << 2 << "memberId" << 3 << "optime"
+                                                              << startingOpTime.getTimestamp())
+                                             << BSON("cfgver" << 2 << "memberId" << 4 << "optime"
+                                                              << startingOpTime.getTimestamp())))));
+
+    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args, 0));
+    // Become PRIMARY.
+    simulateSuccessfulV1Election();
+
+    // Keep two nodes alive.
+    UpdatePositionArgs args1;
+    ASSERT_OK(args1.initialize(
+        BSON("replSetUpdatePosition"
+             << 1 << "optimes" << BSON_ARRAY(BSON("cfgver" << 2 << "memberId" << 1 << "optime"
+                                                           << startingOpTime.getTimestamp())
+                                             << BSON("cfgver" << 2 << "memberId" << 2 << "optime"
+                                                              << startingOpTime.getTimestamp())))));
+    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args1, 0));
+
+    // Confirm that the node remains PRIMARY after the other two nodes are marked DOWN.
+    const Date_t startDate = getNet()->now();
+    getNet()->enterNetwork();
+    getNet()->runUntil(startDate + Milliseconds(1980));
+    getNet()->exitNetwork();
+    ASSERT_EQUALS(MemberState::RS_PRIMARY, getReplCoord()->getMemberState().s);
+
+    // Keep one node alive via two methods (UpdatePosition and requestHeartbeat).
+    UpdatePositionArgs args2;
+    ASSERT_OK(args2.initialize(
+        BSON("replSetUpdatePosition"
+             << 1 << "optimes" << BSON_ARRAY(BSON("cfgver" << 2 << "memberId" << 1 << "optime"
+                                                           << startingOpTime.getTimestamp())))));
+    ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args2, 0));
+
+    ReplSetHeartbeatArgs hbArgs;
+    hbArgs.setSetName("mySet");
+    hbArgs.setProtocolVersion(1);
+    hbArgs.setConfigVersion(2);
+    hbArgs.setSenderId(1);
+    hbArgs.setSenderHost(HostAndPort("node2", 12345));
+    ReplSetHeartbeatResponse hbResp;
+    ASSERT_OK(getReplCoord()->processHeartbeat(hbArgs, &hbResp));
+
+    // Confirm that the node relinquishes PRIMARY after only one node is left UP.
+    const Date_t startDate1 = getNet()->now();
+    getNet()->enterNetwork();
+    getNet()->runUntil(startDate1 + Milliseconds(1980));
+    getNet()->exitNetwork();
+    getReplCoord()->waitForStepDownFinish_forTest();
+    ASSERT_EQUALS(MemberState::RS_SECONDARY, getReplCoord()->getMemberState().s);
+}
+
 // TODO(schwerin): Unit test election id updating
 
 }  // namespace

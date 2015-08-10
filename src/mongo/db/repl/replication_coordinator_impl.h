@@ -319,6 +319,12 @@ public:
      */
     void waitForElectionDryRunFinish_forTest();
 
+    /**
+     * If called after a stepdown starts, blocks until all asynchronous activities associated with
+     * stepdown complete.
+     */
+    void waitForStepDownFinish_forTest();
+
 private:
     struct SnapshotInfo {
         OpTime opTime;
@@ -403,10 +409,13 @@ private:
     struct SlaveInfo {
         OpTime opTime;            // Our last known OpTime that this slave has replicated to.
         HostAndPort hostAndPort;  // Client address of the slave.
-        int memberId;  // Id of the node in the replica set config, or -1 if we're not a replSet.
-        OID rid;       // RID of the node.
-        bool self;     // Whether this SlaveInfo stores the information about ourself
-        SlaveInfo() : memberId(-1), self(false) {}
+        int memberId =
+            -1;   // Id of the node in the replica set config, or -1 if we're not a replSet.
+        OID rid;  // RID of the node.
+        bool self = false;  // Whether this SlaveInfo stores the information about ourself
+        Date_t lastUpdate =
+            Date_t::max();  // The last time we heard from this node; used for liveness detection
+        bool down = false;  // Indicator set when lastUpdate time exceeds the election timeout.
     };
 
     typedef std::vector<SlaveInfo> SlaveInfoVector;
@@ -998,6 +1007,35 @@ private:
      */
     void _dropAllSnapshots_inlock();
 
+    /**
+     * Callback which schedules "_handleLivenessTimeout" to be run whenever the liveness timeout
+     * for the node who was least recently reported to be alive occurs.
+     */
+    void _scheduleNextLivenessUpdate();
+
+    /**
+     * Bottom half of _scheduleNextLivenessUpdate.
+     */
+    void _scheduleNextLivenessUpdate_inlock();
+
+    /**
+     * Callback which marks downed nodes as down, triggers a stepdown if a majority of nodes are no
+     * longer visible, and reschedules itself.
+     */
+    void _handleLivenessTimeout(const ReplicationExecutor::CallbackArgs& cbData);
+
+    /**
+     * If "updatedMemberId" is the current _earliestMemberId, cancels the current
+     * _handleLivenessTimeout callback and calls _scheduleNextLivenessUpdate to schedule a new one.
+     * Returns immediately otherwise.
+     */
+    void _cancelAndRescheduleLivenessUpdate_inlock(int updatedMemberId);
+
+    /**
+     * Bottom half of isV1ElectionProtocol.
+     */
+    bool _isV1ElectionProtocol_inlock();
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -1122,6 +1160,9 @@ private:
     // which includes writing the last vote and scheduling the real election.
     ReplicationExecutor::EventHandle _electionDryRunFinishedEvent;  // (X)
 
+    // Event that the stepdown code will signal when the in-progress stepdown completes.
+    ReplicationExecutor::EventHandle _stepDownFinishedEvent;  // (X)
+
     // Whether we slept last time we attempted an election but possibly tied with other nodes.
     bool _sleptLastElection;  // (X)
 
@@ -1161,6 +1202,14 @@ private:
 
     // The cached current term. It's in sync with the term in topology coordinator.
     long long _cachedTerm = OpTime::kProtocolVersionV0Term;  // (M)
+
+    // Callback Handle used to cancel a scheduled LivenessTimeout callback.
+    ReplicationExecutor::CallbackHandle _handleLivenessTimeoutCbh;  // (M)
+
+    // The id of the earliest member, for which the handleLivenessTimeout callback has been
+    // scheduled.  We need this so that we don't needlessly cancel and reschedule the callback on
+    // every liveness update.
+    int _earliestMemberId = -1;  // (M)
 };
 
 }  // namespace repl
