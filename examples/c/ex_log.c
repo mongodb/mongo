@@ -206,10 +206,14 @@ walk_log(WT_SESSION *session)
 
 		/*
 		 * If the operation is a put, replay it here on the backup
-		 * connection.  Note, we cheat by looking only for fileid 1
-		 * in this example.  The metadata is fileid 0.
+		 * connection.
+		 *
+		 * !!!
+		 * We cheat by only looking for fileid 2 in this example; the
+		 * metadata is fileid 0, the lookaside file is fileid 1, making
+		 * the file we created fileid 2.
 		 */
-		if (fileid == 1 && rectype == WT_LOGREC_COMMIT &&
+		if (fileid == 2 && rectype == WT_LOGREC_COMMIT &&
 		    optype == WT_LOGOP_ROW_PUT) {
 			if (!in_txn) {
 				ret = session2->begin_transaction(session2,
