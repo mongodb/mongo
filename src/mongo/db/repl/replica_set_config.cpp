@@ -279,7 +279,8 @@ Status ReplicaSetConfig::validate() const {
         return Status(ErrorCodes::BadValue,
                       str::stream() << kSettingsFieldName << '.' << kHeartbeatTimeoutFieldName
                                     << " field value must be non-negative, "
-                                       "but found " << _heartbeatTimeoutPeriod.count());
+                                       "but found "
+                                    << durationCount<Seconds>(_heartbeatTimeoutPeriod));
     }
     if (_members.size() > kMaxMembers || _members.empty()) {
         return Status(ErrorCodes::BadValue,
@@ -547,7 +548,8 @@ BSONObj ReplicaSetConfig::toBSON() const {
 
     BSONObjBuilder settingsBuilder(configBuilder.subobjStart(kSettingsFieldName));
     settingsBuilder.append(kChainingAllowedFieldName, _chainingAllowed);
-    settingsBuilder.appendIntOrLL(kHeartbeatTimeoutFieldName, _heartbeatTimeoutPeriod.count());
+    settingsBuilder.appendIntOrLL(kHeartbeatTimeoutFieldName,
+                                  durationCount<Seconds>(_heartbeatTimeoutPeriod));
 
     BSONObjBuilder gleModes(settingsBuilder.subobjStart(kGetLastErrorModesFieldName));
     for (StringMap<ReplicaSetTagPattern>::const_iterator mode = _customWriteConcernModes.begin();

@@ -404,7 +404,7 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithNotMaste
                     // If we're out of retries don't bother sleeping, just return.
                     return target.getStatus();
                 }
-                sleepmillis(kNotMasterRetryInterval.count());
+                sleepmillis(durationCount<Milliseconds>(kNotMasterRetryInterval));
                 continue;
             }
             return target.getStatus();
@@ -423,7 +423,7 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithNotMaste
                 // If we're out of retries don't bother sleeping, just return.
                 return commandStatus;
             }
-            sleepmillis(kNotMasterRetryInterval.count());
+            sleepmillis(durationCount<Milliseconds>(kNotMasterRetryInterval));
             continue;
         }
 

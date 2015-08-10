@@ -1051,8 +1051,12 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     // Now node 0 is down, node 1 is up, and for node 2 we have no heartbeat data yet.
     BSONObjBuilder statusBuilder;
     Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
-    getTopoCoord().prepareStatusResponse(
-        cbData(), curTime, uptimeSecs.count(), oplogProgress, &statusBuilder, &resultStatus);
+    getTopoCoord().prepareStatusResponse(cbData(),
+                                         curTime,
+                                         durationCount<Seconds>(uptimeSecs),
+                                         oplogProgress,
+                                         &statusBuilder,
+                                         &resultStatus);
     ASSERT_OK(resultStatus);
     BSONObj rsStatus = statusBuilder.obj();
 
@@ -1086,7 +1090,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(MemberState::RS_SECONDARY, member1Status["state"].numberInt());
     ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
                   member1Status["stateStr"].String());
-    ASSERT_EQUALS(uptimeSecs.count(), member1Status["uptime"].numberInt());
+    ASSERT_EQUALS(durationCount<Seconds>(uptimeSecs), member1Status["uptime"].numberInt());
     ASSERT_EQUALS(oplogProgress.getTimestamp(),
                   Timestamp(member1Status["optime"].timestampValue()));
     ASSERT_TRUE(member1Status.hasField("optimeDate"));
@@ -1117,7 +1121,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(1, selfStatus["health"].numberDouble());
     ASSERT_EQUALS(MemberState::RS_PRIMARY, selfStatus["state"].numberInt());
     ASSERT_EQUALS(MemberState(MemberState::RS_PRIMARY).toString(), selfStatus["stateStr"].str());
-    ASSERT_EQUALS(uptimeSecs.count(), selfStatus["uptime"].numberInt());
+    ASSERT_EQUALS(durationCount<Seconds>(uptimeSecs), selfStatus["uptime"].numberInt());
     ASSERT_EQUALS(oplogProgress.getTimestamp(), Timestamp(selfStatus["optime"].timestampValue()));
     ASSERT_TRUE(selfStatus.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
@@ -1148,8 +1152,12 @@ TEST_F(TopoCoordTest, ReplSetGetStatusFails) {
 
     BSONObjBuilder statusBuilder;
     Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
-    getTopoCoord().prepareStatusResponse(
-        cbData(), curTime, uptimeSecs.count(), oplogProgress, &statusBuilder, &resultStatus);
+    getTopoCoord().prepareStatusResponse(cbData(),
+                                         curTime,
+                                         durationCount<Seconds>(uptimeSecs),
+                                         oplogProgress,
+                                         &statusBuilder,
+                                         &resultStatus);
     ASSERT_NOT_OK(resultStatus);
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, resultStatus);
 }
@@ -1458,7 +1466,7 @@ public:
         std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
             getTopoCoord().prepareHeartbeatRequest(_firstRequestDate, "rs0", _target);
         // 5 seconds to successfully complete the heartbeat before the timeout expires.
-        ASSERT_EQUALS(5000, request.second.count());
+        ASSERT_EQUALS(5000, durationCount<Milliseconds>(request.second));
 
         // Initial heartbeat request fails at t + 4000ms
         HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
@@ -1477,7 +1485,7 @@ public:
         request = getTopoCoord().prepareHeartbeatRequest(
             _firstRequestDate + Milliseconds(4000), "rs0", _target);
         // One second left to complete the heartbeat.
-        ASSERT_EQUALS(1000, request.second.count());
+        ASSERT_EQUALS(1000, durationCount<Milliseconds>(request.second));
 
         // Ensure a single failed heartbeat did not cause the node to be marked down
         BSONObjBuilder statusBuilder;
@@ -1532,7 +1540,7 @@ public:
             getTopoCoord().prepareHeartbeatRequest(
                 firstRequestDate() + Milliseconds(4500), "rs0", target());
         // 500ms left to complete the heartbeat.
-        ASSERT_EQUALS(500, request.second.count());
+        ASSERT_EQUALS(500, durationCount<Milliseconds>(request.second));
 
         // Ensure a second failed heartbeat did not cause the node to be marked down
         BSONObjBuilder statusBuilder;
@@ -1973,7 +1981,7 @@ TEST_F(HeartbeatResponseTest, HeartbeatTimeoutSuppressesFirstRetry) {
     std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
         getTopoCoord().prepareHeartbeatRequest(firstRequestDate, "rs0", target);
     // 5 seconds to successfully complete the heartbeat before the timeout expires.
-    ASSERT_EQUALS(5000, request.second.count());
+    ASSERT_EQUALS(5000, durationCount<Milliseconds>(request.second));
 
     // Initial heartbeat request fails at t + 5000ms
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
@@ -3796,7 +3804,7 @@ TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderIDMissing) {
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTime().count());
+    ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(1, response.getConfigVersion());
@@ -3819,7 +3827,7 @@ TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderIDNotInConfig
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTime().count());
+    ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(1, response.getConfigVersion());
@@ -3843,7 +3851,7 @@ TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseConfigVersionLow) {
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTime().count());
+    ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(1, response.getConfigVersion());
@@ -3867,7 +3875,7 @@ TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseConfigVersionHigh) 
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTime().count());
+    ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(1, response.getConfigVersion());
@@ -3890,7 +3898,7 @@ TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderDown) {
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTime().count());
+    ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(1, response.getConfigVersion());
@@ -3916,7 +3924,7 @@ TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderUp) {
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(Timestamp(100, 0), 0), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTime().count());
+    ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(1, response.getConfigVersion());
@@ -3939,7 +3947,7 @@ TEST_F(TopoCoordTest, PrepareHeartbeatResponseNoConfigYet) {
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_STARTUP, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTime().count());
+    ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(-2, response.getConfigVersion());
@@ -3966,7 +3974,7 @@ TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseAsPrimary) {
     ASSERT_EQUALS(MemberState::RS_PRIMARY, response.getState().s);
     ASSERT_EQUALS(OpTime(Timestamp(11, 0), 0), response.getOpTime());
     ASSERT_EQUALS(Timestamp(10, 0), response.getElectionTime());
-    ASSERT_EQUALS(0, response.getTime().count());
+    ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     ASSERT_EQUALS("", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(1, response.getConfigVersion());
@@ -3998,7 +4006,7 @@ TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseWithSyncSource) {
     ASSERT_TRUE(response.isReplSet());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(Timestamp(100, 0), 0), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTime().count());
+    ASSERT_EQUALS(0, durationCount<Seconds>(response.getTime()));
     // changed to a syncing message because our sync source changed recently
     ASSERT_EQUALS("syncing from: h2:27017", response.getHbMsg());
     ASSERT_EQUALS("rs0", response.getReplicaSetName());

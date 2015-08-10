@@ -251,8 +251,7 @@ public:
             // applying it to this getMore.
             if (isCursorAwaitData(cursor)) {
                 Seconds awaitDataTimeout(1);
-                CurOp::get(txn)
-                    ->setMaxTimeMicros(duration_cast<Microseconds>(awaitDataTimeout).count());
+                CurOp::get(txn)->setMaxTimeMicros(durationCount<Microseconds>(awaitDataTimeout));
             } else {
                 CurOp::get(txn)->setMaxTimeMicros(cursor->getLeftoverMaxTimeMicros());
             }

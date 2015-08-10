@@ -91,8 +91,8 @@ OplogReader::OplogReader() {
 bool OplogReader::connect(const HostAndPort& host) {
     if (conn() == NULL || _host != host) {
         resetConnection();
-        _conn =
-            shared_ptr<DBClientConnection>(new DBClientConnection(false, kSocketTimeout.count()));
+        _conn = shared_ptr<DBClientConnection>(
+            new DBClientConnection(false, durationCount<Seconds>(kSocketTimeout)));
         string errmsg;
         if (!_conn->connect(host, errmsg) ||
             (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate(_conn.get()))) {

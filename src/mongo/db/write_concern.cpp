@@ -256,8 +256,8 @@ Status waitForWriteConcern(OperationContext* txn,
     }
     // Add stats
     result->writtenTo = repl::getGlobalReplicationCoordinator()->getHostsWrittenTo(replOpTime);
-    gleWtimeStats.recordMillis(replStatus.duration.count());
-    result->wTime = replStatus.duration.count();
+    gleWtimeStats.recordMillis(durationCount<Milliseconds>(replStatus.duration));
+    result->wTime = durationCount<Milliseconds>(replStatus.duration);
 
     return replStatus.status;
 }

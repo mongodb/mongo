@@ -817,7 +817,7 @@ Status syncRollback(OperationContext* txn,
                         localOplog,
                         rollbackSource,
                         replCoord,
-                        [](Seconds seconds) { sleepsecs(seconds.count()); });
+                        [](Seconds seconds) { sleepsecs(durationCount<Seconds>(seconds)); });
 }
 
 }  // namespace repl

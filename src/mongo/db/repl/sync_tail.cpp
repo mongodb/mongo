@@ -551,7 +551,7 @@ void SyncTail::oplogApplication() {
                 tryToGoLiveAsASecondary(&txn, replCoord);
             }
 
-            const int slaveDelaySecs = replCoord->getSlaveDelaySecs().count();
+            const int slaveDelaySecs = durationCount<Seconds>(replCoord->getSlaveDelaySecs());
             if (!ops.empty() && slaveDelaySecs > 0) {
                 const BSONObj lastOp = ops.back();
                 const unsigned int opTimestampSecs = lastOp["ts"].timestamp().getSecs();
@@ -680,7 +680,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn,
 
 void SyncTail::handleSlaveDelay(const BSONObj& lastOp) {
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-    int slaveDelaySecs = replCoord->getSlaveDelaySecs().count();
+    int slaveDelaySecs = durationCount<Seconds>(replCoord->getSlaveDelaySecs());
 
     // ignore slaveDelay if the box is still initializing. once
     // it becomes secondary we can worry about it.
@@ -704,7 +704,7 @@ void SyncTail::handleSlaveDelay(const BSONObj& lastOp) {
                     sleepsecs(6);
 
                     // Handle reconfigs that changed the slave delay
-                    if (replCoord->getSlaveDelaySecs().count() != slaveDelaySecs)
+                    if (durationCount<Seconds>(replCoord->getSlaveDelaySecs()) != slaveDelaySecs)
                         break;
                 }
             }

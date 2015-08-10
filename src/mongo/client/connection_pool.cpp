@@ -149,9 +149,9 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
         try {
             if (candidate->conn->isStillConnected()) {
                 // setSoTimeout takes a double representing the number of seconds for send and
-                // receive timeouts.  Thus, we must take count() and divide by
+                // receive timeouts.  Thus, we must express 'timeout' in milliseconds and divide by
                 // 1000.0 to get the number of seconds with a fractional part.
-                candidate->conn->setSoTimeout(timeout.count() / 1000.0);
+                candidate->conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
                 return candidate;
             }
         } catch (...) {
@@ -170,9 +170,9 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     std::unique_ptr<DBClientConnection> conn(new DBClientConnection());
 
     // setSoTimeout takes a double representing the number of seconds for send and receive
-    // timeouts.  Thus, we must take count() and divide by 1000.0 to get the number
-    // of seconds with a fractional part.
-    conn->setSoTimeout(timeout.count() / 1000.0);
+    // timeouts.  Thus, we must express 'timeout' in milliseconds and divide by 1000.0 to get the
+    // number of seconds with a fractional part.
+    conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
 
     if (_hook) {
         uassertStatusOK(

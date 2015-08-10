@@ -331,7 +331,7 @@ void BackgroundSync::_produce(OperationContext* txn, executor::TaskExecutor* tas
     auto cmdObj = BSON("find" << nsToCollectionSubstring(rsOplogName) << "filter"
                               << BSON("ts" << BSON("$gte" << lastOpTimeFetched.getTimestamp()))
                               << "tailable" << true << "oplogReplay" << true << "awaitData" << true
-                              << "maxTimeMS" << int(fetcherMaxTimeMS.count()));
+                              << "maxTimeMS" << durationCount<Milliseconds>(fetcherMaxTimeMS));
     Fetcher fetcher(taskExecutor,
                     source,
                     nsToDatabase(rsOplogName),
@@ -467,7 +467,7 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     }
 
     // record time for each batch
-    getmoreReplStats.recordMillis(queryResponse.elapsedMillis.count());
+    getmoreReplStats.recordMillis(durationCount<Milliseconds>(queryResponse.elapsedMillis));
 
     networkByteStats.increment(currentBatchMessageSize);
 
@@ -506,7 +506,7 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     invariant(bob);
     bob->append("getMore", queryResponse.cursorId);
     bob->append("collection", queryResponse.nss.coll());
-    bob->append("maxTimeMS", int(fetcherMaxTimeMS.count()));
+    bob->append("maxTimeMS", durationCount<Milliseconds>(fetcherMaxTimeMS));
 }
 
 bool BackgroundSync::_shouldChangeSyncSource(const HostAndPort& syncSource) {

@@ -242,10 +242,10 @@ bool DistributedLock::checkSkew(const ConnectionString& cluster,
             // Remote time can be delayed by at most MAX_NET_SKEW
 
             // Skew is how much time we'd have to add to local to get to remote
-            avgSkews[s] += (remote - local).count();
+            avgSkews[s] += durationCount<Milliseconds>(remote - local);
 
             LOG(logLvl + 1) << "skew from remote server " << server
-                            << " found: " << (remote - local).count();
+                            << " found: " << (remote - local);
         }
     }
 
@@ -418,7 +418,8 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                     if (lastPingEntry.configLocalTime >= remote)
                         elapsed = 0;
                     else
-                        elapsed = (remote - lastPingEntry.configLocalTime).count();
+                        elapsed =
+                            durationCount<Milliseconds>(remote - lastPingEntry.configLocalTime);
                 }
             } catch (LockException& e) {
                 // Remote server cannot be found / is not responsive

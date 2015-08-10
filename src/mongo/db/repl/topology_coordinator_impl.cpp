@@ -216,7 +216,8 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
 
         // Check if primaryOpTime is still close to 0 because we haven't received
         // our first heartbeat from a new primary yet.
-        unsigned int maxLag = static_cast<unsigned int>(_options.maxSyncSourceLagSecs.count());
+        unsigned int maxLag =
+            static_cast<unsigned int>(durationCount<Seconds>(_options.maxSyncSourceLagSecs));
         if (primaryOpTime.getSecs() >= maxLag) {
             oldestSyncOpTime =
                 OpTime(Timestamp(primaryOpTime.getSecs() - maxLag, 0), primaryOpTime.getTerm());
@@ -865,11 +866,11 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinatorImpl::prepare
     }
     hbArgs.setTerm(_term);
 
-    const Milliseconds timeoutPeriod(
-        _rsConfig.isInitialized()
-            ? _rsConfig.getHeartbeatTimeoutPeriodMillis()
-            : Milliseconds(ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod.count()));
-    const Milliseconds timeout(timeoutPeriod.count() - alreadyElapsed.count());
+    const Milliseconds timeoutPeriod(_rsConfig.isInitialized()
+                                         ? _rsConfig.getHeartbeatTimeoutPeriodMillis()
+                                         : Milliseconds(durationCount<Seconds>(
+                                               ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod)));
+    const Milliseconds timeout(timeoutPeriod - alreadyElapsed);
     return std::make_pair(hbArgs, timeout);
 }
 
@@ -885,7 +886,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
     if (!hbResponse.isOK()) {
         hbStats.miss();
     } else {
-        hbStats.hit(networkRoundTripTime.count());
+        hbStats.hit(durationCount<Milliseconds>(networkRoundTripTime));
         // Log diagnostics.
         if (hbResponse.getValue().isStateDisagreement()) {
             LOG(1) << target << " thinks that we are down because they cannot send us heartbeats.";
@@ -970,7 +971,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
         } else {
             LOG(3) << "Bad heartbeat response from " << target << "; trying again; Retries left: "
                    << (kMaxHeartbeatRetries - hbStats.getNumFailuresSinceLastStart()) << "; "
-                   << alreadyElapsed.count() << "ms have already elapsed";
+                   << alreadyElapsed << " have already elapsed";
         }
     } else {
         ReplSetHeartbeatResponse hbr = hbResponse.getValue();
@@ -1566,7 +1567,7 @@ void TopologyCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* response)
     } else if (selfConfig.getPriority() == 0) {
         response->setIsPassive(true);
     }
-    if (selfConfig.getSlaveDelay().count()) {
+    if (selfConfig.getSlaveDelay() > Seconds(0)) {
         response->setSlaveDelay(selfConfig.getSlaveDelay());
     }
     if (selfConfig.isHidden()) {
@@ -2137,7 +2138,7 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
         return false;
     }
     unsigned int currentSecs = currentOpTime.getSecs();
-    unsigned int goalSecs = currentSecs + _options.maxSyncSourceLagSecs.count();
+    unsigned int goalSecs = currentSecs + durationCount<Seconds>(_options.maxSyncSourceLagSecs);
 
     for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); it != _hbdata.end();
          ++it) {
@@ -2149,7 +2150,7 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
             goalSecs < it->getOpTime().getSecs()) {
             log() << "changing sync target because current sync target's most recent OpTime is "
                   << currentOpTime.toString() << " which is more than "
-                  << _options.maxSyncSourceLagSecs.count() << " seconds behind member "
+                  << _options.maxSyncSourceLagSecs << " behind member "
                   << candidateConfig.getHostAndPort().toString() << " whose most recent OpTime is "
                   << it->getOpTime().toString();
             invariant(itIndex != _selfIndex);

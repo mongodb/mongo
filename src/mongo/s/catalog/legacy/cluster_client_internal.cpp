@@ -91,7 +91,7 @@ Status checkClusterMongoVersions(CatalogManager* catalogManager, const string& m
 
             // We assume that anything that hasn't pinged in 5 minutes is probably down
             if (quietIntervalMins >= Minutes{5}) {
-                log() << "stale mongos detected " << quietIntervalMins.count()
+                log() << "stale mongos detected " << durationCount<Minutes>(quietIntervalMins)
                       << " minutes ago, network location is " << pingDoc["_id"].String()
                       << ", not checking version";
             } else {

@@ -788,7 +788,7 @@ TimestampStatus DataReplicator::initialSync() {
 
         // Sleep for retry time
         lk.unlock();
-        sleepmillis(_opts.initialSyncRetryWait.count());
+        sleepmillis(durationCount<Milliseconds>(_opts.initialSyncRetryWait));
         lk.lock();
 
         // No need to print a stack

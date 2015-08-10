@@ -58,7 +58,7 @@ void LegacyDistLockPinger::_distLockPingThread(ConnectionString addr,
     string pingId = pingThreadId(addr, process);
 
     LOG(0) << "creating distributed lock ping thread for " << addr << " and process " << process
-           << " (sleeping for " << sleepTime.count() << "ms)";
+           << " (sleeping for " << sleepTime << ")";
 
     static int loops = 0;
     Date_t lastPingTime = jsTime();
@@ -146,8 +146,7 @@ void LegacyDistLockPinger::_distLockPingThread(ConnectionString addr,
 
             LOG(1 - (loops % 10 == 0 ? 1 : 0)) << "cluster " << addr << " pinged successfully at "
                                                << pingTime << " by distributed lock pinger '"
-                                               << pingId << "', sleeping for " << sleepTime.count()
-                                               << "ms";
+                                               << pingId << "', sleeping for " << sleepTime;
 
             // Remove old locks, if possible
             // Make sure no one else is adding to this list at the same time

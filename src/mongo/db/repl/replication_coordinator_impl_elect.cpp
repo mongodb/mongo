@@ -176,7 +176,7 @@ void ReplicationCoordinatorImpl::_onFreshnessCheckComplete() {
             if ((_selfIndex != 0) && !_sleptLastElection) {
                 const auto ms = Milliseconds(_replExecutor.nextRandomInt64(1000) + 50);
                 const Date_t nextCandidateTime = now + ms;
-                log() << "possible election tie; sleeping " << ms.count() << "ms until "
+                log() << "possible election tie; sleeping " << ms << " until "
                       << dateToISOStringLocal(nextCandidateTime);
                 _topCoord->setElectionSleepUntil(nextCandidateTime);
                 _replExecutor.scheduleWorkAt(

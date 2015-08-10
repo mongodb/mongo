@@ -101,7 +101,7 @@ bool ReplSetDistLockManager::isShutDown() {
 
 void ReplSetDistLockManager::doTask() {
     LOG(0) << "creating distributed lock ping thread for process " << _processID
-           << " (sleeping for " << duration_cast<milliseconds>(_pingInterval).count() << " ms)";
+           << " (sleeping for " << _pingInterval << ")";
 
     Timer elapsedSincelastPing(_serviceContext->getTickSource());
     while (!isShutDown()) {
@@ -224,15 +224,13 @@ StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc) {
     milliseconds elapsedSinceLastPing(configServerLocalTime - pingInfo->configLocalTime);
     if (elapsedSinceLastPing >= _lockExpiration) {
         LOG(0) << "forcing lock '" << lockDoc.getName() << "' because elapsed time "
-               << duration_cast<milliseconds>(elapsedSinceLastPing).count()
-               << " ms >= takeover time " << duration_cast<milliseconds>(_lockExpiration).count()
-               << " ms";
+               << elapsedSinceLastPing << " >= takeover time " << _lockExpiration;
         return true;
     }
 
     LOG(1) << "could not force lock '" << lockDoc.getName() << "' because elapsed time "
-           << duration_cast<milliseconds>(elapsedSinceLastPing).count() << " ms < takeover time "
-           << duration_cast<milliseconds>(_lockExpiration).count() << " ms";
+           << durationCount<Milliseconds>(elapsedSinceLastPing) << " < takeover time "
+           << durationCount<Milliseconds>(_lockExpiration) << " ms";
     return false;
 }
 
@@ -246,8 +244,8 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
         string who = str::stream() << _processID << ":" << getThreadName();
 
         LOG(1) << "trying to acquire new distributed lock for " << name
-               << " ( lock timeout : " << duration_cast<milliseconds>(_lockExpiration).count()
-               << " ms, ping interval : " << duration_cast<milliseconds>(_pingInterval).count()
+               << " ( lock timeout : " << durationCount<Milliseconds>(_lockExpiration)
+               << " ms, ping interval : " << durationCount<Milliseconds>(_pingInterval)
                << " ms, process : " << _processID << " )"
                << " with lockSessionID: " << lockSessionID << ", why: " << whyMessage;
 
