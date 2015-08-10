@@ -16,7 +16,7 @@ var blacklist = [
     'auth_create_role.js',
     'auth_create_user.js',
     'auth_drop_role.js',
-    'auth_drop_user.js', // SERVER-16739 OpenSSL libcrypto crash
+    'auth_drop_user.js',
 
     // These workloads take too long when composed because eval takes a
     // global lock and the composer doesn't honor iteration counts:
