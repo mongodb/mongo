@@ -33,7 +33,9 @@
 #include <jsfriendapi.h>
 #include <limits>
 
+#include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
+#include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -71,6 +73,15 @@ void setJSException(JSContext* cx, ErrorCodes::Error code, StringData sd) {
         code == ErrorCodes::JSUncatchableError ? uncatchableErrorCallback : errorCallback;
 
     JS_ReportErrorNumber(cx, callback, nullptr, JSErr_Limit + code, sd.rawData());
+}
+
+std::string currentJSStackToString(JSContext* cx) {
+    auto scope = getScope(cx);
+
+    JS::RootedValue error(cx);
+    scope->getErrorProto().newInstance(&error);
+
+    return ObjectWrapper(cx, error).getString("stack");
 }
 
 Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {

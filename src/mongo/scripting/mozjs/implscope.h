@@ -42,6 +42,7 @@
 #include "mongo/scripting/mozjs/dbquery.h"
 #include "mongo/scripting/mozjs/dbref.h"
 #include "mongo/scripting/mozjs/engine.h"
+#include "mongo/scripting/mozjs/error.h"
 #include "mongo/scripting/mozjs/global.h"
 #include "mongo/scripting/mozjs/jsthread.h"
 #include "mongo/scripting/mozjs/maxkey.h"
@@ -186,6 +187,10 @@ public:
         return _dbRefProto;
     }
 
+    WrapType<ErrorInfo>& getErrorProto() {
+        return _errorProto;
+    }
+
     WrapType<JSThreadInfo>& getJSThreadProto() {
         return _jsThreadProto;
     }
@@ -250,6 +255,8 @@ public:
 
     static MozJSImplScope* getThreadScope();
     void setOOM();
+    void setParentStack(std::string);
+    const std::string& getParentStack() const;
 
 private:
     void _MozJSCreateFunction(const char* raw,
@@ -312,6 +319,7 @@ private:
     Status _status;
     int _exitCode;
     bool _quickExit;
+    std::string _parentStack;
 
     WrapType<BinDataInfo> _binDataProto;
     WrapType<BSONInfo> _bsonProto;
@@ -323,6 +331,7 @@ private:
     WrapType<DBQueryInfo> _dbQueryProto;
     WrapType<DBInfo> _dbProto;
     WrapType<DBRefInfo> _dbRefProto;
+    WrapType<ErrorInfo> _errorProto;
     WrapType<JSThreadInfo> _jsThreadProto;
     WrapType<MaxKeyInfo> _maxKeyProto;
     WrapType<MinKeyInfo> _minKeyProto;

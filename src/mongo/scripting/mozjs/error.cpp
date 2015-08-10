@@ -26,55 +26,14 @@
  * then also delete it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <jsapi.h>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/scripting/mozjs/error.h"
 
 namespace mongo {
 namespace mozjs {
 
-/**
- * Turns a current C++ exception into a JS exception
- */
-void mongoToJSException(JSContext* cx);
-
-/**
- * Sets an exception for javascript
- */
-void setJSException(JSContext* cx, ErrorCodes::Error code, StringData sd);
-
-/**
- * Converts the current pending js expection into a status
- *
- * The altCode and altReason are used if no JS exception is pending
- */
-Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, StringData altReason);
-
-/**
- * Converts a JSErrorReport to status
- */
-Status JSErrorReportToStatus(JSContext* cx,
-                             JSErrorReport* report,
-                             ErrorCodes::Error altCode,
-                             StringData altReason);
-
-/**
- * Returns the current stack as a string
- */
-std::string currentJSStackToString(JSContext* cx);
-
-/**
- * Turns the current JS exception into a C++ exception
- *
- * The altCode and altReason are used if no JS exception is pending
- */
-MONGO_COMPILER_NORETURN void throwCurrentJSException(JSContext* cx,
-                                                     ErrorCodes::Error altCode,
-                                                     StringData altReason);
+const char* const ErrorInfo::className = "Error";
 
 }  // namespace mozjs
 }  // namespace mongo

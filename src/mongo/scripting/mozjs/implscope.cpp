@@ -44,6 +44,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 using namespace mongoutils;
 
@@ -156,6 +157,9 @@ OperationContext* MozJSImplScope::getOpContext() const {
 bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     auto scope = getScope(cx);
 
+    JS_SetInterruptCallback(scope->_runtime, nullptr);
+    auto guard = MakeGuard([&]() { JS_SetInterruptCallback(scope->_runtime, _interruptCallback); });
+
     if (scope->_pendingGC.load()) {
         scope->_pendingGC.store(false);
         JS_GC(scope->_runtime);
@@ -168,6 +172,8 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     if (kill) {
         scope->_engine->getDeadlineMonitor().stopDeadline(scope);
         scope->unregisterOperation();
+
+        scope->_status = Status(ErrorCodes::JSInterpreterFailure, "Interrupted by the host");
     }
 
     return !kill;
@@ -238,6 +244,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _dbQueryProto(_context),
       _dbProto(_context),
       _dbRefProto(_context),
+      _errorProto(_context),
       _jsThreadProto(_context),
       _maxKeyProto(_context),
       _minKeyProto(_context),
@@ -664,6 +671,7 @@ void MozJSImplScope::installBSONTypes() {
     _bsonProto.install(_global);
     _dbPointerProto.install(_global);
     _dbRefProto.install(_global);
+    _errorProto.install(_global);
     _maxKeyProto.install(_global);
     _minKeyProto.install(_global);
     _nativeFunctionProto.install(_global);
@@ -746,6 +754,14 @@ bool MozJSImplScope::getQuickExit(int* exitCode) {
 
 void MozJSImplScope::setOOM() {
     _status = Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
+}
+
+void MozJSImplScope::setParentStack(std::string parentStack) {
+    _parentStack = std::move(parentStack);
+}
+
+const std::string& MozJSImplScope::getParentStack() const {
+    return _parentStack;
 }
 
 }  // namespace mozjs

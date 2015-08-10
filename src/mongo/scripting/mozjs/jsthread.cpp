@@ -78,6 +78,8 @@ class JSThreadConfig {
 public:
     JSThreadConfig(JSContext* cx, JS::CallArgs args)
         : _started(false), _done(false), _sharedData(new SharedData()) {
+        auto scope = getScope(cx);
+
         uassert(ErrorCodes::JSInterpreterFailure, "need at least one argument", args.length() > 0);
         uassert(ErrorCodes::JSInterpreterFailure,
                 "first argument must be a function",
@@ -93,6 +95,12 @@ public:
         }
 
         _sharedData->_args = b.obj();
+
+        _sharedData->_stack = currentJSStackToString(cx);
+
+        if (!scope->getParentStack().empty()) {
+            _sharedData->_stack = _sharedData->_stack + scope->getParentStack();
+        }
     }
 
     void start() {
@@ -150,12 +158,13 @@ private:
         }
 
         /**
-         * These two members aren't protected in any way, so you have to be
-         * mindful about how they're used. I.e. _args needs to be set before
-         * start() and _returnData can't be touched until after join().
+         * These three members aren't protected in any way, so you have to be
+         * mindful about how they're used. I.e. _args/_stack need to be set
+         * before start() and _returnData can't be touched until after join().
          */
         BSONObj _args;
         BSONObj _returnData;
+        std::string _stack;
 
     private:
         stdx::mutex _erroredMutex;
@@ -173,11 +182,13 @@ private:
             try {
                 MozJSImplScope scope(static_cast<MozJSScriptEngine*>(globalScriptEngine));
 
+                scope.setParentStack(_sharedData->_stack);
                 _sharedData->_returnData = scope.callThreadArgs(_sharedData->_args);
             } catch (...) {
                 auto status = exceptionToStatus();
 
-                log() << "js thread raised js exception: " << status.reason();
+                log() << "js thread raised js exception: " << status.reason()
+                      << _sharedData->_stack;
                 _sharedData->setErrored(true);
                 _sharedData->_returnData = BSON("ret" << BSONUndefined);
             }

@@ -123,6 +123,7 @@ elif usemozjs:
             'mozjs/dbquery.cpp',
             'mozjs/dbref.cpp',
             'mozjs/engine.cpp',
+            'mozjs/error.cpp',
             'mozjs/exception.cpp',
             'mozjs/global.cpp',
             'mozjs/idwrapper.cpp',
