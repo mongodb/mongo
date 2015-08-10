@@ -13,6 +13,7 @@
 #define HAVE_LOCALECONV 1
 #define HAVE_LOCALECONV 1
 #define HAVE_SNPRINTF 1
+#define HAVE_TRUNC 1
 #define HAVE__GETC_NOLOCK 1
 #define HAVE__MSIZE 1
 #define HW_THREADS 1
