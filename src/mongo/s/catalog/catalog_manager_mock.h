@@ -62,14 +62,15 @@ public:
 
     Status updateDatabase(const std::string& dbName, const DatabaseType& db) override;
 
-    StatusWith<DatabaseType> getDatabase(const std::string& dbName) override;
+    StatusWith<OpTimePair<DatabaseType>> getDatabase(const std::string& dbName) override;
 
     Status updateCollection(const std::string& collNs, const CollectionType& coll) override;
 
-    StatusWith<CollectionType> getCollection(const std::string& collNs) override;
+    StatusWith<OpTimePair<CollectionType>> getCollection(const std::string& collNs) override;
 
     Status getCollections(const std::string* dbName,
-                          std::vector<CollectionType>* collections) override;
+                          std::vector<CollectionType>* collections,
+                          repl::OpTime* optime) override;
 
     Status dropCollection(OperationContext* txn, const NamespaceString& ns) override;
 
@@ -79,7 +80,8 @@ public:
     Status getChunks(const BSONObj& filter,
                      const BSONObj& sort,
                      boost::optional<int> limit,
-                     std::vector<ChunkType>* chunks) override;
+                     std::vector<ChunkType>* chunks,
+                     repl::OpTime* opTime) override;
 
     Status getTagsForCollection(const std::string& collectionNs,
                                 std::vector<TagsType>* tags) override;

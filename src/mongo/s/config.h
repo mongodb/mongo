@@ -31,6 +31,7 @@
 #include <set>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/util/concurrency/mutex.h"
 
@@ -48,7 +49,7 @@ struct CollectionInfo {
         _dropped = false;
     }
 
-    CollectionInfo(OperationContext* txn, const CollectionType& in);
+    CollectionInfo(OperationContext* txn, const CollectionType& in, repl::OpTime);
     ~CollectionInfo();
 
     bool isSharded() const {
@@ -85,12 +86,17 @@ struct CollectionInfo {
         return _key;
     }
 
+    repl::OpTime getConfigOpTime() const {
+        return _configOpTime;
+    }
+
 private:
     BSONObj _key;
     bool _unique;
     std::shared_ptr<ChunkManager> _cm;
     bool _dirty;
     bool _dropped;
+    repl::OpTime _configOpTime;
 };
 
 /**
@@ -98,7 +104,7 @@ private:
  */
 class DBConfig {
 public:
-    DBConfig(std::string name, const DatabaseType& dbt);
+    DBConfig(std::string name, const DatabaseType& dbt, repl::OpTime configOpTime);
     ~DBConfig();
 
     /**
@@ -191,6 +197,9 @@ protected:
     // Set of collections and lock to protect access
     stdx::mutex _lock;
     CollectionInfoMap _collections;
+
+    // OpTime of config server when the database definition was loaded.
+    repl::OpTime _configOpTime;
 
     // Ensures that only one thread at a time loads collection configuration data from
     // the config server

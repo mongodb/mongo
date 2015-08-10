@@ -35,6 +35,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/optime_pair.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -168,11 +169,12 @@ public:
      *
      * @param dbName name of the database (case sensitive)
      *
-     * Returns Status::OK along with the database information or any error code indicating the
-     * failure. These are some of the known failures:
+     * Returns Status::OK along with the database information and the OpTime of the config server
+     * which the database information was based upon. Otherwise, returns an error code indicating
+     * the failure. These are some of the known failures:
      *  - DatabaseNotFound - database does not exist
      */
-    virtual StatusWith<DatabaseType> getDatabase(const std::string& dbName) = 0;
+    virtual StatusWith<OpTimePair<DatabaseType>> getDatabase(const std::string& dbName) = 0;
 
     /**
      * Updates or creates the metadata for a given collection.
@@ -184,11 +186,12 @@ public:
      *
      * @param collectionNs fully qualified name of the collection (case sensitive)
      *
-     * Returns Status::OK along with the collection information or any error code indicating
+     * Returns Status::OK along with the collection information and the OpTime of the config server
+     * which the collection information was based upon. Otherwise, returns an error code indicating
      * the failure. These are some of the known failures:
      *  - NamespaceNotFound - collection does not exist
      */
-    virtual StatusWith<CollectionType> getCollection(const std::string& collNs) = 0;
+    virtual StatusWith<OpTimePair<CollectionType>> getCollection(const std::string& collNs) = 0;
 
     /**
      * Retrieves all collections undera specified database (or in the system).
@@ -196,11 +199,15 @@ public:
      * @param dbName an optional database name. Must be nullptr or non-empty. If nullptr is
      *      specified, all collections on the system are returned.
      * @param collections variable to receive the set of collections.
+     * @param optime an out parameter that will contain the opTime of the config server.
+     *      Can be null. Note that collections can be fetched in multiple batches and each batch
+     *      can have a unique opTime. This opTime will be the one from the last batch.
      *
      * Returns a !OK status if an error occurs.
      */
     virtual Status getCollections(const std::string* dbName,
-                                  std::vector<CollectionType>* collections) = 0;
+                                  std::vector<CollectionType>* collections,
+                                  repl::OpTime* optime) = 0;
 
     /**
      * Drops the specified collection from the collection metadata store.
@@ -226,13 +233,17 @@ public:
      * @param sort Fields to use for sorting the results. Pass empty BSON object for no sort.
      * @param limit The number of chunk entries to return. Pass boost::none for no limit.
      * @param chunks Vector entry to receive the results
+     * @param optime an out parameter that will contain the opTime of the config server.
+     *      Can be null. Note that chunks can be fetched in multiple batches and each batch
+     *      can have a unique opTime. This opTime will be the one from the last batch.
      *
      * Returns a !OK status if an error occurs.
      */
     virtual Status getChunks(const BSONObj& filter,
                              const BSONObj& sort,
                              boost::optional<int> limit,
-                             std::vector<ChunkType>* chunks) = 0;
+                             std::vector<ChunkType>* chunks,
+                             repl::OpTime* opTime) = 0;
 
     /**
      * Retrieves all tags for the specified collection.

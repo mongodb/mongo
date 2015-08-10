@@ -32,9 +32,10 @@
 #include <string>
 #include <vector>
 
-#include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 
@@ -243,6 +244,11 @@ public:
     std::shared_ptr<ChunkManager> reload(OperationContext* txn,
                                          bool force = true) const;  // doesn't modify self!
 
+    /**
+     * Returns the opTime of config server the last time chunks were loaded.
+     */
+    repl::OpTime getConfigOpTime() const;
+
 private:
     // returns true if load was consistent
     bool _load(OperationContext* txn,
@@ -272,6 +278,9 @@ private:
 
     // Max version across all chunks
     ChunkVersion _version;
+
+    // OpTime of config server the last time chunks were loaded.
+    repl::OpTime _configOpTime;
 
     //
     // Split Heuristic info

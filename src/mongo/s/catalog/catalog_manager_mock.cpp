@@ -76,20 +76,21 @@ Status CatalogManagerMock::updateDatabase(const string& dbName, const DatabaseTy
     return Status::OK();
 }
 
-StatusWith<DatabaseType> CatalogManagerMock::getDatabase(const string& dbName) {
-    return DatabaseType();
+StatusWith<OpTimePair<DatabaseType>> CatalogManagerMock::getDatabase(const string& dbName) {
+    return OpTimePair<DatabaseType>();
 }
 
 Status CatalogManagerMock::updateCollection(const string& collNs, const CollectionType& coll) {
     return Status::OK();
 }
 
-StatusWith<CollectionType> CatalogManagerMock::getCollection(const string& collNs) {
-    return CollectionType();
+StatusWith<OpTimePair<CollectionType>> CatalogManagerMock::getCollection(const string& collNs) {
+    return OpTimePair<CollectionType>();
 }
 
 Status CatalogManagerMock::getCollections(const string* dbName,
-                                          vector<CollectionType>* collections) {
+                                          vector<CollectionType>* collections,
+                                          repl::OpTime* optime) {
     return Status::OK();
 }
 
@@ -104,7 +105,8 @@ Status CatalogManagerMock::getDatabasesForShard(const string& shardName, vector<
 Status CatalogManagerMock::getChunks(const BSONObj& filter,
                                      const BSONObj& sort,
                                      boost::optional<int> limit,
-                                     std::vector<ChunkType>* chunks) {
+                                     std::vector<ChunkType>* chunks,
+                                     repl::OpTime* opTime) {
     return Status::OK();
 }
 
