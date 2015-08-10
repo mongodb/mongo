@@ -52,6 +52,24 @@ namespace mongo {
 class MultiPlanStage final : public PlanStage {
 public:
     /**
+     * Callers use this to specify how the MultiPlanStage should interact with the plan cache.
+     */
+    enum class CachingMode {
+        // Always write a cache entry for the winning plan to the plan cache, overwriting any
+        // previously existing cache entry for the query shape.
+        AlwaysCache,
+
+        // Write a cache entry for the query shape *unless* we encounter one of the following edge
+        // cases:
+        //  - Two or more plans tied for the win.
+        //  - The winning plan returned zero query results during the plan ranking trial period.
+        SometimesCache,
+
+        // Do not write to the plan cache.
+        NeverCache,
+    };
+
+    /**
      * Takes no ownership.
      *
      * If 'shouldCache' is true, writes a cache entry for the winning plan to the plan cache
@@ -60,7 +78,7 @@ public:
     MultiPlanStage(OperationContext* txn,
                    const Collection* collection,
                    CanonicalQuery* cq,
-                   bool shouldCache = true);
+                   CachingMode cachingMode = CachingMode::AlwaysCache);
 
     bool isEOF() final;
 
@@ -168,8 +186,8 @@ private:
     // Not owned here. Must be non-null.
     const Collection* _collection;
 
-    // Whether or not we should try to cache the winning plan in the plan cache.
-    const bool _shouldCache;
+    // Describes the cases in which we should write an entry for the winning plan to the plan cache.
+    const CachingMode _cachingMode;
 
     // The query that we're trying to figure out the best solution to.
     // not owned here

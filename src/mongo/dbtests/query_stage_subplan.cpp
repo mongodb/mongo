@@ -180,6 +180,118 @@ public:
 };
 
 /**
+ * Ensure that the subplan stage doesn't create a plan cache entry if there are no query results.
+ */
+class QueryStageSubplanDontCacheZeroResults : public QueryStageSubplanBase {
+public:
+    void run() {
+        OldClientWriteContext ctx(&_txn, nss.ns());
+
+        addIndex(BSON("a" << 1 << "b" << 1));
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("c" << 1));
+
+        for (int i = 0; i < 10; i++) {
+            insert(BSON("a" << 1 << "b" << i << "c" << i));
+        }
+
+        // Running this query should not create any cache entries. For the first branch, it's
+        // because there are no matching results. For the second branch it's because there is only
+        // one relevant index.
+        BSONObj query = fromjson("{$or: [{a: 1, b: 15}, {c: 1}]}");
+
+        Collection* collection = ctx.getCollection();
+
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss, query);
+        ASSERT_OK(statusWithCQ.getStatus());
+        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
+        // Get planner params.
+        QueryPlannerParams plannerParams;
+        fillOutPlannerParams(&_txn, collection, cq.get(), &plannerParams);
+
+        WorkingSet ws;
+        std::unique_ptr<SubplanStage> subplan(
+            new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
+
+        PlanYieldPolicy yieldPolicy(nullptr, PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+
+        // Nothing is in the cache yet, so neither branch should have been planned from
+        // the plan cache.
+        ASSERT_FALSE(subplan->branchPlannedFromCache(0));
+        ASSERT_FALSE(subplan->branchPlannedFromCache(1));
+
+        // If we run the query again, it should again be the case that neither branch gets planned
+        // from the cache (because the first call to pickBestPlan() refrained from creating any
+        // cache entries).
+        ws.clear();
+        subplan.reset(new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
+
+        ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+
+        ASSERT_FALSE(subplan->branchPlannedFromCache(0));
+        ASSERT_FALSE(subplan->branchPlannedFromCache(1));
+    }
+};
+
+/**
+ * Ensure that the subplan stage doesn't create a plan cache entry if there are no query results.
+ */
+class QueryStageSubplanDontCacheTies : public QueryStageSubplanBase {
+public:
+    void run() {
+        OldClientWriteContext ctx(&_txn, nss.ns());
+
+        addIndex(BSON("a" << 1 << "b" << 1));
+        addIndex(BSON("a" << 1 << "c" << 1));
+        addIndex(BSON("d" << 1));
+
+        for (int i = 0; i < 10; i++) {
+            insert(BSON("a" << 1 << "e" << 1 << "d" << 1));
+        }
+
+        // Running this query should not create any cache entries. For the first branch, it's
+        // because plans using the {a: 1, b: 1} and {a: 1, c: 1} indices should tie during plan
+        // ranking. For the second branch it's because there is only one relevant index.
+        BSONObj query = fromjson("{$or: [{a: 1, e: 1}, {d: 1}]}");
+
+        Collection* collection = ctx.getCollection();
+
+        auto statusWithCQ = CanonicalQuery::canonicalize(nss, query);
+        ASSERT_OK(statusWithCQ.getStatus());
+        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
+        // Get planner params.
+        QueryPlannerParams plannerParams;
+        fillOutPlannerParams(&_txn, collection, cq.get(), &plannerParams);
+
+        WorkingSet ws;
+        std::unique_ptr<SubplanStage> subplan(
+            new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
+
+        PlanYieldPolicy yieldPolicy(nullptr, PlanExecutor::YIELD_MANUAL);
+        ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+
+        // Nothing is in the cache yet, so neither branch should have been planned from
+        // the plan cache.
+        ASSERT_FALSE(subplan->branchPlannedFromCache(0));
+        ASSERT_FALSE(subplan->branchPlannedFromCache(1));
+
+        // If we run the query again, it should again be the case that neither branch gets planned
+        // from the cache (because the first call to pickBestPlan() refrained from creating any
+        // cache entries).
+        ws.clear();
+        subplan.reset(new SubplanStage(&_txn, collection, &ws, plannerParams, cq.get()));
+
+        ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
+
+        ASSERT_FALSE(subplan->branchPlannedFromCache(0));
+        ASSERT_FALSE(subplan->branchPlannedFromCache(1));
+    }
+};
+
+/**
  * Unit test the subplan stage's canUseSubplanning() method.
  */
 class QueryStageSubplanCanUseSubplanning : public QueryStageSubplanBase {
@@ -485,6 +597,8 @@ public:
     void setupTests() {
         add<QueryStageSubplanGeo2dOr>();
         add<QueryStageSubplanPlanFromCache>();
+        add<QueryStageSubplanDontCacheZeroResults>();
+        add<QueryStageSubplanDontCacheTies>();
         add<QueryStageSubplanCanUseSubplanning>();
         add<QueryStageSubplanRewriteToRootedOr>();
         add<QueryStageSubplanPlanContainedOr>();

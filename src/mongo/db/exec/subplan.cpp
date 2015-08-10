@@ -322,8 +322,13 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
             _ws->clear();
 
-            MultiPlanStage multiPlanStage(
-                getOpCtx(), _collection, branchResult->canonicalQuery.get());
+            // We pass the SometimesCache option to the MPS because the SubplanStage currently does
+            // not use the CachedPlanStage's eviction mechanism. We therefore are more conservative
+            // about putting a potentially bad plan into the cache in the subplan path.
+            MultiPlanStage multiPlanStage(getOpCtx(),
+                                          _collection,
+                                          branchResult->canonicalQuery.get(),
+                                          MultiPlanStage::CachingMode::SometimesCache);
 
             // Dump all the solutions into the MPS.
             for (size_t ix = 0; ix < branchResult->solutions.size(); ++ix) {

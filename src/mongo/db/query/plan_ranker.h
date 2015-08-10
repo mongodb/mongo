@@ -137,6 +137,12 @@ struct PlanRankingDecision {
     // candidates[candidateOrder[1]] followed by
     // candidates[candidateOrder[2]], ...
     std::vector<size_t> candidateOrder;
+
+    // Whether two plans tied for the win.
+    //
+    // Reading this flag is the only reliable way for callers to determine if there was a tie,
+    // because the scores kept inside the PlanRankingDecision do not incorporate the EOF bonus.
+    bool tieForBest = false;
 };
 
 }  // namespace mongo

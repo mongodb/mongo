@@ -64,10 +64,10 @@ const char* MultiPlanStage::kStageType = "MULTI_PLAN";
 MultiPlanStage::MultiPlanStage(OperationContext* txn,
                                const Collection* collection,
                                CanonicalQuery* cq,
-                               bool shouldCache)
+                               CachingMode cachingMode)
     : PlanStage(kStageType, txn),
       _collection(collection),
-      _shouldCache(shouldCache),
+      _cachingMode(cachingMode),
       _query(cq),
       _bestPlanIdx(kNoSuchPlan),
       _backupPlanIdx(kNoSuchPlan),
@@ -265,9 +265,51 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
     }
 
+    // Even if the query is of a cacheable shape, the caller might have indicated that we shouldn't
+    // write to the plan cache.
+    //
+    // TODO: We can remove this if we introduce replanning logic to the SubplanStage.
+    bool canCache = (_cachingMode == CachingMode::AlwaysCache);
+    if (_cachingMode == CachingMode::SometimesCache) {
+        // In "sometimes cache" mode, we cache unless we hit one of the special cases below.
+        canCache = true;
+
+        if (ranking->tieForBest) {
+            // The winning plan tied with the runner-up and we're using "sometimes cache" mode. We
+            // will not write a plan cache entry.
+            canCache = false;
+
+            // These arrays having two or more entries is implied by 'tieForBest'.
+            invariant(ranking->scores.size() > 1U);
+            invariant(ranking->candidateOrder.size() > 1U);
+
+            size_t winnerIdx = ranking->candidateOrder[0];
+            size_t runnerUpIdx = ranking->candidateOrder[1];
+
+            LOG(1) << "Winning plan tied with runner-up. Not caching."
+                   << " ns: " << _collection->ns() << " " << _query->toStringShort()
+                   << " winner score: " << ranking->scores[0]
+                   << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root)
+                   << " runner-up score: " << ranking->scores[1] << " runner-up summary: "
+                   << Explain::getPlanSummary(_candidates[runnerUpIdx].root);
+        }
+
+        if (alreadyProduced.empty()) {
+            // We're using the "sometimes cache" mode, and the winning plan produced no results
+            // during the plan ranking trial period. We will not write a plan cache entry.
+            canCache = false;
+
+            size_t winnerIdx = ranking->candidateOrder[0];
+            LOG(1) << "Winning plan had zero results. Not caching."
+                   << " ns: " << _collection->ns() << " " << _query->toStringShort()
+                   << " winner score: " << ranking->scores[0]
+                   << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root);
+        }
+    }
+
     // Store the choice we just made in the cache, if the query is of a type that is safe to
     // cache.
-    if (PlanCache::shouldCacheQuery(*_query) && _shouldCache) {
+    if (PlanCache::shouldCacheQuery(*_query) && canCache) {
         // Create list of candidate solutions for the cache with
         // the best solution at the front.
         std::vector<QuerySolution*> solutions;

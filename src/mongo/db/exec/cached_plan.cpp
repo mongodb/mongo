@@ -235,8 +235,10 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
 
     // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
     // and so on. The working set will be shared by all candidate plans.
+    auto cachingMode = shouldCache ? MultiPlanStage::CachingMode::AlwaysCache
+                                   : MultiPlanStage::CachingMode::NeverCache;
     _children.emplace_back(
-        new MultiPlanStage(getOpCtx(), _collection, _canonicalQuery, shouldCache));
+        new MultiPlanStage(getOpCtx(), _collection, _canonicalQuery, cachingMode));
     MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(child().get());
 
     for (size_t ix = 0; ix < solutions.size(); ++ix) {

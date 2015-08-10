@@ -31,7 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
-#include <math.h>
+#include <cmath>
 #include <vector>
 #include <utility>
 
@@ -110,6 +110,14 @@ size_t PlanRanker::pickBestPlan(const vector<CandidatePlan>& candidates, PlanRan
     // Sort (scores, candidateIndex). Get best child and populate candidate ordering.
     std::stable_sort(
         scoresAndCandidateindices.begin(), scoresAndCandidateindices.end(), scoreComparator);
+
+    // Determine whether plans tied for the win.
+    if (scoresAndCandidateindices.size() > 1U) {
+        double bestScore = scoresAndCandidateindices[0].first;
+        double runnerUpScore = scoresAndCandidateindices[1].first;
+        const double epsilon = 1e-10;
+        why->tieForBest = std::abs(bestScore - runnerUpScore) < epsilon;
+    }
 
     // Update results in 'why'
     // Stats and scores in 'why' are sorted in descending order by score.
