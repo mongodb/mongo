@@ -47,16 +47,6 @@
     ((size) - offsetof(WT_LOG_RECORD, record))
 
 /*
- * Compare 2 LSNs, return -1 if lsn0 < lsn1, 0 if lsn0 == lsn1
- * and 1 if lsn0 > lsn1.
- */
-#define	WT_LOG_CMP(lsn1, lsn2)						\
-	((lsn1)->file != (lsn2)->file ?					\
-	((lsn1)->file < (lsn2)->file ? -1 : 1) :			\
-	((lsn1)->offset != (lsn2)->offset ?				\
-	((lsn1)->offset < (lsn2)->offset ? -1 : 1) : 0))
-
-/*
  * Possible values for the consolidation array slot states:
  *
  * WT_LOG_SLOT_FREE - slot is available for allocation.

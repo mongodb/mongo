@@ -301,7 +301,7 @@ __log_file_server(void *arg)
 		 * write operations have completed, then fsync and close it.
 		 */
 		if ((close_fh = log->log_close_fh) != NULL &&
-		    WT_LOG_CMP(&log->write_lsn, &log->log_close_lsn) >= 0) {
+		    __wt_log_cmp(&log->write_lsn, &log->log_close_lsn) >= 0) {
 			/*
 			 * We've copied the file handle, clear out the one in
 			 * log structure to allow it to be set again.
@@ -323,7 +323,7 @@ __log_file_server(void *arg)
 			locked = 1;
 			WT_ERR(__wt_close(session, &close_fh));
 			WT_ASSERT(session,
-			    WT_LOG_CMP(&close_end_lsn, &log->sync_lsn) >= 0);
+			    __wt_log_cmp(&close_end_lsn, &log->sync_lsn) >= 0);
 			log->sync_lsn = close_end_lsn;
 			WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
 			locked = 0;
@@ -332,7 +332,7 @@ __log_file_server(void *arg)
 		/*
 		 * If a later thread asked for a background sync, do it now.
 		 */
-		if (WT_LOG_CMP(&log->bg_sync_lsn, &log->sync_lsn) > 0) {
+		if (__wt_log_cmp(&log->bg_sync_lsn, &log->sync_lsn) > 0) {
 			/*
 			 * Save the latest write LSN which is the minimum
 			 * we will have written to disk.
@@ -343,7 +343,7 @@ __log_file_server(void *arg)
 			 * written.  If it isn't signal the wrlsn thread
 			 * to get it written.
 			 */
-			if (WT_LOG_CMP(&log->bg_sync_lsn, &min_lsn) <= 0) {
+			if (__wt_log_cmp(&log->bg_sync_lsn, &min_lsn) <= 0) {
 				WT_ERR(__wt_fsync(session, log->log_fh));
 				__wt_spin_lock(session, &log->log_sync_lock);
 				locked = 1;
@@ -351,7 +351,7 @@ __log_file_server(void *arg)
 				 * The sync LSN could have advanced while we
 				 * were writing to disk.
 				 */
-				if (WT_LOG_CMP(&log->sync_lsn, &min_lsn) <= 0) {
+				if (__wt_log_cmp(&log->sync_lsn, &min_lsn) <= 0) {
 					log->sync_lsn = min_lsn;
 					WT_ERR(__wt_cond_signal(
 					    session, log->log_sync_cond));
@@ -467,9 +467,9 @@ restart:
 			 * empty slot, where empty means the start and end LSN
 			 * are the same, free it and continue.
 			 */
-			if (WT_LOG_CMP(&slot->slot_start_lsn,
+			if (__wt_log_cmp(&slot->slot_start_lsn,
 			    &slot->slot_release_lsn) == 0 &&
-			    WT_LOG_CMP(&slot->slot_start_lsn,
+			    __wt_log_cmp(&slot->slot_start_lsn,
 			    &slot->slot_end_lsn) == 0) {
 				WT_ERR(__wt_log_slot_free(session, slot));
 				continue;
@@ -479,9 +479,9 @@ restart:
 				 * If the write_lsn changed, we may be able to
 				 * process slots.  Try again.
 				 */
-				if (WT_LOG_CMP(&log->write_lsn, &save_lsn) != 0)
+				if (__wt_log_cmp(&log->write_lsn, &save_lsn) != 0)
 					goto restart;
-				if (WT_LOG_CMP(&coalescing->slot_end_lsn,
+				if (__wt_log_cmp(&coalescing->slot_end_lsn,
 				    &written[i].lsn) != 0) {
 					coalescing = slot;
 					continue;
@@ -507,7 +507,7 @@ restart:
 				 * coalescing slots.
 				 */
 				save_lsn = log->write_lsn;
-				if (WT_LOG_CMP(
+				if (__wt_log_cmp(
 				    &log->write_lsn, &written[i].lsn) != 0) {
 					coalescing = slot;
 					continue;
@@ -516,7 +516,7 @@ restart:
 				 * If we get here we have a slot to process.
 				 * Advance the LSN and process the slot.
 				 */
-				WT_ASSERT(session, WT_LOG_CMP(&written[i].lsn,
+				WT_ASSERT(session, __wt_log_cmp(&written[i].lsn,
 				    &slot->slot_release_lsn) == 0);
 				log->write_start_lsn = slot->slot_start_lsn;
 				log->write_lsn = slot->slot_end_lsn;
