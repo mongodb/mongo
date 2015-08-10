@@ -351,7 +351,8 @@ __log_file_server(void *arg)
 				 * The sync LSN could have advanced while we
 				 * were writing to disk.
 				 */
-				if (__wt_log_cmp(&log->sync_lsn, &min_lsn) <= 0) {
+				if (__wt_log_cmp(
+				    &log->sync_lsn, &min_lsn) <= 0) {
 					log->sync_lsn = min_lsn;
 					WT_ERR(__wt_cond_signal(
 					    session, log->log_sync_cond));
@@ -479,7 +480,8 @@ restart:
 				 * If the write_lsn changed, we may be able to
 				 * process slots.  Try again.
 				 */
-				if (__wt_log_cmp(&log->write_lsn, &save_lsn) != 0)
+				if (__wt_log_cmp(
+				    &log->write_lsn, &save_lsn) != 0)
 					goto restart;
 				if (__wt_log_cmp(&coalescing->slot_end_lsn,
 				    &written[i].lsn) != 0) {
