@@ -51,7 +51,7 @@ const JSErrorFormatString* uncatchableErrorCallback(void* data, const unsigned c
     return &kUncatchableErrorFormatString;
 }
 
-static_assert(std::numeric_limits<std::uint32_t>::max() - JSErr_Limit > ErrorCodes::MaxError,
+static_assert(UINT_MAX - JSErr_Limit > ErrorCodes::MaxError,
               "Not enough space in an unsigned int for Mongo ErrorCodes and JSErrorNumbers");
 
 }  // namespace
