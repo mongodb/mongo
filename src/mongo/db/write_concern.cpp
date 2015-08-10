@@ -130,15 +130,16 @@ Status validateWriteConcern(const WriteConcernOptions& writeConcern) {
     const repl::ReplicationCoordinator::Mode replMode =
         repl::getGlobalReplicationCoordinator()->getReplicationMode();
 
-    if (isConfigServer || replMode == repl::ReplicationCoordinator::modeNone) {
-        // Note that config servers can be replicated (have an oplog), but we still don't allow
-        // w > 1
-
+    if (isConfigServer && replMode != repl::ReplicationCoordinator::modeReplSet) {
+        // SCCC config servers can have a master-slave oplog, but we still don't allow w > 1.
         if (writeConcern.wNumNodes > 1) {
             return Status(ErrorCodes::BadValue,
-                          string("cannot use 'w' > 1 ") + (isConfigServer
-                                                               ? "on a config server host"
-                                                               : "when a host is not replicated"));
+                          "cannot use 'w' > 1 on a sync cluster connection config server host");
+        }
+    }
+    if (replMode == repl::ReplicationCoordinator::modeNone) {
+        if (writeConcern.wNumNodes > 1) {
+            return Status(ErrorCodes::BadValue, "cannot use 'w' > 1 when a host is not replicated");
         }
     }
 
