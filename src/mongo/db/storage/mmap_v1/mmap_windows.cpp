@@ -139,8 +139,11 @@ static void* getNextMemoryMappedFileLocation(unsigned long long mmfSize) {
             memInfo.RegionSize > mmfSize)
             break;
 
-        thisMemoryMappedFileLocation =
-            reinterpret_cast<unsigned long long>(memInfo.BaseAddress) + memInfo.RegionSize;
+        // Align the memory location in case RegionSize is not aligned to the OS allocation
+        // granularity size
+        thisMemoryMappedFileLocation = AlignNumber(
+            reinterpret_cast<unsigned long long>(memInfo.BaseAddress) + memInfo.RegionSize,
+            granularity);
     }
 
     _nextMemoryMappedFileLocation =
