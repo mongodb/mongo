@@ -71,7 +71,7 @@ bool SyncSourceFeedback::replAuthenticate() {
 
     if (!isInternalAuthSet())
         return false;
-    return authenticateInternalUser(_connection.get());
+    return _connection->authenticateInternalUser();
 }
 
 bool SyncSourceFeedback::_connect(OperationContext* txn, const HostAndPort& host) {

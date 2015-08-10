@@ -574,6 +574,13 @@ public:
                             int options = 0);
 
     /**
+    * Authenticates to another cluster member using appropriate authentication data.
+    * Uses getInternalUserAuthParams() to retrive authentication parameters.
+    * @return true if the authentication was succesful
+    */
+    bool authenticateInternalUser();
+
+    /**
      * Authenticate a user.
      *
      * The "params" BSONObj should be initialized with some of the fields below.  Which fields

@@ -506,7 +506,7 @@ Status Cloner::copyDb(OperationContext* txn,
             }
 
             if (getGlobalAuthorizationManager()->isAuthEnabled() &&
-                !authenticateInternalUser(con.get())) {
+                !con->authenticateInternalUser()) {
                 return Status(ErrorCodes::AuthenticationFailed,
                               "Unable to authenticate as internal user");
             }

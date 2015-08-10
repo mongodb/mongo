@@ -42,8 +42,10 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -555,6 +557,26 @@ void DBClientWithCommands::_auth(const BSONObj& params) {
                 handler(exceptionToStatus());
             }
         });
+}
+
+bool DBClientWithCommands::authenticateInternalUser() {
+    if (!isInternalAuthSet()) {
+        if (!serverGlobalParams.quiet) {
+            log() << "ERROR: No authentication parameters set for internal user";
+        }
+        return false;
+    }
+
+    try {
+        auth(getInternalUserAuthParamsWithFallback());
+        return true;
+    } catch (const UserException& ex) {
+        if (!serverGlobalParams.quiet) {
+            log() << "can't authenticate to " << toString()
+                  << " as internal user, error: " << ex.what();
+        }
+        return false;
+    }
 }
 
 void DBClientWithCommands::auth(const BSONObj& params) {

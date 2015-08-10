@@ -73,7 +73,7 @@ bool replAuthenticate(DBClientBase* conn) {
 
     if (!isInternalAuthSet())
         return false;
-    return authenticateInternalUser(conn);
+    return conn->authenticateInternalUser();
 }
 
 const Seconds OplogReader::kSocketTimeout(30);

@@ -58,7 +58,7 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
     if (getGlobalAuthorizationManager()->isAuthEnabled()) {
         LOG(2) << "calling onCreate auth for " << conn->toString();
 
-        bool result = authenticateInternalUser(conn);
+        bool result = conn->authenticateInternalUser();
 
         uassert(15847,
                 str::stream() << "can't authenticate to server " << conn->getServerAddress(),

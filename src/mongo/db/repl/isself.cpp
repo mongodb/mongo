@@ -203,7 +203,7 @@ bool isSelf(const HostAndPort& hostAndPort) {
         }
 
         if (getGlobalAuthorizationManager()->isAuthEnabled() && isInternalAuthSet()) {
-            if (!authenticateInternalUser(&conn)) {
+            if (!conn.authenticateInternalUser()) {
                 return false;
             }
         }
