@@ -116,7 +116,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& path,
     ss << "checkpoint=(wait=" << wiredTigerGlobalOptions.checkpointDelaySecs;
     ss << ",log_size=2GB),";
     ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
-    ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getOpenConfig("metadata");
+    ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getOpenConfig("system");
     ss << extraOpenOptions;
     if (!_durable) {
         // If we started without the journal, but previously used the journal then open with the
