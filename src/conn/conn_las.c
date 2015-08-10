@@ -83,19 +83,19 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	 *
 	 * Open an internal session, used for the shared lookaside cursor.
 	 */
-	WT_ERR(__wt_open_internal_session(
+	WT_RET(__wt_open_internal_session(
 	    conn, "lookaside file", 1, 1, &conn->las_session));
 	session = conn->las_session;
 
 	/* Discard any previous incarnation of the file. */
-	WT_ERR(__las_drop(session));
+	WT_RET(__las_drop(session));
 
 	/* Re-create the file. */
-	WT_ERR(__wt_session_create(
+	WT_RET(__wt_session_create(
 	    session, WT_LASFILE_URI, "key_format=u,value_format=QIu"));
 
 	/* Open the shared cursor. */
-	WT_ERR(__las_cursor_create(session, &conn->las_cursor));
+	WT_RET(__las_cursor_create(session, &conn->las_cursor));
 
 	/*
 	 * Configure the session:
@@ -109,8 +109,7 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	F_SET(S2BT(session),
 	    WT_BTREE_LAS_FILE | WT_BTREE_NO_CHECKPOINT | WT_BTREE_NO_LOGGING);
 
-err:	__wt_spin_unlock(session, &conn->las_lock);
-	return (ret);
+	return (0);
 }
 
 /*
@@ -137,7 +136,8 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
 	 * lookaside data handle here, we will drop core removing the data
 	 * handle from the connection session's hash list.
 	 */
-	F_SET(conn->las_session->dhandle, WT_DHANDLE_DISCARD_FORCE);
+	if (conn->las_session->dhandle != NULL)
+		F_SET(conn->las_session->dhandle, WT_DHANDLE_DISCARD_FORCE);
 
 	/* Close the session, closing the open cursor. */
 	wt_session = &conn->las_session->iface;
