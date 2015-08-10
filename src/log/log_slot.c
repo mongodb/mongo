@@ -109,9 +109,6 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 		/*
 		 * For now just restart at 0.  We could use log->pool_index
 		 * if that is inefficient.
-		 * XXX We're not guaranteed to be serial here.  We could
-		 * have more than one thread trying to set up a new active
-		 * slot, and both getting the same start LSN...
 		 */
 		for (i = 0; i < WT_SLOT_POOL; i++) {
 			slot = &log->slot_pool[i];
@@ -119,12 +116,12 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 				/*
 				 * Make sure that the next buffer size can
 				 * fit in the file.  Proactively switch if
-				 * it cannot.  This will reduce, but not
+				 * it cannot.  This reduces, but does not
 				 * eliminate, log files that exceed the
 				 * maximum file size.
 				 *
 				 * We want to minimize the risk of an
-				 * ENOSPC error.
+				 * error due to no space.
 				 */
 				WT_RET(__wt_log_acquire(session,
 				    log->slot_buf_size, slot));
@@ -187,7 +184,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
 	    log_buffer_size, log->slot_buf_size * WT_SLOT_POOL);
-	F_SET(log,  WT_LOG_FORCE_CONSOLIDATE);
+	F_SET(log, WT_LOG_FORCE_CONSOLIDATE);
 	/*
 	 * Set up the available slot from the pool the first time.
 	 */

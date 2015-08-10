@@ -434,6 +434,11 @@ restart:
 	while (i < WT_SLOT_POOL) {
 		save_i = i;
 		slot = &log->slot_pool[i++];
+		/*
+		 * XXX - During debugging I saw slot 0 become orphaned.
+		 * I believe it is fixed, but check for now.
+		 * This assertion should catch that.
+		 */
 		if (slot->slot_state == 0)
 			WT_ASSERT(session,
 			    slot->slot_release_lsn.file >= log->write_lsn.file);
@@ -449,7 +454,6 @@ restart:
 	if (written_i > 0) {
 		WT_INSERTION_SORT(written, written_i,
 		    WT_LOG_WRLSN_ENTRY, WT_WRLSN_ENTRY_CMP_LT);
-
 		/*
 		 * We know the written array is sorted by LSN.  Go
 		 * through them either advancing write_lsn or coalesce
@@ -534,48 +538,6 @@ err:	__wt_spin_unlock(session, &log->log_writelsn_lock);
 }
 
 /*
- * __log_force_write_locked --
- *	Force a switch and release and write of the current slot.
- *	Must be called with the slot lock held.
- */
-static int
-__log_force_write_internal(WT_SESSION_IMPL *session, int new_slot)
-{
-	WT_MYSLOT myslot;
-	int free_slot, release;
-
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
-	WT_RET(__wt_log_slot_join(session, 0, 0, &myslot));
-	WT_RET(__wt_log_slot_close(session, &release));
-	if (release) {
-		WT_RET(__wt_log_release(session, myslot.slot, &free_slot));
-		if (free_slot)
-			WT_RET(__wt_log_slot_free(session, myslot.slot));
-	}
-	if (new_slot)
-		WT_RET(__wt_log_slot_new(session));
-	return (0);
-}
-
-/*
- * __wt_log_force_write --
- *	Force a switch and release and write of the current slot.
- *	Wrapper function that takes the lock.
- */
-int
-__wt_log_force_write(WT_SESSION_IMPL *session, int new_slot, int locked)
-{
-	WT_DECL_RET;
-
-	if (locked)
-		ret = __log_force_write_internal(session, new_slot);
-	else
-		WT_WITH_SLOT_LOCK(session, S2C(session)->log,
-		    ret = __log_force_write_internal(session, new_slot));
-	return (ret);
-}
-
-/*
  * __log_wrlsn_server --
  *	The log wrlsn server thread.
  */
@@ -602,8 +564,6 @@ __log_wrlsn_server(void *arg)
 	/*
 	 * On close we need to do this one more time because there could
 	 * be straggling log writes that need to be written.
-	 * XXX - Can any other log write get in at this point in the
-	 * connection close path??
 	 */
 	WT_ERR(__wt_writelock(session, log->log_direct_lock));
 	dir_lock = 1;
@@ -637,6 +597,17 @@ __log_server(void *arg)
 	conn = S2C(session);
 	log = conn->log;
 	arch_lock = dir_lock = 0;
+	/*
+	 * The log server thread does a variety of work.  It forces out any
+	 * buffered log writes.  It pre-allocates log files and it performs
+	 * log archiving.  The reason the wrlsn thread does not force out
+	 * the buffered writes is because we want to process and move the
+	 * write_lsn forward as quickly as possible.  The same reason applies
+	 * to why the log file server thread does not force out the writes.
+	 * That thread does fsync calls which can take a long time and we
+	 * don't want log records sitting in the buffer over the time it
+	 * takes to sync out an earlier file.
+	 */
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Slots depend on future activity.  Force out buffered

@@ -206,6 +206,9 @@ typedef struct {
 	WT_LOGSLOT	*active_slot;			/* Active slot */
 	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
 	size_t		 slot_buf_size;		/* Buffer size for slots */
+#ifdef HAVE_DIAGNOSTIC
+	uint64_t	 write_calls;		/* Calls to log_write */
+#endif
 
 #define	WT_LOG_FORCE_CONSOLIDATE	0x01	/* Disable direct writes */
 	uint32_t	 flags;

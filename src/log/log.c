@@ -1619,6 +1619,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_CLEAR(tmp);
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 
+	WT_STAT_FAST_CONN_INCR(session, log_direct_writes);
 	/*
 	 * Set up the flags in the temporary slot.
 	 */
@@ -1652,6 +1653,48 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	if (F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE))
 		WT_RET(__wt_log_slot_new(session));
 	return (0);
+}
+
+/*
+ * __log_force_write_internal --
+ *	Force a switch and release and write of the current slot.
+ *	Must be called with the slot lock held.
+ */
+static int
+__log_force_write_internal(WT_SESSION_IMPL *session, int new_slot)
+{
+	WT_MYSLOT myslot;
+	int free_slot, release;
+
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+	WT_RET(__wt_log_slot_join(session, 0, 0, &myslot));
+	WT_RET(__wt_log_slot_close(session, &release));
+	if (release) {
+		WT_RET(__wt_log_release(session, myslot.slot, &free_slot));
+		if (free_slot)
+			WT_RET(__wt_log_slot_free(session, myslot.slot));
+	}
+	if (new_slot)
+		WT_RET(__wt_log_slot_new(session));
+	return (0);
+}
+
+/*
+ * __wt_log_force_write --
+ *	Force a switch and release and write of the current slot.
+ *	Wrapper function that takes the lock.
+ */
+int
+__wt_log_force_write(WT_SESSION_IMPL *session, int new_slot, int locked)
+{
+	WT_DECL_RET;
+
+	if (locked)
+		ret = __log_force_write_internal(session, new_slot);
+	else
+		WT_WITH_SLOT_LOCK(session, S2C(session)->log,
+		    ret = __log_force_write_internal(session, new_slot));
+	return (ret);
 }
 
 /*
@@ -1800,6 +1843,9 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	int64_t release_size;
 	uint32_t force, rdup_len;
 	int free_slot, locked;
+#ifdef HAVE_DIAGNOSTIC
+	int direct_force;
+#endif
 
 	conn = S2C(session);
 	log = conn->log;
@@ -1835,13 +1881,30 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec->checksum = __wt_cksum(logrec, record->size);
 
 	WT_STAT_FAST_CONN_INCR(session, log_writes);
+	/*
+	 * This code is written to allow direct writes initially until there
+	 * is contention.  Currently the log slot initialization function
+	 * will turn on consolidation automatically so this code could
+	 * be simplified some for that case.
+	 */
+#if	HAVE_DIAGNOSTIC
+	/*
+	 * XXX Test out an intermittent direct write call.  We expect this
+	 * to be rare but need to verify the code path.
+	 */
+	direct_force = ((++log->write_calls % 1000) == 0);
 
+	if (direct_force || !F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE) ||
+	    rdup_len >= WT_LOG_SLOT_MAXIMUM) {
+		if (direct_force || rdup_len >= WT_LOG_SLOT_MAXIMUM) {
+#else
 	if (!F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE) ||
 	    rdup_len >= WT_LOG_SLOT_MAXIMUM) {
 		/*
 		 * Large records must use direct write.
 		 */
 		if (rdup_len >= WT_LOG_SLOT_MAXIMUM) {
+#endif
 			WT_STAT_FAST_CONN_INCR(session, log_slot_toobig);
 			WT_ERR(__wt_writelock(session, log->log_direct_lock));
 		} else {
@@ -1904,8 +1967,10 @@ use_slots:
 		/*
 		 * If we are going to wait for this slot to get written,
 		 * signal the wrlsn thread.
+		 *
+		 * XXX I've seen times when conditions are NULL.
 		 */
-		if (conn->log_wrlsn_cond != NULL) {
+		if (conn->log_cond != NULL) {
 			WT_ERR(__wt_cond_signal(session, conn->log_cond));
 			__wt_yield();
 		} else
