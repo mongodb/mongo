@@ -43,7 +43,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
@@ -277,6 +277,8 @@ public:
     virtual Status updateTerm(long long term) override;
 
     virtual SnapshotName reserveSnapshotName() override;
+
+    virtual void forceSnapshotCreation() override;
 
     virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) override;
 

@@ -2960,7 +2960,14 @@ bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term, Handle* 
 }
 
 SnapshotName ReplicationCoordinatorImpl::reserveSnapshotName() {
-    return SnapshotName(_snapshotNameGenerator.addAndFetch(1));
+    auto out = SnapshotName(_snapshotNameGenerator.addAndFetch(1));
+    dassert(out > SnapshotName::min());
+    dassert(out < SnapshotName::max());
+    return out;
+}
+
+void ReplicationCoordinatorImpl::forceSnapshotCreation() {
+    _externalState->forceSnapshotCreation();
 }
 
 void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) {

@@ -34,52 +34,12 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 class RecoveryUnit;
-
-class SnapshotName {
-public:
-    explicit SnapshotName(uint64_t value) : _value(value) {}
-
-    /**
-     * Returns a SnapshotName guaranteed to compare > all others.
-     */
-    static SnapshotName max() {
-        return SnapshotName(std::numeric_limits<uint64_t>::max());
-    }
-
-    /**
-     * Returns an unsigned number that compares with the same ordering as the SnapshotName.
-     */
-    uint64_t asU64() const {
-        return _value;
-    }
-
-    bool operator==(const SnapshotName& rhs) const {
-        return _value == rhs._value;
-    }
-    bool operator!=(const SnapshotName& rhs) const {
-        return _value != rhs._value;
-    }
-    bool operator<(const SnapshotName& rhs) const {
-        return _value < rhs._value;
-    }
-    bool operator<=(const SnapshotName& rhs) const {
-        return _value <= rhs._value;
-    }
-    bool operator>(const SnapshotName& rhs) const {
-        return _value > rhs._value;
-    }
-    bool operator>=(const SnapshotName& rhs) const {
-        return _value >= rhs._value;
-    }
-
-private:
-    uint64_t _value;
-};
 
 /**
  * Manages snapshots that can be read from at a later time.

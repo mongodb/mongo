@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/timer.h"
 
@@ -77,9 +78,11 @@ public:
     virtual SnapshotId getSnapshotId() const;
 
     Status setReadFromMajorityCommittedSnapshot() final;
-    bool isReadingFromMajorityCommittedSnapshot() final {
+    bool isReadingFromMajorityCommittedSnapshot() const final {
         return _readFromMajorityCommittedSnapshot;
     }
+
+    boost::optional<SnapshotName> getMajorityCommittedSnapshot() const final;
 
     // ---- WT STUFF
 
@@ -135,6 +138,7 @@ private:
     bool _syncing;
     RecordId _oplogReadTill;
     bool _readFromMajorityCommittedSnapshot = false;
+    SnapshotName _majorityCommittedSnapshot = SnapshotName::min();
 
     typedef OwnedPointerVector<Change> Changes;
     Changes _changes;

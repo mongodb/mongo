@@ -210,7 +210,7 @@ public:
      * Signals the SnapshotThread, if running, to take a forced snapshot even if the global
      * timestamp hasn't changed.
      *
-     * Does not wait for the timestamp to be taken.
+     * Does not wait for the snapshot to be taken.
      */
     virtual void forceSnapshotCreation() = 0;
 

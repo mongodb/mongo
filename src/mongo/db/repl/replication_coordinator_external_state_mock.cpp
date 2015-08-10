@@ -36,7 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
-#include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 

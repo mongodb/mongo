@@ -401,6 +401,29 @@ void IndexCatalog::IndexBuildBlock::fail() {
     }
 }
 
+namespace {
+class IndexCompletionChange final : public RecoveryUnit::Change {
+public:
+    IndexCompletionChange(OperationContext* txn, IndexCatalogEntry* entry)
+        : _txn(txn), _entry(entry) {}
+
+    void rollback() final {}  // Handled elsewhere by retrying or deleting the index.
+    void commit() final {
+        // Note: this runs after the WUOW commits but before we release our X lock on the
+        // collection. This means that any snapshot created after this must include the full index,
+        // and no one can try to read this index before we set the visibility.
+        auto replCoord = repl::ReplicationCoordinator::get(_txn);
+        auto snapshotName = replCoord->reserveSnapshotName();
+        replCoord->forceSnapshotCreation();  // Ensures a newer snapshot gets created even if idle.
+        _entry->setMinimumVisibleSnapshot(snapshotName);
+    }
+
+private:
+    OperationContext* const _txn;
+    IndexCatalogEntry* const _entry;
+};
+}
+
 void IndexCatalog::IndexBuildBlock::success() {
     fassert(17207, _catalog->_collection->ok());
 
@@ -411,6 +434,7 @@ void IndexCatalog::IndexBuildBlock::success() {
     IndexCatalogEntry* entry = _catalog->_entries.find(desc);
     fassert(17331, entry && entry == _entry);
 
+    _txn->recoveryUnit()->registerChange(new IndexCompletionChange(_txn, entry));
     entry->setIsReady(true);
 
     _catalog->_collection->infoCache()->addedIndex(_txn);
@@ -763,7 +787,7 @@ Status IndexCatalog::dropIndex(OperationContext* txn, IndexDescriptor* desc) {
 }
 
 namespace {
-class IndexRemoveChange : public RecoveryUnit::Change {
+class IndexRemoveChange final : public RecoveryUnit::Change {
 public:
     IndexRemoveChange(OperationContext* txn,
                       Collection* collection,
@@ -771,11 +795,17 @@ public:
                       IndexCatalogEntry* entry)
         : _txn(txn), _collection(collection), _entries(entries), _entry(entry) {}
 
-    virtual void commit() {
+    void commit() final {
+        // Ban reading from this collection on committed reads on snapshots before now.
+        auto replCoord = repl::ReplicationCoordinator::get(_txn);
+        auto snapshotName = replCoord->reserveSnapshotName();
+        replCoord->forceSnapshotCreation();  // Ensures a newer snapshot gets created even if idle.
+        _collection->setMinimumVisibleSnapshot(snapshotName);
+
         delete _entry;
     }
 
-    virtual void rollback() {
+    void rollback() final {
         _entries->add(_entry);
         _collection->infoCache()->reset(_txn);
     }
@@ -937,10 +967,22 @@ void IndexCatalog::IndexIterator::_advance() {
         IndexCatalogEntry* entry = *_iterator;
         ++_iterator;
 
-        if (_includeUnfinishedIndexes || entry->isReady(_txn)) {
-            _next = entry;
-            return;
+        if (!_includeUnfinishedIndexes) {
+            if (auto minSnapshot = entry->getMinimumVisibleSnapshot()) {
+                if (auto mySnapshot = _txn->recoveryUnit()->getMajorityCommittedSnapshot()) {
+                    if (mySnapshot < minSnapshot) {
+                        // This index isn't finished in my snapshot.
+                        continue;
+                    }
+                }
+            }
+
+            if (!entry->isReady(_txn))
+                continue;
         }
+
+        _next = entry;
+        return;
     }
 }
 

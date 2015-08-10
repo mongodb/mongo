@@ -35,6 +35,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/snapshot_name.h"
 
 namespace mongo {
 
@@ -106,6 +107,18 @@ public:
     // if this ready is ready for queries
     bool isReady(OperationContext* txn) const;
 
+    /**
+     * If return value is not boost::none, reads with majority read concern using an older snapshot
+     * must treat this index as unfinished.
+     */
+    boost::optional<SnapshotName> getMinimumVisibleSnapshot() {
+        return _minVisibleSnapshot;
+    }
+
+    void setMinimumVisibleSnapshot(SnapshotName name) {
+        _minVisibleSnapshot = name;
+    }
+
 private:
     class SetMultikeyChange;
     class SetHeadChange;
@@ -136,6 +149,9 @@ private:
     bool _isReady;       // cache of NamespaceDetails info
     RecordId _head;      // cache of IndexDetails
     bool _isMultikey;    // cache of NamespaceDetails info
+
+    // The earliest snapshot that is allowed to read this index.
+    boost::optional<SnapshotName> _minVisibleSnapshot;
 };
 
 class IndexCatalogEntryContainer {

@@ -321,13 +321,21 @@ SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
 }
 
 Status WiredTigerRecoveryUnit::setReadFromMajorityCommittedSnapshot() {
-    if (!_sessionCache->snapshotManager().haveCommittedSnapshot()) {
+    auto snapshotName = _sessionCache->snapshotManager().getMinSnapshotForNextCommittedRead();
+    if (!snapshotName) {
         return {ErrorCodes::ReadConcernMajorityNotAvailableYet,
                 "Read concern majority reads are currently not possible."};
     }
 
+    _majorityCommittedSnapshot = *snapshotName;
     _readFromMajorityCommittedSnapshot = true;
     return Status::OK();
+}
+
+boost::optional<SnapshotName> WiredTigerRecoveryUnit::getMajorityCommittedSnapshot() const {
+    if (!_readFromMajorityCommittedSnapshot)
+        return {};
+    return _majorityCommittedSnapshot;
 }
 
 void WiredTigerRecoveryUnit::markNoTicketRequired() {
@@ -368,7 +376,8 @@ void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
     _syncing = _syncing || waitUntilDurableData.numWaitingForSync.load() > 0;
 
     if (_readFromMajorityCommittedSnapshot) {
-        _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(s, _syncing);
+        _majorityCommittedSnapshot =
+            _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(s, _syncing);
     } else {
         invariantWTOK(s->begin_transaction(s, _syncing ? "sync=true" : NULL));
     }

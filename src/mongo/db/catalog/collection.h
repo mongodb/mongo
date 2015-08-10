@@ -353,7 +353,17 @@ public:
 
     uint64_t getIndexSize(OperationContext* opCtx, BSONObjBuilder* details = NULL, int scale = 1);
 
-    // --- end suspect things
+    /**
+     * If return value is not boost::none, reads with majority read concern using an older snapshot
+     * must error.
+     */
+    boost::optional<SnapshotName> getMinimumVisibleSnapshot() {
+        return _minVisibleSnapshot;
+    }
+
+    void setMinimumVisibleSnapshot(SnapshotName name) {
+        _minVisibleSnapshot = name;
+    }
 
 private:
     /**
@@ -417,6 +427,9 @@ private:
     std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
 
     const bool _mustTakeCappedLockOnInsert;
+
+    // The earliest snapshot that is allowed to use this collection.
+    boost::optional<SnapshotName> _minVisibleSnapshot;
 
     friend class Database;
     friend class IndexCatalog;

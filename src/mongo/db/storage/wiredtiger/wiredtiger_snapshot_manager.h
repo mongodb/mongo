@@ -65,13 +65,22 @@ public:
      */
     void shutdown();
 
-    bool haveCommittedSnapshot() const;
-    void beginTransactionOnCommittedSnapshot(WT_SESSION* session, bool sync) const;
+    /**
+     * Starts a transaction and returns the SnapshotName used.
+     *
+     * Throws if there is currently no committed snapshot.
+     */
+    SnapshotName beginTransactionOnCommittedSnapshot(WT_SESSION* session, bool sync) const;
 
-    // We explicitly do not offer a way to ask for the current committed snapshot name, because
-    // it would be impossible to use correctly without introducing a race condition. All
-    // operations that need to use the _committedSnapshot must be performed while holding
-    // _mutex.
+    /**
+     * Returns lowest SnapshotName that could possibly be used by a future call to
+     * beginTransactionOnCommittedSnapshot, or boost::none if there is currently no committed
+     * snapshot.
+     *
+     * This should not be used for starting a transaction on this SnapshotName since the named
+     * snapshot may be deleted by the time you start the transaction.
+     */
+    boost::optional<SnapshotName> getMinSnapshotForNextCommittedRead() const;
 
 private:
     mutable stdx::mutex _mutex;  // Guards all members.

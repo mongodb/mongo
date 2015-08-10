@@ -653,6 +653,14 @@ public:
     virtual SnapshotName reserveSnapshotName() = 0;
 
     /**
+     * Signals the SnapshotThread, if running, to take a forced snapshot even if the global
+     * timestamp hasn't changed.
+     *
+     * Does not wait for the snapshot to be taken.
+     */
+    virtual void forceSnapshotCreation() = 0;
+
+    /**
      * Called when a new snapshot is created.
      */
     virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) = 0;

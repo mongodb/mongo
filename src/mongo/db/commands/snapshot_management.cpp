@@ -33,6 +33,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_manager.h"
 
@@ -74,13 +75,15 @@ public:
             return appendCommandStatus(result, {ErrorCodes::CommandNotSupported, ""});
         }
 
-        const auto name = SnapshotName(cmdObj.firstElement().Long());
-
         ScopedTransaction st(txn, MODE_IX);
         Lock::GlobalLock lk(txn->lockState(), MODE_IX, UINT_MAX);
+
         auto status = snapshotManager->prepareForCreateSnapshot(txn);
-        if (status.isOK())
+        if (status.isOK()) {
+            const auto name = repl::ReplicationCoordinator::get(txn)->reserveSnapshotName();
+            result.append("name", static_cast<long long>(name.asU64()));
             status = snapshotManager->createSnapshot(txn, name);
+        }
         return appendCommandStatus(result, status);
     }
 };

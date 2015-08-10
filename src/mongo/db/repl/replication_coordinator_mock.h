@@ -208,6 +208,8 @@ public:
 
     virtual SnapshotName reserveSnapshotName();
 
+    virtual void forceSnapshotCreation() override;
+
     virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name);
 
     virtual void dropAllSnapshots() override;
