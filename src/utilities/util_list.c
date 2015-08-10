@@ -98,11 +98,14 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 
 		/*
 		 * XXX
-		 * We don't normally say anything about the WiredTiger
-		 * metadata, it's not a normal "object" in the database.  I'm
-		 * making an exception for the checkpoint and verbose options.
+		 * We don't normally say anything about the WiredTiger metadata
+		 * and lookaside files, they're not application/user "objects"
+		 * in the database.  I'm making an exception for the checkpoint
+		 * and verbose options.
 		 */
-		if (strcmp(key, WT_METADATA_URI) != 0 || cflag || vflag)
+		if (cflag || vflag ||
+		    (strcmp(key, WT_METADATA_URI) != 0 &&
+		    strcmp(key, WT_LASFILE_URI) != 0))
 			printf("%s\n", key);
 
 		if (!cflag && !vflag)
