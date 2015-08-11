@@ -54,12 +54,11 @@ __wt_las_remove_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor_arg,
 	WT_DECL_ITEM(klas);
 	WT_DECL_RET;
 	size_t prefix_len;
-	uint32_t saved_flags;
-	int exact;
+	int exact, reset_evict;
 	uint8_t prefix[WT_MAX_PREFIX_SIZE];
 
 	cursor = NULL;
-	saved_flags = 0;		/* [-Werror=maybe-uninitialized] */
+	reset_evict = 0;		/* [-Werror=maybe-uninitialized] */
 
 	/* Build the unique file/address prefix. */
 	__las_build_prefix(
@@ -75,7 +74,7 @@ __wt_las_remove_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor_arg,
 	 * matching prefix and step through all matching records, removing them.
 	 */
 	if ((cursor = cursor_arg) == NULL)
-		WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
+		WT_ERR(__wt_las_cursor(session, &cursor, &reset_evict));
 	cursor->set_key(cursor, klas);
 	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
 		ret = cursor->next(cursor);
@@ -100,7 +99,7 @@ __wt_las_remove_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor_arg,
 	WT_ERR_NOTFOUND_OK(ret);
 
 err:	if (cursor_arg == NULL)
-		WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
+		WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
 
 	__wt_scr_free(session, &klas);
 	return (ret);
@@ -152,10 +151,10 @@ __las_page_instantiate(
 	WT_PAGE *page;
 	WT_UPDATE *first_upd, *last_upd, *upd;
 	size_t incr, prefix_len, total_incr;
-	uint32_t key_len, saved_flags, upd_size;
+	uint32_t key_len, upd_size;
 	uint64_t current_recno, recno, txnid;
 	uint8_t prefix[WT_MAX_PREFIX_SIZE];
-	int exact;
+	int exact, reset_evict;
 	void *p;
 
 	*need_las_removep = 0;
@@ -165,7 +164,7 @@ __las_page_instantiate(
 	first_upd = last_upd = upd = NULL;
 	total_incr = 0;
 	current_recno = recno = WT_RECNO_OOB;
-	saved_flags = 0;		/* [-Werror=maybe-uninitialized] */
+	reset_evict = 0;		/* [-Werror=maybe-uninitialized] */
 
 	__wt_btcur_init(session, &cbt);
 	__wt_btcur_open(&cbt);
@@ -192,7 +191,7 @@ __las_page_instantiate(
 	 * for a key and then insert those updates into the page, then all the
 	 * updates for the next key, and so on.
 	 */
-	WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
+	WT_ERR(__wt_las_cursor(session, &cursor, &reset_evict));
 	cursor->set_key(cursor, klas);
 	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
 		ret = cursor->next(cursor);
@@ -299,7 +298,7 @@ __las_page_instantiate(
 		}
 
 	/* Discard the cursor. */
-	WT_ERR(__wt_las_cursor_close(session, &cursor, saved_flags));
+	WT_ERR(__wt_las_cursor_close(session, &cursor, reset_evict));
 
 	if (total_incr != 0) {
 		__wt_cache_page_inmem_incr(session, page, total_incr);
@@ -317,7 +316,7 @@ __las_page_instantiate(
 		page->modify->first_dirty_txn = WT_TXN_FIRST;
 	}
 
-err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
+err:	WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
 	WT_TRET(__wt_btcur_close(&cbt, 1));
 
 	/*

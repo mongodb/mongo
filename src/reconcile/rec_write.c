@@ -3211,9 +3211,10 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	WT_UPD_SKIPPED *list;
 	size_t len;
 	uint64_t recno;
-	uint32_t counter, i, keylen, saved_flags, slot;
+	uint32_t counter, i, keylen, slot;
 	uint8_t *counterp;
 	void *p;
+	int reset_evict;
 
 	cursor = NULL;
 	page = r->page;
@@ -3226,7 +3227,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	 */
 	__wt_las_set_written(session);
 
-	WT_ERR(__wt_las_cursor(session, &cursor, &saved_flags));
+	WT_ERR(__wt_las_cursor(session, &cursor, &reset_evict));
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_scr_alloc(session, 0, &klas));
@@ -3370,7 +3371,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 		} while ((upd = upd->next) != NULL);
 	}
 
-err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
+err:	WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
 
 	__wt_scr_free(session, &key);
 	__wt_scr_free(session, &klas);

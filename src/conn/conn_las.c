@@ -184,8 +184,7 @@ __wt_las_is_written(WT_SESSION_IMPL *session)
  *	Return a lookaside cursor.
  */
 int
-__wt_las_cursor(
-    WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t *saved_flagsp)
+__wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *reset_evict)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -211,11 +210,13 @@ __wt_las_cursor(
 
 	/*
 	 * We don't want to get tapped for eviction anywhere in this process;
-	 * save a copy of the current flags for when the cursor is closed, and
-	 * turn eviction off.
+	 * save a copy of the current eviction state and turn eviction off.
 	 */
-	*saved_flagsp = session->flags;
-	F_SET(session, WT_SESSION_NO_EVICTION);
+	*reset_evict = 0;
+	if (!F_ISSET(session, WT_SESSION_NO_EVICTION)) {
+		*reset_evict = 1;
+		F_SET(session, WT_SESSION_NO_EVICTION);
+	}
 
 	*cursorp = conn->las_cursor;
 	return (0);
@@ -227,7 +228,7 @@ __wt_las_cursor(
  */
 int
 __wt_las_cursor_close(
-	WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t saved_flags)
+	WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int reset_evict)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
@@ -250,7 +251,8 @@ __wt_las_cursor_close(
 	 * We turned off eviction while the lookaside cursor was in use, restore
 	 * the session's flags.
 	 */
-	session->flags = saved_flags;
+	if (reset_evict)
+		F_CLR(session, WT_SESSION_NO_EVICTION);
 
 	/* Unlock the shared lookaside cursor. */
 	__wt_spin_unlock(session, &conn->las_lock);
