@@ -546,9 +546,14 @@ static int
 __evict_clear_walk(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
+	WT_CACHE *cache;
 	WT_REF *ref;
 
 	btree = S2BT(session);
+	cache = S2C(session)->cache;
+
+	if (session->dhandle == cache->evict_file_next)
+		cache->evict_file_next = NULL;
 
 	if ((ref = btree->evict_ref) == NULL)
 		return (0);
@@ -568,21 +573,17 @@ __evict_clear_walk(WT_SESSION_IMPL *session)
 static int
 __evict_clear_walks(WT_SESSION_IMPL *session)
 {
-	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *s;
 	u_int i, session_cnt;
 
 	conn = S2C(session);
-	cache = conn->cache;
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
 		if (!s->active || !F_ISSET(s, WT_SESSION_CLEAR_EVICT_WALK))
 			continue;
-		if (s->dhandle == cache->evict_file_next)
-			cache->evict_file_next = NULL;
 		WT_WITH_DHANDLE(
 		    session, s->dhandle, WT_TRET(__evict_clear_walk(session)));
 	}
@@ -957,9 +958,17 @@ retry:	while (slot < max_entries && ret == 0) {
 			dhandle_locked = 1;
 		}
 
-		if (dhandle == NULL)
-			dhandle = SLIST_FIRST(&conn->dhlh);
-		else {
+		if (dhandle == NULL) {
+			/*
+			 * On entry, continue from wherever we got to in the
+			 * scan last time through.  If we don't have a saved
+			 * handle, start from the beginning of the list.
+			 */
+			if ((dhandle = cache->evict_file_next) != NULL)
+				cache->evict_file_next = NULL;
+			else
+				dhandle = SLIST_FIRST(&conn->dhlh);
+		} else {
 			if (incr) {
 				WT_ASSERT(session, dhandle->session_inuse > 0);
 				(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
@@ -976,15 +985,6 @@ retry:	while (slot < max_entries && ret == 0) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
-
-		/*
-		 * Each time we reenter this function, start at the next handle
-		 * on the list.
-		 */
-		if (cache->evict_file_next != NULL &&
-		    cache->evict_file_next != dhandle)
-			continue;
-		cache->evict_file_next = NULL;
 
 		/* Skip files that don't allow eviction. */
 		btree = dhandle->handle;

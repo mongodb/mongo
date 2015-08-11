@@ -64,6 +64,7 @@ wts_ops(int lastrun)
 	session = NULL;			/* -Wconditional-uninitialized */
 	memset(&backup_tid, 0, sizeof(backup_tid));
 	memset(&compact_tid, 0, sizeof(compact_tid));
+	memset(&lrt_tid, 0, sizeof(lrt_tid));
 
 	/*
 	 * There are two mechanisms to specify the length of the run, a number
