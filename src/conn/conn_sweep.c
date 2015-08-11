@@ -133,8 +133,9 @@ __sweep_expire(WT_SESSION_IMPL *session, time_t now)
 		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
 			continue;
 
-		WT_WITH_DHANDLE(session, dhandle,
-		    ret = __sweep_expire_one(session));
+		WT_WITH_DHANDLE_LOCK(session,
+		    WT_WITH_DHANDLE(session, dhandle,
+			ret = __sweep_expire_one(session)));
 		WT_RET_BUSY_OK(ret);
 	}
 
