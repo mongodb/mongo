@@ -625,7 +625,9 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 *  - additional cache would benefit the connection OR
 		 *  - the pool is less than half distributed
 		 */
-		} else if (!pool_full && busy &&
+		} else if (!pool_full &&
+		    __wt_cache_bytes_inuse(cache) >=
+		    (entry->cache_size * cache->eviction_target) / 100 &&
 		    (pressure > bump_threshold ||
 		    cp->currently_used < cp->size * 0.5)) {
 			grow = 1;
