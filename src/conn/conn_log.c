@@ -847,6 +847,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 		conn->log_wrlsn_session = NULL;
 	}
 
+	WT_TRET(__wt_log_slot_destroy(session));
 	WT_TRET(__wt_log_close(session));
 
 	/* Close the server thread's session. */
@@ -856,7 +857,6 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 		conn->log_session = NULL;
 	}
 
-	WT_TRET(__wt_log_slot_destroy(session));
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_write_cond));
 	WT_TRET(__wt_rwlock_destroy(session, &conn->log->log_archive_lock));

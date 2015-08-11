@@ -212,13 +212,34 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
+	WT_LOGSLOT *slot;
+	size_t write_size;
+	int64_t j, rel;
 	int i;
 
 	conn = S2C(session);
 	log = conn->log;
 
-	for (i = 0; i < WT_SLOT_POOL; i++)
+	/*
+	 * Write out any remaining buffers.  Free the buffer.
+	 */
+	for (i = 0; i < WT_SLOT_POOL; i++) {
+		slot = &log->slot_pool[i];
+		if (!FLD64_ISSET(slot->slot_state, WT_LOG_SLOT_RESERVED)) {
+			rel = WT_LOG_SLOT_RELEASED(slot->slot_state);
+			j = WT_LOG_SLOT_JOINED(slot->slot_state);
+			write_size = (size_t)rel - slot->slot_unbuffered;
+			__wt_errx(session,
+			    "Found Slot %d: State %lx j %lu %lx r %lu %lx unbuf %lu wr %lu %lx",
+			    i, slot->slot_state, j, j, rel, rel,
+			    slot->slot_unbuffered, write_size, write_size);
+			if (write_size != 0)
+				WT_RET(__wt_write(session, slot->slot_fh,
+				    slot->slot_start_offset, write_size,
+				    slot->slot_buf.mem));
+		}
 		__wt_buf_free(session, &log->slot_pool[i].slot_buf);
+	}
 	return (0);
 }
 
