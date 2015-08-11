@@ -1127,6 +1127,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
                   selfStatus["optimeDate"].Date());
 
+    ASSERT_EQUALS(2000, rsStatus["heartbeatIntervalMillis"].numberInt());
+
     // TODO(spencer): Test electionTime and pingMs are set properly
 }
 

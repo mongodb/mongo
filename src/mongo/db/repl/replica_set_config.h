@@ -58,6 +58,9 @@ public:
 
     static const size_t kMaxMembers = 50;
     static const size_t kMaxVotingMembers = 7;
+
+    // TODO: Consider returning different default heartbeat interval based on protocol version.
+    static const Milliseconds kDefaultHeartbeatInterval;
     static const Seconds kDefaultHeartbeatTimeoutPeriod;
 
     ReplicaSetConfig();
@@ -165,6 +168,13 @@ public:
     const WriteConcernOptions& getDefaultWriteConcern() const {
         return _defaultWriteConcern;
     }
+
+    /**
+     * Interval between the time the last heartbeat from a node was received successfully, or
+     * the time when we gave up retrying, and when the next heartbeat should be sent to a target.
+     * Returns default heartbeat interval if this configuration is not initialized.
+     */
+    Milliseconds getHeartbeatInterval() const;
 
     /**
      * Gets the amount of time to wait for a response to hearbeats sent to other
@@ -283,6 +293,7 @@ private:
     std::string _replSetName;
     std::vector<MemberConfig> _members;
     WriteConcernOptions _defaultWriteConcern;
+    Milliseconds _heartbeatInterval;
     Seconds _heartbeatTimeoutPeriod;
     bool _chainingAllowed;
     int _majorityVoteCount;

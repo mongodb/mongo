@@ -68,6 +68,7 @@ TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS(0, config.membersBegin()->getId());
     ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
     ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
+    ASSERT_EQUALS(ReplicaSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
     ASSERT_EQUALS(Seconds(10), config.getHeartbeatTimeoutPeriod());
     ASSERT_TRUE(config.isChainingAllowed());
     ASSERT_FALSE(config.isConfigServer());
@@ -76,18 +77,19 @@ TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
 
 TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
     ReplicaSetConfig config;
-    ASSERT_OK(config.initialize(BSON(
-        "_id"
-        << "rs0"
-        << "version" << 1234 << "members" << BSON_ARRAY(BSON("_id" << 234 << "host"
-                                                                   << "localhost:12345"
-                                                                   << "tags" << BSON("NYC"
-                                                                                     << "NY")))
-        << "settings" << BSON("getLastErrorDefaults"
-                              << BSON("w"
-                                      << "majority") << "getLastErrorModes"
-                              << BSON("eastCoast" << BSON("NYC" << 1)) << "chainingAllowed" << false
-                              << "heartbeatTimeoutSecs" << 120 << "protocolVersion" << 2))));
+    ASSERT_OK(config.initialize(
+        BSON("_id"
+             << "rs0"
+             << "version" << 1234 << "members" << BSON_ARRAY(BSON("_id" << 234 << "host"
+                                                                        << "localhost:12345"
+                                                                        << "tags" << BSON("NYC"
+                                                                                          << "NY")))
+             << "settings" << BSON("getLastErrorDefaults"
+                                   << BSON("w"
+                                           << "majority") << "getLastErrorModes"
+                                   << BSON("eastCoast" << BSON("NYC" << 1)) << "chainingAllowed"
+                                   << false << "heartbeatIntervalMillis" << 5000
+                                   << "heartbeatTimeoutSecs" << 120 << "protocolVersion" << 2))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS("rs0", config.getReplSetName());
     ASSERT_EQUALS(1234, config.getConfigVersion());
@@ -97,6 +99,7 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_EQUALS("majority", config.getDefaultWriteConcern().wMode);
     ASSERT_FALSE(config.isChainingAllowed());
     ASSERT_FALSE(config.isConfigServer());
+    ASSERT_EQUALS(Seconds(5), config.getHeartbeatInterval());
     ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
     ASSERT_EQUALS(2, config.getProtocolVersion());
 }
@@ -448,6 +451,23 @@ TEST(ReplicaSetConfig, ParseFailsWithNonArrayMembersField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
+TEST(ReplicaSetConfig, ParseFailsWithNonNumericHeartbeatIntervalMillisField) {
+    ReplicaSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345"))
+                                           << "settings" << BSON("heartbeatIntervalMillis"
+                                                                 << "no")));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+
+    ASSERT_FALSE(config.isInitialized());
+
+    // Uninitialized configuration should return default heartbeat interval.
+    ASSERT_EQUALS(ReplicaSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
+}
+
 TEST(ReplicaSetConfig, ParseFailsWithNonNumericHeartbeatTimeoutSecsField) {
     ReplicaSetConfig config;
     Status status = config.initialize(BSON("_id"
@@ -675,6 +695,26 @@ TEST(ReplicaSetConfig, ConfigServerField) {
     ASSERT_FALSE(config.isConfigServer());
 }
 
+TEST(ReplicaSetConfig, HeartbeatIntervalField) {
+    ReplicaSetConfig config;
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")) << "settings"
+                                     << BSON("heartbeatIntervalMillis" << 5000))));
+    ASSERT_OK(config.validate());
+    ASSERT_EQUALS(Seconds(5), config.getHeartbeatInterval());
+
+    ASSERT_OK(config.initialize(BSON("_id"
+                                     << "rs0"
+                                     << "version" << 1 << "members"
+                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                              << "localhost:12345")) << "settings"
+                                     << BSON("heartbeatIntervalMillis" << -5000))));
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+}
+
 TEST(ReplicaSetConfig, HeartbeatTimeoutField) {
     ReplicaSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
@@ -797,6 +837,7 @@ bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
     // simple comparisons
     return a.getReplSetName() == b.getReplSetName() &&
         a.getConfigVersion() == b.getConfigVersion() && a.getNumMembers() == b.getNumMembers() &&
+        a.getHeartbeatInterval() == b.getHeartbeatInterval() &&
         a.getHeartbeatTimeoutPeriod() == b.getHeartbeatTimeoutPeriod() &&
         a.isChainingAllowed() == b.isChainingAllowed() &&
         a.isConfigServer() == b.isConfigServer() &&
@@ -813,7 +854,8 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbility) {
                                       << "version" << 1 << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")) << "settings"
-                                      << BSON("heartbeatTimeoutSecs" << 20))));
+                                      << BSON("heartbeatIntervalMillis"
+                                              << 5000 << "heartbeatTimeoutSecs" << 20))));
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_TRUE(configA == configB);
 }
@@ -843,10 +885,11 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
                                             << "west"
                                             << "hdd"
                                             << "true"))) << "settings"
-        << BSON("heartbeatTimeoutSecs" << 20 << "chainingAllowd" << true << "getLastErrorDefaults"
-                                       << BSON("w"
-                                               << "majority") << "getLastErrorModes"
-                                       << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1) << "coasts"
+        << BSON("heartbeatIntervalMillis"
+                << 5000 << "heartbeatTimeoutSecs" << 20
+                << "chainingAllowd" << true << "getLastErrorDefaults" << BSON("w"
+                                                                              << "majority")
+                << "getLastErrorModes" << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1) << "coasts"
                                                        << BSON("coast" << 2))))));
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_TRUE(configA == configB);
@@ -869,7 +912,7 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityInvalid) {
                            << BSON("_id" << 2 << "host"
                                          << "localhost:3828"
                                          << "votes" << 0 << "priority" << 0)) << "settings"
-             << BSON("heartbeatTimeoutSecs" << -20))));
+             << BSON("heartbeatIntervalMillis" << -5000 << "heartbeatTimeoutSecs" << -20))));
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_NOT_OK(configA.validate());
     ASSERT_NOT_OK(configB.validate());

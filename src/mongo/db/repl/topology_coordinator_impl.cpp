@@ -67,10 +67,6 @@ int indexOfIterator(const std::vector<T>& vec, typename std::vector<T>::const_it
     return static_cast<int>(it - vec.begin());
 }
 
-// Interval between the time the last heartbeat from a node was received successfully, or
-// the time when we gave up retrying, and when the next heartbeat should be sent to a target.
-const auto kHeartbeatInterval = Seconds{2};
-
 // Maximum number of retries for a failed heartbeat.
 const int kMaxHeartbeatRetries = 2;
 
@@ -902,12 +898,12 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
         (hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
         (alreadyElapsed < _rsConfig.getHeartbeatTimeoutPeriodMillis())) {
         if (isUnauthorized) {
-            nextHeartbeatStartDate = now + kHeartbeatInterval;
+            nextHeartbeatStartDate = now + _rsConfig.getHeartbeatInterval();
         } else {
             nextHeartbeatStartDate = now;
         }
     } else {
-        nextHeartbeatStartDate = now + kHeartbeatInterval;
+        nextHeartbeatStartDate = now + _rsConfig.getHeartbeatInterval();
     }
 
     if (hbResponse.isOK() && hbResponse.getValue().hasConfig()) {
@@ -1047,7 +1043,8 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updateHeartbeatDataImpl(
                           << " and is only "
                           << (latestOpTime.getSecs() - highestPriorityMemberOptime.getSecs())
                           << " seconds behind me";
-                    const Date_t until = now + VoteLease::leaseTime + kHeartbeatInterval;
+                    const Date_t until =
+                        now + VoteLease::leaseTime + _rsConfig.getHeartbeatInterval();
                     if (_electionSleepUntil < until) {
                         _electionSleepUntil = until;
                     }
@@ -1520,6 +1517,9 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
     if (_rsConfig.isConfigServer()) {
         response->append("configsvr", true);
     }
+
+    response->append("heartbeatIntervalMillis",
+                     durationCount<Milliseconds>(_rsConfig.getHeartbeatInterval()));
 
     response->append("members", membersOut);
     *result = Status::OK();

@@ -48,6 +48,7 @@ const size_t ReplicaSetConfig::kMaxVotingMembers;
 const std::string ReplicaSetConfig::kConfigServerFieldName = "configsvr";
 const std::string ReplicaSetConfig::kVersionFieldName = "version";
 const std::string ReplicaSetConfig::kMajorityWriteConcernModeName = "$majority";
+const Milliseconds ReplicaSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
 
 namespace {
@@ -65,6 +66,7 @@ const std::string kLegalConfigTopFieldNames[] = {kIdFieldName,
                                                  kProtocolVersionFieldName,
                                                  ReplicaSetConfig::kConfigServerFieldName};
 
+const std::string kHeartbeatIntervalFieldName = "heartbeatIntervalMillis";
 const std::string kHeartbeatTimeoutFieldName = "heartbeatTimeoutSecs";
 const std::string kChainingAllowedFieldName = "chainingAllowed";
 const std::string kGetLastErrorDefaultsFieldName = "getLastErrorDefaults";
@@ -74,6 +76,7 @@ const std::string kGetLastErrorModesFieldName = "getLastErrorModes";
 
 ReplicaSetConfig::ReplicaSetConfig()
     : _isInitialized(false),
+      _heartbeatInterval(kDefaultHeartbeatInterval),
       _heartbeatTimeoutPeriod(0),
       _protocolVersion(0),
       _configServer(false) {}
@@ -154,6 +157,20 @@ Status ReplicaSetConfig::initialize(const BSONObj& cfg) {
 }
 
 Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
+    //
+    // Parse heartbeatIntervalMillis
+    //
+    long long heartbeatIntervalMillis;
+    Status hbIntervalStatus =
+        bsonExtractIntegerFieldWithDefault(settings,
+                                           kHeartbeatIntervalFieldName,
+                                           durationCount<Milliseconds>(kDefaultHeartbeatInterval),
+                                           &heartbeatIntervalMillis);
+    if (!hbIntervalStatus.isOK()) {
+        return hbIntervalStatus;
+    }
+    _heartbeatInterval = Milliseconds(heartbeatIntervalMillis);
+
     //
     // Parse heartbeatTimeoutSecs
     //
@@ -274,6 +291,13 @@ Status ReplicaSetConfig::validate() const {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Replica set configuration must have non-empty "
                                     << kIdFieldName << " field");
+    }
+    if (_heartbeatInterval < Milliseconds(0)) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << kSettingsFieldName << '.' << kHeartbeatIntervalFieldName
+                                    << " field value must be non-negative, "
+                                       "but found "
+                                    << durationCount<Milliseconds>(_heartbeatInterval));
     }
     if (_heartbeatTimeoutPeriod < Seconds(0)) {
         return Status(ErrorCodes::BadValue,
@@ -472,6 +496,10 @@ const MemberConfig* ReplicaSetConfig::findMemberByHostAndPort(const HostAndPort&
     return idx != -1 ? &getMemberAt(idx) : NULL;
 }
 
+Milliseconds ReplicaSetConfig::getHeartbeatInterval() const {
+    return _heartbeatInterval;
+}
+
 ReplicaSetTag ReplicaSetConfig::findTag(StringData key, StringData value) const {
     return _tagConfig.findTag(key, value);
 }
@@ -548,6 +576,8 @@ BSONObj ReplicaSetConfig::toBSON() const {
 
     BSONObjBuilder settingsBuilder(configBuilder.subobjStart(kSettingsFieldName));
     settingsBuilder.append(kChainingAllowedFieldName, _chainingAllowed);
+    settingsBuilder.appendIntOrLL(kHeartbeatIntervalFieldName,
+                                  durationCount<Milliseconds>(_heartbeatInterval));
     settingsBuilder.appendIntOrLL(kHeartbeatTimeoutFieldName,
                                   durationCount<Seconds>(_heartbeatTimeoutPeriod));
 
