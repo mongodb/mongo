@@ -249,13 +249,6 @@ void auth(RunCommandHook runCommand,
     if (!response.isOK())
         return handler(std::move(response));
 
-    if (mechanism != kMechanismMongoCR && mechanism != kMechanismMongoX509 &&
-        mechanism != kMechanismSaslPlain && mechanism != kMechanismGSSAPI &&
-        mechanism != kMechanismScramSha1) {
-        return handler(
-            {ErrorCodes::AuthenticationFailed, "Auth mechanism " + mechanism + " not supported."});
-    }
-
     if (params.hasField(saslCommandUserDBFieldName) && params.hasField(kUserSourceFieldName)) {
         return handler({ErrorCodes::AuthenticationFailed,
                         "You cannot specify both 'db' and 'userSource'. Please use only 'db'."});
