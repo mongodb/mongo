@@ -975,7 +975,6 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_GLOBAL *txn_global;
-	uint64_t txnid;
 
 	if (inmem_splitp != NULL)
 		*inmem_splitp = 0;
