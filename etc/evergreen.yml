@@ -2093,8 +2093,6 @@ buildvariants:
   - name: replica_sets_WT_ese
   - name: replicasets_auth
   - name: replication_auth
-  - name: rlp
-  - name: rlp_WT
   - name: sasl
   - name: sharding_auth
   - name: sharding_WT_ese
@@ -2961,6 +2959,8 @@ buildvariants:
   - name: mmap
   - name: jsCore_auth
   - name: replicasets_auth
+  - name: rlp # RLP only runs on this variant
+  - name: rlp_WT
   - name: sasl
   - name: sharding_auth
   - name: snmp
