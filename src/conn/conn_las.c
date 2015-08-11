@@ -38,19 +38,6 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 }
 
 /*
- * __las_drop --
- *	Discard the database's lookaside store.
- */
-static int
-__las_drop(WT_SESSION_IMPL *session)
-{
-	const char *drop_cfg[] = {
-	    WT_CONFIG_BASE(session, WT_SESSION_drop), "force=true", NULL };
-
-	return (__wt_session_drop(session, WT_LASFILE_URI, drop_cfg));
-}
-
-/*
  * __las_cursor_create --
  *	Open a new lookaside file cursor.
  */
@@ -102,6 +89,8 @@ __wt_las_create(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	const char *drop_cfg[] = {
+	    WT_CONFIG_BASE(session, WT_SESSION_drop), "force=true", NULL };
 
 	conn = S2C(session);
 
@@ -118,7 +107,7 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	F_SET(session, WT_SESSION_LOOKASIDE_CURSOR);
 
 	/* Discard any previous incarnation of the file. */
-	WT_RET(__las_drop(session));
+	WT_RET(__wt_session_drop(session, WT_LASFILE_URI, drop_cfg));
 
 	/* Re-create the file. */
 	WT_RET(__wt_session_create(
