@@ -97,6 +97,7 @@ env.CppUnitTest(
         "cluster_cursor_manager_test.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/util/clock_source_mock",
         "cluster_client_cursor_mock",
         "cluster_cursor_manager",
     ],

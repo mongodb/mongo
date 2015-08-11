@@ -34,6 +34,7 @@
 
 #include "mongo/s/query/cluster_client_cursor_mock.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -44,11 +45,20 @@ const NamespaceString nss("test.collection");
 
 class ClusterCursorManagerTest : public unittest::Test {
 protected:
+    ClusterCursorManagerTest() : _manager(&_clockSourceMock) {}
+
     /**
      * Returns an unowned pointer to the manager owned by this test fixture.
      */
     ClusterCursorManager* getManager() {
         return &_manager;
+    }
+
+    /**
+     * Returns an unowned pointer to the mock clock source owned by this test fixture.
+     */
+    ClockSourceMock* getClockSource() {
+        return &_clockSourceMock;
     }
 
     /**
@@ -87,6 +97,8 @@ private:
     // We use std::list<> for this member (instead of std::vector<>, for example) so that we can
     // keep references that don't get invalidated as the list grows.
     std::list<bool> _cursorKilledFlags;
+
+    ClockSourceMock _clockSourceMock;
 
     ClusterCursorManager _manager;
 };
@@ -219,6 +231,27 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorWrongCursorId) {
               getManager()->checkOutCursor(nss, cursorId + 1).getStatus());
 }
 
+// Test that checking out a cursor updates the 'last active' time associated with the cursor to the
+// current time.
+TEST_F(ClusterCursorManagerTest, CheckOutCursorUpdateActiveTime) {
+    auto registeredCursor =
+        getManager()->registerCursor(allocateMockCursor(),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal);
+    Date_t cursorRegistrationTime = getClockSource()->now();
+    CursorId cursorId = registeredCursor.getCursorId();
+    registeredCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+    getClockSource()->advance(stdx::chrono::milliseconds(1));
+    auto checkedOutCursor = getManager()->checkOutCursor(nss, cursorId);
+    ASSERT_OK(checkedOutCursor.getStatus());
+    checkedOutCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+    getManager()->killMortalCursorsInactiveSince(cursorRegistrationTime);
+    ASSERT(!isMockCursorKilled(0));
+    getManager()->reapZombieCursors();
+    ASSERT(!isMockCursorKilled(0));
+}
+
 // Test that killing a cursor by id successfully kills the cursor.
 TEST_F(ClusterCursorManagerTest, KillCursorBasic) {
     auto pinnedCursor =
@@ -291,6 +324,82 @@ TEST_F(ClusterCursorManagerTest, KillCursorWrongCursorId) {
     registeredCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
     Status killResult = getManager()->killCursor(nss, cursorId + 1);
     ASSERT_EQ(ErrorCodes::CursorNotFound, killResult);
+}
+
+// Test that killing all mortal expired cursors correctly kills a mortal expired cursor.
+TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceBasic) {
+    auto pinnedCursor =
+        getManager()->registerCursor(allocateMockCursor(),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal);
+    pinnedCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+    getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
+    ASSERT(!isMockCursorKilled(0));
+    getManager()->reapZombieCursors();
+    ASSERT(isMockCursorKilled(0));
+}
+
+// Test that killing all mortal expired cursors does not kill a cursor that is unexpired.
+TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipUnexpired) {
+    Date_t timeBeforeCursorCreation = getClockSource()->now();
+    getClockSource()->advance(stdx::chrono::milliseconds(1));
+    auto pinnedCursor =
+        getManager()->registerCursor(allocateMockCursor(),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal);
+    pinnedCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+    getManager()->killMortalCursorsInactiveSince(timeBeforeCursorCreation);
+    ASSERT(!isMockCursorKilled(0));
+    getManager()->reapZombieCursors();
+    ASSERT(!isMockCursorKilled(0));
+}
+
+// Test that killing all mortal expired cursors does not kill a cursor that is immortal.
+TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipImmortal) {
+    auto pinnedCursor =
+        getManager()->registerCursor(allocateMockCursor(),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Immortal);
+    pinnedCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+    getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
+    ASSERT(!isMockCursorKilled(0));
+    getManager()->reapZombieCursors();
+    ASSERT(!isMockCursorKilled(0));
+}
+
+// Test that killing all mortal expired cursors kills the correct cursors when multiple cursors are
+// registered.
+TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceMultipleCursors) {
+    const size_t numCursors = 10;
+    const size_t numKilledCursorsExpected = 3;
+    Date_t cutoff;
+    for (size_t i = 0; i < numCursors; ++i) {
+        if (i < numKilledCursorsExpected) {
+            cutoff = getClockSource()->now();
+        }
+        auto pinnedCursor =
+            getManager()->registerCursor(allocateMockCursor(),
+                                         nss,
+                                         ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                         ClusterCursorManager::CursorLifetime::Mortal);
+        pinnedCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+        getClockSource()->advance(stdx::chrono::milliseconds(1));
+    }
+    getManager()->killMortalCursorsInactiveSince(cutoff);
+    for (size_t i = 0; i < numCursors; ++i) {
+        ASSERT(!isMockCursorKilled(i));
+    }
+    getManager()->reapZombieCursors();
+    for (size_t i = 0; i < numCursors; ++i) {
+        if (i < numKilledCursorsExpected) {
+            ASSERT(isMockCursorKilled(i));
+        } else {
+            ASSERT(!isMockCursorKilled(i));
+        }
+    }
 }
 
 // Test that killing all cursors successfully kills all cursors.

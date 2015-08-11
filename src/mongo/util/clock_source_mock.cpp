@@ -32,8 +32,6 @@
 
 namespace mongo {
 
-ClockSourceMock::ClockSourceMock(Date_t now) : _now(now) {}
-
 Date_t ClockSourceMock::now() {
     return _now;
 }

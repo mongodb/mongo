@@ -56,6 +56,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 
@@ -77,6 +78,7 @@ const stdx::chrono::seconds CatalogManagerReplSetTestFixture::kFutureTimeout{5};
 
 void CatalogManagerReplSetTestFixture::setUp() {
     _service = stdx::make_unique<ServiceContextNoop>();
+    _service->setClockSource(stdx::make_unique<ClockSourceMock>());
     _messagePort = stdx::make_unique<MessagingPortMock>();
     _client = _service->makeClient("CatalogManagerReplSetTestFixture", _messagePort.get());
     _opCtx = _client->makeOperationContext();
@@ -110,7 +112,9 @@ void CatalogManagerReplSetTestFixture::setUp() {
 
     // For now initialize the global grid object. All sharding objects will be accessible
     // from there until we get rid of it.
-    grid.init(std::move(cm), std::move(shardRegistry));
+    grid.init(std::move(cm),
+              std::move(shardRegistry),
+              stdx::make_unique<ClusterCursorManager>(_service->getClockSource()));
 }
 
 void CatalogManagerReplSetTestFixture::tearDown() {

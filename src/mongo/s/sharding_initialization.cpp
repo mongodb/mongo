@@ -110,7 +110,9 @@ Status initializeGlobalShardingState(const ConnectionString& configCS) {
 
     shardRegistry->init(catalogManager.get());
     shardRegistry->startup();
-    grid.init(std::move(catalogManager), std::move(shardRegistry));
+    grid.init(std::move(catalogManager),
+              std::move(shardRegistry),
+              stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getClockSource()));
 
     return Status::OK();
 }

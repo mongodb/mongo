@@ -47,17 +47,17 @@ Grid grid;
 Grid::Grid() : _allowLocalShard(true) {}
 
 void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
-                std::unique_ptr<ShardRegistry> shardRegistry) {
+                std::unique_ptr<ShardRegistry> shardRegistry,
+                std::unique_ptr<ClusterCursorManager> cursorManager) {
     invariant(!_catalogManager);
     invariant(!_catalogCache);
     invariant(!_shardRegistry);
     invariant(!_cursorManager);
 
     _catalogManager = std::move(catalogManager);
-    _shardRegistry = std::move(shardRegistry);
-
     _catalogCache = stdx::make_unique<CatalogCache>(_catalogManager.get());
-    _cursorManager = stdx::make_unique<ClusterCursorManager>();
+    _shardRegistry = std::move(shardRegistry);
+    _cursorManager = std::move(_cursorManager);
 }
 
 StatusWith<std::shared_ptr<DBConfig>> Grid::implicitCreateDb(OperationContext* txn,

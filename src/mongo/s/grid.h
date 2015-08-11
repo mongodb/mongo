@@ -56,15 +56,15 @@ public:
     Grid();
 
     /**
-     * Called at startup time so the global sharding services (catalog manager, shard registry)
-     * can be set. This method must be called once and once only for the lifetime of the
-     * service.
+     * Called at startup time so the global sharding services can be set. This method must be called
+     * once and once only for the lifetime of the service.
      *
      * NOTE: Unit-tests are allowed to call it more than once, provided they reset the object's
      *       state using clearForUnitTests.
      */
     void init(std::unique_ptr<CatalogManager> catalogManager,
-              std::unique_ptr<ShardRegistry> shardRegistry);
+              std::unique_ptr<ShardRegistry> shardRegistry,
+              std::unique_ptr<ClusterCursorManager> cursorManager);
 
     /**
      * Implicitly creates the specified database as non-sharded.

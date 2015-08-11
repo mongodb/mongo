@@ -32,6 +32,7 @@
 
 #include <set>
 
+#include "mongo/util/clock_source.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -136,8 +137,11 @@ void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
     returnCursor(CursorState::NotExhausted);
 }
 
-ClusterCursorManager::ClusterCursorManager()
-    : _pseudoRandom(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()) {}
+ClusterCursorManager::ClusterCursorManager(ClockSource* clockSource)
+    : _pseudoRandom(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()),
+      _clockSource(clockSource) {
+    invariant(_clockSource);
+}
 
 ClusterCursorManager::~ClusterCursorManager() {
     invariant(_cursorIdPrefixToNamespaceMap.empty());
@@ -185,8 +189,8 @@ ClusterCursorManager::PinnedCursor ClusterCursorManager::registerCursor(
     } while (cursorId == 0 || entryMap.count(cursorId) > 0);
 
     // Create a new CursorEntry and register it in the CursorEntryContainer's map.
-    auto emplaceResult =
-        entryMap.emplace(cursorId, CursorEntry(std::move(cursor), cursorType, cursorLifetime));
+    auto emplaceResult = entryMap.emplace(
+        cursorId, CursorEntry(std::move(cursor), cursorType, cursorLifetime, _clockSource->now()));
     invariant(emplaceResult.second);
 
     // Pin and return the cursor.  Note that pinning a cursor transfers ownership of the underlying
@@ -211,6 +215,8 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     if (!cursor) {
         return cursorInUseStatus(nss, cursorId);
     }
+
+    entry->setLastActive(_clockSource->now());
 
     // Note that pinning a cursor transfers ownership of the underlying ClusterClientCursor object
     // to the pin; the CursorEntry is left with a null ClusterClientCursor.
@@ -251,6 +257,20 @@ Status ClusterCursorManager::killCursor(const NamespaceString& nss, CursorId cur
     entry->setKillPending();
 
     return Status::OK();
+}
+
+void ClusterCursorManager::killMortalCursorsInactiveSince(Date_t cutoff) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    for (auto& nsContainerPair : _namespaceToContainerMap) {
+        for (auto& cursorIdEntryPair : nsContainerPair.second.entryMap) {
+            CursorEntry& entry = cursorIdEntryPair.second;
+            if (entry.getLifetimeType() == CursorLifetime::Mortal &&
+                entry.getLastActive() <= cutoff) {
+                entry.setKillPending();
+            }
+        }
+    }
 }
 
 void ClusterCursorManager::killAllCursors() {

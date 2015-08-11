@@ -39,9 +39,9 @@ namespace mongo {
 class ClockSourceMock final : public ClockSource {
 public:
     /**
-     * Constructs a ClockSourceMock with the current time initialized to the given value.
+     * Constructs a ClockSourceMock with the current time set to the Unix epoch.
      */
-    explicit ClockSourceMock(Date_t now);
+    ClockSourceMock() = default;
 
     Date_t now() final;
 

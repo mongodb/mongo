@@ -37,9 +37,11 @@
 #include "mongo/platform/random.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
+class ClockSource;
 template <typename T>
 class StatusWith;
 
@@ -61,7 +63,6 @@ class StatusWith;
  * No public methods throw exceptions, and all public methods are thread-safe.
  *
  * TODO: Add maxTimeMS support.  SERVER-19410.
- * TODO: Add method "size_t killCursorsIdleSince(Date_t)".  SERVER-18774.
  * TODO: Add method "size_t killCursorsOnNamespace(const NamespaceString& nss)" for
  *       dropCollection()?
  */
@@ -194,8 +195,11 @@ public:
 
     /**
      * Constructs an empty manager.
+     *
+     * Does not take ownership of 'clockSource'.  'clockSource' must refer to a non-null clock
+     * source that is valid for the lifetime of the constructed ClusterCursorManager.
      */
-    ClusterCursorManager();
+    explicit ClusterCursorManager(ClockSource* clockSource);
 
     /**
      * Can only be called if the manager no longer owns any cursors.
@@ -228,13 +232,15 @@ public:
      * returns an error Status with code CursorInUse.  If the given cursor is not registered or has
      * a pending kill, returns an error Status with code CursorNotFound.
      *
+     * This method updates the 'last active' time associated with the cursor to the current time.
+     *
      * Does not block.
      */
     StatusWith<PinnedCursor> checkOutCursor(const NamespaceString& nss, CursorId cursorId);
 
     /**
      * Informs the manager that the given cursor should be killed.  The cursor need not necessarily
-     * be in the 'idle' state.
+     * be in the 'idle' state, and the lifetime type of the cursor is ignored.
      *
      * If the given cursor is not registered, returns an error Status with code CursorNotFound.
      * Otherwise, marks the cursor as 'kill pending' and returns Status::OK().
@@ -244,7 +250,16 @@ public:
     Status killCursor(const NamespaceString& nss, CursorId cursorId);
 
     /**
-     * Informs the manager that all currently-registered cursors should be killed.
+     * Informs the manager that all mortal cursors with a 'last active' time equal to or earlier
+     * than 'cutoff' should be killed.  The cursors need not necessarily be in the 'idle' state.
+     *
+     * Does not block.
+     */
+    void killMortalCursorsInactiveSince(Date_t cutoff);
+
+    /**
+     * Informs the manager that all currently-registered cursors should be killed (regardless of
+     * pinned status or lifetime type).
      *
      * Does not block.
      */
@@ -332,8 +347,12 @@ private:
 
         CursorEntry(std::unique_ptr<ClusterClientCursor> cursor,
                     CursorType cursorType,
-                    CursorLifetime cursorLifetime)
-            : _cursor(std::move(cursor)), _cursorType(cursorType), _cursorLifetime(cursorLifetime) {
+                    CursorLifetime cursorLifetime,
+                    Date_t lastActive)
+            : _cursor(std::move(cursor)),
+              _cursorType(cursorType),
+              _cursorLifetime(cursorLifetime),
+              _lastActive(lastActive) {
             invariant(_cursor);
         }
 
@@ -342,13 +361,15 @@ private:
             : _cursor(std::move(other._cursor)),
               _killPending(std::move(other._killPending)),
               _cursorType(std::move(other._cursorType)),
-              _cursorLifetime(std::move(other._cursorLifetime)) {}
+              _cursorLifetime(std::move(other._cursorLifetime)),
+              _lastActive(std::move(other._lastActive)) {}
 
         CursorEntry& operator=(CursorEntry&& other) {
             _cursor = std::move(other._cursor);
             _killPending = std::move(other._killPending);
             _cursorType = std::move(other._cursorType);
             _cursorLifetime = std::move(other._cursorLifetime);
+            _lastActive = std::move(other._lastActive);
             return *this;
         }
 #else
@@ -366,6 +387,10 @@ private:
 
         CursorLifetime getLifetimeType() const {
             return _cursorLifetime;
+        }
+
+        Date_t getLastActive() const {
+            return _lastActive;
         }
 
         /**
@@ -389,11 +414,16 @@ private:
             _killPending = true;
         }
 
+        void setLastActive(Date_t lastActive) {
+            _lastActive = lastActive;
+        }
+
     private:
         std::unique_ptr<ClusterClientCursor> _cursor;
         bool _killPending = false;
         CursorType _cursorType = CursorType::NamespaceNotSharded;
         CursorLifetime _cursorLifetime = CursorLifetime::Mortal;
+        Date_t _lastActive;
     };
 
     /**
@@ -430,8 +460,11 @@ private:
     // Synchronizes access to all private state.
     mutable stdx::mutex _mutex;
 
-    // Randomness source for cursor id generation.
+    // Randomness source.  Used for cursor id generation.
     PseudoRandom _pseudoRandom;
+
+    // Clock source.  Used when the 'last active' time for a cursor needs to be set/updated.
+    ClockSource* _clockSource;
 
     // Map from cursor id prefix to associated namespace.  Exists only to provide namespace lookup
     // for (deprecated) getNamespaceForCursorId() method.
