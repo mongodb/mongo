@@ -118,3 +118,17 @@ t.drop();
 t.save({loc: [0,0]})
 res = t.ensureIndex({ loc: "2dsphere" }, { finestIndexedLevel: 30, coarsestIndexedLevel: -1 });
 assert.commandFailed(res);
+
+// Ensure polygon which previously triggered an assertion error in SERVER-19674
+// is able to be indexed.
+t.drop();
+t.insert({
+    loc: {
+        "type" : "Polygon",
+        "coordinates" : [
+            [[-45, 0], [-44.875, 0], [-44.875, 0.125], [-45, 0.125], [-45,0]]
+        ]
+    }
+});
+res = t.createIndex({loc: "2dsphere"});
+assert.commandWorked(res);

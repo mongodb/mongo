@@ -35,10 +35,6 @@ LogMessageInfo::LogMessageInfo() : LogMessageBase(std::move(mongo::log())) { }
 LogMessageWarning::LogMessageWarning(const char* file, int line) :
         LogMessageBase(mongo::warning(), file, line) { }
 
-LogMessageWarning::~LogMessageWarning() {
-    mongo::logContext(NULL);
-}
-
 LogMessageFatal::LogMessageFatal(const char* file, int line) :
         LogMessageBase(mongo::severe(), file, line) { }
 
