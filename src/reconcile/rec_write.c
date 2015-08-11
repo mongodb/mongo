@@ -5506,6 +5506,12 @@ err:			__wt_scr_free(session, &tkey);
 			return (EBUSY);
 	} else {
 		/*
+		 * Track the page's maximum transaction ID (used to decide if
+		 * we're likely to be able to evict this page in the future).
+		 */
+		mod->rec_max_txn = r->max_txn;
+
+		/*
 		 * Track the tree's maximum transaction ID (used to decide if
 		 * it's safe to discard the tree). Reconciliation for eviction
 		 * is multi-threaded, only update the tree's maximum transaction

@@ -975,6 +975,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_GLOBAL *txn_global;
+	uint64_t txnid;
 
 	if (inmem_splitp != NULL)
 		*inmem_splitp = 0;
@@ -1044,9 +1045,23 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * for existing hazard pointers, the checkpoint thread reconciling an
 	 * internal page acquires hazard pointers on child pages it reads, and
 	 * is blocked by the exclusive lock.
-	 *
-	 * KEITH: this comment should move to somewhere else.
 	 */
+	if (page->read_gen != WT_READGEN_OLDEST) {
+		/*
+		 * If eviction is stuck, we'll use the lookaside file and so
+		 * only care if all changes on the page are committed.
+		 */
+		if (__wt_eviction_aggressive(session)) {
+			if (__wt_page_is_modified(page) &&
+			    !__wt_txn_committed(session, mod->update_txn))
+				return (0);
+		} else {
+			if (!__wt_txn_visible_all(session,
+			    __wt_page_is_modified(page) ?
+			    mod->update_txn : mod->rec_max_txn))
+				return (0);
+		}
+	}
 
 	/*
 	 * If the page was recently split in-memory, don't force it out: we

@@ -209,6 +209,9 @@ struct __wt_page_modify {
 	/* Avoid checking for obsolete updates during checkpoints. */
 	uint64_t obsolete_check_txn;
 
+	/* The largest transaction ID seen on the page by reconciliation. */
+	uint64_t rec_max_txn;
+
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
 
