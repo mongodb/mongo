@@ -521,8 +521,15 @@ bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = NULL) {
 #else
     int tmp;
     bool ret = (pid.toNative() == waitpid(pid.toNative(), &tmp, (block ? 0 : WNOHANG)));
-    if (exit_code)
-        *exit_code = WEXITSTATUS(tmp);
+    if (ret && exit_code) {
+        if (WIFEXITED(tmp)) {
+            *exit_code = WEXITSTATUS(tmp);
+        } else if (WIFSIGNALED(tmp)) {
+            *exit_code = -WTERMSIG(tmp);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }
     return ret;
 
 #endif
