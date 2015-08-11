@@ -118,7 +118,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_statlog_destroy(session, 1));
 	WT_TRET(__wt_evict_destroy(session));
 
-	/* Close the lookaside file cursors, after all eviction is complete. */
+	/* Shut down the lookaside file, after all eviction is complete. */
 	WT_TRET(__wt_las_destroy(session));
 
 	/* Close open data handles. */
