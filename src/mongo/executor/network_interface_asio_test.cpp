@@ -102,7 +102,10 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
     auto stream = streamFactory().blockUntilStreamExists(testHost);
 
     // Allow stream to connect.
-    stream->unblock();
+    {
+        stream->waitUntilBlocked();
+        auto guard = MakeGuard([&] { stream->unblock(); });
+    }
 
     log() << "connected";
 
