@@ -107,11 +107,11 @@ err:	if (cursor_arg == NULL)
 }
 
 /*
- * __col_update --
+ * __col_instantiate --
  *	Update a column-store page entry based on a lookaside file update list.
  */
 static int
-__col_update(WT_SESSION_IMPL *session,
+__col_instantiate(WT_SESSION_IMPL *session,
     uint64_t recno, WT_REF *ref, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
 	/* Search the page and add updates. */
@@ -121,11 +121,11 @@ __col_update(WT_SESSION_IMPL *session,
 }
 
 /*
- * __row_update --
+ * __row_instantiate --
  *	Update a row-store page entry based on a lookaside file update list.
  */
 static int
-__row_update(WT_SESSION_IMPL *session,
+__row_instantiate(WT_SESSION_IMPL *session,
     WT_ITEM *key, WT_REF *ref, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
 	/* Search the page and add updates. */
@@ -247,7 +247,7 @@ __las_page_instantiate(
 				break;
 
 			if (first_upd != NULL) {
-				WT_ERR(__col_update(session,
+				WT_ERR(__col_instantiate(session,
 				    current_recno, ref, &cbt, first_upd));
 				first_upd = NULL;
 			}
@@ -261,7 +261,7 @@ __las_page_instantiate(
 				break;
 
 			if (first_upd != NULL) {
-				WT_ERR(__row_update(session,
+				WT_ERR(__row_instantiate(session,
 				    current_key, ref, &cbt, first_upd));
 				first_upd = NULL;
 			}
@@ -286,12 +286,12 @@ __las_page_instantiate(
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			WT_ERR(__col_update(session,
+			WT_ERR(__col_instantiate(session,
 			    current_recno, ref, &cbt, first_upd));
 			first_upd = NULL;
 			break;
 		case WT_PAGE_ROW_LEAF:
-			WT_ERR(__row_update(session,
+			WT_ERR(__row_instantiate(session,
 			    current_key, ref, &cbt, first_upd));
 			first_upd = NULL;
 			break;
