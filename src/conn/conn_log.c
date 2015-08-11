@@ -405,7 +405,8 @@ typedef struct {
 /*
  * __wt_log_wrlsn --
  *	Process written log slots and attempt to coalesce them if the LSNs
- *	are contiguous.  Must be called with the log slot lock held.
+ *	are contiguous.  The purpose of this function is to advance the
+ *	write_lsn in LSN order after the buffer is written to the log file.
  */
 int
 __wt_log_wrlsn(WT_SESSION_IMPL *session)
@@ -550,12 +551,12 @@ __log_wrlsn_server(void *arg)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	int dir_lock;
+	int direct_lock;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	dir_lock = 0;
+	direct_lock = 0;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Write out any log record buffers.
@@ -568,16 +569,16 @@ __log_wrlsn_server(void *arg)
 	 * be straggling log writes that need to be written.
 	 */
 	WT_ERR(__wt_writelock(session, log->log_direct_lock));
-	dir_lock = 1;
+	direct_lock = 1;
 	WT_ERR(__wt_log_force_write(session, 0, 0));
 	F_CLR(log, WT_LOG_FORCE_CONSOLIDATE);
-	dir_lock = 0;
+	direct_lock = 0;
 	WT_ERR(__wt_writeunlock(session, log->log_direct_lock));
 	WT_ERR(__wt_log_wrlsn(session));
 	if (0) {
 err:		__wt_err(session, ret, "log wrlsn server error");
 	}
-	if (dir_lock)
+	if (direct_lock)
 		(void)__wt_writeunlock(session, log->log_direct_lock);
 	return (WT_THREAD_RET_VALUE);
 }
@@ -593,12 +594,12 @@ __log_server(void *arg)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	u_int arch_lock, dir_lock;
+	u_int arch_lock, direct_lock;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	arch_lock = dir_lock = 0;
+	arch_lock = direct_lock = 0;
 	/*
 	 * The log server thread does a variety of work.  It forces out any
 	 * buffered log writes.  It pre-allocates log files and it performs
@@ -619,9 +620,9 @@ __log_server(void *arg)
 		 * in the case of a synchronous buffer.  We end up with a hang.
 		 */
 		WT_ERR(__wt_readlock(session, log->log_direct_lock));
-		dir_lock = 1;
+		direct_lock = 1;
 		WT_ERR(__wt_log_force_write(session, 1, 0));
-		dir_lock = 0;
+		direct_lock = 0;
 		WT_ERR(__wt_readunlock(session, log->log_direct_lock));
 		/*
 		 * Perform log pre-allocation.
@@ -652,7 +653,7 @@ __log_server(void *arg)
 	if (0) {
 err:		__wt_err(session, ret, "log server error");
 	}
-	if (dir_lock)
+	if (direct_lock)
 		(void)__wt_readunlock(session, log->log_direct_lock);
 	if (arch_lock)
 		(void)__wt_writeunlock(session, log->log_archive_lock);
