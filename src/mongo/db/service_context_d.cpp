@@ -50,6 +50,7 @@
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/system_clock_source.h"
 #include "mongo/util/system_tick_source.h"
 
 namespace mongo {
@@ -57,6 +58,7 @@ namespace mongo {
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
     setGlobalServiceContext(stdx::make_unique<ServiceContextMongoD>());
     getGlobalServiceContext()->setTickSource(stdx::make_unique<SystemTickSource>());
+    getGlobalServiceContext()->setClockSource(stdx::make_unique<SystemClockSource>());
     return Status::OK();
 }
 

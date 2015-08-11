@@ -36,6 +36,7 @@
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/tick_source.h"
 
 namespace mongo {
@@ -308,16 +309,17 @@ public:
     virtual OpObserver* getOpObserver() = 0;
 
     /**
-     * Returns the tick source set in this context.
+     * Returns the tick/clock source set in this context.
      */
     TickSource* getTickSource() const;
+    ClockSource* getClockSource() const;
 
     /**
-     * Replaces the current tick source with a new one. In other words, the old tick source
-     * will be destroyed. So make sure that no one is using the old tick source when
-     * calling this.
+     * Replaces the current tick/clock source with a new one. In other words, the old source will be
+     * destroyed. So make sure that no one is using the old source when calling this.
      */
     void setTickSource(std::unique_ptr<TickSource> newSource);
+    void setClockSource(std::unique_ptr<ClockSource> newSource);
 
 protected:
     ServiceContext() = default;
@@ -341,6 +343,7 @@ private:
     ClientSet _clients;
 
     std::unique_ptr<TickSource> _tickSource;
+    std::unique_ptr<ClockSource> _clockSource;
 };
 
 /**

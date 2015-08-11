@@ -147,8 +147,16 @@ TickSource* ServiceContext::getTickSource() const {
     return _tickSource.get();
 }
 
+ClockSource* ServiceContext::getClockSource() const {
+    return _clockSource.get();
+}
+
 void ServiceContext::setTickSource(std::unique_ptr<TickSource> newSource) {
     _tickSource = std::move(newSource);
+}
+
+void ServiceContext::setClockSource(std::unique_ptr<ClockSource> newSource) {
+    _clockSource = std::move(newSource);
 }
 
 void ServiceContext::ClientDeleter::operator()(Client* client) const {

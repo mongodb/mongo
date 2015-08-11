@@ -102,6 +102,7 @@ baseSource=[
     'util/stacktrace.cpp',
     'util/static_observer.cpp',
     'util/stringutils.cpp',
+    'util/system_clock_source.cpp',
     'util/system_tick_source.cpp',
     'util/text.cpp',
     'util/time_support.cpp',
