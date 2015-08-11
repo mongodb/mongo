@@ -77,6 +77,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/snapshot_thread.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage_options.h"
@@ -934,6 +935,9 @@ void oplogCheckCloseDatabase(OperationContext* txn, Database* db) {
     _localOplogCollection = nullptr;
 }
 
+
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(replSnapshotThreadThrottleMicros, int, 1000);
+
 SnapshotThread::SnapshotThread(SnapshotManager* manager)
     : _manager(manager), _thread([this] { run(); }) {}
 
@@ -945,6 +949,14 @@ void SnapshotThread::run() {
 
     Timestamp lastTimestamp = {};
     while (true) {
+        {
+            // This block logically belongs at the end of the loop, but having it at the top
+            // simplifies handling of the "continue" cases. It is harmless to do these before the
+            // first run of the loop.
+            _manager->cleanupUnneededSnapshots();
+            sleepmicros(replSnapshotThreadThrottleMicros);  // Throttle by sleeping.
+        }
+
         {
             stdx::unique_lock<stdx::mutex> lock(newOpMutex);
             while (true) {
@@ -1019,9 +1031,6 @@ void SnapshotThread::run() {
             log() << "skipping storage snapshot pass due to write conflict";
             continue;
         }
-
-        // Called outside of all locks.
-        _manager->cleanupUnneededSnapshots();
     }
 }
 
