@@ -137,8 +137,12 @@ func (o ObjectId) MarshalJSON() ([]byte, error) {
 }
 
 func (r RegExp) MarshalJSON() ([]byte, error) {
-	data := fmt.Sprintf(`{ "$regex": "%v", "$options": "%v" }`,
-		r.Pattern, r.Options)
+	pattern, err := Marshal(r.Pattern)
+	if err != nil {
+		return nil, err
+	}
+	data := fmt.Sprintf(`{ "$regex": %v, "$options": "%v" }`,
+		string(pattern), r.Options)
 	return []byte(data), nil
 }
 
