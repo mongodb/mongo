@@ -393,11 +393,17 @@ __evict_review(
 	WT_RET(__wt_reconcile(session, ref, NULL, flags));
 
 	/*
-	 * Success: the page is clean or we've configured for an update/restore
-	 * split.
+	 * Success: assert the page is clean or reconciliation was configured
+	 * for an update/restore split, and if the page is clean, reconciliation
+	 * was configured for a lookaside file or all updates on the page are
+	 * globally visible.
 	 */
 	WT_ASSERT(session,
-	    !__wt_page_is_modified(page) || LF_ISSET(WT_EVICT_UPDATE_RESTORE));
+	    LF_ISSET(WT_EVICT_UPDATE_RESTORE) || !__wt_page_is_modified(page));
+	WT_ASSERT(session,
+	    LF_SET(WT_EVICT_LOOKASIDE) ||
+	    __wt_page_is_modified(page) ||
+	    __wt_txn_visible_all(session, page->modify->rec_max_txn));
 
 	return (0);
 }
