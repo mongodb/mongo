@@ -55,11 +55,11 @@ typedef struct {
 	 * updates into a database side store, restoring them on demand if/when
 	 * the page is read back into memory.
 	 *
-	 * Saving/restoring updates is configured from outside of reconciliation
-	 * (the WT_EVICT_UPDATE_RESTORE flag).  Writing not-yet-visible updates
-	 * is always possible and is preferable to saving/restoring updates --
-	 * the decision is made once we determine if we had to skip updates to
-	 * write the page.
+	 * Both are configured from outside of reconciliation: saving/restoring
+	 * updates is the WT_EVICT_UPDATE_RESTORE flag. Writing not-yet-visible
+	 * updates is the WT_EVICT_LOOKASIDE flag. Both may be set, in which
+	 * case the decision is made once we determine if there are uncommitted
+	 * updates on the page.
 	 */
 	int evict_skipped_updates;
 
