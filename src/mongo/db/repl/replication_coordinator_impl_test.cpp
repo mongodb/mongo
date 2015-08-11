@@ -2586,8 +2586,7 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
                               << 2 << "primaryIndex" << 2 << "term" << 1)));
     getReplCoord()->processReplSetMetadata(metadata.getValue());
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getLastCommittedOpTime());
-    ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1),
-                  getReplCoord()->getCurrentCommittedSnapshot_forTest());
+    ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getCurrentCommittedSnapshotOpTime());
 
     // lower OpTime, should not change
     StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(BSON(
@@ -2678,21 +2677,21 @@ TEST_F(ReplCoordTest, SnapshotCommitting) {
 
     // ensure current snapshot follows price is right rules (closest but not greater than)
     getReplCoord()->setMyLastOptime(time3);
-    ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshot_forTest());
+    ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshotOpTime());
     getReplCoord()->setMyLastOptime(time4);
-    ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshot_forTest());
+    ASSERT_EQUALS(time2, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 
     // ensure current snapshot will not advance beyond existing snapshots
     getReplCoord()->setMyLastOptime(time6);
-    ASSERT_EQUALS(time5, getReplCoord()->getCurrentCommittedSnapshot_forTest());
+    ASSERT_EQUALS(time5, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 
     // ensure current snapshot updates on new snapshot if we are that far
     getReplCoord()->onSnapshotCreate(time6, SnapshotName(4));
-    ASSERT_EQUALS(time6, getReplCoord()->getCurrentCommittedSnapshot_forTest());
+    ASSERT_EQUALS(time6, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 
     // ensure dropping all snapshots should reset the current committed snapshot
     getReplCoord()->dropAllSnapshots();
-    ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshot_forTest());
+    ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshotOpTime());
 }
 
 TEST_F(ReplCoordTest, MoveOpTimeForward) {

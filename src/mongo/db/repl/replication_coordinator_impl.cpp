@@ -248,7 +248,7 @@ ReplicaSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
     return _rsConfig;
 }
 
-OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshot_forTest() {
+OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_currentCommittedSnapshot) {
         return _currentCommittedSnapshot->opTime;
@@ -2749,6 +2749,8 @@ void ReplicationCoordinatorImpl::_processReplSetDeclareElectionWinner_finish(
 }
 
 void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestInterface& request,
+                                                             const OpTime& lastOpTimeFromClient,
+                                                             const ReadConcernArgs& readConcern,
                                                              BSONObjBuilder* builder) {
     if (request.getMetadata().hasField(rpc::kReplSetMetadataFieldName)) {
         rpc::ReplSetMetadata metadata;
@@ -2757,6 +2759,8 @@ void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestI
             stdx::bind(&ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish,
                        this,
                        stdx::placeholders::_1,
+                       lastOpTimeFromClient,
+                       readConcern,
                        &metadata));
 
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -2771,8 +2775,15 @@ void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestI
 }
 
 void ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish(
-    const ReplicationExecutor::CallbackArgs& cbData, rpc::ReplSetMetadata* metadata) {
-    _topCoord->prepareReplResponseMetadata(metadata, getLastCommittedOpTime());
+    const ReplicationExecutor::CallbackArgs& cbData,
+    const OpTime& lastOpTimeFromClient,
+    const ReadConcernArgs& readConcern,
+    rpc::ReplSetMetadata* metadata) {
+    OpTime lastReadableOpTime = readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern
+        ? getCurrentCommittedSnapshotOpTime()
+        : getMyLastOptime();
+    OpTime lastVisibleOpTime = std::max(lastOpTimeFromClient, lastReadableOpTime);
+    _topCoord->prepareReplResponseMetadata(metadata, lastVisibleOpTime, getLastCommittedOpTime());
 }
 
 bool ReplicationCoordinatorImpl::isV1ElectionProtocol() {

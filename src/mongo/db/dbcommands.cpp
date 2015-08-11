@@ -1286,9 +1286,9 @@ bool Command::run(OperationContext* txn,
 
     repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
 
+    repl::ReadConcernArgs readConcern;
     {
         // parse and validate ReadConcernArgs
-        repl::ReadConcernArgs readConcern;
         auto readConcernParseStatus = readConcern.initialize(request.getCommandArgs());
         if (!readConcernParseStatus.isOK()) {
             replyBuilder->setMetadata(rpc::makeEmptyMetadata())
@@ -1343,18 +1343,19 @@ bool Command::run(OperationContext* txn,
 
     BSONObjBuilder metadataBob;
 
-    // For commands from mongos, append some info to help getLastError(w) work.
-    // TODO: refactor out of here as part of SERVER-18326
     bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-
-    if (isReplSet && ShardingState::get(txn)->enabled()) {
-        rpc::ShardingMetadata(
-            repl::ReplClientInfo::forClient(txn->getClient()).getLastOp().getTimestamp(),
-            replCoord->getElectionId()).writeToMetadata(&metadataBob);
-    }
-
     if (isReplSet) {
-        replCoord->prepareReplResponseMetadata(request, &metadataBob);
+        repl::OpTime lastOpTimeFromClient =
+            repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
+        replCoord->prepareReplResponseMetadata(
+            request, lastOpTimeFromClient, readConcern, &metadataBob);
+
+        // For commands from mongos, append some info to help getLastError(w) work.
+        // TODO: refactor out of here as part of SERVER-18326
+        if (ShardingState::get(txn)->enabled()) {
+            rpc::ShardingMetadata(lastOpTimeFromClient.getTimestamp(), replCoord->getElectionId())
+                .writeToMetadata(&metadataBob);
+        }
     }
 
     auto cmdResponse = replyBuilderBob.done();

@@ -193,6 +193,8 @@ public:
                                                        long long* responseTerm);
 
     void prepareReplResponseMetadata(const rpc::RequestInterface& request,
+                                     const OpTime& lastOpTimeFromClient,
+                                     const ReadConcernArgs& readConcern,
                                      BSONObjBuilder* builder) override;
 
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
@@ -213,6 +215,8 @@ public:
     virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name);
 
     virtual void dropAllSnapshots() override;
+
+    virtual OpTime getCurrentCommittedSnapshotOpTime() override;
 
 private:
     AtomicUInt64 _snapshotNameGenerator;

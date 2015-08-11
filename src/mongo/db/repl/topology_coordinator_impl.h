@@ -219,6 +219,7 @@ public:
     virtual bool stepDownIfPending();
     virtual Date_t getStepDownTime() const;
     virtual void prepareReplResponseMetadata(rpc::ReplSetMetadata* metadata,
+                                             const OpTime& lastVisibleOpTime,
                                              const OpTime& lastCommitttedOpTime) const;
     Status processReplSetDeclareElectionWinner(const ReplSetDeclareElectionWinnerArgs& args,
                                                long long* responseTerm);

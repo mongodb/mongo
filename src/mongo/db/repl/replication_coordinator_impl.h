@@ -259,6 +259,8 @@ public:
                                                        long long* responseTerm) override;
 
     void prepareReplResponseMetadata(const rpc::RequestInterface&,
+                                     const OpTime& lastOpTimeFromClient,
+                                     const ReadConcernArgs& readConcern,
                                      BSONObjBuilder* builder) override;
 
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
@@ -282,6 +284,8 @@ public:
 
     virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) override;
 
+    virtual OpTime getCurrentCommittedSnapshotOpTime() override;
+
     // ================== Test support API ===================
 
     /**
@@ -294,11 +298,6 @@ public:
      * Gets the replica set configuration in use by the node.
      */
     ReplicaSetConfig getReplicaSetConfig_forTest();
-
-    /**
-     * Gets the latest OpTime of the currentCommittedSnapshot.
-     */
-    OpTime getCurrentCommittedSnapshot_forTest();
 
     /**
      * Simple wrapper around _setLastOptime_inlock to make it easier to test.
@@ -547,6 +546,8 @@ private:
      * Bottom half of prepareReplResponseMetadata.
      */
     void _prepareReplResponseMetadata_finish(const ReplicationExecutor::CallbackArgs& cbData,
+                                             const OpTime& lastOpTimeFromClient,
+                                             const ReadConcernArgs& readConcern,
                                              rpc::ReplSetMetadata* metadata);
     /**
      * Scheduled to cause the ReplicationCoordinator to reconsider any state that might

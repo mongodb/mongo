@@ -617,6 +617,8 @@ public:
      * Prepares a metadata object describing the current term, primary, and lastOp information.
      */
     virtual void prepareReplResponseMetadata(const rpc::RequestInterface& request,
+                                             const OpTime& lastOpTimeFromClient,
+                                             const ReadConcernArgs& readConcern,
                                              BSONObjBuilder* builder) = 0;
 
     /**
@@ -677,6 +679,11 @@ public:
      * Resets all information related to snapshotting.
      */
     virtual void dropAllSnapshots() = 0;
+
+    /**
+     * Gets the latest OpTime of the currentCommittedSnapshot.
+     */
+    virtual OpTime getCurrentCommittedSnapshotOpTime() = 0;
 
 protected:
     ReplicationCoordinator();

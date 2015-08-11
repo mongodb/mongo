@@ -337,6 +337,8 @@ Status ReplicationCoordinatorMock::processReplSetDeclareElectionWinner(
 }
 
 void ReplicationCoordinatorMock::prepareReplResponseMetadata(const rpc::RequestInterface& request,
+                                                             const OpTime& lastOpTimeFromClient,
+                                                             const ReadConcernArgs& readConcern,
                                                              BSONObjBuilder* builder) {}
 
 Status ReplicationCoordinatorMock::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
@@ -367,6 +369,10 @@ void ReplicationCoordinatorMock::forceSnapshotCreation() {}
 void ReplicationCoordinatorMock::onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) {}
 
 void ReplicationCoordinatorMock::dropAllSnapshots() {}
+
+OpTime ReplicationCoordinatorMock::getCurrentCommittedSnapshotOpTime() {
+    return OpTime();
+}
 
 }  // namespace repl
 }  // namespace mongo
