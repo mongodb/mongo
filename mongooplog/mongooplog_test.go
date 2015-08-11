@@ -5,8 +5,8 @@ import (
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/mgo.v2/bson"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 	"testing"
 )
 
@@ -68,7 +68,6 @@ func TestBasicOps(t *testing.T) {
 
 			// create the collection we are testing against (ignore errors)
 			sess.DB("mongooplog_test").C("data").Create(&mgo.CollectionInfo{})
-			
 
 			// clear out the collection we'll use for testing
 			testColl := sess.DB("mongooplog_test").C("data")
@@ -82,8 +81,10 @@ func TestBasicOps(t *testing.T) {
 				Version:   2,
 				Operation: "i",
 				Namespace: "mongooplog_test.data",
-				Object: bson.M{
-					"_id": 3,
+				Object: bson.D{
+					bson.DocElem{
+						"_id", 3,
+					},
 				},
 			}
 			So(oplogColl.Insert(op1), ShouldBeNil)
@@ -93,8 +94,10 @@ func TestBasicOps(t *testing.T) {
 				Version:   2,
 				Operation: "i",
 				Namespace: "mongooplog_test.data",
-				Object: bson.M{
-					"_id": 4,
+				Object: bson.D{
+					bson.DocElem{
+						"_id", 4,
+					},
 				},
 			}
 			So(oplogColl.Insert(op2), ShouldBeNil)
@@ -107,8 +110,10 @@ func TestBasicOps(t *testing.T) {
 				Version:   2,
 				Operation: "i",
 				Namespace: "mongooplog_test.data",
-				Object: bson.M{
-					"_id": 3,
+				Object: bson.D{
+					bson.DocElem{
+						"_id", 3,
+					},
 				},
 			}
 			So(oplogColl.Insert(op3), ShouldBeNil)
