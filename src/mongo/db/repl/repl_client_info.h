@@ -31,6 +31,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/storage/snapshot_name.h"
 
 namespace mongo {
 
@@ -49,6 +50,13 @@ public:
     }
     OpTime getLastOp() const {
         return _lastOp;
+    }
+
+    void setLastSnapshot(SnapshotName name) {
+        _lastSnapshot = name;
+    }
+    SnapshotName getLastSnapshot() const {
+        return _lastSnapshot;
     }
 
     // Only used for master/slave
@@ -70,6 +78,7 @@ private:
     static const long long kUninitializedTerm = -1;
 
     OpTime _lastOp = OpTime();
+    SnapshotName _lastSnapshot = SnapshotName::min();
     OID _remoteId = OID();
 };
 

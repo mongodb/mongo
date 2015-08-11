@@ -1004,7 +1004,7 @@ void SnapshotThread::run() {
                 // Reserve the name immediately before we take our snapshot. This ensures that all
                 // names that compare lower must be from points in time visible to this named
                 // snapshot.
-                name = replCoord->reserveSnapshotName();
+                name = replCoord->reserveSnapshotName(nullptr);
 
                 // This establishes the view that we will name.
                 _manager->prepareForCreateSnapshot(txn.get());

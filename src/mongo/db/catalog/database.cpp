@@ -91,7 +91,7 @@ public:
 
         // Ban reading from this collection on committed reads on snapshots before now.
         auto replCoord = repl::ReplicationCoordinator::get(_txn);
-        auto snapshotName = replCoord->reserveSnapshotName();
+        auto snapshotName = replCoord->reserveSnapshotName(_txn);
         replCoord->forceSnapshotCreation();  // Ensures a newer snapshot gets created even if idle.
         it->second->setMinimumVisibleSnapshot(snapshotName);
     }

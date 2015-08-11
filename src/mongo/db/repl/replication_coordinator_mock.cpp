@@ -358,7 +358,7 @@ Status ReplicationCoordinatorMock::updateTerm(long long term) {
     return Status::OK();
 }
 
-SnapshotName ReplicationCoordinatorMock::reserveSnapshotName() {
+SnapshotName ReplicationCoordinatorMock::reserveSnapshotName(OperationContext* txn) {
     return SnapshotName(_snapshotNameGenerator.addAndFetch(1));
 }
 

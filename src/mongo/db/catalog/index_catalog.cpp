@@ -413,7 +413,7 @@ public:
         // collection. This means that any snapshot created after this must include the full index,
         // and no one can try to read this index before we set the visibility.
         auto replCoord = repl::ReplicationCoordinator::get(_txn);
-        auto snapshotName = replCoord->reserveSnapshotName();
+        auto snapshotName = replCoord->reserveSnapshotName(_txn);
         replCoord->forceSnapshotCreation();  // Ensures a newer snapshot gets created even if idle.
         _entry->setMinimumVisibleSnapshot(snapshotName);
     }
@@ -798,7 +798,7 @@ public:
     void commit() final {
         // Ban reading from this collection on committed reads on snapshots before now.
         auto replCoord = repl::ReplicationCoordinator::get(_txn);
-        auto snapshotName = replCoord->reserveSnapshotName();
+        auto snapshotName = replCoord->reserveSnapshotName(_txn);
         replCoord->forceSnapshotCreation();  // Ensures a newer snapshot gets created even if idle.
         _collection->setMinimumVisibleSnapshot(snapshotName);
 

@@ -981,34 +981,35 @@ void ReplicationCoordinatorImpl::interruptAll() {
 }
 
 bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
-    const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+    const OpTime& opTime, SnapshotName minSnapshot, const WriteConcernOptions& writeConcern) {
     Status status = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
     if (!status.isOK()) {
         return true;
     }
 
-    if (!writeConcern.wMode.empty()) {
-        StringData patternName;
-        if (writeConcern.wMode == WriteConcernOptions::kMajority) {
-            if (_externalState->snapshotsEnabled()) {
-                if (!_currentCommittedSnapshot) {
-                    return false;
-                }
-                return opTime <= _currentCommittedSnapshot->opTime;
-            } else {
-                patternName = ReplicaSetConfig::kMajorityWriteConcernModeName;
-            }
-        } else {
-            patternName = writeConcern.wMode;
-        }
-        StatusWith<ReplicaSetTagPattern> tagPattern = _rsConfig.findCustomWriteMode(patternName);
-        if (!tagPattern.isOK()) {
-            return true;
-        }
-        return _haveTaggedNodesReachedOpTime_inlock(opTime, tagPattern.getValue());
-    } else {
+    if (writeConcern.wMode.empty())
         return _haveNumNodesReachedOpTime_inlock(opTime, writeConcern.wNumNodes);
+
+    StringData patternName;
+    if (writeConcern.wMode == WriteConcernOptions::kMajority) {
+        if (_externalState->snapshotsEnabled()) {
+            if (!_currentCommittedSnapshot) {
+                return false;
+            }
+            return (_currentCommittedSnapshot->opTime >= opTime &&
+                    _currentCommittedSnapshot->name >= minSnapshot);
+        } else {
+            patternName = ReplicaSetConfig::kMajorityWriteConcernModeName;
+        }
+    } else {
+        patternName = writeConcern.wMode;
     }
+
+    StatusWith<ReplicaSetTagPattern> tagPattern = _rsConfig.findCustomWriteMode(patternName);
+    if (!tagPattern.isOK()) {
+        return true;
+    }
+    return _haveTaggedNodesReachedOpTime_inlock(opTime, tagPattern.getValue());
 }
 
 bool ReplicationCoordinatorImpl::_haveNumNodesReachedOpTime_inlock(const OpTime& opTime,
@@ -1058,7 +1059,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
     OperationContext* txn, const OpTime& opTime, const WriteConcernOptions& writeConcern) {
     Timer timer;
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    return _awaitReplication_inlock(&timer, &lock, txn, opTime, writeConcern);
+    return _awaitReplication_inlock(&timer, &lock, txn, opTime, SnapshotName::min(), writeConcern);
 }
 
 ReplicationCoordinator::StatusAndDuration
@@ -1066,8 +1067,9 @@ ReplicationCoordinatorImpl::awaitReplicationOfLastOpForClient(
     OperationContext* txn, const WriteConcernOptions& writeConcern) {
     Timer timer;
     stdx::unique_lock<stdx::mutex> lock(_mutex);
+    const auto& clientInfo = ReplClientInfo::forClient(txn->getClient());
     return _awaitReplication_inlock(
-        &timer, &lock, txn, ReplClientInfo::forClient(txn->getClient()).getLastOp(), writeConcern);
+        &timer, &lock, txn, clientInfo.getLastOp(), clientInfo.getLastSnapshot(), writeConcern);
 }
 
 ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitReplication_inlock(
@@ -1075,6 +1077,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
     stdx::unique_lock<stdx::mutex>* lock,
     OperationContext* txn,
     const OpTime& opTime,
+    SnapshotName minSnapshot,
     const WriteConcernOptions& writeConcern) {
     const Mode replMode = getReplicationMode();
     if (replMode == modeNone) {
@@ -1087,7 +1090,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
         return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
     }
 
-    if (opTime.isNull()) {
+    if (opTime.isNull() && minSnapshot == SnapshotName::min()) {
         // If waiting for the empty optime, always say it's been replicated.
         return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
     }
@@ -1109,7 +1112,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
     // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
     stdx::condition_variable condVar;
     WaiterInfo waitInfo(&_replicationWaiterList, txn->getOpID(), &opTime, &writeConcern, &condVar);
-    while (!_doneWaitingForReplication_inlock(opTime, writeConcern)) {
+    while (!_doneWaitingForReplication_inlock(opTime, minSnapshot, writeConcern)) {
         const Milliseconds elapsed{timer->millis()};
 
         Status interruptedStatus = txn->checkForInterruptNoAssert();
@@ -2318,7 +2321,8 @@ void ReplicationCoordinatorImpl::_wakeReadyWaiters_inlock() {
          it != _replicationWaiterList.end();
          ++it) {
         WaiterInfo* info = *it;
-        if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
+        if (_doneWaitingForReplication_inlock(
+                *info->opTime, SnapshotName::min(), *info->writeConcern)) {
             info->condVar->notify_all();
         }
     }
@@ -2959,11 +2963,14 @@ bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term, Handle* 
     return updated;
 }
 
-SnapshotName ReplicationCoordinatorImpl::reserveSnapshotName() {
-    auto out = SnapshotName(_snapshotNameGenerator.addAndFetch(1));
-    dassert(out > SnapshotName::min());
-    dassert(out < SnapshotName::max());
-    return out;
+SnapshotName ReplicationCoordinatorImpl::reserveSnapshotName(OperationContext* txn) {
+    auto reservedName = SnapshotName(_snapshotNameGenerator.addAndFetch(1));
+    dassert(reservedName > SnapshotName::min());
+    dassert(reservedName < SnapshotName::max());
+    if (txn) {
+        ReplClientInfo::forClient(txn->getClient()).setLastSnapshot(reservedName);
+    }
+    return reservedName;
 }
 
 void ReplicationCoordinatorImpl::forceSnapshotCreation() {

@@ -276,7 +276,7 @@ public:
 
     virtual Status updateTerm(long long term) override;
 
-    virtual SnapshotName reserveSnapshotName() override;
+    virtual SnapshotName reserveSnapshotName(OperationContext* txn) override;
 
     virtual void forceSnapshotCreation() override;
 
@@ -565,12 +565,17 @@ private:
         stdx::unique_lock<stdx::mutex>* lock,
         OperationContext* txn,
         const OpTime& opTime,
+        SnapshotName minSnapshot,
         const WriteConcernOptions& writeConcern);
 
-    /*
+    /**
      * Returns true if the given writeConcern is satisfied up to "optime" or is unsatisfiable.
+     *
+     * If the writeConcern is 'majority', also waits for _currentCommittedSnapshot to be newer than
+     * minSnapshot.
      */
     bool _doneWaitingForReplication_inlock(const OpTime& opTime,
+                                           SnapshotName minSnapshot,
                                            const WriteConcernOptions& writeConcern);
 
     /**

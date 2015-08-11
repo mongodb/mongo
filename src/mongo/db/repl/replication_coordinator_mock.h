@@ -206,7 +206,7 @@ public:
 
     virtual Status updateTerm(long long term);
 
-    virtual SnapshotName reserveSnapshotName();
+    virtual SnapshotName reserveSnapshotName(OperationContext* txn);
 
     virtual void forceSnapshotCreation() override;
 

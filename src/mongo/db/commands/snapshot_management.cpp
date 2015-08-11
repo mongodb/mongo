@@ -80,7 +80,7 @@ public:
 
         auto status = snapshotManager->prepareForCreateSnapshot(txn);
         if (status.isOK()) {
-            const auto name = repl::ReplicationCoordinator::get(txn)->reserveSnapshotName();
+            const auto name = repl::ReplicationCoordinator::get(txn)->reserveSnapshotName(nullptr);
             result.append("name", static_cast<long long>(name.asU64()));
             status = snapshotManager->createSnapshot(txn, name);
         }

@@ -52,6 +52,7 @@
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -749,7 +750,10 @@ TEST_F(ReplCoordTest, AwaitReplicationNumberOfNodesNonBlocking) {
 }
 
 TEST_F(ReplCoordTest, AwaitReplicationNamedModesNonBlocking) {
-    OperationContextNoop txn;
+    auto service = stdx::make_unique<ServiceContextNoop>();
+    auto client = service->makeClient("test");
+    OperationContextNoop txn(client.get(), 100);
+
     assertStartSuccess(
         BSON("_id"
              << "mySet"
@@ -847,6 +851,30 @@ TEST_F(ReplCoordTest, AwaitReplicationNamedModesNonBlocking) {
     statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiDCWriteConcern);
     ASSERT_OK(statusAndDur.status);
     statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiRackWriteConcern);
+    ASSERT_OK(statusAndDur.status);
+
+    // Majority also waits for the committed snapshot to be newer than all snapshots reserved by
+    // this operation. Custom modes not affected by this.
+    while (getReplCoord()->reserveSnapshotName(&txn) <= SnapshotName(1)) {
+        // These unittests "cheat" and use SnapshotName(1) without advancing the counter. Reserve
+        // another name if we didn't get a high enough one.
+    }
+
+    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, majorityWriteConcern);
+    ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, statusAndDur.status);
+    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, multiDCWriteConcern);
+    ASSERT_OK(statusAndDur.status);
+    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, multiRackWriteConcern);
+    ASSERT_OK(statusAndDur.status);
+
+    // All modes satisfied
+    getReplCoord()->onSnapshotCreate(time1, getReplCoord()->reserveSnapshotName(nullptr));
+
+    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, majorityWriteConcern);
+    ASSERT_OK(statusAndDur.status);
+    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, multiDCWriteConcern);
+    ASSERT_OK(statusAndDur.status);
+    statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, multiRackWriteConcern);
     ASSERT_OK(statusAndDur.status);
 
     // multiDC satisfied but not majority or multiRack
