@@ -1527,7 +1527,28 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
 
 void TopologyCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* response) {
     const MemberState myState = getMemberState();
-    if (!_rsConfig.isInitialized() || myState.removed()) {
+    if (!_rsConfig.isInitialized()) {
+        response->markAsNoConfig();
+        return;
+    }
+
+    for (ReplicaSetConfig::MemberIterator it = _rsConfig.membersBegin();
+         it != _rsConfig.membersEnd();
+         ++it) {
+        if (it->isHidden() || it->getSlaveDelay() > Seconds{0}) {
+            continue;
+        }
+
+        if (it->isElectable()) {
+            response->addHost(it->getHostAndPort());
+        } else if (it->isArbiter()) {
+            response->addArbiter(it->getHostAndPort());
+        } else {
+            response->addPassive(it->getHostAndPort());
+        }
+    }
+
+    if (myState.removed()) {
         response->markAsNoConfig();
         return;
     }
@@ -1536,24 +1557,6 @@ void TopologyCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* response)
     response->setReplSetVersion(_rsConfig.getConfigVersion());
     response->setIsMaster(myState.primary());
     response->setIsSecondary(myState.secondary());
-
-    {
-        for (ReplicaSetConfig::MemberIterator it = _rsConfig.membersBegin();
-             it != _rsConfig.membersEnd();
-             ++it) {
-            if (it->isHidden() || it->getSlaveDelay() > Seconds{0}) {
-                continue;
-            }
-
-            if (it->isElectable()) {
-                response->addHost(it->getHostAndPort());
-            } else if (it->isArbiter()) {
-                response->addArbiter(it->getHostAndPort());
-            } else {
-                response->addPassive(it->getHostAndPort());
-            }
-        }
-    }
 
     const MemberConfig* curPrimary = _currentPrimaryMember();
     if (curPrimary) {

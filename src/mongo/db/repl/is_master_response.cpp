@@ -96,6 +96,28 @@ IsMasterResponse::IsMasterResponse()
       _shutdownInProgress(false) {}
 
 void IsMasterResponse::addToBSON(BSONObjBuilder* builder) const {
+    if (_hostsSet) {
+        std::vector<std::string> hosts;
+        for (size_t i = 0; i < _hosts.size(); ++i) {
+            hosts.push_back(_hosts[i].toString());
+        }
+        builder->append(kHostsFieldName, hosts);
+    }
+    if (_passivesSet) {
+        std::vector<std::string> passives;
+        for (size_t i = 0; i < _passives.size(); ++i) {
+            passives.push_back(_passives[i].toString());
+        }
+        builder->append(kPassivesFieldName, passives);
+    }
+    if (_arbitersSet) {
+        std::vector<std::string> arbiters;
+        for (size_t i = 0; i < _arbiters.size(); ++i) {
+            arbiters.push_back(_arbiters[i].toString());
+        }
+        builder->append(kArbitersFieldName, arbiters);
+    }
+
     if (_shutdownInProgress) {
         builder->append(kCodeFieldName, ErrorCodes::ShutdownInProgress);
         builder->append(kErrmsgFieldName, "replication shutdown in progress");
@@ -119,27 +141,6 @@ void IsMasterResponse::addToBSON(BSONObjBuilder* builder) const {
     invariant(_isSecondarySet);
     builder->append(kSecondaryFieldName, _secondary);
 
-    if (_hostsSet) {
-        std::vector<std::string> hosts;
-        for (size_t i = 0; i < _hosts.size(); ++i) {
-            hosts.push_back(_hosts[i].toString());
-        }
-        builder->append(kHostsFieldName, hosts);
-    }
-    if (_passivesSet) {
-        std::vector<std::string> passives;
-        for (size_t i = 0; i < _passives.size(); ++i) {
-            passives.push_back(_passives[i].toString());
-        }
-        builder->append(kPassivesFieldName, passives);
-    }
-    if (_arbitersSet) {
-        std::vector<std::string> arbiters;
-        for (size_t i = 0; i < _arbiters.size(); ++i) {
-            arbiters.push_back(_arbiters[i].toString());
-        }
-        builder->append(kArbitersFieldName, arbiters);
-    }
     if (_primarySet)
         builder->append(kPrimaryFieldName, _primary.toString());
     if (_arbiterOnlySet)
