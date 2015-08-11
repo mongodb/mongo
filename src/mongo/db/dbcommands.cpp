@@ -1320,7 +1320,11 @@ bool Command::run(OperationContext* txn,
                     return false;
                 }
             }
-            if (readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+
+            if ((replCoord->getReplicationMode() ==
+                     repl::ReplicationCoordinator::Mode::modeReplSet ||
+                 testingSnapshotBehaviorInIsolation) &&
+                readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
                 Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
                 if (!status.isOK()) {
                     replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
