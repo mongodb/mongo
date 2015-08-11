@@ -84,10 +84,12 @@ env.Library(
         'network_interface_asio_operation.cpp',
     ],
     LIBDEPS=[
-        'network_interface',
-        'task_executor_interface',
+        '$BUILD_DIR/mongo/client/authentication',
+        '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/third_party/shim_asio',
+        'network_interface',
+        'task_executor_interface',
     ])
 
 env.CppUnitTest(

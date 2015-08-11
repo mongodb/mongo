@@ -104,7 +104,7 @@ void NetworkInterfaceASIO::_setupSocket(AsyncOp* op, tcp::resolver::iterator end
 
     stream.connect(std::move(endpoints),
                    [this, op](std::error_code ec) {
-                       _validateAndRun(op, ec, [this, op]() { _authenticate(op); });
+                       _validateAndRun(op, ec, [this, op]() { _runIsMaster(op); });
                    });
 }
 
