@@ -48,11 +48,11 @@ __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 }
 
 /*
- * __sweep_expire_handle --
+ * __sweep_expire_one --
  *	Mark a single handle dead.
  */
 static int
-__sweep_expire_handle(WT_SESSION_IMPL *session)
+__sweep_expire_one(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
@@ -127,13 +127,14 @@ __sweep_expire(WT_SESSION_IMPL *session, time_t now)
 			break;
 
 		if (WT_IS_METADATA(dhandle) ||
+		    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
 		    dhandle->session_inuse != 0 ||
 		    dhandle->timeofdeath == 0 ||
 		    now <= dhandle->timeofdeath + conn->sweep_idle_time)
 			continue;
 
 		WT_WITH_DHANDLE(session, dhandle,
-		    ret = __sweep_expire_handle(session));
+		    ret = __sweep_expire_one(session));
 		WT_RET_BUSY_OK(ret);
 	}
 
@@ -184,8 +185,42 @@ __sweep_discard_trees(
 }
 
 /*
+ * __sweep_remove_one --
+ *	Remove a closed handle from the connection list.
+ */
+static int
+__sweep_remove_one(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
+{
+	WT_DECL_RET;
+
+	/* Try to get exclusive access. */
+	WT_RET(__wt_try_writelock(session, dhandle->rwlock));
+
+	/*
+	 * If there are no longer any references to the handle in any
+	 * sessions, attempt to discard it.
+	 */
+	if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN) ||
+	    dhandle->session_inuse != 0 || dhandle->session_ref != 0)
+		WT_ERR(EBUSY);
+
+	WT_WITH_DHANDLE(session, dhandle,
+	    ret = __wt_conn_dhandle_discard_single(session, 0, 1));
+
+	/*
+	 * If the handle was not successfully discarded, unlock it and
+	 * don't retry the discard until it times out again.
+	 */
+	if (ret != 0) {
+err:		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
+	}
+
+	return (ret);
+}
+
+/*
  * __sweep_remove_handles --
- *	Remove closed dhandles from the connection list.
+ *	Remove closed handles from the connection list.
  */
 static int
 __sweep_remove_handles(WT_SESSION_IMPL *session, time_t now)
@@ -195,9 +230,10 @@ __sweep_remove_handles(WT_SESSION_IMPL *session, time_t now)
 	WT_DECL_RET;
 
 	conn = S2C(session);
-	dhandle = SLIST_FIRST(&conn->dhlh);
 
-	for (; dhandle != NULL; dhandle = dhandle_next) {
+	for (dhandle = SLIST_FIRST(&conn->dhlh);
+	    dhandle != NULL;
+	    dhandle = dhandle_next) {
 		dhandle_next = SLIST_NEXT(dhandle, l);
 		if (WT_IS_METADATA(dhandle))
 			continue;
@@ -208,37 +244,13 @@ __sweep_remove_handles(WT_SESSION_IMPL *session, time_t now)
 		    now <= dhandle->timeofdiscard + conn->sweep_idle_time)
 			continue;
 
-		/* Make sure we get exclusive access. */
-		if ((ret =
-		    __wt_try_writelock(session, dhandle->rwlock)) == EBUSY) {
+		WT_WITH_DHANDLE_LOCK(session,
+		    ret = __sweep_remove_one(session, dhandle));
+		if (ret == 0)
+			WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
+		else
 			dhandle->timeofdiscard = now;
-			continue;
-		}
-		WT_RET(ret);
-
-		/*
-		 * If there are no longer any references to the handle in any
-		 * sessions, attempt to discard it.
-		 */
-		if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN) ||
-		    dhandle->session_inuse != 0 || dhandle->session_ref != 0) {
-			WT_RET(__wt_writeunlock(session, dhandle->rwlock));
-			continue;
-		}
-
-		WT_WITH_DHANDLE(session, dhandle,
-		    ret = __wt_conn_dhandle_discard_single(session, 0, 1));
-
-		/*
-		 * If the handle was not successfully discarded, unlock it and
-		 * don't retry the discard until it times out again.
-		 */
-		if (ret != 0) {
-			dhandle->timeofdiscard = now;
-			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
-		}
 		WT_RET_BUSY_OK(ret);
-		WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
 	}
 
 	return (ret == EBUSY ? 0 : ret);
@@ -283,19 +295,13 @@ __sweep_server(void *arg)
 		 * If sweep_idle_time is 0, handles never become idle.
 		 */
 		if (conn->sweep_idle_time != 0 &&
-		    conn->open_btree_count >= conn->sweep_handles_min) {
-			WT_WITH_DHANDLE_LOCK(session,
-			    ret = __sweep_expire(session, now));
-			WT_ERR(ret);
-		}
+		    conn->open_btree_count >= conn->sweep_handles_min)
+			WT_ERR(__sweep_expire(session, now));
 
 		WT_ERR(__sweep_discard_trees(session, now, &dead_handles));
 
-		if (dead_handles > 0) {
-			WT_WITH_DHANDLE_LOCK(session,
-			    ret = __sweep_remove_handles(session, now));
-			WT_ERR(ret);
-		}
+		if (dead_handles > 0)
+			WT_ERR(__sweep_remove_handles(session, now));
 	}
 
 	if (0) {
