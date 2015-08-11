@@ -101,11 +101,6 @@ elif usemozjs:
         'STATIC_JS_API=1',
     ])
 
-    scriptingEnv.JSHeader(
-        target='mozjs/mongohelpers_js.cpp',
-        source=[ 'mozjs/mongohelpers.js']
-    )
-
     scriptingEnv.Library(
         target='scripting',
         source=[
@@ -130,8 +125,6 @@ elif usemozjs:
             'mozjs/maxkey.cpp',
             'mozjs/minkey.cpp',
             'mozjs/mongo.cpp',
-            'mozjs/mongohelpers.cpp',
-            'mozjs/mongohelpers_js.cpp',
             'mozjs/nativefunction.cpp',
             'mozjs/numberint.cpp',
             'mozjs/numberlong.cpp',
