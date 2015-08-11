@@ -57,8 +57,16 @@ void WiredTigerSnapshotManager::setCommittedSnapshot(const SnapshotName& name) {
 
     invariant(!_committedSnapshot || *_committedSnapshot <= name);
     _committedSnapshot = name;
+}
 
-    const std::string config = str::stream() << "drop=(before=" << name.asU64() << ')';
+void WiredTigerSnapshotManager::cleanupUnneededSnapshots() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+    if (!_committedSnapshot)
+        return;
+
+    const std::string config = str::stream() << "drop=(before=" << _committedSnapshot->asU64()
+                                             << ')';
     invariantWTOK(_session->snapshot(_session, config.c_str()));
 }
 

@@ -1019,6 +1019,9 @@ void SnapshotThread::run() {
             log() << "skipping storage snapshot pass due to write conflict";
             continue;
         }
+
+        // Called outside of all locks.
+        _manager->cleanupUnneededSnapshots();
     }
 }
 

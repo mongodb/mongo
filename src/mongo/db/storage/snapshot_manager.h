@@ -71,13 +71,25 @@ public:
     virtual Status createSnapshot(OperationContext* txn, const SnapshotName& name) = 0;
 
     /**
-     * Sets the snapshot to be used for committed reads. Once set, all older snapshots that are
-     * not currently in use by any RecoveryUnit can be deleted.
+     * Sets the snapshot to be used for committed reads.
      *
      * Implementations are allowed to assume that all older snapshots have names that compare
      * less than the passed in name, and newer ones compare greater.
+     *
+     * This is called while holding a very hot mutex. Therefore it should avoid doing any work that
+     * can be done later. In particular, cleaning up of old snapshots should be deferred until
+     * cleanupUnneededSnapshots is called.
      */
     virtual void setCommittedSnapshot(const SnapshotName& name) = 0;
+
+    /**
+     * Cleans up all snapshots older than the current committed snapshot.
+     *
+     * Operations that have already begun using an older snapshot must continue to work using that
+     * snapshot until they would normally start using a newer one. Any implementation that allows
+     * that without an unbounded growth of snapshots is permitted.
+     */
+    virtual void cleanupUnneededSnapshots() = 0;
 
     /**
      * Drops all snapshots and clears the "committed" snapshot.
