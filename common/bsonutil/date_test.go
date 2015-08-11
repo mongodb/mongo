@@ -127,6 +127,43 @@ func TestDateValue(t *testing.T) {
 				So(ok, ShouldBeTrue)
 				So(jsonValue.Equal(date), ShouldBeTrue)
 			})
+			Convey(`of numeric int32 ('{ "$date": 2136800000 }')`, func() {
+				key := "key"
+
+				date = time.Unix(0, int64(time.Duration(2136800000)*time.Millisecond))
+
+				jsonMap := map[string]interface{}{
+					key: map[string]interface{}{
+						"$date": int32(2136800000),
+					},
+				}
+
+				err := ConvertJSONDocumentToBSON(jsonMap)
+				So(err, ShouldBeNil)
+
+				jsonValue, ok := jsonMap[key].(time.Time)
+				So(ok, ShouldBeTrue)
+				So(jsonValue.Equal(date), ShouldBeTrue)
+			})
+
+			Convey(`of negative numeric int32 ('{ "$date": -2136800000 }')`, func() {
+				key := "key"
+
+				date = time.Unix(0, int64(time.Duration(-2136800000)*time.Millisecond))
+
+				jsonMap := map[string]interface{}{
+					key: map[string]interface{}{
+						"$date": int32(-2136800000),
+					},
+				}
+
+				err := ConvertJSONDocumentToBSON(jsonMap)
+				So(err, ShouldBeNil)
+
+				jsonValue, ok := jsonMap[key].(time.Time)
+				So(ok, ShouldBeTrue)
+				So(jsonValue.Equal(date), ShouldBeTrue)
+			})
 		})
 	})
 }
