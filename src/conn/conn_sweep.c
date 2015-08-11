@@ -361,9 +361,13 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 	 * Handle sweep does enough I/O it may be called upon to perform slow
 	 * operations for the block manager.
 	 *
+	 * The sweep thread sweeps the lookaside table for outdated records,
+	 * it gets its own cursor for that purpose.
+	 *
 	 * Don't tap the sweep thread for eviction.
 	 */
-	F_SET(session, WT_SESSION_NO_EVICTION | WT_SESSION_CAN_WAIT);
+	F_SET(session, WT_SESSION_CAN_WAIT |
+	    WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION);
 
 	WT_RET(__wt_cond_alloc(
 	    session, "handle sweep server", 0, &conn->sweep_cond));

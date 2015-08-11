@@ -115,6 +115,7 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	WT_RET(__wt_open_internal_session(
 	    conn, "lookaside file", 1, 1, &conn->las_session));
 	session = conn->las_session;
+	F_SET(session, WT_SESSION_LOOKASIDE_CURSOR);
 
 	/* Discard any previous incarnation of the file. */
 	WT_RET(__las_drop(session));
@@ -299,22 +300,12 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_ITEM *key;
 	uint64_t cnt;
-	int notused;
+	int notused, reset_evict;
 
 	conn = S2C(session);
-
-	/*
-	 * If the sweep thread does not yet have a lookaside file cursor,
-	 * create one.
-	 */
-	if (session->las_cursor == NULL) {
-		WT_WITHOUT_DHANDLE(session,
-		    ret = __las_cursor_create(session, &session->las_cursor));
-		WT_RET(ret);
-	}
-
-	cursor = session->las_cursor;
 	key = &conn->las_sweep_key;
+
+	WT_RET(__wt_las_cursor(session, &cursor, &reset_evict));
 
 	/*
 	 * If we're not starting a new sweep, position the cursor using the key
@@ -408,7 +399,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 err:		__wt_buf_free(session, key);
 	}
 
-	WT_TRET(cursor->reset(cursor));
+	WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
 
 	return (ret);
 }
