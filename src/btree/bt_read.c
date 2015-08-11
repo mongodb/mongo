@@ -139,8 +139,8 @@ __row_update(WT_SESSION_IMPL *session,
  *	Instantiate lookaside update records in a recently read page.
  */
 static int
-__las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref,
-    WT_DATA_HANDLE *read_dhandle, uint32_t read_id,
+__las_page_instantiate(
+    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t read_id,
     const uint8_t *addr, size_t addr_size, int *need_las_removep)
 {
 	WT_CURSOR *cursor;
@@ -155,7 +155,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref,
 	uint32_t key_len, saved_flags, upd_size;
 	uint64_t current_recno, recno, txnid;
 	uint8_t prefix[WT_MAX_PREFIX_SIZE];
-	int exact, tret;
+	int exact;
 	void *p;
 
 	*need_las_removep = 0;
@@ -167,7 +167,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref,
 	current_recno = recno = WT_RECNO_OOB;
 	saved_flags = 0;		/* [-Werror=maybe-uninitialized] */
 
-	WT_WITH_DHANDLE(session, read_dhandle, __wt_btcur_init(session, &cbt));
+	__wt_btcur_init(session, &cbt);
 	__wt_btcur_open(&cbt);
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current_key));
@@ -247,11 +247,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref,
 				break;
 
 			if (first_upd != NULL) {
-				WT_WITH_DHANDLE(session, read_dhandle,
-				    ret = __col_update(session,
+				WT_ERR(__col_update(session,
 				    current_recno, ref, &cbt, first_upd));
-				WT_ERR(ret);
-
 				first_upd = NULL;
 			}
 			current_recno = recno;
@@ -264,11 +261,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref,
 				break;
 
 			if (first_upd != NULL) {
-				WT_WITH_DHANDLE(session, read_dhandle,
-				    ret = __row_update(session,
+				WT_ERR(__row_update(session,
 				    current_key, ref, &cbt, first_upd));
-				WT_ERR(ret);
-
 				first_upd = NULL;
 			}
 			WT_ERR(__wt_buf_set(session, current_key, p, key_len));
@@ -292,19 +286,13 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref,
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			WT_WITH_DHANDLE(session, read_dhandle,
-			    ret = __col_update(session,
+			WT_ERR(__col_update(session,
 			    current_recno, ref, &cbt, first_upd));
-			WT_ERR(ret);
-
 			first_upd = NULL;
 			break;
 		case WT_PAGE_ROW_LEAF:
-			WT_WITH_DHANDLE(session, read_dhandle,
-			    ret = __row_update(session,
+			WT_ERR(__row_update(session,
 			    current_key, ref, &cbt, first_upd));
-			WT_ERR(ret);
-
 			first_upd = NULL;
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
@@ -330,9 +318,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref,
 	}
 
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, saved_flags));
-	WT_WITH_DHANDLE(
-	    session, read_dhandle, tret = __wt_btcur_close(&cbt, 1));
-	WT_TRET(tret);
+	WT_TRET(__wt_btcur_close(&cbt, 1));
 
 	/*
 	 * On error, upd points to a single unlinked WT_UPDATE structure,
@@ -395,7 +381,6 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	const WT_PAGE_HEADER *dsk;
 	WT_BTREE *btree;
-	WT_DATA_HANDLE *read_dhandle;
 	WT_DECL_RET;
 	WT_ITEM tmp;
 	WT_PAGE *page;
@@ -466,11 +451,8 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 			WT_STAT_FAST_CONN_INCR(session, cache_read_lookaside);
 			WT_STAT_FAST_DATA_INCR(session, cache_read_lookaside);
 
-			read_dhandle = session->dhandle;
-			WT_WITHOUT_DHANDLE(session, ret =
-			    __las_page_instantiate(session, ref, read_dhandle,
+			WT_ERR(__las_page_instantiate(session, ref,
 			    btree->id, addr, addr_size, &need_las_remove));
-			WT_ERR(ret);
 		}
 	}
 
@@ -481,12 +463,9 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * We successfully instantiated the page, remove any update entries from
 	 * the lookaside file.
 	 */
-	if (need_las_remove) {
-		WT_WITHOUT_DHANDLE(session,
-		    ret = __wt_las_remove_block(
+	if (need_las_remove)
+		WT_ERR(__wt_las_remove_block(
 		    session, NULL, btree->id, addr, addr_size));
-		WT_ERR(ret);
-	}
 
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 

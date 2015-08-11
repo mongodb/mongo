@@ -3186,8 +3186,7 @@ skip_check_complete:
 	 * this page, copy those updates into the database's lookaside store.
 	 */
 	if (!r->evict_skipped_updates && bnd->skip != NULL)
-		WT_WITHOUT_DHANDLE(session,
-		    ret = __rec_update_las(session, r, btree->id, bnd));
+		ret = __rec_update_las(session, r, btree->id, bnd);
 
 done:
 err:	__wt_scr_free(session, &key);
@@ -3255,10 +3254,8 @@ __rec_update_las(WT_SESSION_IMPL *session,
 		 * block that has lookaside records, we'll run this code which
 		 * cleans out any old records.
 		 */
-		WT_WITHOUT_DHANDLE(session,
-		    ret = __wt_las_remove_block(
+		WT_ERR(__wt_las_remove_block(
 		    session, cursor, btree_id, bnd->addr.addr, bnd->addr.size));
-		WT_ERR(ret);
 
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
