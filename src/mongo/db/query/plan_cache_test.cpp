@@ -940,8 +940,11 @@ TEST_F(CachePlanSelectionTest, CollscanMergeSort) {
     BSONObj sort = BSON("c" << 1);
     runQuerySortProj(query, sort, BSONObj());
 
-    assertPlanCacheRecoversSolution(
-        query, sort, BSONObj(), "{sort: {pattern: {c: 1}, limit: 0, node: {cscan: {dir: 1}}}}");
+    assertPlanCacheRecoversSolution(query,
+                                    sort,
+                                    BSONObj(),
+                                    "{sort: {pattern: {c: 1}, limit: 0, node: {sortKeyGen: "
+                                    "{node: {cscan: {dir: 1}}}}}}");
 }
 
 //
@@ -976,8 +979,8 @@ TEST_F(CachePlanSelectionTest, NaturalHintNotCached) {
     addIndex(BSON("b" << 1));
     runQuerySortHint(BSON("a" << 1), BSON("b" << 1), BSON("$natural" << 1));
     assertNotCached(
-        "{sort: {pattern: {b: 1}, limit: 0, node: "
-        "{cscan: {filter: {a: 1}, dir: 1}}}}");
+        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{cscan: {filter: {a: 1}, dir: 1}}}}}}");
 }
 
 TEST_F(CachePlanSelectionTest, HintValidNotCached) {

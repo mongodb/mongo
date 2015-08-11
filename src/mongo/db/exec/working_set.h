@@ -202,6 +202,9 @@ enum WorkingSetComputedDataType {
     // via geoNear?
     WSM_GEO_NEAR_POINT = 3,
 
+    // Comparison key for sorting.
+    WSM_SORT_KEY = 4,
+
     // Must be last.
     WSM_COMPUTED_NUM_TYPES,
 };

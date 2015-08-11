@@ -510,10 +510,16 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         solnRoot = fetch;
     }
 
-    // And build the full sort stage.
+    // And build the full sort stage. The sort stage has to have a sort key generating stage
+    // as its child, supplying it with the appropriate sort keys.
+    SortKeyGeneratorNode* keyGenNode = new SortKeyGeneratorNode();
+    keyGenNode->queryObj = lpq.getFilter();
+    keyGenNode->sortSpec = sortObj;
+    keyGenNode->children.push_back(solnRoot);
+    solnRoot = keyGenNode;
+
     SortNode* sort = new SortNode();
     sort->pattern = sortObj;
-    sort->query = lpq.getFilter();
     sort->children.push_back(solnRoot);
     solnRoot = sort;
     // When setting the limit on the sort, we need to consider both

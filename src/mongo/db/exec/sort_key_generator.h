@@ -32,7 +32,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/stage_types.h"
 
 namespace mongo {
 
@@ -60,15 +62,6 @@ public:
      */
     Status getSortKey(const WorkingSetMember& member, BSONObj* objOut) const;
 
-    /**
-     * Passed to std::sort and used to sort the keys that are returned from getSortKey.
-     *
-     * Returned reference lives as long as 'this'.
-     */
-    const BSONObj& getSortComparator() const {
-        return _comparatorObj;
-    }
-
 private:
     Status getBtreeKey(const BSONObj& memberObj, BSONObj* objOut) const;
 
@@ -84,10 +77,6 @@ private:
 
     // Not owned by us
     const Collection* _collection;
-
-    // The object that we use to call woCompare on our resulting key.  Is equal to _rawSortSpec
-    // unless we have some $meta expressions.  Each $meta expression has a default sort order.
-    BSONObj _comparatorObj;
 
     // The raw object in .sort()
     BSONObj _rawSortSpec;
@@ -109,6 +98,47 @@ private:
 
     // Helper to filter keys, ensuring keys generated with _keyGen are within _bounds.
     std::unique_ptr<IndexBoundsChecker> _boundsChecker;
+};
+
+/**
+ * Passes results from the child through after adding the sort key for each result as
+ * WorkingSetMember computed data.
+ */
+class SortKeyGeneratorStage final : public PlanStage {
+public:
+    SortKeyGeneratorStage(OperationContext* opCtx,
+                          PlanStage* child,
+                          WorkingSet* ws,
+                          const Collection* collection,
+                          const BSONObj& sortSpecObj,
+                          const BSONObj& queryObj);
+
+    bool isEOF() final;
+
+    StageState work(WorkingSetID* out) final;
+
+    StageType stageType() const final {
+        return STAGE_SORT_KEY_GENERATOR;
+    }
+
+    std::unique_ptr<PlanStageStats> getStats() final;
+
+    const SpecificStats* getSpecificStats() const final;
+
+    static const char* kStageType;
+
+private:
+    WorkingSet* const _ws;
+
+    const Collection* const _collection;
+
+    // The raw sort pattern as expressed by the user.
+    const BSONObj _sortSpec;
+
+    // The raw query as expressed by the user.
+    const BSONObj _query;
+
+    std::unique_ptr<SortKeyGenerator> _sortKeyGen;
 };
 
 }  // namespace mongo

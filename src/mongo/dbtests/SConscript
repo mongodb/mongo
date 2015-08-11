@@ -73,7 +73,7 @@ dbtest = env.Program(
         'pdfiletests.cpp',
         'perftests.cpp',
         'plan_ranking.cpp',
-        'query_multi_plan_runner.cpp',
+        'query_stage_multiplan.cpp',
         'query_plan_executor.cpp',
         'query_stage_and.cpp',
         'query_stage_cached_plan.cpp',

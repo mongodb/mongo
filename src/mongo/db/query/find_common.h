@@ -28,6 +28,7 @@
 
 namespace mongo {
 
+class BSONObj;
 class LiteParsedQuery;
 
 /**
@@ -60,6 +61,17 @@ public:
     static bool enoughForGetMore(long long effectiveBatchSize,
                                  long long numDocs,
                                  int bytesBuffered);
+
+    /**
+     * Transforms the raw sort spec into one suitable for use as the ordering specification in
+     * BSONObj::woCompare().
+     *
+     * In particular, eliminates text score meta-sort from 'sortSpec'.
+     *
+     * The input must be validated (each BSON element must be either a number or text score
+     * meta-sort specification).
+     */
+    static BSONObj transformSortSpec(const BSONObj& sortSpec);
 };
 
 }  // namespace mongo

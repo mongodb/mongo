@@ -563,6 +563,39 @@ struct ProjectionNode : public QuerySolutionNode {
     BSONObj coveredKeyObj;
 };
 
+struct SortKeyGeneratorNode : public QuerySolutionNode {
+    StageType getType() const final {
+        return STAGE_SORT_KEY_GENERATOR;
+    }
+
+    bool fetched() const final {
+        return children[0]->fetched();
+    }
+
+    bool hasField(const std::string& field) const final {
+        return children[0]->hasField(field);
+    }
+
+    bool sortedByDiskLoc() const final {
+        return children[0]->sortedByDiskLoc();
+    }
+
+    const BSONObjSet& getSort() const final {
+        return children[0]->getSort();
+    }
+
+    QuerySolutionNode* clone() const final;
+
+    void appendToString(mongoutils::str::stream* ss, int indent) const final;
+
+    // The query predicate provided by the user. For sorted by an array field, the sort key depends
+    // on the predicate.
+    BSONObj queryObj;
+
+    // The user-supplied sort pattern.
+    BSONObj sortSpec;
+};
+
 struct SortNode : public QuerySolutionNode {
     SortNode() : limit(0) {}
     virtual ~SortNode() {}
@@ -600,8 +633,6 @@ struct SortNode : public QuerySolutionNode {
     BSONObjSet _sorts;
 
     BSONObj pattern;
-
-    BSONObj query;
 
     // Sum of both limit and skip count in the parsed query.
     size_t limit;

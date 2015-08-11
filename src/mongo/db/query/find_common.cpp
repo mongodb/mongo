@@ -30,7 +30,9 @@
 
 #include "mongo/db/query/find_common.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -54,6 +56,25 @@ bool FindCommon::enoughForGetMore(long long effectiveBatchSize,
                                   int bytesBuffered) {
     return (effectiveBatchSize && numDocs >= effectiveBatchSize) ||
         (bytesBuffered > kMaxBytesToReturnToClientAtOnce);
+}
+
+BSONObj FindCommon::transformSortSpec(const BSONObj& sortSpec) {
+    BSONObjBuilder comparatorBob;
+
+    for (BSONElement elt : sortSpec) {
+        if (elt.isNumber()) {
+            comparatorBob.append(elt);
+        } else if (LiteParsedQuery::isTextScoreMeta(elt)) {
+            // Sort text score decreasing by default. Field name doesn't matter but we choose
+            // something that a user shouldn't ever have.
+            comparatorBob.append("$metaTextScore", -1);
+        } else {
+            // Sort spec should have been validated before here.
+            fassertFailed(28784);
+        }
+    }
+
+    return comparatorBob.obj();
 }
 
 }  // namespace mongo

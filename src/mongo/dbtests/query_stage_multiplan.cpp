@@ -26,7 +26,6 @@
  *    then also delete it in the license file.
  */
 
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/db_raii.h"
@@ -55,13 +54,13 @@ extern bool internalQueryForceIntersectionPlans;
 
 }  // namespace mongo
 
-namespace QueryMultiPlanRunner {
+namespace QueryStageMultiPlan {
 
 using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
 
-static const NamespaceString nss("unittests.QueryStageMultiPlanRunner");
+static const NamespaceString nss("unittests.QueryStageMultiPlan");
 
 /**
  * Create query solution.
@@ -74,14 +73,14 @@ QuerySolution* createQuerySolution() {
     return soln.release();
 }
 
-class MultiPlanRunnerBase {
+class QueryStageMultiPlanBase {
 public:
-    MultiPlanRunnerBase() : _client(&_txn) {
+    QueryStageMultiPlanBase() : _client(&_txn) {
         OldClientWriteContext ctx(&_txn, nss.ns());
         _client.dropCollection(nss.ns());
     }
 
-    virtual ~MultiPlanRunnerBase() {
+    virtual ~QueryStageMultiPlanBase() {
         OldClientWriteContext ctx(&_txn, nss.ns());
         _client.dropCollection(nss.ns());
     }
@@ -108,7 +107,7 @@ protected:
 
 // Basic ranking test: collection scan vs. highly selective index scan.  Make sure we also get
 // all expected results out as well.
-class MPRCollectionScanVsHighlySelectiveIXScan : public MultiPlanRunnerBase {
+class MPSCollectionScanVsHighlySelectiveIXScan : public QueryStageMultiPlanBase {
 public:
     void run() {
         const int N = 5000;
@@ -151,7 +150,7 @@ public:
         unique_ptr<PlanStage> secondRoot(
             new CollectionScan(&_txn, csparams, sharedWs.get(), filter.get()));
 
-        // Hand the plans off to the runner.
+        // Hand the plans off to the MPS.
         auto statusWithCQ = CanonicalQuery::canonicalize(nss, BSON("foo" << 7));
         verify(statusWithCQ.isOK());
         unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
@@ -192,7 +191,7 @@ public:
 
 // Case in which we select a blocking plan as the winner, and a non-blocking plan
 // is available as a backup.
-class MPRBackupPlan : public MultiPlanRunnerBase {
+class MPSBackupPlan : public QueryStageMultiPlanBase {
 public:
     void run() {
         // Data is just a single {_id: 1, a: 1, b: 1} document.
@@ -253,10 +252,10 @@ public:
         // We should have picked the index intersection plan due to forcing ixisect.
         QuerySolution* soln = mps->bestSolution();
         ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{sort: {pattern: {b: 1}, limit: 0, node: "
+            "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node:"
             "{fetch: {node: {andSorted: {nodes: ["
             "{ixscan: {filter: null, pattern: {a:1}}},"
-            "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
+            "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}}}",
             soln->root.get()));
 
         // Get the resulting document.
@@ -277,10 +276,10 @@ public:
         ASSERT(!mps->hasBackupPlan());
         soln = mps->bestSolution();
         ASSERT(QueryPlannerTestLib::solutionMatches(
-            "{sort: {pattern: {b: 1}, limit: 0, node: "
+            "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node:"
             "{fetch: {node: {andSorted: {nodes: ["
             "{ixscan: {filter: null, pattern: {a:1}}},"
-            "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}",
+            "{ixscan: {filter: null, pattern: {b:1}}}]}}}}}}}}",
             soln->root.get()));
 
         // Restore index intersection force parameter.
@@ -290,14 +289,14 @@ public:
 
 class All : public Suite {
 public:
-    All() : Suite("query_multi_plan_runner") {}
+    All() : Suite("query_stage_multiplan") {}
 
     void setupTests() {
-        add<MPRCollectionScanVsHighlySelectiveIXScan>();
-        add<MPRBackupPlan>();
+        add<MPSCollectionScanVsHighlySelectiveIXScan>();
+        add<MPSBackupPlan>();
     }
 };
 
-SuiteInstance<All> queryMultiPlanRunnerAll;
+SuiteInstance<All> queryStageMultiPlanAll;
 
-}  // namespace QueryMultiPlanRunner
+}  // namespace QueryStageMultiPlan

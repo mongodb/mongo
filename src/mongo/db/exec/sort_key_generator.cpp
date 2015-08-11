@@ -35,12 +35,19 @@
 #include <vector>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+//
+// SortKeyGenerator
+//
 
 SortKeyGenerator::SortKeyGenerator(const Collection* collection,
                                    const BSONObj& sortSpec,
@@ -57,30 +64,19 @@ SortKeyGenerator::SortKeyGenerator(const Collection* collection,
     // key generator below as part of generating sort keys for the docs.
     BSONObjBuilder btreeBob;
 
-    // The pattern we use to woCompare keys.  Each field in 'sortSpec' will go in here with
-    // a value of 1 or -1.  The Btree key fields are verbatim, meta fields have a default.
-    BSONObjBuilder comparatorBob;
-
     BSONObjIterator it(sortSpec);
     while (it.more()) {
         BSONElement elt = it.next();
         if (elt.isNumber()) {
             // Btree key.  elt (should be) foo: 1 or foo: -1.
-            comparatorBob.append(elt);
             btreeBob.append(elt);
         } else if (LiteParsedQuery::isTextScoreMeta(elt)) {
-            // Sort text score decreasing by default.  Field name doesn't matter but we choose
-            // something that a user shouldn't ever have.
-            comparatorBob.append("$metaTextScore", -1);
             _sortHasMeta = true;
         } else {
             // Sort spec. should have been validated before here.
             verify(false);
         }
     }
-
-    // Our pattern for woComparing keys.
-    _comparatorObj = comparatorBob.obj();
 
     // The fake index key pattern used to generate Btree keys.
     _btreeObj = btreeBob.obj();
@@ -251,6 +247,81 @@ void SortKeyGenerator::getBoundsForSort(const BSONObj& queryObj, const BSONObj& 
     for (size_t i = 0; i < solns.size(); ++i) {
         delete solns[i];
     }
+}
+
+//
+// SortKeyGeneratorStage
+//
+
+const char* SortKeyGeneratorStage::kStageType = "SORT_KEY_GENERATOR";
+
+SortKeyGeneratorStage::SortKeyGeneratorStage(OperationContext* opCtx,
+                                             PlanStage* child,
+                                             WorkingSet* ws,
+                                             const Collection* collection,
+                                             const BSONObj& sortSpecObj,
+                                             const BSONObj& queryObj)
+    : PlanStage(kStageType, opCtx),
+      _ws(ws),
+      _collection(collection),
+      _sortSpec(sortSpecObj),
+      _query(queryObj) {
+    _children.emplace_back(child);
+}
+
+bool SortKeyGeneratorStage::isEOF() {
+    return child()->isEOF();
+}
+
+PlanStage::StageState SortKeyGeneratorStage::work(WorkingSetID* out) {
+    ++_commonStats.works;
+
+    // Adds the amount of time taken by work() to executionTimeMillis.
+    ScopedTimer timer(&_commonStats.executionTimeMillis);
+
+    if (!_sortKeyGen) {
+        _sortKeyGen = stdx::make_unique<SortKeyGenerator>(_collection, _sortSpec, _query);
+        ++_commonStats.needTime;
+        return PlanStage::NEED_TIME;
+    }
+
+    auto stageState = child()->work(out);
+    if (stageState == PlanStage::ADVANCED) {
+        WorkingSetMember* member = _ws->get(*out);
+
+        BSONObj sortKey;
+        Status sortKeyStatus = _sortKeyGen->getSortKey(*member, &sortKey);
+        if (!sortKeyStatus.isOK()) {
+            *out = WorkingSetCommon::allocateStatusMember(_ws, sortKeyStatus);
+            return PlanStage::FAILURE;
+        }
+
+        // Add the sort key to the WSM as computed data.
+        member->addComputed(new SortKeyComputedData(sortKey));
+
+        return PlanStage::ADVANCED;
+    }
+
+    if (stageState == PlanStage::IS_EOF) {
+        _commonStats.isEOF = true;
+    } else if (stageState == PlanStage::NEED_TIME) {
+        ++_commonStats.needTime;
+    } else if (stageState == PlanStage::NEED_YIELD) {
+        ++_commonStats.needYield;
+    }
+
+    return stageState;
+}
+
+std::unique_ptr<PlanStageStats> SortKeyGeneratorStage::getStats() {
+    auto ret = stdx::make_unique<PlanStageStats>(_commonStats, STAGE_SORT_KEY_GENERATOR);
+    ret->children.push_back(child()->getStats().release());
+    return ret;
+}
+
+const SpecificStats* SortKeyGeneratorStage::getSpecificStats() const {
+    // No specific stats are tracked for the sort key generation stage.
+    return nullptr;
 }
 
 }  // namespace mongo

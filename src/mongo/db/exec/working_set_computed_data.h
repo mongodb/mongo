@@ -100,4 +100,21 @@ private:
     BSONObj _point;
 };
 
+class SortKeyComputedData : public WorkingSetComputedData {
+public:
+    SortKeyComputedData(BSONObj sortKey)
+        : WorkingSetComputedData(WSM_SORT_KEY), _sortKey(sortKey.getOwned()) {}
+
+    BSONObj getSortKey() const {
+        return _sortKey;
+    }
+
+    SortKeyComputedData* clone() const final {
+        return new SortKeyComputedData(_sortKey);
+    }
+
+private:
+    BSONObj _sortKey;
+};
+
 }  // namespace mongo

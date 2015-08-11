@@ -48,6 +48,7 @@
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort.h"
+#include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/text.h"
 #include "mongo/db/index/fts_access_method.h"
@@ -115,9 +116,16 @@ PlanStage* buildStages(OperationContext* txn,
         SortStageParams params;
         params.collection = collection;
         params.pattern = sn->pattern;
-        params.query = sn->query;
         params.limit = sn->limit;
         return new SortStage(txn, params, ws, childStage);
+    } else if (STAGE_SORT_KEY_GENERATOR == root->getType()) {
+        const SortKeyGeneratorNode* keyGenNode = static_cast<const SortKeyGeneratorNode*>(root);
+        PlanStage* childStage = buildStages(txn, collection, qsol, keyGenNode->children[0], ws);
+        if (NULL == childStage) {
+            return NULL;
+        }
+        return new SortKeyGeneratorStage(
+            txn, childStage, ws, collection, keyGenNode->sortSpec, keyGenNode->queryObj);
     } else if (STAGE_PROJECTION == root->getType()) {
         const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
         PlanStage* childStage = buildStages(txn, collection, qsol, pn->children[0], ws);

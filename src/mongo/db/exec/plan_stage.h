@@ -269,6 +269,16 @@ public:
     }
 
     /**
+     * Returns the only child.
+     *
+     * Convenience method for PlanStages that have exactly one child.
+     */
+    const std::unique_ptr<PlanStage>& child() const {
+        dassert(_children.size() == 1);
+        return _children.front();
+    }
+
+    /**
      * What type of stage is this?
      */
     virtual StageType stageType() const = 0;
@@ -341,16 +351,6 @@ protected:
      * Does the stage-specific invalidation work.
      */
     virtual void doInvalidate(OperationContext* txn, const RecordId& dl, InvalidationType type) {}
-
-    /**
-     * Returns the only child.
-     *
-     * Convenience method for PlanStages that have exactly one child.
-     */
-    const std::unique_ptr<PlanStage>& child() const {
-        dassert(_children.size() == 1);
-        return _children.front();
-    }
 
     OperationContext* getOpCtx() const {
         return _opCtx;

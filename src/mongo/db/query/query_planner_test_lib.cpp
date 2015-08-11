@@ -486,6 +486,20 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         size_t expectedLimit = limitEl.numberInt();
         return (patternEl.Obj() == sn->pattern) && (expectedLimit == sn->limit) &&
             solutionMatches(child.Obj(), sn->children[0]);
+    } else if (STAGE_SORT_KEY_GENERATOR == trueSoln->getType()) {
+        const SortKeyGeneratorNode* keyGenNode = static_cast<const SortKeyGeneratorNode*>(trueSoln);
+        BSONElement el = testSoln["sortKeyGen"];
+        if (el.eoo() || !el.isABSONObj()) {
+            return false;
+        }
+        BSONObj keyGenObj = el.Obj();
+
+        BSONElement child = keyGenObj["node"];
+        if (child.eoo() || !child.isABSONObj()) {
+            return false;
+        }
+
+        return solutionMatches(child.Obj(), keyGenNode->children[0]);
     } else if (STAGE_SORT_MERGE == trueSoln->getType()) {
         const MergeSortNode* msn = static_cast<const MergeSortNode*>(trueSoln);
         BSONElement el = testSoln["mergeSort"];

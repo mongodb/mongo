@@ -54,9 +54,6 @@ public:
     // How we're sorting.
     BSONObj pattern;
 
-    // The query.  Used to create the IndexBounds for the sorting.
-    BSONObj query;
-
     // Equal to 0 for no limit.
     size_t limit;
 };
@@ -64,8 +61,10 @@ public:
 /**
  * Sorts the input received from the child according to the sort pattern provided.
  *
- * Preconditions: For each field in 'pattern', all inputs in the child must handle a
- * getFieldDotted for that field.
+ * Preconditions:
+ *   -- For each field in 'pattern', all inputs in the child must handle a getFieldDotted for that
+ *   field.
+ *   -- All WSMs produced by the child stage must have the sort key available as WSM computed data.
  */
 class SortStage final : public PlanStage {
 public:
@@ -104,16 +103,8 @@ private:
     // The raw sort _pattern as expressed by the user
     BSONObj _pattern;
 
-    // The raw query as expressed by the user
-    BSONObj _query;
-
     // Equal to 0 for no limit.
     size_t _limit;
-
-    //
-    // Sort key generation
-    //
-    std::unique_ptr<SortKeyGenerator> _sortKeyGen;
 
     //
     // Data storage

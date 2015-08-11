@@ -38,6 +38,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
@@ -75,12 +76,21 @@ SortStage::SortStage(OperationContext* opCtx,
       _collection(params.collection),
       _ws(ws),
       _pattern(params.pattern),
-      _query(params.query),
       _limit(params.limit),
       _sorted(false),
       _resultIterator(_data.end()),
       _memUsage(0) {
     _children.emplace_back(child);
+
+    BSONObj sortComparator = FindCommon::transformSortSpec(_pattern);
+    _sortKeyComparator = stdx::make_unique<WorkingSetComparator>(sortComparator);
+
+    // If limit > 1, we need to initialize _dataSet here to maintain ordered set of data items while
+    // fetching from the child stage.
+    if (_limit > 1) {
+        const WorkingSetComparator& cmp = *_sortKeyComparator;
+        _dataSet.reset(new SortableDataItemSet(cmp));
+    }
 }
 
 SortStage::~SortStage() {}
@@ -96,19 +106,6 @@ PlanStage::StageState SortStage::work(WorkingSetID* out) {
 
     // Adds the amount of time taken by work() to executionTimeMillis.
     ScopedTimer timer(&_commonStats.executionTimeMillis);
-
-    if (NULL == _sortKeyGen) {
-        // This is heavy and should be done as part of work().
-        _sortKeyGen.reset(new SortKeyGenerator(_collection, _pattern, _query));
-        _sortKeyComparator.reset(new WorkingSetComparator(_sortKeyGen->getSortComparator()));
-        // If limit > 1, we need to initialize _dataSet here to maintain ordered
-        // set of data items while fetching from the child stage.
-        if (_limit > 1) {
-            const WorkingSetComparator& cmp = *_sortKeyComparator;
-            _dataSet.reset(new SortableDataItemSet(cmp));
-        }
-        return PlanStage::NEED_TIME;
-    }
 
     const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes);
     if (_memUsage > maxBytes) {
@@ -143,14 +140,15 @@ PlanStage::StageState SortStage::work(WorkingSetID* out) {
                 _wsidByDiskLoc[member->loc] = id;
             }
 
-            // The data remains in the WorkingSet and we wrap the WSID with the sort key.
             SortableDataItem item;
-            Status sortKeyStatus = _sortKeyGen->getSortKey(*member, &item.sortKey);
-            if (!_sortKeyGen->getSortKey(*member, &item.sortKey).isOK()) {
-                *out = WorkingSetCommon::allocateStatusMember(_ws, sortKeyStatus);
-                return PlanStage::FAILURE;
-            }
             item.wsid = id;
+
+            // We extract the sort key from the WSM's computed data. This must have been generated
+            // by a SortKeyGeneratorStage descendent in the execution tree.
+            auto sortKeyComputedData =
+                static_cast<const SortKeyComputedData*>(member->getComputed(WSM_SORT_KEY));
+            item.sortKey = sortKeyComputedData->getSortKey();
+
             if (member->hasLoc()) {
                 // The RecordId breaks ties when sorting two WSMs with the same sort key.
                 item.loc = member->loc;
