@@ -81,9 +81,7 @@ const char tsFieldName[] = "ts";
 
 // Set this to false to disable the background creation of snapshots. This can be used for A-B
 // benchmarking to find how much overhead repl::SnapshotThread introduces.
-// TODO SERVER-19213 Make this the default once secondaries can advance their commit
-//                   points (SERVER-19208) and we've validated the performance impact.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableReplSnapshotThread, bool, false);
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableReplSnapshotThread, bool, true);
 }  // namespace
 
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl()
