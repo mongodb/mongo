@@ -44,6 +44,10 @@ env.Library(
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'hostandport',
     ],
+    LIBDEPS_TAGS=[
+        # Depends on inShutdown
+        'incomplete',
+    ],
 )
 
 env.Library(
@@ -75,6 +79,10 @@ env.Library(
     LIBDEPS=[
         'network',
         '$BUILD_DIR/mongo/db/stats/counters',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on inShutdown and dbexit
+        'incomplete',
     ],
 )
 

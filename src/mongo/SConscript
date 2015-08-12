@@ -371,7 +371,16 @@ if not has_option('noshell') and usemozjs:
                     'util/signal_handlers',
                     'linenoise_utf8',
                     'shell/mongojs',
-                ])
+                ],
+                LIBDEPS_TAGS=[
+                    # Circular with shell_options below. It is unclear
+                    # why this is split into two libraries, or even
+                    # why these libraries exist at all, since it seems
+                    # that the only thing that links them is the shell
+                    # itself.
+                    'incomplete',
+                ],
+    )
 
     # mongo shell options
     shell_core_env.Library("shell_options", ["shell/shell_options.cpp"],

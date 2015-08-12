@@ -139,7 +139,12 @@ env.Library(
         'authentication',
         'connection_string',
         'read_preference',
-    ]
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on mongo::inShutdown
+        'incomplete'
+    ],
+
 )
 
 env.Library(
@@ -149,6 +154,7 @@ env.Library(
     ],
     LIBDEPS=[
         'clientdriver',
+        '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
     ]
 )
@@ -168,7 +174,12 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/protocol',
         '$BUILD_DIR/mongo/util/net/hostandport',
         'connection_pool',
-    ]
+    ],
+    LIBDEPS_TAGS=[
+        # Needs things from coredb in Command, but this would be circular through the
+        # libsharding_client
+        'incomplete',
+    ],
 )
 
 env.Library(
@@ -234,6 +245,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/s/catalog/catalog_manager',
+        '$BUILD_DIR/mongo/s/coreshard',
         'clientdriver',
     ],
 )

@@ -9,7 +9,9 @@ env.Library(
         'cluster_get_shard_map_cmd.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/mongo/s/coreshard',
     ]
 )
 
@@ -62,7 +64,10 @@ env.Library(
         'run_on_all_shards_cmd.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/client/parallel',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/db/commands/killcursors_common'
+        '$BUILD_DIR/mongo/db/commands/killcursors_common',
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/mongoscore',
     ]
 )

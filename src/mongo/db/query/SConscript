@@ -51,8 +51,15 @@ env.Library(
         "internal_plans",
         "query_planner",
         "query_planner_test_lib",
-        "$BUILD_DIR/mongo/db/exec/exec"
+        "$BUILD_DIR/mongo/db/curop",
+        "$BUILD_DIR/mongo/db/exec/exec",
+        "$BUILD_DIR/mongo/db/s/sharding",
     ],
+    LIBDEPS_TAGS=[
+        # Depends on files from serverOnlyFiles, and has many other
+        # missing dependencies.
+        'incomplete',
+    ]
 )
 
 # Shared mongod/mongos query code.
@@ -145,6 +152,10 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/exec',
         '$BUILD_DIR/mongo/db/exec/working_set',
+    ],
+    LIBDEPS_TAGS=[
+        # Circular with the 'query' library in this directory
+        'incomplete',
     ],
 )
 

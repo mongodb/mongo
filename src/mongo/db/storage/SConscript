@@ -88,6 +88,11 @@ env.Library(
         '$BUILD_DIR/mongo/unittest/unittest',
         'index_entry_comparison',
     ],
+    LIBDEPS_TAGS=[
+        # Depends on newHarnessHelper, which does not have a unique definition
+        'incomplete',
+    ],
+
 )
 
 env.Library(
@@ -114,7 +119,11 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/db/service_context',
-        ]
+        ],
+    LIBDEPS_TAGS=[
+        # Depends on newHarnessHelper, which does not have a unique definition
+        'incomplete',
+    ],
     )
 
 env.Library(

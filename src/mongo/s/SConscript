@@ -22,6 +22,8 @@ env.Library(
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/s/catalog/forwarding_catalog_manager',
+        'client/sharding_connection_hook',
+        'coreshard',
     ]
 )
 
@@ -100,6 +102,10 @@ env.Library(
         'write_ops/cluster_write_op_conversion',
         '$BUILD_DIR/mongo/base',
     ],
+    LIBDEPS_TAGS=[
+        # Circular with coreshard, below
+        'incomplete',
+    ],
 )
 
 env.CppUnitTest(
@@ -130,6 +136,7 @@ env.Library(
         'version_manager.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
         'catalog/forwarding_catalog_manager',
         'catalog/catalog_types',
@@ -137,7 +144,10 @@ env.Library(
         'cluster_ops_impl',
         'common',
         'shard_util',
-    ]
+    ],
+    LIBDEPS_TAGS=[
+        'incomplete',
+    ],
 )
 
 # This library is only used by the mongos execuable and any tests which require mongos runtime
@@ -162,7 +172,11 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/task',
         'write_ops/cluster_write_op',
         'write_ops/cluster_write_op_conversion',
-    ]
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on inShutdown
+        'incomplete',
+    ],
 )
 
 env.CppUnitTest(
@@ -189,6 +203,16 @@ env.Library(
         "distlock_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/executor/network_interface_factory"
+        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/db/query/query",
+        "$BUILD_DIR/mongo/db/range_deleter",
+        "$BUILD_DIR/mongo/db/s/metadata",
+        "$BUILD_DIR/mongo/db/s/sharding",
+        "$BUILD_DIR/mongo/executor/network_interface_factory",
+        "coreshard",
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on symbols from files in serverOnlyFiles
+        'incomplete',
     ],
 )

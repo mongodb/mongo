@@ -25,6 +25,10 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
+    LIBDEPS_TAGS=[
+        # Depends on validation in a strange way right now
+        'incomplete'
+    ],
 )
 
 env.Library(
@@ -72,6 +76,10 @@ env.Library(
         'document_range',
         '$BUILD_DIR/mongo/util/net/network',
     ],
+    LIBDEPS_TAGS=[
+        # Circular with rpc because it needs object_check.cpp
+        'incomplete'
+    ],
 )
 
 env.Library(
@@ -102,6 +110,10 @@ env.Library(
     LIBDEPS=[
         'document_range',
         '$BUILD_DIR/mongo/util/net/network',
+    ],
+    LIBDEPS_TAGS=[
+        # Circular with rpc because it needs object_check.cpp
+        'incomplete'
     ],
 )
 

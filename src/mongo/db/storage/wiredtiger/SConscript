@@ -39,6 +39,11 @@ if wiredtiger:
             '$BUILD_DIR/third_party/shim_snappy',
             '$BUILD_DIR/third_party/shim_zlib',
             ],
+        LIBDEPS_TAGS=[
+            # References WiredTigerKVEngine::initRsOplogBackgroundThread which does not have
+            # a unique definition.
+            'incomplete',
+        ],
         )
 
     wtEnv.Library(
@@ -52,7 +57,13 @@ if wiredtiger:
             ],
         LIBDEPS=['storage_wiredtiger_core',
                  '$BUILD_DIR/mongo/db/storage/kv/kv_engine',
-                 ]
+                 '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
+                 '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
+                 ],
+        LIBDEPS_TAGS=[
+            # Depends on symbols defined in serverOnlyfiles
+            'incomplete',
+        ],
         )
 
     wtEnv.Library(

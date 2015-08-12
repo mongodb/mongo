@@ -11,7 +11,12 @@ env.Library(
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
-        ]
+        ],
+    LIBDEPS_TAGS=[
+        # Depends on KVDatabaseCatalogEntry::getIndex, which does not have
+        # a unique definition.
+        'incomplete',
+    ],
     )
 
 # Should not be referenced outside this SConscript file.
@@ -22,6 +27,10 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on KVDatabaseCatalogEntry::getIndex, which is not uniquely defined
+        'incomplete',
     ],
 )
 
@@ -47,7 +56,11 @@ env.Library(
         'kv_database_catalog_entry_core',
         'kv_engine_core',
         'kv_storage_engine',
-        ]
+        ],
+    LIBDEPS_TAGS=[
+        # Depends on symbols from serverOnlyFiles
+        'incomplete',
+        ],
     )
 
 # Stubs out KVDatabaseCatalogEntry::getIndex() for testing.
@@ -73,7 +86,12 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/unittest/unittest',
         'kv_engine_core',
-        ]
+        ],
+    LIBDEPS_TAGS=[
+        # Depends on KVHarnessHelper::create which does not have a unique definition
+        'incomplete',
+    ],
+
     )
 
 env.CppUnitTest(

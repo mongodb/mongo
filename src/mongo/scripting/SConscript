@@ -19,6 +19,11 @@ env.Library(
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/md5',
     ],
+    LIBDEPS_TAGS=[
+        # Depends on mongo::createDirectClient, which is not uniquely defined
+        'incomplete'
+    ],
+
 )
 
 env.Library(
@@ -135,6 +140,11 @@ if usemozjs:
             '$BUILD_DIR/third_party/shim_mozjs',
             '$BUILD_DIR/mongo/shell/mongojs',
             '$BUILD_DIR/mongo/db/service_context',
+        ],
+        LIBDEPS_TAGS=[
+            # Depends on haveLocalShardingInfo and createDirectClient, which are not
+            # uniquely defined.
+            'incomplete',
         ],
     )
 else:

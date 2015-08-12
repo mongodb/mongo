@@ -76,6 +76,7 @@ env.Library('authservercommon',
                 'security_key.cpp',
             ],
             LIBDEPS=[
+                '$BUILD_DIR/mongo/db/coredb',
                 'authcommon',
                 'authcore',
                 'authmocks',
@@ -111,26 +112,45 @@ env.Library('saslauth',
                 'authmocks', # Wat?
                 'sasl_options',
                 '$BUILD_DIR/mongo/crypto/scramauth',
-                '$BUILD_DIR/mongo/util/net/network'])
+                '$BUILD_DIR/mongo/util/net/network',
+             ],
+            LIBDEPS_TAGS=[
+                # Depends on Commands::testCommandsEnabled, which is not uniquely defined
+                'incomplete',
+            ],
+)
 
 env.Library('authmongod',
             ['authz_manager_external_state_d.cpp',
              'authz_session_external_state_d.cpp',
              'auth_index_d.cpp',
-             'impersonation_session.cpp'],
-
+             'impersonation_session.cpp'
+            ],
             LIBDEPS=[
                 'authservercommon',
                 '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
                 '$BUILD_DIR/mongo/db/server_parameters',
-            ])
+            ],
+            LIBDEPS_TAGS=[
+                # Depends on files db_raii.cpp and catalog support files from serverOnlyFiles
+                'incomplete',
+            ],
+)
 
 env.Library('authmongos',
             ['authz_manager_external_state_s.cpp',
              'authz_session_external_state_s.cpp',
              'user_cache_invalidator_job.cpp'],
-            LIBDEPS=['authservercommon',
-                     '$BUILD_DIR/mongo/s/catalog/dist_lock_manager'])
+            LIBDEPS=[
+                'authservercommon',
+                '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
+                '$BUILD_DIR/mongo/s/coreshard',
+            ],
+            LIBDEPS_TAGS=[
+                # Depends on inShutdown
+                'incomplete',
+            ],
+)
 
 env.Library(
     target='authmocks',

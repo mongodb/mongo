@@ -812,6 +812,7 @@ envDict = dict(BUILD_ROOT=buildDir,
                CONFIGURELOG=sconsDataDir.File('config.log'),
                INSTALL_DIR=installDir,
                CONFIG_HEADER_DEFINES={},
+               LIBDEPS_TAG_EXPANSIONS=[],
                )
 
 env = Environment(variables=env_vars, **envDict)
@@ -1054,26 +1055,77 @@ if link_model.startswith("dynamic"):
     # Do the same for SharedObject
     env['BUILDERS']['Object'] = env['BUILDERS']['SharedObject']
 
-    # TODO: Ideally, the conditions below should be based on a detection of what linker we are
-    # using, not the local OS, but I doubt very much that we will see the mach-o linker on
-    # anything other than Darwin, or a BFD/sun-esque linker elsewhere.
+    # TODO: Ideally, the conditions below should be based on a
+    # detection of what linker we are using, not the local OS, but I
+    # doubt very much that we will see the mach-o linker on anything
+    # other than Darwin, or a BFD/sun-esque linker elsewhere.
 
-    # On Darwin, we need to tell the linker that undefined symbols are resolved via dynamic
-    # lookup; otherwise we get build failures. On other unixes, we need to suppress as-needed
-    # behavior so that initializers are ensured present, even if there is no visible edge to
-    # the library in the symbol graph.
+    # On Darwin, we need to tell the linker that undefined symbols are
+    # resolved via dynamic lookup; otherwise we get build failures. On
+    # other unixes, we need to suppress as-needed behavior so that
+    # initializers are ensured present, even if there is no visible
+    # edge to the library in the symbol graph.
     #
-    # NOTE: The darwin linker flag is only needed because the library graph is not a DAG. Once
-    # the graph is a DAG, we will require all edges to be expressed, and we should drop the
-    # flag. When that happens, we should also add -z,defs flag on ELF platforms to ensure that
-    # missing symbols due to unnamed dependency edges result in link errors.
+    # NOTE: The darwin linker flag is only needed because the library
+    # graph is not a DAG. Once the graph is a DAG, we will require all
+    # edges to be expressed, and we should drop the flag. When that
+    # happens, we should also add -z,defs flag on ELF platforms to
+    # ensure that missing symbols due to unnamed dependency edges
+    # result in link errors.
+    #
+    # NOTE: The 'incomplete' tag can be applied to a library to
+    # indicate that it does not (or cannot) completely express all of
+    # its required link dependencies. This can occur for three
+    # reasons:
+    #
+    # - No unique provider for the symbol: Some symbols do not have a
+    #   unique dependency that provides a definition, in which case it
+    #   is impossible for the library to express a dependency edge to
+    #   resolve the symbol
+    #
+    # - The library is part of a cycle: If library A depends on B,
+    #   which depends on C, which depends on A, then it is impossible
+    #   to express all three edges in SCons, since otherwise there is
+    #   no way to sequence building the libraries. The cyclic
+    #   libraries actually work at runtime, because some parent object
+    #   links all of them.
+    #
+    # - The symbol is provided by an executable into which the library
+    #   will be linked. The mongo::inShutdown symbol is a good
+    #   example.
+    #
+    # All of these are defects in the linking model. In an effort to
+    # eliminate these issues, we have begun tagging those libraries
+    # that are affected, and requiring that all non-tagged libraries
+    # correctly express all dependencies. As we repair each defective
+    # library, we can remove the tag. When all the tags are removed
+    # the graph will be acyclic.
+
     if env.TargetOSIs('osx'):
-        if link_model != "dynamic-strict":
-            env.AppendUnique(SHLINKFLAGS=["-Wl,-undefined,dynamic_lookup"])
+        if link_model == "dynamic-strict":
+            # Darwin is strict by default
+            pass
+        else:
+            def libdeps_tags_expand_incomplete(source, target, env, for_signature):
+                # On darwin, since it is strict by default, we need to add a flag
+                # when libraries are tagged incomplete.
+                if 'incomplete' in target[0].get_env().get("LIBDEPS_TAGS", []):
+                    return ["-Wl,-undefined,dynamic_lookup"]
+                return []
+            env['LIBDEPS_TAG_EXPANSIONS'].append(libdeps_tags_expand_incomplete)
     else:
         env.AppendUnique(SHLINKFLAGS=["-Wl,--no-as-needed"])
         if link_model == "dynamic-strict":
             env.AppendUnique(SHLINKFLAGS=["-Wl,-z,defs"])
+        else:
+            # On BFD/gold linker environments, which are not strict by
+            # default, we need to add a flag when libraries are not
+            # tagged incomplete.
+            def libdeps_tags_expand_incomplete(source, target, env, for_signature):
+                if 'incomplete' not in target[0].get_env().get("LIBDEPS_TAGS", []):
+                    return ["-Wl,-z,defs"]
+                return []
+            env['LIBDEPS_TAG_EXPANSIONS'].append(libdeps_tags_expand_incomplete)
 
 if optBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")

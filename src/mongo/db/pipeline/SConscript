@@ -121,7 +121,13 @@ docSourceEnv.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/third_party/shim_snappy',
-    ]
+    ],
+    LIBDEPS_TAGS=[
+        # Inclusion of sorter.cpp causes a dependency on mongo::isMongos,
+        # which is not uniquely defined
+        'incomplete'
+    ],
+
 )
 
 env.Library(

@@ -51,6 +51,7 @@ env.Library(
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/bson/util/bson_extract',
             '$BUILD_DIR/mongo/db/geo/geometry',
+            '$BUILD_DIR/mongo/db/geo/geoparser',
             '$BUILD_DIR/mongo/db/mongohasher',
             '$BUILD_DIR/third_party/s2/s2',
         ]

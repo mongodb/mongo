@@ -32,7 +32,12 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/s/sharding_initialization',
-    ]
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on symbols defined in files in serverOnlyFiles, and has
+        # many other missing dependencies.
+        'incomplete',
+    ],
 )
 
 env.Library(
@@ -42,6 +47,8 @@ env.Library(
         'set_shard_version_command.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/mongo/s/serveronly',
         'metadata',
         'sharding',
     ]

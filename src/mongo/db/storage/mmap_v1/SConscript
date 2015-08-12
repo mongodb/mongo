@@ -38,7 +38,11 @@ env.Library(
         'compress',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/storage/paths',
-    ]
+    ],
+    LIBDEPS_TAGS=[
+        # Many undefined symbols
+        'incomplete',
+    ],
     )
 
 compressEnv = env.Clone()

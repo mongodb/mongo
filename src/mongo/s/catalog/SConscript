@@ -53,11 +53,17 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
+        '$BUILD_DIR/mongo/s/common',
         '$BUILD_DIR/mongo/s/catalog/catalog_types',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/shard_util',
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
-    ]
+        'dist_lock_manager',
+    ],
+    LIBDEPS_TAGS=[
+        # Circular with coreshard for mongo::grid and mongo::DBConfig.
+        'incomplete',
+    ],
 )
 
 env.Library(
@@ -151,6 +157,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
         '$BUILD_DIR/mongo/util/net/hostandport',
         'dist_lock_catalog_interface',
     ],

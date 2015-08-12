@@ -216,6 +216,9 @@ env.Library(
         'concurrency/spin_lock',
         'foundation',
     ],
+    LIBDEPS_TAGS=[
+        'incomplete'
+    ],
 )
 
 env.CppUnitTest(
@@ -368,6 +371,10 @@ env.Library(
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/db/server_options_core",
     ],
+    LIBDEPS_TAGS=[
+        # Depends on logProcessDetailsForLogRotate and exitCleanly
+        'incomplete',
+    ]
 )
 
 env.CppUnitTest(

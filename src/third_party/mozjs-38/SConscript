@@ -92,4 +92,11 @@ sources.extend(Glob('platform/' + env["TARGET_ARCH"] + "/" + env["TARGET_OS"] + 
 
 # All of those unified sources come in from configure.  The files don't
 # actually build individually anymore.
-env.Library( "mozjs", sources )
+env.Library(
+    target="mozjs",
+    source=sources,
+    LIBDEPS_TAGS=[
+        # Depends on allocation symbols defined elsewhere
+        'incomplete'
+    ],
+)

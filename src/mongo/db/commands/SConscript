@@ -17,7 +17,11 @@ env.Library(
     target='killcursors_common',
     source=[
         'killcursors_common.cpp',
-    ]
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/coredb",
+        '$BUILD_DIR/mongo/db/query/command_request_response',
+    ],
 )
 
 env.CppUnitTest(
