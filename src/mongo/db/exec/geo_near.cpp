@@ -42,7 +42,6 @@
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index/expression_params.h"
-#include "mongo/db/index/s2_keys.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs.h"
@@ -851,7 +850,7 @@ void GeoNear2DSphereStage::DensityEstimator::buildIndexScan(OperationContext* tx
     invariant(_currentLevel < centerId.level());
     centerId.AppendVertexNeighbors(_currentLevel, &neighbors);
 
-    S2CellIdsToIntervals(neighbors, _indexParams, coveredIntervals);
+    ExpressionMapping::S2CellIdsToIntervals(neighbors, _indexParams.indexVersion, coveredIntervals);
 
     // Index scan
     invariant(!_indexScan);
@@ -1002,7 +1001,7 @@ StatusWith<NearStage::CoveredInterval*>  //
     _scannedCells.Add(cover);
 
     OrderedIntervalList* coveredIntervals = &scanParams.bounds.fields[s2FieldPosition];
-    S2CellIdsToIntervalsWithParents(cover, _indexParams, coveredIntervals);
+    ExpressionMapping::S2CellIdsToIntervalsWithParents(cover, _indexParams, coveredIntervals);
 
     IndexScan* scan = new IndexScan(txn, scanParams, workingSet, nullptr);
 

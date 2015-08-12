@@ -30,20 +30,20 @@
 
 #include <iostream>
 
-#include "third_party/s2/s2regioncoverer.h"
-
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/expression_params.h"
-#include "mongo/db/index/s2_indexing_params.h"
-#include "mongo/db/index/s2_keys.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/query/expression_index_knobs.h"
+#include "third_party/s2/s2cellid.h"
+#include "third_party/s2/s2region.h"
+#include "third_party/s2/s2regioncoverer.h"
 
 namespace mongo {
 
 using std::set;
+using mongo::Interval;
 
 BSONObj ExpressionMapping::hash(const BSONElement& value) {
     BSONObjBuilder bob;
@@ -134,6 +134,100 @@ void ExpressionMapping::cover2dsphere(const S2Region& region,
                                       OrderedIntervalList* oilOut) {
     std::vector<S2CellId> cover = get2dsphereCovering(region);
     S2CellIdsToIntervalsWithParents(cover, indexingParams, oilOut);
+}
+
+namespace {
+bool compareIntervals(const Interval& a, const Interval& b) {
+    return a.precedes(b);
+}
+
+void S2CellIdsToIntervalsUnsorted(const std::vector<S2CellId>& intervalSet,
+                                  const S2IndexVersion indexVersion,
+                                  OrderedIntervalList* oilOut) {
+    for (const S2CellId& interval : intervalSet) {
+        BSONObjBuilder b;
+        if (indexVersion >= S2_INDEX_VERSION_3) {
+            long long start = static_cast<long long>(interval.range_min().id());
+            long long end = static_cast<long long>(interval.range_max().id());
+            b.append("start", start);
+            b.append("end", end);
+            invariant(start <= end);
+            oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(b.obj(), true, true));
+        } else {
+            // for backwards compatibility, use strings
+            std::string start = interval.toString();
+            std::string end = start;
+            end[start.size() - 1]++;
+            b.append("start", start);
+            b.append("end", end);
+            oilOut->intervals.push_back(
+                IndexBoundsBuilder::makeRangeInterval(b.obj(), true, false));
+        }
+    }
+}
+}  // namespace
+
+void ExpressionMapping::S2CellIdsToIntervals(const std::vector<S2CellId>& intervalSet,
+                                             const S2IndexVersion indexVersion,
+                                             OrderedIntervalList* oilOut) {
+    // Order is not preserved in changing from numeric to string
+    // form of index key. Therefore, sorting is deferred to after
+    // intervals are made
+    S2CellIdsToIntervalsUnsorted(intervalSet, indexVersion, oilOut);
+    std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), compareIntervals);
+    // Make sure that our intervals don't overlap each other and are ordered correctly.
+    // This perhaps should only be done in debug mode.
+    if (!oilOut->isValidFor(1)) {
+        std::cout << "check your assumptions! OIL = " << oilOut->toString() << std::endl;
+        verify(0);
+    }
+}
+
+void ExpressionMapping::S2CellIdsToIntervalsWithParents(const std::vector<S2CellId>& intervalSet,
+                                                        const S2IndexingParams& indexParams,
+                                                        OrderedIntervalList* oilOut) {
+    // There may be duplicates when going up parent cells if two cells share a parent
+    std::unordered_set<S2CellId> exactSet;
+    for (const S2CellId& interval : intervalSet) {
+        S2CellId coveredCell = interval;
+        // Look at the cells that cover us.  We want to look at every cell that contains the
+        // covering we would index on if we were to insert the query geometry.  We generate
+        // the would-index-with-this-covering and find all the cells strictly containing the
+        // cells in that set, until we hit the coarsest indexed cell.  We use equality, not
+        // a prefix match.  Why not prefix?  Because we've already looked at everything
+        // finer or as fine as our initial covering.
+        //
+        // Say we have a fine point with cell id 212121, we go up one, get 21212, we don't
+        // want to look at cells 21212[not-1] because we know they're not going to intersect
+        // with 212121, but entries inserted with cell value 21212 (no trailing digits) may.
+        // And we've already looked at points with the cell id 211111 from the regex search
+        // created above, so we only want things where the value of the last digit is not
+        // stored (and therefore could be 1).
+
+        while (coveredCell.level() > indexParams.coarsestIndexedLevel) {
+            // Add the parent cell of the currently covered cell since we aren't at the
+            // coarsest level yet
+            // NOTE: Be careful not to generate cells strictly less than the
+            // coarsestIndexedLevel - this can result in S2 failures when level < 0.
+
+            coveredCell = coveredCell.parent();
+            exactSet.insert(coveredCell);
+        }
+    }
+
+    for (const S2CellId& exact : exactSet) {
+        BSONObj exactBSON = S2CellIdToIndexKey(exact, indexParams.indexVersion);
+        oilOut->intervals.push_back(IndexBoundsBuilder::makePointInterval(exactBSON));
+    }
+
+    S2CellIdsToIntervalsUnsorted(intervalSet, indexParams.indexVersion, oilOut);
+    std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), compareIntervals);
+    // Make sure that our intervals don't overlap each other and are ordered correctly.
+    // This perhaps should only be done in debug mode.
+    if (!oilOut->isValidFor(1)) {
+        std::cout << "check your assumptions! OIL = " << oilOut->toString() << std::endl;
+        verify(0);
+    }
 }
 
 }  // namespace mongo

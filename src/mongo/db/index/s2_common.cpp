@@ -26,11 +26,14 @@
  *    it in the license file.
  */
 
-#include "mongo/db/index/s2_indexing_params.h"
+#include "mongo/db/index/s2_common.h"
 
-#include "third_party/s2/s2regioncoverer.h"
+#include <cstdlib>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/geo/geometry_container.h"
+#include "third_party/s2/s2cellid.h"
+#include "third_party/s2/s2regioncoverer.h"
 
 namespace mongo {
 
@@ -61,5 +64,33 @@ void S2IndexingParams::configureCoverer(const GeometryContainer& geoContainer,
 
     // This is advisory; the two above are strict.
     coverer->set_max_cells(maxCellsInCovering);
+}
+
+BSONObj S2CellIdToIndexKey(const S2CellId& cellId, S2IndexVersion indexVersion) {
+    // The range of an unsigned long long is
+    // |-----------------|------------------|
+    // 0                2^32               2^64 - 1
+    // 000...           100...             111...
+    // The range of a signed long long is
+    // |-----------------|------------------|
+    // -2^63             0                 2^63 - 1
+    // 100...           000...             011...
+    // S2 gives us an unsigned long long, and we need
+    // to use signed long longs for the index.
+    //
+    // The relative ordering may be changed with unsigned
+    // numbers around 2^32 being converted to signed
+    //
+    // However, because a single cell cannot span over
+    // more than once face, individual intervals will
+    // never cross that threshold. Thus, scans will still
+    // produce the same results.
+    BSONObjBuilder b;
+    if (indexVersion >= S2_INDEX_VERSION_3) {
+        b.append("", static_cast<long long>(cellId.id()));
+    } else {
+        b.append("", cellId.ToString());
+    }
+    return b.obj();
 }
 }  // namespace mongo

@@ -31,7 +31,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/s2_indexing_params.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {

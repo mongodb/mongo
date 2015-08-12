@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2015 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,8 +28,11 @@
 
 #pragma once
 
-#include "mongo/db/geo/s2.h"
+#include <string>
 
+#include "mongo/db/jsobj.h"
+
+class S2CellId;
 class S2RegionCoverer;
 
 namespace mongo {
@@ -55,7 +58,7 @@ enum S2IndexVersion {
 struct S2IndexingParams {
     // Since we take the cartesian product when we generate keys for an insert,
     // we need a cap.
-    size_t maxKeysPerInsert;
+    std::size_t maxKeysPerInsert;
     // This is really an advisory parameter that we pass to the cover generator.  The
     // finest/coarsest index level determine the required # of cells.
     int maxCellsInCovering;
@@ -73,5 +76,7 @@ struct S2IndexingParams {
 
     void configureCoverer(const GeometryContainer& geoContainer, S2RegionCoverer* coverer) const;
 };
+
+BSONObj S2CellIdToIndexKey(const S2CellId& cellId, S2IndexVersion indexVersion);
 
 }  // namespace mongo

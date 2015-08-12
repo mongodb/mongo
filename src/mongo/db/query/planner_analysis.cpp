@@ -35,7 +35,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/index/expression_params.h"
-#include "mongo/db/index/s2_indexing_params.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_planner.h"

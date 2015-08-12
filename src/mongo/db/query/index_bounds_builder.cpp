@@ -36,7 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/index/expression_params.h"
-#include "mongo/db/index/s2_indexing_params.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs.h"

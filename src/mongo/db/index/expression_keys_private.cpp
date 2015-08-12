@@ -39,8 +39,7 @@
 #include "mongo/db/geo/s2.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
-#include "mongo/db/index/s2_indexing_params.h"
-#include "mongo/db/index/s2_keys.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -134,15 +133,7 @@ void getS2GeoKeys(const BSONObj& document,
                 cells.size() > 0);
 
         for (vector<S2CellId>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
-            BSONObjBuilder b;
-            if (params.indexVersion < S2_INDEX_VERSION_3) {
-                b.append("", it->toString());
-            } else {
-                b.append("", S2CellIdToIndexKey(*it));
-            }
-
-
-            out->insert(b.obj());
+            out->insert(S2CellIdToIndexKey(*it, params.indexVersion));
         }
     }
 

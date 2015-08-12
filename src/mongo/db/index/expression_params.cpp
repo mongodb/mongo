@@ -33,8 +33,9 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
-#include "mongo/db/index/s2_indexing_params.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/util/mongoutils/str.h"
+#include "third_party/s2/s2.h"
 
 namespace mongo {
 
