@@ -45,7 +45,7 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec MongoBase::methods[13] = {
+const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_FUNCTION(auth),
     MONGO_ATTACH_JS_FUNCTION(copyDatabaseWithSCRAM),
     MONGO_ATTACH_JS_FUNCTION(cursorFromId),
@@ -56,6 +56,7 @@ const JSFunctionSpec MongoBase::methods[13] = {
     MONGO_ATTACH_JS_FUNCTION(logout),
     MONGO_ATTACH_JS_FUNCTION(remove),
     MONGO_ATTACH_JS_FUNCTION(runCommand),
+    MONGO_ATTACH_JS_FUNCTION(runCommandWithMetadata),
     MONGO_ATTACH_JS_FUNCTION(setClientRPCProtocols),
     MONGO_ATTACH_JS_FUNCTION(update),
     JS_FS_END,
@@ -117,6 +118,42 @@ void MongoBase::Functions::runCommand(JSContext* cx, JS::CallArgs args) {
 
     // the returned object is not read only as some of our tests depend on modifying it.
     ValueReader(cx, args.rval()).fromBSON(cmdRes, false /* read only */);
+}
+
+void MongoBase::Functions::runCommandWithMetadata(JSContext* cx, JS::CallArgs args) {
+    if (args.length() != 4)
+        uasserted(ErrorCodes::BadValue, "runCommandWithMetadata needs 4 args");
+
+    if (!args.get(0).isString())
+        uasserted(ErrorCodes::BadValue,
+                  "the database parameter to runCommandWithMetadata must be a string");
+
+    if (!args.get(1).isString())
+        uasserted(ErrorCodes::BadValue,
+                  "the commandName parameter to runCommandWithMetadata must be a string");
+
+    if (!args.get(2).isObject())
+        uasserted(ErrorCodes::BadValue,
+                  "the metadata argument to runCommandWithMetadata must be an object");
+
+    if (!args.get(3).isObject())
+        uasserted(ErrorCodes::BadValue,
+                  "the commandArgs argument to runCommandWithMetadata must be an object");
+
+    std::string database = ValueWriter(cx, args.get(0)).toString();
+    std::string commandName = ValueWriter(cx, args.get(1)).toString();
+    BSONObj metadata = ValueWriter(cx, args.get(2)).toBSON();
+    BSONObj commandArgs = ValueWriter(cx, args.get(3)).toBSON();
+
+    auto conn = getConnection(args);
+    auto res = conn->runCommandWithMetadata(database, commandName, metadata, commandArgs);
+
+    BSONObjBuilder mergedResultBob;
+    mergedResultBob.append("commandReply", res->getCommandReply());
+    mergedResultBob.append("metadata", res->getMetadata());
+
+    auto mergedResult = mergedResultBob.done();
+    ValueReader(cx, args.rval()).fromBSON(mergedResult, false);
 }
 
 void MongoBase::Functions::find(JSContext* cx, JS::CallArgs args) {

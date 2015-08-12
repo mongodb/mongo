@@ -54,11 +54,12 @@ struct MongoBase : public BaseInfo {
         MONGO_DEFINE_JS_FUNCTION(logout);
         MONGO_DEFINE_JS_FUNCTION(remove);
         MONGO_DEFINE_JS_FUNCTION(runCommand);
+        MONGO_DEFINE_JS_FUNCTION(runCommandWithMetadata);
         MONGO_DEFINE_JS_FUNCTION(setClientRPCProtocols);
         MONGO_DEFINE_JS_FUNCTION(update);
     };
 
-    static const JSFunctionSpec methods[13];
+    static const JSFunctionSpec methods[14];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;

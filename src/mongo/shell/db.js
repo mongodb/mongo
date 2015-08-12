@@ -128,6 +128,9 @@ DB.prototype.commandHelp = function( name ){
      return res;
  };
 
+DB.prototype.runCommandWithMetadata = function(commandName, commandArgs, metadata) {
+    return this.getMongo().runCommandWithMetadata(this._name, commandName, metadata, commandArgs);
+};
 
 DB.prototype._dbCommand = DB.prototype.runCommand;
 DB.prototype._dbReadCommand = DB.prototype.runReadCommand;
