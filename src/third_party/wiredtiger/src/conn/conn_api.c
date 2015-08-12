@@ -1904,7 +1904,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->hazard_max = (uint32_t)cval.val;
 
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
-	conn->session_size = (uint32_t)cval.val + WT_NUM_INTERNAL_SESSIONS;
+	conn->session_size = (uint32_t)cval.val + WT_EXTRA_INTERNAL_SESSIONS;
 
 	WT_ERR(__wt_config_gets(session, cfg, "session_scratch_max", &cval));
 	conn->session_scratch_max = (size_t)cval.val;

@@ -609,6 +609,7 @@ idx
 ifdef's
 ikey
 impl
+incase
 incr
 incrementing
 indices
@@ -743,6 +744,7 @@ nop
 noraw
 notfound
 notsup
+notused
 nset
 nsnap
 nul

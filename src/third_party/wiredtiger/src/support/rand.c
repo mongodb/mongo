@@ -41,18 +41,18 @@
  * of the values to avoid that, and read/write in atomic, 8B chunks.
  */
 #undef	M_W
-#define	M_W(p)	((uint32_t *)&(p))[0]
+#define	M_W(r)	r.x.w
 #undef	M_Z
-#define	M_Z(p)	((uint32_t *)&(p))[1]
+#define	M_Z(r)	r.x.z
 
 /*
  * __wt_random_init --
  *	Initialize return of a 32-bit pseudo-random number.
  */
 void
-__wt_random_init(uint64_t volatile * rnd_state)
+__wt_random_init(WT_RAND_STATE volatile * rnd_state)
 {
-	uint64_t rnd;
+	WT_RAND_STATE rnd;
 
 	M_W(rnd) = 521288629;
 	M_Z(rnd) = 362436069;
@@ -64,9 +64,9 @@ __wt_random_init(uint64_t volatile * rnd_state)
  *	Return a 32-bit pseudo-random number.
  */
 uint32_t
-__wt_random(uint64_t volatile * rnd_state)
+__wt_random(WT_RAND_STATE volatile * rnd_state)
 {
-	uint64_t rnd;
+	WT_RAND_STATE rnd;
 	uint32_t w, z;
 
 	/*

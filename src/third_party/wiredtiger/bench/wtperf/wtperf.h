@@ -26,6 +26,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef	HAVE_WTPERF_H
+#define	HAVE_WTPERF_H
+
 #ifndef _WIN32
 #include <sys/time.h>
 #endif
@@ -90,13 +93,38 @@ typedef struct {
 	int64_t throttle;		/* Maximum operations/second */
 		/* Number of operations per transaction. Zero for autocommit */
 	int64_t ops_per_txn;
+	int64_t truncate;		/* Truncate ratio */
+	uint64_t truncate_pct;		/* Truncate Percent */
+	uint64_t truncate_count;	/* Truncate Count */
 
 #define	WORKER_INSERT		1	/* Insert */
 #define	WORKER_INSERT_RMW	2	/* Insert with read-modify-write */
 #define	WORKER_READ		3	/* Read */
-#define	WORKER_UPDATE		4	/* Update */
+#define	WORKER_TRUNCATE		4	/* Truncate */
+#define	WORKER_UPDATE		5	/* Update */
 	uint8_t ops[100];		/* Operation schedule */
 } WORKLOAD;
+
+/* Steering items for the truncate workload */
+typedef struct __truncate_struct TRUNCATE_CONFIG;
+struct __truncate_struct {
+	uint64_t stone_gap;
+	uint64_t needed_stones;
+	uint64_t final_stone_gap;
+	uint64_t expected_total;
+	uint64_t total_inserts;
+	uint64_t last_total_inserts;
+	uint64_t num_stones;
+	uint64_t last_key;
+};
+
+/* Queue entry for use with the Truncate Logic */
+struct __truncate_queue_entry {
+	char *key;			/* Truncation point */
+	uint64_t diff;			/* Number of items to be truncated*/
+	STAILQ_ENTRY(__truncate_queue_entry) q;
+};
+typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 
 #define	LOG_PARTIAL_CONFIG	",log=(enabled=false)"
 /*
@@ -135,6 +163,7 @@ struct __config {			/* Configuration structure */
 	uint64_t ckpt_ops;		/* checkpoint operations */
 	uint64_t insert_ops;		/* insert operations */
 	uint64_t read_ops;		/* read operations */
+	uint64_t truncate_ops;		/* truncate operations */
 	uint64_t update_ops;		/* update operations */
 
 	uint64_t insert_key;		/* insert key */
@@ -145,6 +174,11 @@ struct __config {			/* Configuration structure */
 	volatile int in_warmup;		/* Running warmup phase */
 
 	volatile uint32_t totalsec;	/* total seconds running */
+
+	u_int		 has_truncate;  /* if there is a truncate workload */
+
+	/* Queue head for use with the Truncate Logic */
+	STAILQ_HEAD(__truncate_qh, __truncate_queue_entry) stone_head;
 
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT
@@ -211,7 +245,7 @@ typedef struct {
 struct __config_thread {		/* Per-thread structure */
 	CONFIG *cfg;			/* Enclosing configuration */
 
-	uint64_t rnd;			/* Random number generation state */
+	WT_RAND_STATE rnd;		/* Random number generation state */
 
 	pthread_t handle;		/* Handle */
 
@@ -223,8 +257,13 @@ struct __config_thread {		/* Per-thread structure */
 	TRACK insert;			/* Insert operations */
 	TRACK read;			/* Read operations */
 	TRACK update;			/* Update operations */
+	TRACK truncate;			/* Truncate operations */
+	TRACK truncate_sleep;		/* Truncate sleep operations */
+	TRUNCATE_CONFIG trunc_cfg;	/* Truncate configuration */
+
 };
 
+void	 cleanup_truncate_config(CONFIG *);
 int	 config_assign(CONFIG *, const CONFIG *);
 int	 config_compress(CONFIG *);
 void	 config_free(CONFIG *);
@@ -238,11 +277,15 @@ void	 latency_read(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_print(CONFIG *);
 int	 enomem(const CONFIG *);
+int	 run_truncate(
+    CONFIG *, CONFIG_THREAD *, WT_CURSOR *, WT_SESSION *, int *);
 int	 setup_log_file(CONFIG *);
+int	 setup_truncate(CONFIG *, CONFIG_THREAD *, WT_SESSION *);
 uint64_t sum_ckpt_ops(CONFIG *);
 uint64_t sum_insert_ops(CONFIG *);
 uint64_t sum_pop_ops(CONFIG *);
 uint64_t sum_read_ops(CONFIG *);
+uint64_t sum_truncate_ops(CONFIG *);
 uint64_t sum_update_ops(CONFIG *);
 void	 usage(void);
 
@@ -251,3 +294,14 @@ void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
 __attribute__((format (printf, 4, 5)))
 #endif
 ;
+
+static inline void
+generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
+{
+	/*
+	 * Don't change to snprintf, sprintf is faster in some tests.
+	 */
+	sprintf(key_buf, "%0*" PRIu64, cfg->key_sz - 1, keyno);
+}
+
+#endif

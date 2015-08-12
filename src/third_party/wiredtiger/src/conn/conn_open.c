@@ -128,7 +128,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * conditional because we allocate the log path so that printlog can
 	 * run without running logging or recovery.
 	 */
-	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE))
 		WT_TRET(__wt_txn_checkpoint_log(
 		    session, 1, WT_TXN_LOG_CKPT_STOP, NULL));
 	F_CLR(conn, WT_CONN_LOG_SERVER_RUN);

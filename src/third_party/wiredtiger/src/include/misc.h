@@ -255,3 +255,11 @@
 #define	__wt_page_swap(session, held, want, flags)			\
 	__wt_page_swap_func(session, held, want, flags)
 #endif
+
+/* Random number generator state. */
+union __wt_rand_state {
+	uint64_t v;
+	struct {
+		uint32_t w, z;
+	} x;
+};

@@ -125,20 +125,6 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	txn_global = &conn->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
 
-	current_id = snap_min = txn_global->current;
-	prev_oldest_id = txn_global->oldest_id;
-
-	/* For pure read-only workloads, avoid scanning. */
-	if (prev_oldest_id == current_id) {
-		txn_state->snap_min = current_id;
-		__txn_sort_snapshot(session, 0, current_id);
-
-		/* Check that the oldest ID has not moved in the meantime. */
-		if (prev_oldest_id == txn_global->oldest_id &&
-		    txn_global->scan_count == 0)
-			return;
-	}
-
 	/*
 	 * We're going to scan.  Increment the count of scanners to prevent the
 	 * oldest ID from moving forwards.  Spin if the count is negative,
@@ -150,9 +136,21 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	} while (count < 0 ||
 	    !WT_ATOMIC_CAS4(txn_global->scan_count, count, count + 1));
 
-	/* The oldest ID cannot change until the scan count goes to zero. */
-	prev_oldest_id = txn_global->oldest_id;
 	current_id = snap_min = txn_global->current;
+	prev_oldest_id = txn_global->oldest_id;
+
+	/* For pure read-only workloads, avoid scanning. */
+	if (prev_oldest_id == current_id) {
+		txn_state->snap_min = current_id;
+		__txn_sort_snapshot(session, 0, current_id);
+
+		/* Check that the oldest ID has not moved in the meantime. */
+		if (prev_oldest_id == txn_global->oldest_id) {
+			WT_ASSERT(session, txn_global->scan_count > 0);
+			(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
+			return;
+		}
+	}
 
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -184,10 +182,6 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
 	txn_state->snap_min = snap_min;
 
-	/* Update the last running ID if we have a much newer value. */
-	if (snap_min > txn_global->last_running + 100)
-		txn_global->last_running = snap_min;
-
 	WT_ASSERT(session, txn_global->scan_count > 0);
 	(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
 
@@ -214,7 +208,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	WT_SESSION_IMPL *oldest_session;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
-	uint64_t current_id, id, oldest_id, prev_oldest_id, snap_min;
+	uint64_t current_id, id, last_running, oldest_id, prev_oldest_id;
 	uint32_t i, session_cnt;
 	int32_t count;
 	int last_running_moved;
@@ -222,7 +216,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
 
-	current_id = snap_min = txn_global->current;
+	current_id = last_running = txn_global->current;
 	oldest_session = NULL;
 	prev_oldest_id = txn_global->oldest_id;
 
@@ -247,7 +241,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 
 	/* The oldest ID cannot change until the scan count goes to zero. */
 	prev_oldest_id = txn_global->oldest_id;
-	current_id = oldest_id = snap_min = txn_global->current;
+	current_id = oldest_id = last_running = txn_global->current;
 
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -262,8 +256,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		 */
 		if ((id = s->id) != WT_TXN_NONE &&
 		    WT_TXNID_LE(prev_oldest_id, id) &&
-		    WT_TXNID_LT(id, snap_min))
-			snap_min = id;
+		    WT_TXNID_LT(id, last_running))
+			last_running = id;
 
 		/*
 		 * !!!
@@ -280,8 +274,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		}
 	}
 
-	if (WT_TXNID_LT(snap_min, oldest_id))
-		oldest_id = snap_min;
+	if (WT_TXNID_LT(last_running, oldest_id))
+		oldest_id = last_running;
 
 	/* The oldest ID can't move past any named snapshots. */
 	if ((id = txn_global->nsnap_oldest_id) != WT_TXN_NONE &&
@@ -289,26 +283,42 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		oldest_id = id;
 
 	/* Update the last running ID. */
-	if (WT_TXNID_LT(txn_global->last_running, snap_min)) {
-		txn_global->last_running = snap_min;
-		last_running_moved = 1;
-	} else
-		last_running_moved = 0;
+	last_running_moved =
+	    WT_TXNID_LT(txn_global->last_running, last_running);
 
 	/* Update the oldest ID. */
-	if (WT_TXNID_LT(prev_oldest_id, oldest_id) &&
+	if ((WT_TXNID_LT(prev_oldest_id, oldest_id) || last_running_moved) &&
 	    WT_ATOMIC_CAS4(txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 			if ((id = s->id) != WT_TXN_NONE &&
-			    WT_TXNID_LT(id, oldest_id))
-				oldest_id = id;
+			    WT_TXNID_LT(id, last_running))
+				last_running = id;
 			if ((id = s->snap_min) != WT_TXN_NONE &&
 			    WT_TXNID_LT(id, oldest_id))
 				oldest_id = id;
 		}
+
+		if (WT_TXNID_LT(last_running, oldest_id))
+			oldest_id = last_running;
+
+#ifdef HAVE_DIAGNOSTIC
+		/*
+		 * Make sure the ID doesn't move past any named snapshots.
+		 *
+		 * Don't include the read/assignment in the assert statement.
+		 * Coverity complains if there are assignments only done in
+		 * diagnostic builds, and when the read is from a volatile.
+		 */
+		id = txn_global->nsnap_oldest_id;
+		WT_ASSERT(session,
+		    id == WT_TXN_NONE || !WT_TXNID_LT(id, oldest_id));
+#endif
+		if (WT_TXNID_LT(txn_global->last_running, last_running))
+			txn_global->last_running = last_running;
 		if (WT_TXNID_LT(txn_global->oldest_id, oldest_id))
 			txn_global->oldest_id = oldest_id;
+		WT_ASSERT(session, txn_global->scan_count == -1);
 		txn_global->scan_count = 0;
 	} else {
 		if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
@@ -408,6 +418,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		txn_global->checkpoint_id = 0;
 		txn_global->checkpoint_pinned = WT_TXN_NONE;
 	} else if (F_ISSET(txn, WT_TXN_HAS_ID)) {
+		WT_ASSERT(session,
+		    !WT_TXNID_LT(txn->id, txn_global->last_running));
+
 		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 		    txn->id != WT_TXN_NONE);
 		WT_PUBLISH(txn_state->id, WT_TXN_NONE);
@@ -458,7 +471,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	txn = &session->txn;
 	conn = S2C(session);
-	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR));
+	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || txn->mod_count == 0);
 
 	if (!F_ISSET(txn, WT_TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
@@ -582,6 +595,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		switch (op->type) {
 		case WT_TXN_OP_BASIC:
 		case WT_TXN_OP_INMEM:
+		       WT_ASSERT(session, op->u.upd->txnid == txn->id);
 			op->u.upd->txnid = WT_TXN_ABORTED;
 			break;
 		case WT_TXN_OP_REF:

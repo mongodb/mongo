@@ -192,7 +192,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 * The serial mutex acts as our memory barrier to flush these
 		 * writes before inserting them into the list.
 		 */
-		if (WT_SKIP_FIRST(ins_head) == NULL)
+		if (cbt->ins_stack[0] == NULL)
 			for (i = 0; i < skipdepth; i++) {
 				cbt->ins_stack[i] = &ins_head->head[i];
 				ins->next[i] = cbt->next_stack[i] = NULL;
@@ -263,7 +263,6 @@ int
 __wt_update_alloc(
     WT_SESSION_IMPL *session, WT_ITEM *value, WT_UPDATE **updp, size_t *sizep)
 {
-	WT_UPDATE *upd;
 	size_t size;
 
 	/*
@@ -271,16 +270,15 @@ __wt_update_alloc(
 	 * the value into place.
 	 */
 	size = value == NULL ? 0 : value->size;
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_UPDATE) + size, &upd));
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_UPDATE) + size, updp));
 	if (value == NULL)
-		WT_UPDATE_DELETED_SET(upd);
+		WT_UPDATE_DELETED_SET(*updp);
 	else {
-		upd->size = WT_STORE_SIZE(size);
-		memcpy(WT_UPDATE_DATA(upd), value->data, size);
+		(*updp)->size = WT_STORE_SIZE(size);
+		memcpy(WT_UPDATE_DATA(*updp), value->data, size);
 	}
 
-	*updp = upd;
-	*sizep = WT_UPDATE_MEMSIZE(upd);
+	*sizep = WT_UPDATE_MEMSIZE(*updp);
 	return (0);
 }
 
