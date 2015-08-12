@@ -98,7 +98,7 @@ fop(void *arg)
 {
 	STATS *s;
 	uintptr_t id;
-	uint64_t rnd;
+	WT_RAND_STATE rnd;
 	u_int i;
 
 	id = (uintptr_t)arg;

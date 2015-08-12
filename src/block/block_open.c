@@ -132,8 +132,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	bucket = block->name_hash % WT_HASH_ARRAY_SIZE;
 	WT_CONN_BLOCK_REMOVE(conn, block, bucket);
 
-	if (block->name != NULL)
-		__wt_free(session, block->name);
+	__wt_free(session, block->name);
 
 	if (block->fh != NULL)
 		WT_TRET(__wt_close(session, &block->fh));
@@ -195,14 +194,20 @@ __wt_block_open(WT_SESSION_IMPL *session,
 		}
 	}
 
-	/* Basic structure allocation, initialization. */
+	/*
+	 * Basic structure allocation, initialization.
+	 *
+	 * Note: set the block's name-hash value before any work that can fail
+	 * because cleanup calls the block destroy code which uses that hash
+	 * value to remove the block from the underlying linked lists.
+	 */
 	WT_ERR(__wt_calloc_one(session, &block));
 	block->ref = 1;
+	block->name_hash = hash;
+	block->allocsize = allocsize;
 	WT_CONN_BLOCK_INSERT(conn, block, bucket);
 
 	WT_ERR(__wt_strdup(session, filename, &block->name));
-	block->name_hash = hash;
-	block->allocsize = allocsize;
 
 	WT_ERR(__wt_config_gets(session, cfg, "block_allocation", &cval));
 	block->allocfirst =

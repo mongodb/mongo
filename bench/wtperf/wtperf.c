@@ -50,6 +50,7 @@ static const CONFIG default_cfg = {
 	0,				/* checkpoint operations */
 	0,				/* insert operations */
 	0,				/* read operations */
+	0,				/* truncate operations */
 	0,				/* update operations */
 	0,				/* insert key */
 	0,				/* checkpoint in progress */
@@ -57,6 +58,8 @@ static const CONFIG default_cfg = {
 	0,				/* notify threads to stop */
 	0,				/* in warmup phase */
 	0,				/* total seconds running */
+	0,				/* has truncate */
+	{NULL, NULL},			/* the truncate queue */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
@@ -98,15 +101,6 @@ static inline uint64_t
 get_next_incr(CONFIG *cfg)
 {
 	return (WT_ATOMIC_ADD8(cfg->insert_key, 1));
-}
-
-static inline void
-generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
-{
-	/*
-	 * Don't change to snprintf, sprintf is faster in some tests.
-	 */
-	sprintf(key_buf, "%0*" PRIu64, cfg->key_sz - 1, keyno);
 }
 
 static void
@@ -258,6 +252,8 @@ op_name(uint8_t *op)
 		return ("insert_rmw");
 	case WORKER_READ:
 		return ("read");
+	case WORKER_TRUNCATE:
+		return ("truncate");
 	case WORKER_UPDATE:
 		return ("update");
 	default:
@@ -389,7 +385,7 @@ worker(void *arg)
 	size_t i;
 	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
-	int measure_latency, ret;
+	int measure_latency, ret, truncated;
 	char *value_buf, *key_buf, *value;
 	char buf[512];
 
@@ -444,6 +440,11 @@ worker(void *arg)
 		goto err;
 	}
 
+	/* Setup for truncate */
+	if (thread->workload->truncate != 0)
+		if ((ret = setup_truncate(cfg, thread, session)) != 0)
+			goto err;
+
 	key_buf = thread->key_buf;
 	value_buf = thread->value_buf;
 
@@ -486,6 +487,10 @@ worker(void *arg)
 			if (wtperf_value_range(cfg) < next_val)
 				continue;
 			break;
+		case WORKER_TRUNCATE:
+			/* Required but not used. */
+			next_val = wtperf_rand(thread);
+			break;
 		default:
 			goto err;		/* can't happen */
 		}
@@ -502,10 +507,9 @@ worker(void *arg)
 		 * is 0, to avoid first time latency spikes.
 		 */
 		measure_latency =
-		    cfg->sample_interval != 0 && trk->ops != 0 && (
-		    trk->ops % cfg->sample_rate == 0);
-		if (measure_latency &&
-		    (ret = __wt_epoch(NULL, &start)) != 0) {
+		    cfg->sample_interval != 0 && trk != NULL &&
+		    trk->ops != 0 && (trk->ops % cfg->sample_rate == 0);
+		if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
@@ -547,6 +551,18 @@ worker(void *arg)
 			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) == 0)
 				break;
+			goto op_err;
+		case WORKER_TRUNCATE:
+			if ((ret = run_truncate(
+			    cfg, thread, cursor, session, &truncated)) == 0) {
+				if (truncated)
+					trk = &thread->truncate;
+				else
+					trk = &thread->truncate_sleep;
+				/* Pause between truncate attempts */
+				(void)usleep(1000);
+				break;
+			}
 			goto op_err;
 		case WORKER_UPDATE:
 			if ((ret = cursor->search(cursor)) == 0) {
@@ -711,16 +727,33 @@ run_mix_schedule(CONFIG *cfg, WORKLOAD *workp)
 {
 	int64_t pct;
 
-	/* Confirm reads, inserts and updates cannot all be zero. */
-	if (workp->insert == 0 && workp->read == 0 && workp->update == 0) {
+	/* Confirm reads, inserts, truncates and updates cannot all be zero. */
+	if (workp->insert == 0 && workp->read == 0 &&
+	    workp->truncate == 0 && workp->update == 0) {
 		lprintf(cfg, EINVAL, 0, "no operations scheduled");
 		return (EINVAL);
 	}
 
 	/*
+	 * Handle truncate first - it's a special case that can't be used in
+	 * a mixed workload.
+	 */
+	if (workp->truncate != 0) {
+		if (workp->insert != 0 ||
+		    workp->read != 0 || workp->update != 0) {
+			lprintf(cfg, EINVAL, 0,
+			    "Can't configure truncate in a mixed workload");
+			return (EINVAL);
+		}
+		memset(workp->ops, WORKER_TRUNCATE, sizeof(workp->ops));
+		return (0);
+	}
+
+	/*
 	 * Check for a simple case where the thread is only doing insert or
-	 * update operations (because the default operation for a job-mix is
-	 * read, the subsequent code works fine if only reads are specified).
+	 * update operations (because the default operation for a
+	 * job-mix is read, the subsequent code works fine if only reads are
+	 * specified).
 	 */
 	if (workp->insert != 0 && workp->read == 0 && workp->update == 0) {
 		memset(workp->ops,
@@ -840,10 +873,9 @@ populate_thread(void *arg)
 		cursor = cursors[op % cfg->table_count];
 		generate_key(cfg, key_buf, op);
 		measure_latency =
-		    cfg->sample_interval != 0 && trk->ops != 0 && (
-		    trk->ops % cfg->sample_rate == 0);
-		if (measure_latency &&
-		    (ret = __wt_epoch(NULL, &start)) != 0) {
+		    cfg->sample_interval != 0 &&
+		    trk->ops != 0 && (trk->ops % cfg->sample_rate == 0);
+		if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
@@ -961,10 +993,9 @@ populate_async(void *arg)
 	 * the time to process by workers.
 	 */
 	measure_latency =
-	    cfg->sample_interval != 0 && trk->ops != 0 && (
-	    trk->ops % cfg->sample_rate == 0);
-	if (measure_latency &&
-	    (ret = __wt_epoch(NULL, &start)) != 0) {
+	    cfg->sample_interval != 0 &&
+	    trk->ops != 0 && (trk->ops % cfg->sample_rate == 0);
+	if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
 		lprintf(cfg, ret, 0, "Get time call failed");
 		goto err;
 	}
@@ -1006,8 +1037,7 @@ populate_async(void *arg)
 		goto err;
 	if (measure_latency) {
 		if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-			lprintf(cfg, ret, 0,
-			    "Get time call failed");
+			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
 		++trk->latency_ops;
@@ -1246,8 +1276,9 @@ execute_populate(CONFIG *cfg)
 	CONFIG_THREAD *popth;
 	WT_ASYNC_OP *asyncop;
 	size_t i;
-	uint64_t last_ops, msecs;
+	uint64_t last_ops, msecs, print_ops_sec;
 	uint32_t interval, tables;
+	double print_secs;
 	int elapsed, ret;
 	void *(*pfunc)(void *);
 
@@ -1325,10 +1356,22 @@ execute_populate(CONFIG *cfg)
 
 	lprintf(cfg, 0, 1, "Finished load of %" PRIu32 " items", cfg->icount);
 	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
+
+	/*
+	 * This is needed as the divisions will fail if the insert takes no time
+	 * which will only be the case when there is no data to insert.
+	 */
+	if (msecs == 0) {
+		print_secs = 0;
+		print_ops_sec = 0;
+	} else {
+		print_secs = (double)msecs / (double)MSEC_PER_SEC;
+		print_ops_sec =
+		    (uint64_t)((cfg->icount / msecs) / MSEC_PER_SEC);
+	}
 	lprintf(cfg, 0, 1,
 	    "Load time: %.2f\n" "load ops/sec: %" PRIu64,
-	    (double)msecs / (double)MSEC_PER_SEC,
-	    (uint64_t)((cfg->icount / msecs) / MSEC_PER_SEC));
+	    print_secs, print_ops_sec);
 
 	/*
 	 * If configured, compact to allow LSM merging to complete.  We
@@ -1420,16 +1463,19 @@ execute_workload(CONFIG *cfg)
 {
 	CONFIG_THREAD *threads;
 	WORKLOAD *workp;
-	uint64_t last_ckpts, last_inserts, last_reads, last_updates;
+	uint64_t last_ckpts, last_inserts, last_reads, last_truncates;
+	uint64_t last_updates;
 	uint32_t interval, run_ops, run_time;
 	u_int i;
 	int ret, t_ret;
 	void *(*pfunc)(void *);
 
 	cfg->insert_key = 0;
-	cfg->insert_ops = cfg->read_ops = cfg->update_ops = 0;
+	cfg->insert_ops = cfg->read_ops = cfg->truncate_ops = 0;
+	cfg->update_ops = 0;
 
-	last_ckpts = last_inserts = last_reads = last_updates = 0;
+	last_ckpts = last_inserts = last_reads = last_truncates = 0;
+	last_updates = 0;
 	ret = 0;
 
 	if (cfg->warmup != 0)
@@ -1454,9 +1500,9 @@ execute_workload(CONFIG *cfg)
 	    workp = cfg->workload; i < cfg->workload_cnt; ++i, ++workp) {
 		lprintf(cfg, 0, 1,
 		    "Starting workload #%d: %" PRId64 " threads, inserts=%"
-		    PRId64 ", reads=%" PRId64 ", updates=%" PRId64,
-		    i + 1,
-		    workp->threads, workp->insert, workp->read, workp->update);
+		    PRId64 ", reads=%" PRId64 ", updates=%" PRId64
+		    ", truncate=%" PRId64, i + 1, workp->threads, workp->insert,
+		    workp->read, workp->update, workp->truncate);
 
 		/* Figure out the workload's schedule. */
 		if ((ret = run_mix_schedule(cfg, workp)) != 0)
@@ -1496,6 +1542,7 @@ execute_workload(CONFIG *cfg)
 		cfg->insert_ops = sum_insert_ops(cfg);
 		cfg->read_ops = sum_read_ops(cfg);
 		cfg->update_ops = sum_update_ops(cfg);
+		cfg->truncate_ops = sum_truncate_ops(cfg);
 
 		/* If we're checking total operations, see if we're done. */
 		if (run_ops != 0 && run_ops <=
@@ -1510,16 +1557,18 @@ execute_workload(CONFIG *cfg)
 
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
-		    " updates, %" PRIu64 " checkpoints in %" PRIu32
-		    " secs (%" PRIu32 " total secs)",
+		    " updates, %" PRIu64 " truncates, %" PRIu64
+		    " checkpoints in %" PRIu32 " secs (%" PRIu32 " total secs)",
 		    cfg->read_ops - last_reads,
 		    cfg->insert_ops - last_inserts,
 		    cfg->update_ops - last_updates,
+		    cfg->truncate_ops - last_truncates,
 		    cfg->ckpt_ops - last_ckpts,
 		    cfg->report_interval, cfg->totalsec);
 		last_reads = cfg->read_ops;
 		last_inserts = cfg->insert_ops;
 		last_updates = cfg->update_ops;
+		last_truncates = cfg->truncate_ops;
 		last_ckpts = cfg->ckpt_ops;
 	}
 
@@ -1902,6 +1951,7 @@ start_run(CONFIG *cfg)
 		/* One final summation of the operations we've completed. */
 		cfg->read_ops = sum_read_ops(cfg);
 		cfg->insert_ops = sum_insert_ops(cfg);
+		cfg->truncate_ops = sum_truncate_ops(cfg);
 		cfg->update_ops = sum_update_ops(cfg);
 		cfg->ckpt_ops = sum_ckpt_ops(cfg);
 		total_ops = cfg->read_ops + cfg->insert_ops + cfg->update_ops;
@@ -1916,6 +1966,11 @@ start_run(CONFIG *cfg)
 		    "%%) %" PRIu64 " ops/sec",
 		    cfg->insert_ops, (cfg->insert_ops * 100) / total_ops,
 		    cfg->insert_ops / cfg->run_time);
+		lprintf(cfg, 0, 1,
+		    "Executed %" PRIu64 " truncate operations (%" PRIu64
+		    "%%) %" PRIu64 " ops/sec",
+		    cfg->truncate_ops, (cfg->truncate_ops * 100) / total_ops,
+		    cfg->truncate_ops / cfg->run_time);
 		lprintf(cfg, 0, 1,
 		    "Executed %" PRIu64 " update operations (%" PRIu64
 		    "%%) %" PRIu64 " ops/sec",
@@ -2062,14 +2117,25 @@ main(int argc, char *argv[])
 			break;
 		}
 
+	if (cfg->populate_threads == 0 && cfg->icount != 0) {
+		lprintf(cfg, 1, 0,
+		    "Cannot have 0 populate threads when icount is set\n");
+		goto err;
+	}
+
 	cfg->async_config = NULL;
 	/*
 	 * If the user specified async_threads we use async for all ops.
 	 * If the user wants compaction, then we also enable async for
 	 * the compact operation, but not for the workloads.
 	 */
-	if (cfg->async_threads > 0)
+	if (cfg->async_threads > 0) {
+		if (cfg->has_truncate > 0) {
+			lprintf(cfg, 1, 0, "Cannot run truncate and async\n");
+			goto err;
+		}
 		cfg->use_asyncops = 1;
+	}
 	if (cfg->compact && cfg->async_threads == 0)
 		cfg->async_threads = 2;
 	if (cfg->async_threads > 0) {
@@ -2090,6 +2156,18 @@ main(int argc, char *argv[])
 	}
 	if ((ret = config_compress(cfg)) != 0)
 		goto err;
+
+	/* You can't have truncate on a random collection. */
+	if (cfg->has_truncate && cfg->random_range) {
+		lprintf(cfg, 1, 0, "Cannot run truncate and random_range\n");
+		goto err;
+	}
+
+	/* We can't run truncate with more than one table. */
+	if (cfg->has_truncate && cfg->table_count > 1) {
+		lprintf(cfg, 1, 0, "Cannot truncate more than 1 table\n");
+		goto err;
+	}
 
 	/* Build the URI from the table name. */
 	req_len = strlen("table:") +
@@ -2361,7 +2439,12 @@ wtperf_value_range(CONFIG *cfg)
 {
 	if (cfg->random_range)
 		return (cfg->icount + cfg->random_range);
-
+	/*
+	 * It is legal to configure a zero size populate phase, hide that
+	 * from other code by pretending the range is 1 in that case.
+	 */
+	if (cfg->icount + cfg->insert_key == 0)
+		return (1);
 	return (cfg->icount + cfg->insert_key - (u_int)(cfg->workers_cnt + 1));
 }
 

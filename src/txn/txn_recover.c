@@ -522,7 +522,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 */
 	WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
 
-done:
+done:	FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE);
 err:	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
 	WT_TRET(session->iface.close(&session->iface, NULL));

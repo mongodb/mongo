@@ -172,7 +172,7 @@ real_worker(void)
 {
 	WT_CURSOR **cursors;
 	WT_SESSION *session;
-	uint64_t rnd;
+	WT_RAND_STATE rnd;
 	u_int i, keyno;
 	int j, ret, t_ret;
 

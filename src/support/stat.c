@@ -444,11 +444,15 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search.desc = "cursor: cursor search calls";
 	stats->cursor_search_near.desc = "cursor: cursor search near calls";
 	stats->cursor_update.desc = "cursor: cursor update calls";
-	stats->dh_conn_ref.desc =
-	    "data-handle: connection candidate referenced";
-	stats->dh_conn_handles.desc = "data-handle: connection dhandles swept";
-	stats->dh_conn_sweeps.desc = "data-handle: connection sweeps";
-	stats->dh_conn_tod.desc = "data-handle: connection time-of-death sets";
+	stats->dh_sweep_ref.desc =
+	    "data-handle: connection sweep candidate became referenced";
+	stats->dh_sweep_close.desc =
+	    "data-handle: connection sweep dhandles closed";
+	stats->dh_sweep_remove.desc =
+	    "data-handle: connection sweep dhandles removed from hash list";
+	stats->dh_sweep_tod.desc =
+	    "data-handle: connection sweep time-of-death sets";
+	stats->dh_sweeps.desc = "data-handle: connection sweeps";
 	stats->dh_session_handles.desc = "data-handle: session dhandles swept";
 	stats->dh_session_sweeps.desc = "data-handle: session sweep attempts";
 	stats->log_slot_closes.desc = "log: consolidated slot closures";
@@ -618,10 +622,11 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->cursor_search.v = 0;
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
-	stats->dh_conn_ref.v = 0;
-	stats->dh_conn_handles.v = 0;
-	stats->dh_conn_sweeps.v = 0;
-	stats->dh_conn_tod.v = 0;
+	stats->dh_sweep_ref.v = 0;
+	stats->dh_sweep_close.v = 0;
+	stats->dh_sweep_remove.v = 0;
+	stats->dh_sweep_tod.v = 0;
+	stats->dh_sweeps.v = 0;
 	stats->dh_session_handles.v = 0;
 	stats->dh_session_sweeps.v = 0;
 	stats->log_slot_closes.v = 0;

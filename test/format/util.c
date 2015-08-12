@@ -33,7 +33,7 @@
 #endif
 
 static inline uint32_t
-kv_len(uint64_t *rnd, uint64_t keyno, uint32_t min, uint32_t max)
+kv_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
 {
 	/*
 	 * Focus on relatively small key/value items, admitting the possibility
@@ -116,7 +116,7 @@ key_gen(uint8_t *key, size_t *sizep, uint64_t keyno)
 }
 
 void
-key_gen_insert(uint64_t *rnd, uint8_t *key, size_t *sizep, uint64_t keyno)
+key_gen_insert(WT_RAND_STATE *rnd, uint8_t *key, size_t *sizep, uint64_t keyno)
 {
 	key_gen_common(key, sizep, keyno, (int)mmrand(rnd, 1, 15));
 }
@@ -124,7 +124,7 @@ key_gen_insert(uint64_t *rnd, uint8_t *key, size_t *sizep, uint64_t keyno)
 static uint32_t val_dup_data_len;	/* Length of duplicate data items */
 
 void
-val_gen_setup(uint64_t *rnd, uint8_t **valp)
+val_gen_setup(WT_RAND_STATE *rnd, uint8_t **valp)
 {
 	uint8_t *val;
 	size_t i, len;
@@ -151,7 +151,7 @@ val_gen_setup(uint64_t *rnd, uint8_t **valp)
 }
 
 void
-val_gen(uint64_t *rnd, uint8_t *val, size_t *sizep, uint64_t keyno)
+val_gen(WT_RAND_STATE *rnd, uint8_t *val, size_t *sizep, uint64_t keyno)
 {
 	/*
 	 * Fixed-length records: take the low N bits from the last digit of
@@ -361,7 +361,7 @@ path_setup(const char *home)
  *	Return a random number.
  */
 uint32_t
-rng(uint64_t *rnd)
+rng(WT_RAND_STATE *rnd)
 {
 	char buf[64];
 	uint32_t r;

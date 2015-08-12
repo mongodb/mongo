@@ -56,7 +56,7 @@ typedef enum {
 		case EMFILE:						\
 		case ENFILE:						\
 		case ENOSPC:						\
-			__wt_sleep(0L, 500000L);			\
+			__wt_sleep(0L, 50000L);				\
 			continue;					\
 		default:						\
 			break;						\

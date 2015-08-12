@@ -93,7 +93,7 @@ cursor_search(WT_CURSOR *cursor)
 
 	cursor->set_key(cursor, "foo");
 
-	if ((ret = cursor->search(cursor)) != 0)
+	if ((ret = cursor->search(cursor)) == 0)
 		ret = cursor->get_value(cursor, &value);
 
 	return (ret);
