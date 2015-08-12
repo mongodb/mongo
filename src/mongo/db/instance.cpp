@@ -317,8 +317,19 @@ void receivedPseudoCommand(OperationContext* txn,
                            Message& message,
                            StringData realCommandName) {
     DbMessage originalDbm(message);
-    originalDbm.pullInt();  // ntoskip
-    originalDbm.pullInt();  // ntoreturn
+
+    auto originalNToSkip = originalDbm.pullInt();
+
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "invalid nToSkip - expected 0, but got " << originalNToSkip,
+            originalNToSkip == 0);
+
+    auto originalNToReturn = originalDbm.pullInt();
+
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "invalid nToReturn - expected -1 or 1, but got " << originalNToSkip,
+            originalNToReturn == -1 || originalNToReturn == 1);
+
     auto cmdParams = originalDbm.nextJsObj();
 
     Message interposed;
