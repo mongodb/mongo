@@ -50,6 +50,7 @@ const std::string ReplicaSetConfig::kVersionFieldName = "version";
 const std::string ReplicaSetConfig::kMajorityWriteConcernModeName = "$majority";
 const Milliseconds ReplicaSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
+const Milliseconds ReplicaSetConfig::kDefaultElectionTimeoutPeriod(2000);
 
 namespace {
 
@@ -66,6 +67,7 @@ const std::string kLegalConfigTopFieldNames[] = {kIdFieldName,
                                                  kProtocolVersionFieldName,
                                                  ReplicaSetConfig::kConfigServerFieldName};
 
+const std::string kElectionTimeoutFieldName = "electionTimeoutMillis";
 const std::string kHeartbeatIntervalFieldName = "heartbeatIntervalMillis";
 const std::string kHeartbeatTimeoutFieldName = "heartbeatTimeoutSecs";
 const std::string kChainingAllowedFieldName = "chainingAllowed";
@@ -73,13 +75,6 @@ const std::string kGetLastErrorDefaultsFieldName = "getLastErrorDefaults";
 const std::string kGetLastErrorModesFieldName = "getLastErrorModes";
 
 }  // namespace
-
-ReplicaSetConfig::ReplicaSetConfig()
-    : _isInitialized(false),
-      _heartbeatInterval(kDefaultHeartbeatInterval),
-      _heartbeatTimeoutPeriod(0),
-      _protocolVersion(0),
-      _configServer(false) {}
 
 Status ReplicaSetConfig::initialize(const BSONObj& cfg) {
     _isInitialized = false;
@@ -170,6 +165,21 @@ Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
         return hbIntervalStatus;
     }
     _heartbeatInterval = Milliseconds(heartbeatIntervalMillis);
+
+    // Parse electionTimeoutMillis
+    //
+    BSONElement electionTimeoutMillisElement = settings[kElectionTimeoutFieldName];
+    if (electionTimeoutMillisElement.eoo()) {
+        _electionTimeoutPeriod = Milliseconds(kDefaultElectionTimeoutPeriod);
+    } else if (electionTimeoutMillisElement.isNumber()) {
+        _electionTimeoutPeriod = Milliseconds(electionTimeoutMillisElement.numberInt());
+    } else {
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "Expected type of " << kSettingsFieldName << "."
+                                    << kElectionTimeoutFieldName
+                                    << " to be a number, but found a value of type "
+                                    << typeName(electionTimeoutMillisElement.type()));
+    }
 
     //
     // Parse heartbeatTimeoutSecs
@@ -305,6 +315,13 @@ Status ReplicaSetConfig::validate() const {
                                     << " field value must be non-negative, "
                                        "but found "
                                     << durationCount<Seconds>(_heartbeatTimeoutPeriod));
+    }
+    if (_electionTimeoutPeriod < Milliseconds(0)) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << kSettingsFieldName << '.' << kElectionTimeoutFieldName
+                                    << " field value must be non-negative, "
+                                       "but found "
+                                    << durationCount<Milliseconds>(_electionTimeoutPeriod));
     }
     if (_members.size() > kMaxMembers || _members.empty()) {
         return Status(ErrorCodes::BadValue,
@@ -580,6 +597,9 @@ BSONObj ReplicaSetConfig::toBSON() const {
                                   durationCount<Milliseconds>(_heartbeatInterval));
     settingsBuilder.appendIntOrLL(kHeartbeatTimeoutFieldName,
                                   durationCount<Seconds>(_heartbeatTimeoutPeriod));
+    settingsBuilder.appendIntOrLL(kElectionTimeoutFieldName,
+                                  durationCount<Milliseconds>(_electionTimeoutPeriod));
+
 
     BSONObjBuilder gleModes(settingsBuilder.subobjStart(kGetLastErrorModesFieldName));
     for (StringMap<ReplicaSetTagPattern>::const_iterator mode = _customWriteConcernModes.begin();
