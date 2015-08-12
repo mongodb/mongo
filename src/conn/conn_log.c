@@ -494,18 +494,18 @@ restart:
 				 * and free.
 				 */
 				/*
- 				 * !!! The slot_start_lsn is used for the
- 				 * write_start_lsn which guarantees that the
- 				 * ckpt_lsn points to the beginning of a real
- 				 * log record.  However, that LSN is the
- 				 * start of the slot, which could contain a lot
- 				 * of log records.  In particular, the
- 				 * write_start_lsn could point at or before a
- 				 * commit and it may cause recovery to think a
- 				 * shutdown was not clean when it really was.
- 				 *
- 				 * Coalescing makes this LSN span even larger.
- 				 */
+				 * !!! The slot_start_lsn is used for the
+				 * write_start_lsn which guarantees that the
+				 * ckpt_lsn points to the beginning of a real
+				 * log record.  However, that LSN is the
+				 * start of the slot, which could contain a lot
+				 * of log records.  In particular, the
+				 * write_start_lsn could point at or before a
+				 * commit and it may cause recovery to think a
+				 * shutdown was not clean when it really was.
+				 *
+				 * Coalescing makes this LSN span even larger.
+				 */
 				coalescing->slot_end_lsn = slot->slot_end_lsn;
 				WT_STAT_FAST_CONN_INCR(
 				    session, log_slot_coalesced);
