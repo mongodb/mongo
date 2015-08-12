@@ -91,7 +91,7 @@ bool shouldSaveCursor(OperationContext* txn,
         return false;
     }
 
-    if (!pq.isFromFindCommand() && pq.getBatchSize() && *pq.getBatchSize() == 1) {
+    if (pq.getNToReturn().value_or(0) == 1) {
         return false;
     }
 
@@ -574,7 +574,7 @@ std::string runQuery(OperationContext* txn,
 
         if (FindCommon::enoughForFirstBatch(pq, numResults, bb.len())) {
             LOG(5) << "Enough for first batch, wantMore=" << pq.wantMore()
-                   << " batchSize=" << pq.getBatchSize().value_or(0) << " numResults=" << numResults
+                   << " ntoreturn=" << pq.getNToReturn().value_or(0) << " numResults=" << numResults
                    << endl;
             break;
         }

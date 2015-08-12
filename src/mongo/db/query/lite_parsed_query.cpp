@@ -78,6 +78,7 @@ const char kHintField[] = "hint";
 const char kSkipField[] = "skip";
 const char kLimitField[] = "limit";
 const char kBatchSizeField[] = "batchSize";
+const char kNToReturnField[] = "ntoreturn";
 const char kSingleBatchField[] = "singleBatch";
 const char kCommentField[] = "comment";
 const char kMaxScanField[] = "maxScan";
@@ -107,7 +108,6 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                                                                              const BSONObj& cmdObj,
                                                                              bool isExplain) {
     unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
-    pq->_fromCommand = true;
     pq->_explain = isExplain;
 
     // Parse the command BSON by looping through one element at a time.
@@ -207,6 +207,20 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_batchSize = batchSize;
+        } else if (str::equals(fieldName, kNToReturnField)) {
+            if (!el.isNumber()) {
+                str::stream ss;
+                ss << "Failed to parse: " << cmdObj.toString() << ". "
+                   << "'ntoreturn' field must be numeric.";
+                return Status(ErrorCodes::FailedToParse, ss);
+            }
+
+            long long ntoreturn = el.numberLong();
+            if (ntoreturn < 0) {
+                return Status(ErrorCodes::BadValue, "ntoreturn value must be non-negative");
+            }
+
+            pq->_ntoreturn = ntoreturn;
         } else if (str::equals(fieldName, kSingleBatchField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
@@ -411,6 +425,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     boost::optional<long long> skip,
     boost::optional<long long> limit,
     boost::optional<long long> batchSize,
+    boost::optional<long long> ntoreturn,
     bool wantMore,
     bool isExplain,
     const std::string& comment,
@@ -429,7 +444,10 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     bool isAwaitData,
     bool isPartial) {
     unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
-    pq->_fromCommand = true;
+    // ntoreturn and batchSize or limit are mutually exclusive.
+    if (batchSize || limit) {
+        invariant(!ntoreturn);
+    }
 
     pq->_filter = filter;
     pq->_proj = projection;
@@ -439,6 +457,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     pq->_skip = skip;
     pq->_limit = limit;
     pq->_batchSize = batchSize;
+    pq->_ntoreturn = ntoreturn;
     pq->_wantMore = wantMore;
 
     pq->_explain = isExplain;
@@ -490,6 +509,10 @@ void LiteParsedQuery::asFindCommand(BSONObjBuilder* cmdBuilder) const {
 
     if (_skip) {
         cmdBuilder->append(kSkipField, *_skip);
+    }
+
+    if (_ntoreturn) {
+        cmdBuilder->append(kNToReturnField, *_ntoreturn);
     }
 
     if (_limit) {
@@ -622,6 +645,11 @@ Status LiteParsedQuery::validate() const {
         }
     }
 
+    if ((_limit || _batchSize) && _ntoreturn) {
+        return Status(ErrorCodes::BadValue,
+                      "'limit' or 'batchSize' fields can not be set with 'ntoreturn' field.");
+    }
+
     return Status::OK();
 }
 
@@ -746,30 +774,29 @@ Status LiteParsedQuery::init(int ntoskip,
     _proj = proj.getOwned();
 
     if (ntoskip) {
+        if (ntoskip < 0) {
+            str::stream ss;
+            ss << "Skip value must be positive, but received: " << ntoskip << ". ";
+            return Status(ErrorCodes::BadValue, ss);
+        }
         _skip = ntoskip;
     }
 
     if (ntoreturn) {
-        _batchSize = ntoreturn;
+        if (ntoreturn < 0) {
+            if (ntoreturn == std::numeric_limits<int>::min()) {
+                // ntoreturn is negative but can't be negated.
+                return Status(ErrorCodes::BadValue, "bad ntoreturn value in query");
+            }
+            _ntoreturn = -ntoreturn;
+            _wantMore = false;
+        } else {
+            _ntoreturn = ntoreturn;
+        }
     }
 
     // Initialize flags passed as 'queryOptions' bit vector.
     initFromInt(queryOptions);
-
-    if (_skip && *_skip < 0) {
-        return Status(ErrorCodes::BadValue, "bad skip value in query");
-    }
-
-    if (_batchSize && *_batchSize < 0) {
-        if (*_batchSize == std::numeric_limits<int>::min()) {
-            // _batchSize is negative but can't be negated.
-            return Status(ErrorCodes::BadValue, "bad limit value in query");
-        }
-
-        // A negative number indicates that the cursor should be closed after the first batch.
-        _wantMore = false;
-        _batchSize = -*_batchSize;
-    }
 
     if (fromQueryMessage) {
         BSONElement queryField = queryObj["query"];
@@ -952,6 +979,10 @@ Status LiteParsedQuery::validateFindCmd() {
     }
 
     return validate();
+}
+
+boost::optional<long long> LiteParsedQuery::getEffectiveBatchSize() const {
+    return _batchSize ? _batchSize : _ntoreturn;
 }
 
 }  // namespace mongo

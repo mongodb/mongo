@@ -3956,4 +3956,28 @@ TEST(BadInputTest, TagAccordingToCache) {
     ASSERT_NOT_OK(s);
 }
 
+// A query run as a find command with a sort and ntoreturn should generate a plan implementing
+// the 'ntoreturn hack'.
+TEST_F(QueryPlannerTest, NToReturnHackWithFindCommand) {
+    params.options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
+
+    runQueryAsCommand(fromjson("{find: 'testns', sort: {a:1}, ntoreturn:3}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{or: {nodes: ["
+        "{sort: {limit:3, pattern: {a:1}, node: {cscan: {dir:1}}}}, "
+        "{sort: {limit:0, pattern: {a:1}, node: {cscan: {dir:1}}}}"
+        "]}}");
+}
+
+TEST_F(QueryPlannerTest, NToReturnHackWithSingleBatch) {
+    params.options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
+
+    runQueryAsCommand(fromjson("{find: 'testns', sort: {a:1}, ntoreturn:3, singleBatch:true}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{sort: {pattern: {a:1}, limit:3, node: {cscan: {dir:1, filter: {}}}}}");
+}
+
 }  // namespace

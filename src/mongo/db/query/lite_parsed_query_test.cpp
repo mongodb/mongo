@@ -107,7 +107,7 @@ TEST(LiteParsedQueryTest, NumToReturn) {
                                                                              false,     // snapshot
                                                                              false)));  // explain
 
-    ASSERT_EQUALS(6, *lpq->getBatchSize());
+    ASSERT_EQUALS(6, *lpq->getNToReturn());
     ASSERT(lpq->wantMore());
 }
 
@@ -125,7 +125,7 @@ TEST(LiteParsedQueryTest, NumToReturnNegative) {
                                                                              false,     // snapshot
                                                                              false)));  // explain
 
-    ASSERT_EQUALS(6, *lpq->getBatchSize());
+    ASSERT_EQUALS(6, *lpq->getNToReturn());
     ASSERT(!lpq->wantMore());
 }
 
@@ -257,7 +257,6 @@ TEST(LiteParsedQueryTest, ForbidMetaSortOnFieldWithoutMetaProject) {
 
 TEST(LiteParsedQueryTest, MakeAsFindCmdDefaultArgs) {
     auto lpq = LiteParsedQuery::makeAsFindCmd(NamespaceString("test.ns"));
-    ASSERT_TRUE(lpq->isFromFindCommand());
 
     ASSERT_EQUALS("test.ns", lpq->ns());
 
@@ -269,6 +268,7 @@ TEST(LiteParsedQueryTest, MakeAsFindCmdDefaultArgs) {
     ASSERT_FALSE(lpq->getSkip());
     ASSERT_FALSE(lpq->getLimit());
     ASSERT_FALSE(lpq->getBatchSize());
+    ASSERT_FALSE(lpq->getNToReturn());
     ASSERT_TRUE(lpq->wantMore());
 
     ASSERT_FALSE(lpq->isExplain());
@@ -300,6 +300,7 @@ TEST(LiteParsedQueryTest, MakeFindCmdAllArgs) {
                                               4,
                                               5,
                                               6,
+                                              boost::none,
                                               false,
                                               true,
                                               "this is a comment",
@@ -317,7 +318,6 @@ TEST(LiteParsedQueryTest, MakeFindCmdAllArgs) {
                                               true,
                                               true,
                                               true);
-    ASSERT_TRUE(lpq->isFromFindCommand());
 
     ASSERT_EQUALS("test.ns", lpq->ns());
 
@@ -329,7 +329,71 @@ TEST(LiteParsedQueryTest, MakeFindCmdAllArgs) {
     ASSERT_EQ(4, *lpq->getSkip());
     ASSERT_EQ(5, *lpq->getLimit());
     ASSERT_EQ(6, *lpq->getBatchSize());
+    ASSERT_FALSE(lpq->getNToReturn());
     ASSERT_FALSE(lpq->wantMore());
+    ASSERT_EQ(6, *lpq->getEffectiveBatchSize());
+
+    ASSERT_TRUE(lpq->isExplain());
+    ASSERT_EQ("this is a comment", lpq->getComment());
+    ASSERT_EQUALS(7, lpq->getMaxScan());
+    ASSERT_EQUALS(8, lpq->getMaxTimeMS());
+
+    ASSERT_EQUALS(BSON("e" << 1), lpq->getMin());
+    ASSERT_EQUALS(BSON("f" << 1), lpq->getMax());
+
+    ASSERT_TRUE(lpq->returnKey());
+    ASSERT_TRUE(lpq->showRecordId());
+    ASSERT_TRUE(lpq->isSnapshot());
+    ASSERT_TRUE(lpq->hasReadPref());
+    ASSERT_TRUE(lpq->isTailable());
+    ASSERT_TRUE(lpq->isSlaveOk());
+    ASSERT_TRUE(lpq->isOplogReplay());
+    ASSERT_TRUE(lpq->isNoCursorTimeout());
+    ASSERT_TRUE(lpq->isAwaitData());
+    ASSERT_TRUE(lpq->isPartial());
+}
+
+TEST(LiteParsedQueryTest, MakeAsFindCmdNToReturn) {
+    auto lpq = LiteParsedQuery::makeAsFindCmd(NamespaceString("test.ns"),
+                                              BSON("a" << 1),
+                                              BSON("b" << 1),
+                                              BSON("c" << 1),
+                                              BSON("d" << 1),
+                                              4,
+                                              boost::none,
+                                              boost::none,
+                                              5,
+                                              false,
+                                              true,
+                                              "this is a comment",
+                                              7,
+                                              8,
+                                              BSON("e" << 1),
+                                              BSON("f" << 1),
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true,
+                                              true);
+
+    ASSERT_EQUALS("test.ns", lpq->ns());
+
+    ASSERT_EQUALS(BSON("a" << 1), lpq->getFilter());
+    ASSERT_EQUALS(BSON("b" << 1), lpq->getProj());
+    ASSERT_EQUALS(BSON("c" << 1), lpq->getSort());
+    ASSERT_EQUALS(BSON("d" << 1), lpq->getHint());
+
+    ASSERT_EQ(4, *lpq->getSkip());
+    ASSERT_FALSE(lpq->getLimit());
+    ASSERT_FALSE(lpq->getBatchSize());
+    ASSERT_EQ(5, *lpq->getNToReturn());
+    ASSERT_FALSE(lpq->wantMore());
+    ASSERT_EQ(5, *lpq->getEffectiveBatchSize());
 
     ASSERT_TRUE(lpq->isExplain());
     ASSERT_EQ("this is a comment", lpq->getComment());
@@ -1013,7 +1077,7 @@ TEST(LiteParsedQueryTest, ParseCommandIsFromFindCommand) {
     unique_ptr<LiteParsedQuery> lpq(
         assertGet(LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain)));
 
-    ASSERT(lpq->isFromFindCommand());
+    ASSERT_FALSE(lpq->getNToReturn());
 }
 
 TEST(LiteParsedQueryTest, ParseCommandNotFromFindCommand) {
@@ -1030,7 +1094,7 @@ TEST(LiteParsedQueryTest, ParseCommandNotFromFindCommand) {
                                                  BSONObj(),
                                                  false,     // snapshot
                                                  false)));  // explain
-    ASSERT(!lpq->isFromFindCommand());
+    ASSERT_TRUE(lpq->getNToReturn());
 }
 
 TEST(LiteParsedQueryTest, ParseCommandAwaitDataButNotTailable) {
@@ -1068,7 +1132,7 @@ TEST(LiteParsedQueryTest, DefaultQueryParametersCorrect) {
     ASSERT_FALSE(lpq->getLimit());
 
     ASSERT_EQUALS(true, lpq->wantMore());
-    ASSERT_EQUALS(true, lpq->isFromFindCommand());
+    ASSERT_FALSE(lpq->getNToReturn());
     ASSERT_EQUALS(false, lpq->isExplain());
     ASSERT_EQUALS(0, lpq->getMaxScan());
     ASSERT_EQUALS(0, lpq->getMaxTimeMS());

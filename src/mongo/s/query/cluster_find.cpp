@@ -74,6 +74,7 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
                                           boost::none,  // Don't forward skip.
                                           newLimit,
                                           lpq.getBatchSize(),
+                                          lpq.getNToReturn(),
                                           lpq.wantMore(),
                                           lpq.isExplain(),
                                           lpq.getComment(),
@@ -117,6 +118,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     }
 
     ClusterClientCursorParams params(query.nss());
+    params.limit = query.getParsed().getLimit();
     params.batchSize = query.getParsed().getBatchSize();
     params.limit = query.getParsed().getLimit();
     params.sort = query.getParsed().getSort();

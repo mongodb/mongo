@@ -52,12 +52,14 @@ public:
     /**
      * Returns true if enough results have been prepared to stop adding more to a getMore batch.
      *
-     * An 'ntoreturn' value of zero is interpreted as the absence of a batchSize; in this case,
-     * returns true only once the size threshold is exceeded. If 'ntoreturn' is positive, returns
-     * true once either are added until we have either satisfied the batch size or exceeded the size
-     * threshold.
+     * An 'effectiveBatchSize' value of zero is interpreted as the absence of a batchSize;
+     * in this case, returns true only once the size threshold is exceeded. If 'effectiveBatchSize'
+     * is positive, returns true once either are added until we have either satisfied the batch size
+     * or exceeded the size threshold.
      */
-    static bool enoughForGetMore(long long ntoreturn, long long numDocs, int bytesBuffered);
+    static bool enoughForGetMore(long long effectiveBatchSize,
+                                 long long numDocs,
+                                 int bytesBuffered);
 };
 
 }  // namespace mongo

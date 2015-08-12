@@ -37,7 +37,7 @@ namespace mongo {
 bool FindCommon::enoughForFirstBatch(const LiteParsedQuery& pq,
                                      long long numDocs,
                                      int bytesBuffered) {
-    if (!pq.getBatchSize()) {
+    if (!pq.getEffectiveBatchSize()) {
         // If there is no batch size, we stop generating additional results as soon as we have
         // either 101 documents or at least 1MB of data.
         return (bytesBuffered > 1024 * 1024) || numDocs >= LiteParsedQuery::kDefaultBatchSize;
@@ -45,11 +45,15 @@ bool FindCommon::enoughForFirstBatch(const LiteParsedQuery& pq,
 
     // If there is a batch size, we add results until either satisfying this batch size or exceeding
     // the 4MB size threshold.
-    return numDocs >= *pq.getBatchSize() || bytesBuffered > kMaxBytesToReturnToClientAtOnce;
+    return numDocs >= pq.getEffectiveBatchSize().value() ||
+        bytesBuffered > kMaxBytesToReturnToClientAtOnce;
 }
 
-bool FindCommon::enoughForGetMore(long long ntoreturn, long long numDocs, int bytesBuffered) {
-    return (ntoreturn && numDocs >= ntoreturn) || (bytesBuffered > kMaxBytesToReturnToClientAtOnce);
+bool FindCommon::enoughForGetMore(long long effectiveBatchSize,
+                                  long long numDocs,
+                                  int bytesBuffered) {
+    return (effectiveBatchSize && numDocs >= effectiveBatchSize) ||
+        (bytesBuffered > kMaxBytesToReturnToClientAtOnce);
 }
 
 }  // namespace mongo

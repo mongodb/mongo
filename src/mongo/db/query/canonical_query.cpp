@@ -571,7 +571,11 @@ std::string CanonicalQuery::toString() const {
     }
 
     if (_pq->getSkip()) {
-        ss << " skip=" << *_pq->getSkip() << "\n";
+        ss << " skip=" << *_pq->getSkip();
+    }
+
+    if (_pq->getNToReturn()) {
+        ss << " ntoreturn=" << *_pq->getNToReturn() << '\n';
     }
 
     // The expression tree puts an endl on for us.
@@ -596,6 +600,10 @@ std::string CanonicalQuery::toStringShort() const {
 
     if (_pq->getSkip()) {
         ss << " skip: " << *_pq->getSkip();
+    }
+
+    if (_pq->getNToReturn()) {
+        ss << " ntoreturn=" << *_pq->getNToReturn();
     }
 
     return ss;
