@@ -343,6 +343,8 @@ __wt_txn_checkpoint_log(
 			txn->ckpt_nsnapshot = 0;
 			WT_CLEAR(empty);
 			ckpt_snapshot = &empty;
+			WT_ERR(__wt_log_force_write(session, 1, 0));
+			WT_ERR(__wt_log_wrlsn(session));
 			*ckpt_lsn = S2C(session)->log->write_start_lsn;
 		} else
 			ckpt_snapshot = txn->ckpt_snapshot;
