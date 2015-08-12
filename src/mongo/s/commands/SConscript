@@ -36,6 +36,7 @@ env.Library(
         'cluster_index_filter_cmd.cpp',
         'cluster_is_db_grid_cmd.cpp',
         'cluster_is_master_cmd.cpp',
+        'cluster_killcursors_cmd.cpp',
         'cluster_kill_op.cpp',
         'cluster_list_databases_cmd.cpp',
         'cluster_list_shards_cmd.cpp',
@@ -62,5 +63,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/commands/killcursors_common'
     ]
 )

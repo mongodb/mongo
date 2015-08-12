@@ -13,6 +13,13 @@ env.Library(
         ]
     )
 
+env.Library(
+    target='killcursors_common',
+    source=[
+        'killcursors_common.cpp',
+    ]
+)
+
 env.CppUnitTest(
     target="index_filter_commands_test",
     source=[

@@ -28,44 +28,21 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/commands/killcursors_common.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/query/killcursors_request.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
+namespace {
 
-class KillCursorsCmd final : public KillCursorsCmdBase {
-    MONGO_DISALLOW_COPYING(KillCursorsCmd);
-
+class ClusterKillCursorsCmd final : public KillCursorsCmdBase {
 public:
-    KillCursorsCmd() = default;
+    ClusterKillCursorsCmd() = default;
 
 private:
     Status _killCursor(OperationContext* txn, const NamespaceString& nss, CursorId cursorId) final {
-        std::unique_ptr<AutoGetCollectionForRead> ctx;
-
-        CursorManager* cursorManager;
-        if (nss.isListIndexesCursorNS() || nss.isListCollectionsCursorNS()) {
-            // listCollections and listIndexes are special cursor-generating commands whose cursors
-            // are managed globally, as they operate over catalog data rather than targeting the
-            // data within a collection.
-            cursorManager = CursorManager::getGlobalCursorManager();
-        } else {
-            ctx = stdx::make_unique<AutoGetCollectionForRead>(txn, nss);
-            Collection* collection = ctx->getCollection();
-            if (!collection) {
-                return {ErrorCodes::CursorNotFound,
-                        str::stream() << "collection does not exist: " << nss.ns()};
-            }
-            cursorManager = collection->getCursorManager();
-        }
-        invariant(cursorManager);
-
-        return cursorManager->eraseCursor(txn, cursorId, true /*shouldAudit*/);
+        return grid.getCursorManager()->killCursor(nss, cursorId);
     }
-} killCursorsCmd;
+} clusterKillCursorsCmd;
 
+}  // namespace
 }  // namespace mongo

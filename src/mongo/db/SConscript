@@ -637,6 +637,7 @@ serveronlyLibdeps = [
     "auth/authmongod",
     "catalog/collection_options",
     "catalog/index_key_validate",
+    "commands/killcursors_common",
     "common",
     "concurrency/lock_manager",
     "concurrency/write_conflict_exception",
