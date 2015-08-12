@@ -308,6 +308,12 @@ __wt_txn_checkpoint_log(
 	switch (flags) {
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = 1;
+		/*
+		 * We need to make sure anything buffered is written out
+		 * and the LSN is advanced properly before recording the LSN.
+		 */
+		WT_ERR(__wt_log_force_write(session, 1, 0));
+		WT_ERR(__wt_log_wrlsn(session));
 		*ckpt_lsn = S2C(session)->log->write_start_lsn;
 		/*
 		 * We need to make sure that the log records in the checkpoint
