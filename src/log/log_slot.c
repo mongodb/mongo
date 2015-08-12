@@ -233,6 +233,7 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 			    "Found Slot %d: State %lx j %lu %lx r %lu %lx unbuf %lu wr %lu %lx",
 			    i, slot->slot_state, j, j, rel, rel,
 			    slot->slot_unbuffered, write_size, write_size);
+			abort();
 			if (write_size != 0)
 				WT_RET(__wt_write(session, slot->slot_fh,
 				    slot->slot_start_offset, write_size,

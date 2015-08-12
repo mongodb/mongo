@@ -1960,13 +1960,19 @@ use_slots:
 	 * switch in a new slot.
 	 */
 	force = LF_ISSET(WT_LOG_FLUSH | WT_LOG_FSYNC);
-	if (myslot.end_offset >= WT_LOG_SLOT_BUF_MAX || force) {
+	ret = 0;
+	if (myslot.end_offset >= WT_LOG_SLOT_BUF_MAX || force)
 		WT_WITH_SLOT_LOCK(session, log,
 		    ret = __wt_log_slot_switch(session, NULL));
-		WT_ERR(ret);
-	}
-	WT_ERR(__log_fill(session, &myslot, 0, record, &lsn));
+	if (ret == 0)
+		ret = __log_fill(session, &myslot, 0, record, &lsn);
 	release_size = __wt_log_slot_release(myslot.slot, (int64_t)rdup_len);
+	/*
+	 * If we get an error we still need to do proper accounting in
+	 * the slot fields.
+	 * XXX On error we may still need to call release and free.
+	 */
+	WT_ERR(ret);
 	if (WT_LOG_SLOT_DONE(release_size)) {
 		WT_ERR(__wt_log_release(session, myslot.slot, &free_slot));
 		if (free_slot)
