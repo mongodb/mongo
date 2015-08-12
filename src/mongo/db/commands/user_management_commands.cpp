@@ -1338,6 +1338,13 @@ public:
                 Status(ErrorCodes::BadValue, "Cannot create roles in the $external database"));
         }
 
+        if (RoleGraph::isBuiltinRole(args.roleName)) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::BadValue,
+                       "Cannot create roles with the same name as a built-in role"));
+        }
+
         if (!args.hasRoles) {
             return appendCommandStatus(
                 result,
