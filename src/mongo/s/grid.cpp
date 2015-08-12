@@ -55,7 +55,7 @@ void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
     invariant(!_cursorManager);
 
     _catalogManager = std::move(catalogManager);
-    _catalogCache = stdx::make_unique<CatalogCache>(_catalogManager.get());
+    _catalogCache = stdx::make_unique<CatalogCache>();
     _shardRegistry = std::move(shardRegistry);
     _cursorManager = std::move(cursorManager);
 }

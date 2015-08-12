@@ -35,6 +35,7 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/config.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 
@@ -42,9 +43,7 @@ using std::shared_ptr;
 using std::string;
 
 
-CatalogCache::CatalogCache(CatalogManager* catalogManager) : _catalogManager(catalogManager) {
-    invariant(_catalogManager);
-}
+CatalogCache::CatalogCache() {}
 
 StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn,
                                                            const string& dbName) {
@@ -56,7 +55,7 @@ StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn
     }
 
     // Need to load from the store
-    StatusWith<DatabaseType> status = _catalogManager->getDatabase(dbName);
+    StatusWith<DatabaseType> status = grid.catalogManager(txn)->getDatabase(dbName);
     if (!status.isOK()) {
         return status.getStatus();
     }

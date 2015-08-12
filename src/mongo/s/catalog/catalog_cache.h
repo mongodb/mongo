@@ -53,7 +53,7 @@ class CatalogCache {
     MONGO_DISALLOW_COPYING(CatalogCache);
 
 public:
-    explicit CatalogCache(CatalogManager* catalogManager);
+    CatalogCache();
 
     /**
      * Retrieves the cached metadata for the specified database. The returned value is still
@@ -80,10 +80,6 @@ public:
 
 private:
     typedef std::map<std::string, std::shared_ptr<DBConfig>> ShardedDatabasesMap;
-
-
-    // Reference to the catalog manager. Not owned.
-    CatalogManager* const _catalogManager;
 
     // Databases catalog map and mutex to protect it
     stdx::mutex _mutex;
