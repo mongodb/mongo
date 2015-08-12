@@ -3,10 +3,10 @@ load("jstests/replsets/rslib.js");
 (function() {
 "use strict";
 
-function checkTerm(primary, expectedTerm) {
+function getCurrentTerm(primary) {
     var res = primary.adminCommand({replSetGetStatus: 1});
     assert.commandWorked(res);
-    assert.eq(res.term, NumberLong(expectedTerm));
+    return res.term;
 }
 
 var name = "restore_term";
@@ -23,9 +23,11 @@ rst.awaitSecondaryNodes();
 var primary = rst.getMaster();
 var primaryColl = primary.getDB("test").coll;
 
-checkTerm(primary, 1);
+// Current term may be greater than 1 if election race happens.
+var firstSuccessfulTerm = getCurrentTerm(primary);
+assert.gte(firstSuccessfulTerm, 1);
 assert.writeOK(primaryColl.insert({x: 1}, {writeConcern: {w: "majority"}}));
-checkTerm(primary, 1);
+assert.eq(getCurrentTerm(primary), firstSuccessfulTerm);
 
 // Check that the insert op has the initial term.
 var latestOp = getLatestOp(primary);
@@ -40,7 +42,8 @@ try {
 }
 rst.awaitSecondaryNodes();
 // The secondary became the new primary now with a higher term.
-checkTerm(rst.getMaster(), 2);
+// Since there's only one secondary who may run for election, the new term is higher by 1.
+assert.eq(getCurrentTerm(rst.getMaster()), firstSuccessfulTerm + 1);
 
 // Restart the replset and verify the term is the same.
 rst.stopSet(null /* signal */, true /* forRestart */);
@@ -50,6 +53,6 @@ primary = rst.getMaster();
 
 assert.eq(primary.getDB("test").coll.find().itcount(), 1);
 // After restart, the new primary stands up with the newer term.
-checkTerm(rst.getMaster(), 3);
+assert.gte(getCurrentTerm(primary), firstSuccessfulTerm + 1);
 
 })();
