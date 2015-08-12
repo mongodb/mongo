@@ -376,7 +376,7 @@ tasks:
           set -o errexit
           set -o verbose
 
-          curl --silent --max-time 600 http://boxes.10gen.com/build/node-v0.12.4-linux-x64.tar.gz --output node.tar.gz
+          curl --silent --max-time 600 http://boxes.10gen.com/build/node-v0.12.7-linux-x64.tar.gz --output node.tar.gz
           ${decompress} node.tar.gz
     - command: shell.exec
       params:
@@ -394,7 +394,7 @@ tasks:
           set -o errexit
           set -o verbose
 
-          export PATH="$PATH":${workdir}/src/node-v0.12.4-linux-x64/bin
+          export PATH="$PATH":${workdir}/src/node-v0.12.7-linux-x64/bin
 
           # Create an output directory for the generated test cases and ensure it always contains at least one JS file
           # for resmoke to run so that glob expansion cannot result in an error.
