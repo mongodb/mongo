@@ -25,5 +25,29 @@ env.CppUnitTest('base_test',
                  'parse_number_test.cpp',
                  'status_test.cpp',
                  'status_with_test.cpp',
-                 'string_data_test.cpp'
+                 'string_data_test.cpp',
                 ])
+
+env.Library(
+    target=[
+        'system_error'
+    ],
+    source=[
+        'system_error.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target=[
+        'system_error_test',
+    ],
+    source=[
+        'system_error_test.cpp',
+    ],
+    LIBDEPS=[
+        'system_error',
+    ],
+)
