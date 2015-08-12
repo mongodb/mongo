@@ -1064,7 +1064,8 @@ main(void)
 		home = NULL;
 
 	/*! [Open a connection] */
-	ret = wiredtiger_open(home, NULL, "create,cache_size=500M", &conn);
+	ret = wiredtiger_open(home, NULL,
+	    "create,cache_size=5GB,log=(enabled,recover=on)", &conn);
 	/*! [Open a connection] */
 
 	if (ret == 0)
