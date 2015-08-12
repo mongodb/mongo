@@ -42,7 +42,6 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablebase
     numfiles = 50
     numkv = 1000
-    ckpt = 5
 
     types = [
         ('row', dict(tabletype='row',
@@ -65,7 +64,6 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
                 ',create,error_prefix="%s: ",' % self.shortid() + \
                 'file_manager=(close_handle_minimum=0,' + \
                 'close_idle_time=6,close_scan_interval=2),' + \
-                'checkpoint=(wait=%d),' % self.ckpt + \
                 'statistics=(fast),'
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
         try:
@@ -117,10 +115,15 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         # checkpoint something to do.  Make sure checkpoint doesn't adjust
         # the time of death for inactive handles.
         #
+        # Note that we do checkpoints inline because that has the side effect
+        # of sweeping the session cache, which will allow handles to be
+        # removed.
+        #
         c = self.session.open_cursor(uri, None)
         k = 0
         sleep = 0
         while sleep < 12:
+            self.session.checkpoint()
             k = k+1
             c[k] = 1
             sleep += 2
