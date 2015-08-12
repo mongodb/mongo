@@ -34,6 +34,24 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 }
 
 /*
+ * __wt_log_ckpt_lsn --
+ *	Force out buffered records and return an LSN for checkpoint.
+ */
+int
+__wt_log_ckpt_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
+	WT_RET(__wt_log_force_write(session, 1, 0));
+	WT_RET(__wt_log_wrlsn(session));
+	*ckp_lsn = log->write_start_lsn;
+	return (0);
+}
+
+/*
  * __wt_log_background --
  *	Record the given LSN as the background LSN and signal the
  *	thread as needed.

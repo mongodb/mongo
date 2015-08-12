@@ -316,6 +316,7 @@ extern void __wt_cache_dump(WT_SESSION_IMPL *session);
 extern int __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int closing);
 extern int __wt_evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, int closing);
 extern int __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn);
+extern int __wt_log_ckpt_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn);
 extern int __wt_log_background(WT_SESSION_IMPL *session, WT_LSN *lsn);
 extern int __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn);
 extern int __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec);
