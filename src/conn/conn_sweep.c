@@ -21,7 +21,6 @@ __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 
 	conn = S2C(session);
 
-	WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (WT_IS_METADATA(dhandle))
 			continue;
@@ -41,7 +40,7 @@ __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 			continue;
 
 		dhandle->timeofdeath = now;
-		WT_STAT_FAST_CONN_INCR(session, dh_conn_tod);
+		WT_STAT_FAST_CONN_INCR(session, dh_sweep_tod);
 	}
 
 	return (0);
@@ -117,7 +116,6 @@ __sweep_expire(WT_SESSION_IMPL *session, time_t now)
 
 	conn = S2C(session);
 
-	WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		/*
 		 * Ignore open files once the btree file count is below the
@@ -157,7 +155,6 @@ __sweep_discard_trees(
 
 	*dead_handlesp = 0;
 
-	WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN | WT_DHANDLE_EXCLUSIVE) &&
 		    (dhandle->timeofdiscard == 0 ||
@@ -174,9 +171,10 @@ __sweep_discard_trees(
 
 		/* We closed the btree handle. */
 		if (ret == 0) {
-			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
+			WT_STAT_FAST_CONN_INCR(session, dh_sweep_close);
 			++*dead_handlesp;
-		}
+		} else
+			WT_STAT_FAST_CONN_INCR(session, dh_sweep_ref);
 
 		WT_RET_BUSY_OK(ret);
 	}
@@ -247,9 +245,12 @@ __sweep_remove_handles(WT_SESSION_IMPL *session, time_t now)
 		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __sweep_remove_one(session, dhandle));
 		if (ret == 0)
-			WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
-		else
+			WT_STAT_FAST_CONN_INCR(
+			    session, dh_sweep_remove);
+		else {
+			WT_STAT_FAST_CONN_INCR(session, dh_sweep_ref);
 			dhandle->timeofdiscard = now;
+		}
 		WT_RET_BUSY_OK(ret);
 	}
 
@@ -281,6 +282,8 @@ __sweep_server(void *arg)
 		WT_ERR(__wt_cond_wait(session, conn->sweep_cond,
 		    (uint64_t)conn->sweep_interval * WT_MILLION));
 		WT_ERR(__wt_seconds(session, &now));
+
+		WT_STAT_FAST_CONN_INCR(session, dh_sweeps);
 
 		/*
 		 * Mark handles with a time of death, and report whether any

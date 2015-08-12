@@ -42,7 +42,6 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablebase
     numfiles = 50
     numkv = 1000
-    ckpt = 5
 
     types = [
         ('row', dict(tabletype='row',
@@ -65,7 +64,6 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
                 ',create,error_prefix="%s: ",' % self.shortid() + \
                 'file_manager=(close_handle_minimum=0,' + \
                 'close_idle_time=6,close_scan_interval=2),' + \
-                'checkpoint=(wait=%d),' % self.ckpt + \
                 'statistics=(fast),'
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
         try:
@@ -93,12 +91,13 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
                 time.sleep(1)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close1 = stat_cursor[stat.conn.dh_conn_handles][2]
-        sweep1 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        close1 = stat_cursor[stat.conn.dh_sweep_close][2]
+        remove1 = stat_cursor[stat.conn.dh_sweep_remove][2]
+        sweep1 = stat_cursor[stat.conn.dh_sweeps][2]
         sclose1 = stat_cursor[stat.conn.dh_session_handles][2]
         ssweep1 = stat_cursor[stat.conn.dh_session_sweeps][2]
-        tod1 = stat_cursor[stat.conn.dh_conn_tod][2]
-        ref1 = stat_cursor[stat.conn.dh_conn_ref][2]
+        tod1 = stat_cursor[stat.conn.dh_sweep_tod][2]
+        ref1 = stat_cursor[stat.conn.dh_sweep_ref][2]
         nfile1 = stat_cursor[stat.conn.file_open][2]
         stat_cursor.close()
 
@@ -116,10 +115,15 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         # checkpoint something to do.  Make sure checkpoint doesn't adjust
         # the time of death for inactive handles.
         #
+        # Note that we do checkpoints inline because that has the side effect
+        # of sweeping the session cache, which will allow handles to be
+        # removed.
+        #
         c = self.session.open_cursor(uri, None)
         k = 0
         sleep = 0
         while sleep < 12:
+            self.session.checkpoint()
             k = k+1
             c[k] = 1
             sleep += 2
@@ -127,13 +131,14 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close2 = stat_cursor[stat.conn.dh_conn_handles][2]
-        sweep2 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        close2 = stat_cursor[stat.conn.dh_sweep_close][2]
+        remove2 = stat_cursor[stat.conn.dh_sweep_remove][2]
+        sweep2 = stat_cursor[stat.conn.dh_sweeps][2]
         sclose2 = stat_cursor[stat.conn.dh_session_handles][2]
         ssweep2 = stat_cursor[stat.conn.dh_session_sweeps][2]
         nfile2 = stat_cursor[stat.conn.file_open][2]
-        tod2 = stat_cursor[stat.conn.dh_conn_tod][2]
-        ref2 = stat_cursor[stat.conn.dh_conn_ref][2]
+        tod2 = stat_cursor[stat.conn.dh_sweep_tod][2]
+        ref2 = stat_cursor[stat.conn.dh_sweep_ref][2]
         stat_cursor.close()
         # print "checkpoint: " + str(self.ckpt)
         # print "nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
@@ -150,6 +155,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         #
         if (close1 >= close2):
             print "XX: close1: " + str(close1) + " close2: " + str(close2)
+            print "remove1: " + str(remove1) + " remove2: " + str(remove2)
             print "sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
             print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
             print "ssweep1: " + str(ssweep1) + " ssweep2: " + str(ssweep2)
@@ -157,8 +163,19 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print "ref1: " + str(ref1) + " ref2: " + str(ref2)
             print "nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
         self.assertEqual(close1 < close2, True)
+        if (remove1 >= remove2):
+            print "close1: " + str(close1) + " close2: " + str(close2)
+            print "XX: remove1: " + str(remove1) + " remove2: " + str(remove2)
+            print "sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
+            print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
+            print "ssweep1: " + str(ssweep1) + " ssweep2: " + str(ssweep2)
+            print "tod1: " + str(tod1) + " tod2: " + str(tod2)
+            print "ref1: " + str(ref1) + " ref2: " + str(ref2)
+            print "nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
+        self.assertEqual(remove1 < remove2, True)
         if (sweep1 >= sweep2):
             print "close1: " + str(close1) + " close2: " + str(close2)
+            print "remove1: " + str(remove1) + " remove2: " + str(remove2)
             print "XX: sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
             print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
             print "ssweep1: " + str(ssweep1) + " ssweep2: " + str(ssweep2)
@@ -167,6 +184,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(sweep1 < sweep2, True)
         if (nfile2 >= nfile1):
             print "close1: " + str(close1) + " close2: " + str(close2)
+            print "remove1: " + str(remove1) + " remove2: " + str(remove2)
             print "sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
             print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
             print "ssweep1: " + str(ssweep1) + " ssweep2: " + str(ssweep2)
@@ -178,6 +196,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         # and the active file.
         if (nfile2 != 3):
             print "close1: " + str(close1) + " close2: " + str(close2)
+            print "remove1: " + str(remove1) + " remove2: " + str(remove2)
             print "sweep1: " + str(sweep1) + " sweep2: " + str(sweep2)
             print "sclose1: " + str(sclose1) + " sclose2: " + str(sclose2)
             print "ssweep1: " + str(ssweep1) + " ssweep2: " + str(ssweep2)
