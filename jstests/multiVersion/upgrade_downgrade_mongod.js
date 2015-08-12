@@ -10,10 +10,10 @@
  *      After downgrade, this should be ignored.
  *  - Text index
  *      This sets the text index version to a new value.
- *      After downgrade, mongod should fail to start.
+ *      After downgrade, mongod should fail to start (SERVER-19557).
  *  - Geo index
  *      This sets the geo 2dsphere index version to a new value.
- *      After downgrade, mongod should fail to start (SERVER-19557).
+ *      After downgrade, mongod should fail to start.
 */
 
 (function() {
@@ -400,8 +400,7 @@
             storageEngine: "mmapv1",
             data: {
                 indexNames: {_id_: 1},
-                // Uncomment this when implemented (SERVER-19557)
-                // failedConn: true
+                failedConn: true
             },
             init: [init_fullTextSearch],
             verify: [verify_fullTextSearch]
