@@ -245,8 +245,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session, time_t now)
 		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __sweep_remove_one(session, dhandle));
 		if (ret == 0)
-			WT_STAT_FAST_CONN_INCR(
-			    session, dh_sweep_remove);
+			WT_STAT_FAST_CONN_INCR(session, dh_sweep_remove);
 		else {
 			WT_STAT_FAST_CONN_INCR(session, dh_sweep_ref);
 			dhandle->timeofdiscard = now;
