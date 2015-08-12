@@ -37,10 +37,16 @@ if (!db.serverStatus().storageEngine.supportsCommittedReads) {
 // Do a write, wait for it to replicate, and ensure it is visible.
 assert.writeOK(db.foo.save({_id: 1, state: 0}, {writeConcern: {w: "majority", wtimeout: 60*1000}}));
 
+// We need to propagate the lastOp from the primary as afterOpTime in the secondary to ensure we
+// wait for the write to be in the majority committed view.
+// TODO SERVER-19890 Fix this to get the real optime rather than constructing a fake one.
+var lastOp = {ts: db.getLastErrorObj().lastOp, term: 1};
+
 secondary.setSlaveOk();
 // Timeout is based on heartbeat timeout.
 assert.commandWorked(secondary.getDB(name).foo.runCommand(
-            'find', {"readConcern": {"level": "majority"}, "maxTimeMS": 10 * 1000}));
+            'find', {"readConcern": {"level": "majority", "afterOpTime": lastOp},
+                     "maxTimeMS": 10 * 1000}));
 
 // Disable snapshotting via failpoint
 secondary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'});
