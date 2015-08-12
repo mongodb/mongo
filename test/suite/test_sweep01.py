@@ -91,13 +91,13 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
                 time.sleep(1)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close1 = stat_cursor[stat.conn.dh_conn_handles_closed][2]
-        remove1 = stat_cursor[stat.conn.dh_conn_handles_removed][2]
-        sweep1 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        close1 = stat_cursor[stat.conn.dh_sweep_close][2]
+        remove1 = stat_cursor[stat.conn.dh_sweep_remove][2]
+        sweep1 = stat_cursor[stat.conn.dh_sweeps][2]
         sclose1 = stat_cursor[stat.conn.dh_session_handles][2]
         ssweep1 = stat_cursor[stat.conn.dh_session_sweeps][2]
-        tod1 = stat_cursor[stat.conn.dh_conn_tod][2]
-        ref1 = stat_cursor[stat.conn.dh_conn_ref][2]
+        tod1 = stat_cursor[stat.conn.dh_sweep_tod][2]
+        ref1 = stat_cursor[stat.conn.dh_sweep_ref][2]
         nfile1 = stat_cursor[stat.conn.file_open][2]
         stat_cursor.close()
 
@@ -131,14 +131,14 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close2 = stat_cursor[stat.conn.dh_conn_handles_closed][2]
-        remove2 = stat_cursor[stat.conn.dh_conn_handles_removed][2]
-        sweep2 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        close2 = stat_cursor[stat.conn.dh_sweep_close][2]
+        remove2 = stat_cursor[stat.conn.dh_sweep_remove][2]
+        sweep2 = stat_cursor[stat.conn.dh_sweeps][2]
         sclose2 = stat_cursor[stat.conn.dh_session_handles][2]
         ssweep2 = stat_cursor[stat.conn.dh_session_sweeps][2]
         nfile2 = stat_cursor[stat.conn.file_open][2]
-        tod2 = stat_cursor[stat.conn.dh_conn_tod][2]
-        ref2 = stat_cursor[stat.conn.dh_conn_ref][2]
+        tod2 = stat_cursor[stat.conn.dh_sweep_tod][2]
+        ref2 = stat_cursor[stat.conn.dh_sweep_ref][2]
         stat_cursor.close()
         # print "checkpoint: " + str(self.ckpt)
         # print "nfile1: " + str(nfile1) + " nfile2: " + str(nfile2)
