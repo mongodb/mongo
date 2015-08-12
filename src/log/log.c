@@ -1231,6 +1231,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 */
 	WT_STAT_FAST_CONN_INCR(session, log_release_write_lsn);
 	while (__wt_log_cmp(&log->write_lsn, &slot->slot_release_lsn) != 0) {
+#if 0
 		/*
 		 * If it is not equal, it better not be larger than our
 		 * release LSN.  Check <= because it could have changed
@@ -1239,6 +1240,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 		WT_ASSERT(session,
 		    __wt_log_cmp(&log->write_lsn,
 		    &slot->slot_release_lsn) <= 0);
+#endif
 		if (++yield_count < 1000)
 			__wt_yield();
 		else
