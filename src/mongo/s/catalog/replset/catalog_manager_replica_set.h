@@ -45,16 +45,8 @@ class VersionType;
  */
 class CatalogManagerReplicaSet final : public CatalogManager {
 public:
-    CatalogManagerReplicaSet();
+    explicit CatalogManagerReplicaSet(std::unique_ptr<DistLockManager> distLockManager);
     virtual ~CatalogManagerReplicaSet();
-
-    /**
-     * Initializes the catalog manager.
-     * Can only be called once for the lifetime of the catalog manager.
-     * TODO(spencer): Take pointer to ShardRegistry rather than getting it from the global
-     * "grid" object.
-     */
-    Status init(const ConnectionString& configCS, std::unique_ptr<DistLockManager> distLockManager);
 
     Status startup() override;
 
@@ -190,9 +182,6 @@ private:
     //
 
     stdx::mutex _mutex;
-
-    // Config server connection string
-    ConnectionString _configServerConnectionString;  // (R)
 
     // Distribted lock manager singleton.
     std::unique_ptr<DistLockManager> _distLockManager;  // (R)

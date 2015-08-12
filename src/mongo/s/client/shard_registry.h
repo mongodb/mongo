@@ -85,11 +85,12 @@ public:
      * @param commandRunner Command runner for executing commands against hosts
      * @param executor Asynchronous task executor to use for making calls to shards.
      * @param network Network interface backing executor.
-     * @param catalogManager Used to retrieve the list of registered shard. TODO: remove.
+     * @param configServerCS ConnectionString used for communicating with the config servers
      */
     ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                   std::unique_ptr<executor::TaskExecutor> executor,
-                  executor::NetworkInterface* network);
+                  executor::NetworkInterface* network,
+                  ConnectionString configServerCS);
 
     ~ShardRegistry();
 
@@ -116,6 +117,10 @@ public:
 
     executor::NetworkInterface* getNetwork() const {
         return _network;
+    }
+
+    ConnectionString getConfigServerConnectionString() const {
+        return _configServerCS;
     }
 
     void reload();
@@ -225,6 +230,9 @@ private:
     // Network interface being used by _executor.  Used for asking questions about the network
     // configuration, such as getting the current server's hostname.
     executor::NetworkInterface* const _network;
+
+    // Config server connection string
+    ConnectionString _configServerCS;
 
     // Catalog manager from which to load the shard information. Not owned and must outlive
     // the shard registry object.  Should be set once by a call to init() then never modified again.

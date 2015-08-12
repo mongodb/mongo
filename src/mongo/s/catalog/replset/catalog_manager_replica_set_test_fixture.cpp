@@ -94,19 +94,18 @@ void CatalogManagerReplSetTestFixture::setUp() {
     _networkTestEnv = stdx::make_unique<NetworkTestEnv>(executor.get(), _mockNetwork);
     _executor = executor.get();
 
-    std::unique_ptr<CatalogManagerReplicaSet> cm(stdx::make_unique<CatalogManagerReplicaSet>());
+    std::unique_ptr<CatalogManagerReplicaSet> cm(
+        stdx::make_unique<CatalogManagerReplicaSet>(stdx::make_unique<DistLockManagerMock>()));
 
-    ASSERT_OK(cm->init(
-        ConnectionString::forReplicaSet("CatalogManagerReplSetTest",
-                                        {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}}),
-        stdx::make_unique<DistLockManagerMock>()));
+    ConnectionString configCS = ConnectionString::forReplicaSet(
+        "CatalogManagerReplSetTest", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});
 
     auto configTargeter(stdx::make_unique<RemoteCommandTargeterMock>());
     _configTargeter = configTargeter.get();
     _targeterFactory->addTargeterToReturn(cm->connectionString(), std::move(configTargeter));
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(
-        std::move(targeterFactory), std::move(executor), _mockNetwork));
+        std::move(targeterFactory), std::move(executor), _mockNetwork, configCS));
     shardRegistry->init(cm.get());
     shardRegistry->startup();
 

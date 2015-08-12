@@ -86,6 +86,7 @@ public:
 
     /**
      * Retrieves the connection string for the catalog manager's backing server.
+     * TODO(spencer): Remove this method in favor of getting it from the ShardRegistry
      */
     virtual ConnectionString connectionString() = 0;
 

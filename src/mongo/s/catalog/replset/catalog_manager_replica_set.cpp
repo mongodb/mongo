@@ -106,26 +106,17 @@ void _toBatchError(const Status& status, BatchedCommandResponse* response) {
 
 }  // namespace
 
-CatalogManagerReplicaSet::CatalogManagerReplicaSet() = default;
+CatalogManagerReplicaSet::CatalogManagerReplicaSet(std::unique_ptr<DistLockManager> distLockManager)
+    : _distLockManager(std::move(distLockManager)) {}
 
 CatalogManagerReplicaSet::~CatalogManagerReplicaSet() = default;
-
-Status CatalogManagerReplicaSet::init(const ConnectionString& configCS,
-                                      std::unique_ptr<DistLockManager> distLockManager) {
-    invariant(configCS.type() == ConnectionString::SET);
-
-    _configServerConnectionString = configCS;
-    _distLockManager = std::move(distLockManager);
-
-    return Status::OK();
-}
 
 Status CatalogManagerReplicaSet::startup() {
     return Status::OK();
 }
 
 ConnectionString CatalogManagerReplicaSet::connectionString() {
-    return _configServerConnectionString;
+    return grid.shardRegistry()->getConfigServerConnectionString();
 }
 
 void CatalogManagerReplicaSet::shutDown() {
@@ -220,13 +211,13 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
     // Tell the primary mongod to refresh its data
     // TODO:  Think the real fix here is for mongos to just
     //        assume that all collections are sharded, when we get there
-    SetShardVersionRequest ssv =
-        SetShardVersionRequest::makeForVersioningNoPersist(_configServerConnectionString,
-                                                           dbPrimaryShardId,
-                                                           primaryShard->getConnString(),
-                                                           NamespaceString(ns),
-                                                           manager->getVersion(),
-                                                           true);
+    SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
+        grid.shardRegistry()->getConfigServerConnectionString(),
+        dbPrimaryShardId,
+        primaryShard->getConnString(),
+        NamespaceString(ns),
+        manager->getVersion(),
+        true);
 
     auto ssvStatus = grid.shardRegistry()->runCommandWithNotMasterRetries(
         dbPrimaryShardId, "admin", ssv.toBSON());

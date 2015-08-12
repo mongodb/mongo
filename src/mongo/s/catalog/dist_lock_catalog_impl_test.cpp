@@ -111,8 +111,12 @@ private:
 
         _networkTestEnv = stdx::make_unique<NetworkTestEnv>(executor.get(), network);
 
-        _shardRegistry = stdx::make_unique<ShardRegistry>(
-            stdx::make_unique<RemoteCommandTargeterFactoryMock>(), std::move(executor), network);
+        ConnectionString configCS(HostAndPort("dummy:1234"));
+        _shardRegistry =
+            stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
+                                             std::move(executor),
+                                             network,
+                                             configCS);
         _shardRegistry->init(&_catalogMgr);
         _shardRegistry->startup();
 

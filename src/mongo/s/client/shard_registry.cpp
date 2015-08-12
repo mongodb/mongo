@@ -67,21 +67,21 @@ const Milliseconds kNotMasterRetryInterval{500};
 
 ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                              std::unique_ptr<executor::TaskExecutor> executor,
-                             executor::NetworkInterface* network)
+                             executor::NetworkInterface* network,
+                             ConnectionString configServerCS)
     : _targeterFactory(std::move(targeterFactory)),
       _executor(std::move(executor)),
       _network(network),
-      _catalogManager(nullptr) {}
+      _configServerCS(configServerCS),
+      _catalogManager(nullptr) {
+    _addConfigShard_inlock();
+}
 
 ShardRegistry::~ShardRegistry() = default;
 
 void ShardRegistry::init(CatalogManager* catalogManager) {
     invariant(!_catalogManager);
     _catalogManager = catalogManager;
-
-    // add config shard registry entry so know it's always there
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _addConfigShard_inlock();
 }
 
 void ShardRegistry::startup() {
@@ -207,7 +207,7 @@ void ShardRegistry::toBSON(BSONObjBuilder* result) {
 void ShardRegistry::_addConfigShard_inlock() {
     ShardType configServerShard;
     configServerShard.setName("config");
-    configServerShard.setHost(_catalogManager->connectionString().toString());
+    configServerShard.setHost(_configServerCS.toString());
     _addShard_inlock(configServerShard);
 }
 
