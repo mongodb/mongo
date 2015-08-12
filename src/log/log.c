@@ -779,6 +779,8 @@ __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	 */
 	slot->slot_start_lsn = slot->slot_end_lsn = log->alloc_lsn;
 	slot->slot_start_offset = log->alloc_lsn.offset;
+	slot->slot_last_offset = slot->slot_start_offset;
+	slot->slot_last_offset = slot->slot_start_offset;
 	/*
 	 * Pre-allocate on the first real write into the log file, if it
 	 * was just created (i.e. not pre-allocated).
@@ -1966,7 +1968,7 @@ use_slots:
 		    ret = __wt_log_slot_switch(session, NULL));
 	if (ret == 0)
 		ret = __log_fill(session, &myslot, 0, record, &lsn);
-	release_size = __wt_log_slot_release(myslot.slot, (int64_t)rdup_len);
+	release_size = __wt_log_slot_release(&myslot, (int64_t)rdup_len);
 	/*
 	 * If we get an error we still need to do proper accounting in
 	 * the slot fields.

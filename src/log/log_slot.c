@@ -192,6 +192,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	slot->slot_state = 0;
 	slot->slot_start_lsn = log->alloc_lsn;
 	slot->slot_start_offset = log->alloc_lsn.offset;
+	slot->slot_last_offset = log->alloc_lsn.offset;
 	slot->slot_release_lsn = log->alloc_lsn;
 	slot->slot_fh = log->log_fh;
 	log->active_slot = slot;
@@ -336,10 +337,26 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
  *	the memory buffer.
  */
 int64_t
-__wt_log_slot_release(WT_LOGSLOT *slot, int64_t size)
+__wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
 {
+	WT_LOGSLOT *slot;
+	wt_off_t cur_offset, my_start;
 	int64_t my_size, newsize;
 
+	slot = myslot->slot;
+	my_start = slot->slot_start_offset + myslot->offset;
+	while ((cur_offset = slot->slot_last_offset) < my_start) {
+		/*
+		 * Set our offset if we are larger.
+		 */
+		if (WT_ATOMIC_CAS8(
+		    slot->slot_last_offset, cur_offset, my_start))
+			break;
+		/*
+		 * If we raced another thread updating this, try again.
+		 */
+		WT_BARRIER();
+	}
 	/*
 	 * Add my size into the state and return the new size.
 	 */

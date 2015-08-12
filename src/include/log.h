@@ -112,6 +112,7 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 	int64_t	 slot_direct_size;	/* Direct write size */
 	int32_t	 slot_error;		/* Error value */
 	wt_off_t slot_start_offset;	/* Starting file offset */
+	wt_off_t slot_last_offset;	/* Last record offset */
 	WT_LSN	 slot_release_lsn;	/* Slot release LSN */
 	WT_LSN	 slot_start_lsn;	/* Slot starting LSN */
 	WT_LSN	 slot_end_lsn;		/* Slot ending LSN */

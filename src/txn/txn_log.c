@@ -243,12 +243,6 @@ __txn_log_file_sync(WT_SESSION_IMPL *session, uint32_t flags, WT_LSN *lsnp)
 	    fmt, rectype, btree->id, start));
 	logrec->size += (uint32_t)header_size;
 
-	/*
-	 * XXX We want to force out any earlier commits so that on a
-	 * clean shutdown we don't end up with a commit that is the
-	 * checkpoint LSN and we think there are updates when there are not.
-	 */
-	WT_ERR(__wt_log_force_write(session, 1, 0));
 	WT_ERR(__wt_log_write(
 	    session, logrec, lsnp, need_sync ? WT_LOG_FSYNC : 0));
 err:	__wt_logrec_free(session, &logrec);

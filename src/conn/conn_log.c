@@ -493,19 +493,8 @@ restart:
 				 * If we get here we have a slot to coalesce
 				 * and free.
 				 */
-				/*
-				 * !!! The slot_start_lsn is used for the
-				 * write_start_lsn which guarantees that the
-				 * ckpt_lsn points to the beginning of a real
-				 * log record.  However, that LSN is the
-				 * start of the slot, which could contain a lot
-				 * of log records.  In particular, the
-				 * write_start_lsn could point at or before a
-				 * commit and it may cause recovery to think a
-				 * shutdown was not clean when it really was.
-				 *
-				 * Coalescing makes this LSN span even larger.
-				 */
+				coalescing->slot_last_offset =
+				    slot->slot_last_offset;
 				coalescing->slot_end_lsn = slot->slot_end_lsn;
 				WT_STAT_FAST_CONN_INCR(
 				    session, log_slot_coalesced);
@@ -534,6 +523,10 @@ restart:
 				 */
 				WT_ASSERT(session, __wt_log_cmp(&written[i].lsn,
 				    &slot->slot_release_lsn) == 0);
+				if (slot->slot_start_lsn.offset !=
+				    slot->slot_last_offset)
+					slot->slot_start_lsn.offset =
+					    slot->slot_last_offset;
 				log->write_start_lsn = slot->slot_start_lsn;
 				log->write_lsn = slot->slot_end_lsn;
 				WT_ERR(__wt_cond_signal(
