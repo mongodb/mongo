@@ -208,10 +208,12 @@ connection_stats = [
     ##########################################
     # Dhandle statistics
     ##########################################
-    DhandleStat('dh_conn_handles', 'connection dhandles swept'),
-    DhandleStat('dh_conn_ref', 'connection candidate referenced'),
-    DhandleStat('dh_conn_sweeps', 'connection sweeps'),
-    DhandleStat('dh_conn_tod', 'connection time-of-death sets'),
+    DhandleStat('dh_sweep_close', 'connection sweep dhandles closed'),
+    DhandleStat('dh_sweep_remove',
+        'connection sweep dhandles removed from hash list'),
+    DhandleStat('dh_sweep_ref', 'connection sweep candidate became referenced'),
+    DhandleStat('dh_sweep_tod', 'connection sweep time-of-death sets'),
+    DhandleStat('dh_sweeps', 'connection sweeps'),
     DhandleStat('dh_session_handles', 'session dhandles swept'),
     DhandleStat('dh_session_sweeps', 'session sweep attempts'),
 

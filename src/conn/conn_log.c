@@ -500,7 +500,7 @@ __wt_log_wrlsn(WT_SESSION_IMPL *session, uint32_t *free_i, int *yield)
 			WT_RET(__wt_log_slot_free(session, slot));
 			if (free_i != NULL && *free_i == WT_SLOT_POOL &&
 			    slot->slot_state == WT_LOG_SLOT_FREE)
-				*free_i = save_i;
+				*free_i = written[i].slot_index;
 		}
 	}
 	return (0);

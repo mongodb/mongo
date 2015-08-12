@@ -196,12 +196,13 @@ struct __wt_connection_stats {
 	WT_STATS cursor_search;
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
-	WT_STATS dh_conn_handles;
-	WT_STATS dh_conn_ref;
-	WT_STATS dh_conn_sweeps;
-	WT_STATS dh_conn_tod;
 	WT_STATS dh_session_handles;
 	WT_STATS dh_session_sweeps;
+	WT_STATS dh_sweep_close;
+	WT_STATS dh_sweep_ref;
+	WT_STATS dh_sweep_remove;
+	WT_STATS dh_sweep_tod;
+	WT_STATS dh_sweeps;
 	WT_STATS file_open;
 	WT_STATS log_buffer_size;
 	WT_STATS log_bytes_payload;

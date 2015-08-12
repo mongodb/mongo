@@ -591,6 +591,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
 	bucket = dhandle->name_hash % WT_HASH_ARRAY_SIZE;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
+	WT_ASSERT(session, dhandle != conn->cache->evict_file_next);
 
 	/* Check if the handle was reacquired by a session while we waited. */
 	if (!final &&
