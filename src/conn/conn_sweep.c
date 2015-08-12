@@ -40,7 +40,7 @@ __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 			continue;
 
 		dhandle->timeofdeath = now;
-		WT_STAT_FAST_CONN_INCR(session, dh_conn_tod);
+		WT_STAT_FAST_CONN_INCR(session, dh_sweep_tod);
 	}
 
 	return (0);
@@ -172,9 +172,10 @@ __sweep_discard_trees(
 
 		/* We closed the btree handle. */
 		if (ret == 0) {
-			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
+			WT_STAT_FAST_CONN_INCR(session, dh_sweep_close);
 			++*dead_handlesp;
-		}
+		} else
+			WT_STAT_FAST_CONN_INCR(session, dh_sweep_ref);
 
 		WT_RET_BUSY_OK(ret);
 	}
@@ -245,9 +246,12 @@ __sweep_remove_handles(WT_SESSION_IMPL *session, time_t now)
 		WT_WITH_DHANDLE_LOCK(session,
 		    ret = __sweep_remove_one(session, dhandle));
 		if (ret == 0)
-			WT_STAT_FAST_CONN_INCR(session, dh_conn_ref);
-		else
+			WT_STAT_FAST_CONN_INCR(
+			    session, dh_sweep_remove);
+		else {
+			WT_STAT_FAST_CONN_INCR(session, dh_sweep_ref);
 			dhandle->timeofdiscard = now;
+		}
 		WT_RET_BUSY_OK(ret);
 	}
 
@@ -280,7 +284,7 @@ __sweep_server(void *arg)
 		    (uint64_t)conn->sweep_interval * WT_MILLION));
 		WT_ERR(__wt_seconds(session, &now));
 
-		WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
+		WT_STAT_FAST_CONN_INCR(session, dh_sweeps);
 
 		/*
 		 * Mark handles with a time of death, and report whether any
