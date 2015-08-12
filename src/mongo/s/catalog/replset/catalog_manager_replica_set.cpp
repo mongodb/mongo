@@ -452,6 +452,126 @@ Status CatalogManagerReplicaSet::getCollections(const std::string* dbName,
     return Status::OK();
 }
 
+Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const NamespaceString& ns) {
+    logChange(txn->getClient()->clientAddress(true), "dropCollection.start", ns.ns(), BSONObj());
+
+    vector<ShardType> allShards;
+    Status status = getAllShards(&allShards);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    LOG(1) << "dropCollection " << ns << " started";
+
+    // Lock the collection globally so that split/migrate cannot run
+    auto scopedDistLock = getDistLockManager()->lock(ns.ns(), "drop");
+    if (!scopedDistLock.isOK()) {
+        return scopedDistLock.getStatus();
+    }
+
+    LOG(1) << "dropCollection " << ns << " locked";
+
+    std::map<string, BSONObj> errors;
+    auto* shardRegistry = grid.shardRegistry();
+
+    for (const auto& shardEntry : allShards) {
+        auto dropResult = shardRegistry->runCommandWithNotMasterRetries(
+            shardEntry.getName(), ns.db().toString(), BSON("drop" << ns.coll()));
+
+        if (!dropResult.isOK()) {
+            return dropResult.getStatus();
+        }
+
+        auto dropStatus = getStatusFromCommandResult(dropResult.getValue());
+        if (!dropStatus.isOK()) {
+            if (dropStatus.code() == ErrorCodes::NamespaceNotFound) {
+                continue;
+            }
+
+            errors.emplace(shardEntry.getHost(), dropResult.getValue());
+        }
+    }
+
+    if (!errors.empty()) {
+        StringBuilder sb;
+        sb << "Dropping collection failed on the following hosts: ";
+
+        for (auto it = errors.cbegin(); it != errors.cend(); ++it) {
+            if (it != errors.cbegin()) {
+                sb << ", ";
+            }
+
+            sb << it->first << ": " << it->second;
+        }
+
+        return {ErrorCodes::OperationFailed, sb.str()};
+    }
+
+    LOG(1) << "dropCollection " << ns << " shard data deleted";
+
+    // Remove chunk data
+    Status result = remove(ChunkType::ConfigNS, BSON(ChunkType::ns(ns.ns())), 0, nullptr);
+    if (!result.isOK()) {
+        return result;
+    }
+
+    LOG(1) << "dropCollection " << ns << " chunk data deleted";
+
+    // Mark the collection as dropped
+    CollectionType coll;
+    coll.setNs(ns);
+    coll.setDropped(true);
+    coll.setEpoch(ChunkVersion::DROPPED().epoch());
+    coll.setUpdatedAt(grid.shardRegistry()->getNetwork()->now());
+
+    result = updateCollection(ns.ns(), coll);
+    if (!result.isOK()) {
+        return result;
+    }
+
+    LOG(1) << "dropCollection " << ns << " collection marked as dropped";
+
+    for (const auto& shardEntry : allShards) {
+        SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
+            connectionString(),
+            shardEntry.getName(),
+            fassertStatusOK(28781, ConnectionString::parse(shardEntry.getHost())),
+            ns,
+            ChunkVersion::DROPPED(),
+            true);
+
+        auto ssvResult = shardRegistry->runCommandWithNotMasterRetries(
+            shardEntry.getName(), "admin", ssv.toBSON());
+
+        if (!ssvResult.isOK()) {
+            return ssvResult.getStatus();
+        }
+
+        auto ssvStatus = getStatusFromCommandResult(ssvResult.getValue());
+        if (!ssvStatus.isOK()) {
+            return ssvStatus;
+        }
+
+        auto unsetShardingStatus = shardRegistry->runCommandWithNotMasterRetries(
+            shardEntry.getName(), "admin", BSON("unsetSharding" << 1));
+
+        if (!unsetShardingStatus.isOK()) {
+            return unsetShardingStatus.getStatus();
+        }
+
+        auto unsetShardingResult = getStatusFromCommandResult(unsetShardingStatus.getValue());
+        if (!unsetShardingResult.isOK()) {
+            return unsetShardingResult;
+        }
+    }
+
+    LOG(1) << "dropCollection " << ns << " completed";
+
+    logChange(txn->getClient()->clientAddress(true), "dropCollection", ns.ns(), BSONObj());
+
+    return Status::OK();
+}
+
 void CatalogManagerReplicaSet::logAction(const ActionLogType& actionLog) {
     if (_actionLogCollectionCreated.load() == 0) {
         BSONObj createCmd = BSON("create" << ActionLogType::ConfigNS << "capped" << true << "size"

@@ -73,6 +73,8 @@ public:
     Status getCollections(const std::string* dbName,
                           std::vector<CollectionType>* collections) override;
 
+    Status dropCollection(OperationContext* txn, const NamespaceString& ns) override;
+
     Status getDatabasesForShard(const std::string& shardName,
                                 std::vector<std::string>* dbs) override;
 

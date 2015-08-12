@@ -101,6 +101,10 @@ Status CatalogManagerMock::getCollections(const string* dbName,
     return Status::OK();
 }
 
+Status CatalogManagerMock::dropCollection(OperationContext* txn, const NamespaceString& ns) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
 Status CatalogManagerMock::getDatabasesForShard(const string& shardName, vector<string>* dbs) {
     return Status::OK();
 }

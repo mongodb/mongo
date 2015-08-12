@@ -214,7 +214,7 @@ public:
      * some of the known failures:
      *  - NamespaceNotFound - collection does not exist
      */
-    Status dropCollection(OperationContext* txn, const NamespaceString& ns);
+    virtual Status dropCollection(OperationContext* txn, const NamespaceString& ns) = 0;
 
     /**
      * Retrieves all databases for a shard.
