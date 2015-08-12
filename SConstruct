@@ -1586,11 +1586,31 @@ def doConfigure(myenv):
 
     conf.Finish()
 
-    def AddFlagIfSupported(env, tool, extension, flag, **mutation):
+    def AddFlagIfSupported(env, tool, extension, flag, link, **mutation):
         def CheckFlagTest(context, tool, extension, flag):
-            test_body = ""
-            context.Message('Checking if %s compiler supports %s... ' % (tool, flag))
-            ret = context.TryCompile(test_body, extension)
+            if link:
+                if tool == 'C':
+                    test_body = """
+                    #include <stdlib.h>
+                    #include <stdio.h>
+                    int main() {
+                        printf("Hello, World!");
+                        return EXIT_SUCCESS;
+                    }"""
+                elif tool == 'C++':
+                    test_body = """
+                    #include <iostream>
+                    #include <cstdlib>
+                    int main() {
+                        std::cout << "Hello, World!" << std::endl;
+                        return EXIT_SUCCESS;
+                    }"""
+                context.Message('Checking if linker supports %s... ' % (flag))
+                ret = context.TryLink(textwrap.dedent(test_body), extension)
+            else:
+                test_body = ""
+                context.Message('Checking if %s compiler supports %s... ' % (tool, flag))
+                ret = context.TryCompile(textwrap.dedent(test_body), extension)
             context.Result(ret)
             return ret
 
@@ -1629,13 +1649,20 @@ def doConfigure(myenv):
         return available
 
     def AddToCFLAGSIfSupported(env, flag):
-        return AddFlagIfSupported(env, 'C', '.c', flag, CFLAGS=[flag])
+        return AddFlagIfSupported(env, 'C', '.c', flag, False, CFLAGS=[flag])
 
     def AddToCCFLAGSIfSupported(env, flag):
-        return AddFlagIfSupported(env, 'C', '.c', flag, CCFLAGS=[flag])
+        return AddFlagIfSupported(env, 'C', '.c', flag, False, CCFLAGS=[flag])
 
     def AddToCXXFLAGSIfSupported(env, flag):
-        return AddFlagIfSupported(env, 'C++', '.cpp', flag, CXXFLAGS=[flag])
+        return AddFlagIfSupported(env, 'C++', '.cpp', flag, False, CXXFLAGS=[flag])
+
+    def AddToLINKFLAGSIfSupported(env, flag):
+        return AddFlagIfSupported(env, 'C', '.c', flag, True, LINKFLAGS=[flag])
+
+    def AddToSHLINKFLAGSIfSupported(env, flag):
+        return AddFlagIfSupported(env, 'C', '.c', flag, True, SHLINKFLAGS=[flag])
+
 
     if myenv.ToolchainIs('clang', 'gcc'):
         # This warning was added in g++-4.8.
@@ -2023,6 +2050,11 @@ def doConfigure(myenv):
         #
         myenv.Append( CCFLAGS=["/Zc:inline"])
 
+    # This tells clang/gcc to use the gold linker if it is available - we prefer the gold linker
+    # because it is much faster.
+    if myenv.ToolchainIs('gcc', 'clang'):
+        AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
+
     # Apply any link time optimization settings as selected by the 'lto' option.
     if has_option('lto'):
         if myenv.ToolchainIs('msvc'):
@@ -2038,41 +2070,8 @@ def doConfigure(myenv):
         elif myenv.ToolchainIs('gcc', 'clang'):
             # For GCC and clang, the flag is -flto, and we need to pass it both on the compile
             # and link lines.
-            if AddToCCFLAGSIfSupported(myenv, '-flto'):
-                myenv.Append(LINKFLAGS=['-flto'])
-
-                def LinkHelloWorld(context, adornment = None):
-                    test_body = """
-                    #include <iostream>
-                    int main() {
-                        std::cout << "Hello, World!" << std::endl;
-                        return 0;
-                    }
-                    """
-                    message = "Trying to link with LTO"
-                    if adornment:
-                        message = message + " " + adornment
-                    message = message + "..."
-                    context.Message(message)
-                    ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
-                    context.Result(ret)
-                    return ret
-
-                conf = Configure(myenv, help=False, custom_tests = {
-                    'LinkHelloWorld' : LinkHelloWorld,
-                })
-
-                # Some systems (clang, on a system with the BFD linker by default) may need to
-                # explicitly request the gold linker for LTO to work. If we can't LTO link a
-                # simple program, see if -fuse=ld=gold helps.
-                if not conf.LinkHelloWorld():
-                    conf.env.Append(LINKFLAGS=["-fuse-ld=gold"])
-                    if not conf.LinkHelloWorld("(with -fuse-ld=gold)"):
-                        myenv.ConfError("Error: Couldn't link with LTO")
-
-                myenv = conf.Finish()
-
-            else:
+            if not AddToCCFLAGSIfSupported(myenv, '-flto') or \
+                    not AddToLINKFLAGSIfSupported(myenv, '-flto'):
                 myenv.ConfError("Link time optimization requested, "
                     "but selected compiler does not honor -flto" )
         else:
