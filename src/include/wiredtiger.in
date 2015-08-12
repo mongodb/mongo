@@ -3670,20 +3670,20 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CURSOR_SEARCH_NEAR			1062
 /*! cursor: cursor update calls */
 #define	WT_STAT_CONN_CURSOR_UPDATE			1063
-/*! data-handle: connection dhandles swept closed */
-#define	WT_STAT_CONN_DH_CONN_HANDLES_CLOSED		1064
-/*! data-handle: connection dhandles swept from hash list */
-#define	WT_STAT_CONN_DH_CONN_HANDLES_REMOVED		1065
-/*! data-handle: connection sweep candidate became referenced */
-#define	WT_STAT_CONN_DH_CONN_REF			1066
-/*! data-handle: connection sweeps */
-#define	WT_STAT_CONN_DH_CONN_SWEEPS			1067
-/*! data-handle: connection time-of-death sets */
-#define	WT_STAT_CONN_DH_CONN_TOD			1068
 /*! data-handle: session dhandles swept */
-#define	WT_STAT_CONN_DH_SESSION_HANDLES			1069
+#define	WT_STAT_CONN_DH_SESSION_HANDLES			1064
 /*! data-handle: session sweep attempts */
-#define	WT_STAT_CONN_DH_SESSION_SWEEPS			1070
+#define	WT_STAT_CONN_DH_SESSION_SWEEPS			1065
+/*! data-handle: connection sweep dhandles closed */
+#define	WT_STAT_CONN_DH_SWEEP_CLOSE			1066
+/*! data-handle: connection sweep candidate became referenced */
+#define	WT_STAT_CONN_DH_SWEEP_REF			1067
+/*! data-handle: connection sweep dhandles removed from hash list */
+#define	WT_STAT_CONN_DH_SWEEP_REMOVE			1068
+/*! data-handle: connection sweep time-of-death sets */
+#define	WT_STAT_CONN_DH_SWEEP_TOD			1069
+/*! data-handle: connection sweeps */
+#define	WT_STAT_CONN_DH_SWEEPS				1070
 /*! connection: files currently open */
 #define	WT_STAT_CONN_FILE_OPEN				1071
 /*! log: total log buffer size */
