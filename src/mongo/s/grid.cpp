@@ -57,7 +57,7 @@ void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
     _catalogManager = std::move(catalogManager);
     _catalogCache = stdx::make_unique<CatalogCache>(_catalogManager.get());
     _shardRegistry = std::move(shardRegistry);
-    _cursorManager = std::move(_cursorManager);
+    _cursorManager = std::move(cursorManager);
 }
 
 StatusWith<std::shared_ptr<DBConfig>> Grid::implicitCreateDb(OperationContext* txn,
