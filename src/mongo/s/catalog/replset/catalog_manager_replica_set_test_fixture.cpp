@@ -102,7 +102,7 @@ void CatalogManagerReplSetTestFixture::setUp() {
 
     auto configTargeter(stdx::make_unique<RemoteCommandTargeterMock>());
     _configTargeter = configTargeter.get();
-    _targeterFactory->addTargeterToReturn(cm->connectionString(), std::move(configTargeter));
+    _targeterFactory->addTargeterToReturn(configCS, std::move(configTargeter));
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(
         std::move(targeterFactory), std::move(executor), _mockNetwork, configCS));
@@ -367,7 +367,7 @@ void CatalogManagerReplSetTestFixture::expectSetShardVersion(
 
         ASSERT(!ssv.isInit());
         ASSERT(ssv.isAuthoritative());
-        ASSERT_EQ(catalogManager()->connectionString().toString(),
+        ASSERT_EQ(grid.shardRegistry()->getConfigServerConnectionString().toString(),
                   ssv.getConfigServer().toString());
         ASSERT_EQ(expectedShard.getHost(), ssv.getShardConnectionString().toString());
         ASSERT_EQ(expectedNs.toString(), ssv.getNS().ns());

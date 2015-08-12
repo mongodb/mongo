@@ -444,7 +444,7 @@ Status Chunk::multiSplit(OperationContext* txn, const vector<BSONObj>& m, BSONOb
     cmd.append("max", getMax());
     cmd.append("from", getShardId());
     cmd.append("splitKeys", m);
-    cmd.append("configdb", grid.catalogManager(txn)->connectionString().toString());
+    cmd.append("configdb", grid.shardRegistry()->getConfigServerConnectionString().toString());
     cmd.append("epoch", _manager->getVersion().epoch());
     BSONObj cmdObj = cmd.obj();
 
@@ -497,7 +497,7 @@ bool Chunk::moveAndCommit(OperationContext* txn,
     builder.append("min", _min);
     builder.append("max", _max);
     builder.append("maxChunkSizeBytes", chunkSize);
-    builder.append("configdb", grid.catalogManager(txn)->connectionString().toString());
+    builder.append("configdb", grid.shardRegistry()->getConfigServerConnectionString().toString());
 
     // For legacy secondary throttle setting.
     bool secondaryThrottle = true;

@@ -251,10 +251,6 @@ Status CatalogManagerLegacy::_startConfigServerChecker() {
     return Status::OK();
 }
 
-ConnectionString CatalogManagerLegacy::connectionString() {
-    return _configServerConnectionString;
-}
-
 void CatalogManagerLegacy::shutDown() {
     LOG(1) << "CatalogManagerLegacy::shutDown() called.";
     {
@@ -607,7 +603,7 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
 
     for (const auto& shardEntry : allShards) {
         SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
-            connectionString(),
+            grid.shardRegistry()->getConfigServerConnectionString(),
             shardEntry.getName(),
             fassertStatusOK(28753, ConnectionString::parse(shardEntry.getHost())),
             ns,

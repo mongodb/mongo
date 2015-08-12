@@ -214,7 +214,7 @@ bool initShardVersionEmptyNS(OperationContext* txn, DBClientBase* conn_in) {
 
         ok = setShardVersion(*conn,
                              "",
-                             grid.catalogManager(txn)->connectionString().toString(),
+                             grid.shardRegistry()->getConfigServerConnectionString().toString(),
                              ChunkVersion(),
                              NULL,
                              true,
@@ -373,7 +373,7 @@ bool checkShardVersion(OperationContext* txn,
     BSONObj result;
     if (setShardVersion(*conn,
                         ns,
-                        grid.catalogManager(txn)->connectionString().toString(),
+                        grid.shardRegistry()->getConfigServerConnectionString().toString(),
                         version,
                         manager.get(),
                         authoritative,

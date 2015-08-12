@@ -53,8 +53,6 @@ public:
 
     Status startup() override;
 
-    ConnectionString connectionString() override;
-
     void shutDown() override;
 
     Status shardCollection(OperationContext* txn,

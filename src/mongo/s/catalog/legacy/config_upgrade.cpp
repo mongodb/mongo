@@ -45,6 +45,8 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -330,7 +332,7 @@ Status getConfigVersion(CatalogManager* catalogManager, VersionType* versionInfo
     try {
         versionInfo->clear();
 
-        ScopedDbConnection conn(catalogManager->connectionString(), 30);
+        ScopedDbConnection conn(grid.shardRegistry()->getConfigServerConnectionString(), 30);
 
         unique_ptr<DBClientCursor> cursor(_safeCursor(conn->query("config.version", BSONObj())));
 
@@ -425,7 +427,8 @@ bool checkAndUpgradeConfigVersion(CatalogManager* catalogManager,
 
     // Contact the config servers to make sure all are online - otherwise we wait a long time
     // for locks.
-    if (!_checkConfigServersAlive(catalogManager->connectionString(), errMsg)) {
+    if (!_checkConfigServersAlive(grid.shardRegistry()->getConfigServerConnectionString(),
+                                  errMsg)) {
         if (isEmptyVersion) {
             *errMsg = stream() << "all config servers must be reachable for initial"
                                << " config database creation" << causedBy(errMsg);

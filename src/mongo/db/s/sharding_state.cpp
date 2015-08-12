@@ -130,7 +130,7 @@ string ShardingState::getConfigServer(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_enabled);
 
-    return grid.catalogManager(txn)->connectionString().toString();
+    return grid.shardRegistry()->getConfigServerConnectionString().toString();
 }
 
 string ShardingState::getShardName() {
@@ -752,7 +752,8 @@ void ShardingState::appendInfo(OperationContext* txn, BSONObjBuilder& builder) {
         return;
     }
 
-    builder.append("configServer", grid.catalogManager(txn)->connectionString().toString());
+    builder.append("configServer",
+                   grid.shardRegistry()->getConfigServerConnectionString().toString());
     builder.append("shardName", _shardName);
 
     BSONObjBuilder versionB(builder.subobjStart("versions"));

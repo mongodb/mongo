@@ -115,10 +115,6 @@ Status CatalogManagerReplicaSet::startup() {
     return Status::OK();
 }
 
-ConnectionString CatalogManagerReplicaSet::connectionString() {
-    return grid.shardRegistry()->getConfigServerConnectionString();
-}
-
 void CatalogManagerReplicaSet::shutDown() {
     LOG(1) << "CatalogManagerReplicaSet::shutDown() called.";
     {
@@ -524,7 +520,7 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
 
     for (const auto& shardEntry : allShards) {
         SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
-            connectionString(),
+            grid.shardRegistry()->getConfigServerConnectionString(),
             shardEntry.getName(),
             fassertStatusOK(28781, ConnectionString::parse(shardEntry.getHost())),
             ns,

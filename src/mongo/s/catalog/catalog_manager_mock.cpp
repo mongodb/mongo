@@ -40,18 +40,10 @@ namespace mongo {
 using std::string;
 using std::vector;
 
-namespace {
-ConnectionString kConfigHost(HostAndPort("dummy:1234"));
-}  // unnamed namespace
-
 CatalogManagerMock::CatalogManagerMock() {
     _mockDistLockMgr = stdx::make_unique<DistLockManagerMock>();
 }
 CatalogManagerMock::~CatalogManagerMock() = default;
-
-ConnectionString CatalogManagerMock::connectionString() {
-    return kConfigHost;
-}
 
 Status CatalogManagerMock::startup() {
     return Status::OK();

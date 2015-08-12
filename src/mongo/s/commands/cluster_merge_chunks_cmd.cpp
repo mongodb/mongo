@@ -176,7 +176,7 @@ public:
         remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::nsField()]);
         remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::boundsField()]);
         remoteCmdObjB.append(ClusterMergeChunksCommand::configField(),
-                             grid.catalogManager(txn)->connectionString().toString());
+                             grid.shardRegistry()->getConfigServerConnectionString().toString());
         remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(), firstChunk->getShardId());
 
         BSONObj remoteResult;

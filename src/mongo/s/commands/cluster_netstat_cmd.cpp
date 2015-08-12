@@ -30,6 +30,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -69,7 +70,8 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        result.append("configserver", grid.catalogManager(txn)->connectionString().toString());
+        result.append("configserver",
+                      grid.shardRegistry()->getConfigServerConnectionString().toString());
         result.append("isdbgrid", 1);
         return true;
     }

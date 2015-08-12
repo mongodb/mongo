@@ -41,8 +41,6 @@ public:
     CatalogManagerMock();
     ~CatalogManagerMock();
 
-    ConnectionString connectionString() override;
-
     Status startup() override;
 
     void shutDown() override;

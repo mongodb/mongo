@@ -39,6 +39,8 @@
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
 
@@ -58,7 +60,8 @@ Status checkClusterMongoVersions(CatalogManager* catalogManager, const string& m
     //
 
     try {
-        connPtr.reset(new ScopedDbConnection(catalogManager->connectionString(), 30));
+        connPtr.reset(
+            new ScopedDbConnection(grid.shardRegistry()->getConfigServerConnectionString(), 30));
         ScopedDbConnection& conn = *connPtr;
         unique_ptr<DBClientCursor> cursor(_safeCursor(conn->query(MongosType::ConfigNS, Query())));
 
@@ -148,7 +151,8 @@ Status checkClusterMongoVersions(CatalogManager* catalogManager, const string& m
     }
 
     // Add config servers to list of servers to check version against
-    vector<HostAndPort> configServers = catalogManager->connectionString().getServers();
+    vector<HostAndPort> configServers =
+        grid.shardRegistry()->getConfigServerConnectionString().getServers();
     servers.insert(servers.end(), configServers.begin(), configServers.end());
 
     //
