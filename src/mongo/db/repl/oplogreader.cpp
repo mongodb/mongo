@@ -183,7 +183,7 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
         // Read the first (oldest) op and confirm that it's not newer than our last
         // fetched op. Otherwise, we have fallen off the back of that source's oplog.
         BSONObj remoteOldestOp(findOne(rsOplogName.c_str(), Query()));
-        OpTime remoteOldOpTime = extractOpTime(remoteOldestOp);
+        OpTime remoteOldOpTime = fassertStatusOK(28776, OpTime::parseFromBSON(remoteOldestOp));
 
         // remoteOldOpTime may come from a very old config, so we cannot compare their terms.
         if (!lastOpTimeFetched.isNull() &&

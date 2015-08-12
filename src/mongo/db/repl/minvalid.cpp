@@ -111,7 +111,7 @@ OpTime getMinValid(OperationContext* txn) {
         BSONObj mv;
         bool found = Helpers::getSingleton(txn, minvalidNS, mv);
         if (found) {
-            return extractOpTime(mv);
+            return fassertStatusOK(28771, OpTime::parseFromBSON(mv));
         }
         return OpTime();
     }

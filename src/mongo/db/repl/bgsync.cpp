@@ -93,7 +93,7 @@ Status checkRemoteOplogStart(stdx::function<StatusWith<BSONObj>()> getNextOperat
                       "we are ahead of the sync source, will try to roll back");
     }
     BSONObj o = result.getValue();
-    OpTime opTime = extractOpTime(o);
+    OpTime opTime = fassertStatusOK(28778, OpTime::parseFromBSON(o));
     long long hash = o["h"].numberLong();
     if (opTime != lastOpTimeFetched || hash != lastHashFetched) {
         return Status(ErrorCodes::OplogStartMissing,
@@ -461,7 +461,7 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
         {
             stdx::unique_lock<stdx::mutex> lock(_mutex);
             _lastFetchedHash = o["h"].numberLong();
-            _lastOpTimeFetched = extractOpTime(o);
+            _lastOpTimeFetched = fassertStatusOK(28770, OpTime::parseFromBSON(o));
             LOG(3) << "lastOpTimeFetched: " << _lastOpTimeFetched;
         }
     }

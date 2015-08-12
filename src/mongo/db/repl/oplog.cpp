@@ -121,9 +121,6 @@ stdx::condition_variable newTimestampNotifier;
 
 static std::string _oplogCollectionName;
 
-const std::string kTimestampFieldName = "ts";
-const std::string kTermFieldName = "t";
-
 // so we can fail the same way
 void checkOplogInsert(StatusWith<RecordId> result) {
     massert(17322,
@@ -318,11 +315,8 @@ void _logOp(OperationContext* txn,
     */
 
     BSONObjBuilder b(256);
-    b.append(kTimestampFieldName, slot.first.getTimestamp());
-    // Don't add term in protocol version 0.
-    if (slot.first.getTerm() != OpTime::kProtocolVersionV0Term) {
-        b.append(kTermFieldName, slot.first.getTerm());
-    }
+
+    slot.first.append(&b);
     b.append("h", slot.second);
     b.append("v", OPLOG_VERSION);
     b.append("op", opstr);
@@ -391,7 +385,7 @@ OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
 
         for (std::deque<BSONObj>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
             const BSONObj& op = *it;
-            const OpTime optime = extractOpTime(op);
+            const OpTime optime = fassertStatusOK(28779, OpTime::parseFromBSON(op));
 
             checkOplogInsert(_localOplogCollection->insertDocument(txn, op, false));
 
@@ -908,23 +902,14 @@ void setNewTimestamp(const Timestamp& newTime) {
     newTimestampNotifier.notify_all();
 }
 
-OpTime extractOpTime(const BSONObj& op) {
-    const Timestamp ts = op[kTimestampFieldName].timestamp();
-    long long term;
-    // Default to -1 if the term is absent.
-    fassert(28696,
-            bsonExtractIntegerFieldWithDefault(
-                op, kTermFieldName, OpTime::kProtocolVersionV0Term, &term));
-    return OpTime(ts, term);
-}
-
 void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS) {
     DBDirectClient c(txn);
     BSONObj lastOp = c.findOne(oplogNS, Query().sort(reverseNaturalObj), NULL, QueryOption_SlaveOk);
 
     if (!lastOp.isEmpty()) {
         LOG(1) << "replSet setting last Timestamp";
-        setNewTimestamp(lastOp[kTimestampFieldName].timestamp());
+        const OpTime opTime = fassertStatusOK(28696, OpTime::parseFromBSON(lastOp));
+        setNewTimestamp(opTime.getTimestamp());
     }
 }
 
@@ -1021,7 +1006,7 @@ void SnapshotThread::run() {
                     continue;  // oplog is completely empty.
 
                 const auto op = record->data.releaseToBson();
-                opTimeOfSnapshot = extractOpTime(op);
+                opTimeOfSnapshot = fassertStatusOK(28780, OpTime::parseFromBSON(op));
                 invariant(!opTimeOfSnapshot.isNull());
             }
 

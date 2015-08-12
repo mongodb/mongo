@@ -33,6 +33,12 @@
 #include "mongo/bson/timestamp.h"
 
 namespace mongo {
+
+class BSONObj;
+class BSONObjBuilder;
+template <typename T>
+class StatusWith;
+
 namespace repl {
 
 /**
@@ -61,6 +67,14 @@ public:
     long long getSecs() const;
 
     long long getTerm() const;
+
+    /**
+     * Serializes the contents of this optime to the specified builder in the form:
+     *      { ts: <timestamp>, t: term }
+     */
+    void append(BSONObjBuilder* builder) const;
+
+    static StatusWith<OpTime> parseFromBSON(const BSONObj& obj);
 
     std::string toString() const;
 

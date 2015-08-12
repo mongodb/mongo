@@ -31,10 +31,18 @@
 #include <string>
 #include <utility>
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/repl/optime.h"
 
 namespace mongo {
 namespace repl {
+namespace {
+
+const char* kTimestampFieldName = "ts";
+const char* kTermFieldName = "t";
+
+}  // namespace
 
 OpTime::OpTime(Timestamp ts, long long term) : _timestamp(std::move(ts)), _term(term) {}
 
@@ -52,6 +60,30 @@ long long OpTime::getTerm() const {
 
 bool OpTime::isNull() const {
     return _timestamp.isNull();
+}
+
+void OpTime::append(BSONObjBuilder* builder) const {
+    builder->append(kTimestampFieldName, _timestamp);
+
+    // Don't add term in protocol version 0.
+    if (_term != kProtocolVersionV0Term) {
+        builder->append(kTermFieldName, _term);
+    }
+}
+
+StatusWith<OpTime> OpTime::parseFromBSON(const BSONObj& obj) {
+    Timestamp ts;
+    Status status = bsonExtractTimestampField(obj, kTimestampFieldName, &ts);
+    if (!status.isOK())
+        return status;
+
+    // Default to -1 if the term is absent.
+    long long term;
+    status = bsonExtractIntegerFieldWithDefault(obj, kTermFieldName, kProtocolVersionV0Term, &term);
+    if (!status.isOK())
+        return status;
+
+    return OpTime(ts, term);
 }
 
 std::string OpTime::toString() const {

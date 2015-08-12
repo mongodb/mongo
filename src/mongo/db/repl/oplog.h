@@ -141,11 +141,6 @@ void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS);
  */
 void setNewTimestamp(const Timestamp& newTime);
 
-/*
- * Extract the OpTime from log entry.
- */
-OpTime extractOpTime(const BSONObj& op);
-
 /**
  * Detects the current replication mode and sets the "_oplogCollectionName" accordingly.
  */
