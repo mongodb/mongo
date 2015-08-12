@@ -404,13 +404,13 @@ bool Strategy::handleSpecialNamespaces(OperationContext* txn, Request& r, QueryM
 
     BSONObjBuilder reply;
 
-    const auto upgradeToRealCommand = [txn, &r, &q, &reply](StringData commandName) {
+    const auto upgradeToRealCommand = [txn, &q, &reply](StringData commandName) {
         BSONObjBuilder cmdBob;
         cmdBob.append(commandName, 1);
         cmdBob.appendElements(q.query);  // fields are validated by Commands
         auto interposedCmd = cmdBob.done();
-        NamespaceString nss(r.getns());
-        NamespaceString interposedNss(nss.db(), "$cmd");
+        // Rewrite upgraded pseudoCommands to run on the 'admin' database.
+        NamespaceString interposedNss("admin", "$cmd");
         Command::runAgainstRegistered(
             txn, interposedNss.ns().c_str(), interposedCmd, reply, q.queryOptions);
     };
