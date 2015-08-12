@@ -65,6 +65,19 @@ function runTest(conn) {
          assert.commandFailedWithCode(res, authzErrorCode);
      })();
 
+    (function () {
+        jsTestLog("Testing role creation, of user-defined roles with same name as built-in roles");
+
+        var cmdObj = {createRole: "readWrite", roles: [], privileges: []};
+        var res = adminUserAdmin.runCommand(cmdObj);
+        assert.commandFailed(res, tojson(cmdObj));
+
+        var roleObj = adminUserAdmin.system.roles.findOne({role: "readWrite", db: "admin"});
+        // double check that no role object named "readWrite" has been created
+        assert(!roleObj, "user-defined \"readWrite\" role was created: " + tojson(roleObj));
+
+    })();
+
     (function testViewUser() {
          jsTestLog("Testing viewing user information");
 
