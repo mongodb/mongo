@@ -79,5 +79,13 @@
     assert.eq(cmdRes.cursor.firstBatch.length, 1);
     assert.eq(cmdRes.cursor.firstBatch[0], {_id: -5});
 
+    // A predicate with $where.
+    cmdRes = db.runCommand({find: coll.getName(), filter: {$where: "this._id == 5"}});
+    assert.commandWorked(cmdRes);
+    assert.eq(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
+    assert.eq(cmdRes.cursor.firstBatch.length, 1);
+    assert.eq(cmdRes.cursor.firstBatch[0], {_id: 5});
+
     st.stop();
 })();

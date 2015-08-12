@@ -168,7 +168,7 @@ public:
             return appendCommandStatus(result, lpq.getStatus());
         }
 
-        auto cq = CanonicalQuery::canonicalize(lpq.getValue().release());
+        auto cq = CanonicalQuery::canonicalize(lpq.getValue().release(), WhereCallbackNoop());
         if (!cq.isOK()) {
             return appendCommandStatus(result, cq.getStatus());
         }

@@ -229,6 +229,12 @@ bool shardVersionOk(OperationContext* txn,
                     ChunkVersion& received,
                     ChunkVersion& wanted) {
     Client* client = txn->getClient();
+
+    // Operations using the DBDirectClient are unversioned.
+    if (client->isInDirectClient()) {
+        return true;
+    }
+
     ShardingState* shardingState = ShardingState::get(client->getServiceContext());
     if (!shardingState->enabled()) {
         return true;

@@ -195,7 +195,7 @@ void Strategy::queryOp(OperationContext* txn, Request& r) {
             uassertStatusOK(readPrefExtractStatus);
         }
 
-        auto canonicalQuery = CanonicalQuery::canonicalize(q);
+        auto canonicalQuery = CanonicalQuery::canonicalize(q, WhereCallbackNoop());
         uassertStatusOK(canonicalQuery.getStatus());
 
         // Do the work to generate the first batch of results. This blocks waiting to get responses
