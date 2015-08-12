@@ -55,7 +55,7 @@ var dropAction = [
     {dropIndexes: collection, index: "i_1"},
     {drop: collection},
     {dropDatabase: 1 },
-    {convertToCapped: collection, size: 20000}
+    // {convertToCapped: collection, size: 20000} // Re-enable for SERVER-19910 after WT-2042.
 ];
 
 
