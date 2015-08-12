@@ -614,7 +614,8 @@ __evict_request_walk_clear(WT_SESSION_IMPL *session)
 
 	F_SET(session, WT_SESSION_CLEAR_EVICT_WALK);
 
-	while (btree->evict_ref != NULL && ret == 0) {
+	while (ret == 0 && (btree->evict_ref != NULL ||
+	    cache->evict_file_next == session->dhandle)) {
 		F_SET(cache, WT_CACHE_CLEAR_WALKS);
 		ret = __wt_cond_wait(
 		    session, cache->evict_waiter_cond, 100000);
@@ -1055,6 +1056,9 @@ retry:	while (slot < max_entries && ret == 0) {
 	}
 
 	if (incr) {
+		/* Remember the file we should visit first, next loop. */
+		cache->evict_file_next = dhandle;
+
 		WT_ASSERT(session, dhandle->session_inuse > 0);
 		(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
 		incr = 0;
@@ -1068,21 +1072,17 @@ retry:	while (slot < max_entries && ret == 0) {
 	/*
 	 * Walk the list of files a few times if we don't find enough pages.
 	 * Try two passes through all the files, give up when we have some
-	 * candidates and we aren't finding more.  Take care not to skip files
-	 * on subsequent passes.
+	 * candidates and we aren't finding more.
 	 */
 	if (!F_ISSET(cache, WT_CACHE_CLEAR_WALKS) && ret == 0 &&
 	    slot < max_entries && (retries < 2 ||
 	    (!LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK) && retries < 10 &&
 	    (slot == cache->evict_entries || slot > start_slot)))) {
-		cache->evict_file_next = NULL;
 		start_slot = slot;
 		++retries;
 		goto retry;
 	}
 
-	/* Remember the file we should visit first, next loop. */
-	cache->evict_file_next = dhandle;
 	cache->evict_entries = slot;
 	return (ret);
 }
