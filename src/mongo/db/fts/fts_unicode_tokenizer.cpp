@@ -62,7 +62,7 @@ UnicodeFTSTokenizer::UnicodeFTSTokenizer(const FTSLanguage* language)
 void UnicodeFTSTokenizer::reset(StringData document, Options options) {
     _options = options;
     _pos = 0;
-    _document = unicode::String(document);
+    _document.resetData(document);
 
     // Skip any leading delimiters (and handle the case where the document is entirely delimiters).
     _skipDelimiters();
@@ -81,29 +81,30 @@ bool UnicodeFTSTokenizer::moveNext() {
                (!unicode::codepointIsDelimiter(_document[_pos], _delimListLanguage))) {
             ++_pos;
         }
-        unicode::String token = _document.substr(start, _pos - start);
+        _document.substrToBuf(start, _pos - start, _tokenBuf);
 
         // Skip the delimiters before the next token.
         _skipDelimiters();
 
         // Stop words are case-sensitive and diacritic sensitive, so we need them to be lower cased
         // but with diacritics not removed to check against the stop word list.
-        unicode::String word = token.toLower(_caseFoldMode);
+        _tokenBuf.toLowerToBuf(_caseFoldMode, _wordBuf);
 
-        if ((_options & kFilterStopWords) && _stopWords->isStopWord(word.toString())) {
+        if ((_options & kFilterStopWords) && _stopWords->isStopWord(_wordBuf.toString())) {
             continue;
         }
 
         if (_options & kGenerateCaseSensitiveTokens) {
-            word = token;
+            _tokenBuf.copyToBuf(_wordBuf);
         }
 
         // The stemmer is diacritic sensitive, so stem the word before removing diacritics.
-        _stem = _stemmer.stem(word.toString());
+        _stem = _stemmer.stem(_wordBuf.toString());
 
         if (!(_options & kGenerateDiacriticSensitiveTokens)) {
-            token.resetData(_stem);
-            _stem = token.removeDiacritics().toString();
+            _tokenBuf.resetData(_stem);
+            _tokenBuf.removeDiacriticsToBuf(_wordBuf);
+            _stem = _wordBuf.toString();
         }
 
         return true;

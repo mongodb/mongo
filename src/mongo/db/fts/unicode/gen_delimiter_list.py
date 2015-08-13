@@ -65,6 +65,13 @@ DelimiterListLanguage lang) {
         return false;
     }
 
+    // Most characters are latin letters, so filter those out first.
+    if (codepoint >= 'A' && codepoint <= 'Z') {
+        return false;
+    } else if (codepoint >= 'a' && codepoint <= 'z') {
+        return false;
+    }
+
     switch (codepoint) {\n""")
 
     for delim in sorted(delim_codepoints):

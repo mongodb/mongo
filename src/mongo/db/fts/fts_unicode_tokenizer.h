@@ -83,6 +83,9 @@ private:
     unicode::String _document;
     size_t _pos;
 
+    unicode::String _tokenBuf;
+    unicode::String _wordBuf;
+
     Options _options;
 
     std::string _stem;

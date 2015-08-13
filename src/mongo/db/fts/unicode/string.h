@@ -67,7 +67,7 @@ public:
     void resetData(const StringData utf8_src);
 
     /**
-     * Return a lowercased version of the String instance using the Unicode data in u_data.h.
+     * Return a lowercased version of the String instance.
      */
     String toLower(CaseFoldMode mode = CaseFoldMode::kNormal) const;
 
@@ -82,9 +82,30 @@ public:
     String substr(size_t begin, size_t end) const;
 
     /**
-     * Returns a UTF-8 encoded std::string version of the String instance.
+     * Copies the current String to another String.
      */
-    std::string toString() const;
+    void copyToBuf(String& buffer) const;
+
+    /**
+     * Takes a substring of the current String and puts it in another String.
+     */
+    void substrToBuf(size_t pos, size_t len, String& buffer) const;
+
+    /**
+     * Lowercases the current String and stores the result in another String.
+     */
+    void toLowerToBuf(CaseFoldMode mode, String& buffer) const;
+
+    /**
+     * Removes diacritics from the current String and stores the result in another String.
+     */
+    void removeDiacriticsToBuf(String& buffer) const;
+
+    /**
+     * Returns a UTF-8 encoded std::string version of the String instance. Uses the conversion
+     * stored in the output buffer when possible.
+     */
+    std::string toString();
 
     /**
      * Returns the number Unicode codepoints in the String.
@@ -143,6 +164,17 @@ private:
      * The underlying UTF-32 data.
      */
     std::u32string _data;
+
+    /**
+     * A buffer for storing the result of the UTF-32 to UTF-8 conversion.
+     */
+    std::string _outputBuf;
+
+    /**
+     * A bool flag that is set to true when toString() will require that the UTF-32 to UTF-8
+     * conversion be applied again.
+     */
+    bool _needsOutputConversion;
 };
 
 }  // namespace unicode

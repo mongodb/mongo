@@ -42,10 +42,16 @@ using linenoise_utf8::copyString8to32;
 using std::u32string;
 
 String::String(const StringData utf8_src) {
+    // Reserve space for underlying buffers to prevent excessive reallocations.
+    _outputBuf.reserve(utf8_src.size() * 4);
+    _data.reserve(utf8_src.size() * 4);
+
+    // Convert UTF-8 input to UTF-32 data.
     setData(utf8_src);
 }
 
 void String::resetData(const StringData utf8_src) {
+    // Convert UTF-8 input to UTF-32 data.
     setData(utf8_src);
 }
 
@@ -70,20 +76,28 @@ void String::setData(const StringData utf8_src) {
 
     // Resize _data so it is only as big as what it contains.
     _data.resize(resultSize);
+    _needsOutputConversion = true;
 }
 
-String::String(u32string&& src) : _data(std::move(src)) {}
+String::String(u32string&& src) : _data(std::move(src)), _needsOutputConversion(true) {
+    // Reserve space for underlying buffers to prevent excessive reallocations.
+    _outputBuf.reserve(src.size() * 4);
+    _data.reserve(src.size() * 4);
+}
 
-std::string String::toString() const {
-    // output is the target, resize it so that it's guaranteed to fit all of the input characters,
-    // plus a null character if there isn't one.
-    std::string output(_data.size() * 4 + 1, '\0');
-    size_t resultSize =
-        copyString32to8(reinterpret_cast<unsigned char*>(&output[0]), &_data[0], output.size());
+std::string String::toString() {
+    // _outputBuf is the target, resize it so that it's guaranteed to fit all of the input
+    // characters, plus a null character if there isn't one.
+    if (_needsOutputConversion) {
+        _outputBuf.resize(_data.size() * 4 + 1);
+        size_t resultSize = copyString32to8(
+            reinterpret_cast<unsigned char*>(&_outputBuf[0]), &_data[0], _outputBuf.size());
 
-    // Resize output so it is only as large as what it contains.
-    output.resize(resultSize);
-    return output;
+        // Resize output so it is only as large as what it contains.
+        _outputBuf.resize(resultSize);
+        _needsOutputConversion = false;
+    }
+    return _outputBuf;
 }
 
 size_t String::size() const {
@@ -95,30 +109,61 @@ const char32_t& String::operator[](int i) const {
 }
 
 String String::substr(size_t pos, size_t len) const {
-    return String(_data.substr(pos, len));
+    unicode::String buf;
+    substrToBuf(pos, len, buf);
+    return buf;
 }
 
 String String::toLower(CaseFoldMode mode) const {
-    u32string newdata(_data.size(), 0);
-    auto index = 0;
-    for (auto codepoint : _data) {
-        newdata[index++] = codepointToLower(codepoint, mode);
-    }
-
-    return String(std::move(newdata));
+    unicode::String buf;
+    toLowerToBuf(mode, buf);
+    return buf;
 }
 
 String String::removeDiacritics() const {
-    u32string newdata(_data.size(), 0);
+    unicode::String buf;
+    removeDiacriticsToBuf(buf);
+    return buf;
+}
+
+void String::copyToBuf(String& buffer) const {
+    buffer._data = _data;
+    buffer._data.resize(_data.size());
+    auto index = 0;
+    for (auto codepoint : _data) {
+        buffer._data[index++] = codepoint;
+    }
+    buffer._needsOutputConversion = true;
+}
+
+void String::substrToBuf(size_t pos, size_t len, String& buffer) const {
+    buffer._data.resize(len + 1);
+    for (size_t index = 0, src_pos = pos; index < len;) {
+        buffer._data[index++] = _data[src_pos++];
+    }
+    buffer._data[len] = '\0';
+    buffer._needsOutputConversion = true;
+}
+
+void String::toLowerToBuf(CaseFoldMode mode, String& buffer) const {
+    buffer._data.resize(_data.size());
+    auto index = 0;
+    for (auto codepoint : _data) {
+        buffer._data[index++] = codepointToLower(codepoint, mode);
+    }
+    buffer._needsOutputConversion = true;
+}
+
+void String::removeDiacriticsToBuf(String& buffer) const {
+    buffer._data.resize(_data.size());
     auto index = 0;
     for (auto codepoint : _data) {
         if (!codepointIsDiacritic(codepoint)) {
-            newdata[index++] = codepointRemoveDiacritics(codepoint);
+            buffer._data[index++] = codepointRemoveDiacritics(codepoint);
         }
     }
-
-    newdata.resize(index);
-    return String(std::move(newdata));
+    buffer._data.resize(index);
+    buffer._needsOutputConversion = true;
 }
 
 bool String::substrMatch(const String& str,
