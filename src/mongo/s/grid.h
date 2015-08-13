@@ -97,6 +97,7 @@ public:
     bool getConfigShouldBalance(OperationContext* txn) const;
 
     Grid::CatalogManagerGuard catalogManager(OperationContext* txn);
+    Grid::CatalogManagerGuard catalogManager();  // TODO(spencer): remove
 
     CatalogCache* catalogCache() {
         return _catalogCache.get();

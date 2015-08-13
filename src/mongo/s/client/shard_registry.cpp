@@ -44,6 +44,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_connection.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
@@ -72,17 +73,11 @@ ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targe
     : _targeterFactory(std::move(targeterFactory)),
       _executor(std::move(executor)),
       _network(network),
-      _configServerCS(configServerCS),
-      _catalogManager(nullptr) {
+      _configServerCS(configServerCS) {
     _addConfigShard_inlock();
 }
 
 ShardRegistry::~ShardRegistry() = default;
-
-void ShardRegistry::init(CatalogManager* catalogManager) {
-    invariant(!_catalogManager);
-    _catalogManager = catalogManager;
-}
 
 void ShardRegistry::startup() {
     _executor->startup();
@@ -95,7 +90,7 @@ void ShardRegistry::shutdown() {
 
 void ShardRegistry::reload() {
     vector<ShardType> shards;
-    Status status = _catalogManager->getAllShards(&shards);
+    Status status = grid.catalogManager()->getAllShards(&shards);
     massert(13632, "couldn't get updated shard list from config server", status.isOK());
 
     int numShards = shards.size();

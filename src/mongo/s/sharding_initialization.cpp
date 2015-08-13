@@ -106,7 +106,6 @@ Status initializeGlobalShardingState(const ConnectionString& configCS) {
         catalogManager = std::move(catalogManagerLegacy);
     }
 
-    shardRegistry->init(catalogManager.get());
     shardRegistry->startup();
     grid.init(std::move(catalogManager),
               std::move(shardRegistry),

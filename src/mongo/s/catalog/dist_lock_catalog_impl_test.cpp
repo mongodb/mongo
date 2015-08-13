@@ -117,7 +117,6 @@ private:
                                              std::move(executor),
                                              network,
                                              configCS);
-        _shardRegistry->init(&_catalogMgr);
         _shardRegistry->startup();
 
         _distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(_shardRegistry.get(), kWTimeout);

@@ -234,10 +234,6 @@ private:
     // Config server connection string
     ConnectionString _configServerCS;
 
-    // Catalog manager from which to load the shard information. Not owned and must outlive
-    // the shard registry object.  Should be set once by a call to init() then never modified again.
-    CatalogManager* _catalogManager;
-
     // Protects the maps below
     mutable stdx::mutex _mutex;
 

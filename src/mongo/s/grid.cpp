@@ -135,6 +135,10 @@ Grid::CatalogManagerGuard Grid::catalogManager(OperationContext* txn) {
     return Grid::CatalogManagerGuard(txn, this);
 }
 
+Grid::CatalogManagerGuard Grid::catalogManager() {
+    return Grid::CatalogManagerGuard(nullptr, this);
+}
+
 Grid::CatalogManagerGuard::CatalogManagerGuard(OperationContext* txn, Grid* grid) : _grid(grid) {
     _grid->_catalogManagerLock.lock_shared();
 }

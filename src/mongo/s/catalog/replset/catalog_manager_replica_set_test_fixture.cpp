@@ -106,7 +106,6 @@ void CatalogManagerReplSetTestFixture::setUp() {
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(
         std::move(targeterFactory), std::move(executor), _mockNetwork, configCS));
-    shardRegistry->init(cm.get());
     shardRegistry->startup();
 
     // For now initialize the global grid object. All sharding objects will be accessible
