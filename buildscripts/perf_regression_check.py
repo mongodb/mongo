@@ -40,21 +40,21 @@ def main(args):
         reference = h.seriesAtRevision(test, args.reference)
         if previous["max"] - this_one["max"] >= (args.threshold * previous["max"]):
             print "\tregression found: drop from %s (commit %s) to %s" % (previous["max"], previous["revision"][:5], this_one["max"])
-            Failed = True
+            failed = True
         else :  
             print "\tno regresion against previous. "
         if not daysprevious :
             print "\tno regresion against previous. No n day data"
         elif daysprevious["max"] - this_one["max"] >= (args.threshold * daysprevious["max"]):
             print "\tregression found over days: drop from %s (commit %s) to %s" % (daysprevious["max"], daysprevious["revision"][:5], this_one["max"])
-            Failed = True
+            failed = True
         else:
             print "\tno regression against n day data"
         if not reference :
             print "\tno No data for reference commit"
         elif reference["max"] - this_one["max"] >= (args.threshold * reference["max"]):
             print "\tregression found over reference commit: drop from %s (commit %s) to %s" % (reference["max"], reference["revision"][:5], this_one["max"])
-            Failed = True
+            failed = True
         else:
             print "\tno regression against reference commit"
 
