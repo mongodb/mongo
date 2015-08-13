@@ -2602,6 +2602,20 @@ var authCommandsLib = {
             ]
         },
         {
+            // Test that the root role has the privilege to validate any system.* collection
+            testname: "validate_system",
+            command: {validate: "system.users"},
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: {
+                        root: 1,
+                        __system: 1
+                    }
+                }
+            ]
+        },
+        {
             testname: "whatsmyuri",
             command: {whatsmyuri: 1},
             testcases: [

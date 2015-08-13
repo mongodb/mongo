@@ -541,6 +541,9 @@ void addRootRolePrivileges(PrivilegeVector* privileges) {
     addUserAdminAnyDbPrivileges(privileges);
     addDbAdminAnyDbPrivileges(privileges);
     addReadWriteAnyDbPrivileges(privileges);
+
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges, Privilege(ResourcePattern::forAnyResource(), ActionType::validate));
 }
 
 void addInternalRolePrivileges(PrivilegeVector* privileges) {
