@@ -784,6 +784,9 @@ __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	 * from outstanding writes.
 	 */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+	/*
+	 * We need to set the release LSN earlier, before a log file change.
+	 */
 	slot->slot_release_lsn = log->alloc_lsn;
 	if (!__log_size_fit(session, &log->alloc_lsn, recsize)) {
 		WT_RET(__log_newfile(session, 0, &created_log));

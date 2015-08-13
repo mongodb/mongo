@@ -25,7 +25,6 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	slot->slot_start_lsn = slot->slot_end_lsn = log->alloc_lsn;
 	slot->slot_start_offset = log->alloc_lsn.offset;
 	slot->slot_last_offset = log->alloc_lsn.offset;
-	slot->slot_release_lsn = log->alloc_lsn;
 	slot->slot_fh = log->log_fh;
 	slot->slot_error = 0;
 	slot->slot_unbuffered = 0;
@@ -213,6 +212,11 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	 * Set up the available slot from the pool the first time.
 	 */
 	slot = &log->slot_pool[0];
+	/*
+	 * We cannot initialize the release LSN in the activate function
+	 * because that is called after a log file switch.
+	 */
+	slot->slot_release_lsn = log->alloc_lsn;
 	__wt_log_slot_activate(session, slot);
 	log->active_slot = slot;
 
