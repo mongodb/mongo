@@ -21,8 +21,7 @@ __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 
 	conn = S2C(session);
 
-	WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (WT_IS_METADATA(dhandle))
 			continue;
 
@@ -117,8 +116,7 @@ __sweep_expire(WT_SESSION_IMPL *session, time_t now)
 
 	conn = S2C(session);
 
-	WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		/*
 		 * Ignore open files once the btree file count is below the
 		 * minimum number of handles.
@@ -158,8 +156,7 @@ __sweep_discard_trees(
 
 	*dead_handlesp = 0;
 
-	WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN | WT_DHANDLE_EXCLUSIVE) &&
 		    (dhandle->timeofdiscard == 0 ||
 		    now <= dhandle->timeofdiscard + conn->sweep_idle_time))
@@ -232,10 +229,10 @@ __sweep_remove_handles(WT_SESSION_IMPL *session, time_t now)
 
 	conn = S2C(session);
 
-	for (dhandle = SLIST_FIRST(&conn->dhlh);
+	for (dhandle = TAILQ_FIRST(&conn->dhqh);
 	    dhandle != NULL;
 	    dhandle = dhandle_next) {
-		dhandle_next = SLIST_NEXT(dhandle, l);
+		dhandle_next = TAILQ_NEXT(dhandle, q);
 		if (WT_IS_METADATA(dhandle))
 			continue;
 		if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN) ||
@@ -282,6 +279,8 @@ __sweep_server(void *arg)
 		WT_ERR(__wt_cond_wait(session, conn->sweep_cond,
 		    (uint64_t)conn->sweep_interval * WT_MILLION));
 		WT_ERR(__wt_seconds(session, &now));
+
+		WT_STAT_FAST_CONN_INCR(session, dh_conn_sweeps);
 
 		/*
 		 * Mark handles with a time of death, and report whether any

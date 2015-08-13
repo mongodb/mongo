@@ -77,8 +77,8 @@ typedef enum {
 struct __wt_fh {
 	char	*name;				/* File name */
 	uint64_t name_hash;			/* Hash of name */
-	SLIST_ENTRY(__wt_fh) l;			/* List of open handles */
-	SLIST_ENTRY(__wt_fh) hashl;		/* Hashed list of handles */
+	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
+	TAILQ_ENTRY(__wt_fh) hashq;		/* Hashed list of handles */
 
 	u_int	ref;				/* Reference count */
 
