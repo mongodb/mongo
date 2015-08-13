@@ -58,7 +58,7 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
     requestBuilder.setCommandArgs(BSON("isMaster" << 1));
 
     // Set current command to ismaster request and run
-    auto& cmd = op->beginCommand(std::move(*(requestBuilder.done())));
+    auto& cmd = op->beginCommand(std::move(*(requestBuilder.done())), now());
 
     // Callback to parse protocol information out of received ismaster response
     auto parseIsMaster = [this, op]() {
@@ -119,11 +119,10 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
     // authenticateClient will use this to run auth-related commands over our connection.
     auto runCommandHook = [this, op](executor::RemoteCommandRequest request,
                                      auth::AuthCompletionHandler handler) {
-        auto& cmd = op->beginCommand(request, op->operationProtocol());
+        auto& cmd = op->beginCommand(request, op->operationProtocol(), now());
 
         auto callAuthCompletionHandler = [this, op, handler]() {
-            auto authResponse =
-                _responseFromMessage(op->command().toRecv(), op->operationProtocol());
+            auto authResponse = op->command().response(op->operationProtocol(), now());
             handler(authResponse);
         };
 

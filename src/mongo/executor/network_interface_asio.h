@@ -120,19 +120,15 @@ private:
      */
     class AsyncCommand {
     public:
-        AsyncCommand(AsyncConnection* conn);
-
-        // This method resets the Messages and associated information held inside
-        // an AsyncCommand so that it may be reused to run a new network roundtrip.
-        void reset();
+        AsyncCommand(AsyncConnection* conn, Message&& command, Date_t now);
 
         NetworkInterfaceASIO::AsyncConnection& conn();
 
         Message& toSend();
-        void setToSend(Message&& message);
-
         Message& toRecv();
         MSGHEADER::Value& header();
+
+        ResponseStatus response(rpc::Protocol protocol, Date_t now);
 
     private:
         NetworkInterfaceASIO::AsyncConnection* const _conn;
@@ -142,6 +138,8 @@ private:
 
         // TODO: Investigate efficiency of storing header separately.
         MSGHEADER::Value _header;
+
+        const Date_t _start;
     };
 
     /**
@@ -166,8 +164,10 @@ private:
         // AsyncOp may run multiple commands over its lifetime (for example, an ismaster
         // command, the command provided to the NetworkInterface via startCommand(), etc.)
         // Calling beginCommand() resets internal state to prepare to run newCommand.
-        AsyncCommand& beginCommand(const RemoteCommandRequest& request, rpc::Protocol protocol);
-        AsyncCommand& beginCommand(Message&& newCommand);
+        AsyncCommand& beginCommand(const RemoteCommandRequest& request,
+                                   rpc::Protocol protocol,
+                                   Date_t now);
+        AsyncCommand& beginCommand(Message&& newCommand, Date_t now);
         AsyncCommand& command();
 
         void finish(const TaskExecutor::ResponseStatus& status);
@@ -231,8 +231,6 @@ private:
 
         handler();
     }
-
-    ResponseStatus _responseFromMessage(const Message& received, rpc::Protocol protocol);
 
     // Connection
     void _connect(AsyncOp* op);

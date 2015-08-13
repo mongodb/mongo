@@ -124,12 +124,11 @@ void asyncRecvMessageBody(AsyncStreamInterface& stream,
 
 }  // namespace
 
-NetworkInterfaceASIO::AsyncCommand::AsyncCommand(AsyncConnection* conn) : _conn(conn) {}
-
-void NetworkInterfaceASIO::AsyncCommand::reset() {
-    // TODO: Optimize reuse of Messages to be more space-efficient.
-    _toSend.reset();
-    _toRecv.reset();
+NetworkInterfaceASIO::AsyncCommand::AsyncCommand(AsyncConnection* conn,
+                                                 Message&& command,
+                                                 Date_t now)
+    : _conn(conn), _toSend(std::move(command)), _start(now) {
+    _toSend.header().setResponseTo(0);
 }
 
 NetworkInterfaceASIO::AsyncConnection& NetworkInterfaceASIO::AsyncCommand::conn() {
@@ -140,10 +139,6 @@ Message& NetworkInterfaceASIO::AsyncCommand::toSend() {
     return _toSend;
 }
 
-void NetworkInterfaceASIO::AsyncCommand::setToSend(Message&& message) {
-    _toSend = std::move(message);
-}
-
 Message& NetworkInterfaceASIO::AsyncCommand::toRecv() {
     return _toRecv;
 }
@@ -152,22 +147,9 @@ MSGHEADER::Value& NetworkInterfaceASIO::AsyncCommand::header() {
     return _header;
 }
 
-void NetworkInterfaceASIO::_startCommand(AsyncOp* op) {
-    LOG(3) << "running command " << op->request().cmdObj << " against database "
-           << op->request().dbname << " across network to " << op->request().target.toString();
-    if (inShutdown()) {
-        return;
-    }
-
-    // _connect() will continue the state machine.
-    _connect(op);
-}
-
-ResponseStatus NetworkInterfaceASIO::_responseFromMessage(const Message& received,
-                                                          rpc::Protocol protocol) {
+ResponseStatus NetworkInterfaceASIO::AsyncCommand::response(rpc::Protocol protocol, Date_t now) {
+    auto& received = _toRecv;
     try {
-        // TODO: elapsed isn't going to be correct here, SERVER-19697
-        auto start = now();
         auto reply = rpc::makeReply(&received);
 
         if (reply->getProtocol() != protocol) {
@@ -185,16 +167,27 @@ ResponseStatus NetworkInterfaceASIO::_responseFromMessage(const Message& receive
         // unavoidable copy
         auto ownedCommandReply = reply->getCommandReply().getOwned();
         auto ownedReplyMetadata = reply->getMetadata().getOwned();
-        return ResponseStatus(
-            RemoteCommandResponse(ownedCommandReply, ownedReplyMetadata, now() - start));
+        return ResponseStatus(RemoteCommandResponse(
+            std::move(ownedCommandReply), std::move(ownedReplyMetadata), now - _start));
     } catch (...) {
         // makeReply can throw if the reply was invalid.
         return exceptionToStatus();
     }
 }
 
+void NetworkInterfaceASIO::_startCommand(AsyncOp* op) {
+    LOG(3) << "running command " << op->request().cmdObj << " against database "
+           << op->request().dbname << " across network to " << op->request().target.toString();
+    if (inShutdown()) {
+        return;
+    }
+
+    // _connect() will continue the state machine.
+    _connect(op);
+}
+
 void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
-    auto& cmd = op->beginCommand(op->request(), op->operationProtocol());
+    auto& cmd = op->beginCommand(op->request(), op->operationProtocol(), now());
 
     _asyncRunCommand(&cmd,
                      [this, op](std::error_code ec, size_t bytes) {
@@ -204,7 +197,7 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
 
 void NetworkInterfaceASIO::_completedOpCallback(AsyncOp* op) {
     // TODO: handle metadata readers.
-    auto response = _responseFromMessage(op->command().toRecv(), op->operationProtocol());
+    auto response = op->command().response(op->operationProtocol(), now());
     _completeOperation(op, response);
 }
 

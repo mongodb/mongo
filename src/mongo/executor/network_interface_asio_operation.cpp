@@ -92,25 +92,20 @@ void NetworkInterfaceASIO::AsyncOp::setConnection(AsyncConnection&& conn) {
 }
 
 NetworkInterfaceASIO::AsyncCommand& NetworkInterfaceASIO::AsyncOp::beginCommand(
-    Message&& newCommand) {
+    Message&& newCommand, Date_t now) {
     // NOTE: We operate based on the assumption that AsyncOp's
     // AsyncConnection does not change over its lifetime.
     invariant(_connection.is_initialized());
-    if (_command.is_initialized()) {
-        // We can just reset our state if initialized.
-        _command->reset();
-    } else {
-        _command.emplace(_connection.get_ptr());
-    }
-    newCommand.header().setResponseTo(0);
-    _command->setToSend(std::move(newCommand));
+
+    // Construct a new AsyncCommand object for each command.
+    _command.emplace(_connection.get_ptr(), std::move(newCommand), now);
     return _command.get();
 }
 
 NetworkInterfaceASIO::AsyncCommand& NetworkInterfaceASIO::AsyncOp::beginCommand(
-    const RemoteCommandRequest& request, rpc::Protocol protocol) {
+    const RemoteCommandRequest& request, rpc::Protocol protocol, Date_t now) {
     auto newCommand = messageFromRequest(request, protocol);
-    return beginCommand(std::move(*newCommand));
+    return beginCommand(std::move(*newCommand), now);
 }
 
 NetworkInterfaceASIO::AsyncCommand& NetworkInterfaceASIO::AsyncOp::command() {
