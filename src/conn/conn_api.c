@@ -432,7 +432,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 		    "requires connection encryption to be set");
 	hash = __wt_hash_city64(keyid->str, keyid->len);
 	bucket = hash % WT_HASH_ARRAY_SIZE;
-	SLIST_FOREACH(kenc, &nenc->keyedhashlh[bucket], l)
+	TAILQ_FOREACH(kenc, &nenc->keyedhashqh[bucket], q)
 		if (WT_STRING_MATCH(kenc->keyid, keyid->str, keyid->len))
 			goto out;
 
@@ -450,8 +450,8 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	WT_ERR(encryptor->sizing(encryptor, &session->iface,
 	    &kenc->size_const));
 	kenc->encryptor = encryptor;
-	SLIST_INSERT_HEAD(&nenc->keyedlh, kenc, l);
-	SLIST_INSERT_HEAD(&nenc->keyedhashlh[bucket], kenc, hashl);
+	TAILQ_INSERT_HEAD(&nenc->keyedqh, kenc, q);
+	TAILQ_INSERT_HEAD(&nenc->keyedhashqh[bucket], kenc, hashq);
 
 out:	__wt_spin_unlock(session, &conn->encryptor_lock);
 	*kencryptorp = kenc;
@@ -506,9 +506,9 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 	WT_ERR(__wt_calloc_one(session, &nenc));
 	WT_ERR(__wt_strdup(session, name, &nenc->name));
 	nenc->encryptor = encryptor;
-	SLIST_INIT(&nenc->keyedlh);
+	TAILQ_INIT(&nenc->keyedqh);
 	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
-		SLIST_INIT(&nenc->keyedhashlh[i]);
+		TAILQ_INIT(&nenc->keyedhashqh[i]);
 
 	TAILQ_INSERT_TAIL(&conn->encryptqh, nenc, q);
 	nenc = NULL;
@@ -537,15 +537,14 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	while ((nenc = TAILQ_FIRST(&conn->encryptqh)) != NULL) {
-		while ((kenc = SLIST_FIRST(&nenc->keyedlh)) != NULL) {
+		while ((kenc = TAILQ_FIRST(&nenc->keyedqh)) != NULL) {
 			/* Call any termination method. */
 			if (kenc->owned && kenc->encryptor->terminate != NULL)
 				WT_TRET(kenc->encryptor->terminate(
 				    kenc->encryptor, (WT_SESSION *)session));
 
 			/* Remove from the connection's list, free memory. */
-			SLIST_REMOVE(
-			    &nenc->keyedlh, kenc, __wt_keyed_encryptor, l);
+			TAILQ_REMOVE(&nenc->keyedqh, kenc, q);
 			__wt_free(session, kenc->keyid);
 			__wt_free(session, kenc);
 		}
