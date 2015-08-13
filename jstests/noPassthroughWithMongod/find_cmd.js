@@ -47,3 +47,7 @@ assert.commandFailed(coll.runCommand("find", {foo: "bar"}));
 
 // Filter doesn't parse.
 assert.commandFailed(coll.runCommand("find", {projection: {_id: 0}, filter: {$foo: "bar"}}));
+
+// Special command namespace.
+assert.commandFailed(coll.getDB().runCommand({find: "$cmd"}));
+assert.commandFailed(coll.getDB().runCommand({find: "$cmd.sys.inprog"}));

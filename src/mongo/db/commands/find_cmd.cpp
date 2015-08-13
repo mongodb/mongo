@@ -181,7 +181,7 @@ public:
              BSONObjBuilder& result) override {
         const std::string fullns = parseNs(dbname, cmdObj);
         const NamespaceString nss(fullns);
-        if (!nss.isValid()) {
+        if (!nss.isValid() || nss.isCommand() || nss.isSpecialCommand()) {
             return appendCommandStatus(result,
                                        {ErrorCodes::InvalidNamespace,
                                         str::stream() << "Invalid collection name: " << nss.ns()});
