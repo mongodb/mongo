@@ -76,7 +76,7 @@ public:
 
 const std::error_category& mongoErrorCategory() {
     // TODO: Remove this static, and make a constexpr instance when we move to C++14.
-    const static MongoErrorCategoryImpl instance{};
+    static const MongoErrorCategoryImpl instance{};
     return instance;
 }
 
