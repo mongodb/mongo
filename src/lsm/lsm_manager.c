@@ -273,7 +273,7 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
-	WT_LSM_WORK_UNIT *current, *next;
+	WT_LSM_WORK_UNIT *current;
 	WT_SESSION *wt_session;
 	uint32_t i;
 	uint64_t removed;
@@ -297,23 +297,17 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 		manager->lsm_worker_cookies[0].tid = 0;
 
 		/* Release memory from any operations left on the queue. */
-		for (current = TAILQ_FIRST(&manager->switchqh);
-		    current != NULL; current = next) {
-			next = TAILQ_NEXT(current, q);
+		while ((current = TAILQ_FIRST(&manager->switchqh)) != NULL) {
 			TAILQ_REMOVE(&manager->switchqh, current, q);
 			++removed;
 			__wt_lsm_manager_free_work_unit(session, current);
 		}
-		for (current = TAILQ_FIRST(&manager->appqh);
-		    current != NULL; current = next) {
-			next = TAILQ_NEXT(current, q);
+		while ((current = TAILQ_FIRST(&manager->appqh)) != NULL) {
 			TAILQ_REMOVE(&manager->appqh, current, q);
 			++removed;
 			__wt_lsm_manager_free_work_unit(session, current);
 		}
-		for (current = TAILQ_FIRST(&manager->managerqh);
-		    current != NULL; current = next) {
-			next = TAILQ_NEXT(current, q);
+		while ((current = TAILQ_FIRST(&manager->managerqh)) != NULL) {
 			TAILQ_REMOVE(&manager->managerqh, current, q);
 			++removed;
 			__wt_lsm_manager_free_work_unit(session, current);
