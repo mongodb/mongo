@@ -51,12 +51,18 @@ static void assertExpectedResults(
     std::string expression,
     std::initializer_list<std::pair<std::vector<Value>, Value>> operations) {
     for (auto&& op : operations) {
-        VariablesIdGenerator idGenerator;
-        VariablesParseState vps(&idGenerator);
-        const BSONObj obj = BSON(expression << Value(op.first));
-        Value result = Expression::parseExpression(obj.firstElement(), vps)->evaluate(Document());
-        ASSERT_EQUALS(op.second, result);
-        ASSERT_EQUALS(op.second.getType(), result.getType());
+        try {
+            VariablesIdGenerator idGenerator;
+            VariablesParseState vps(&idGenerator);
+            const BSONObj obj = BSON(expression << Value(op.first));
+            Value result =
+                Expression::parseExpression(obj.firstElement(), vps)->evaluate(Document());
+            ASSERT_EQUALS(op.second, result);
+            ASSERT_EQUALS(op.second.getType(), result.getType());
+        } catch (...) {
+            log() << "failed with arguments: " << Value(op.first);
+            throw;
+        }
     }
 }
 
