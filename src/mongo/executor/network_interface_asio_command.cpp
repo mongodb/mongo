@@ -203,13 +203,6 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
 }
 
 void NetworkInterfaceASIO::_completedOpCallback(AsyncOp* op) {
-    // If we were told to send an empty message, toRecv will be empty here.
-    if (op->command().toRecv().empty()) {
-        LOG(3) << "received an empty message";
-        auto elapsed = now() - op->start();
-        return _completeOperation(op, RemoteCommandResponse(BSONObj(), BSONObj(), elapsed));
-    }
-
     // TODO: handle metadata readers.
     auto response = _responseFromMessage(op->command().toRecv(), op->operationProtocol());
     _completeOperation(op, response);
