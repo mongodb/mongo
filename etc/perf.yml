@@ -1,4 +1,3 @@
-command_type: system
 stepback: false
 
 pre:
@@ -38,7 +37,7 @@ functions:
           chmod +x mongo
           git clone https://github.com/mongodb/mongo-perf perf
           cd perf
-          git checkout develop # Need to change this to the tagged release
+          git checkout r20150702
     - command: shell.exec
       params:
         background: true
@@ -52,31 +51,6 @@ functions:
           # if we started a replset, initiate it and wait for it to become primary
           ./mongo --eval "if(db.isMaster().isreplicaset){rs.initiate(); assert.soon(function(){return db.isMaster().ismaster}, 'no primary')}"
           echo "MONGOD STARTED."
-  "analyze":
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -e
-          set -v
-          virtualenv ./venv
-          source ./venv/bin/activate
-          pip install argparse python-dateutil
-    - command: json.get_history
-      params:
-        task: ${task_name}
-        file: "src/perf/history.json"
-        name: "perf"
-    - command: shell.exec
-      type : test
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          source ./venv/bin/activate
-          cd perf
-          python perf_regression_check.py -f history.json --rev ${revision}
   "run perf tests":
     - command: shell.exec
       params:
@@ -87,6 +61,7 @@ functions:
           virtualenv ./venv
           source ./venv/bin/activate
           pip install argparse
+
     - command: shell.exec
       params:
         working_dir: src
@@ -152,7 +127,6 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
-    - func: "analyze"
 - name: update
   depends_on:
   - name: compile
@@ -164,7 +138,6 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
-    - func: "analyze"
 - name: insert
   depends_on:
   - name: compile
@@ -176,7 +149,6 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
-    - func: "analyze"
 - name: geo
   depends_on:
   - name: compile
@@ -188,7 +160,6 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
-    - func: "analyze"
 - name: misc
   depends_on:
   - name: compile
@@ -200,7 +171,6 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
-    - func: "analyze"
 - name: singleThreaded
   depends_on:
   - name: compile
@@ -212,7 +182,6 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "none"
         threads : "1"
-    - func: "analyze"
 
 buildvariants:
 - name: linux-wt-standalone
