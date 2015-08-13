@@ -1,3 +1,4 @@
+command_type: system
 stepback: false
 
 pre:
@@ -51,6 +52,37 @@ functions:
           # if we started a replset, initiate it and wait for it to become primary
           ./mongo --eval "if(db.isMaster().isreplicaset){rs.initiate(); assert.soon(function(){return db.isMaster().ismaster}, 'no primary')}"
           echo "MONGOD STARTED."
+  "analyze":
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: perf/${build_variant}/${revision}/perf_regression_check.py-${build_id}
+        bucket: mciuploads
+        local_file: src/perf_regression_check.py
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -e
+          set -v
+          virtualenv ./venv
+          source ./venv/bin/activate
+          pip install argparse python-dateutil
+    - command: json.get_history
+      params:
+        task: ${task_name}
+        file: "src/history.json"
+        name: "perf"
+    - command: shell.exec
+      type : test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          source ./venv/bin/activate
+          python perf_regression_check.py -f history.json --rev ${revision}
   "run perf tests":
     - command: shell.exec
       params:
@@ -61,7 +93,6 @@ functions:
           virtualenv ./venv
           source ./venv/bin/activate
           pip install argparse
-
     - command: shell.exec
       params:
         working_dir: src
@@ -115,6 +146,16 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
         display_name: mongo
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/buildscripts/perf_regression_check.py
+        remote_file: perf/${build_variant}/${revision}/perf_regression_check.py-${build_id}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/octet-stream}
+        display_name: perf_regression_check.py
 
 - name: query
   depends_on:
@@ -127,6 +168,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "analyze"
 - name: update
   depends_on:
   - name: compile
@@ -138,6 +180,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "analyze"
 - name: insert
   depends_on:
   - name: compile
@@ -149,6 +192,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "analyze"
 - name: geo
   depends_on:
   - name: compile
@@ -160,6 +204,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "analyze"
 - name: misc
   depends_on:
   - name: compile
@@ -171,6 +216,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "analyze"
 - name: singleThreaded
   depends_on:
   - name: compile
@@ -182,6 +228,7 @@ tasks:
         includeFilter2 : "core regression" 
         excludeFilter : "none"
         threads : "1"
+    - func: "analyze"
 
 buildvariants:
 - name: linux-wt-standalone
