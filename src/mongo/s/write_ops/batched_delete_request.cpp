@@ -290,10 +290,6 @@ void BatchedDeleteRequest::setMetadata(BatchedRequestMetadata* metadata) {
     _metadata.reset(metadata);
 }
 
-void BatchedDeleteRequest::unsetMetadata() {
-    _metadata.reset();
-}
-
 bool BatchedDeleteRequest::isMetadataSet() const {
     return _metadata.get();
 }

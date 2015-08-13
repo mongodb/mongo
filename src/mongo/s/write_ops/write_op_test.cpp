@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 MongoDB Inc.
+ *    Copyright (C) 2013-2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,8 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_ops/write_op.h"
-
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/owned_pointer_vector.h"
@@ -36,15 +35,16 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
 #include "mongo/s/write_ops/write_error_detail.h"
+#include "mongo/s/write_ops/write_op.h"
 #include "mongo/unittest/unittest.h"
 
-namespace {
+namespace mongo {
 
 using std::unique_ptr;
 using std::string;
 using std::vector;
 
-using namespace mongo;
+namespace {
 
 WriteErrorDetail* buildError(int code, const BSONObj& info, const string& message) {
     WriteErrorDetail* error = new WriteErrorDetail();
@@ -364,4 +364,5 @@ TEST(WriteOpTests, RetrySingleOp) {
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 }
 
-}  // unnamed namespace
+}  // namespace
+}  // namespace mongo

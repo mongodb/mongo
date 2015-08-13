@@ -617,8 +617,7 @@ TEST_F(SingleChunkFixture, MinusChunkWithPending) {
 }
 
 TEST_F(SingleChunkFixture, SingleSplit) {
-    ChunkVersion version;
-    getCollMetadata().getCollVersion().cloneTo(&version);
+    ChunkVersion version = getCollMetadata().getCollVersion();
     version.incMinor();
 
     ChunkType chunk;
@@ -662,8 +661,7 @@ TEST_F(SingleChunkFixture, MultiSplit) {
     splitPoints.push_back(BSON("a" << 14));
     splitPoints.push_back(BSON("a" << 16));
 
-    ChunkVersion version;
-    getCollMetadata().getCollVersion().cloneTo(&version);
+    ChunkVersion version = getCollMetadata().getCollVersion();
     version.incMinor();
 
     cloned.reset(getCollMetadata().cloneSplit(chunk, splitPoints, version, &errMsg));

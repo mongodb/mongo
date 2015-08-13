@@ -8,6 +8,7 @@ env.SConscript(
         'client',
         'commands',
         'query',
+        'write_ops',
     ],
 )
 
@@ -81,114 +82,6 @@ env.CppUnitTest(
 )
 
 #
-# Write Operations
-#
-
-# Types for write operations
-# TODO: Push upward into shared types library between mongos/mongod
-env.Library(
-    target='batch_write_types',
-    source=[
-        'write_ops/batched_command_request.cpp',
-        'write_ops/batched_command_response.cpp',
-        'write_ops/batched_delete_request.cpp',
-        'write_ops/batched_delete_document.cpp',
-        'write_ops/batched_insert_request.cpp',
-        'write_ops/batched_request_metadata.cpp',
-        'write_ops/batched_update_request.cpp',
-        'write_ops/batched_update_document.cpp',
-        'write_ops/batched_upsert_detail.cpp',
-        'write_ops/wc_error_detail.cpp',
-        'write_ops/write_error_detail.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/common',
-    ],
-)
-
-env.CppUnitTest(
-    target='batch_write_types_test',
-    source=[
-        'write_ops/batched_command_request_test.cpp',
-        'write_ops/batched_command_response_test.cpp',
-        'write_ops/batched_delete_request_test.cpp',
-        'write_ops/batched_insert_request_test.cpp',
-        'write_ops/batched_request_metadata_test.cpp',
-        'write_ops/batched_update_request_test.cpp',
-    ],
-    LIBDEPS=[
-        'batch_write_types',
-        '$BUILD_DIR/mongo/db/common',
-    ]
-)
-
-#
-# State and execution of operations across multiple hosts
-#
-# This functionality is self-contained and independent of any network or system-level
-# code.
-#
-env.Library(
-    target='cluster_ops',
-    source=[
-        'write_ops/write_op.cpp',
-        'write_ops/batch_write_op.cpp',
-        'write_ops/batch_write_exec.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/clientdriver',
-        'batch_write_types',
-        '$BUILD_DIR/mongo/util/concurrency/synchronization'
-    ],
-)
-
-env.CppUnitTest(
-    target='cluster_ops_test',
-    source=[
-        'write_ops/write_op_test.cpp',
-        'write_ops/batch_write_op_test.cpp',
-        'write_ops/batch_write_exec_test.cpp',
-    ],
-    LIBDEPS=[
-        'cluster_ops',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/range_arithmetic',
-        '$BUILD_DIR/mongo/db/service_context',
-    ]
-)
-
-# Upconvert/Downconvert write functionality for mongos
-env.Library(
-    target='cluster_write_op_conversion',
-    source=[
-        'write_ops/batch_upconvert.cpp',
-        'write_ops/batch_downconvert.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/common', # for Message
-        '$BUILD_DIR/mongo/db/lasterror',
-        'cluster_ops',
-    ],
-)
-
-env.CppUnitTest(
-    target='cluster_write_op_conversion_test',
-    source=[
-        'write_ops/batch_upconvert_test.cpp',
-        'write_ops/batch_downconvert_test.cpp',
-    ],
-    LIBDEPS=[
-        'cluster_ops',
-        'cluster_write_op_conversion',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/client/clientdriver',
-    ]
-)
-
-#
 # Implementations of components to perform cluster operations in mongos
 #
 # This is the glue code implementing the interfaces required by cluster ops
@@ -203,10 +96,10 @@ env.Library(
         'dbclient_shard_resolver.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'cluster_ops',
-        'cluster_write_op_conversion',
         'client/sharding_client',
+        'write_ops/cluster_write_op',
+        'write_ops/cluster_write_op_conversion',
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -268,8 +161,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/s/query/cluster_query',
         '$BUILD_DIR/mongo/util/concurrency/task',
-        'cluster_ops',
-        'cluster_write_op_conversion',
+        'write_ops/cluster_write_op',
+        'write_ops/cluster_write_op_conversion',
     ]
 )
 

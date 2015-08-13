@@ -304,10 +304,6 @@ void BatchedInsertRequest::setMetadata(BatchedRequestMetadata* metadata) {
     _metadata.reset(metadata);
 }
 
-void BatchedInsertRequest::unsetMetadata() {
-    _metadata.reset();
-}
-
 bool BatchedInsertRequest::isMetadataSet() const {
     return _metadata.get();
 }

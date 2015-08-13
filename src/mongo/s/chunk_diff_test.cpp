@@ -241,7 +241,6 @@ protected:
                     rightB.append(chunk[ChunkType::shard()]);
 
                     version.incMajor();
-                    version._minor = 0;
                     version.addToBSON(leftB, ChunkType::DEPRECATED_lastmod());
                     version.incMinor();
                     version.addToBSON(rightB, ChunkType::DEPRECATED_lastmod());
@@ -294,7 +293,6 @@ protected:
                         prevShardB.append(prevShardChunk[ChunkType::shard()]);
 
                         version.incMajor();
-                        version._minor = 0;
                         version.addToBSON(newShardB, ChunkType::DEPRECATED_lastmod());
                         version.incMinor();
                         version.addToBSON(prevShardB, ChunkType::DEPRECATED_lastmod());

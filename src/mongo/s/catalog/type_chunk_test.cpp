@@ -124,8 +124,8 @@ TEST(ChunkType, NewFormatVersion) {
     ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
     ASSERT_EQUALS(chunk.getMax(), BSON("a" << 20));
     ChunkVersion fetchedVersion = chunk.getVersion();
-    ASSERT_EQUALS(fetchedVersion._combined, 1ULL);
-    ASSERT_EQUALS(fetchedVersion._epoch, epoch);
+    ASSERT_EQUALS(fetchedVersion.toLong(), 1ULL);
+    ASSERT_EQUALS(fetchedVersion.epoch(), epoch);
     ASSERT_EQUALS(chunk.getShard(), "shard0001");
     ASSERT_TRUE(chunk.validate().isOK());
 }
@@ -147,8 +147,8 @@ TEST(ChunkType, OldFormatVersion) {
     ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
     ASSERT_EQUALS(chunk.getMax(), BSON("a" << 20));
     ChunkVersion fetchedVersion = chunk.getVersion();
-    ASSERT_EQUALS(fetchedVersion._combined, 1ULL);
-    ASSERT_EQUALS(fetchedVersion._epoch, epoch);
+    ASSERT_EQUALS(fetchedVersion.toLong(), 1ULL);
+    ASSERT_EQUALS(fetchedVersion.epoch(), epoch);
     ASSERT_EQUALS(chunk.getShard(), "shard0001");
     ASSERT_TRUE(chunk.validate().isOK());
 }

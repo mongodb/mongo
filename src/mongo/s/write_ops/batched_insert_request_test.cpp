@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -17,30 +17,32 @@
  *    code of portions of this program with the OpenSSL library under certain
  *    conditions as described in each individual source file and distribute
  *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the GNU Affero General Public License in all respects
- *    for all of the code used other than as permitted herein. If you modify
- *    file(s) with this exception, you may extend this exception to your
- *    version of the file(s), but you are not obligated to do so. If you do not
- *    wish to do so, delete this exception statement from your version. If you
- *    delete this exception statement from all source files in the program,
- *    then also delete it in the license file.
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
  */
 
-#include "mongo/s/write_ops/batched_insert_request.h"
+#include "mongo/platform/basic.h"
 
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_insert_request.h"
+#include "mongo/unittest/unittest.h"
 
-namespace {
+namespace mongo {
 
-using namespace mongo;
 using std::unique_ptr;
 using std::string;
 
-TEST(RoundTrip, Normal) {
+namespace {
+
+TEST(BatchedInsertRequest, Basic) {
     BSONArray insertArray = BSON_ARRAY(BSON("a" << 1) << BSON("b" << 1));
 
     BSONObj writeConcernObj = BSON("w" << 1);
@@ -71,7 +73,7 @@ TEST(RoundTrip, Normal) {
     ASSERT_EQUALS(0, genInsertRequestObj.woCompare(origInsertRequestObj));
 }
 
-TEST(GenID, All) {
+TEST(BatchedInsertRequest, GenIDAll) {
     BatchedCommandRequest cmdRequest(BatchedCommandRequest::BatchType_Insert);
     BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
 
@@ -97,7 +99,7 @@ TEST(GenID, All) {
     ASSERT_EQUALS(idRequest->getDocumentsAt(1).nFields(), 2);
 }
 
-TEST(GenID, Partial) {
+TEST(BatchedInsertRequest, GenIDPartial) {
     BatchedCommandRequest cmdRequest(BatchedCommandRequest::BatchType_Insert);
     BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
 
@@ -127,7 +129,7 @@ TEST(GenID, Partial) {
     ASSERT_EQUALS(idRequest->getDocumentsAt(1).nFields(), 2);
 }
 
-TEST(GenID, None) {
+TEST(BatchedInsertRequest, GenIDNone) {
     BatchedCommandRequest cmdRequest(BatchedCommandRequest::BatchType_Insert);
     BatchedInsertRequest& request = *cmdRequest.getInsertRequest();
 
@@ -144,5 +146,5 @@ TEST(GenID, None) {
     ASSERT(!idCmdRequest.get());
 }
 
-
-}  // unnamed namespace
+}  // namespace
+}  // namespace mongo

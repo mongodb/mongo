@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/write_ops/batch_write_op.h"
 
 #include "mongo/base/error_codes.h"

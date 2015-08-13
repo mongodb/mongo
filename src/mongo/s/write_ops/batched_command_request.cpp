@@ -261,10 +261,6 @@ void BatchedCommandRequest::setMetadata(BatchedRequestMetadata* metadata) {
     INVOKE(setMetadata, metadata);
 }
 
-void BatchedCommandRequest::unsetMetadata() {
-    INVOKE(unsetMetadata);
-}
-
 bool BatchedCommandRequest::isMetadataSet() const {
     INVOKE(isMetadataSet);
 }

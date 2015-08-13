@@ -533,7 +533,6 @@ serverOnlyFiles = [
     "commands/list_collections.cpp",
     "commands/list_databases.cpp",
     "commands/list_indexes.cpp",
-    "commands/merge_chunks_cmd.cpp",
     "commands/mr.cpp",
     "commands/oplog_note.cpp",
     "commands/parallel_collection_scan.cpp",
@@ -624,7 +623,6 @@ serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 serveronlyLibdeps = [
     "$BUILD_DIR/mongo/client/parallel",
     "$BUILD_DIR/mongo/executor/network_interface_factory",
-    "$BUILD_DIR/mongo/s/batch_write_types",
     "$BUILD_DIR/mongo/s/catalog/legacy/catalog_manager_legacy",
     "$BUILD_DIR/mongo/s/catalog/replset/catalog_manager_replica_set",
     "$BUILD_DIR/mongo/s/client/sharding_connection_hook",

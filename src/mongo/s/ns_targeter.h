@@ -154,8 +154,6 @@ public:
  * the logical target (shard name/version/broadcast) and the physical target (host name).
  */
 struct ShardEndpoint {
-    ShardEndpoint() {}
-
     ShardEndpoint(const ShardEndpoint& other)
         : shardName(other.shardName), shardVersion(other.shardVersion) {}
 

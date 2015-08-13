@@ -307,10 +307,6 @@ void BatchedUpdateRequest::setMetadata(BatchedRequestMetadata* metadata) {
     _metadata.reset(metadata);
 }
 
-void BatchedUpdateRequest::unsetMetadata() {
-    _metadata.reset();
-}
-
 bool BatchedUpdateRequest::isMetadataSet() const {
     return _metadata.get();
 }

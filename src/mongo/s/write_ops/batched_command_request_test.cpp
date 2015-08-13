@@ -36,7 +36,7 @@
 namespace mongo {
 namespace {
 
-TEST(BatchedCommandRequest, BasicInsertClone) {
+TEST(BatchedCommandRequest, InsertClone) {
     auto insertRequest = stdx::make_unique<BatchedInsertRequest>();
     BatchedCommandRequest batchedRequest(insertRequest.release());
 
@@ -83,7 +83,7 @@ TEST(BatchedCommandRequest, InsertIndexClone) {
     ASSERT_EQ(indexSpec, insertDocs.front());
 }
 
-TEST(BatchedCommandRequest, BasicInsertCloneWithId) {
+TEST(BatchedCommandRequest, InsertCloneWithId) {
     auto insertRequest = stdx::make_unique<BatchedInsertRequest>();
     insertRequest->setOrdered(true);
     insertRequest->setWriteConcern(BSON("w" << 2));
@@ -111,7 +111,7 @@ TEST(BatchedCommandRequest, BasicInsertCloneWithId) {
     ASSERT_EQ(4, insertDoc["x"].numberLong());
 }
 
-TEST(BatchedCommandRequest, BasicUpdateClone) {
+TEST(BatchedCommandRequest, UpdateClone) {
     auto insertRequest = stdx::make_unique<BatchedUpdateRequest>();
     BatchedCommandRequest batchedRequest(insertRequest.release());
 
@@ -128,7 +128,7 @@ TEST(BatchedCommandRequest, BasicUpdateClone) {
     ASSERT_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
 }
 
-TEST(BatchedCommandRequest, BasicDeleteClone) {
+TEST(BatchedCommandRequest, DeleteClone) {
     auto insertRequest = stdx::make_unique<BatchedDeleteRequest>();
     BatchedCommandRequest batchedRequest(insertRequest.release());
 

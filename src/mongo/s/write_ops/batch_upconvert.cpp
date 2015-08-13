@@ -30,7 +30,6 @@
 
 #include "mongo/s/write_ops/batch_upconvert.h"
 
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
@@ -43,24 +42,14 @@
 
 namespace mongo {
 
-using mongoutils::str::stream;
+using str::stream;
 using std::string;
 using std::unique_ptr;
 using std::vector;
 
-void msgToBatchRequests(const Message& msg, vector<BatchedCommandRequest*>* requests) {
-    int opType = msg.operation();
+namespace {
 
-    if (opType == dbInsert) {
-        msgToBatchInserts(msg, requests);
-    } else if (opType == dbUpdate) {
-        requests->push_back(msgToBatchUpdate(msg));
-    } else {
-        dassert(opType == dbDelete);
-        requests->push_back(msgToBatchDelete(msg));
-    }
-}
-
+// Batch inserts may get mapped to multiple batch requests, to avoid spilling MaxBSONObjSize
 void msgToBatchInserts(const Message& insertMsg, vector<BatchedCommandRequest*>* insertRequests) {
     // Parsing DbMessage throws
     DbMessage dbMsg(insertMsg);
@@ -156,6 +145,21 @@ void buildErrorFromResponse(const BatchedCommandResponse& response, WriteErrorDe
     error->setErrMessage(response.getErrMessage());
 }
 
+}  // namespace
+
+void msgToBatchRequests(const Message& msg, vector<BatchedCommandRequest*>* requests) {
+    int opType = msg.operation();
+
+    if (opType == dbInsert) {
+        msgToBatchInserts(msg, requests);
+    } else if (opType == dbUpdate) {
+        requests->push_back(msgToBatchUpdate(msg));
+    } else {
+        dassert(opType == dbDelete);
+        requests->push_back(msgToBatchDelete(msg));
+    }
+}
+
 bool batchErrorToLastError(const BatchedCommandRequest& request,
                            const BatchedCommandResponse& response,
                            LastError* error) {
@@ -222,4 +226,5 @@ bool batchErrorToLastError(const BatchedCommandRequest& request,
 
     return false;
 }
-}
+
+}  // namespace mongo

@@ -582,13 +582,12 @@ void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
         ChunkVersion& previouslyNotedVersion = it->second;
         if (previouslyNotedVersion.hasEqualEpoch(remoteShardVersion)) {
             if (previouslyNotedVersion.isOlderThan(remoteShardVersion)) {
-                remoteShardVersion.cloneTo(&previouslyNotedVersion);
+                previouslyNotedVersion = remoteShardVersion;
             }
         } else {
-            // Epoch changed midway while applying the batch so set the version to
-            // something unique and non-existent to force a reload when
-            // refreshIsNeeded is called.
-            ChunkVersion::IGNORED().cloneTo(&previouslyNotedVersion);
+            // Epoch changed midway while applying the batch so set the version to something unique
+            // and non-existent to force a reload when refreshIsNeeded is called.
+            previouslyNotedVersion = ChunkVersion::IGNORED();
         }
     }
 }

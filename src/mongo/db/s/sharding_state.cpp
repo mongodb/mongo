@@ -422,6 +422,7 @@ Status ShardingState::refreshMetadataIfNeeded(OperationContext* txn,
         if (it != _collMetadata.end())
             storedMetadata = it->second;
     }
+
     ChunkVersion storedShardVersion;
     if (storedMetadata)
         storedShardVersion = storedMetadata->getShardVersion();
@@ -542,8 +543,7 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
     string errMsg;
 
     MetadataLoader mdLoader;
-    CollectionMetadata* remoteMetadataRaw = new CollectionMetadata();
-    shared_ptr<CollectionMetadata> remoteMetadata(remoteMetadataRaw);
+    shared_ptr<CollectionMetadata> remoteMetadata(std::make_shared<CollectionMetadata>());
 
     Timer refreshTimer;
     long long refreshMillis;
@@ -554,12 +554,11 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
                                                         ns,
                                                         getShardName(),
                                                         fullReload ? NULL : beforeMetadata.get(),
-                                                        remoteMetadataRaw);
+                                                        remoteMetadata.get());
         refreshMillis = refreshTimer.millis();
 
         if (status.code() == ErrorCodes::NamespaceNotFound) {
             remoteMetadata.reset();
-            remoteMetadataRaw = NULL;
         } else if (!status.isOK()) {
             warning() << "could not remotely refresh metadata for " << ns
                       << causedBy(status.reason());
@@ -630,7 +629,7 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
         // Resolve newer pending chunks with the remote metadata, finish construction
         //
 
-        Status status = mdLoader.promotePendingChunks(afterMetadata.get(), remoteMetadataRaw);
+        Status status = mdLoader.promotePendingChunks(afterMetadata.get(), remoteMetadata.get());
 
         if (!status.isOK()) {
             warning() << "remote metadata for " << ns

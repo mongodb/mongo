@@ -38,6 +38,7 @@ env.Library(
 env.Library(
     target='commands',
     source=[
+        'merge_chunks_command.cpp',
         'set_shard_version_command.cpp',
     ],
     LIBDEPS=[

@@ -26,45 +26,46 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_ops/batch_write_op.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
+#include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/unittest/unittest.h"
 
-namespace {
+namespace mongo {
 
 using std::unique_ptr;
 using std::string;
 using std::vector;
 
-using namespace mongo;
+namespace {
 
-static void initTargeterFullRange(const NamespaceString& nss,
-                                  const ShardEndpoint& endpoint,
-                                  MockNSTargeter* targeter) {
+void initTargeterFullRange(const NamespaceString& nss,
+                           const ShardEndpoint& endpoint,
+                           MockNSTargeter* targeter) {
     vector<MockRange*> mockRanges;
     mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
     targeter->init(mockRanges);
 }
 
-static void initTargeterSplitRange(const NamespaceString& nss,
-                                   const ShardEndpoint& endpointA,
-                                   const ShardEndpoint& endpointB,
-                                   MockNSTargeter* targeter) {
+void initTargeterSplitRange(const NamespaceString& nss,
+                            const ShardEndpoint& endpointA,
+                            const ShardEndpoint& endpointB,
+                            MockNSTargeter* targeter) {
     vector<MockRange*> mockRanges;
     mockRanges.push_back(new MockRange(endpointA, nss, BSON("x" << MINKEY), BSON("x" << 0)));
     mockRanges.push_back(new MockRange(endpointB, nss, BSON("x" << 0), BSON("x" << MAXKEY)));
     targeter->init(mockRanges);
 }
 
-static void initTargeterHalfRange(const NamespaceString& nss,
-                                  const ShardEndpoint& endpoint,
-                                  MockNSTargeter* targeter) {
+void initTargeterHalfRange(const NamespaceString& nss,
+                           const ShardEndpoint& endpoint,
+                           MockNSTargeter* targeter) {
     vector<MockRange*> mockRanges;
     mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << 0)));
 
@@ -73,14 +74,14 @@ static void initTargeterHalfRange(const NamespaceString& nss,
     targeter->init(mockRanges);
 }
 
-static BatchedDeleteDocument* buildDelete(const BSONObj& query, int limit) {
+BatchedDeleteDocument* buildDelete(const BSONObj& query, int limit) {
     BatchedDeleteDocument* deleteDoc = new BatchedDeleteDocument;
     deleteDoc->setQuery(query);
     deleteDoc->setLimit(limit);
     return deleteDoc;
 }
 
-static BatchedUpdateDocument* buildUpdate(const BSONObj& query, bool multi) {
+BatchedUpdateDocument* buildUpdate(const BSONObj& query, bool multi) {
     BatchedUpdateDocument* updateDoc = new BatchedUpdateDocument;
     updateDoc->setUpdateExpr(BSONObj());
     updateDoc->setQuery(query);
@@ -88,9 +89,7 @@ static BatchedUpdateDocument* buildUpdate(const BSONObj& query, bool multi) {
     return updateDoc;
 }
 
-static BatchedUpdateDocument* buildUpdate(const BSONObj& query,
-                                          const BSONObj& updateExpr,
-                                          bool multi) {
+BatchedUpdateDocument* buildUpdate(const BSONObj& query, const BSONObj& updateExpr, bool multi) {
     BatchedUpdateDocument* updateDoc = new BatchedUpdateDocument;
     updateDoc->setQuery(query);
     updateDoc->setUpdateExpr(updateExpr);
@@ -98,14 +97,14 @@ static BatchedUpdateDocument* buildUpdate(const BSONObj& query,
     return updateDoc;
 }
 
-static void buildResponse(int n, BatchedCommandResponse* response) {
+void buildResponse(int n, BatchedCommandResponse* response) {
     response->clear();
     response->setOk(true);
     response->setN(n);
     ASSERT(response->isValid(NULL));
 }
 
-static void buildErrResponse(int code, const string& message, BatchedCommandResponse* response) {
+void buildErrResponse(int code, const string& message, BatchedCommandResponse* response) {
     response->clear();
     response->setOk(false);
     response->setN(0);
@@ -114,7 +113,7 @@ static void buildErrResponse(int code, const string& message, BatchedCommandResp
     ASSERT(response->isValid(NULL));
 }
 
-static void addError(int code, const string& message, int index, BatchedCommandResponse* response) {
+void addError(int code, const string& message, int index, BatchedCommandResponse* response) {
     unique_ptr<WriteErrorDetail> error(new WriteErrorDetail);
     error->setErrCode(code);
     error->setErrMessage(message);
@@ -123,7 +122,7 @@ static void addError(int code, const string& message, int index, BatchedCommandR
     response->addToErrDetails(error.release());
 }
 
-static void addWCError(BatchedCommandResponse* response) {
+void addWCError(BatchedCommandResponse* response) {
     unique_ptr<WCErrorDetail> error(new WCErrorDetail);
     error->setErrCode(ErrorCodes::WriteConcernFailed);
     error->setErrMessage("mock wc error");
@@ -1190,7 +1189,6 @@ TEST(WriteOpTests, MultiOpErrorAndWriteConcernErrorUnordered) {
     ASSERT(clientResponse.isWriteConcernErrorSet());
 }
 
-
 TEST(WriteOpTests, SingleOpErrorAndWriteConcernErrorOrdered) {
     //
     // Single-op (ordered) error and write concern error test
@@ -1810,5 +1808,5 @@ TEST(WriteOpLimitTests, UpdateOverheadIncluded) {
     ASSERT(batchOp.isFinished());
 }
 
-
-}  // unnamed namespace
+}  // namespace
+}  // namespace mongo

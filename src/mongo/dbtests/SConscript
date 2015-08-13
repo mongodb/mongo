@@ -109,7 +109,6 @@ dbtest = env.Program(
         "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils",
         "$BUILD_DIR/mongo/platform/platform",
-        "$BUILD_DIR/mongo/s/cluster_ops",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/util/concurrency/rwlock",
         "mocklib",

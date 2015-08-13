@@ -36,7 +36,7 @@
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/client/dbclientinterface.h"  // ConnectionString (header-only)
+#include "mongo/client/connection_string.h"
 #include "mongo/s/client/multi_command_dispatch.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_error_detail.h"
@@ -44,7 +44,6 @@
 
 namespace mongo {
 
-using std::endl;
 using std::make_pair;
 using std::stringstream;
 using std::vector;
@@ -97,8 +96,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                                   const BatchedCommandRequest& clientRequest,
                                   BatchedCommandResponse* clientResponse) {
     LOG(4) << "starting execution of write batch of size "
-           << static_cast<int>(clientRequest.sizeWriteOps()) << " for " << clientRequest.getNS()
-           << endl;
+           << static_cast<int>(clientRequest.sizeWriteOps()) << " for " << clientRequest.getNS();
 
     BatchWriteOp batchOp;
     batchOp.initClientRequest(&clientRequest);
@@ -193,7 +191,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                     buildErrorFrom(resolveStatus, &error);
 
                     LOG(4) << "unable to send write batch to " << shardHost.toString()
-                           << causedBy(resolveStatus.toString()) << endl;
+                           << causedBy(resolveStatus.toString());
 
                     batchOp.noteBatchError(*nextBatch, error);
 
@@ -223,7 +221,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                 request.setNS(nss);
 
                 LOG(4) << "sending write batch to " << shardHost.toString() << ": "
-                       << request.toString() << endl;
+                       << request.toString();
 
                 _dispatcher->addCommand(shardHost, nss.db(), request.toBSON());
 
@@ -260,7 +258,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                     trackedErrors.startTracking(ErrorCodes::StaleShardVersion);
 
                     LOG(4) << "write results received from " << shardHost.toString() << ": "
-                           << response.toString() << endl;
+                           << response.toString();
 
                     // Dispatch was ok, note response
                     batchOp.noteBatchResponse(*batch, response, &trackedErrors);
@@ -297,7 +295,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                     buildErrorFrom(Status(ErrorCodes::RemoteResultsUnavailable, msg.str()), &error);
 
                     LOG(4) << "unable to receive write results from " << shardHost.toString()
-                           << causedBy(dispatchStatus.toString()) << endl;
+                           << causedBy(dispatchStatus.toString());
 
                     batchOp.noteBatchError(*batch, error);
                 }
@@ -323,7 +321,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
         if (!refreshStatus.isOK()) {
             // It's okay if we can't refresh, we'll just record errors for the ops if
             // needed.
-            warning() << "could not refresh targeter" << causedBy(refreshStatus.reason()) << endl;
+            warning() << "could not refresh targeter" << causedBy(refreshStatus.reason());
         }
 
         //
@@ -359,7 +357,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                    ? " and"
                    : "")
            << (clientResponse->isWriteConcernErrorSet() ? " with write concern error" : "")
-           << " for " << clientRequest.getNS() << endl;
+           << " for " << clientRequest.getNS();
 }
 
 const BatchWriteExecStats& BatchWriteExec::getStats() {

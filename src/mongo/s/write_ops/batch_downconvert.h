@@ -85,4 +85,5 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors);
  * Given a GLE response, strips out all non-write-concern related information
  */
 BSONObj stripNonWCInfo(const BSONObj& gleResponse);
-}
+
+}  // namespace mongo

@@ -26,25 +26,25 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_ops/batch_write_exec.h"
-
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/s/client/mock_multi_write_command.h"
 #include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/mock_shard_resolver.h"
+#include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/unittest.h"
 
-namespace {
+namespace mongo {
 
 using std::unique_ptr;
 using std::string;
 using std::vector;
 
-using namespace mongo;
+namespace {
 
 /**
  * Mimics a single shard backend for a particular collection which can be initialized with a
@@ -308,4 +308,5 @@ TEST(BatchWriteExecTests, ManyStaleOpWithMigration) {
     ASSERT_EQUALS(stats.numStaleBatches, 10);
 }
 
-}  // unnamed namespace
+}  // namespace
+}  // namespace mongo

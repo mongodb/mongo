@@ -44,14 +44,6 @@ namespace mongo {
 
 void msgToBatchRequests(const Message& msg, std::vector<BatchedCommandRequest*>* requests);
 
-// Batch inserts may get mapped to multiple batch requests, to avoid spilling MaxBSONObjSize
-void msgToBatchInserts(const Message& insertMsg,
-                       std::vector<BatchedCommandRequest*>* insertRequests);
-
-BatchedCommandRequest* msgToBatchUpdate(const Message& updateMsg);
-
-BatchedCommandRequest* msgToBatchDelete(const Message& deleteMsg);
-
 /**
  * Utility function for recording completed batch writes into the LastError object.
  * (Interpreting the response requires the request object as well.)

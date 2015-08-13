@@ -288,4 +288,5 @@ Status enforceLegacyWriteConcern(MultiCommandDispatch* dispatcher,
                                               : ErrorCodes::MultipleErrorsOccurred,
                   builder.str());
 }
-}
+
+}  // namespace mongo

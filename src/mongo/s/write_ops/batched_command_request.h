@@ -28,7 +28,6 @@
 
 #pragma once
 
-
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/s/write_ops/batched_update_request.h"
@@ -130,7 +129,6 @@ public:
     bool getOrdered() const;
 
     void setMetadata(BatchedRequestMetadata* metadata);
-    void unsetMetadata();
     bool isMetadataSet() const;
     BatchedRequestMetadata* getMetadata() const;
 
