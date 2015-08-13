@@ -47,7 +47,7 @@ else
 	fi
 
 	if ! expr "$f" : 'src/include/queue\.h' > /dev/null &&
-	    egrep 'STAIL_|SLIST_|\bLIST_' $f ; then
+	    egrep 'STAILQ_|SLIST_|\bLIST_' $f ; then
 		echo "$f: use TAILQ for all lists"
 	fi
 
