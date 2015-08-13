@@ -392,6 +392,10 @@ void addClusterManagerPrivileges(PrivilegeVector* privileges) {
         privileges,
         Privilege(ResourcePattern::forExactNamespace(NamespaceString("local", "system.replset")),
                   readRoleActions));
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
+        Privilege(ResourcePattern::forExactNamespace(NamespaceString("config", "tags")),
+                  configSettingsActions));
 }
 
 void addClusterAdminPrivileges(PrivilegeVector* privileges) {

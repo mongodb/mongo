@@ -219,6 +219,24 @@ var authCommandsLib = {
             ]
         },
         {
+            // Test that clusterManager role has permission to run addTagRange
+            testname: "addTagRange",
+            command: {  // addTagRange is not a "real command"; it updates config.tags
+                update: "tags",
+                updates: [ {
+                    q: {_id: { ns : "test.x" , min : 1 }},
+                    u: {_id: { ns : "test.x" , min : 1 },
+                    ns : "test.x"}
+                } ] },
+            skipStandalone: true,
+            testcases: [
+                {
+                    runOnDb: "config",
+                    roles: Object.extend({readWriteAnyDatabase: 1}, roles_clusterManager)
+                }
+            ]
+        },
+        {
             testname: "applyOps",
             command: {applyOps: "x"},
             testcases: [
