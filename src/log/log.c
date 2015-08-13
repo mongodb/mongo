@@ -1987,7 +1987,9 @@ use_slots:
 	 * the slot fields.
 	 * XXX On error we may still need to call release and free.
 	 */
-	WT_ERR(ret);
+	if (ret != 0)
+		myslot.slot->slot_error = ret;
+	WT_ASSERT(session, ret == 0);
 	if (WT_LOG_SLOT_DONE(release_size)) {
 		WT_ERR(__wt_log_release(session, myslot.slot, &free_slot));
 		if (free_slot)
