@@ -53,7 +53,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	hash = __wt_hash_city64(name, strlen(name));
 	bucket = hash % WT_HASH_ARRAY_SIZE;
 	__wt_spin_lock(session, &conn->fh_lock);
-	SLIST_FOREACH(tfh, &conn->fhhash[bucket], hashl) {
+	TAILQ_FOREACH(tfh, &conn->fhhash[bucket], hashq) {
 		if (strcmp(name, tfh->name) == 0) {
 			++tfh->ref;
 			*fhp = tfh;
@@ -167,7 +167,7 @@ setupfh:
 	 */
 	matched = 0;
 	__wt_spin_lock(session, &conn->fh_lock);
-	SLIST_FOREACH(tfh, &conn->fhhash[bucket], hashl) {
+	TAILQ_FOREACH(tfh, &conn->fhhash[bucket], hashq) {
 		if (strcmp(name, tfh->name) == 0) {
 			++tfh->ref;
 			*fhp = tfh;
