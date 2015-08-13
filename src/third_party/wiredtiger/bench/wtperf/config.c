@@ -95,6 +95,7 @@ config_assign(CONFIG *dest, const CONFIG *src)
 				*pstr = newstr;
 			}
 		}
+
 	return (0);
 }
 
