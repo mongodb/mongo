@@ -28,6 +28,9 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	slot->slot_fh = log->log_fh;
 	slot->slot_error = 0;
 	slot->slot_unbuffered = 0;
+	slot->slot_force_old = 0;
+	slot->slot_force_new = 0;
+	slot->slot_lastrel = 0;
 	return;
 }
 
@@ -63,12 +66,16 @@ retry:
 	/*
 	 * Close this slot.  If we lose the race retry.
 	 */
+	__wt_epoch(session, &current->slot_fstart);
 	if (!WT_ATOMIC_CAS8(current->slot_state, old_state, new_state))
 		goto retry;
+	__wt_epoch(session, &current->slot_fend);
 	/*
 	 * We own the slot now.  No one else can join.
 	 * Set the end LSN.
 	 */
+	current->slot_force_old = old_state;
+	current->slot_force_new = new_state;
 	WT_STAT_FAST_CONN_INCR(session, log_slot_closes);
 	if (WT_LOG_SLOT_DONE(new_state) && releasep != NULL)
 		*releasep = 1;
@@ -379,7 +386,10 @@ __wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
 	 * Add my size into the state and return the new size.
 	 */
 	my_size = WT_LOG_SLOT_JOIN_REL((uint64_t)0, size, 0);
+	__wt_epoch(NULL, &slot->slot_rstart);
 	newsize = WT_ATOMIC_ADD8(slot->slot_state, my_size);
+	__wt_epoch(NULL, &slot->slot_rend);
+	slot->slot_lastrel = newsize;
 	return (newsize);
 }
 
