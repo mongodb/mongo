@@ -238,7 +238,7 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
 	size_t write_size;
-	int64_t j, rel;
+	int64_t rel;
 	int i;
 
 	conn = S2C(session);
@@ -251,7 +251,6 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 		slot = &log->slot_pool[i];
 		if (!FLD64_ISSET(slot->slot_state, WT_LOG_SLOT_RESERVED)) {
 			rel = WT_LOG_SLOT_RELEASED(slot->slot_state);
-			j = WT_LOG_SLOT_JOINED(slot->slot_state);
 			write_size = (size_t)rel - slot->slot_unbuffered;
 			if (write_size != 0)
 				WT_RET(__wt_write(session, slot->slot_fh,
