@@ -37,6 +37,7 @@
 #include <unordered_map>
 
 #include "mongo/base/status.h"
+#include "mongo/base/system_error.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -225,7 +226,7 @@ private:
         if (op->canceled())
             return _completeOperation(op,
                                       Status(ErrorCodes::CallbackCanceled, "Callback canceled"));
-        if (ec)
+        if (ec != ErrorCodes::OK)
             return _networkErrorCallback(op, ec);
 
         handler();

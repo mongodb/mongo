@@ -35,9 +35,9 @@
 #include <type_traits>
 #include <utility>
 
-#include "mongo/executor/async_stream_interface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/executor/async_stream_interface.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
@@ -95,19 +95,16 @@ void asyncRecvMessageBody(AsyncStreamInterface& stream,
     static_assert(
         IsNetworkHandler<Handler>::value,
         "Handler passed to asyncRecvMessageBody does not conform to NetworkHandler concept");
-    // TODO: This error code should be more meaningful.
-    std::error_code ec;
-
     // validate message length
     int len = header->constView().getMessageLength();
     if (len == 542393671) {
         LOG(3) << "attempt to access MongoDB over HTTP on the native driver port.";
-        return handler(ec, 0);
+        return handler(make_error_code(ErrorCodes::ProtocolError), 0);
     } else if (static_cast<size_t>(len) < sizeof(MSGHEADER::Value) ||
                static_cast<size_t>(len) > MaxMessageSizeBytes) {
         warning() << "recv(): message len " << len << " is invalid. "
                   << "Min " << sizeof(MSGHEADER::Value) << " Max: " << MaxMessageSizeBytes;
-        return handler(ec, 0);
+        return handler(make_error_code(ErrorCodes::InvalidLength), 0);
     }
 
     int z = (len + 1023) & 0xfffffc00;
@@ -220,7 +217,13 @@ void NetworkInterfaceASIO::_completedOpCallback(AsyncOp* op) {
 
 void NetworkInterfaceASIO::_networkErrorCallback(AsyncOp* op, const std::error_code& ec) {
     LOG(3) << "networking error occurred";
-    _completeOperation(op, Status(ErrorCodes::HostUnreachable, ec.message()));
+    if (ec.category() == mongoErrorCategory()) {
+        // If we get a Mongo error code, we can preserve it.
+        _completeOperation(op, Status(ErrorCodes::fromInt(ec.value()), ec.message()));
+    } else {
+        // If we get an asio or system error, we just convert it to a network error.
+        _completeOperation(op, Status(ErrorCodes::HostUnreachable, ec.message()));
+    }
 }
 
 // NOTE: This method may only be called by ASIO threads
@@ -252,7 +255,7 @@ void NetworkInterfaceASIO::_asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler 
     // Step 3
     auto recvHeaderCallback = [this, cmd, handler, recvMessageCallback](std::error_code ec,
                                                                         size_t bytes) {
-        if (ec)
+        if (ec != ErrorCodes::OK)
             return handler(ec, bytes);
 
         // validate response id
@@ -272,7 +275,7 @@ void NetworkInterfaceASIO::_asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler 
     // Step 2
     auto sendMessageCallback = [this, cmd, handler, recvHeaderCallback](std::error_code ec,
                                                                         size_t bytes) {
-        if (ec)
+        if (ec != ErrorCodes::OK)
             return handler(ec, bytes);
 
         asyncRecvMessageHeader(cmd->conn().stream(), &cmd->header(), std::move(recvHeaderCallback));

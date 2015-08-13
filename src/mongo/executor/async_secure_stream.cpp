@@ -32,9 +32,10 @@
 
 #include "mongo/executor/async_secure_stream.h"
 
+#include "mongo/base/system_error.h"
 #include "mongo/config.h"
-#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/ssl_manager.h"
 
 #ifdef MONGO_CONFIG_SSL
 
@@ -52,7 +53,7 @@ void AsyncSecureStream::connect(const asio::ip::tcp::resolver::iterator endpoint
     asio::async_connect(_stream.lowest_layer(),
                         std::move(endpoints),
                         [this](std::error_code ec, asio::ip::tcp::resolver::iterator iter) {
-                            if (ec) {
+                            if (ec != ErrorCodes::OK) {
                                 return _userHandler(ec);
                             }
                             return _handleConnect(ec, std::move(iter));
@@ -70,7 +71,7 @@ void AsyncSecureStream::read(asio::mutable_buffer buffer, StreamHandler&& stream
 void AsyncSecureStream::_handleConnect(std::error_code ec, asio::ip::tcp::resolver::iterator iter) {
     _stream.async_handshake(decltype(_stream)::client,
                             [this, iter](std::error_code ec) {
-                                if (ec) {
+                                if (ec != ErrorCodes::OK) {
                                     return _userHandler(ec);
                                 }
                                 return _handleHandshake(ec, iter->host_name());
@@ -82,11 +83,8 @@ void AsyncSecureStream::_handleHandshake(std::error_code ec, const std::string& 
         getSSLManager()->parseAndValidatePeerCertificate(_stream.native_handle(), hostName);
     if (!certStatus.isOK()) {
         warning() << certStatus.getStatus();
-        return _userHandler(
-            // TODO: fix handling of std::error_code w.r.t. codes used by Status
-            std::error_code(certStatus.getStatus().code(), std::generic_category()));
     }
-    _userHandler(std::error_code());
+    _userHandler(make_error_code(certStatus.getStatus().code()));
 }
 
 }  // namespace executor

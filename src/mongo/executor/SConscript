@@ -84,6 +84,7 @@ env.Library(
         'network_interface_asio_operation.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base/system_error',
         '$BUILD_DIR/mongo/client/authentication',
         '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/rpc/rpc',
