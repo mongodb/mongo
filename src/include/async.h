@@ -17,7 +17,7 @@
  *	The URI/config/format cache.
  */
 struct __wt_async_format {
-	STAILQ_ENTRY(__wt_async_format) q;
+	TAILQ_ENTRY(__wt_async_format) q;
 	const char	*config;
 	uint64_t	cfg_hash;		/* Config hash */
 	const char	*uri;
@@ -80,7 +80,7 @@ struct __wt_async {
 	uint64_t		 alloc_tail;	/* Next slot to dequeue */
 	uint64_t		 tail_slot;	/* Worker slot consumed */
 
-	STAILQ_HEAD(__wt_async_format_qh, __wt_async_format) formatqh;
+	TAILQ_HEAD(__wt_async_format_qh, __wt_async_format) formatqh;
 	uint32_t		 cur_queue;	/* Currently enqueued */
 	uint32_t		 max_queue;	/* Maximum enqueued */
 
@@ -110,7 +110,7 @@ struct __wt_async {
  *	has a cache of async cursors to reuse for operations.
  */
 struct __wt_async_cursor {
-	STAILQ_ENTRY(__wt_async_cursor) q;	/* Worker cache */
+	TAILQ_ENTRY(__wt_async_cursor) q;	/* Worker cache */
 	uint64_t	cfg_hash;		/* Config hash */
 	uint64_t	uri_hash;		/* URI hash */
 	WT_CURSOR	*c;			/* WT cursor */
@@ -122,6 +122,6 @@ struct __wt_async_cursor {
  */
 struct __wt_async_worker_state {
 	uint32_t	id;
-	STAILQ_HEAD(__wt_cursor_qh, __wt_async_cursor)	cursorqh;
+	TAILQ_HEAD(__wt_cursor_qh, __wt_async_cursor)	cursorqh;
 	uint32_t	num_cursors;
 };

@@ -81,7 +81,7 @@ __wt_conn_dhandle_find(
 
 	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
 	if (checkpoint == NULL) {
-		SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl) {
+		TAILQ_FOREACH(dhandle, &conn->dhhash[bucket], hashq) {
 			if (F_ISSET(dhandle, WT_DHANDLE_DEAD))
 				continue;
 			if (dhandle->checkpoint == NULL &&
@@ -91,7 +91,7 @@ __wt_conn_dhandle_find(
 			}
 		}
 	} else
-		SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl) {
+		TAILQ_FOREACH(dhandle, &conn->dhhash[bucket], hashq) {
 			if (F_ISSET(dhandle, WT_DHANDLE_DEAD))
 				continue;
 			if (dhandle->checkpoint != NULL &&
@@ -399,7 +399,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 	if (uri != NULL) {
 		bucket =
 		    __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
-		SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl)
+		TAILQ_FOREACH(dhandle, &conn->dhhash[bucket], hashq)
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    !F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
 			    strcmp(uri, dhandle->name) == 0 &&
@@ -407,7 +407,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 				WT_RET(__conn_btree_apply_internal(
 				    session, dhandle, func, cfg));
 	} else {
-		SLIST_FOREACH(dhandle, &conn->dhlh, l)
+		TAILQ_FOREACH(dhandle, &conn->dhqh, q)
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    !F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
 			    (apply_checkpoints ||
@@ -484,7 +484,7 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 
 	hash = __wt_hash_city64(uri, strlen(uri));
 	bucket = hash % WT_HASH_ARRAY_SIZE;
-	SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl)
+	TAILQ_FOREACH(dhandle, &conn->dhhash[bucket], hashq)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    !F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
 		    (hash == dhandle->name_hash &&
@@ -533,7 +533,7 @@ __wt_conn_dhandle_close_all(
 	WT_ASSERT(session, session->dhandle == NULL);
 
 	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
-	SLIST_FOREACH(dhandle, &conn->dhhash[bucket], hashl) {
+	TAILQ_FOREACH(dhandle, &conn->dhhash[bucket], hashq) {
 		if (strcmp(dhandle->name, uri) != 0 ||
 		    F_ISSET(dhandle, WT_DHANDLE_DEAD))
 			continue;
@@ -671,7 +671,7 @@ __wt_conn_dhandle_discard(WT_SESSION_IMPL *session)
 	 * the list, so we do it the hard way.
 	 */
 restart:
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (WT_IS_METADATA(dhandle))
 			continue;
 
@@ -690,7 +690,7 @@ restart:
 	F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 
 	/* Close the metadata file handle. */
-	while ((dhandle = SLIST_FIRST(&conn->dhlh)) != NULL)
+	while ((dhandle = TAILQ_FIRST(&conn->dhqh)) != NULL)
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_conn_dhandle_discard_single(session, 1, 0)));
 

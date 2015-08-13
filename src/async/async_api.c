@@ -43,7 +43,7 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	 * is a possibility a duplicate entry might be inserted, but
 	 * that is not harmful.
 	 */
-	STAILQ_FOREACH(af, &async->formatqh, q) {
+	TAILQ_FOREACH(af, &async->formatqh, q) {
 		if (af->uri_hash == uri_hash && af->cfg_hash == cfg_hash)
 			goto setup;
 	}
@@ -71,7 +71,7 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	WT_ERR(c->close(c));
 	c = NULL;
 
-	STAILQ_INSERT_HEAD(&async->formatqh, af, q);
+	TAILQ_INSERT_HEAD(&async->formatqh, af, q);
 	__wt_spin_unlock(session, &async->ops_lock);
 	WT_ERR(wt_session->close(wt_session, NULL));
 
@@ -237,7 +237,7 @@ __async_start(WT_SESSION_IMPL *session)
 	 */
 	WT_RET(__wt_calloc_one(session, &conn->async));
 	async = conn->async;
-	STAILQ_INIT(&async->formatqh);
+	TAILQ_INIT(&async->formatqh);
 	WT_RET(__wt_spin_init(session, &async->ops_lock, "ops"));
 	WT_RET(__wt_cond_alloc(session, "async flush", 0, &async->flush_cond));
 	WT_RET(__wt_async_op_init(session));
@@ -461,9 +461,9 @@ __wt_async_destroy(WT_SESSION_IMPL *session)
 	}
 
 	/* Free format resources */
-	af = STAILQ_FIRST(&async->formatqh);
+	af = TAILQ_FIRST(&async->formatqh);
 	while (af != NULL) {
-		afnext = STAILQ_NEXT(af, q);
+		afnext = TAILQ_NEXT(af, q);
 		__wt_free(session, af->uri);
 		__wt_free(session, af->config);
 		__wt_free(session, af->key_format);

@@ -39,7 +39,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	/* Increment the reference count if we already have the file open. */
 	matched = 0;
 	__wt_spin_lock(session, &conn->fh_lock);
-	SLIST_FOREACH(tfh, &conn->fhhash[bucket], hashl)
+	TAILQ_FOREACH(tfh, &conn->fhhash[bucket], hashq)
 		if (strcmp(name, tfh->name) == 0) {
 			++tfh->ref;
 			*fhp = tfh;
@@ -160,7 +160,7 @@ setupfh:
 	 */
 	matched = 0;
 	__wt_spin_lock(session, &conn->fh_lock);
-	SLIST_FOREACH(tfh, &conn->fhhash[bucket], hashl)
+	TAILQ_FOREACH(tfh, &conn->fhhash[bucket], hashq)
 		if (strcmp(name, tfh->name) == 0) {
 			++tfh->ref;
 			*fhp = tfh;

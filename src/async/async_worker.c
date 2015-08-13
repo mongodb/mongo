@@ -135,7 +135,7 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	if (op->optype == WT_AOP_COMPACT)
 		return (0);
 	WT_ASSERT(session, op->format != NULL);
-	STAILQ_FOREACH(ac, &worker->cursorqh, q) {
+	TAILQ_FOREACH(ac, &worker->cursorqh, q) {
 		if (op->format->cfg_hash == ac->cfg_hash &&
 		    op->format->uri_hash == ac->uri_hash) {
 			/*
@@ -156,7 +156,7 @@ __async_worker_cursor(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op,
 	ac->cfg_hash = op->format->cfg_hash;
 	ac->uri_hash = op->format->uri_hash;
 	ac->c = c;
-	STAILQ_INSERT_HEAD(&worker->cursorqh, ac, q);
+	TAILQ_INSERT_HEAD(&worker->cursorqh, ac, q);
 	worker->num_cursors++;
 	*cursorp = c;
 	return (0);
@@ -297,7 +297,7 @@ __wt_async_worker(void *arg)
 	async = conn->async;
 
 	worker.num_cursors = 0;
-	STAILQ_INIT(&worker.cursorqh);
+	TAILQ_INIT(&worker.cursorqh);
 	while (F_ISSET(conn, WT_CONN_SERVER_ASYNC) &&
 	    F_ISSET(session, WT_SESSION_SERVER_ASYNC)) {
 		WT_ERR(__async_op_dequeue(conn, session, &op));
@@ -346,9 +346,9 @@ err:		WT_PANIC_MSG(session, ret, "async worker error");
 	 * Worker thread cleanup, close our cached cursors and free all the
 	 * WT_ASYNC_CURSOR structures.
 	 */
-	ac = STAILQ_FIRST(&worker.cursorqh);
+	ac = TAILQ_FIRST(&worker.cursorqh);
 	while (ac != NULL) {
-		acnext = STAILQ_NEXT(ac, q);
+		acnext = TAILQ_NEXT(ac, q);
 		WT_TRET(ac->c->close(ac->c));
 		__wt_free(session, ac);
 		ac = acnext;
