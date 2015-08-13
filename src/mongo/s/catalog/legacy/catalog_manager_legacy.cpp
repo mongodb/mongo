@@ -224,13 +224,9 @@ Status CatalogManagerLegacy::startup() {
 }
 
 Status CatalogManagerLegacy::checkAndUpgrade(bool checkOnly) {
-    VersionType initVersionInfo;
-    VersionType versionInfo;
     string errMsg;
 
-    bool upgraded =
-        checkAndUpgradeConfigVersion(this, !checkOnly, &initVersionInfo, &versionInfo, &errMsg);
-    if (!upgraded) {
+    if (!checkAndInitConfigVersion(this, &errMsg)) {
         return Status(ErrorCodes::IncompatibleShardingMetadata,
                       str::stream() << "error upgrading config database to v"
                                     << CURRENT_CONFIG_VERSION << causedBy(errMsg));

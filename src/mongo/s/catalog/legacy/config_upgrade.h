@@ -50,10 +50,6 @@ Status getConfigVersion(CatalogManager* catalogManager, VersionType* versionInfo
  * @return initial and finalVersionInfo indicating the start and end versions of the upgrade.
  *         These are the same if no upgrade occurred.
  */
-bool checkAndUpgradeConfigVersion(CatalogManager* catalogManager,
-                                  bool upgrade,
-                                  VersionType* initialVersionInfo,
-                                  VersionType* finalVersionInfo,
-                                  std::string* errMsg);
+bool checkAndInitConfigVersion(CatalogManager* catalogManager, std::string* errMsg);
 
 }  // namespace mongo

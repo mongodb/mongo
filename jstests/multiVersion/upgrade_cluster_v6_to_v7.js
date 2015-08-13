@@ -141,5 +141,6 @@ st.stop();
 
 };
 
-runTest(false);
-runTest(true);
+// TODO: SERVER-19592 Revisit after reverting version bump
+//runTest(false);
+//runTest(true);

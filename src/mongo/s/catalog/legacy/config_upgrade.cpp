@@ -62,13 +62,46 @@ using std::vector;
 using str::stream;
 
 // Implemented in the respective steps' .cpp file
-bool doUpgradeV0ToV7(CatalogManager* catalogManager,
-                     const VersionType& lastVersionInfo,
-                     std::string* errMsg);
+bool makeConfigVersionDocument(CatalogManager* catalogManager, std::string* errMsg) {
+    string dummy;
+    if (!errMsg)
+        errMsg = &dummy;
 
-bool doUpgradeV6ToV7(CatalogManager* catalogManager,
-                     const VersionType& lastVersionInfo,
-                     std::string* errMsg);
+    //
+    // Even though the initial config write is a single-document update, that single document
+    // is on multiple config servers and requests can interleave.  The upgrade lock prevents
+    // this.
+    //
+
+    log() << "writing initial config version at v" << CURRENT_CONFIG_VERSION;
+
+    OID newClusterId = OID::gen();
+
+    VersionType versionInfo;
+
+    // Upgrade to new version
+    versionInfo.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
+    versionInfo.setCurrentVersion(CURRENT_CONFIG_VERSION);
+    versionInfo.setClusterId(newClusterId);
+
+    verify(versionInfo.validate().isOK());
+
+    // If the cluster has not previously been initialized, we need to set the version before
+    // using so subsequent mongoses use the config data the same way.  This requires all three
+    // config servers online initially.
+    Status result = catalogManager->update(VersionType::ConfigNS,
+                                           BSON("_id" << 1),
+                                           versionInfo.toBSON(),
+                                           true,   // upsert
+                                           false,  // multi
+                                           NULL);
+    if (!result.isOK()) {
+        *errMsg = stream() << "error writing initial config version: " << result.reason();
+        return false;
+    }
+
+    return true;
+}
 
 namespace {
 
@@ -99,99 +132,6 @@ enum VersionStatus {
     // Test version must be upgraded to be compatible with current version
     VersionStatus_NeedUpgrade
 };
-
-/**
- * Encapsulates the information needed to register a config upgrade.
- */
-struct UpgradeStep {
-    typedef stdx::function<bool(CatalogManager*, const VersionType&, string*)> UpgradeCallback;
-
-    UpgradeStep(int _fromVersion,
-                const VersionRange& _toVersionRange,
-                UpgradeCallback _upgradeCallback)
-        : fromVersion(_fromVersion),
-          toVersionRange(_toVersionRange),
-          upgradeCallback(_upgradeCallback) {}
-
-    // The config version we're upgrading from
-    int fromVersion;
-
-    // The config version we're upgrading to and the min compatible config version (min, to)
-    VersionRange toVersionRange;
-
-    // The upgrade callback which performs the actual upgrade
-    UpgradeCallback upgradeCallback;
-};
-
-typedef map<int, UpgradeStep> ConfigUpgradeRegistry;
-
-/**
- * Does a sanity-check validation of the registry ensuring three things:
- * 1. All upgrade paths lead to the same minCompatible/currentVersion
- * 2. Our constants match this final version pair
- * 3. There is a zero-version upgrade path
- */
-void validateRegistry(const ConfigUpgradeRegistry& registry) {
-    VersionRange maxCompatibleConfigVersionRange(-1, -1);
-    bool hasZeroVersionUpgrade = false;
-
-    for (const auto& upgradeStep : registry) {
-        const UpgradeStep& upgrade = upgradeStep.second;
-
-        if (upgrade.fromVersion == 0) {
-            hasZeroVersionUpgrade = true;
-        }
-
-        if (maxCompatibleConfigVersionRange.currentVersion <
-            upgrade.toVersionRange.currentVersion) {
-            maxCompatibleConfigVersionRange = upgrade.toVersionRange;
-        } else if (maxCompatibleConfigVersionRange.currentVersion ==
-                   upgrade.toVersionRange.currentVersion) {
-            // Make sure all max upgrade paths end up with same version and compatibility
-            fassert(16621, maxCompatibleConfigVersionRange == upgrade.toVersionRange);
-        }
-    }
-
-    // Make sure we have a zero-version upgrade
-    fassert(16622, hasZeroVersionUpgrade);
-
-    // Make sure our max registered range is the same as our constants
-    fassert(16623,
-            maxCompatibleConfigVersionRange ==
-                VersionRange(MIN_COMPATIBLE_CONFIG_VERSION, CURRENT_CONFIG_VERSION));
-}
-
-/**
- * Creates a registry of config upgrades used by the code below.
- *
- * MODIFY THIS CODE HERE TO CREATE A NEW UPGRADE PATH FROM X to Y
- * YOU MUST ALSO MODIFY THE VERSION DECLARATIONS IN config_upgrade.h
- *
- * Caveats:
- * - All upgrade paths must eventually lead to the exact same version range of
- * min and max compatible versions.
- * - This resulting version range must be equal to:
- * make_pair(MIN_COMPATIBLE_CONFIG_VERSION, CURRENT_CONFIG_VERSION)
- * - There must always be an upgrade path from the empty version (0) to the latest
- * config version.
- *
- * If any of the above is false, we fassert and fail to start.
- */
-ConfigUpgradeRegistry createRegistry() {
-    ConfigUpgradeRegistry registry;
-
-    // v0 to v7
-    UpgradeStep v0ToV7(0, VersionRange(6, 7), doUpgradeV0ToV7);
-    registry.insert(make_pair(v0ToV7.fromVersion, v0ToV7));
-
-    // v6 to v7
-    UpgradeStep v6ToV7(6, VersionRange(6, 7), doUpgradeV6ToV7);
-    registry.insert(make_pair(v6ToV7.fromVersion, v6ToV7));
-
-    validateRegistry(registry);
-
-    return registry;
-}
 
 /**
  * Checks whether or not a particular cluster version is compatible with our current
@@ -267,59 +207,6 @@ bool _checkConfigServersAlive(const ConnectionString& configLoc, string* errMsg)
     return true;
 }
 
-// Dispatches upgrades based on version to the upgrades registered in the upgrade registry
-bool _nextUpgrade(CatalogManager* catalogManager,
-                  const ConfigUpgradeRegistry& registry,
-                  const VersionType& lastVersionInfo,
-                  VersionType* upgradedVersionInfo,
-                  string* errMsg) {
-    int fromVersion = lastVersionInfo.getCurrentVersion();
-
-    ConfigUpgradeRegistry::const_iterator foundIt = registry.find(fromVersion);
-
-    if (foundIt == registry.end()) {
-        *errMsg = stream() << "newer version " << CURRENT_CONFIG_VERSION
-                           << " of mongo config metadata is required, "
-                           << "current version is " << fromVersion << ", "
-                           << "don't know how to upgrade from this version";
-
-        return false;
-    }
-
-    const UpgradeStep& upgrade = foundIt->second;
-    int toVersion = upgrade.toVersionRange.currentVersion;
-
-    log() << "starting next upgrade step from v" << fromVersion << " to v" << toVersion;
-
-    // Log begin to config.changelog
-    catalogManager->logChange("<upgrade>",
-                              "starting upgrade of config database",
-                              VersionType::ConfigNS,
-                              BSON("from" << fromVersion << "to" << toVersion));
-
-    if (!upgrade.upgradeCallback(catalogManager, lastVersionInfo, errMsg)) {
-        *errMsg = stream() << "error upgrading config database from v" << fromVersion << " to v"
-                           << toVersion << causedBy(errMsg);
-        return false;
-    }
-
-    // Get the config version we've upgraded to and make sure it's sane
-    Status verifyConfigStatus = getConfigVersion(catalogManager, upgradedVersionInfo);
-
-    if (!verifyConfigStatus.isOK()) {
-        *errMsg = stream() << "failed to validate v" << fromVersion << " config version upgrade"
-                           << causedBy(verifyConfigStatus);
-
-        return false;
-    }
-
-    catalogManager->logChange("<upgrade>",
-                              "finished upgrade of config database",
-                              VersionType::ConfigNS,
-                              BSON("from" << fromVersion << "to" << toVersion));
-    return true;
-}
-
 }  // namespace
 
 
@@ -379,26 +266,21 @@ Status getConfigVersion(CatalogManager* catalogManager, VersionType* versionInfo
     return Status::OK();
 }
 
-bool checkAndUpgradeConfigVersion(CatalogManager* catalogManager,
-                                  bool upgrade,
-                                  VersionType* initialVersionInfo,
-                                  VersionType* versionInfo,
-                                  string* errMsg) {
+bool checkAndInitConfigVersion(CatalogManager* catalogManager, string* errMsg) {
     string dummy;
     if (!errMsg) {
         errMsg = &dummy;
     }
 
-    Status getConfigStatus = getConfigVersion(catalogManager, versionInfo);
+    VersionType versionInfo;
+    Status getConfigStatus = getConfigVersion(catalogManager, &versionInfo);
     if (!getConfigStatus.isOK()) {
         *errMsg = stream() << "could not load config version for upgrade"
                            << causedBy(getConfigStatus);
         return false;
     }
 
-    versionInfo->cloneTo(initialVersionInfo);
-
-    VersionStatus comp = isConfigVersionCompatible(*versionInfo, errMsg);
+    VersionStatus comp = isConfigVersionCompatible(versionInfo, errMsg);
 
     if (comp == VersionStatus_Incompatible)
         return false;
@@ -407,21 +289,10 @@ bool checkAndUpgradeConfigVersion(CatalogManager* catalogManager,
 
     invariant(comp == VersionStatus_NeedUpgrade);
 
-    //
-    // Our current config version is now greater than the current version, so we should upgrade
-    // if possible.
-    //
-
-    // The first empty version is technically an upgrade, but has special semantics
-    bool isEmptyVersion = versionInfo->getCurrentVersion() == UpgradeHistory_EmptyVersion;
-
-    // First check for the upgrade flag (but no flag is needed if we're upgrading from empty)
-    if (!isEmptyVersion && !upgrade) {
+    if (versionInfo.getCurrentVersion() != UpgradeHistory_EmptyVersion) {
         *errMsg = stream() << "newer version " << CURRENT_CONFIG_VERSION
                            << " of mongo config metadata is required, "
-                           << "current version is " << versionInfo->getCurrentVersion() << ", "
-                           << "need to run mongos with --upgrade";
-
+                           << "current version is " << versionInfo.getCurrentVersion();
         return false;
     }
 
@@ -429,28 +300,9 @@ bool checkAndUpgradeConfigVersion(CatalogManager* catalogManager,
     // for locks.
     if (!_checkConfigServersAlive(grid.shardRegistry()->getConfigServerConnectionString(),
                                   errMsg)) {
-        if (isEmptyVersion) {
-            *errMsg = stream() << "all config servers must be reachable for initial"
-                               << " config database creation" << causedBy(errMsg);
-        } else {
-            *errMsg = stream() << "all config servers must be reachable for config upgrade"
-                               << causedBy(errMsg);
-        }
-
+        *errMsg = stream() << "all config servers must be reachable for initial"
+                           << " config database creation" << causedBy(errMsg);
         return false;
-    }
-
-    // Check whether or not the balancer is online, if it is online we will not upgrade
-    // (but we will initialize the config server)
-    if (!isEmptyVersion) {
-        auto balSettingsResult = catalogManager->getGlobalSettings(SettingsType::BalancerDocKey);
-        if (balSettingsResult.isOK()) {
-            SettingsType balSettings = balSettingsResult.getValue();
-            if (!balSettings.getBalancerStopped()) {
-                *errMsg = stream() << "balancer must be stopped for config upgrade"
-                                   << causedBy(errMsg);
-            }
-        }
     }
 
     //
@@ -460,7 +312,7 @@ bool checkAndUpgradeConfigVersion(CatalogManager* catalogManager,
     // time.
     //
 
-    string whyMessage(stream() << "upgrading config database to new format v"
+    string whyMessage(stream() << "initializing config database to new format v"
                                << CURRENT_CONFIG_VERSION);
     auto lockTimeout = stdx::chrono::milliseconds(20 * 60 * 1000);
     auto scopedDistLock =
@@ -476,16 +328,14 @@ bool checkAndUpgradeConfigVersion(CatalogManager* catalogManager,
     // if this is the case.
     //
 
-    getConfigStatus = getConfigVersion(catalogManager, versionInfo);
+    getConfigStatus = getConfigVersion(catalogManager, &versionInfo);
     if (!getConfigStatus.isOK()) {
         *errMsg = stream() << "could not reload config version for upgrade"
                            << causedBy(getConfigStatus);
         return false;
     }
 
-    versionInfo->cloneTo(initialVersionInfo);
-
-    comp = isConfigVersionCompatible(*versionInfo, errMsg);
+    comp = isConfigVersionCompatible(versionInfo, errMsg);
 
     if (comp == VersionStatus_Incompatible)
         return false;
@@ -499,36 +349,13 @@ bool checkAndUpgradeConfigVersion(CatalogManager* catalogManager,
     // version
     //
 
-    log() << "starting upgrade of config server from v" << versionInfo->getCurrentVersion()
-          << " to v" << CURRENT_CONFIG_VERSION;
+    log() << "initializing config server version to " << CURRENT_CONFIG_VERSION;
 
-    ConfigUpgradeRegistry registry(createRegistry());
-
-    while (versionInfo->getCurrentVersion() < CURRENT_CONFIG_VERSION) {
-        int fromVersion = versionInfo->getCurrentVersion();
-
-        //
-        // Run the next upgrade process and replace versionInfo with the result of the
-        // upgrade.
-        //
-
-        if (!_nextUpgrade(catalogManager, registry, *versionInfo, versionInfo, errMsg)) {
-            return false;
-        }
-
-        // Ensure we're making progress here
-        if (versionInfo->getCurrentVersion() <= fromVersion) {
-            *errMsg = stream() << "bad v" << fromVersion << " config version upgrade, "
-                               << "version did not increment and is now "
-                               << versionInfo->getCurrentVersion();
-
-            return false;
-        }
+    if (!makeConfigVersionDocument(catalogManager, errMsg)) {
+        return false;
     }
 
-    invariant(versionInfo->getCurrentVersion() == CURRENT_CONFIG_VERSION);
-
-    log() << "upgrade of config server to v" << versionInfo->getCurrentVersion() << " successful";
+    log() << "initialization of config server to v" << CURRENT_CONFIG_VERSION << " successful";
 
     return true;
 }

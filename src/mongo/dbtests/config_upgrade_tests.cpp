@@ -209,44 +209,6 @@ TEST_F(ConfigUpgradeTests, ClusterIDVersion) {
     ASSERT_EQUALS(newVersion.getClusterId(), clusterId);
 }
 
-TEST_F(ConfigUpgradeTests, InitialUpgrade) {
-    //
-    // Tests initializing the config server to the initial version
-    //
-
-    // Empty version
-    VersionType versionOld;
-    VersionType version;
-    string errMsg;
-    bool result = checkAndUpgradeConfigVersion(
-        grid.catalogManager(&_txn).get(), false, &versionOld, &version, &errMsg);
-
-    ASSERT(result);
-    ASSERT_EQUALS(versionOld.getCurrentVersion(), 0);
-    ASSERT_EQUALS(version.getMinCompatibleVersion(), MIN_COMPATIBLE_CONFIG_VERSION);
-    ASSERT_EQUALS(version.getCurrentVersion(), CURRENT_CONFIG_VERSION);
-    ASSERT_NOT_EQUALS(version.getClusterId(), OID());
-}
-
-TEST_F(ConfigUpgradeTests, BadVersionUpgrade) {
-    //
-    // Tests that we can't upgrade from a config version we don't have an upgrade path for
-    //
-
-    stopBalancer();
-
-    storeLegacyConfigVersion(1);
-
-    // Default version (not upgradeable)
-    VersionType versionOld;
-    VersionType version;
-    string errMsg;
-    bool result = checkAndUpgradeConfigVersion(
-        grid.catalogManager(&_txn).get(), false, &versionOld, &version, &errMsg);
-
-    ASSERT(!result);
-}
-
 TEST_F(ConfigUpgradeTests, CheckMongoVersion) {
     //
     // Tests basic detection of existing mongos and mongod versions from mongos ping
