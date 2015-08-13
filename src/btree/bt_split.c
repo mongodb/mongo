@@ -557,7 +557,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 */
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
 	WT_INTL_INDEX_SET(parent, alloc_index);
-	split_gen = __wt_atomic_addv8(&S2C(session)->split_gen, 1);
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
 	panic = 1;
 
 #ifdef HAVE_DIAGNOSTIC
@@ -933,7 +933,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
 		if (next_ref->state == WT_REF_DELETED &&
 		    __wt_delete_page_skip(session, next_ref) &&
-		    __wt_atomic_casv4(
+		    __wt_atomic_casv32(
 		    &next_ref->state, WT_REF_DELETED, WT_REF_SPLIT))
 			deleted_entries++;
 	}
@@ -994,7 +994,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
 	WT_INTL_INDEX_SET(parent, alloc_index);
-	split_gen = __wt_atomic_addv8(&S2C(session)->split_gen, 1);
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
 	alloc_index = NULL;
 
 #ifdef HAVE_DIAGNOSTIC

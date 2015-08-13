@@ -129,16 +129,16 @@ __wt_atomic_cas##name(type *vp, type old, type new)			\
 	return (WT_ATOMIC_CAS(vp, old, new));				\
 }
 
-WT_ATOMIC_FUNC(1, uint8_t, uint8_t)
-WT_ATOMIC_FUNC(2, uint16_t, uint16_t)
-WT_ATOMIC_FUNC(4, uint32_t, uint32_t)
-WT_ATOMIC_FUNC(v4, uint32_t, volatile uint32_t)
-WT_ATOMIC_FUNC(i4, int32_t, int32_t)
-WT_ATOMIC_FUNC(iv4, int32_t, volatile int32_t)
-WT_ATOMIC_FUNC(8, uint64_t, uint64_t)
-WT_ATOMIC_FUNC(v8, uint64_t, volatile uint64_t)
-WT_ATOMIC_FUNC(i8, int64_t, int64_t)
-WT_ATOMIC_FUNC(iv8, int64_t, volatile int64_t)
+WT_ATOMIC_FUNC(8, uint8_t, uint8_t)
+WT_ATOMIC_FUNC(16, uint16_t, uint16_t)
+WT_ATOMIC_FUNC(32, uint32_t, uint32_t)
+WT_ATOMIC_FUNC(v32, uint32_t, volatile uint32_t)
+WT_ATOMIC_FUNC(i32, int32_t, int32_t)
+WT_ATOMIC_FUNC(iv32, int32_t, volatile int32_t)
+WT_ATOMIC_FUNC(64, uint64_t, uint64_t)
+WT_ATOMIC_FUNC(v64, uint64_t, volatile uint64_t)
+WT_ATOMIC_FUNC(i64, int64_t, int64_t)
+WT_ATOMIC_FUNC(iv64, int64_t, volatile int64_t)
 
 /*
  * __wt_atomic_cas_ptr --

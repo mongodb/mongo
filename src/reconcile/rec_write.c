@@ -1104,7 +1104,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * to see if the delete is visible to us.  Lock down the
 			 * structure.
 			 */
-			if (!__wt_atomic_casv4(
+			if (!__wt_atomic_casv32(
 			    &ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
 			ret = __rec_child_deleted(session, r, ref, statep);
@@ -5108,7 +5108,7 @@ err:			__wt_scr_free(session, &tkey);
 		 * write generation changed, the page has been written since
 		 * we started reconciliation and remains dirty.
 		 */
-		if (__wt_atomic_cas4(&mod->write_gen, r->orig_write_gen, 0))
+		if (__wt_atomic_cas32(&mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
 	}
 

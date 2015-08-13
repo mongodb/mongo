@@ -17,11 +17,11 @@ struct __wt_stats {
 #define	WT_STAT(stats, fld)						\
 	((stats)->fld.v)
 #define	WT_STAT_ATOMIC_DECRV(stats, fld, value) do {			\
-	(void)__wt_atomic_sub8(&WT_STAT(stats, fld), (value));		\
+	(void)__wt_atomic_sub64(&WT_STAT(stats, fld), (value));		\
 } while (0)
 #define	WT_STAT_ATOMIC_DECR(stats, fld) WT_STAT_ATOMIC_DECRV(stats, fld, 1)
 #define	WT_STAT_ATOMIC_INCRV(stats, fld, value) do {			\
-	(void)__wt_atomic_add8(&WT_STAT(stats, fld), (value));		\
+	(void)__wt_atomic_add64(&WT_STAT(stats, fld), (value));		\
 } while (0)
 #define	WT_STAT_ATOMIC_INCR(stats, fld) WT_STAT_ATOMIC_INCRV(stats, fld, 1)
 #define	WT_STAT_DECRV(stats, fld, value) do {				\
