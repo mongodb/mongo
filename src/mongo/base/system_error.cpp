@@ -44,7 +44,7 @@ class MongoErrorCategoryImpl final : public std::error_category {
 public:
     MongoErrorCategoryImpl() = default;
 
-    const char* name() const noexcept override {
+    const char* name() const BOOST_NOEXCEPT override {
         return "mongo";
     }
 
