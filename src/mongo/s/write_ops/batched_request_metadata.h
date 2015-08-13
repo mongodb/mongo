@@ -28,34 +28,33 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/chunk_version.h"
 
 namespace mongo {
-class BatchedRequestMetadata : public BSONSerializable {
-    MONGO_DISALLOW_COPYING(BatchedRequestMetadata);
 
+class BatchedRequestMetadata {
 public:
     static const BSONField<std::string> shardName;
     static const BSONField<ChunkVersion> shardVersion;
     static const BSONField<long long> session;
 
     BatchedRequestMetadata();
-    virtual ~BatchedRequestMetadata();
+    ~BatchedRequestMetadata();
 
     //
     // bson serializable interface implementation
     //
 
-    virtual bool isValid(std::string* errMsg) const;
-    virtual BSONObj toBSON() const;
-    virtual bool parseBSON(const BSONObj& source, std::string* errMsg);
-    virtual void clear();
-    virtual std::string toString() const;
+    bool isValid(std::string* errMsg) const;
+    BSONObj toBSON() const;
+    bool parseBSON(const BSONObj& source, std::string* errMsg);
+    void clear();
+    std::string toString() const;
 
     void cloneTo(BatchedRequestMetadata* other) const;
 
@@ -64,14 +63,12 @@ public:
     //
 
     void setShardName(StringData shardName);
-    void unsetShardName();
-    bool isShardNameSet() const;
     const std::string& getShardName() const;
 
-    void setShardVersion(const ChunkVersion& shardVersion);
-    void unsetShardVersion();
+    void setShardVersion(const ChunkVersionAndOpTime& shardVersion);
     bool isShardVersionSet() const;
     const ChunkVersion& getShardVersion() const;
+    const repl::OpTime& getOpTime() const;
 
     void setSession(long long session);
     void unsetSession();
@@ -84,10 +81,11 @@ private:
     bool _isShardNameSet;
 
     // (O)  version for this collection on a given shard
-    std::unique_ptr<ChunkVersion> _shardVersion;
+    boost::optional<ChunkVersionAndOpTime> _shardVersion;
 
     // (O)  session number the inserts belong to
     long long _session;
     bool _isSessionSet;
 };
-}
+
+}  // namespace mongo

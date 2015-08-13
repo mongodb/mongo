@@ -149,15 +149,11 @@ public:
         }
 
         // step 2
-        if (!ChunkVersion::canParseBSON(cmdObj, "version")) {
-            errmsg = "need to specify version";
-            return false;
-        }
-
-        const ChunkVersion version = ChunkVersion::fromBSON(cmdObj, "version");
+        ChunkVersionAndOpTime verAndOpTime =
+            uassertStatusOK(ChunkVersionAndOpTime::parseFromBSONForSetShardVersion(cmdObj));
+        const auto& version = verAndOpTime.getVersion();
 
         // step 3
-
         const ChunkVersion oldVersion = info->getVersion(ns);
         const ChunkVersion globalVersion = ShardingState::get(txn)->getVersion(ns);
 

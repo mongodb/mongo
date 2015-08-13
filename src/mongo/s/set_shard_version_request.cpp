@@ -46,7 +46,6 @@ const char kShardName[] = "shard";
 const char kShardConnectionString[] = "shardHost";
 const char kInit[] = "init";
 const char kAuthoritative[] = "authoritative";
-const char kVersion[] = "version";
 const char kNoConnectionVersioning[] = "noConnectionVersioning";
 
 }  // namespace
@@ -64,7 +63,7 @@ SetShardVersionRequest::SetShardVersionRequest(ConnectionString configServer,
                                                std::string shardName,
                                                ConnectionString shardConnectionString,
                                                NamespaceString nss,
-                                               ChunkVersion version,
+                                               ChunkVersionAndOpTime version,
                                                bool isAuthoritative)
     : _init(false),
       _isAuthoritative(isAuthoritative),
@@ -88,7 +87,7 @@ SetShardVersionRequest SetShardVersionRequest::makeForVersioning(
     const std::string& shardName,
     const ConnectionString& shardConnectionString,
     const NamespaceString& nss,
-    const ChunkVersion& nssVersion,
+    const ChunkVersionAndOpTime& nssVersion,
     bool isAuthoritative) {
     return SetShardVersionRequest(
         configServer, shardName, shardConnectionString, nss, nssVersion, isAuthoritative);
@@ -99,7 +98,7 @@ SetShardVersionRequest SetShardVersionRequest::makeForVersioningNoPersist(
     const std::string& shardName,
     const ConnectionString& shard,
     const NamespaceString& nss,
-    const ChunkVersion& nssVersion,
+    const ChunkVersionAndOpTime& nssVersion,
     bool isAuthoritative) {
     auto ssv = makeForVersioning(configServer, shardName, shard, nss, nssVersion, isAuthoritative);
     ssv._noConnectionVersioning = true;
@@ -185,14 +184,11 @@ StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const B
     }
 
     {
-        bool canParse;
+        auto versionStatus = ChunkVersionAndOpTime::parseFromBSONForSetShardVersion(cmdObj);
+        if (!versionStatus.isOK())
+            return versionStatus.getStatus();
 
-        ChunkVersion chunkVersion = ChunkVersion::fromBSON(cmdObj, kVersion, &canParse);
-        if (!canParse) {
-            return {ErrorCodes::BadValue, "Unable to parse shard version"};
-        }
-
-        request._version = std::move(chunkVersion);
+        request._version = versionStatus.getValue();
     }
 
     return request;
@@ -209,7 +205,7 @@ BSONObj SetShardVersionRequest::toBSON() const {
     cmdBuilder.append(kShardConnectionString, _shardCS.toString());
 
     if (!_init) {
-        _version.get().addToBSON(cmdBuilder, kVersion);
+        _version.get().appendForSetShardVersion(&cmdBuilder);
     }
 
     if (_noConnectionVersioning) {
@@ -226,7 +222,7 @@ const NamespaceString& SetShardVersionRequest::getNS() const {
 
 const ChunkVersion SetShardVersionRequest::getNSVersion() const {
     invariant(!_init);
-    return _version.get();
+    return _version.get().getVersion();
 }
 
 }  // namespace mongo

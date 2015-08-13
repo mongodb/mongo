@@ -320,7 +320,8 @@ Status ChunkManagerTargeter::targetInsert(OperationContext* txn,
                                         << "; no metadata found");
         }
 
-        *endpoint = new ShardEndpoint(_primary->getId(), ChunkVersion::UNSHARDED());
+        *endpoint =
+            new ShardEndpoint(_primary->getId(), ChunkVersionAndOpTime(ChunkVersion::UNSHARDED()));
         return Status::OK();
     }
 }
@@ -496,7 +497,10 @@ Status ChunkManagerTargeter::targetQuery(const BSONObj& query,
 
     for (const ShardId& shardId : shardIds) {
         endpoints->push_back(new ShardEndpoint(
-            shardId, _manager ? _manager->getVersion(shardId) : ChunkVersion::UNSHARDED()));
+            shardId,
+            _manager
+                ? ChunkVersionAndOpTime(_manager->getVersion(shardId), _manager->getConfigOpTime())
+                : ChunkVersionAndOpTime(ChunkVersion::UNSHARDED())));
     }
 
     return Status::OK();
@@ -516,7 +520,9 @@ Status ChunkManagerTargeter::targetShardKey(OperationContext* txn,
         _stats.chunkSizeDelta[chunk->getMin()] += estDataSize;
     }
 
-    *endpoint = new ShardEndpoint(chunk->getShardId(), _manager->getVersion(chunk->getShardId()));
+    *endpoint = new ShardEndpoint(chunk->getShardId(),
+                                  ChunkVersionAndOpTime(_manager->getVersion(chunk->getShardId()),
+                                                        _manager->getConfigOpTime()));
 
     return Status::OK();
 }
@@ -537,7 +543,10 @@ Status ChunkManagerTargeter::targetCollection(vector<ShardEndpoint*>* endpoints)
 
     for (const ShardId& shardId : shardIds) {
         endpoints->push_back(new ShardEndpoint(
-            shardId, _manager ? _manager->getVersion(shardId) : ChunkVersion::UNSHARDED()));
+            shardId,
+            _manager
+                ? ChunkVersionAndOpTime(_manager->getVersion(shardId), _manager->getConfigOpTime())
+                : ChunkVersionAndOpTime(ChunkVersion::UNSHARDED())));
     }
 
     return Status::OK();
@@ -555,7 +564,10 @@ Status ChunkManagerTargeter::targetAllShards(vector<ShardEndpoint*>* endpoints) 
 
     for (const ShardId& shardId : shardIds) {
         endpoints->push_back(new ShardEndpoint(
-            shardId, _manager ? _manager->getVersion(shardId) : ChunkVersion::UNSHARDED()));
+            shardId,
+            _manager
+                ? ChunkVersionAndOpTime(_manager->getVersion(shardId), _manager->getConfigOpTime())
+                : ChunkVersionAndOpTime(ChunkVersion::UNSHARDED())));
     }
 
     return Status::OK();

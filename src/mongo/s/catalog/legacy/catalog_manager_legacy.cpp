@@ -607,7 +607,7 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
             shardEntry.getName(),
             fassertStatusOK(28753, ConnectionString::parse(shardEntry.getHost())),
             ns,
-            ChunkVersion::DROPPED(),
+            ChunkVersionAndOpTime(ChunkVersion::DROPPED()),
             true);
 
         auto ssvResult = shardRegistry->runCommandWithNotMasterRetries(

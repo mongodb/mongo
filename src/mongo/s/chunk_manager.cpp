@@ -172,6 +172,10 @@ ChunkManager::ChunkManager(const CollectionType& coll)
     _version = ChunkVersion::fromBSON(coll.toBSON());
 }
 
+repl::OpTime ChunkManager::getConfigOpTime() const {
+    return repl::OpTime(Timestamp(0, 0), 0);
+}
+
 void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager* oldManager) {
     int tries = 3;
 

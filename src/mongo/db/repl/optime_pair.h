@@ -26,31 +26,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include <string>
-
-#include "mongo/s/write_ops/batched_request_metadata.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
+namespace repl {
 
-using std::string;
+template <typename T>
+struct OpTimePair {
+public:
+    OpTimePair() = default;
+    explicit OpTimePair(T val) : value(std::move(val)) {}
+    OpTimePair(T val, OpTime ts) : value(std::move(val)), opTime(std::move(ts)) {}
 
-namespace {
+    T value;
+    OpTime opTime;
+};
 
-TEST(BatchedRequestMetadata, Basic) {
-    BSONObj metadataObj(BSON("shardName"
-                             << "shard0000"
-                             << "shardVersion" << BSON_ARRAY(Timestamp(1, 2) << OID::gen()) << "ts"
-                             << Timestamp(3, 4) << "t" << 5 << "session" << 0LL));
-
-    string errMsg;
-    BatchedRequestMetadata metadata;
-    ASSERT_TRUE(metadata.parseBSON(metadataObj, &errMsg));
-
-    ASSERT_EQUALS(metadataObj, metadata.toBSON());
-}
-
-}  // namespace
+}  // namespace repl
 }  // namespace mongo

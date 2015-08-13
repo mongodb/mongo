@@ -87,11 +87,13 @@ static int compareEndpoints(const ShardEndpoint* endpointA, const ShardEndpoint*
     if (shardNameDiff != 0)
         return shardNameDiff;
 
-    long shardVersionDiff = endpointA->shardVersion.toLong() - endpointB->shardVersion.toLong();
+    long shardVersionDiff = endpointA->shardVersion.getVersion().toLong() -
+        endpointB->shardVersion.getVersion().toLong();
     if (shardVersionDiff != 0)
         return shardVersionDiff;
 
-    int shardEpochDiff = endpointA->shardVersion.epoch().compare(endpointB->shardVersion.epoch());
+    int shardEpochDiff = endpointA->shardVersion.getVersion().epoch().compare(
+        endpointB->shardVersion.getVersion().epoch());
     return shardEpochDiff;
 }
 
@@ -456,7 +458,8 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
 
     unique_ptr<BatchedRequestMetadata> requestMetadata(new BatchedRequestMetadata());
     requestMetadata->setShardName(targetedBatch.getEndpoint().shardName);
-    requestMetadata->setShardVersion(targetedBatch.getEndpoint().shardVersion);
+    requestMetadata->setShardVersion(
+        ChunkVersionAndOpTime(targetedBatch.getEndpoint().shardVersion));
     requestMetadata->setSession(0);
     request->setMetadata(requestMetadata.release());
 }

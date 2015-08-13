@@ -44,6 +44,10 @@ class CollectionType;
 struct QuerySolutionNode;
 class OperationContext;
 
+namespace repl {
+class OpTime;
+}
+
 typedef std::shared_ptr<ChunkManager> ChunkManagerPtr;
 
 // The key for the map is max for each Chunk or ChunkRange
@@ -153,6 +157,11 @@ public:
     unsigned long long getSequenceNumber() const {
         return _sequenceNumber;
     }
+
+    /**
+     * Returns the latest op time from when this chunk manager's data was loaded.
+     */
+    repl::OpTime getConfigOpTime() const;
 
     //
     // After constructor is invoked, we need to call loadExistingRanges.  If this is a new
