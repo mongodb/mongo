@@ -792,24 +792,16 @@ __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	}
 
 	/*
-	 * Need to minimally fill in slot info here.  Our slot start LSN
-	 * comes after any potential new log file creations.
-	 */
-	slot->slot_start_lsn = slot->slot_end_lsn = log->alloc_lsn;
-	slot->slot_start_offset = log->alloc_lsn.offset;
-	slot->slot_last_offset = slot->slot_start_offset;
-	slot->slot_last_offset = slot->slot_start_offset;
-	/*
 	 * Pre-allocate on the first real write into the log file, if it
 	 * was just created (i.e. not pre-allocated).
 	 */
 	if (log->alloc_lsn.offset == WT_LOG_FIRST_RECORD && created_log)
 		WT_RET(__log_prealloc(session, log->log_fh));
+	/*
+	 * Initialize the slot for activation.
+	 */
+	__wt_log_slot_activate(session, slot);
 
-	slot->slot_error = 0;
-	slot->slot_fh = log->log_fh;
-	slot->slot_state = 0;
-	slot->slot_unbuffered = 0;
 	return (0);
 }
 

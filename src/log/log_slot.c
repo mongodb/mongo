@@ -9,6 +9,30 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_log_slot_activate --
+ *	Initialize a slot to become active.
+ */
+void
+__wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
+
+	slot->slot_state = 0;
+	slot->slot_start_lsn = slot->slot_end_lsn = log->alloc_lsn;
+	slot->slot_start_offset = log->alloc_lsn.offset;
+	slot->slot_last_offset = log->alloc_lsn.offset;
+	slot->slot_release_lsn = log->alloc_lsn;
+	slot->slot_fh = log->log_fh;
+	slot->slot_error = 0;
+	slot->slot_unbuffered = 0;
+	return;
+}
+
+/*
  * __wt_log_slot_close --
  *	Close out the current active slot.
  */
@@ -189,12 +213,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	 * Set up the available slot from the pool the first time.
 	 */
 	slot = &log->slot_pool[0];
-	slot->slot_state = 0;
-	slot->slot_start_lsn = log->alloc_lsn;
-	slot->slot_start_offset = log->alloc_lsn.offset;
-	slot->slot_last_offset = log->alloc_lsn.offset;
-	slot->slot_release_lsn = log->alloc_lsn;
-	slot->slot_fh = log->log_fh;
+	__wt_log_slot_activate(session, slot);
 	log->active_slot = slot;
 
 	if (0) {
@@ -230,10 +249,6 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 			rel = WT_LOG_SLOT_RELEASED(slot->slot_state);
 			j = WT_LOG_SLOT_JOINED(slot->slot_state);
 			write_size = (size_t)rel - slot->slot_unbuffered;
-			__wt_errx(session,
-			    "Found Slot %d: State %lx j %lu %lx r %lu %lx unbuf %lu wr %lu %lx",
-			    i, slot->slot_state, j, j, rel, rel,
-			    slot->slot_unbuffered, write_size, write_size);
 			if (write_size != 0)
 				WT_RET(__wt_write(session, slot->slot_fh,
 				    slot->slot_start_offset, write_size,
