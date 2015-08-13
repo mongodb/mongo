@@ -14,8 +14,8 @@
 struct __wt_data_handle_cache {
 	WT_DATA_HANDLE *dhandle;
 
-	SLIST_ENTRY(__wt_data_handle_cache) l;
-	SLIST_ENTRY(__wt_data_handle_cache) hashl;
+	TAILQ_ENTRY(__wt_data_handle_cache) q;
+	TAILQ_ENTRY(__wt_data_handle_cache) hashq;
 };
 
 /*
@@ -66,7 +66,7 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	 * across session close - so it is declared further down.
 	 */
 					/* Session handle reference list */
-	SLIST_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
+	TAILQ_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
 	time_t last_sweep;		/* Last sweep for dead handles */
 
 	WT_CURSOR *cursor;		/* Current cursor */
@@ -90,7 +90,7 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	 * table of lists. The hash table list is kept in allocated memory
 	 * that lives across session close - so it is declared further down.
 	 */
-	SLIST_HEAD(__tables, __wt_table) tables;
+	TAILQ_HEAD(__tables, __wt_table) tables;
 
 	WT_ITEM	**scratch;		/* Temporary memory for any function */
 	u_int	  scratch_alloc;	/* Currently allocated */
@@ -151,9 +151,9 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	WT_RAND_STATE rnd;		/* Random number generation state */
 
 					/* Hashed handle reference list array */
-	SLIST_HEAD(__dhandles_hash, __wt_data_handle_cache) *dhhash;
+	TAILQ_HEAD(__dhandles_hash, __wt_data_handle_cache) *dhhash;
 					/* Hashed table reference list array */
-	SLIST_HEAD(__tables_hash, __wt_table) *tablehash;
+	TAILQ_HEAD(__tables_hash, __wt_table) *tablehash;
 
 	/*
 	 * Splits can "free" memory that may still be in use, and we use a
