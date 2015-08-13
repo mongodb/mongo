@@ -715,7 +715,7 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_rwlock_alloc(session,
 	    &txn_global->nsnap_rwlock, "named snapshot lock"));
 	txn_global->nsnap_oldest_id = WT_TXN_NONE;
-	STAILQ_INIT(&txn_global->nsnaph);
+	TAILQ_INIT(&txn_global->nsnaph);
 
 	WT_RET(__wt_calloc_def(
 	    session, conn->session_size, &txn_global->states));
