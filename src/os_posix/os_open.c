@@ -177,7 +177,7 @@ setupfh:
 	}
 	if (!matched) {
 		WT_CONN_FILE_INSERT(conn, fh, bucket);
-		(void)WT_ATOMIC_SUB4(conn->open_file_count, 1);
+		(void)WT_ATOMIC_ADD4(conn->open_file_count, 1);
 
 		*fhp = fh;
 	}
