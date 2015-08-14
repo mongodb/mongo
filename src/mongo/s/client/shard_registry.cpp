@@ -91,7 +91,10 @@ void ShardRegistry::shutdown() {
 void ShardRegistry::reload() {
     vector<ShardType> shards;
     Status status = grid.catalogManager()->getAllShards(&shards);
-    massert(13632, "couldn't get updated shard list from config server", status.isOK());
+    uassert(13632,
+            str::stream() << "could not get updated shard list from config server due to "
+                          << status.toString(),
+            status.isOK());
 
     int numShards = shards.size();
 
