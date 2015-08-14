@@ -75,10 +75,11 @@
         );
         var endTime = new Date();
 
-        // Ensure it took at least 1 second to time out.
-        assert.lte(1,
+        // Ensure it took at least 1 second to time out. Adjust the timeout a little bit
+        // for the precision issue of clock on Windows 2K8.
+        assert.lte(0.95,
                    (endTime - startTime) / 1000,
-                   'Expected replSetStepDown command to fail within 1 second.');
+                   'Expected replSetStepDown command to fail after 1 second.');
     }
     catch (err) {
         disableFailPoint();
