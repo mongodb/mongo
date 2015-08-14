@@ -311,7 +311,7 @@ public:
         // 5) Stream query results, adding them to a BSONArray as we go.
         BSONArrayBuilder firstBatch;
         BSONObj obj;
-        PlanExecutor::ExecState state;
+        PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
         long long numResults = 0;
         while (!FindCommon::enoughForFirstBatch(pq, numResults, firstBatch.len()) &&
                PlanExecutor::ADVANCED == (state = cursorExec->getNext(&obj, NULL))) {
