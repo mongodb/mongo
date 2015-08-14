@@ -241,7 +241,7 @@ void NetworkInterfaceASIO::_asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler 
     // Step 3
     auto recvHeaderCallback = [this, cmd, handler, recvMessageCallback](std::error_code ec,
                                                                         size_t bytes) {
-        if (ec != ErrorCodes::OK)
+        if (ec)
             return handler(ec, bytes);
 
         // validate response id
@@ -261,7 +261,7 @@ void NetworkInterfaceASIO::_asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler 
     // Step 2
     auto sendMessageCallback = [this, cmd, handler, recvHeaderCallback](std::error_code ec,
                                                                         size_t bytes) {
-        if (ec != ErrorCodes::OK)
+        if (ec)
             return handler(ec, bytes);
 
         asyncRecvMessageHeader(cmd->conn().stream(), &cmd->header(), std::move(recvHeaderCallback));

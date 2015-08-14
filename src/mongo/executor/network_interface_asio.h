@@ -226,7 +226,7 @@ private:
         if (op->canceled())
             return _completeOperation(op,
                                       Status(ErrorCodes::CallbackCanceled, "Callback canceled"));
-        if (ec != ErrorCodes::OK)
+        if (ec)
             return _networkErrorCallback(op, ec);
 
         handler();
