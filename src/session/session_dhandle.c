@@ -38,6 +38,61 @@ __session_add_dhandle(
 }
 
 /*
+ * __session_discard_dhandle --
+ *	Remove a data handle from the session cache.
+ */
+static void
+__session_discard_dhandle(
+    WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE *dhandle_cache)
+{
+	uint64_t bucket;
+
+	bucket = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;
+	TAILQ_REMOVE(&session->dhandles, dhandle_cache, q);
+	TAILQ_REMOVE(&session->dhhash[bucket], dhandle_cache, hashq);
+
+	(void)WT_ATOMIC_SUB4(dhandle_cache->dhandle->session_ref, 1);
+
+	__wt_overwrite_and_free(session, dhandle_cache);
+}
+
+/*
+ * __session_find_dhandle --
+ *	Search for a data handle in the session cache.
+ */
+static void
+__session_find_dhandle(WT_SESSION_IMPL *session,
+    const char *uri, const char *checkpoint,
+    WT_DATA_HANDLE_CACHE **dhandle_cachep)
+{
+	WT_DATA_HANDLE *dhandle;
+	WT_DATA_HANDLE_CACHE *dhandle_cache;
+	uint64_t bucket;
+
+	dhandle = NULL;
+
+	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
+retry:	TAILQ_FOREACH(dhandle_cache, &session->dhhash[bucket], hashq) {
+		dhandle = dhandle_cache->dhandle;
+		if (WT_DHANDLE_INACTIVE(dhandle) && !WT_IS_METADATA(dhandle)) {
+			__session_discard_dhandle(session, dhandle_cache);
+			/* We deleted our entry, retry from the start. */
+			goto retry;
+		}
+
+		if (strcmp(uri, dhandle->name) != 0)
+			continue;
+		if (checkpoint == NULL && dhandle->checkpoint == NULL)
+			break;
+		if (checkpoint != NULL && dhandle->checkpoint != NULL &&
+		    strcmp(checkpoint, dhandle->checkpoint) == 0)
+			break;
+	}
+
+	*dhandle_cachep = dhandle_cache;
+}
+
+/*
  * __wt_session_lock_dhandle --
  *	Try to lock a handle that is cached in this session.  This is the fast
  *	path that tries to lock a handle without the need for the schema lock.
@@ -134,6 +189,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	enum { NOLOCK, READLOCK, WRITELOCK } locked;
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
+	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
 
 	btree = S2BT(session);
@@ -144,6 +200,13 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 * If we had special flags set, close the handle so that future access
 	 * can get a handle without special flags.
 	 */
+	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD | WT_DHANDLE_DISCARD_FORCE)) {
+		__session_find_dhandle(session,
+		    dhandle->name, dhandle->checkpoint, &dhandle_cache);
+		if (dhandle_cache != NULL)
+			__session_discard_dhandle(session, dhandle_cache);
+	}
+
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_FORCE)) {
 		WT_WITH_DHANDLE_LOCK(session,
 		    ret = __wt_conn_btree_sync_and_close(session, 0, 1));
@@ -232,25 +295,6 @@ retry:			WT_RET(__wt_meta_checkpoint_last_name(
 }
 
 /*
- * __session_discard_btree --
- *	Discard our reference to the btree.
- */
-static void
-__session_discard_btree(
-    WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE *dhandle_cache)
-{
-	uint64_t bucket;
-
-	bucket = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;
-	TAILQ_REMOVE(&session->dhandles, dhandle_cache, q);
-	TAILQ_REMOVE(&session->dhhash[bucket], dhandle_cache, hashq);
-
-	(void)WT_ATOMIC_SUB4(dhandle_cache->dhandle->session_ref, 1);
-
-	__wt_overwrite_and_free(session, dhandle_cache);
-}
-
-/*
  * __wt_session_close_cache --
  *	Close any cached handles in a session.
  */
@@ -260,7 +304,7 @@ __wt_session_close_cache(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 
 	while ((dhandle_cache = TAILQ_FIRST(&session->dhandles)) != NULL)
-		__session_discard_btree(session, dhandle_cache);
+		__session_discard_dhandle(session, dhandle_cache);
 }
 
 /*
@@ -294,10 +338,12 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 		dhandle = dhandle_cache->dhandle;
 		if (dhandle != session->dhandle &&
 		    dhandle->session_inuse == 0 &&
-		    (F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
-		    now - dhandle->timeofdeath > conn->sweep_idle_time)) {
+		    (WT_DHANDLE_INACTIVE(dhandle) ||
+		    (dhandle->timeofdeath != 0 &&
+		    now - dhandle->timeofdeath > conn->sweep_idle_time))) {
 			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
-			__session_discard_btree(session, dhandle_cache);
+			WT_ASSERT(session, !WT_IS_METADATA(dhandle));
+			__session_discard_dhandle(session, dhandle_cache);
 		}
 		dhandle_cache = dhandle_cache_next;
 	}
@@ -305,18 +351,19 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 }
 
 /*
- * __session_dhandle_find --
+ * __session_find_shared_dhandle --
  *	Search for a data handle in the connection and add it to a session's
  *	cache.  Since the data handle isn't locked, this must be called holding
  *	the handle list lock, and we must increment the handle's reference
  *	count before releasing it.
  */
 static int
-__session_dhandle_find(WT_SESSION_IMPL *session,
+__session_find_shared_dhandle(WT_SESSION_IMPL *session,
     const char *uri, const char *checkpoint, uint32_t flags)
 {
 	WT_RET(__wt_conn_dhandle_find(session, uri, checkpoint, flags));
-	return (__session_add_dhandle(session, NULL));
+	(void)WT_ATOMIC_ADD4(session->dhandle->session_ref, 1);
+	return (0);
 }
 
 /*
@@ -330,35 +377,22 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
-	uint64_t bucket;
 	int is_dead;
 
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES));
 	WT_ASSERT(session, !LF_ISSET(WT_DHANDLE_HAVE_REF));
 
-	dhandle = NULL;
-
-	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
-	TAILQ_FOREACH(dhandle_cache, &session->dhhash[bucket], hashq) {
-		dhandle = dhandle_cache->dhandle;
-		if (strcmp(uri, dhandle->name) != 0)
-			continue;
-		if (checkpoint == NULL && dhandle->checkpoint == NULL)
-			break;
-		if (checkpoint != NULL && dhandle->checkpoint != NULL &&
-		    strcmp(checkpoint, dhandle->checkpoint) == 0)
-			break;
-	}
+	__session_find_dhandle(session, uri, checkpoint, &dhandle_cache);
 
 	if (dhandle_cache != NULL)
-		session->dhandle = dhandle;
+		session->dhandle = dhandle = dhandle_cache->dhandle;
 	else {
 		/*
 		 * We didn't find a match in the session cache, now search the
 		 * shared handle list and cache any handle we find.
 		 */
 		WT_WITH_DHANDLE_LOCK(session, ret =
-		    __session_dhandle_find(session, uri, checkpoint, flags));
+		    __session_find_shared_dhandle(session, uri, checkpoint, flags));
 		dhandle = (ret == 0) ? session->dhandle : NULL;
 		WT_RET_NOTFOUND_OK(ret);
 	}
@@ -386,7 +420,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 		/* If we found the handle and it isn't dead, reopen it. */
 		if (is_dead) {
-			__session_discard_btree(session, dhandle_cache);
+			__session_discard_dhandle(session, dhandle_cache);
 			dhandle_cache = NULL;
 			session->dhandle = dhandle = NULL;
 		} else
@@ -413,7 +447,7 @@ retry:	is_dead = 0;
 
 	if (is_dead) {
 		if (dhandle_cache != NULL)
-			__session_discard_btree(session, dhandle_cache);
+			__session_discard_dhandle(session, dhandle_cache);
 		dhandle_cache = NULL;
 		session->dhandle = dhandle = NULL;
 		LF_CLR(WT_DHANDLE_HAVE_REF);
