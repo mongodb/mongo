@@ -77,7 +77,8 @@ WT_ATOMIC_FUNC(iv64, int64_t, volatile int64_t, 64, __int64)
 static inline int
 __wt_atomic_cas_ptr(void *vp, void *old, void *new)
 {
-	return (_InterlockedCompareExchange64(vp, new, old) == (old));
+	return (_InterlockedCompareExchange64(
+	    vp, (int64_t)new, (int64_t)old) == ((int64_t)old));
 }
 
 static inline void WT_BARRIER(void) { _ReadWriteBarrier(); }
