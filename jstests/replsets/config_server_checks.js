@@ -18,46 +18,6 @@ function expectState(rst, state) {
 "use strict";
 
 (function() {
-// Test that node without --configsvr cmd line but with configsvr in replset config goes
-// into REMOVED state
-jsTestLog("configsvr in rs config, no --configsvr cmd line")
-var rst = new ReplSetTest({name: "configrs1",
-                           nodes: 1,
-                           nodeOptions: {storageEngine: "wiredTiger"}});
-
-rst.startSet();
-var conf = rst.getReplSetConfig();
-conf.configsvr = true;
-try {
-    rst.nodes[0].adminCommand({replSetInitiate: conf});
-} catch (e) {
-    // expected since we close all connections after going into REMOVED
-}
-expectState(rst, 10 /*REMOVED*/);
-rst.stopSet();
-})();
-
-
-(function() {
-// Test that node with --configsvr cmd line but without configsvr in replset config goes
-// into REMOVED state
-jsTestLog("no configsvr in rs config but --configsvr cmd line");
-var rst = new ReplSetTest({name: "configrs2",
-                           nodes: 1,
-                           nodeOptions: {configsvr: "", storageEngine: "wiredTiger"}});
-
-rst.startSet();
-var conf = rst.getReplSetConfig();
-try {
-    rst.nodes[0].adminCommand({replSetInitiate: conf});
-} catch (e) {
-    // expected since we close all connections after going into REMOVED
-}
-expectState(rst, 10 /*REMOVED*/);
-rst.stopSet();
-})();
-
-(function() {
 // Test that node with --configsvr cmd line and configsvr in replset config goes
 // into REMOVED state if storage engine is not WiredTiger
 jsTestLog("configsvr in rs config and --configsvr cmd line, but mmapv1");

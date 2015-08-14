@@ -31,6 +31,7 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -698,16 +699,24 @@ TEST(ReplicaSetConfig, ConfigServerField) {
                                      << "version" << 1 << "configsvr" << true << "members"
                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                               << "localhost:12345")))));
-    ASSERT_OK(config.validate());
     ASSERT_TRUE(config.isConfigServer());
 
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 1 << "configsvr" << false << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")))));
+    ReplicaSetConfig config2;
+    ASSERT_OK(config2.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "configsvr" << false << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345")))));
+    ASSERT_FALSE(config2.isConfigServer());
+
+    // Configs in which configsvr is not the same as the --configsvr flag are invalid.
+    serverGlobalParams.configsvr = true;
     ASSERT_OK(config.validate());
-    ASSERT_FALSE(config.isConfigServer());
+    ASSERT_EQUALS(ErrorCodes::BadValue, config2.validate());
+
+    serverGlobalParams.configsvr = false;
+    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+    ASSERT_OK(config2.validate());
 }
 
 TEST(ReplicaSetConfig, HeartbeatIntervalField) {

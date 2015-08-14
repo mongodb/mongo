@@ -34,6 +34,7 @@
 #include "mongo/db/repl/replica_set_config_checks.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
+#include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -712,37 +713,6 @@ TEST(ValidateForReconfig, ForceStillNeedsSelfPresent) {
     ASSERT_EQUALS(ErrorCodes::NodeNotFound,
                   validateConfigForReconfig(&presentOnceExternalState, oldConfig, newConfig, true)
                       .getStatus());
-}
-
-TEST(ValidateForReconfig, CantRemoveConfigServer) {
-    ReplicationCoordinatorExternalStateMock externalState;
-    externalState.addSelf(HostAndPort("h0"));
-
-    // The new config does not contain self. This tests that ValidateForReconfig fails
-    // if the member receiving it is absent from the config, even if force is true.
-    ReplicaSetConfig oldConfig;
-    ASSERT_OK(oldConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "configsvr" << true << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h0")
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "h1")))));
-    ASSERT_OK(oldConfig.validate());
-
-    ReplicaSetConfig newConfig;
-    ASSERT_OK(newConfig.initialize(BSON("_id"
-                                        << "rs0"
-                                        << "version" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "h0")
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "h1")))));
-    ASSERT_OK(oldConfig.validate());
-
-    ASSERT_EQUALS(
-        ErrorCodes::NewReplicaSetConfigurationIncompatible,
-        validateConfigForReconfig(&externalState, oldConfig, newConfig, false).getStatus());
 }
 
 }  // namespace

@@ -40,6 +40,7 @@
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
@@ -5092,38 +5093,8 @@ TEST_F(TopoCoordTest, ProcessDeclareElectionWinner) {
     ASSERT_EQUALS(2, responseTerm5);
 }
 
-TEST_F(TopoCoordTest, GetMemberStateConfigSvrInRSConfigButNotOnCmdLine) {
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "configsvr" << true << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2") << BSON("_id" << 30 << "host"
-                                                                         << "h3"))),
-                 0);
-    ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
-}
-
-TEST_F(TopoCoordTest, GetMemberStateConfigSvrOnCmdLineButNotInRSConfig) {
-    TopologyCoordinatorImpl::Options options;
-    options.configServerMode = ServerGlobalParams::ConfigServerMode::CSRS;
-    options.storageEngineSupportsReadCommitted = true;
-    setOptions(options);
-
-    updateConfig(BSON("_id"
-                      << "rs0"
-                      << "version" << 1 << "members"
-                      << BSON_ARRAY(BSON("_id" << 10 << "host"
-                                               << "hself")
-                                    << BSON("_id" << 20 << "host"
-                                                  << "h2") << BSON("_id" << 30 << "host"
-                                                                         << "h3"))),
-                 0);
-    ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
-}
-
 TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommitted) {
+    serverGlobalParams.configsvr = true;
     TopologyCoordinatorImpl::Options options;
     options.configServerMode = ServerGlobalParams::ConfigServerMode::CSRS;
     options.storageEngineSupportsReadCommitted = false;
@@ -5142,6 +5113,7 @@ TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommitted) {
 }
 
 TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommittedButInSCCCMode) {
+    serverGlobalParams.configsvr = true;
     TopologyCoordinatorImpl::Options options;
     options.configServerMode = ServerGlobalParams::ConfigServerMode::SCCC;
     options.storageEngineSupportsReadCommitted = false;
@@ -5163,6 +5135,7 @@ TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommittedButInSCCCMode) {
 }
 
 TEST_F(TopoCoordTest, GetMemberStateValidConfigSvr) {
+    serverGlobalParams.configsvr = true;
     TopologyCoordinatorImpl::Options options;
     options.configServerMode = ServerGlobalParams::ConfigServerMode::CSRS;
     options.storageEngineSupportsReadCommitted = true;

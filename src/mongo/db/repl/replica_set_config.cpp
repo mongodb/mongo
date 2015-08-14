@@ -35,6 +35,7 @@
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_options.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -427,6 +428,15 @@ Status ReplicaSetConfig::validate() const {
                           "Arbiters are not allowed in replica set configurations being used for "
                           "config servers");
         }
+        if (!serverGlobalParams.configsvr) {
+            return Status(ErrorCodes::BadValue,
+                          "Nodes being used for config servers must be started with the "
+                          "--configsvr flag");
+        }
+    } else if (serverGlobalParams.configsvr) {
+        return Status(ErrorCodes::BadValue,
+                      "Nodes started with the --configsvr flag must have configsvr:true in "
+                      "their config");
     }
 
     return Status::OK();
