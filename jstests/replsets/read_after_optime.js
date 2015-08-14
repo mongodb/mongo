@@ -7,8 +7,6 @@ var replTest = new ReplSetTest({ nodes: 2 });
 replTest.startSet();
 
 var config = replTest.getReplSetConfig();
-// TODO: SERVER-18298 uncomment once implemented.
-//config.settings.protocolVersion = 1;
 replTest.initiate(config);
 
 var runTest = function(testDB, primaryConn) {

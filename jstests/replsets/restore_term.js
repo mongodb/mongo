@@ -16,7 +16,7 @@ rst.startSet();
 // Initiate the replset in protocol version 1.
 var conf = rst.getReplSetConfig();
 conf.settings = conf.settings || { };
-conf.settings.protocolVersion = 1;
+conf.protocolVersion = 1;
 rst.initiate(conf);
 rst.awaitSecondaryNodes();
 

@@ -10,7 +10,7 @@ rst.startSet();
 // Initiate the replset in protocol version 0.
 var conf = rst.getReplSetConfig();
 conf.settings = conf.settings || { };
-conf.settings.protocolVersion = 0;
+conf.protocolVersion = 0;
 rst.initiate(conf);
 rst.awaitSecondaryNodes();
 
@@ -41,9 +41,9 @@ assert.eq(res.members[0].optime.term, null);
 res = primary.adminCommand({replSetGetConfig: 1});
 assert.commandWorked(res);
 conf = res.config;
-assert.eq(conf.settings.protocolVersion, 0);
+assert.eq(conf.protocolVersion, undefined);
 // Change protocol version
-conf.settings.protocolVersion = 1;
+conf.protocolVersion = 1;
 conf.version++;
 reconfig(rst, conf);
 // This write may block until all nodes finish upgrade, because replSetUpdatePosition may be
@@ -62,9 +62,9 @@ assert.eq(res.members[0].optime.term, NumberLong(0));
 res = primary.adminCommand({replSetGetConfig: 1});
 assert.commandWorked(res);
 conf = res.config;
-assert.eq(conf.settings.protocolVersion, 1);
+assert.eq(conf.protocolVersion, 1);
 // Change protocol version
-conf.settings.protocolVersion = 0;
+conf.protocolVersion = 0;
 conf.version++;
 reconfig(rst, conf);
 assert.writeOK(primaryColl.bar.insert({x: 3}, {writeConcern: {w: 3}}));

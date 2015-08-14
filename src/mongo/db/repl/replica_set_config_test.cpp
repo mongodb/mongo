@@ -85,12 +85,13 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
                                                                    << "localhost:12345"
                                                                    << "tags" << BSON("NYC"
                                                                                      << "NY")))
-        << "settings" << BSON("getLastErrorDefaults"
-                              << BSON("w"
-                                      << "majority") << "getLastErrorModes"
-                              << BSON("eastCoast" << BSON("NYC" << 1)) << "chainingAllowed" << false
-                              << "heartbeatIntervalMillis" << 5000 << "heartbeatTimeoutSecs" << 120
-                              << "electionTimeoutMillis" << 10 << "protocolVersion" << 2))));
+        << "protocolVersion" << 2 << "settings"
+        << BSON("getLastErrorDefaults" << BSON("w"
+                                               << "majority") << "getLastErrorModes"
+                                       << BSON("eastCoast" << BSON("NYC" << 1)) << "chainingAllowed"
+                                       << false << "heartbeatIntervalMillis" << 5000
+                                       << "heartbeatTimeoutSecs" << 120 << "electionTimeoutMillis"
+                                       << 10))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS("rs0", config.getReplSetName());
     ASSERT_EQUALS(1234, config.getConfigVersion());
@@ -919,7 +920,7 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
                                     << BSON("coast"
                                             << "west"
                                             << "hdd"
-                                            << "true")))
+                                            << "true"))) << "protocolVersion" << 0
         << "settings" << BSON("heartbeatIntervalMillis"
                               << 5000 << "heartbeatTimeoutSecs" << 20 << "electionTimeoutMillis"
                               << 4 << "chainingAllowd" << true << "getLastErrorDefaults"
@@ -927,7 +928,10 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
                                       << "majority") << "getLastErrorModes"
                               << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1) << "coasts"
                                               << BSON("coast" << 2))))));
-    ASSERT_OK(configB.initialize(configA.toBSON()));
+    BSONObj configObjA = configA.toBSON();
+    // Ensure a protocolVersion does not show up if it is 0 to maintain cross version compatibility.
+    ASSERT_FALSE(configObjA.hasField("protocolVersion"));
+    ASSERT_OK(configB.initialize(configObjA));
     ASSERT_TRUE(configA == configB);
 }
 

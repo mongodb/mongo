@@ -131,6 +131,14 @@ Status ReplicaSetConfig::initialize(const BSONObj& cfg) {
     }
 
     //
+    // Parse protocol version
+    //
+    status = bsonExtractIntegerField(cfg, kProtocolVersionFieldName, &_protocolVersion);
+    if (!status.isOK() && status != ErrorCodes::NoSuchKey) {
+        return status;
+    }
+
+    //
     // Parse settings
     //
     BSONElement settingsElement;
@@ -278,14 +286,6 @@ Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
             }
         }
         _customWriteConcernModes[modeElement.fieldNameStringData()] = pattern;
-    }
-
-    //
-    // Parse protocol version
-    //
-    status = bsonExtractIntegerField(settings, kProtocolVersionFieldName, &_protocolVersion);
-    if (!status.isOK() && status != ErrorCodes::NoSuchKey) {
-        return status;
     }
 
     return Status::OK();
@@ -585,6 +585,10 @@ BSONObj ReplicaSetConfig::toBSON() const {
         configBuilder.append(kConfigServerFieldName, _configServer);
     }
 
+    if (_protocolVersion > 0) {
+        configBuilder.append(kProtocolVersionFieldName, _protocolVersion);
+    }
+
     BSONArrayBuilder members(configBuilder.subarrayStart(kMembersFieldName));
     for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
         members.append(mem->toBSON(getTagConfig()));
@@ -621,7 +625,6 @@ BSONObj ReplicaSetConfig::toBSON() const {
     gleModes.done();
 
     settingsBuilder.append(kGetLastErrorDefaultsFieldName, _defaultWriteConcern.toBSON());
-    settingsBuilder.append(kProtocolVersionFieldName, _protocolVersion);
     settingsBuilder.done();
     return configBuilder.obj();
 }

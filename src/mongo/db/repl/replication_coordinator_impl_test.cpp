@@ -1199,7 +1199,7 @@ TEST_F(ReplCoordTest, UpdateTerm) {
                            << BSON("_id" << 1 << "host"
                                          << "test2:1234") << BSON("_id" << 2 << "host"
                                                                         << "test3:1234"))
-             << "settings" << BSON("protocolVersion" << 1)),
+             << "protocolVersion" << 1),
         HostAndPort("test1", 1234));
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 1), 0));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
@@ -2568,7 +2568,7 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
                                                   << "_id" << 1) << BSON("host"
                                                                          << "node3:12345"
                                                                          << "_id" << 2))
-                            << "settings" << BSON("protocolVersion" << 1)),
+                            << "protocolVersion" << 1),
                        HostAndPort("node1", 12345));
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
@@ -2612,7 +2612,7 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
                                                   << "_id" << 1) << BSON("host"
                                                                          << "node3:12345"
                                                                          << "_id" << 2))
-                            << "settings" << BSON("protocolVersion" << 1)),
+                            << "protocolVersion" << 1),
                        HostAndPort("node1", 12345));
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
     getReplCoord()->updateTerm(1);
@@ -2725,8 +2725,8 @@ TEST_F(ReplCoordTest, LivenessForwardingForChainedMember) {
                            << BSON("_id" << 1 << "host"
                                          << "test2:1234") << BSON("_id" << 2 << "host"
                                                                         << "test3:1234"))
-             << "settings" << BSON("protocolVersion" << 1 << "electionTimeoutMillis" << 2000
-                                                     << "heartbeatIntervalMillis" << 40000)),
+             << "protocolVersion" << 1 << "settings"
+             << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 40000)),
         HostAndPort("test1", 1234));
     OpTime optime(Timestamp(100, 2), 0);
     getReplCoord()->setMyLastOptime(optime);
@@ -2772,26 +2772,25 @@ TEST_F(ReplCoordTest, LivenessForwardingForChainedMember) {
 }
 
 TEST_F(ReplCoordTest, LivenessElectionTimeout) {
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "members"
-                            << BSON_ARRAY(BSON("host"
-                                               << "node1:12345"
-                                               << "_id" << 0)
-                                          << BSON("host"
-                                                  << "node2:12345"
-                                                  << "_id" << 1) << BSON("host"
-                                                                         << "node3:12345"
-                                                                         << "_id" << 2)
-                                          << BSON("host"
-                                                  << "node4:12345"
-                                                  << "_id" << 3) << BSON("host"
-                                                                         << "node5:12345"
-                                                                         << "_id" << 4))
-                            << "settings"
-                            << BSON("protocolVersion" << 1 << "electionTimeoutMillis" << 2000
-                                                      << "heartbeatIntervalMillis" << 40000)),
-                       HostAndPort("node1", 12345));
+    assertStartSuccess(
+        BSON("_id"
+             << "mySet"
+             << "version" << 2 << "members"
+             << BSON_ARRAY(BSON("host"
+                                << "node1:12345"
+                                << "_id" << 0)
+                           << BSON("host"
+                                   << "node2:12345"
+                                   << "_id" << 1) << BSON("host"
+                                                          << "node3:12345"
+                                                          << "_id" << 2) << BSON("host"
+                                                                                 << "node4:12345"
+                                                                                 << "_id" << 3)
+                           << BSON("host"
+                                   << "node5:12345"
+                                   << "_id" << 4)) << "protocolVersion" << 1 << "settings"
+             << BSON("electionTimeoutMillis" << 2000 << "heartbeatIntervalMillis" << 40000)),
+        HostAndPort("node1", 12345));
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     OpTime startingOpTime = OpTime(Timestamp(100, 1), 0);
     getReplCoord()->setMyLastOptime(startingOpTime);

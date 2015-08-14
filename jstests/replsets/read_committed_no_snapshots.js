@@ -17,9 +17,7 @@ replTest.initiate({"_id": name,
                        { "_id": 0, "host": nodes[0] },
                        { "_id": 1, "host": nodes[1], priority: 0 },
                        { "_id": 2, "host": nodes[2], arbiterOnly: true }],
-                   "settings": {
-                       "protocolVersion": 1
-                   }
+                   "protocolVersion": 1
                   });
 
 // Get connections and collection.
