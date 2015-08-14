@@ -2290,7 +2290,6 @@ buildvariants:
   display_name: Linux 64-bit
   modules: ~
   run_on:
-  - rhel55
   - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
@@ -2368,7 +2367,6 @@ buildvariants:
   display_name: Linux 64-bit DEBUG
   modules: ~
   run_on:
-  - rhel55
   - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
@@ -2436,7 +2434,6 @@ buildvariants:
   display_name: Linux 64-bit DUR OFF
   modules: ~
   run_on:
-  - rhel55
   - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
@@ -2486,7 +2483,6 @@ buildvariants:
   stepback: false
   display_name: Linux 64-bit LSM
   run_on:
-  - rhel55
   - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
@@ -3490,7 +3486,6 @@ buildvariants:
   display_name: SSL RHEL 5.5 64-bit
   modules: ~
   run_on:
-  - rhel55
   - rhel55-test
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
