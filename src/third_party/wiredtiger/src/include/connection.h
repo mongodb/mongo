@@ -86,11 +86,13 @@ struct __wt_named_extractor {
 #define	WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket) do {		\
 	TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);			\
 	TAILQ_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashq);	\
+	++conn->dhandle_count;						\
 } while (0)
 
 #define	WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket) do {		\
 	TAILQ_REMOVE(&(conn)->dhqh, dhandle, q);			\
 	TAILQ_REMOVE(&(conn)->dhhash[bucket], dhandle, hashq);		\
+	--conn->dhandle_count;						\
 } while (0)
 
 /*
@@ -198,6 +200,7 @@ struct __wt_connection_impl {
 	TAILQ_HEAD(__wt_blockhash, __wt_block) blockhash[WT_HASH_ARRAY_SIZE];
 	TAILQ_HEAD(__wt_block_qh, __wt_block) blockqh;
 
+	u_int dhandle_count;		/* Locked: handles in the queue */
 	u_int open_btree_count;		/* Locked: open writable btree count */
 	uint32_t next_file_id;		/* Locked: file ID counter */
 	uint32_t open_file_count;	/* Atomic: open file handle count */

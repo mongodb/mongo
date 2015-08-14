@@ -358,9 +358,7 @@ __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session)
 	txn_global = &S2C(session)->txn_global;
 	txn_global->nsnap_oldest_id = WT_TXN_NONE;
 
-	while (!TAILQ_EMPTY(&txn_global->nsnaph)) {
-		nsnap = TAILQ_FIRST(&txn_global->nsnaph);
-		WT_ASSERT(session, nsnap != NULL);
+	while ((nsnap = TAILQ_FIRST(&txn_global->nsnaph)) != NULL) {
 		TAILQ_REMOVE(&txn_global->nsnaph, nsnap, q);
 		__nsnap_destroy(session, nsnap);
 	}
