@@ -32,7 +32,7 @@ assert.eq(getCurrentTerm(primary), firstSuccessfulTerm);
 // Check that the insert op has the initial term.
 var latestOp = getLatestOp(primary);
 assert.eq(latestOp.op, "i");
-assert.eq(latestOp.t, NumberLong(1));
+assert.eq(latestOp.t, firstSuccessfulTerm);
 
 // Step down to increase the term.
 try {
