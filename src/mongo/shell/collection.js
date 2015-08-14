@@ -37,6 +37,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".copyTo(newColl) - duplicates collection by copying all documents to newColl; no indexes are copied.");
     print("\tdb." + shortName + ".convertToCapped(maxBytes) - calls {convertToCapped:'" + shortName + "', size:maxBytes}} command");
     print("\tdb." + shortName + ".createIndex(keypattern[,options])");
+    print("\tdb." + shortName + ".createIndexes([keypatterns], <options>)");
     print("\tdb." + shortName + ".dataSize()");
     print("\tdb." + shortName + ".deleteOne( filter, <optional params> ) - delete first matching document, optional parameters are: w, wtimeout, j");
     print("\tdb." + shortName + ".deleteMany( filter, <optional params> ) - delete all matching documents, optional parameters are: w, wtimeout, j");
@@ -577,29 +578,39 @@ DBCollection.prototype._indexSpec = function( keys, options ) {
     return ret;
 }
 
-DBCollection.prototype.createIndex = function( keys , options ){
-    var o = this._indexSpec( keys, options );
+DBCollection.prototype.createIndex = function(keys , options) {
+    return this.createIndexes([keys], options);
+}
 
-    if ( this.getMongo().writeMode() == "commands" ) {
-        delete o.ns; // ns is passed to the first element in the command.
-        return this._db.runCommand({ createIndexes: this.getName(), indexes: [o] });
+DBCollection.prototype.createIndexes = function(keys, options) {
+    var indexSpecs = Array(keys.length);
+    for (var i = 0; i < indexSpecs.length; i++) {
+        indexSpecs[i] = this._indexSpec(keys[i], options);
     }
-    else if( this.getMongo().writeMode() == "compatibility" ) {
+
+    if (this.getMongo().writeMode() == "commands") {
+        for (i = 0; i++; i < indexSpecs.length) {
+            delete (indexSpecs[i].ns); // ns is passed to the first element in the command.
+        }
+        return this._db.runCommand({createIndexes: this.getName(), indexes: indexSpecs}); 
+    }
+    else if(this.getMongo().writeMode() == "compatibility") {
         // Use the downconversion machinery of the bulk api to do a safe write, report response as a
         // command response
-        var result = this._db.getCollection( "system.indexes" ).insert( o , 0, true );
+        var result = this._db.getCollection("system.indexes").insert(indexSpecs , 0, true);
 
-        if (result.hasWriteError() || result.hasWriteConcernError()) {
-            var error = result.hasWriteError() ? result.getWriteError() :
-                                                 result.getWriteConcernError();
-            return { ok : 0.0, code : error.code, errmsg : error.errmsg };
+        if (result.hasWriteErrors() || result.hasWriteConcernError()) {
+            // Return the first error
+            var error = result.hasWriteErrors() ? result.getWriteErrors()[0] :
+                                                  result.getWriteConcernError();
+            return {ok : 0.0, code : error.code, errmsg : error.errmsg};
         }
         else {
-            return { ok : 1.0 };
+            return {ok : 1.0};
         }
     }
     else {
-        this._db.getCollection( "system.indexes" ).insert( o , 0, true );
+        this._db.getCollection("system.indexes").insert(indexSpecs, 0, true);
     }
 }
 
