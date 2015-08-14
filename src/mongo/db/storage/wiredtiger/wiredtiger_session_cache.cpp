@@ -91,10 +91,10 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
     // across all of them (i.e., each cursor has 1/N chance of used for each operation).  We
     // would like to cache N cursors in that case, so any given cursor could go N**2 operations
     // in between use.
-    uint64_t cutoff = std::max(100, _cursorsCached * _cursorsCached);
-    while (_cursorGen - _cursors.back()._gen > cutoff) {
+    while (_cursorGen - _cursors.back()._gen > 10000) {
         cursor = _cursors.back()._cursor;
         _cursors.pop_back();
+        _cursorsCached--;
         invariantWTOK(cursor->close(cursor));
     }
 }
