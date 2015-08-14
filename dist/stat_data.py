@@ -208,6 +208,8 @@ connection_stats = [
     ##########################################
     # Dhandle statistics
     ##########################################
+    DhandleStat('dh_conn_handle_count',
+        'connection data handles currently active', 'no_clear,no_scale'),
     DhandleStat('dh_sweep_close', 'connection sweep dhandles closed'),
     DhandleStat('dh_sweep_remove',
         'connection sweep dhandles removed from hash list'),
