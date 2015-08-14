@@ -157,11 +157,26 @@ struct ShardEndpoint {
     ShardEndpoint(const ShardEndpoint& other)
         : shardName(other.shardName), shardVersion(other.shardVersion) {}
 
-    ShardEndpoint(const std::string& shardName, const ChunkVersionAndOpTime& shardVersion)
+    ShardEndpoint(const std::string& shardName, const ChunkVersion& shardVersion)
         : shardName(shardName), shardVersion(shardVersion) {}
 
     const std::string shardName;
-    const ChunkVersionAndOpTime shardVersion;
+    const ChunkVersion shardVersion;
+
+    //
+    // For testing *only* - do not use as part of API
+    //
+
+    BSONObj toBSON() const {
+        BSONObjBuilder b;
+        appendBSON(&b);
+        return b.obj();
+    }
+
+    void appendBSON(BSONObjBuilder* builder) const {
+        builder->append("shardName", shardName);
+        shardVersion.addToBSON(*builder, "shardVersion");
+    }
 };
 
 }  // namespace mongo

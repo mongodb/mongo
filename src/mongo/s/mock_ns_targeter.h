@@ -211,11 +211,8 @@ private:
 
 inline void assertEndpointsEqual(const ShardEndpoint& endpointA, const ShardEndpoint& endpointB) {
     ASSERT_EQUALS(endpointA.shardName, endpointB.shardName);
-    ASSERT_EQUALS(endpointA.shardVersion.getVersion().toLong(),
-                  endpointB.shardVersion.getVersion().toLong());
-    ASSERT_EQUALS(endpointA.shardVersion.getVersion().epoch(),
-                  endpointB.shardVersion.getVersion().epoch());
-    ASSERT_EQUALS(endpointA.shardVersion.getOpTime(), endpointB.shardVersion.getOpTime());
+    ASSERT_EQUALS(endpointA.shardVersion.toLong(), endpointB.shardVersion.toLong());
+    ASSERT_EQUALS(endpointA.shardVersion.epoch(), endpointB.shardVersion.epoch());
 }
 
 }  // namespace mongo

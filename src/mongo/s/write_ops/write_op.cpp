@@ -127,8 +127,7 @@ Status WriteOp::targetWrites(OperationContext* txn,
         if (endpoints.size() == 1u) {
             targetedWrites->push_back(new TargetedWrite(*endpoint, ref));
         } else {
-            ShardEndpoint broadcastEndpoint(endpoint->shardName,
-                                            ChunkVersionAndOpTime(ChunkVersion::IGNORED()));
+            ShardEndpoint broadcastEndpoint(endpoint->shardName, ChunkVersion::IGNORED());
             targetedWrites->push_back(new TargetedWrite(broadcastEndpoint, ref));
         }
 

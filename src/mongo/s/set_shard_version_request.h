@@ -38,6 +38,7 @@
 namespace mongo {
 
 class BSONObj;
+struct ChunkVersion;
 template <typename T>
 class StatusWith;
 
@@ -66,7 +67,7 @@ public:
                                                     const std::string& shardName,
                                                     const ConnectionString& shard,
                                                     const NamespaceString& nss,
-                                                    const ChunkVersionAndOpTime& nssVersion,
+                                                    const ChunkVersion& nssVersion,
                                                     bool isAuthoritative);
 
     /**
@@ -76,13 +77,12 @@ public:
      * connection WILL NOT be marked as "versioned". DO NOT USE unless the command will be sent
      * through the TaskExecutor.
      */
-    static SetShardVersionRequest makeForVersioningNoPersist(
-        const ConnectionString& configServer,
-        const std::string& shardName,
-        const ConnectionString& shard,
-        const NamespaceString& nss,
-        const ChunkVersionAndOpTime& nssVersion,
-        bool isAuthoritative);
+    static SetShardVersionRequest makeForVersioningNoPersist(const ConnectionString& configServer,
+                                                             const std::string& shardName,
+                                                             const ConnectionString& shard,
+                                                             const NamespaceString& nss,
+                                                             const ChunkVersion& nssVersion,
+                                                             bool isAuthoritative);
 
     /**
      * Parses an SSV request from a set shard version command.
@@ -153,7 +153,7 @@ private:
                            std::string shardName,
                            ConnectionString shardConnectionString,
                            NamespaceString nss,
-                           ChunkVersionAndOpTime version,
+                           ChunkVersion nssVersion,
                            bool isAuthoritative);
 
     SetShardVersionRequest();
@@ -169,7 +169,7 @@ private:
 
     // These values are only set if _init is false
     boost::optional<NamespaceString> _nss;
-    boost::optional<ChunkVersionAndOpTime> _version;
+    boost::optional<ChunkVersion> _version;
 };
 
 }  // namespace mongo

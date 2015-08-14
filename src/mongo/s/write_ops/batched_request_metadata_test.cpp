@@ -40,16 +40,22 @@ using std::string;
 namespace {
 
 TEST(BatchedRequestMetadata, Basic) {
-    BSONObj metadataObj(BSON("shardName"
-                             << "shard0000"
-                             << "shardVersion" << BSON_ARRAY(Timestamp(1, 2) << OID::gen()) << "ts"
-                             << Timestamp(3, 4) << "t" << 5 << "session" << 0LL));
+    // The BSON_ARRAY macro doesn't support Timestamps.
+    BSONArrayBuilder arrBuilder;
+    arrBuilder.append(Timestamp(1, 1));
+    arrBuilder.append(OID::gen());
+    BSONArray shardVersionArray = arrBuilder.arr();
+
+    BSONObj metadataObj(BSON(BatchedRequestMetadata::shardName("shard0000")
+                             << BatchedRequestMetadata::shardVersion() << shardVersionArray
+                             << BatchedRequestMetadata::session(100)));
 
     string errMsg;
     BatchedRequestMetadata metadata;
     ASSERT_TRUE(metadata.parseBSON(metadataObj, &errMsg));
 
-    ASSERT_EQUALS(metadataObj, metadata.toBSON());
+    BSONObj genMetadataObj = metadata.toBSON();
+    ASSERT_EQUALS(metadataObj, genMetadataObj);
 }
 
 }  // namespace

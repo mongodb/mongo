@@ -33,13 +33,11 @@ env.Library(
     target='common',
     source=[
         'chunk_diff.cpp',
-        'chunk_version.cpp',
         'set_shard_version_request.cpp',
     ],
     LIBDEPS=[
         'catalog/catalog_types',
         '$BUILD_DIR/mongo/client/connection_string',
-        '$BUILD_DIR/mongo/db/repl/optime',
     ]
 )
 

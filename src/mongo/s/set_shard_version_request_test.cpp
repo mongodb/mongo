@@ -215,8 +215,7 @@ TEST(SetShardVersionRequest, ToSSVCommandInit) {
 }
 
 TEST(SetShardVersionRequest, ToSSVCommandFull) {
-    const ChunkVersionAndOpTime chunkVersion(ChunkVersion(1, 2, OID::gen()),
-                                             repl::OpTime(Timestamp(10), 20LL));
+    const ChunkVersion chunkVersion(1, 2, OID::gen());
 
     SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioning(
         configCS, "TestShard", shardCS, NamespaceString("db.coll"), chunkVersion, false);
@@ -229,7 +228,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFull) {
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
     ASSERT_EQ(ssv.getNSVersion().toBSONWithPrefix("version"),
-              chunkVersion.getVersion().toBSONWithPrefix("version"));
+              chunkVersion.toBSONWithPrefix("version"));
 
     ASSERT_EQ(ssv.toBSON(),
               BSON("setShardVersion"
@@ -238,13 +237,11 @@ TEST(SetShardVersionRequest, ToSSVCommandFull) {
                    << configCS.toString() << "shard"
                    << "TestShard"
                    << "shardHost" << shardCS.toString() << "version"
-                   << Timestamp(chunkVersion.getVersion().toLong()) << "versionEpoch"
-                   << chunkVersion.getVersion().epoch() << "ts" << Timestamp(10) << "t" << 20LL));
+                   << Timestamp(chunkVersion.toLong()) << "versionEpoch" << chunkVersion.epoch()));
 }
 
 TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
-    const ChunkVersionAndOpTime chunkVersion(ChunkVersion(1, 2, OID::gen()),
-                                             repl::OpTime(Timestamp(10), 20LL));
+    const ChunkVersion chunkVersion(1, 2, OID::gen());
 
     SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioning(
         configCS, "TestShard", shardCS, NamespaceString("db.coll"), chunkVersion, true);
@@ -257,7 +254,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
     ASSERT_EQ(ssv.getNSVersion().toBSONWithPrefix("version"),
-              chunkVersion.getVersion().toBSONWithPrefix("version"));
+              chunkVersion.toBSONWithPrefix("version"));
 
     ASSERT_EQ(ssv.toBSON(),
               BSON("setShardVersion"
@@ -266,13 +263,11 @@ TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
                    << configCS.toString() << "shard"
                    << "TestShard"
                    << "shardHost" << shardCS.toString() << "version"
-                   << Timestamp(chunkVersion.getVersion().toLong()) << "versionEpoch"
-                   << chunkVersion.getVersion().epoch() << "ts" << Timestamp(10) << "t" << 20LL));
+                   << Timestamp(chunkVersion.toLong()) << "versionEpoch" << chunkVersion.epoch()));
 }
 
 TEST(SetShardVersionRequest, ToSSVCommandFullNoConnectionVersioning) {
-    const ChunkVersionAndOpTime chunkVersion(ChunkVersion(1, 2, OID::gen()),
-                                             repl::OpTime(Timestamp(10), 20LL));
+    const ChunkVersion chunkVersion(1, 2, OID::gen());
 
     SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
         configCS, "TestShard", shardCS, NamespaceString("db.coll"), chunkVersion, true);
@@ -285,7 +280,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullNoConnectionVersioning) {
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
     ASSERT_EQ(ssv.getNSVersion().toBSONWithPrefix("version"),
-              chunkVersion.getVersion().toBSONWithPrefix("version"));
+              chunkVersion.toBSONWithPrefix("version"));
 
     ASSERT_EQ(ssv.toBSON(),
               BSON("setShardVersion"
@@ -294,8 +289,7 @@ TEST(SetShardVersionRequest, ToSSVCommandFullNoConnectionVersioning) {
                    << configCS.toString() << "shard"
                    << "TestShard"
                    << "shardHost" << shardCS.toString() << "version"
-                   << Timestamp(chunkVersion.getVersion().toLong()) << "versionEpoch"
-                   << chunkVersion.getVersion().epoch() << "ts" << Timestamp(10) << "t" << 20LL
+                   << Timestamp(chunkVersion.toLong()) << "versionEpoch" << chunkVersion.epoch()
                    << "noConnectionVersioning" << true));
 }
 
