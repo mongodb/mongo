@@ -33,9 +33,10 @@
 #include <utility>
 
 #include "mongo/base/status.h"
-#include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/test_network_connection_hook.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -43,44 +44,6 @@
 namespace mongo {
 namespace executor {
 namespace {
-
-template <typename ValidateFunc, typename RequestFunc, typename ReplyFunc>
-class TestConnectionHook final : public NetworkConnectionHook {
-public:
-    TestConnectionHook(ValidateFunc&& validateFunc,
-                       RequestFunc&& requestFunc,
-                       ReplyFunc&& replyFunc)
-        : _validateFunc(std::forward<ValidateFunc>(validateFunc)),
-          _requestFunc(std::forward<RequestFunc>(requestFunc)),
-          _replyFunc(std::forward<ReplyFunc>(replyFunc)) {}
-
-    Status validateHost(const HostAndPort& remoteHost,
-                        const RemoteCommandResponse& isMasterReply) override {
-        return _validateFunc(remoteHost, isMasterReply);
-    }
-
-    StatusWith<boost::optional<RemoteCommandRequest>> makeRequest(const HostAndPort& remoteHost) {
-        return _requestFunc(remoteHost);
-    }
-
-    Status handleReply(const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
-        return _replyFunc(remoteHost, std::move(response));
-    }
-
-private:
-    ValidateFunc _validateFunc;
-    RequestFunc _requestFunc;
-    ReplyFunc _replyFunc;
-};
-
-template <typename Val, typename Req, typename Rep>
-static std::unique_ptr<TestConnectionHook<Val, Req, Rep>> makeTestHook(Val&& validateFunc,
-                                                                       Req&& requestFunc,
-                                                                       Rep&& replyFunc) {
-    return stdx::make_unique<TestConnectionHook<Val, Req, Rep>>(std::forward<Val>(validateFunc),
-                                                                std::forward<Req>(requestFunc),
-                                                                std::forward<Rep>(replyFunc));
-}
 
 class NetworkInterfaceMockTest : public mongo::unittest::Test {
 public:

@@ -36,8 +36,13 @@
 
 #include "mongo/executor/async_stream_factory_interface.h"
 #include "mongo/executor/async_stream_interface.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -57,6 +62,15 @@ public:
         MockStream(asio::io_service* io_service,
                    AsyncMockStreamFactory* factory,
                    const HostAndPort& target);
+
+        // Use unscoped enum so we can specialize on it
+        enum StreamState {
+            kRunning,
+            kBlockedBeforeConnect,
+            kBlockedBeforeRead,
+            kBlockedAfterWrite,
+        };
+
         ~MockStream();
 
         void connect(asio::ip::tcp::resolver::iterator endpoints,
@@ -64,27 +78,32 @@ public:
         void write(asio::const_buffer buf, StreamHandler&& writeHandler) override;
         void read(asio::mutable_buffer buf, StreamHandler&& readHandler) override;
 
-        void waitUntilBlocked();
+        HostAndPort target();
+
+        StreamState waitUntilBlocked();
 
         std::vector<uint8_t> popWrite();
         void pushRead(std::vector<uint8_t> toRead);
 
         void unblock();
 
+        void simulateServer(
+            rpc::Protocol proto,
+            const stdx::function<RemoteCommandResponse(RemoteCommandRequest)> replyFunc);
+
     private:
         void _unblock_inlock(stdx::unique_lock<stdx::mutex>* lk);
-        void _block_inlock(stdx::unique_lock<stdx::mutex>* lk);
+        void _block_inlock(StreamState state, stdx::unique_lock<stdx::mutex>* lk);
 
         asio::io_service* _io_service;
 
         AsyncMockStreamFactory* _factory;
         HostAndPort _target;
 
-
         stdx::mutex _mutex;
 
         stdx::condition_variable _cv;
-        bool _blocked{false};
+        StreamState _state{kRunning};
 
         std::queue<std::vector<uint8_t>> _readQueue;
         std::queue<std::vector<uint8_t>> _writeQueue;
@@ -101,6 +120,34 @@ private:
 
     std::unordered_map<HostAndPort, MockStream*> _streams;
 };
+
+template <int EventType>
+class StreamEvent {
+public:
+    StreamEvent(AsyncMockStreamFactory::MockStream* stream) : _stream(stream) {
+        ASSERT(stream->waitUntilBlocked() == EventType);
+    }
+
+    void skip() {
+        _stream->unblock();
+        skipped = true;
+    }
+
+    ~StreamEvent() {
+        if (!skipped) {
+            skip();
+        }
+    }
+
+private:
+    bool skipped = false;
+    AsyncMockStreamFactory::MockStream* _stream = nullptr;
+};
+
+using ReadEvent = StreamEvent<AsyncMockStreamFactory::MockStream::StreamState::kBlockedBeforeRead>;
+using WriteEvent = StreamEvent<AsyncMockStreamFactory::MockStream::StreamState::kBlockedAfterWrite>;
+using ConnectEvent =
+    StreamEvent<AsyncMockStreamFactory::MockStream::StreamState::kBlockedBeforeConnect>;
 
 }  // namespace executor
 }  // namespace mongo

@@ -72,7 +72,6 @@ env.Library(target='network_test_env',
 env.Library(
     target='network_interface_asio',
     source=[
-        'async_mock_stream_factory.cpp',
         'async_secure_stream.cpp',
         'async_secure_stream_factory.cpp',
         'async_stream.cpp',
@@ -96,6 +95,7 @@ env.Library(
 env.CppUnitTest(
     target='network_interface_asio_test',
     source=[
+        'async_mock_stream_factory.cpp',
         'network_interface_asio_test.cpp',
     ],
     LIBDEPS=[

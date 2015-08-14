@@ -41,6 +41,7 @@
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/request_builder_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -270,6 +271,49 @@ void NetworkInterfaceASIO::_asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler 
     // Step 1
     asyncSendMessage(cmd->conn().stream(), &cmd->toSend(), std::move(sendMessageCallback));
 }
+
+void NetworkInterfaceASIO::_runConnectionHook(AsyncOp* op) {
+    if (!_hook) {
+        return _beginCommunication(op);
+    }
+
+    auto swOptionalRequest = _hook->makeRequest(op->request().target);
+
+    if (!swOptionalRequest.isOK()) {
+        return _completeOperation(op, swOptionalRequest.getStatus());
+    }
+
+    auto optionalRequest = std::move(swOptionalRequest.getValue());
+
+    if (optionalRequest == boost::none) {
+        return _beginCommunication(op);
+    }
+
+    auto& cmd = op->beginCommand(*optionalRequest, op->operationProtocol(), now());
+
+    auto finishHook = [this, op]() {
+        auto response = op->command().response(op->operationProtocol(), now());
+
+        if (!response.isOK()) {
+            return _completeOperation(op, response.getStatus());
+        }
+
+        auto handleStatus =
+            _hook->handleReply(op->request().target, std::move(response.getValue()));
+
+        if (!handleStatus.isOK()) {
+            return _completeOperation(op, handleStatus);
+        }
+
+        return _beginCommunication(op);
+    };
+
+    return _asyncRunCommand(&cmd,
+                            [this, op, finishHook](std::error_code ec, std::size_t bytes) {
+                                _validateAndRun(op, ec, finishHook);
+                            });
+}
+
 
 }  // namespace executor
 }  // namespace mongo

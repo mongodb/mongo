@@ -34,6 +34,11 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+namespace rpc {
+class ReplyInterface;
+}  // namespace rpc
+
 namespace executor {
 
 
@@ -45,6 +50,8 @@ struct RemoteCommandResponse {
 
     RemoteCommandResponse(BSONObj dataObj, BSONObj metadataObj, Milliseconds millis)
         : data(std::move(dataObj)), metadata(std::move(metadataObj)), elapsedMillis(millis) {}
+
+    RemoteCommandResponse(const rpc::ReplyInterface& rpcReply, Milliseconds millis);
 
     std::string toString() const;
 

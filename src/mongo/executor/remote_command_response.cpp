@@ -30,10 +30,18 @@
 
 #include "mongo/executor/remote_command_response.h"
 
+#include "mongo/rpc/reply_interface.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace executor {
+
+// TODO(amidvidy): we currently discard output docs when we use this constructor. We should
+// have RCR hold those too, but we need more machinery before that is possible.
+RemoteCommandResponse::RemoteCommandResponse(const rpc::ReplyInterface& rpcReply,
+                                             Milliseconds millis)
+    : RemoteCommandResponse(rpcReply.getCommandReply(), rpcReply.getMetadata(), std::move(millis)) {
+}
 
 std::string RemoteCommandResponse::toString() const {
     return str::stream() << "RemoteResponse -- "

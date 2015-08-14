@@ -38,6 +38,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/system_error.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -54,7 +55,6 @@ namespace executor {
 
 class AsyncStreamFactoryInterface;
 class AsyncStreamInterface;
-class NetworkConnectionHook;
 
 /**
  * Implementation of the replication system's network interface using Christopher
@@ -62,6 +62,8 @@ class NetworkConnectionHook;
  */
 class NetworkInterfaceASIO final : public NetworkInterface {
 public:
+    NetworkInterfaceASIO(std::unique_ptr<AsyncStreamFactoryInterface> streamFactory,
+                         std::unique_ptr<NetworkConnectionHook> networkConnectionHook);
     NetworkInterfaceASIO(std::unique_ptr<AsyncStreamFactoryInterface> streamFactory);
     std::string getDiagnosticString() override;
     std::string getHostName() override;
@@ -239,6 +241,7 @@ private:
     void _setupSocket(AsyncOp* op, asio::ip::tcp::resolver::iterator endpoints);
 
     void _runIsMaster(AsyncOp* op);
+    void _runConnectionHook(AsyncOp* op);
     void _authenticate(AsyncOp* op);
 
     // Communication state machine
@@ -253,6 +256,8 @@ private:
 
     asio::io_service _io_service;
     stdx::thread _serviceRunner;
+
+    std::unique_ptr<NetworkConnectionHook> _hook;
 
     asio::ip::tcp::resolver _resolver;
 

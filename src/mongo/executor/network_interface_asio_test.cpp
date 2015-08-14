@@ -30,15 +30,15 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
+
+#include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/async_mock_stream_factory.h"
 #include "mongo/executor/network_interface_asio.h"
-#include "mongo/rpc/command_reply_builder.h"
-#include "mongo/rpc/factory.h"
+#include "mongo/executor/test_network_connection_hook.h"
 #include "mongo/rpc/legacy_reply_builder.h"
-#include "mongo/rpc/protocol.h"
-#include "mongo/rpc/request_interface.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -48,6 +48,8 @@
 namespace mongo {
 namespace executor {
 namespace {
+
+HostAndPort testHost{"localhost", 20000};
 
 class NetworkInterfaceASIOTest : public mongo::unittest::Test {
 public:
@@ -73,7 +75,11 @@ public:
         return *_streamFactory;
     }
 
-private:
+    void simulateServerReply(AsyncMockStreamFactory::MockStream* stream,
+                             rpc::Protocol proto,
+                             const stdx::function<RemoteCommandResponse(RemoteCommandRequest)>) {}
+
+protected:
     AsyncMockStreamFactory* _streamFactory;
     std::unique_ptr<NetworkInterfaceASIO> _net;
 };
@@ -104,124 +110,339 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
     auto stream = streamFactory().blockUntilStreamExists(testHost);
 
     // Allow stream to connect.
-    {
-        stream->waitUntilBlocked();
-        auto guard = MakeGuard([&] { stream->unblock(); });
-    }
+    ConnectEvent{stream}.skip();
 
-    log() << "connected";
+    // simulate isMaster reply.
+    stream->simulateServer(
+        rpc::Protocol::kOpQuery,
+        [](RemoteCommandRequest request) -> RemoteCommandResponse {
+            ASSERT_EQ(std::string{request.cmdObj.firstElementFieldName()}, "isMaster");
+            ASSERT_EQ(request.dbname, "admin");
 
-    uint32_t isMasterMsgId = 0;
+            RemoteCommandResponse response;
+            response.data = BSON("minWireVersion" << mongo::minWireVersion << "maxWireVersion"
+                                                  << mongo::maxWireVersion);
+            return response;
+        });
 
-    {
-        stream->waitUntilBlocked();
-        auto guard = MakeGuard([&] { stream->unblock(); });
-
-        log() << "NIA blocked after writing isMaster request";
-
-        // Check that an isMaster has been run on the stream
-        std::vector<uint8_t> messageData = stream->popWrite();
-        Message msg(messageData.data(), false);
-
-        auto request = rpc::makeRequest(&msg);
-
-        ASSERT_EQ(request->getCommandName(), "isMaster");
-        ASSERT_EQ(request->getDatabase(), "admin");
-
-        isMasterMsgId = msg.header().getId();
-
-        // Check that we used OP_QUERY.
-        ASSERT(request->getProtocol() == rpc::Protocol::kOpQuery);
-    }
-
-    rpc::LegacyReplyBuilder replyBuilder;
-    replyBuilder.setMetadata(BSONObj());
-    replyBuilder.setCommandReply(BSON("minWireVersion" << mongo::minWireVersion << "maxWireVersion"
-                                                       << mongo::maxWireVersion));
-    auto replyMsg = replyBuilder.done();
-    replyMsg->header().setResponseTo(isMasterMsgId);
-
-    {
-        stream->waitUntilBlocked();
-        auto guard = MakeGuard([&] { stream->unblock(); });
-
-        log() << "NIA blocked before reading isMaster reply header";
-
-        // write out the full message now, even though another read() call will read the rest.
-        auto hdrBytes = reinterpret_cast<const uint8_t*>(replyMsg->header().view2ptr());
-
-        stream->pushRead({hdrBytes, hdrBytes + sizeof(MSGHEADER::Value)});
-
-        auto dataBytes = reinterpret_cast<const uint8_t*>(replyMsg->buf());
-        auto pastHeader = dataBytes;
-        std::advance(pastHeader, sizeof(MSGHEADER::Value));  // skip the header this time
-
-        stream->pushRead({pastHeader, dataBytes + static_cast<std::size_t>(replyMsg->size())});
-    }
-
-    {
-        stream->waitUntilBlocked();
-        auto guard = MakeGuard([&] { stream->unblock(); });
-        log() << "NIA blocked before reading isMaster reply data";
-    }
-
+    auto expectedMetadata = BSON("meep"
+                                 << "beep");
     auto expectedCommandReply = BSON("boop"
                                      << "bop"
                                      << "ok" << 1.0);
-    auto expectedMetadata = BSON("meep"
-                                 << "beep");
 
-    {
-        stream->waitUntilBlocked();
-        auto guard = MakeGuard([&] { stream->unblock(); });
+    // simulate user command
+    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+                           [&](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               ASSERT_EQ(std::string{request.cmdObj.firstElementFieldName()},
+                                         "foo");
+                               ASSERT_EQ(request.dbname, "testDB");
 
-        log() << "blocked after write(), reading user command request";
-
-        std::vector<uint8_t> messageData{stream->popWrite()};
-
-        Message msg(messageData.data(), false);
-        auto request = rpc::makeRequest(&msg);
-
-        // the command we requested should be running.
-        ASSERT_EQ(request->getCommandName(), "foo");
-        ASSERT_EQ(request->getDatabase(), "testDB");
-
-        // we should be using op command given our previous isMaster reply.
-        ASSERT(request->getProtocol() == rpc::Protocol::kOpCommandV1);
-
-        rpc::CommandReplyBuilder replyBuilder;
-        replyBuilder.setMetadata(expectedMetadata).setCommandReply(expectedCommandReply);
-        auto replyMsg = replyBuilder.done();
-
-        replyMsg->header().setResponseTo(msg.header().getId());
-
-        // write out the full message now, even though another read() call will read the rest.
-        auto hdrBytes = reinterpret_cast<const uint8_t*>(replyMsg->header().view2ptr());
-
-        stream->pushRead({hdrBytes, hdrBytes + sizeof(MSGHEADER::Value)});
-
-        auto dataBytes = reinterpret_cast<const uint8_t*>(replyMsg->buf());
-        auto pastHeader = dataBytes;
-        std::advance(pastHeader, sizeof(MSGHEADER::Value));  // skip the header this time
-
-        stream->pushRead({pastHeader, dataBytes + static_cast<std::size_t>(replyMsg->size())});
-    }
-
-    {
-        stream->waitUntilBlocked();
-        auto guard = MakeGuard([&] { stream->unblock(); });
-    }
-
-    {
-        stream->waitUntilBlocked();
-        auto guard = MakeGuard([&] { stream->unblock(); });
-    }
+                               RemoteCommandResponse response;
+                               response.data = expectedCommandReply;
+                               response.metadata = expectedMetadata;
+                               return response;
+                           });
 
     auto res = fut.get();
 
     ASSERT(callbackCalled);
     ASSERT_EQ(res.data, expectedCommandReply);
     ASSERT_EQ(res.metadata, expectedMetadata);
+}
+
+class NetworkInterfaceASIOConnectionHookTest : public NetworkInterfaceASIOTest {
+public:
+    void setUp() override {}
+
+    void start(std::unique_ptr<NetworkConnectionHook> hook) {
+        auto factory = stdx::make_unique<AsyncMockStreamFactory>();
+        // keep unowned pointer, but pass ownership to NIA
+        _streamFactory = factory.get();
+        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(factory), std::move(hook));
+        _net->startup();
+    }
+};
+
+template <typename T>
+void assertThrowsStatus(stdx::future<T>&& fut, const Status& s) {
+    ASSERT([&] {
+        try {
+            std::forward<stdx::future<T>>(fut).get();
+            return false;
+        } catch (const DBException& ex) {
+            return ex.toStatus() == s;
+        }
+    }());
+}
+
+TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
+    bool validateCalled = false;
+    bool hostCorrect = false;
+    bool isMasterReplyCorrect = false;
+    bool makeRequestCalled = false;
+    bool handleReplyCalled = false;
+
+    auto validationFailedStatus = Status(ErrorCodes::AlreadyInitialized, "blahhhhh");
+
+    start(makeTestHook(
+        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply) {
+            validateCalled = true;
+            hostCorrect = (remoteHost == testHost);
+            isMasterReplyCorrect = (isMasterReply.data["TESTKEY"].str() == "TESTVALUE");
+            return validationFailedStatus;
+        },
+        [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
+            makeRequestCalled = true;
+            return {boost::none};
+        },
+        [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
+            handleReplyCalled = true;
+            return Status::OK();
+        }));
+
+    stdx::promise<RemoteCommandResponse> done;
+    auto doneFuture = done.get_future();
+
+    net().startCommand({},
+                       {testHost,
+                        "blah",
+                        BSON("foo"
+                             << "bar")},
+                       [&](StatusWith<RemoteCommandResponse> result) {
+                           try {
+                               done.set_value(uassertStatusOK(result));
+                           } catch (...) {
+                               done.set_exception(std::current_exception());
+                           }
+                       });
+
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+
+    ConnectEvent{stream}.skip();
+
+    // simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               RemoteCommandResponse response;
+                               response.data = BSON("minWireVersion"
+                                                    << mongo::minWireVersion << "maxWireVersion"
+                                                    << mongo::maxWireVersion << "TESTKEY"
+                                                    << "TESTVALUE");
+                               return response;
+                           });
+
+    // we should stop here.
+    assertThrowsStatus(std::move(doneFuture), validationFailedStatus);
+    ASSERT(validateCalled);
+    ASSERT(hostCorrect);
+    ASSERT(isMasterReplyCorrect);
+
+    ASSERT(!makeRequestCalled);
+    ASSERT(!handleReplyCalled);
+}
+
+TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
+    bool makeRequestCalled = false;
+    bool handleReplyCalled = false;
+
+    Status makeRequestError{ErrorCodes::DBPathInUse, "bloooh"};
+
+    start(makeTestHook(
+        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply)
+            -> Status { return Status::OK(); },
+        [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
+            makeRequestCalled = true;
+            return makeRequestError;
+        },
+        [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
+            handleReplyCalled = true;
+            return Status::OK();
+        }));
+
+    stdx::promise<RemoteCommandResponse> done;
+    auto doneFuture = done.get_future();
+
+    net().startCommand({},
+                       {testHost,
+                        "blah",
+                        BSON("foo"
+                             << "bar")},
+                       [&](StatusWith<RemoteCommandResponse> result) {
+                           try {
+                               done.set_value(uassertStatusOK(result));
+                           } catch (...) {
+                               done.set_exception(std::current_exception());
+                           }
+                       });
+
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               RemoteCommandResponse response;
+                               response.data = BSON("minWireVersion" << mongo::minWireVersion
+                                                                     << "maxWireVersion"
+                                                                     << mongo::maxWireVersion);
+                               return response;
+                           });
+
+    // We should stop here.
+    assertThrowsStatus(std::move(doneFuture), makeRequestError);
+
+    ASSERT(makeRequestCalled);
+    ASSERT(!handleReplyCalled);
+}
+
+TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
+    bool makeRequestCalled = false;
+    bool handleReplyCalled = false;
+
+    start(makeTestHook(
+        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply)
+            -> Status { return Status::OK(); },
+        [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
+            makeRequestCalled = true;
+            return {boost::none};
+        },
+        [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
+            handleReplyCalled = true;
+            return Status::OK();
+        }));
+
+    stdx::promise<RemoteCommandResponse> done;
+    auto doneFuture = done.get_future();
+
+    auto commandRequest = BSON("foo"
+                               << "bar");
+
+    net().startCommand({},
+                       {testHost, "blah", commandRequest},
+                       [&](StatusWith<RemoteCommandResponse> result) {
+                           try {
+                               done.set_value(uassertStatusOK(result));
+                           } catch (...) {
+                               done.set_exception(std::current_exception());
+                           }
+                       });
+
+
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               RemoteCommandResponse response;
+                               response.data = BSON("minWireVersion" << mongo::minWireVersion
+                                                                     << "maxWireVersion"
+                                                                     << mongo::maxWireVersion);
+                               return response;
+                           });
+
+    auto commandReply = BSON("foo"
+                             << "boo"
+                             << "ok" << 1.0);
+
+    auto metadata = BSON("aaa"
+                         << "bbb");
+
+    // Simulate user command.
+    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+                           [&](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               ASSERT_EQ(commandRequest, request.cmdObj);
+
+                               RemoteCommandResponse response;
+                               response.data = commandReply;
+                               response.metadata = metadata;
+                               return response;
+                           });
+
+    // We should get back the reply now.
+    auto reply = doneFuture.get();
+    ASSERT_EQ(reply.data, commandReply);
+    ASSERT_EQ(reply.metadata, metadata);
+}
+
+TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
+    bool makeRequestCalled = false;
+
+    bool handleReplyCalled = false;
+    bool handleReplyArgumentCorrect = false;
+
+    BSONObj hookCommandRequest = BSON("1ddd"
+                                      << "fff");
+    BSONObj hookRequestMetadata = BSON("wdwd" << 1212);
+
+    BSONObj hookCommandReply = BSON("blah"
+                                    << "blah"
+                                    << "ok" << 1.0);
+    BSONObj hookReplyMetadata = BSON("1111" << 2222);
+
+    Status handleReplyError{ErrorCodes::AuthSchemaIncompatible, "daowdjkpowkdjpow"};
+
+    start(makeTestHook(
+        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply)
+            -> Status { return Status::OK(); },
+        [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
+            makeRequestCalled = true;
+            return {boost::make_optional<RemoteCommandRequest>(
+                {testHost, "foo", hookCommandRequest, hookRequestMetadata})};
+
+        },
+        [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
+            handleReplyCalled = true;
+            handleReplyArgumentCorrect =
+                (response.data == hookCommandReply) && (response.metadata == hookReplyMetadata);
+            return handleReplyError;
+        }));
+
+    stdx::promise<RemoteCommandResponse> done;
+    auto doneFuture = done.get_future();
+    auto commandRequest = BSON("foo"
+                               << "bar");
+    net().startCommand({},
+                       {testHost, "blah", commandRequest},
+                       [&](StatusWith<RemoteCommandResponse> result) {
+                           try {
+                               done.set_value(uassertStatusOK(result));
+                           } catch (...) {
+                               done.set_exception(std::current_exception());
+                           }
+                       });
+
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               RemoteCommandResponse response;
+                               response.data = BSON("minWireVersion" << mongo::minWireVersion
+                                                                     << "maxWireVersion"
+                                                                     << mongo::maxWireVersion);
+                               return response;
+                           });
+
+    // Simulate hook reply
+    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+                           [&](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               ASSERT_EQ(request.cmdObj, hookCommandRequest);
+                               ASSERT_EQ(request.metadata, hookRequestMetadata);
+
+                               RemoteCommandResponse response;
+                               response.data = hookCommandReply;
+                               response.metadata = hookReplyMetadata;
+                               return response;
+                           });
+
+    assertThrowsStatus(std::move(doneFuture), handleReplyError);
+
+    ASSERT(makeRequestCalled);
+    ASSERT(handleReplyCalled);
+    ASSERT(handleReplyArgumentCorrect);
 }
 
 TEST_F(NetworkInterfaceASIOTest, setAlarm) {

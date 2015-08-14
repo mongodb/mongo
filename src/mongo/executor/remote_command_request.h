@@ -31,8 +31,9 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/util/net/hostandport.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/request_interface.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -71,6 +72,15 @@ struct RemoteCommandRequest {
                          const Milliseconds timeoutMillis = kNoTimeout)
         : RemoteCommandRequest(
               theTarget, theDbName, theCmdObj, rpc::makeEmptyMetadata(), timeoutMillis) {}
+
+    RemoteCommandRequest(const HostAndPort& theTarget,
+                         const rpc::RequestInterface& request,
+                         const Milliseconds timeoutMillis = kNoTimeout)
+        : RemoteCommandRequest(theTarget,
+                               request.getDatabase().toString(),
+                               request.getCommandArgs(),
+                               request.getMetadata(),
+                               timeoutMillis) {}
 
     std::string toString() const;
 

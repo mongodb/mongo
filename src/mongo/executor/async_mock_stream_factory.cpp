@@ -32,12 +32,18 @@
 
 #include "mongo/executor/async_mock_stream_factory.h"
 
+#include <exception>
 #include <iterator>
 #include <system_error>
 
+#include "mongo/rpc/command_reply_builder.h"
+#include "mongo/rpc/factory.h"
+#include "mongo/rpc/legacy_reply_builder.h"
+#include "mongo/rpc/request_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace executor {
@@ -86,9 +92,9 @@ void AsyncMockStreamFactory::MockStream::connect(asio::ip::tcp::resolver::iterat
                                                  ConnectHandler&& connectHandler) {
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
-        log() << "connect() for: " << _target;
 
-        _block_inlock(&lk);
+        // Block before returning from connect.
+        _block_inlock(kBlockedBeforeConnect, &lk);
     }
     _io_service->post([connectHandler, endpoints] { connectHandler(std::error_code()); });
 }
@@ -96,15 +102,13 @@ void AsyncMockStreamFactory::MockStream::connect(asio::ip::tcp::resolver::iterat
 void AsyncMockStreamFactory::MockStream::write(asio::const_buffer buf,
                                                StreamHandler&& writeHandler) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    log() << "write() for: " << _target;
-
 
     auto begin = asio::buffer_cast<const uint8_t*>(buf);
     auto size = asio::buffer_size(buf);
     _writeQueue.push({begin, begin + size});
 
     // Block after data is written.
-    _block_inlock(&lk);
+    _block_inlock(kBlockedAfterWrite, &lk);
 
     lk.unlock();
     _io_service->post([writeHandler, size] { writeHandler(std::error_code(), size); });
@@ -113,10 +117,8 @@ void AsyncMockStreamFactory::MockStream::write(asio::const_buffer buf,
 void AsyncMockStreamFactory::MockStream::read(asio::mutable_buffer buf,
                                               StreamHandler&& readHandler) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    log() << "read() for: " << _target;
-
     // Block before data is read.
-    _block_inlock(&lk);
+    _block_inlock(kBlockedBeforeRead, &lk);
 
     auto nextRead = std::move(_readQueue.front());
     _readQueue.pop();
@@ -138,26 +140,26 @@ void AsyncMockStreamFactory::MockStream::read(asio::mutable_buffer buf,
 
 void AsyncMockStreamFactory::MockStream::pushRead(std::vector<uint8_t> toRead) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    invariant(_blocked);
+    invariant(_state != kRunning);
     _readQueue.emplace(std::move(toRead));
 }
 
 std::vector<uint8_t> AsyncMockStreamFactory::MockStream::popWrite() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    invariant(_blocked);
+    invariant(_state != kRunning);
     auto nextWrite = std::move(_writeQueue.front());
     _writeQueue.pop();
     return nextWrite;
 }
 
-void AsyncMockStreamFactory::MockStream::_block_inlock(stdx::unique_lock<stdx::mutex>* lk) {
-    log() << "blocking in stream for: " << _target;
-    invariant(!_blocked);
-    _blocked = true;
+void AsyncMockStreamFactory::MockStream::_block_inlock(StreamState state,
+                                                       stdx::unique_lock<stdx::mutex>* lk) {
+    invariant(_state == kRunning);
+    _state = state;
     lk->unlock();
     _cv.notify_one();
     lk->lock();
-    _cv.wait(*lk, [this]() { return !_blocked; });
+    _cv.wait(*lk, [this]() { return _state == kRunning; });
 }
 
 void AsyncMockStreamFactory::MockStream::unblock() {
@@ -166,18 +168,79 @@ void AsyncMockStreamFactory::MockStream::unblock() {
 }
 
 void AsyncMockStreamFactory::MockStream::_unblock_inlock(stdx::unique_lock<stdx::mutex>* lk) {
-    log() << "unblocking stream for: " << _target;
-    invariant(_blocked);
-    _blocked = false;
+    invariant(_state != kRunning);
+    _state = kRunning;
     lk->unlock();
     _cv.notify_one();
     lk->lock();
 }
 
-void AsyncMockStreamFactory::MockStream::waitUntilBlocked() {
+auto AsyncMockStreamFactory::MockStream::waitUntilBlocked() -> StreamState {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    log() << "waiting until stream for " << _target << " has blocked";
-    _cv.wait(lk, [this]() { return _blocked; });
+    _cv.wait(lk, [this]() { return _state != kRunning; });
+    return _state;
+}
+
+HostAndPort AsyncMockStreamFactory::MockStream::target() {
+    return _target;
+}
+
+void AsyncMockStreamFactory::MockStream::simulateServer(
+    rpc::Protocol proto,
+    const stdx::function<RemoteCommandResponse(RemoteCommandRequest)> replyFunc) {
+    std::exception_ptr ex;
+    uint32_t messageId = 0;
+
+    RemoteCommandResponse resp;
+    {
+        WriteEvent write{this};
+
+        std::vector<uint8_t> messageData = popWrite();
+        Message msg(messageData.data(), false);
+
+        auto parsedRequest = rpc::makeRequest(&msg);
+        ASSERT(parsedRequest->getProtocol() == proto);
+
+        RemoteCommandRequest rcr(target(), *parsedRequest);
+
+        messageId = msg.header().getId();
+
+        // So we can allow ASSERTs in replyFunc, we capture any exceptions, but rethrow
+        // them later to prevent deadlock
+        try {
+            resp = replyFunc(std::move(rcr));
+        } catch (...) {
+            ex = std::current_exception();
+        }
+    }
+
+    auto replyBuilder = rpc::makeReplyBuilder(proto);
+    replyBuilder->setMetadata(resp.metadata);
+    replyBuilder->setCommandReply(resp.data);
+
+    auto replyMsg = replyBuilder->done();
+    replyMsg->header().setResponseTo(messageId);
+
+    {
+        // The first read will be for the header.
+        ReadEvent read{this};
+        auto hdrBytes = reinterpret_cast<const uint8_t*>(replyMsg->header().view2ptr());
+        pushRead({hdrBytes, hdrBytes + sizeof(MSGHEADER::Value)});
+    }
+
+    {
+        // The second read will be for the message data.
+        ReadEvent read{this};
+        auto dataBytes = reinterpret_cast<const uint8_t*>(replyMsg->buf());
+        auto pastHeader = dataBytes;
+        std::advance(pastHeader, sizeof(MSGHEADER::Value));
+        pushRead({pastHeader, dataBytes + static_cast<std::size_t>(replyMsg->size())});
+    }
+
+    if (ex) {
+        // Rethrow ASSERTS after the NIA completes it's Write-Read-Read sequence.
+        std::rethrow_exception(ex);
+    }
 }
 
 }  // namespace executor

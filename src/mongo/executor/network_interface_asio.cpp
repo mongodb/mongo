@@ -48,7 +48,13 @@ namespace executor {
 
 NetworkInterfaceASIO::NetworkInterfaceASIO(
     std::unique_ptr<AsyncStreamFactoryInterface> streamFactory)
+    : NetworkInterfaceASIO(std::move(streamFactory), nullptr) {}
+
+NetworkInterfaceASIO::NetworkInterfaceASIO(
+    std::unique_ptr<AsyncStreamFactoryInterface> streamFactory,
+    std::unique_ptr<NetworkConnectionHook> networkConnectionHook)
     : _io_service(),
+      _hook(std::move(networkConnectionHook)),
       _resolver(_io_service),
       _state(State::kReady),
       _streamFactory(std::move(streamFactory)),

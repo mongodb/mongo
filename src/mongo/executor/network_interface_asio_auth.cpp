@@ -62,33 +62,40 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
 
     // Callback to parse protocol information out of received ismaster response
     auto parseIsMaster = [this, op]() {
-        try {
-            auto commandReply = rpc::makeReply(&(op->command().toRecv()));
-            BSONObj isMasterReply = commandReply->getCommandReply();
 
-            auto protocolSet = rpc::parseProtocolSetFromIsMasterReply(isMasterReply);
-            if (!protocolSet.isOK())
-                return _completeOperation(op, protocolSet.getStatus());
-
-            op->connection().setServerProtocols(protocolSet.getValue());
-
-            // Set the operation protocol
-            auto negotiatedProtocol = rpc::negotiate(op->connection().serverProtocols(),
-                                                     op->connection().clientProtocols());
-
-            if (!negotiatedProtocol.isOK()) {
-                return _completeOperation(op, negotiatedProtocol.getStatus());
-            }
-
-            op->setOperationProtocol(negotiatedProtocol.getValue());
-
-            // Advance the state machine
-            return _authenticate(op);
-
-        } catch (...) {
-            // makeReply will throw if the reply was invalid.
-            return _completeOperation(op, exceptionToStatus());
+        auto swCommandReply = op->command().response(rpc::Protocol::kOpQuery, now());
+        if (!swCommandReply.isOK()) {
+            return _completeOperation(op, swCommandReply.getStatus());
         }
+
+        auto commandReply = std::move(swCommandReply.getValue());
+
+        if (_hook) {
+            // Run the validation hook.
+            auto validHost = _hook->validateHost(op->request().target, commandReply);
+            if (!validHost.isOK()) {
+                return _completeOperation(op, validHost);
+            }
+        }
+
+        auto protocolSet = rpc::parseProtocolSetFromIsMasterReply(commandReply.data);
+        if (!protocolSet.isOK())
+            return _completeOperation(op, protocolSet.getStatus());
+
+        op->connection().setServerProtocols(protocolSet.getValue());
+
+        // Set the operation protocol
+        auto negotiatedProtocol =
+            rpc::negotiate(op->connection().serverProtocols(), op->connection().clientProtocols());
+
+        if (!negotiatedProtocol.isOK()) {
+            return _completeOperation(op, negotiatedProtocol.getStatus());
+        }
+
+        op->setOperationProtocol(negotiatedProtocol.getValue());
+
+        return _authenticate(op);
+
     };
 
     _asyncRunCommand(&cmd,
@@ -105,7 +112,7 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
     // This check is sufficient to see if auth is enabled on the system,
     // and avoids creating dependencies on deeper, less accessible auth code.
     if (!isInternalAuthSet()) {
-        return asio::post(_io_service, [this, op]() { _beginCommunication(op); });
+        return _runConnectionHook(op);
     }
 
     // We will only have a valid clientName if SSL is enabled.
@@ -136,7 +143,7 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
     auto authHook = [this, op](auth::AuthResponse response) {
         if (!response.isOK())
             return _completeOperation(op, response);
-        return _beginCommunication(op);
+        return _runConnectionHook(op);
     };
 
     auto params = getInternalUserAuthParamsWithFallback();
