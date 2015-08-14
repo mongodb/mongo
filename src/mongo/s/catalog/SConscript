@@ -60,6 +60,20 @@ env.Library(
 )
 
 env.Library(
+    target='forwarding_catalog_manager',
+    source=[
+        'forwarding_catalog_manager.cpp'
+    ],
+    LIBDEPS=[
+        'catalog_manager',
+        'dist_lock_catalog_impl',
+        'legacy/catalog_manager_legacy',
+        'replset/catalog_manager_replica_set',
+        'replset/replset_dist_lock_manager',
+    ]
+)
+
+env.Library(
     target='catalog_manager_mock',
     source=[
         'catalog_manager_mock.cpp',

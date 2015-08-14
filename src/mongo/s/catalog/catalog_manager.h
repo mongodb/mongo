@@ -417,15 +417,15 @@ public:
     virtual Status checkAndUpgrade(bool checkOnly) = 0;
 
 protected:
-    CatalogManager() = default;
-
     /**
      * Selects an optimal shard on which to place a newly created database from the set of
      * available shards. Will return ShardNotFound if shard could not be found.
      */
     static StatusWith<ShardId> selectShardForNewDatabase(ShardRegistry* shardRegistry);
 
-private:
+    CatalogManager() = default;
+
+public:
     /**
      * Checks that the given database name doesn't already exist in the config.databases
      * collection, including under different casing. Optional db can be passed and will
