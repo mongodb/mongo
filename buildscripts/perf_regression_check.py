@@ -10,12 +10,43 @@ from datetime import timedelta, datetime
 # Loads the history json file, and looks for regressions at the revision 18808cd...
 # Will exit with status code 1 if any regression is found, 0 otherwise.
 
+def compareResults(this_one, reference, threshold, label, threadThreshold=None) : 
+    '''
+    Take two result series and compare them to see if they are acceptable. 
+    Return true if failed, and false if pass
+    '''
+    
+    failed = False;
+    if not reference : 
+        return failed
+    # Default threadThreshold to the same as the max threshold
+    if  not threadThreshold : 
+        threadThreshold = threshold
+    
+    # Check max throughput first
+    if reference["max"] - this_one["max"] >= (threshold * reference["max"]):
+        print "\tregression found on max: drop from %s (commit %s) to %s for comparison %s" % (reference["max"], reference["revision"][:5], this_one["max"], label)
+        failed = True
+    # Check for regression on threading levels
+    for (level, ops_per_sec) in ([(r, this_one["results"][r]['ops_per_sec']) for r in this_one["results"] if type(this_one["results"][r]) == type({})]) :
+        # Need to get the reference data to compare against
+        refvalue = reference["results"][level]['ops_per_sec']
+        if refvalue - ops_per_sec >= (threadThreshold * refvalue):
+            print "\tregression found on thread level %s: drop from %s (commit %s) to %s for comparison %s" % (level, refvalue, reference["revision"][:7], ops_per_sec, label)
+            failed = True
+    if not failed : 
+        print "\tno regresion against %s" %(label)
+    return failed
+            
+
+
 def main(args):
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--file", dest="file", help="path to json file containing history data")
     parser.add_argument("--rev", dest="rev", help="revision to examine for regressions")
     parser.add_argument("--ndays", default=7, type=int, dest="ndays", help="Check against commit form n days ago.")
     parser.add_argument("--threshold", default=0.1, type=float, dest="threshold", help="Flag an error if throughput is more than 'threshold'x100 percent off")
+    parser.add_argument("--threadThreshold", type=float, dest="threadThreshold", help="Flag an error if thread level throughput is more than 'threadThreshold'x100 percent off")
     parser.add_argument("--reference", dest="reference", help="Reference commit to compare against. Should be a githash")
     args = parser.parse_args()
     j = get_json(args.file)
@@ -35,28 +66,14 @@ def main(args):
         if not previous:
             print "\tno previous data, skipping"
             continue
-        previous = previous[0]
+        if compareResults(this_one, previous[0], args.threshold, "Previous", args.threadThreshold) : 
+            failed = True
         daysprevious = h.seriesItemsNDaysBefore(test, args.rev,args.ndays)
         reference = h.seriesAtRevision(test, args.reference)
-        if previous["max"] - this_one["max"] >= (args.threshold * previous["max"]):
-            print "\tregression found: drop from %s (commit %s) to %s" % (previous["max"], previous["revision"][:5], this_one["max"])
+        if compareResults(this_one, daysprevious, args.threshold, "NDays", args.threadThreshold) : 
             failed = True
-        else :  
-            print "\tno regresion against previous. "
-        if not daysprevious :
-            print "\tno regresion against previous. No n day data"
-        elif daysprevious["max"] - this_one["max"] >= (args.threshold * daysprevious["max"]):
-            print "\tregression found over days: drop from %s (commit %s) to %s" % (daysprevious["max"], daysprevious["revision"][:5], this_one["max"])
+        if compareResults(this_one, reference, args.threshold, "Reference", args.threadThreshold) : 
             failed = True
-        else:
-            print "\tno regression against n day data"
-        if not reference :
-            print "\tno No data for reference commit"
-        elif reference["max"] - this_one["max"] >= (args.threshold * reference["max"]):
-            print "\tregression found over reference commit: drop from %s (commit %s) to %s" % (reference["max"], reference["revision"][:5], this_one["max"])
-            failed = True
-        else:
-            print "\tno regression against reference commit"
 
     if failed:
         sys.exit(1)
@@ -140,9 +157,6 @@ class TestResult:
         self._raw = json
 
     #def max(self):
-
-
-
 
 if __name__ == '__main__': 
     main(sys.argv[1:])
