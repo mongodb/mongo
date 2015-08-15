@@ -221,7 +221,7 @@ __curstat_next(WT_CURSOR *cursor)
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		WT_ERR(WT_NOTFOUND);
 	}
-	cst->v = (uint64_t)cst->stats_first[WT_STAT_KEY_OFFSET(cst)];
+	cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -260,7 +260,7 @@ __curstat_prev(WT_CURSOR *cursor)
 		WT_ERR(WT_NOTFOUND);
 	}
 
-	cst->v = (uint64_t)cst->stats_first[WT_STAT_KEY_OFFSET(cst)];
+	cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -314,7 +314,7 @@ __curstat_search(WT_CURSOR *cursor)
 	if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
 		WT_ERR(WT_NOTFOUND);
 
-	cst->v = (uint64_t)cst->stats_first[WT_STAT_KEY_OFFSET(cst)];
+	cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -364,7 +364,7 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 		__wt_stat_connection_clear_all(conn->stats);
 
-	cst->stats_first = cst->stats = (int64_t *)&cst->u.conn_stats;
+	cst->stats = (int64_t *)&cst->u.conn_stats;
 	cst->stats_base = WT_CONNECTION_STATS_BASE;
 	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(int64_t);
 	cst->stats_dsrc = 0;
@@ -425,7 +425,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 void
 __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst)
 {
-	cst->stats_first = cst->stats = (int64_t *)&cst->u.dsrc_stats;
+	cst->stats = (int64_t *)&cst->u.dsrc_stats;
 	cst->stats_base = WT_DSRC_STATS_BASE;
 	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(int64_t);
 	cst->stats_dsrc = 1;
