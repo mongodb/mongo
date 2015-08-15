@@ -113,16 +113,12 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 		WT_ERR(__wt_struct_size(session, &size, cursor->value_format,
-		    cst->stats_dsrc ?
-		    __wt_stat_dsrc_desc(WT_STAT_KEY_OFFSET(cst)) :
-		    __wt_stat_connection_desc(WT_STAT_KEY_OFFSET(cst)),
+		    cst->stats_desc(WT_STAT_KEY_OFFSET(cst)),
 		    cst->pv.data, cst->v));
 		WT_ERR(__wt_buf_initsize(session, &cursor->value, size));
 		WT_ERR(__wt_struct_pack(session, cursor->value.mem, size,
 		    cursor->value_format,
-		    cst->stats_dsrc ?
-		    __wt_stat_dsrc_desc(WT_STAT_KEY_OFFSET(cst)) :
-		    __wt_stat_connection_desc(WT_STAT_KEY_OFFSET(cst)),
+		    cst->stats_desc(WT_STAT_KEY_OFFSET(cst)),
 		    cst->pv.data, cst->v));
 
 		item = va_arg(ap, WT_ITEM *);
@@ -134,9 +130,7 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 		 * pointer support isn't documented, but it's a cheap test.
 		 */
 		if ((p = va_arg(ap, const char **)) != NULL)
-			*p = cst->stats_dsrc ?
-			    __wt_stat_dsrc_desc(WT_STAT_KEY_OFFSET(cst)) :
-			    __wt_stat_connection_desc(WT_STAT_KEY_OFFSET(cst));
+			*p = cst->stats_desc(WT_STAT_KEY_OFFSET(cst));
 		if ((p = va_arg(ap, const char **)) != NULL)
 			*p = cst->pv.data;
 		if ((v = va_arg(ap, uint64_t *)) != NULL)
@@ -367,7 +361,7 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	cst->stats = (int64_t *)&cst->u.conn_stats;
 	cst->stats_base = WT_CONNECTION_STATS_BASE;
 	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(int64_t);
-	cst->stats_dsrc = 0;
+	cst->stats_desc = __wt_stat_connection_desc;
 }
 
 /*
@@ -428,7 +422,7 @@ __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst)
 	cst->stats = (int64_t *)&cst->u.dsrc_stats;
 	cst->stats_base = WT_DSRC_STATS_BASE;
 	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(int64_t);
-	cst->stats_dsrc = 1;
+	cst->stats_desc = __wt_stat_dsrc_desc;
 }
 
 /*

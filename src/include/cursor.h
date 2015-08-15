@@ -303,10 +303,10 @@ struct __wt_cursor_stat {
 	int	notinitialized;		/* Cursor not initialized */
 	int	notpositioned;		/* Cursor not positioned */
 
-	int64_t *stats;			/* Stats owned by the cursor */
-	int	 stats_base;		/* Base statistics value */
-	int	 stats_count;		/* Count of stats elements */
-	int	 stats_dsrc;		/* Data-source (vs. connection) */
+	int64_t	     *stats;		/* Statistics */
+	int	      stats_base;	/* Base statistics value */
+	int	      stats_count;	/* Count of statistics values */
+	const char *(*stats_desc)(int);	/* Statistics descriptions */
 
 	union {				/* Copies of the statistics */
 		WT_DSRC_STATS dsrc_stats;
