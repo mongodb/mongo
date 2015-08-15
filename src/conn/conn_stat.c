@@ -177,8 +177,8 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 	switch (ret = __wt_curstat_open(session, uri, cfg, &cursor)) {
 	case 0:
 		cst = (WT_CURSOR_STAT *)cursor;
-		for (stats = WT_CURSOR_STATS(cursor),
-		    i = 0; i <  cst->stats_count; ++i, ++stats)
+		for (stats = cst->stats_first,
+		    i = 0; i <  cst->stats_count; ++i)
 			WT_ERR(__wt_fprintf(conn->stat_fp,
 			    "%s %" PRId64 " %s %s\n",
 			    conn->stat_stamp, stats[i],
