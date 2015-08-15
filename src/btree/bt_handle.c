@@ -189,7 +189,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_DECL_RET;
 	int64_t maj_version, min_version;
 	uint32_t bitcnt;
-	int fixed;
+	int fixed, i;
 	const char **cfg, *enc_cfg[] = { NULL, NULL };
 
 	btree = S2BT(session);
@@ -352,7 +352,10 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	    session, &btree->ovfl_lock, "btree overflow lock"));
 	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush lock"));
 
-	__wt_stat_init_dsrc_stats(&btree->dhandle->stats);
+	/* Statistics */
+	for (i = 0; i < WT_COUNTER_SLOTS; ++i)
+		btree->dhandle->stats[i] = &btree->dhandle->stat_array[i];
+	__wt_stat_dsrc_init(btree->dhandle->stats);
 
 	btree->write_gen = ckpt->write_gen;		/* Write generation */
 	btree->modified = 0;				/* Clean */

@@ -45,9 +45,12 @@ static int
 __split_stash_add(
     WT_SESSION_IMPL *session, uint64_t split_gen, void *p, size_t len)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_SPLIT_STASH *stash;
 
 	WT_ASSERT(session, p != NULL);
+
+	conn = S2C(session);
 
 	/* Grow the list as necessary. */
 	WT_RET(__wt_realloc_def(session, &session->split_stash_alloc,
@@ -58,8 +61,8 @@ __split_stash_add(
 	stash->p = p;
 	stash->len = len;
 
-	WT_STAT_FAST_CONN_ATOMIC_INCRV(session, rec_split_stashed_bytes, len);
-	WT_STAT_FAST_CONN_ATOMIC_INCR(session, rec_split_stashed_objects);
+	WT_ATOMIC_ADD8(conn->split_stashed_bytes, len);
+	WT_ATOMIC_ADD8(conn->split_stashed_objects, 1);
 
 	/* See if we can free any previous entries. */
 	if (session->split_stash_cnt > 1)
@@ -75,9 +78,12 @@ __split_stash_add(
 void
 __wt_split_stash_discard(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_SPLIT_STASH *stash;
 	uint64_t oldest;
 	size_t i;
+
+	conn = S2C(session);
 
 	/* Get the oldest split generation. */
 	oldest = __split_oldest_gen(session);
@@ -93,10 +99,8 @@ __wt_split_stash_discard(WT_SESSION_IMPL *session)
 		 * It's a bad thing if another thread is in this memory after
 		 * we free it, make sure nothing good happens to that thread.
 		 */
-		WT_STAT_FAST_CONN_ATOMIC_DECRV(
-		    session, rec_split_stashed_bytes, stash->len);
-		WT_STAT_FAST_CONN_ATOMIC_DECR(
-		    session, rec_split_stashed_objects);
+		WT_ATOMIC_SUB8(conn->split_stashed_bytes, stash->len);
+		WT_ATOMIC_SUB8(conn->split_stashed_objects, 1);
 		__wt_overwrite_and_free_len(session, stash->p, stash->len);
 	}
 
