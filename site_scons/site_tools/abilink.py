@@ -35,16 +35,26 @@ def generate(env):
         def get_contents(self):
             if not self.rexists():
                 return ''
+
             fname = self.rfile().abspath
+            contents = None
+
             try:
                 # TODO: If there were python bindings for libabigail, we
                 # could avoid the shell out (and probably be faster, as we
                 # could get exactly the information we want).
                 contents = subprocess.check_output([env.subst('$ABIDW'), fname])
-            except EnvironmentError, e:
-                if not e.filename:
-                    e.filename = fname
-                raise
+            except subprocess.CalledProcessError, e:
+                # ABIDW sometimes fails. In that case, log an error
+                # and fall back to the normal contents
+                print "WARNING: ABIDW failed for target %s, please file a bug report" % fname
+                try:
+                    contents = open(fname, "rb").read()
+                except EnvironmentError, e:
+                    if not e.filename:
+                        e.filename = fname
+                    raise
+
             return contents
 
         def get_content_hash(self):
