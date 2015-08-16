@@ -909,9 +909,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * could conceivably be evicted.  Get a hazard pointer on the parent
 	 * now, so that we can safely access it after updating the index.
 	 *
-	 * Take care that getting the page doesn't trigger eviction, or we
-	 * could block trying to split a different child of our parent and
-	 * deadlock.
+	 * Take care getting the page doesn't trigger eviction work: we could
+	 * block trying to split a different child of our parent and deadlock
+	 * or we could be the eviction server relied upon by other threads to
+	 * populate the eviction queue.
 	 */
 	if (!__wt_ref_is_root(parent_ref = parent->pg_intl_parent_ref)) {
 		WT_ERR(__wt_page_in(session, parent_ref, WT_READ_NO_EVICT));
