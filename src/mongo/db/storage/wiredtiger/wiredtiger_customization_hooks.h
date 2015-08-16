@@ -49,9 +49,12 @@ public:
     virtual ~WiredTigerCustomizationHooks() = default;
 
     /**
-     *  Appends additional configuration sub object(s) to the BSONObjbuilder builder.
+     * Perform any encryption engine initialization/sanity checking that needs to happen after
+     * storage engine initialization but before the server starts accepting incoming connections.
+     *
+     * Returns true if the server needs to be rebooted because of configuration changes.
      */
-    virtual void appendUID(BSONObjBuilder* builder) = 0;
+    virtual bool restartRequired() = 0;
 
     /**
      *  Gets the WiredTiger encryption configuration string for the
@@ -65,7 +68,7 @@ class EmptyWiredTigerCustomizationHooks : public WiredTigerCustomizationHooks {
 public:
     ~EmptyWiredTigerCustomizationHooks() override;
 
-    void appendUID(BSONObjBuilder* builder) override;
+    bool restartRequired() override;
 
     std::string getOpenConfig(StringData tableName) override;
 };

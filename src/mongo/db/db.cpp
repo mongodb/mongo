@@ -89,6 +89,7 @@
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -413,6 +414,9 @@ static void _initAndListen(int listenPort) {
     }
 
     getGlobalServiceContext()->initializeGlobalStorageEngine();
+    if (WiredTigerCustomizationHooks::get(getGlobalServiceContext())->restartRequired()) {
+        exitCleanly(EXIT_CLEAN);
+    }
 
     // Warn if we detect configurations for multiple registered storage engines in
     // the same configuration file/environment.

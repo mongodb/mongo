@@ -65,7 +65,9 @@ WiredTigerCustomizationHooks* WiredTigerCustomizationHooks::get(ServiceContext* 
 
 EmptyWiredTigerCustomizationHooks::~EmptyWiredTigerCustomizationHooks() {}
 
-void EmptyWiredTigerCustomizationHooks::appendUID(BSONObjBuilder* builder) {}
+bool EmptyWiredTigerCustomizationHooks::restartRequired() {
+    return false;
+}
 
 std::string EmptyWiredTigerCustomizationHooks::getOpenConfig(StringData tableName) {
     return "";
