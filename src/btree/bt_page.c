@@ -81,10 +81,12 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				return (WT_NOTFOUND);
 
 			/*
-			 * The page isn't in memory, attempt to read it.
-			 * Make sure there is space in the cache.
+			 * The page isn't in memory, read it. If this thread is
+			 * allowed to do eviction work, check for space in the
+			 * cache.
 			 */
-			WT_RET(__wt_cache_full_check(session));
+			if (!LF_ISSET(WT_READ_NO_EVICT))
+				WT_RET(__wt_cache_full_check(session));
 			WT_RET(__wt_cache_read(session, ref));
 			oldgen = LF_ISSET(WT_READ_WONT_NEED) ||
 			    F_ISSET(session, WT_SESSION_NO_CACHE);
@@ -185,6 +187,13 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 		if (++wait_cnt < 1000)
 			__wt_yield();
 		else {
+			/*
+			 * If stalling and this thread is allowed to do eviction
+			 * work, check if the cache needs help.
+			 */
+			if (!LF_ISSET(WT_READ_NO_EVICT))
+				WT_RET(__wt_cache_full_check(session));
+
 			sleep_cnt = WT_MIN(wait_cnt, 10000);
 			wait_cnt *= 2;
 			WT_STAT_FAST_CONN_INCRV(session, page_sleep, sleep_cnt);
