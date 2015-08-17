@@ -185,13 +185,15 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-          ${scons|scons} ${compile_flags|} mongo mongod
+          ${scons|scons} ${compile_flags|} mongo mongod mongos
           # strip binaries here
           strip mongo
           strip mongod
+          strip mongos
           mkdir -p mongodb/bin
           mv mongo mongodb/bin
           mv mongod mongodb/bin
+          mv mongos mongodb/bin
           tar cvf mongodb.tar mongodb
           gzip mongodb.tar
     - command: s3.put
