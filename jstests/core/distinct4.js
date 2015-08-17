@@ -19,7 +19,7 @@
 
     // from command interface
     assert.commandFailedWithCode(t.runCommand("distinct", {"key": {a: 1}}),
-                                 14); // ErrorCodes::TypeMismatch
+                                 ErrorCodes.TypeMismatch);
 
 
     //second argument should be a document or error
@@ -29,7 +29,7 @@
 
     // from command interface
     assert.commandFailedWithCode(t.runCommand("distinct", {"key": "a", "query": "a"}),
-                                 14); // ErrorCodes::TypeMismatch
+                                 ErrorCodes.TypeMismatch);
 
 
 
