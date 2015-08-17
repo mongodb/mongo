@@ -110,18 +110,21 @@ StatusWith<ShardDrainingStatus> ForwardingCatalogManager::removeShard(OperationC
     return retry([&] { return _actual->removeShard(txn, name); });
 }
 
-StatusWith<DatabaseType> ForwardingCatalogManager::getDatabase(const std::string& dbName) {
+StatusWith<OpTimePair<DatabaseType>> ForwardingCatalogManager::getDatabase(
+    const std::string& dbName) {
     return retry([&] { return _actual->getDatabase(dbName); });
 }
 
-StatusWith<CollectionType> ForwardingCatalogManager::getCollection(const std::string& collNs) {
+StatusWith<OpTimePair<CollectionType>> ForwardingCatalogManager::getCollection(
+    const std::string& collNs) {
     return retry([&] { return _actual->getCollection(collNs); });
 }
 
 Status ForwardingCatalogManager::getCollections(const std::string* dbName,
-                                                std::vector<CollectionType>* collections) {
+                                                std::vector<CollectionType>* collections,
+                                                repl::OpTime* opTime) {
     invariant(collections->empty());
-    return retry([&] { return _actual->getCollections(dbName, collections); });
+    return retry([&] { return _actual->getCollections(dbName, collections, opTime); });
 }
 
 Status ForwardingCatalogManager::dropCollection(OperationContext* txn, const NamespaceString& ns) {
@@ -137,9 +140,10 @@ Status ForwardingCatalogManager::getDatabasesForShard(const std::string& shardNa
 Status ForwardingCatalogManager::getChunks(const BSONObj& query,
                                            const BSONObj& sort,
                                            boost::optional<int> limit,
-                                           std::vector<ChunkType>* chunks) {
+                                           std::vector<ChunkType>* chunks,
+                                           repl::OpTime* opTime) {
     invariant(chunks->empty());
-    return retry([&] { return _actual->getChunks(query, sort, limit, chunks); });
+    return retry([&] { return _actual->getChunks(query, sort, limit, chunks, opTime); });
 }
 
 Status ForwardingCatalogManager::getTagsForCollection(const std::string& collectionNs,
