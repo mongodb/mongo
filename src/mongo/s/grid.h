@@ -31,11 +31,9 @@
 #include <string>
 #include <vector>
 
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/forwarding_catalog_manager.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/rwlock.h"
 
 namespace mongo {
 
@@ -55,8 +53,6 @@ class StatusWith;
  */
 class Grid {
 public:
-    class CatalogManagerGuard;
-
     Grid();
 
     /**
@@ -66,7 +62,7 @@ public:
      * NOTE: Unit-tests are allowed to call it more than once, provided they reset the object's
      *       state using clearForUnitTests.
      */
-    void init(std::unique_ptr<CatalogManager> catalogManager,
+    void init(std::unique_ptr<ForwardingCatalogManager> catalogManager,
               std::unique_ptr<ShardRegistry> shardRegistry,
               std::unique_ptr<ClusterCursorManager> cursorManager);
 
@@ -97,8 +93,8 @@ public:
      */
     bool getConfigShouldBalance(OperationContext* txn) const;
 
-    Grid::CatalogManagerGuard catalogManager(OperationContext* txn);
-    Grid::CatalogManagerGuard catalogManager();  // TODO(spencer): remove
+    ForwardingCatalogManager* catalogManager(OperationContext* txn);
+    ForwardingCatalogManager* catalogManager();  // TODO(spencer): remove
 
     CatalogCache* catalogCache() {
         return _catalogCache.get();
@@ -130,67 +126,13 @@ public:
     void clearForUnitTests();
 
 private:
+    std::unique_ptr<ForwardingCatalogManager> _catalogManager;
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<ClusterCursorManager> _cursorManager;
 
     // can 'localhost' be used in shard addresses?
     bool _allowLocalShard;
-
-    // Concurrency control around access the _catalogManager is as follows.
-    // In order to read _catalogManager, one must either lock _catalogManagerLock in shared mode
-    // or hold _catalogManagerMutex.  In order to change _catalogManager, one must hold
-    // both _catalogManagerLock in exclusive mode and _catalogManagerMutex.
-
-    // Guards access to _catalogManager
-    stdx::mutex _catalogManagerMutex;
-
-    /**
-     * Protects access to _catalogManager.
-     * All normal accessors of the current CatalogManager will go through Grid::CatalogManagerGuard,
-     * which always takes the lock in shared mode.  In order to swap the active catalog manager,
-     * the lock must be held in exclusive mode.
-     * TODO(SERVER-19875) Use a new lock manager resource for this instead.
-     */
-    RWLock _catalogManagerLock;
-
-    // Current active catalog manager
-    std::unique_ptr<CatalogManager> _catalogManager;
-};
-
-/**
- * Guard object that protects access to the current active CatalogManager to enable switching the
- * active catalog manager at runtime.
- * Note: Never contstruct a CatalogManagerGuard directly, they should only be given out by calling
- * grid.catalogManager().
- */
-class Grid::CatalogManagerGuard {
-    MONGO_DISALLOW_COPYING(CatalogManagerGuard);
-
-public:
-    CatalogManagerGuard(OperationContext* txn, Grid* grid);
-    ~CatalogManagerGuard();
-
-    CatalogManager* operator->() const;
-
-    explicit operator bool() const;
-
-    CatalogManager* get() const;
-
-#if defined(_MSC_VER) && _MSC_VER < 1900
-    CatalogManagerGuard(CatalogManagerGuard&& other) : _grid(other._grid) {}
-
-    CatalogManagerGuard& operator=(CatalogManagerGuard&& other) {
-        _grid = other._grid;
-        return *this;
-    }
-#else
-    CatalogManagerGuard(CatalogManagerGuard&& other) = default;
-    CatalogManagerGuard& operator=(CatalogManagerGuard&& other) = default;
-#endif
-
-private:
-    Grid* _grid;
 };
 
 extern Grid grid;

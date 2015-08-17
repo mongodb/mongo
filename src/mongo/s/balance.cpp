@@ -53,7 +53,6 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/config.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -530,8 +529,8 @@ void Balancer::run() {
             uassert(13258, "oids broken after resetting!", _checkOIDs());
 
             {
-                auto scopedDistLock = grid.catalogManager(txn.get())->getDistLockManager()->lock(
-                    "balancer", "doing balance round");
+                auto scopedDistLock =
+                    grid.catalogManager(txn.get())->distLock("balancer", "doing balance round");
 
                 if (!scopedDistLock.isOK()) {
                     LOG(1) << "skipping balancing round" << causedBy(scopedDistLock.getStatus());

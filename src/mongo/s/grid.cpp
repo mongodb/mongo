@@ -34,7 +34,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/forwarding_catalog_manager.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/util/log.h"
@@ -44,9 +44,9 @@ namespace mongo {
 // Global grid instance
 Grid grid;
 
-Grid::Grid() : _allowLocalShard(true), _catalogManagerLock("CatalogManagerLock") {}
+Grid::Grid() : _allowLocalShard(true) {}
 
-void Grid::init(std::unique_ptr<CatalogManager> catalogManager,
+void Grid::init(std::unique_ptr<ForwardingCatalogManager> catalogManager,
                 std::unique_ptr<ShardRegistry> shardRegistry,
                 std::unique_ptr<ClusterCursorManager> cursorManager) {
     invariant(!_catalogManager);
@@ -153,32 +153,8 @@ Status Grid::checkIfCatalogNeedsSwapping(CatalogManager::ConfigServerMode desire
                   "communication.  Downgrade needed but not yet supported");
 }
 
-Grid::CatalogManagerGuard Grid::catalogManager(OperationContext* txn) {
-    return Grid::CatalogManagerGuard(txn, this);
-}
-
-Grid::CatalogManagerGuard Grid::catalogManager() {
-    return Grid::CatalogManagerGuard(nullptr, this);
-}
-
-Grid::CatalogManagerGuard::CatalogManagerGuard(OperationContext* txn, Grid* grid) : _grid(grid) {
-    _grid->_catalogManagerLock.lock_shared();
-}
-
-Grid::CatalogManagerGuard::~CatalogManagerGuard() {
-    _grid->_catalogManagerLock.unlock_shared();
-}
-
-CatalogManager* Grid::CatalogManagerGuard::operator->() const {
-    return get();
-}
-
-Grid::CatalogManagerGuard::operator bool() const {
-    return get();
-}
-
-CatalogManager* Grid::CatalogManagerGuard::get() const {
-    return _grid->_catalogManager.get();
+ForwardingCatalogManager* Grid::catalogManager(OperationContext* txn) {
+    return _catalogManager.get();
 }
 
 }  // namespace mongo

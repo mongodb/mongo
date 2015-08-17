@@ -84,6 +84,9 @@ ForwardingCatalogManager::ForwardingCatalogManager(ServiceContext* service,
                                                    const std::string& distLockProcessId)
     : _actual(makeCatalogManager(service, configCS, shardRegistry, distLockProcessId)) {}
 
+ForwardingCatalogManager::ForwardingCatalogManager(std::unique_ptr<CatalogManager> actual)
+    : _actual(std::move(actual)) {}
+
 ForwardingCatalogManager::~ForwardingCatalogManager() = default;
 
 CatalogManager::ConfigServerMode ForwardingCatalogManager::getMode() {
@@ -244,6 +247,31 @@ Status ForwardingCatalogManager::_checkDbDoesNotExist(const std::string& dbName,
 StatusWith<std::string> ForwardingCatalogManager::_generateNewShardName() {
     return retry([&] { return _actual->_generateNewShardName(); });
 }
+
+StatusWith<ForwardingCatalogManager::ScopedDistLock> ForwardingCatalogManager::distLock(
+    StringData name,
+    StringData whyMessage,
+    stdx::chrono::milliseconds waitFor,
+    stdx::chrono::milliseconds lockTryInterval) {
+    auto theLock = getDistLockManager()->lock(name, whyMessage, waitFor, lockTryInterval);
+    if (!theLock.isOK()) {
+        return std::move(theLock.getStatus());
+    }
+    return ScopedDistLock(std::move(theLock.getValue()));
+}
+
+#if defined(_MSC_VER) && _MSC_VER < 1900
+
+ForwardingCatalogManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other)
+    : _lock(std::move(other._lock)) {}
+
+ForwardingCatalogManager::ScopedDistLock& ForwardingCatalogManager::ScopedDistLock::operator=(
+    ScopedDistLock&& other) {
+    _lock = std::move(other._lock);
+    return *this;
+}
+
+#endif
 
 template <typename Callable>
 auto ForwardingCatalogManager::retry(Callable&& c) -> decltype(std::forward<Callable>(c)()) {

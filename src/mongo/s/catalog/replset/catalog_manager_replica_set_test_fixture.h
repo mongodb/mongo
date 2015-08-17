@@ -38,6 +38,7 @@
 namespace mongo {
 
 class BSONObj;
+class CatalogManager;
 class CatalogManagerReplicaSet;
 struct ChunkVersion;
 class CollectionType;
@@ -72,7 +73,7 @@ protected:
         return _networkTestEnv->launchAsync(std::forward<Lambda>(func));
     }
 
-    CatalogManagerReplicaSet* catalogManager() const;
+    CatalogManager* catalogManager() const;
 
     ShardRegistry* shardRegistry() const;
 
@@ -179,6 +180,7 @@ private:
     executor::NetworkInterfaceMock* _mockNetwork;
     executor::TaskExecutor* _executor;
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
+    DistLockManagerMock* _distLockManager = nullptr;
 };
 
 }  // namespace mongo

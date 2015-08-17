@@ -81,6 +81,7 @@ enum ShardDrainingStatus {
  */
 class CatalogManager {
     MONGO_DISALLOW_COPYING(CatalogManager);
+    friend class ForwardingCatalogManager;
 
 public:
     enum class ConfigServerMode {
@@ -363,15 +364,6 @@ public:
                                          BatchedCommandResponse* response) = 0;
 
     /**
-     * Obtains a reference to the distributed lock manager instance to use for synchronizing
-     * system-wide changes.
-     *
-     * The returned reference is valid only as long as the catalog manager is valid and should not
-     * be cached.
-     */
-    virtual DistLockManager* getDistLockManager() = 0;
-
-    /**
      * Creates a new database entry for the specified database name in the configuration
      * metadata and sets the specified shard as primary.
      *
@@ -437,7 +429,16 @@ protected:
 
     CatalogManager() = default;
 
-public:
+    /**
+     * Obtains a reference to the distributed lock manager instance to use for synchronizing
+     * system-wide changes.
+     *
+     * The returned reference is valid only as long as the catalog manager is valid and should not
+     * be cached.
+     */
+    virtual DistLockManager* getDistLockManager() = 0;
+
+private:
     /**
      * Checks that the given database name doesn't already exist in the config.databases
      * collection, including under different casing. Optional db can be passed and will

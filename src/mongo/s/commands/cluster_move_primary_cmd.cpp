@@ -44,7 +44,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
@@ -148,8 +147,7 @@ public:
 
         string whyMessage(str::stream() << "Moving primary shard of " << dbname);
         auto catalogManager = grid.catalogManager(txn);
-        auto scopedDistLock =
-            catalogManager->getDistLockManager()->lock(dbname + "-movePrimary", whyMessage);
+        auto scopedDistLock = catalogManager->distLock(dbname + "-movePrimary", whyMessage);
 
         if (!scopedDistLock.isOK()) {
             return appendCommandStatus(result, scopedDistLock.getStatus());

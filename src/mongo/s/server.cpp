@@ -57,7 +57,7 @@
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/forwarding_catalog_manager.h"
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"

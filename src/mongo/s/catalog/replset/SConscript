@@ -56,16 +56,17 @@ env.CppUnitTest(
         'catalog_manager_replica_set_upgrade_test.cpp',
     ],
     LIBDEPS=[
-        'catalog_manager_replica_set',
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
+        '$BUILD_DIR/mongo/s/catalog/forwarding_catalog_manager',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
-        '$BUILD_DIR/mongo/util/net/message_port_mock',
         '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/mongo/util/net/message_port_mock',
+        'catalog_manager_replica_set',
     ]
 )

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/dist_lock_manager.h"
 
 namespace mongo {
 
@@ -49,6 +50,11 @@ public:
                              const ConnectionString& configCS,
                              ShardRegistry* shardRegistry,
                              const std::string& distLockProcessId);
+
+    /**
+     * Constructor for use in tests.
+     */
+    explicit ForwardingCatalogManager(std::unique_ptr<CatalogManager> actual);
     virtual ~ForwardingCatalogManager();
 
     ConfigServerMode getMode() override;
@@ -125,6 +131,36 @@ public:
     DistLockManager* getDistLockManager() override;
 
     Status checkAndUpgrade(bool checkOnly) override;
+
+    class ScopedDistLock {
+        MONGO_DISALLOW_COPYING(ScopedDistLock);
+
+    public:
+        explicit ScopedDistLock(DistLockManager::ScopedDistLock&& theLock)
+            : _lock(std::move(theLock)) {}
+        ~ScopedDistLock() = default;
+
+#if defined(_MSC_VER) && _MSC_VER < 1900
+        ScopedDistLock(ScopedDistLock&& other);
+        ScopedDistLock& operator=(ScopedDistLock&& other);
+#else
+        ScopedDistLock(ScopedDistLock&& other) = default;
+        ScopedDistLock& operator=(ScopedDistLock&& other) = default;
+#endif
+
+        Status checkStatus() {
+            return _lock.checkStatus();
+        }
+
+    private:
+        DistLockManager::ScopedDistLock _lock;
+    };
+
+    StatusWith<ScopedDistLock> distLock(
+        StringData name,
+        StringData whyMessage,
+        stdx::chrono::milliseconds waitFor = DistLockManager::kDefaultSingleLockAttemptTimeout,
+        stdx::chrono::milliseconds lockTryInterval = DistLockManager::kDefaultLockRetryInterval);
 
 private:
     Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) override;

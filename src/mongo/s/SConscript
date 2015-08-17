@@ -131,7 +131,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
-        'catalog/catalog_manager',
+        'catalog/forwarding_catalog_manager',
         'catalog/catalog_types',
         'client/sharding_client',
         'cluster_ops_impl',

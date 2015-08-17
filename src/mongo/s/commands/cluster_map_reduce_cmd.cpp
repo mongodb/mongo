@@ -454,7 +454,7 @@ public:
             map<BSONObj, int> chunkSizes;
             {
                 // Take distributed lock to prevent split / migration.
-                auto scopedDistLock = grid.catalogManager(txn)->getDistLockManager()->lock(
+                auto scopedDistLock = grid.catalogManager(txn)->distLock(
                     finalColLong,
                     "mr-post-process",
                     stdx::chrono::milliseconds(-1),  // retry indefinitely

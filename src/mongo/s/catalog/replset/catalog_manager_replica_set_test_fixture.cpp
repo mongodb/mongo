@@ -94,8 +94,10 @@ void CatalogManagerReplSetTestFixture::setUp() {
     _networkTestEnv = stdx::make_unique<NetworkTestEnv>(executor.get(), _mockNetwork);
     _executor = executor.get();
 
+    auto uniqueDistLockManager = stdx::make_unique<DistLockManagerMock>();
+    _distLockManager = uniqueDistLockManager.get();
     std::unique_ptr<CatalogManagerReplicaSet> cm(
-        stdx::make_unique<CatalogManagerReplicaSet>(stdx::make_unique<DistLockManagerMock>()));
+        stdx::make_unique<CatalogManagerReplicaSet>(std::move(uniqueDistLockManager)));
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
         "CatalogManagerReplSetTest", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});
@@ -110,7 +112,7 @@ void CatalogManagerReplSetTestFixture::setUp() {
 
     // For now initialize the global grid object. All sharding objects will be accessible
     // from there until we get rid of it.
-    grid.init(std::move(cm),
+    grid.init(stdx::make_unique<ForwardingCatalogManager>(std::move(cm)),
               std::move(shardRegistry),
               stdx::make_unique<ClusterCursorManager>(_service->getClockSource()));
 }
@@ -131,11 +133,8 @@ void CatalogManagerReplSetTestFixture::shutdownExecutor() {
     }
 }
 
-CatalogManagerReplicaSet* CatalogManagerReplSetTestFixture::catalogManager() const {
-    auto cm = dynamic_cast<CatalogManagerReplicaSet*>(grid.catalogManager(_opCtx.get()).get());
-    invariant(cm);
-
-    return cm;
+CatalogManager* CatalogManagerReplSetTestFixture::catalogManager() const {
+    return grid.catalogManager(_opCtx.get());
 }
 
 ShardRegistry* CatalogManagerReplSetTestFixture::shardRegistry() const {
@@ -167,10 +166,8 @@ MessagingPortMock* CatalogManagerReplSetTestFixture::getMessagingPort() const {
 }
 
 DistLockManagerMock* CatalogManagerReplSetTestFixture::distLock() const {
-    auto distLock = dynamic_cast<DistLockManagerMock*>(catalogManager()->getDistLockManager());
-    invariant(distLock);
-
-    return distLock;
+    invariant(_distLockManager);
+    return _distLockManager;
 }
 
 OperationContext* CatalogManagerReplSetTestFixture::operationContext() const {

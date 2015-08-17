@@ -33,6 +33,7 @@
 namespace mongo {
 
 class CatalogManager;
+class DistLockManager;
 class Status;
 class VersionType;
 
@@ -50,6 +51,8 @@ Status getConfigVersion(CatalogManager* catalogManager, VersionType* versionInfo
  * @return initial and finalVersionInfo indicating the start and end versions of the upgrade.
  *         These are the same if no upgrade occurred.
  */
-bool checkAndInitConfigVersion(CatalogManager* catalogManager, std::string* errMsg);
+bool checkAndInitConfigVersion(CatalogManager* catalogManager,
+                               DistLockManager* distLockManager,
+                               std::string* errMsg);
 
 }  // namespace mongo

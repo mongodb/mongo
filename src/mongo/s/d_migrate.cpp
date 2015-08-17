@@ -59,7 +59,6 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
@@ -443,7 +442,7 @@ public:
 
         string whyMessage(str::stream() << "migrating chunk [" << minKey << ", " << maxKey
                                         << ") in " << ns);
-        auto scopedDistLock = grid.catalogManager(txn)->getDistLockManager()->lock(ns, whyMessage);
+        auto scopedDistLock = grid.catalogManager(txn)->distLock(ns, whyMessage);
 
         if (!scopedDistLock.isOK()) {
             errmsg = stream() << "could not acquire collection lock for " << ns

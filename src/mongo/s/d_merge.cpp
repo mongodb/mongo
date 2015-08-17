@@ -42,7 +42,6 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/config.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -71,8 +70,7 @@ bool mergeChunks(OperationContext* txn,
     // Get the distributed lock
     string whyMessage = stream() << "merging chunks in " << nss.ns() << " from " << minKey << " to "
                                  << maxKey;
-    auto scopedDistLock =
-        grid.catalogManager(txn)->getDistLockManager()->lock(nss.ns(), whyMessage);
+    auto scopedDistLock = grid.catalogManager(txn)->distLock(nss.ns(), whyMessage);
 
     if (!scopedDistLock.isOK()) {
         *errMsg = stream() << "could not acquire collection lock for " << nss.ns()

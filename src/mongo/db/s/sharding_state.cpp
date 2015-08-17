@@ -557,8 +557,7 @@ Status ShardingState::doRefreshMetadata(OperationContext* txn,
     long long refreshMillis;
 
     {
-        auto catalogManagerGuard = grid.catalogManager(txn);
-        Status status = mdLoader.makeCollectionMetadata(catalogManagerGuard.get(),
+        Status status = mdLoader.makeCollectionMetadata(grid.catalogManager(txn),
                                                         ns,
                                                         getShardName(),
                                                         fullReload ? NULL : beforeMetadata.get(),

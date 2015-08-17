@@ -35,7 +35,6 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/syncclusterconnection.h"
-#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
@@ -266,7 +265,9 @@ Status getConfigVersion(CatalogManager* catalogManager, VersionType* versionInfo
     return Status::OK();
 }
 
-bool checkAndInitConfigVersion(CatalogManager* catalogManager, string* errMsg) {
+bool checkAndInitConfigVersion(CatalogManager* catalogManager,
+                               DistLockManager* distLockManager,
+                               string* errMsg) {
     string dummy;
     if (!errMsg) {
         errMsg = &dummy;
@@ -315,8 +316,7 @@ bool checkAndInitConfigVersion(CatalogManager* catalogManager, string* errMsg) {
     string whyMessage(stream() << "initializing config database to new format v"
                                << CURRENT_CONFIG_VERSION);
     auto lockTimeout = stdx::chrono::milliseconds(20 * 60 * 1000);
-    auto scopedDistLock =
-        catalogManager->getDistLockManager()->lock("configUpgrade", whyMessage, lockTimeout);
+    auto scopedDistLock = distLockManager->lock("configUpgrade", whyMessage, lockTimeout);
     if (!scopedDistLock.isOK()) {
         *errMsg = scopedDistLock.getStatus().toString();
         return false;
