@@ -3,10 +3,9 @@
 (function() {
 "use strict";
 
-var name = "readMajority";
-db = db.getSiblingDB(name);
-assert.writeOK(db.foo.insert({x: 3}));
+var name = "read_majority_mmap";
+assert.writeOK(db[name].insert({x: 3}));
 
-assert.commandWorked(db.foo.runCommand({find: name, readConcern: {level: "majority"}}));
+assert.commandWorked(db.runCommand({find: name, readConcern: {level: "majority"}}));
 
 }());
