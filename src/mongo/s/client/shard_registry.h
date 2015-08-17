@@ -95,10 +95,10 @@ public:
     ~ShardRegistry();
 
     /**
-     * Stores the given CatalogManager into _catalogManager for use for retrieving the list of
-     * registered shards, and creates the hard-coded config shard.
+     * Invoked when the connection string for the config server changes. Updates the config server
+     * connection string and recreates the config server's shard.
      */
-    void init(CatalogManager* catalogManager);
+    void updateConfigServerConnectionString(ConnectionString configServerCS);
 
     /**
      * Invokes the executor's startup method, which will start any networking/async execution
@@ -231,18 +231,16 @@ private:
     // configuration, such as getting the current server's hostname.
     executor::NetworkInterface* const _network;
 
+    // Protects the config server connections string and the lookup maps below
+    mutable stdx::mutex _mutex;
+
     // Config server connection string
     ConnectionString _configServerCS;
-
-    // Protects the maps below
-    mutable stdx::mutex _mutex;
 
     // Map of both shardName -> Shard and hostName -> Shard
     ShardMap _lookup;
 
-    // TODO: These should eventually disappear and become parts of Shard
-
-    // Map from all hosts within a replica set to the shard representing this replica set
+    // Map from replica set name to shard corresponding to this replica set
     ShardMap _rsLookup;
 };
 

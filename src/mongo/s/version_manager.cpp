@@ -279,8 +279,6 @@ bool checkShardVersion(OperationContext* txn,
                        ChunkManagerPtr refManager,
                        bool authoritative,
                        int tryNumber) {
-    // TODO: cache, optimize, etc...
-
     // Empty namespaces are special - we require initialization but not versioning
     if (ns.size() == 0) {
         return initShardVersionEmptyNS(txn, conn_in);
@@ -291,22 +289,28 @@ bool checkShardVersion(OperationContext* txn,
         return false;
     }
 
-    shared_ptr<DBConfig> conf = status.getValue();
-
     DBClientBase* conn = getVersionable(conn_in);
     verify(conn);  // errors thrown above
 
-    unsigned long long officialSequenceNumber = 0;
+    shared_ptr<DBConfig> conf = status.getValue();
 
-    ShardPtr primary;
-    ChunkManagerPtr manager;
-    if (authoritative)
+    if (authoritative) {
         conf->getChunkManagerIfExists(txn, ns, true);
+    }
+
+    shared_ptr<Shard> primary;
+    shared_ptr<ChunkManager> manager;
 
     conf->getChunkManagerOrPrimary(ns, manager, primary);
 
+    unsigned long long officialSequenceNumber = 0;
+
     if (manager) {
         officialSequenceNumber = manager->getSequenceNumber();
+    } else if (primary && primary->isConfig()) {
+        // Do not send setShardVersion to collections on the config servers - this causes problems
+        // when config servers are also shards and get SSV with conflicting names.
+        return false;
     }
 
     const auto shard = grid.shardRegistry()->getShard(conn->getServerAddress());
@@ -341,13 +345,6 @@ bool checkShardVersion(OperationContext* txn,
 
         throw SendStaleConfigException(
             ns, msg, refManager->getVersion(shard->getId()), ChunkVersion::UNSHARDED());
-    }
-
-    // Do not send setShardVersion to collections on the config servers - this causes problems
-    // when config servers are also shards and get SSV with conflicting names.
-    // TODO: Make config servers regular shards
-    if (primary && primary->getId() == "config") {
-        return false;
     }
 
     // Has the ChunkManager been reloaded since the last time we updated the shard version over

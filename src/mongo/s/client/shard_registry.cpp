@@ -72,12 +72,18 @@ ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targe
                              ConnectionString configServerCS)
     : _targeterFactory(std::move(targeterFactory)),
       _executor(std::move(executor)),
-      _network(network),
-      _configServerCS(configServerCS) {
-    _addConfigShard_inlock();
+      _network(network) {
+    updateConfigServerConnectionString(configServerCS);
 }
 
 ShardRegistry::~ShardRegistry() = default;
+
+void ShardRegistry::updateConfigServerConnectionString(ConnectionString configServerCS) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _configServerCS = std::move(configServerCS);
+
+    _addConfigShard_inlock();
+}
 
 void ShardRegistry::startup() {
     _executor->startup();
@@ -220,21 +226,31 @@ void ShardRegistry::_addShard_inlock(const ShardType& shardType) {
 
     const ConnectionString& shardHost(shardHostStatus.getValue());
 
-    // Sync cluster connections (legacy config server) do not go through the normal targeting
-    // mechanism and must only be reachable through CatalogManagerLegacy or legacy-style
-    // queries and inserts. Do not create targeter for these connections. This code should go
-    // away after 3.2 is released.
+    shared_ptr<Shard> shard;
+
     if (shardHost.type() == ConnectionString::SYNC) {
-        _lookup[shardType.getName()] =
-            std::make_shared<Shard>(shardType.getName(), shardHost, nullptr);
-        return;
+        // Sync cluster connections (legacy config server) do not go through the normal targeting
+        // mechanism and must only be reachable through CatalogManagerLegacy or legacy-style queries
+        // and inserts. Do not create targeter for these connections. This code should go away after
+        // 3.2 is released.
+        shard = std::make_shared<Shard>(shardType.getName(), shardHost, nullptr);
+    } else {
+        // Non-SYNC shards use targeter factory.
+        shard = std::make_shared<Shard>(
+            shardType.getName(), shardHost, std::move(_targeterFactory->create(shardHost)));
     }
 
-    // Non-SYNC shards
-    shared_ptr<Shard> shard = std::make_shared<Shard>(
-        shardType.getName(), shardHost, std::move(_targeterFactory->create(shardHost)));
-
     _lookup[shardType.getName()] = shard;
+
+    if (shardHost.type() == ConnectionString::SET) {
+        _rsLookup[shardHost.getSetName()] = shard;
+    }
+
+    // Config servers never go through the set shard version mechanism, so there is no need to have
+    // them in the reverse-lookup map.
+    if (shard->isConfig()) {
+        return;
+    }
 
     // TODO: The only reason to have the shard host names in the lookup table is for the
     // setShardVersion call, which resolves the shard id from the shard address. This is
@@ -244,16 +260,6 @@ void ShardRegistry::_addShard_inlock(const ShardType& shardType) {
 
     for (const HostAndPort& hostAndPort : shardHost.getServers()) {
         _lookup[hostAndPort.toString()] = shard;
-
-        // Maintain a mapping from host to shard it belongs to for the case where we need to
-        // update the shard connection string on reconfigurations.
-        if (shardHost.type() == ConnectionString::SET) {
-            _rsLookup[hostAndPort.toString()] = shard;
-        }
-    }
-
-    if (shardHost.type() == ConnectionString::SET) {
-        _rsLookup[shardHost.getSetName()] = shard;
     }
 }
 

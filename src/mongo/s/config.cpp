@@ -796,16 +796,21 @@ void ConfigServer::replicaSetChange(const string& setName, const string& newConn
             return;
         }
 
-        Status result = grid.catalogManager(txn.get())
-                            ->update(ShardType::ConfigNS,
-                                     BSON(ShardType::name(s->getId())),
-                                     BSON("$set" << BSON(ShardType::host(newConnectionString))),
-                                     false,  // upsert
-                                     false,  // multi
-                                     NULL);
-        if (!result.isOK()) {
-            error() << "RSChangeWatcher: could not update config db for set: " << setName
-                    << " to: " << newConnectionString << ": " << result.reason();
+        if (s->isConfig()) {
+            grid.shardRegistry()->updateConfigServerConnectionString(
+                fassertStatusOK(28783, ConnectionString::parse(newConnectionString)));
+        } else {
+            Status result = grid.catalogManager(txn.get())
+                                ->update(ShardType::ConfigNS,
+                                         BSON(ShardType::name(s->getId())),
+                                         BSON("$set" << BSON(ShardType::host(newConnectionString))),
+                                         false,  // upsert
+                                         false,  // multi
+                                         NULL);
+            if (!result.isOK()) {
+                error() << "RSChangeWatcher: could not update config db for set: " << setName
+                        << " to: " << newConnectionString << ": " << result.reason();
+            }
         }
     } catch (const std::exception& e) {
         log() << "caught exception while updating config servers: " << e.what();

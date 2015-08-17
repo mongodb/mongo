@@ -64,6 +64,11 @@ public:
         return _id;
     }
 
+    /**
+     * Returns true if this shard object represents the config server.
+     */
+    bool isConfig() const;
+
     const ConnectionString& getConnString() const {
         return _cs;
     }

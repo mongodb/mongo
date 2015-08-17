@@ -54,6 +54,10 @@ Shard::Shard(const ShardId& id,
 
 Shard::~Shard() = default;
 
+bool Shard::isConfig() const {
+    return _id == "config";
+}
+
 std::string Shard::toString() const {
     return _id + ":" + _cs.toString();
 }
