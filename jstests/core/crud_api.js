@@ -722,17 +722,22 @@
         // Insert all of them
         coll.insertMany([{a:0, b:0}, {a:1, b:1}]);
 
-        // Simple aggregation with useCursor
-        var result = coll.aggregate([{$match: {}}], {useCursor:true}).toArray();
-        assert.eq(2, result.length);
+        // TODO: When SERVER-19569 is done, we should be able to run this test regardless of whether
+        // we are using the find/getMore commands, both against a standalone server and passed
+        // through mongos.
+        if (!db.getMongo().useReadCommands()) {
+            // Simple aggregation with useCursor
+            var result = coll.aggregate([{$match: {}}], {useCursor:true}).toArray();
+            assert.eq(2, result.length);
 
-        // Simple aggregation with batchSize
-        var result = coll.aggregate([{$match: {}}], {batchSize:2}).toArray();
-        assert.eq(2, result.length);
+            // Simple aggregation with batchSize
+            var result = coll.aggregate([{$match: {}}], {batchSize:2}).toArray();
+            assert.eq(2, result.length);
 
-        // Set the maxTimeMS and allowDiskUse on aggregation query
-        var result = coll.aggregate([{$match: {}}], {batchSize:2, maxTimeMS:100, allowDiskUse:true}).toArray();
-        assert.eq(2, result.length);
+            // Set the maxTimeMS and allowDiskUse on aggregation query
+            var result = coll.aggregate([{$match: {}}], {batchSize:2, maxTimeMS:100, allowDiskUse:true}).toArray();
+            assert.eq(2, result.length);
+        }
 
         // Drop collection
         coll.drop();

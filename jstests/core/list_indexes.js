@@ -75,33 +75,38 @@
     // Test basic usage of "cursor.batchSize" option.
     //
 
-    coll.drop();
-    assert.commandWorked(coll.getDB().createCollection(coll.getName()));
-    assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
+    // TODO: When SERVER-19569 is done, we should be able to run this test regardless of whether we
+    // are using the find/getMore commands, both against a standalone server and passed through
+    // mongos.
+    if (!coll.getDB().getMongo().useReadCommands()) {
+        coll.drop();
+        assert.commandWorked(coll.getDB().createCollection(coll.getName()));
+        assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
 
-    cursor = getListIndexesCursor(coll, {cursor: {batchSize: 2}});
-    assert.eq(2, cursor.objsLeftInBatch());
-    assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
+        cursor = getListIndexesCursor(coll, {cursor: {batchSize: 2}});
+        assert.eq(2, cursor.objsLeftInBatch());
+        assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
 
-    cursor = getListIndexesCursor(coll, {cursor: {batchSize: 1}});
-    assert.eq(1, cursor.objsLeftInBatch());
-    assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
+        cursor = getListIndexesCursor(coll, {cursor: {batchSize: 1}});
+        assert.eq(1, cursor.objsLeftInBatch());
+        assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
 
-    cursor = getListIndexesCursor(coll, {cursor: {batchSize: 0}});
-    assert.eq(0, cursor.objsLeftInBatch());
-    assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
+        cursor = getListIndexesCursor(coll, {cursor: {batchSize: 0}});
+        assert.eq(0, cursor.objsLeftInBatch());
+        assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
 
-    cursor = getListIndexesCursor(coll, {cursor: {batchSize: NumberInt(2)}});
-    assert.eq(2, cursor.objsLeftInBatch());
-    assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
+        cursor = getListIndexesCursor(coll, {cursor: {batchSize: NumberInt(2)}});
+        assert.eq(2, cursor.objsLeftInBatch());
+        assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
 
-    cursor = getListIndexesCursor(coll, {cursor: {batchSize: NumberLong(2)}});
-    assert.eq(2, cursor.objsLeftInBatch());
-    assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
+        cursor = getListIndexesCursor(coll, {cursor: {batchSize: NumberLong(2)}});
+        assert.eq(2, cursor.objsLeftInBatch());
+        assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
 
-    cursor = getListIndexesCursor(coll, {cursor: {batchSize: Math.pow(2, 62)}});
-    assert.eq(2, cursor.objsLeftInBatch());
-    assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
+        cursor = getListIndexesCursor(coll, {cursor: {batchSize: Math.pow(2, 62)}});
+        assert.eq(2, cursor.objsLeftInBatch());
+        assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
+    }
 
     // Ensure that the server accepts an empty object for "cursor".  This is equivalent to not
     // specifying "cursor" at all.
@@ -115,31 +120,36 @@
     // Test more than 2 batches of results.
     //
 
-    coll.drop();
-    assert.commandWorked(coll.getDB().createCollection(coll.getName()));
-    assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
-    assert.commandWorked(coll.ensureIndex({b: 1}, {unique: true}));
-    assert.commandWorked(coll.ensureIndex({c: 1}, {unique: true}));
+    // TODO: When SERVER-19569 is done, we should be able to run this test regardless of whether we
+    // are using the find/getMore commands, both against a standalone server and passed through
+    // mongos.
+    if (!coll.getDB().getMongo().useReadCommands()) {
+        coll.drop();
+        assert.commandWorked(coll.getDB().createCollection(coll.getName()));
+        assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
+        assert.commandWorked(coll.ensureIndex({b: 1}, {unique: true}));
+        assert.commandWorked(coll.ensureIndex({c: 1}, {unique: true}));
 
-    cursor = getListIndexesCursor(coll, {cursor: {batchSize: 0}}, 2);
-    assert.eq(0, cursor.objsLeftInBatch());
-    assert(cursor.hasNext());
-    assert.eq(2, cursor.objsLeftInBatch());
+        cursor = getListIndexesCursor(coll, {cursor: {batchSize: 0}}, 2);
+        assert.eq(0, cursor.objsLeftInBatch());
+        assert(cursor.hasNext());
+        assert.eq(2, cursor.objsLeftInBatch());
 
-    cursor.next();
-    assert(cursor.hasNext());
-    assert.eq(1, cursor.objsLeftInBatch());
+        cursor.next();
+        assert(cursor.hasNext());
+        assert.eq(1, cursor.objsLeftInBatch());
 
-    cursor.next();
-    assert(cursor.hasNext());
-    assert.eq(2, cursor.objsLeftInBatch());
+        cursor.next();
+        assert(cursor.hasNext());
+        assert.eq(2, cursor.objsLeftInBatch());
 
-    cursor.next();
-    assert(cursor.hasNext());
-    assert.eq(1, cursor.objsLeftInBatch());
+        cursor.next();
+        assert(cursor.hasNext());
+        assert.eq(1, cursor.objsLeftInBatch());
 
-    cursor.next();
-    assert(!cursor.hasNext());
+        cursor.next();
+        assert(!cursor.hasNext());
+    }
 
     //
     // Test on collection with no indexes.
