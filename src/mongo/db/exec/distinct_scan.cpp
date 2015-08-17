@@ -61,7 +61,6 @@ DistinctScan::DistinctScan(OperationContext* txn,
     _specificStats.isUnique = _params.descriptor->unique();
     _specificStats.isSparse = _params.descriptor->isSparse();
     _specificStats.isPartial = _params.descriptor->isPartial();
-    _specificStats.indexBounds = _params.bounds.toBSON();
     _specificStats.direction = _params.direction;
 
     // Set up our initial seek. If there is no valid data, just mark as EOF.
@@ -155,6 +154,13 @@ void DistinctScan::doReattachToOperationContext() {
 }
 
 unique_ptr<PlanStageStats> DistinctScan::getStats() {
+    // Serialize the bounds to BSON if we have not done so already. This is done here rather than in
+    // the constructor in order to avoid the expensive serialization operation unless the distinct
+    // command is being explained.
+    if (_specificStats.indexBounds.isEmpty()) {
+        _specificStats.indexBounds = _params.bounds.toBSON();
+    }
+
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_DISTINCT_SCAN);
     ret->specific = make_unique<DistinctScanStats>(_specificStats);
     return ret;
