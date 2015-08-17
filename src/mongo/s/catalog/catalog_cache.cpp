@@ -55,12 +55,14 @@ StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn
     }
 
     // Need to load from the store
-    StatusWith<DatabaseType> status = grid.catalogManager(txn)->getDatabase(dbName);
+    auto status = grid.catalogManager(txn)->getDatabase(dbName);
     if (!status.isOK()) {
         return status.getStatus();
     }
 
-    shared_ptr<DBConfig> db = std::make_shared<DBConfig>(dbName, status.getValue());
+    const auto dbOpTimePair = status.getValue();
+    shared_ptr<DBConfig> db =
+        std::make_shared<DBConfig>(dbName, dbOpTimePair.value, dbOpTimePair.opTime);
     db->load(txn);
 
     invariant(_databases.insert(std::make_pair(dbName, db)).second);

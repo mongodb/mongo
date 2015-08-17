@@ -954,7 +954,8 @@ public:
                                         ->getChunks(BSON(ChunkType::ns(ns)),
                                                     BSON(ChunkType::DEPRECATED_lastmod() << -1),
                                                     1,
-                                                    &newestChunk);
+                                                    &newestChunk,
+                                                    nullptr);
                     uassertStatusOK(status);
 
                     ChunkVersion checkVersion;

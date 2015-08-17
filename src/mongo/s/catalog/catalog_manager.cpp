@@ -342,13 +342,14 @@ StatusWith<string> CatalogManager::addShard(OperationContext* txn,
 
     // Check that none of the existing shard candidate's dbs exist already
     for (const string& dbName : dbNamesStatus.getValue()) {
-        StatusWith<DatabaseType> dbt = getDatabase(dbName);
+        auto dbt = getDatabase(dbName);
         if (dbt.isOK()) {
+            const auto& dbDoc = dbt.getValue().value;
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "can't add shard "
                                         << "'" << shardConnectionString.toString() << "'"
                                         << " because a local database '" << dbName
-                                        << "' exists in another " << dbt.getValue().getPrimary());
+                                        << "' exists in another " << dbDoc.getPrimary());
         } else if (dbt != ErrorCodes::DatabaseNotFound) {
             return dbt.getStatus();
         }
