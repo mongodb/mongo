@@ -33,6 +33,7 @@
 #include "mongo/db/s/sharded_connection_info.h"
 
 #include <boost/optional.hpp>
+#include <boost/utility/in_place_factory.hpp>
 
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/db/client.h"

@@ -250,7 +250,7 @@ public:
 
     void detachFromOperationContext() final {
         _txn = nullptr;
-        _cursor = {};
+        _cursor = boost::none;
     }
 
     void reattachToOperationContext(OperationContext* txn) final {

@@ -72,7 +72,7 @@ void WiredTigerSnapshotManager::cleanupUnneededSnapshots() {
 
 void WiredTigerSnapshotManager::dropAllSnapshots() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _committedSnapshot = {};
+    _committedSnapshot = boost::none;
     invariantWTOK(_session->snapshot(_session, "drop=(all)"));
 }
 

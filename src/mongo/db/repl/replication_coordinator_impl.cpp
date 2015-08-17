@@ -3034,7 +3034,7 @@ void ReplicationCoordinatorImpl::dropAllSnapshots() {
 
 void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {
     _uncommittedSnapshots.clear();
-    _currentCommittedSnapshot = {};
+    _currentCommittedSnapshot = boost::none;
     _externalState->dropAllSnapshots();
 }
 

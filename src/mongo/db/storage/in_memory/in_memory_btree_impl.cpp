@@ -245,7 +245,7 @@ public:
         void setEndPosition(const BSONObj& key, bool inclusive) override {
             if (key.isEmpty()) {
                 // This means scan to end of index.
-                _endState = {};
+                _endState = boost::none;
                 return;
             }
 
