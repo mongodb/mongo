@@ -2998,10 +2998,17 @@ void ReplicationCoordinatorImpl::forceSnapshotCreation() {
     _externalState->forceSnapshotCreation();
 }
 
+void ReplicationCoordinatorImpl::waitForNewSnapshot(OperationContext* txn) {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    _snapshotCreatedCond.wait_for(lock, Microseconds(txn->getRemainingMaxTimeMicros()));
+    txn->checkForInterrupt();
+}
+
 void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     auto snapshotInfo = SnapshotInfo{timeOfSnapshot, name};
+    _snapshotCreatedCond.notify_all();
 
     if (timeOfSnapshot <= _lastCommittedOpTime) {
         // This snapshot is ready to be marked as committed.
@@ -3038,13 +3045,6 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
 
     // Wake up any threads waiting for read concern or write concern.
     _wakeReadyWaiters_inlock();
-
-    // TODO use _currentCommittedSnapshot for the following things:
-    // * SERVER-19206 make w:majority writes block until they are in the committed snapshot.
-    // * SERVER-19211 make readCommitted + afterOptime block until the optime is in the
-    //   committed view.
-    // * SERVER-19212 make new indexes not be used for any queries until the index is in the
-    //   committed view.
 }
 
 void ReplicationCoordinatorImpl::dropAllSnapshots() {

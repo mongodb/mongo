@@ -9,15 +9,11 @@ var testServer = MongoRunner.runMongod({setParameter: 'testingSnapshotBehaviorIn
 var db = testServer.getDB("test");
 var t = db.readMajority;
 
-var errorCodes = {
-    CommandNotSupported: 115,
-    ReadConcernMajorityNotAvailableYet: 134,
-}
-
 function assertNoReadMajoritySnapshotAvailable() {
-    var res = t.runCommand('find', {batchSize: 2, readConcern: {level: "majority"}});
+    var res = t.runCommand('find',
+                           {batchSize: 2, readConcern: {level: "majority"}, maxTimeMS: 1000});
     assert.commandFailed(res);
-    assert.eq(res.code, errorCodes.ReadConcernMajorityNotAvailableYet);
+    assert.eq(res.code, ErrorCodes.ExceededTimeLimit);
 }
 
 function getReadMajorityCursor() {

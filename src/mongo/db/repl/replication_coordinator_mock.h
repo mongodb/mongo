@@ -218,6 +218,8 @@ public:
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() override;
 
+    virtual void waitForNewSnapshot(OperationContext* txn) override;
+
 private:
     AtomicUInt64 _snapshotNameGenerator;
     const ReplSettings _settings;

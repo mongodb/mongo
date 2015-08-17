@@ -286,6 +286,8 @@ public:
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() override;
 
+    virtual void waitForNewSnapshot(OperationContext* txn) override;
+
     // ================== Test support API ===================
 
     /**
@@ -1123,6 +1125,9 @@ private:
 
     // Used to signal threads waiting for changes to _rsConfigState.
     stdx::condition_variable _rsConfigStateChange;  // (M)
+
+    // Used to signal threads that are waiting for new snapshots.
+    stdx::condition_variable _snapshotCreatedCond;  // (M)
 
     // Represents the configuration state of the coordinator, which controls how and when
     // _rsConfig may change.  See the state transition diagram in the type definition of

@@ -676,6 +676,12 @@ public:
     virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) = 0;
 
     /**
+     * Called by threads that wish to be alerted of the creation of a new snapshot. "txn" is used
+     * to checkForInterrupt and enforce maxTimeMS.
+     */
+    virtual void waitForNewSnapshot(OperationContext* txn) = 0;
+
+    /**
      * Resets all information related to snapshotting.
      */
     virtual void dropAllSnapshots() = 0;

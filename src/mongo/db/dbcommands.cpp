@@ -1326,6 +1326,13 @@ bool Command::run(OperationContext* txn,
                  testingSnapshotBehaviorInIsolation) &&
                 readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
                 Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+
+                // Wait until a snapshot is available.
+                while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
+                    replCoord->waitForNewSnapshot(txn);
+                    status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+                }
+
                 if (!status.isOK()) {
                     replyBuilder->setMetadata(rpc::makeEmptyMetadata()).setCommandReply(status);
                     return false;
