@@ -35,6 +35,7 @@
 #include "mongo/executor/async_secure_stream_factory.h"
 #include "mongo/executor/async_stream_factory.h"
 #include "mongo/executor/async_stream_interface.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/executor/network_interface_impl.h"
 #include "mongo/stdx/memory.h"
@@ -60,6 +61,11 @@ MONGO_INITIALIZER(outboundNetworkImpl)(InitializerContext*) {
 }
 
 std::unique_ptr<NetworkInterface> makeNetworkInterface() {
+    return makeNetworkInterface(nullptr);
+}
+
+std::unique_ptr<NetworkInterface> makeNetworkInterface(
+    std::unique_ptr<NetworkConnectionHook> hook) {
     if (outboundNetworkImpl == kNetworkImplASIO) {
 #ifdef MONGO_CONFIG_SSL
         if (SSLManagerInterface* manager = getSSLManager()) {
@@ -71,7 +77,11 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface() {
         return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
 
     } else {
-        return stdx::make_unique<NetworkInterfaceImpl>();
+        if (hook) {
+            return stdx::make_unique<NetworkInterfaceImpl>(std::move(hook));
+        } else {
+            return stdx::make_unique<NetworkInterfaceImpl>();
+        }
     }
 }
 

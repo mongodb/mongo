@@ -1107,11 +1107,22 @@ public:
     using DBClientBase::query;
 
     /**
+     * A hook used to validate the reply of an 'isMaster' command during connection. If the hook
+     * returns a non-OK Status, the DBClientConnection object will disconnect from the remote
+     * server. This function must not throw - it can only indicate failure by returning a non-OK
+     * status.
+     */
+    using HandshakeValidationHook =
+        stdx::function<Status(const executor::RemoteCommandResponse& isMasterReply)>;
+
+    /**
        @param _autoReconnect if true, automatically reconnect on a connection failure
        @param timeout tcp timeout in seconds - this is for read/write, not connect.
        Connect timeout is fixed, but short, at 5 seconds.
      */
-    DBClientConnection(bool _autoReconnect = false, double so_timeout = 0);
+    DBClientConnection(bool _autoReconnect = false,
+                       double so_timeout = 0,
+                       const HandshakeValidationHook& hook = HandshakeValidationHook());
 
     virtual ~DBClientConnection() {
         _numConnections.fetchAndAdd(-1);
@@ -1130,16 +1141,6 @@ public:
     virtual bool connect(const HostAndPort& server, std::string& errmsg);
 
     /**
-
-     * A hook used to validate the reply of an 'isMaster' command during connection. If the hook
-     * returns a non-OK Status, the DBClientConnection object will disconnect from the remote
-     * server. This function must not throw - it can only indicate failure by returning a non-OK
-     * status.
-     */
-    using HandshakeValidationHook =
-        stdx::function<Status(const executor::RemoteCommandResponse& isMasterReply)>;
-
-    /**
      * Semantically equivalent to the previous connect method, but returns a Status
      * instead of taking an errmsg out parameter. Also allows optional validation of the reply to
      * the 'isMaster' command executed during connection.
@@ -1148,8 +1149,7 @@ public:
      * @param a hook to validate the 'isMaster' reply received during connection. If the hook
      * fails, the connection will be terminated and a non-OK status will be returned.
      */
-    Status connect(const HostAndPort& server,
-                   const HandshakeValidationHook& hook = HandshakeValidationHook());
+    Status connect(const HostAndPort& server);
 
     /**
      * This version of connect does not run 'isMaster' after creating a TCP connection to the
@@ -1310,6 +1310,9 @@ private:
     // Contains the string for the replica set name of the host this is connected to.
     // Should be empty if this connection is not pointing to a replica set member.
     std::string _parentReplSetName;
+
+    // Hook ran on every call to connect()
+    HandshakeValidationHook _hook;
 };
 
 BSONElement getErrField(const BSONObj& result);

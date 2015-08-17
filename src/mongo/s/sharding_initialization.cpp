@@ -36,6 +36,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
+#include "mongo/client/syncclusterconnection.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -43,6 +44,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/forwarding_catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -66,7 +68,12 @@ std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<Network
 }  // namespace
 
 Status initializeGlobalShardingState(const ConnectionString& configCS) {
-    auto network = executor::makeNetworkInterface();
+    SyncClusterConnection::setConnectionValidationHook(
+        [](const HostAndPort& target, const executor::RemoteCommandResponse& isMasterReply) {
+            return ShardingNetworkConnectionHook::validateHostImpl(target, isMasterReply);
+        });
+    auto network =
+        executor::makeNetworkInterface(stdx::make_unique<ShardingNetworkConnectionHook>());
     auto networkPtr = network.get();
     auto shardRegistry(
         stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),

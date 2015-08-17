@@ -36,6 +36,8 @@
 namespace mongo {
 namespace executor {
 
+class NetworkConnectionHook;
+
 /**
  * Returns a new NetworkInterface.
  *
@@ -43,6 +45,14 @@ namespace executor {
  * 'outboundNetworkImpl' at startup.
  */
 std::unique_ptr<NetworkInterface> makeNetworkInterface();
+
+/**
+ * Returns a new NetworkInterface with the given connection hook set.
+ *
+ * Different NetworkInterface implementations may be specified setting the
+ * 'outboundNetworkImpl' at startup.
+ */
+std::unique_ptr<NetworkInterface> makeNetworkInterface(std::unique_ptr<NetworkConnectionHook> hook);
 
 }  // namespace executor
 }  // namespace mongo

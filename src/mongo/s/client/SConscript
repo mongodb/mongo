@@ -25,6 +25,7 @@ env.Library(
         'multi_host_query.cpp',
         'scc_fast_query_handler.cpp',
         'sharding_connection_hook.cpp',
+        'sharding_network_connection_hook.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',

@@ -892,8 +892,7 @@ bool DBClientConnection::connect(const HostAndPort& server, std::string& errmsg)
     return true;
 }
 
-Status DBClientConnection::connect(const HostAndPort& serverAddress,
-                                   const HandshakeValidationHook& hook) {
+Status DBClientConnection::connect(const HostAndPort& serverAddress) {
     auto connectStatus = connectSocketOnly(serverAddress);
     if (!connectStatus.isOK()) {
         return connectStatus;
@@ -912,8 +911,8 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress,
 
     _setServerRPCProtocols(swProtocolSet.getValue());
 
-    if (hook) {
-        auto validationStatus = hook(swIsMasterReply.getValue());
+    if (_hook) {
+        auto validationStatus = _hook(swIsMasterReply.getValue());
         if (!validationStatus.isOK()) {
             // Disconnect and mark failed.
             _failed = true;
@@ -1010,7 +1009,11 @@ void DBClientConnection::_checkConnection() {
     if (!connectStatus.isOK()) {
         _failed = true;
         LOG(_logLevel) << "reconnect " << toString() << " failed " << errmsg << endl;
-        throw SocketException(SocketException::CONNECT_ERROR, connectStatus.reason());
+        if (connectStatus == ErrorCodes::IncompatibleCatalogManager) {
+            uassertStatusOK(connectStatus);  // Will always throw
+        } else {
+            throw SocketException(SocketException::CONNECT_ERROR, connectStatus.reason());
+        }
     }
 
     LOG(_logLevel) << "reconnect " << toString() << " ok" << endl;
@@ -1438,11 +1441,14 @@ void assembleQueryRequest(const string& ns,
     toSend.setData(dbQuery, b.buf(), b.len());
 }
 
-DBClientConnection::DBClientConnection(bool _autoReconnect, double so_timeout)
+DBClientConnection::DBClientConnection(bool _autoReconnect,
+                                       double so_timeout,
+                                       const HandshakeValidationHook& hook)
     : _failed(false),
       autoReconnect(_autoReconnect),
       autoReconnectBackoff(1000, 2000),
-      _so_timeout(so_timeout) {
+      _so_timeout(so_timeout),
+      _hook(hook) {
     _numConnections.fetchAndAdd(1);
 }
 

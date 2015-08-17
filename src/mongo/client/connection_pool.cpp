@@ -167,19 +167,21 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
     // No idle connection in the pool; make a new one.
     lk.unlock();
 
-    std::unique_ptr<DBClientConnection> conn(new DBClientConnection());
-
-    // setSoTimeout takes a double representing the number of seconds for send and receive
-    // timeouts.  Thus, we must express 'timeout' in milliseconds and divide by 1000.0 to get the
-    // number of seconds with a fractional part.
-    conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
-
+    std::unique_ptr<DBClientConnection> conn;
     if (_hook) {
-        uassertStatusOK(
-            conn->connect(target,
-                          [this, &target](const executor::RemoteCommandResponse& isMasterReply) {
-                              return _hook->validateHost(target, isMasterReply);
-                          }));
+        conn.reset(new DBClientConnection(
+            false,  // auto reconnect
+            0,      // socket timeout
+            [this, target](const executor::RemoteCommandResponse& isMasterReply) {
+                return _hook->validateHost(target, isMasterReply);
+            }));
+
+        // setSoTimeout takes a double representing the number of seconds for send and receive
+        // timeouts.  Thus, we must express 'timeout' in milliseconds and divide by 1000.0 to get
+        // the number of seconds with a fractional part.
+        conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
+
+        uassertStatusOK(conn->connect(target));
 
         auto postConnectRequest = uassertStatusOK(_hook->makeRequest(target));
 
@@ -199,6 +201,11 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
             uassertStatusOK(_hook->handleReply(target, std::move(rcr)));
         }
     } else {
+        conn.reset(new DBClientConnection());
+        // setSoTimeout takes a double representing the number of seconds for send and receive
+        // timeouts.  Thus, we must express 'timeout' in milliseconds and divide by 1000.0 to get
+        // the number of seconds with a fractional part.
+        conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
         uassertStatusOK(conn->connect(target));
     }
 

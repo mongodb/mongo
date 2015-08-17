@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -62,6 +63,15 @@ public:
     class QueryHandler;
 
     /**
+     * Hook run on the response of an isMaster request.  Run on the DBClientConnections that
+     * SyncClusterConnection uses under the hood.  Used to detect and signal when the catalog
+     * manager needs swapping.
+     */
+    using ConnectionValidationHook = stdx::function<Status(
+        const HostAndPort& host, const executor::RemoteCommandResponse& isMasterReply)>;
+
+
+    /**
      * @param commaSeparated should be 3 hosts comma separated
      */
     SyncClusterConnection(const std::list<HostAndPort>&, double socketTimeout = 0);
@@ -71,6 +81,12 @@ public:
                           const std::string& c,
                           double socketTimeout = 0);
     ~SyncClusterConnection();
+
+    /**
+     * Sets the ConnectionValidationHook that will be used for the DBClientConnections created by
+     * all future constructed SyncClusterConnections.
+     */
+    static void setConnectionValidationHook(ConnectionValidationHook hook);
 
     /**
      * @return true if all servers are up and ready for writes
