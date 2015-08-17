@@ -1500,25 +1500,23 @@ bool ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(BSONObjBuil
     cmdBuilder->append("replSetUpdatePosition", 1);
     // create an array containing objects each member connected to us and for ourself
     BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
-    const Date_t now = _replExecutor.now();
-    {
-        for (SlaveInfoVector::iterator itr = _slaveInfo.begin(); itr != _slaveInfo.end(); ++itr) {
-            if (itr->opTime.isNull()) {
-                // Don't include info on members we haven't heard from yet.
-                continue;
-            }
-            // Don't include members we think are down.
-            if (!itr->self && itr->down) {
-                continue;
-            }
-
-            BSONObjBuilder entry(arrayBuilder.subobjStart());
-            entry.append("_id", itr->rid);
-            entry.append("optime", itr->opTime.getTimestamp());
-            entry.append("memberId", itr->memberId);
-            entry.append("cfgver", _rsConfig.getConfigVersion());
+    for (SlaveInfoVector::iterator itr = _slaveInfo.begin(); itr != _slaveInfo.end(); ++itr) {
+        if (itr->opTime.isNull()) {
+            // Don't include info on members we haven't heard from yet.
+            continue;
         }
+        // Don't include members we think are down.
+        if (!itr->self && itr->down) {
+            continue;
+        }
+
+        BSONObjBuilder entry(arrayBuilder.subobjStart());
+        entry.append("_id", itr->rid);
+        entry.append("optime", itr->opTime.getTimestamp());
+        entry.append("memberId", itr->memberId);
+        entry.append("cfgver", _rsConfig.getConfigVersion());
     }
+
     return true;
 }
 
