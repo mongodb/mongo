@@ -397,6 +397,13 @@ QueryResult::View getMore(OperationContext* txn,
             generateBatch(ntoreturn, cc, &bb, &numResults, &slaveReadTill, &state);
         }
 
+        // We have to do this before re-acquiring locks in the agg case because
+        // shouldSaveCursorGetMore() can make a network call for agg cursors.
+        //
+        // TODO: Getting rid of PlanExecutor::isEOF() in favor of PlanExecutor::IS_EOF would mean
+        // that this network operation is no longer necessary.
+        const bool shouldSaveCursor = shouldSaveCursorGetMore(state, exec, isCursorTailable(cc));
+
         // In order to deregister a cursor, we need to be holding the DB + collection lock and
         // if the cursor is aggregation, we release these locks.
         if (cc->isAggCursor()) {
@@ -411,7 +418,7 @@ QueryResult::View getMore(OperationContext* txn,
         //    this case, the pin's destructor will be invoked, which will call release() on the
         //    pin.  Because our ClientCursorPin is declared after our lock is declared, this
         //    will happen under the lock.
-        if (!shouldSaveCursorGetMore(state, exec, isCursorTailable(cc))) {
+        if (!shouldSaveCursor) {
             ccPin.deleteUnderlying();
 
             // cc is now invalid, as is the executor
