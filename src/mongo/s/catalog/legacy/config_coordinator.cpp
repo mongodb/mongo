@@ -356,6 +356,8 @@ void ConfigCoordinator::executeBatch(const BatchedCommandRequest& clientRequest,
                     log() << "Config server check for host " << host
                           << " returned error: " << response;
                 }
+            } else if (status == ErrorCodes::IncompatibleCatalogManager) {
+                uassertStatusOK(status);
             } else {
                 error = true;
                 log() << "Config server check for host " << host
@@ -414,6 +416,10 @@ void ConfigCoordinator::executeBatch(const BatchedCommandRequest& clientRequest,
             _dispatcher->recvAny(&configResponse.configHost, &configResponse.response);
 
         if (!dispatchStatus.isOK()) {
+            if (dispatchStatus == ErrorCodes::IncompatibleCatalogManager) {
+                uassertStatusOK(dispatchStatus);
+            }
+
             buildErrorFrom(dispatchStatus, &configResponse.response);
         }
     }
