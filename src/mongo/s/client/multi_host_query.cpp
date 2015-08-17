@@ -249,6 +249,12 @@ bool MultiHostQueryOp::releaseResult_inlock(StatusWith<DBClientCursor*>* nextRes
             ++numReleased;
         } else {
             ++numErrors;
+
+            // End immediately and don't try to combine errors with WrongShardingCatalog.
+            if (result == ErrorCodes::IncompatibleCatalogManager) {
+                *nextResult = result;
+                return true;
+            }
         }
     }
 

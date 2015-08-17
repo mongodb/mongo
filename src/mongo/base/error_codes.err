@@ -143,6 +143,7 @@ error_code("InvalidSSLConfiguration", 140)
 error_code("SSLHandshakeFailed", 141)
 error_code("JSUncatchableError", 142)
 error_code("CursorInUse", 143)
+error_code("IncompatibleCatalogManager", 144)
 
 # Non-sequential error codes (for compatibility only)
 error_code("RecvStaleConfig", 9996)
