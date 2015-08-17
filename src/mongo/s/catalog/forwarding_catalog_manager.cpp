@@ -86,6 +86,10 @@ ForwardingCatalogManager::ForwardingCatalogManager(ServiceContext* service,
 
 ForwardingCatalogManager::~ForwardingCatalogManager() = default;
 
+ServerGlobalParams::ConfigServerMode ForwardingCatalogManager::getMode() {
+    return retry([this] { return _actual->getMode(); });
+}
+
 Status ForwardingCatalogManager::startup() {
     return retry([this] { return _actual->startup(); });
 }

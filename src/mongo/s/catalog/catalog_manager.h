@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/server_options.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/optime_pair.h"
 #include "mongo/stdx/memory.h"
@@ -95,6 +96,12 @@ public:
      * Performs necessary cleanup when shutting down cleanly.
      */
     virtual void shutDown() = 0;
+
+    /**
+     * Returns what type of catalog manager this is - CSRS for the CatalogManagerReplicaSet and
+     * SCCC for the CatalogManagerLegacy.
+     */
+    virtual ServerGlobalParams::ConfigServerMode getMode() = 0;
 
     /**
      * Creates a new database or updates the sharding status for an existing one. Cannot be

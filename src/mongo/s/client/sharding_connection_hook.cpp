@@ -34,14 +34,17 @@
 
 #include <string>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
+#include "mongo/db/server_options.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/s/client/scc_fast_query_handler.h"
 #include "mongo/s/cluster_last_error_info.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/util/log.h"
 
@@ -91,6 +94,29 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
         if (scc) {
             scc->attachQueryHandler(new SCCFastQueryHandler);
         }
+    } else if (conn->type() == ConnectionString::MASTER) {
+        BSONObj isMasterResponse;
+        conn->runCommand("admin", BSON("ismaster" << 1), isMasterResponse);
+
+
+        long long configServerModeNumber;
+        Status status =
+            bsonExtractIntegerField(isMasterResponse, "configsvr", &configServerModeNumber);
+
+        if (status == ErrorCodes::NoSuchKey) {
+            // This isn't a config server we're talking to.
+            return;
+        }
+
+        uassert(28785,
+                str::stream() << "Unrecognized configsvr version number: " << configServerModeNumber
+                              << ". Expected either 0 or 1",
+                configServerModeNumber == 0 || configServerModeNumber == 1);
+
+        status = grid.checkIfCatalogNeedsSwapping(configServerModeNumber == 0
+                                                      ? ServerGlobalParams::ConfigServerMode::SCCC
+                                                      : ServerGlobalParams::ConfigServerMode::CSRS);
+        uassertStatusOK(status);
     }
 }
 

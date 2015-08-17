@@ -31,8 +31,10 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/server_options.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/rwlock.h"
 
 namespace mongo {
@@ -111,6 +113,15 @@ public:
     }
 
     /**
+     * Compares desiredMode against _catalogManagerMode.  Returns Status::OK() if they match,
+     * returns ErrorCodes::IncompatibleCatalogManger if desiredMode is CSRS and the current mode is
+     * SCCC. If desiredMode is SCCC and current mode is CSRS returns InvalidOperation as we do not
+     * support downgrade.
+     * TODO(spencer): Support downgrade.
+     */
+    Status checkIfCatalogNeedsSwapping(ServerGlobalParams::ConfigServerMode desiredMode);
+
+    /**
      * Clears the grid object so that it can be reused between test executions. This will not
      * be necessary if grid is hanging off the global ServiceContext and each test gets its
      * own service context.
@@ -120,13 +131,20 @@ public:
     void clearForUnitTests();
 
 private:
-    std::unique_ptr<CatalogManager> _catalogManager;
     std::unique_ptr<CatalogCache> _catalogCache;
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<ClusterCursorManager> _cursorManager;
 
     // can 'localhost' be used in shard addresses?
     bool _allowLocalShard;
+
+    // Concurrency control around access the _catalogManager is as follows.
+    // In order to read _catalogManager, one must either lock _catalogManagerLock in shared mode
+    // or hold _catalogManagerMutex.  In order to change _catalogManager, one must hold
+    // both _catalogManagerLock in exclusive mode and _catalogManagerMutex.
+
+    // Guards access to _catalogManager
+    stdx::mutex _catalogManagerMutex;
 
     /**
      * Protects access to _catalogManager.
@@ -136,6 +154,9 @@ private:
      * TODO(SERVER-19875) Use a new lock manager resource for this instead.
      */
     RWLock _catalogManagerLock;
+
+    // Current active catalog manager
+    std::unique_ptr<CatalogManager> _catalogManager;
 };
 
 /**

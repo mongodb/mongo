@@ -48,6 +48,10 @@ public:
     explicit CatalogManagerReplicaSet(std::unique_ptr<DistLockManager> distLockManager);
     virtual ~CatalogManagerReplicaSet();
 
+    ServerGlobalParams::ConfigServerMode getMode() override {
+        return ServerGlobalParams::ConfigServerMode::CSRS;
+    }
+
     Status startup() override;
 
     void shutDown() override;

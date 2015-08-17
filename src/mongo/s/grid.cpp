@@ -131,6 +131,28 @@ void Grid::clearForUnitTests() {
     _cursorManager.reset();
 }
 
+Status Grid::checkIfCatalogNeedsSwapping(ServerGlobalParams::ConfigServerMode desiredMode) {
+    stdx::lock_guard<stdx::mutex> lk(_catalogManagerMutex);
+    auto currentMode = _catalogManager->getMode();
+    if (desiredMode == currentMode) {
+        return Status::OK();
+    }
+    if (desiredMode == ServerGlobalParams::ConfigServerMode::CSRS) {
+        invariant(currentMode == ServerGlobalParams::ConfigServerMode::SCCC);
+
+        return Status(ErrorCodes::IncompatibleCatalogManager,
+                      "Need to swap sharding catalog manager.  Config server "
+                      "reports that it is in replica set mode, but we are still using the "
+                      "legacy SCCC protocol for config server communication");
+    }
+    invariant(currentMode == ServerGlobalParams::ConfigServerMode::CSRS);
+    // TODO(spencer): Support downgrade.
+    return Status(ErrorCodes::IllegalOperation,
+                  "Config server reports that it legacy SCCC mode, but we are already using "
+                  "the replica set config server protocol for config server "
+                  "communication.  Downgrade needed but not yet supported");
+}
+
 Grid::CatalogManagerGuard Grid::catalogManager(OperationContext* txn) {
     return Grid::CatalogManagerGuard(txn, this);
 }

@@ -45,6 +45,10 @@ public:
     CatalogManagerLegacy();
     ~CatalogManagerLegacy();
 
+    ServerGlobalParams::ConfigServerMode getMode() override {
+        return ServerGlobalParams::ConfigServerMode::SCCC;
+    }
+
     /**
      * Initializes the catalog manager with the hosts, which will be used as a configuration
      * server. Can only be called once for the lifetime.
