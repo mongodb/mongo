@@ -10,6 +10,9 @@ ftdcEnv.Library(
         'block_compressor.cpp',
         'compressor.cpp',
         'decompressor.cpp',
+        'file_manager.cpp',
+        'file_reader.cpp',
+        'file_writer.cpp',
         'util.cpp',
         'varint.cpp'
     ],
@@ -25,6 +28,8 @@ env.CppUnitTest(
     target='ftdc_test',
     source=[
         'compressor_test.cpp',
+        'file_manager_test.cpp',
+        'file_writer_test.cpp',
         'ftdc_test.cpp',
         'util_test.cpp',
         'varint_test.cpp',
