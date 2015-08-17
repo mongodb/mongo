@@ -286,6 +286,7 @@ extern const JSFile utils;
 extern const JSFile utils_sh;
 extern const JSFile utils_auth;
 extern const JSFile bulk_api;
+extern const JSFile error_codes;
 }
 
 void Scope::execCoreFiles() {
@@ -297,6 +298,7 @@ void Scope::execCoreFiles() {
     execSetup(JSFiles::mr);
     execSetup(JSFiles::query);
     execSetup(JSFiles::bulk_api);
+    execSetup(JSFiles::error_codes);
     execSetup(JSFiles::collection);
     execSetup(JSFiles::crud_api);
     execSetup(JSFiles::explain_query);
