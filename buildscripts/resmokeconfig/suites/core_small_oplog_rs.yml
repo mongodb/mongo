@@ -5,6 +5,7 @@ selector:
     exclude_files:
     # These tests are not expected to pass with replica-sets:
     - jstests/core/dbadmin.js
+    - jstests/core/read_majority_mmap.js
     - jstests/core/opcounters_write_cmd.js
     - jstests/core/read_after_optime.js
 
