@@ -261,13 +261,9 @@ bool ChunkManager::_load(OperationContext* txn,
     // Get the diff query required
     auto diffQuery = differ.configDiffQuery();
 
-    repl::OpTime opTime;
     std::vector<ChunkType> chunks;
-    uassertStatusOK(grid.catalogManager(txn)->getChunks(
-        diffQuery.query, diffQuery.sort, boost::none, &chunks, &opTime));
-
-    invariant(opTime >= _configOpTime);
-    _configOpTime = opTime;
+    uassertStatusOK(
+        grid.catalogManager(txn)->getChunks(diffQuery.query, diffQuery.sort, boost::none, &chunks));
 
     int diffsApplied = differ.calculateConfigDiff(chunks);
     if (diffsApplied > 0) {
@@ -285,8 +281,6 @@ bool ChunkManager::_load(OperationContext* txn,
             }
         }
 
-        _configOpTime = opTime;
-
         return true;
     } else if (diffsApplied == 0) {
         // No chunks were found for the ns
@@ -298,7 +292,6 @@ bool ChunkManager::_load(OperationContext* txn,
         shardVersions->clear();
 
         _version = ChunkVersion(0, 0, OID());
-        _configOpTime = opTime;
 
         return true;
     } else {  // diffsApplied < 0
@@ -816,10 +809,6 @@ int ChunkManager::getCurrentDesiredChunkSize() const {
     }
 
     return splitThreshold;
-}
-
-repl::OpTime ChunkManager::getConfigOpTime() const {
-    return _configOpTime;
 }
 
 }  // namespace mongo

@@ -135,8 +135,7 @@ public:
                 Status status = catalogManager->getChunks(BSON(ChunkType::shard(s->getId())),
                                                           BSONObj(),
                                                           boost::none,  // return all
-                                                          &chunks,
-                                                          nullptr);
+                                                          &chunks);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }

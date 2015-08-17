@@ -280,12 +280,13 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
         return scopedDistLock.getStatus();
     }
 
-    auto status = getDatabase(nsToDatabase(ns));
+    StatusWith<DatabaseType> status = getDatabase(nsToDatabase(ns));
     if (!status.isOK()) {
         return status.getStatus();
     }
 
-    ShardId dbPrimaryShardId = status.getValue().value.getPrimary();
+    DatabaseType dbt = status.getValue();
+    ShardId dbPrimaryShardId = dbt.getPrimary();
 
     // This is an extra safety check that the collection is not getting sharded concurrently by
     // two different mongos instances. It is not 100%-proof, but it reduces the chance that two
@@ -448,7 +449,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
     return ShardDrainingStatus::ONGOING;
 }
 
-StatusWith<OpTimePair<DatabaseType>> CatalogManagerLegacy::getDatabase(const std::string& dbName) {
+StatusWith<DatabaseType> CatalogManagerLegacy::getDatabase(const std::string& dbName) {
     invariant(nsIsDbOnly(dbName));
 
     // The two databases that are hosted on the config server are config and admin
@@ -458,7 +459,7 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerLegacy::getDatabase(const std
         dbt.setSharded(false);
         dbt.setPrimary("config");
 
-        return OpTimePair<DatabaseType>(dbt);
+        return dbt;
     }
 
     ScopedDbConnection conn(_configServerConnectionString, 30.0);
@@ -470,18 +471,10 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerLegacy::getDatabase(const std
     }
 
     conn.done();
-
-    auto parseStatus = DatabaseType::fromBSON(dbObj);
-
-    if (!parseStatus.isOK()) {
-        return parseStatus.getStatus();
-    }
-
-    return OpTimePair<DatabaseType>(parseStatus.getValue());
+    return DatabaseType::fromBSON(dbObj);
 }
 
-StatusWith<OpTimePair<CollectionType>> CatalogManagerLegacy::getCollection(
-    const std::string& collNs) {
+StatusWith<CollectionType> CatalogManagerLegacy::getCollection(const std::string& collNs) {
     ScopedDbConnection conn(_configServerConnectionString, 30.0);
 
     BSONObj collObj = conn->findOne(CollectionType::ConfigNS, BSON(CollectionType::fullNs(collNs)));
@@ -492,19 +485,11 @@ StatusWith<OpTimePair<CollectionType>> CatalogManagerLegacy::getCollection(
     }
 
     conn.done();
-
-    auto parseStatus = CollectionType::fromBSON(collObj);
-
-    if (!parseStatus.isOK()) {
-        return parseStatus.getStatus();
-    }
-
-    return OpTimePair<CollectionType>(parseStatus.getValue());
+    return CollectionType::fromBSON(collObj);
 }
 
 Status CatalogManagerLegacy::getCollections(const std::string* dbName,
-                                            std::vector<CollectionType>* collections,
-                                            repl::OpTime* optime) {
+                                            std::vector<CollectionType>* collections) {
     BSONObjBuilder b;
     if (dbName) {
         invariant(!dbName->empty());
@@ -807,8 +792,7 @@ Status CatalogManagerLegacy::getDatabasesForShard(const string& shardName, vecto
 Status CatalogManagerLegacy::getChunks(const BSONObj& query,
                                        const BSONObj& sort,
                                        boost::optional<int> limit,
-                                       vector<ChunkType>* chunks,
-                                       repl::OpTime* opTime) {
+                                       vector<ChunkType>* chunks) {
     chunks->clear();
 
     try {

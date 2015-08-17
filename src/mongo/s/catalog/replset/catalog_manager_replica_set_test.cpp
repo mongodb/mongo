@@ -66,7 +66,6 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using executor::TaskExecutor;
 using rpc::ReplSetMetadata;
-using repl::OpTime;
 using std::string;
 using std::vector;
 using stdx::chrono::milliseconds;
@@ -83,15 +82,11 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionExisting) {
     expectedColl.setUpdatedAt(Date_t());
     expectedColl.setEpoch(OID::gen());
 
-    const OpTime newOpTime(Timestamp(7, 6), 5);
-
     auto future = launchAsync([this, &expectedColl] {
         return assertGet(catalogManager()->getCollection(expectedColl.getNs().ns()));
     });
 
-    onFindWithMetadataCommand([this, &expectedColl, newOpTime](
-        const RemoteCommandRequest& request) {
-
+    onFindCommand([this, &expectedColl](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -107,17 +102,12 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionExisting) {
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
 
-        ReplSetMetadata metadata(10, newOpTime, OpTime(), 100, 30);
-        BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
-
-        return std::make_tuple(vector<BSONObj>{expectedColl.toBSON()}, builder.obj());
+        return vector<BSONObj>{expectedColl.toBSON()};
     });
 
     // Now wait for the getCollection call to return
-    const auto collOpTimePair = future.timed_get(kFutureTimeout);
-    ASSERT_EQ(newOpTime, collOpTimePair.opTime);
-    ASSERT_EQ(expectedColl.toBSON(), collOpTimePair.value.toBSON());
+    const auto& actualColl = future.timed_get(kFutureTimeout);
+    ASSERT_EQ(expectedColl.toBSON(), actualColl.toBSON());
 }
 
 TEST_F(CatalogManagerReplSetTest, GetCollectionNotExisting) {
@@ -142,13 +132,11 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseExisting) {
     expectedDb.setPrimary("shard0000");
     expectedDb.setSharded(true);
 
-    const OpTime newOpTime(Timestamp(7, 6), 5);
-
     auto future = launchAsync([this, &expectedDb] {
         return assertGet(catalogManager()->getDatabase(expectedDb.getName()));
     });
 
-    onFindWithMetadataCommand([this, &expectedDb, newOpTime](const RemoteCommandRequest& request) {
+    onFindCommand([this, &expectedDb](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.ns(), DatabaseType::ConfigNS);
 
@@ -163,16 +151,11 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseExisting) {
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
 
-        ReplSetMetadata metadata(10, newOpTime, OpTime(), 100, 30);
-        BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
-
-        return std::make_tuple(vector<BSONObj>{expectedDb.toBSON()}, builder.obj());
+        return vector<BSONObj>{expectedDb.toBSON()};
     });
 
-    const auto dbOpTimePair = future.timed_get(kFutureTimeout);
-    ASSERT_EQ(newOpTime, dbOpTimePair.opTime);
-    ASSERT_EQ(expectedDb.toBSON(), dbOpTimePair.value.toBSON());
+    const auto& actualDb = future.timed_get(kFutureTimeout);
+    ASSERT_EQ(expectedDb.toBSON(), actualDb.toBSON());
 }
 
 TEST_F(CatalogManagerReplSetTest, GetDatabaseNotExisting) {
@@ -402,22 +385,17 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
              << ChunkType::DEPRECATED_lastmod()
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
-    const OpTime newOpTime(Timestamp(7, 6), 5);
-
-    auto future = launchAsync([this, &chunksQuery, newOpTime] {
+    auto future = launchAsync([this, &chunksQuery] {
         vector<ChunkType> chunks;
-        OpTime opTime;
 
-        ASSERT_OK(catalogManager()->getChunks(
-            chunksQuery, BSON(ChunkType::version() << -1), 1, &chunks, &opTime));
+        ASSERT_OK(
+            catalogManager()->getChunks(chunksQuery, BSON(ChunkType::version() << -1), 1, &chunks));
         ASSERT_EQ(2U, chunks.size());
-        ASSERT_EQ(newOpTime, opTime);
 
         return chunks;
     });
 
-    onFindWithMetadataCommand([this, &chunksQuery, chunkA, chunkB, newOpTime](
-        const RemoteCommandRequest& request) {
+    onFindCommand([this, &chunksQuery, chunkA, chunkB](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -432,11 +410,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
 
-        ReplSetMetadata metadata(10, newOpTime, OpTime(), 100, 30);
-        BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
-
-        return std::make_tuple(vector<BSONObj>{chunkA.toBSON(), chunkB.toBSON()}, builder.obj());
+        return vector<BSONObj>{chunkA.toBSON(), chunkB.toBSON()};
     });
 
     const auto& chunks = future.timed_get(kFutureTimeout);
@@ -457,8 +431,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSNoSortNoLimit) {
     auto future = launchAsync([this, &chunksQuery] {
         vector<ChunkType> chunks;
 
-        ASSERT_OK(
-            catalogManager()->getChunks(chunksQuery, BSONObj(), boost::none, &chunks, nullptr));
+        ASSERT_OK(catalogManager()->getChunks(chunksQuery, BSONObj(), boost::none, &chunks));
         ASSERT_EQ(0U, chunks.size());
 
         return chunks;
@@ -497,8 +470,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSInvalidChunk) {
 
     auto future = launchAsync([this, &chunksQuery] {
         vector<ChunkType> chunks;
-        Status status =
-            catalogManager()->getChunks(chunksQuery, BSONObj(), boost::none, &chunks, nullptr);
+        Status status = catalogManager()->getChunks(chunksQuery, BSONObj(), boost::none, &chunks);
 
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
         ASSERT_EQ(0U, chunks.size());
@@ -884,22 +856,16 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsNoDb) {
     coll3.setKeyPattern(KeyPattern{BSON("_id" << 1)});
     ASSERT_OK(coll3.validate());
 
-    const OpTime newOpTime(Timestamp(7, 6), 5);
-
-    auto future = launchAsync([this, newOpTime] {
+    auto future = launchAsync([this] {
         vector<CollectionType> collections;
 
-        OpTime opTime;
-        const auto status = catalogManager()->getCollections(nullptr, &collections, &opTime);
+        const auto status = catalogManager()->getCollections(nullptr, &collections);
 
         ASSERT_OK(status);
-        ASSERT_EQ(newOpTime, opTime);
-
         return collections;
     });
 
-    onFindWithMetadataCommand([this, coll1, coll2, coll3, newOpTime](
-        const RemoteCommandRequest& request) {
+    onFindCommand([this, coll1, coll2, coll3](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
@@ -913,12 +879,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsNoDb) {
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
 
-        ReplSetMetadata metadata(10, newOpTime, OpTime(), 100, 30);
-        BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
-
-        return std::make_tuple(vector<BSONObj>{coll1.toBSON(), coll2.toBSON(), coll3.toBSON()},
-                               builder.obj());
+        return vector<BSONObj>{coll1.toBSON(), coll2.toBSON(), coll3.toBSON()};
     });
 
     const auto& actualColls = future.timed_get(kFutureTimeout);
@@ -949,7 +910,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsWithDb) {
         string dbName = "test";
         vector<CollectionType> collections;
 
-        const auto status = catalogManager()->getCollections(&dbName, &collections, nullptr);
+        const auto status = catalogManager()->getCollections(&dbName, &collections);
 
         ASSERT_OK(status);
         return collections;
@@ -988,7 +949,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsInvalidCollectionType) {
         string dbName = "test";
         vector<CollectionType> collections;
 
-        const auto status = catalogManager()->getCollections(&dbName, &collections, nullptr);
+        const auto status = catalogManager()->getCollections(&dbName, &collections);
 
         ASSERT_EQ(ErrorCodes::FailedToParse, status);
         ASSERT_EQ(0U, collections.size());
@@ -2127,7 +2088,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExistsNoShards) {
 TEST_F(CatalogManagerReplSetTest, BasicReadAfterOpTime) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    OpTime lastOpTime;
+    repl::OpTime lastOpTime;
     for (int x = 0; x < 3; x++) {
         auto future = launchAsync([this] {
             BSONObjBuilder responseBuilder;
@@ -2135,7 +2096,7 @@ TEST_F(CatalogManagerReplSetTest, BasicReadAfterOpTime) {
                 catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
         });
 
-        const OpTime newOpTime(Timestamp(x + 2, x + 6), x + 5);
+        const repl::OpTime newOpTime(Timestamp(x + 2, x + 6), x + 5);
 
         onCommandWithMetadata([this, &newOpTime, &lastOpTime](const RemoteCommandRequest& request) {
             ASSERT_EQUALS("test", request.dbname);
@@ -2145,7 +2106,7 @@ TEST_F(CatalogManagerReplSetTest, BasicReadAfterOpTime) {
             ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
             checkReadConcern(request.cmdObj, lastOpTime.getTimestamp(), lastOpTime.getTerm());
 
-            ReplSetMetadata metadata(10, newOpTime, repl::OpTime(), 100, 30);
+            ReplSetMetadata metadata(12, newOpTime, repl::OpTime(), 100, 3);
             BSONObjBuilder builder;
             metadata.writeToMetadata(&builder);
 
@@ -2168,8 +2129,8 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
         ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
     });
 
-    OpTime highestOpTime;
-    const OpTime newOpTime(Timestamp(7, 6), 5);
+    repl::OpTime highestOpTime;
+    const repl::OpTime newOpTime(Timestamp(7, 6), 5);
 
     onCommandWithMetadata([this, &newOpTime, &highestOpTime](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("test", request.dbname);
@@ -2179,7 +2140,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
         ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
         checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
 
-        ReplSetMetadata metadata(10, newOpTime, repl::OpTime(), 100, 30);
+        ReplSetMetadata metadata(12, newOpTime, repl::OpTime(), 100, 3);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 
@@ -2196,7 +2157,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
         ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
     });
 
-    const OpTime oldOpTime(Timestamp(3, 10), 5);
+    const repl::OpTime oldOpTime(Timestamp(3, 10), 5);
 
     onCommandWithMetadata([this, &oldOpTime, &highestOpTime](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("test", request.dbname);
@@ -2206,7 +2167,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
         ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
         checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
 
-        ReplSetMetadata metadata(10, oldOpTime, repl::OpTime(), 100, 30);
+        ReplSetMetadata metadata(12, oldOpTime, repl::OpTime(), 100, 3);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 
@@ -2229,7 +2190,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
         ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
         checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
 
-        ReplSetMetadata metadata(10, oldOpTime, repl::OpTime(), 100, 30);
+        ReplSetMetadata metadata(12, oldOpTime, repl::OpTime(), 100, 3);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 
@@ -2245,15 +2206,15 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeFindThenCmd) {
     auto future1 = launchAsync(
         [this] { ASSERT_OK(catalogManager()->getGlobalSettings("chunksize").getStatus()); });
 
-    OpTime highestOpTime;
-    const OpTime newOpTime(Timestamp(7, 6), 5);
+    repl::OpTime highestOpTime;
+    const repl::OpTime newOpTime(Timestamp(7, 6), 5);
 
     onFindWithMetadataCommand(
         [this, &newOpTime, &highestOpTime](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
             checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
 
-            ReplSetMetadata metadata(10, newOpTime, repl::OpTime(), 100, 30);
+            ReplSetMetadata metadata(12, newOpTime, repl::OpTime(), 100, 3);
             BSONObjBuilder builder;
             metadata.writeToMetadata(&builder);
 
@@ -2274,7 +2235,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeFindThenCmd) {
         ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
     });
 
-    const OpTime oldOpTime(Timestamp(3, 10), 5);
+    const repl::OpTime oldOpTime(Timestamp(3, 10), 5);
 
     onCommand([this, &oldOpTime, &highestOpTime](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("test", request.dbname);
@@ -2299,8 +2260,8 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeCmdThenFind) {
         ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
     });
 
-    OpTime highestOpTime;
-    const OpTime newOpTime(Timestamp(7, 6), 5);
+    repl::OpTime highestOpTime;
+    const repl::OpTime newOpTime(Timestamp(7, 6), 5);
 
     onCommandWithMetadata([this, &newOpTime, &highestOpTime](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("test", request.dbname);
@@ -2310,7 +2271,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeCmdThenFind) {
         ASSERT_EQ(string("dummy"), request.cmdObj.firstElementFieldName());
         checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
 
-        ReplSetMetadata metadata(10, newOpTime, repl::OpTime(), 100, 30);
+        ReplSetMetadata metadata(12, newOpTime, repl::OpTime(), 100, 3);
         BSONObjBuilder builder;
         metadata.writeToMetadata(&builder);
 
@@ -2325,7 +2286,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeCmdThenFind) {
     auto future2 = launchAsync(
         [this] { ASSERT_OK(catalogManager()->getGlobalSettings("chunksize").getStatus()); });
 
-    const OpTime oldOpTime(Timestamp(3, 10), 5);
+    const repl::OpTime oldOpTime(Timestamp(3, 10), 5);
 
     onFindCommand([this, &oldOpTime, &highestOpTime](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);

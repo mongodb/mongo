@@ -45,7 +45,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -78,7 +77,6 @@
 
 namespace mongo {
 
-using repl::OpTime;
 using std::set;
 using std::shared_ptr;
 using std::string;
@@ -141,12 +139,13 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
         return scopedDistLock.getStatus();
     }
 
-    auto status = getDatabase(nsToDatabase(ns));
+    StatusWith<DatabaseType> status = getDatabase(nsToDatabase(ns));
     if (!status.isOK()) {
         return status.getStatus();
     }
 
-    ShardId dbPrimaryShardId = status.getValue().value.getPrimary();
+    DatabaseType dbt = status.getValue();
+    ShardId dbPrimaryShardId = dbt.getPrimary();
     const auto primaryShard = grid.shardRegistry()->getShard(dbPrimaryShardId);
 
     {
@@ -334,8 +333,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationC
     return ShardDrainingStatus::COMPLETED;
 }
 
-StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
-    const std::string& dbName) {
+StatusWith<DatabaseType> CatalogManagerReplicaSet::getDatabase(const std::string& dbName) {
     invariant(nsIsDbOnly(dbName));
 
     // The two databases that are hosted on the config server are config and admin
@@ -345,7 +343,7 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
         dbt.setSharded(false);
         dbt.setPrimary("config");
 
-        return OpTimePair<DatabaseType>(dbt);
+        return dbt;
     }
 
     const auto configShard = grid.shardRegistry()->getShard("config");
@@ -363,23 +361,17 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
         return findStatus.getStatus();
     }
 
-    const auto& docsWithOpTime = findStatus.getValue();
-    if (docsWithOpTime.value.empty()) {
+    const auto& docs = findStatus.getValue();
+    if (docs.empty()) {
         return {ErrorCodes::DatabaseNotFound, stream() << "database " << dbName << " not found"};
     }
 
-    invariant(docsWithOpTime.value.size() == 1);
+    invariant(docs.size() == 1);
 
-    auto parseStatus = DatabaseType::fromBSON(docsWithOpTime.value.front());
-    if (!parseStatus.isOK()) {
-        return parseStatus.getStatus();
-    }
-
-    return OpTimePair<DatabaseType>(parseStatus.getValue(), docsWithOpTime.opTime);
+    return DatabaseType::fromBSON(docs.front());
 }
 
-StatusWith<OpTimePair<CollectionType>> CatalogManagerReplicaSet::getCollection(
-    const std::string& collNs) {
+StatusWith<CollectionType> CatalogManagerReplicaSet::getCollection(const std::string& collNs) {
     auto configShard = grid.shardRegistry()->getShard("config");
 
     auto readHostStatus = configShard->getTargeter()->findHost(kConfigReadSelector);
@@ -396,8 +388,7 @@ StatusWith<OpTimePair<CollectionType>> CatalogManagerReplicaSet::getCollection(
         return statusFind.getStatus();
     }
 
-    const auto& retOpTimePair = statusFind.getValue();
-    const auto& retVal = retOpTimePair.value;
+    const auto& retVal = statusFind.getValue();
     if (retVal.empty()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       stream() << "collection " << collNs << " not found");
@@ -405,17 +396,11 @@ StatusWith<OpTimePair<CollectionType>> CatalogManagerReplicaSet::getCollection(
 
     invariant(retVal.size() == 1);
 
-    auto parseStatus = CollectionType::fromBSON(retVal.front());
-    if (!parseStatus.isOK()) {
-        return parseStatus.getStatus();
-    }
-
-    return OpTimePair<CollectionType>(parseStatus.getValue(), retOpTimePair.opTime);
+    return CollectionType::fromBSON(retVal.front());
 }
 
 Status CatalogManagerReplicaSet::getCollections(const std::string* dbName,
-                                                std::vector<CollectionType>* collections,
-                                                OpTime* opTime) {
+                                                std::vector<CollectionType>* collections) {
     BSONObjBuilder b;
     if (dbName) {
         invariant(!dbName->empty());
@@ -438,9 +423,7 @@ Status CatalogManagerReplicaSet::getCollections(const std::string* dbName,
         return findStatus.getStatus();
     }
 
-    const auto& docsOpTimePair = findStatus.getValue();
-
-    for (const BSONObj& obj : docsOpTimePair.value) {
+    for (const BSONObj& obj : findStatus.getValue()) {
         const auto collectionResult = CollectionType::fromBSON(obj);
         if (!collectionResult.isOK()) {
             collections->clear();
@@ -451,10 +434,6 @@ Status CatalogManagerReplicaSet::getCollections(const std::string* dbName,
         }
 
         collections->push_back(collectionResult.getValue());
-    }
-
-    if (opTime) {
-        *opTime = docsOpTimePair.opTime;
     }
 
     return Status::OK();
@@ -666,7 +645,7 @@ StatusWith<SettingsType> CatalogManagerReplicaSet::getGlobalSettings(const strin
         return findStatus.getStatus();
     }
 
-    const auto& docs = findStatus.getValue().value;
+    const auto& docs = findStatus.getValue();
     if (docs.empty()) {
         return {ErrorCodes::NoMatchingDocument,
                 str::stream() << "can't find settings document with key: " << key};
@@ -707,7 +686,7 @@ Status CatalogManagerReplicaSet::getDatabasesForShard(const string& shardName,
         return findStatus.getStatus();
     }
 
-    for (const BSONObj& obj : findStatus.getValue().value) {
+    for (const BSONObj& obj : findStatus.getValue()) {
         string dbName;
         Status status = bsonExtractStringField(obj, DatabaseType::name(), &dbName);
         if (!status.isOK()) {
@@ -724,8 +703,7 @@ Status CatalogManagerReplicaSet::getDatabasesForShard(const string& shardName,
 Status CatalogManagerReplicaSet::getChunks(const BSONObj& query,
                                            const BSONObj& sort,
                                            boost::optional<int> limit,
-                                           vector<ChunkType>* chunks,
-                                           OpTime* opTime) {
+                                           vector<ChunkType>* chunks) {
     chunks->clear();
 
     auto configShard = grid.shardRegistry()->getShard("config");
@@ -742,8 +720,7 @@ Status CatalogManagerReplicaSet::getChunks(const BSONObj& query,
         return findStatus.getStatus();
     }
 
-    const auto chunkDocsOpTimePair = findStatus.getValue();
-    for (const BSONObj& obj : chunkDocsOpTimePair.value) {
+    for (const BSONObj& obj : findStatus.getValue()) {
         auto chunkRes = ChunkType::fromBSON(obj);
         if (!chunkRes.isOK()) {
             chunks->clear();
@@ -754,10 +731,6 @@ Status CatalogManagerReplicaSet::getChunks(const BSONObj& query,
         }
 
         chunks->push_back(chunkRes.getValue());
-    }
-
-    if (opTime) {
-        *opTime = chunkDocsOpTimePair.opTime;
     }
 
     return Status::OK();
@@ -781,7 +754,7 @@ Status CatalogManagerReplicaSet::getTagsForCollection(const std::string& collect
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
-    for (const BSONObj& obj : findStatus.getValue().value) {
+    for (const BSONObj& obj : findStatus.getValue()) {
         auto tagRes = TagsType::fromBSON(obj);
         if (!tagRes.isOK()) {
             tags->clear();
@@ -813,7 +786,7 @@ StatusWith<string> CatalogManagerReplicaSet::getTagForChunk(const std::string& c
         return findStatus.getStatus();
     }
 
-    const auto& docs = findStatus.getValue().value;
+    const auto& docs = findStatus.getValue();
     if (docs.empty()) {
         return string{};
     }
@@ -846,7 +819,7 @@ Status CatalogManagerReplicaSet::getAllShards(vector<ShardType>* shards) {
         return findStatus.getStatus();
     }
 
-    for (const BSONObj& doc : findStatus.getValue().value) {
+    for (const BSONObj& doc : findStatus.getValue()) {
         auto shardRes = ShardType::fromBSON(doc);
         if (!shardRes.isOK()) {
             shards->clear();
@@ -959,7 +932,7 @@ Status CatalogManagerReplicaSet::_checkDbDoesNotExist(const string& dbName, Data
         return findStatus.getStatus();
     }
 
-    const auto& docs = findStatus.getValue().value;
+    const auto& docs = findStatus.getValue();
     if (docs.empty()) {
         return Status::OK();
     }
@@ -1004,7 +977,7 @@ StatusWith<std::string> CatalogManagerReplicaSet::_generateNewShardName() {
         return findStatus.getStatus();
     }
 
-    const auto& docs = findStatus.getValue().value;
+    const auto& docs = findStatus.getValue();
 
     int count = 0;
     if (!docs.empty()) {
@@ -1124,7 +1097,7 @@ StatusWith<VersionType> CatalogManagerReplicaSet::_getConfigVersion() {
         return findStatus.getStatus();
     }
 
-    auto queryResults = findStatus.getValue().value;
+    auto queryResults = findStatus.getValue();
 
     if (queryResults.size() > 1) {
         return {ErrorCodes::RemoteValidationError,
@@ -1205,7 +1178,7 @@ StatusWith<BSONObj> CatalogManagerReplicaSet::_runCommandOnConfigWithNotMasterRe
     return response.response;
 }
 
-StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFindOnConfig(
+StatusWith<std::vector<BSONObj>> CatalogManagerReplicaSet::_exhaustiveFindOnConfig(
     const HostAndPort& host,
     const NamespaceString& nss,
     const BSONObj& query,
@@ -1225,15 +1198,15 @@ StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFin
 
     _updateLastSeenConfigOpTime(response.opTime);
 
-    return OpTimePair<vector<BSONObj>>(std::move(response.docs), response.opTime);
+    return std::move(response.docs);
 }
 
-OpTime CatalogManagerReplicaSet::_getConfigOpTime() {
+repl::OpTime CatalogManagerReplicaSet::_getConfigOpTime() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _configOpTime;
 }
 
-void CatalogManagerReplicaSet::_updateLastSeenConfigOpTime(const OpTime& optime) {
+void CatalogManagerReplicaSet::_updateLastSeenConfigOpTime(const repl::OpTime& optime) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (_configOpTime < optime) {

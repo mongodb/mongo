@@ -62,13 +62,12 @@ public:
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
-    StatusWith<OpTimePair<DatabaseType>> getDatabase(const std::string& dbName) override;
+    StatusWith<DatabaseType> getDatabase(const std::string& dbName) override;
 
-    StatusWith<OpTimePair<CollectionType>> getCollection(const std::string& collNs) override;
+    StatusWith<CollectionType> getCollection(const std::string& collNs) override;
 
     Status getCollections(const std::string* dbName,
-                          std::vector<CollectionType>* collections,
-                          repl::OpTime* optime) override;
+                          std::vector<CollectionType>* collections) override;
 
     Status dropCollection(OperationContext* txn, const NamespaceString& ns) override;
 
@@ -78,8 +77,7 @@ public:
     Status getChunks(const BSONObj& query,
                      const BSONObj& sort,
                      boost::optional<int> limit,
-                     std::vector<ChunkType>* chunks,
-                     repl::OpTime* opTime) override;
+                     std::vector<ChunkType>* chunks) override;
 
     Status getTagsForCollection(const std::string& collectionNs,
                                 std::vector<TagsType>* tags) override;
@@ -146,12 +144,11 @@ private:
     StatusWith<BSONObj> _runCommandOnConfigWithNotMasterRetries(const std::string& dbName,
                                                                 BSONObj cmdObj);
 
-    StatusWith<OpTimePair<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
-        const HostAndPort& host,
-        const NamespaceString& nss,
-        const BSONObj& query,
-        const BSONObj& sort,
-        boost::optional<long long> limit);
+    StatusWith<std::vector<BSONObj>> _exhaustiveFindOnConfig(const HostAndPort& host,
+                                                             const NamespaceString& nss,
+                                                             const BSONObj& query,
+                                                             const BSONObj& sort,
+                                                             boost::optional<long long> limit);
 
     /**
      * Appends a read committed read concern to the request object.

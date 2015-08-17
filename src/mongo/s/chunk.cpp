@@ -587,7 +587,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) const {
                 return false;
             }
 
-            shouldBalance = status.getValue().value.getAllowBalance();
+            shouldBalance = status.getValue().getAllowBalance();
         }
 
         log() << "autosplitted " << _manager->getns() << " shard: " << toString() << " into "

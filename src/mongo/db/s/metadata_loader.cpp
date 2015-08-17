@@ -114,7 +114,7 @@ Status MetadataLoader::_initCollection(CatalogManager* catalogManager,
         return coll.getStatus();
     }
 
-    const auto& collInfo = coll.getValue().value;
+    CollectionType collInfo = coll.getValue();
     if (collInfo.getDropped()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "could not load metadata, collection " << ns
@@ -174,8 +174,8 @@ Status MetadataLoader::initChunks(CatalogManager* catalogManager,
     try {
         std::vector<ChunkType> chunks;
         const auto diffQuery = differ.configDiffQuery();
-        Status status = catalogManager->getChunks(
-            diffQuery.query, diffQuery.sort, boost::none, &chunks, nullptr);
+        Status status =
+            catalogManager->getChunks(diffQuery.query, diffQuery.sort, boost::none, &chunks);
         if (!status.isOK()) {
             if (status == ErrorCodes::HostUnreachable) {
                 // Make our metadata invalid

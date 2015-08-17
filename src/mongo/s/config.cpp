@@ -62,10 +62,7 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-CollectionInfo::CollectionInfo(OperationContext* txn,
-                               const CollectionType& coll,
-                               repl::OpTime opTime)
-    : _configOpTime(std::move(opTime)) {
+CollectionInfo::CollectionInfo(OperationContext* txn, const CollectionType& coll) {
     _dropped = coll.getDropped();
 
     shard(txn, new ChunkManager(coll));
@@ -84,8 +81,6 @@ void CollectionInfo::resetCM(ChunkManager* cm) {
 void CollectionInfo::shard(OperationContext* txn, ChunkManager* manager) {
     // Do this *first* so we're invisible to everyone else
     manager->loadExistingRanges(txn, nullptr);
-
-    const auto cmOpTime = manager->getConfigOpTime();
 
     //
     // Collections with no chunks are unsharded, no matter what the collections entry says
@@ -139,8 +134,7 @@ void CollectionInfo::save(OperationContext* txn, const string& ns) {
     _dirty = false;
 }
 
-DBConfig::DBConfig(std::string name, const DatabaseType& dbt, repl::OpTime configOpTime)
-    : _name(name), _configOpTime(std::move(configOpTime)) {
+DBConfig::DBConfig(std::string name, const DatabaseType& dbt) : _name(name) {
     invariant(_name == dbt.getName());
     _primaryId = dbt.getPrimary();
     _shardingEnabled = dbt.getSharded();
@@ -221,13 +215,11 @@ bool DBConfig::removeSharding(OperationContext* txn, const string& ns) {
     return true;
 }
 
-// Handles weird logic related to getting *either* a chunk manager *or* the collection primary
-// shard
+// Handles weird logic related to getting *either* a chunk manager *or* the collection primary shard
 void DBConfig::getChunkManagerOrPrimary(const string& ns,
                                         std::shared_ptr<ChunkManager>& manager,
                                         std::shared_ptr<Shard>& primary) {
-    // The logic here is basically that at any time, our collection can become sharded or
-    // unsharded
+    // The logic here is basically that at any time, our collection can become sharded or unsharded
     // via a command.  If we're not sharded, we want to send data to the primary, if sharded, we
     // want to send data to the correct chunks, and we can't check both w/o the lock.
 
@@ -319,12 +311,8 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     // currently
     vector<ChunkType> newestChunk;
     if (oldVersion.isSet() && !forceReload) {
-        uassertStatusOK(
-            grid.catalogManager(txn)->getChunks(BSON(ChunkType::ns(ns)),
-                                                BSON(ChunkType::DEPRECATED_lastmod() << -1),
-                                                1,
-                                                &newestChunk,
-                                                nullptr));
+        uassertStatusOK(grid.catalogManager(txn)->getChunks(
+            BSON(ChunkType::ns(ns)), BSON(ChunkType::DEPRECATED_lastmod() << -1), 1, &newestChunk));
 
         if (!newestChunk.empty()) {
             invariant(newestChunk.size() == 1);
@@ -416,10 +404,6 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     // end legacy behavior
 
     if (shouldReset) {
-        const auto cmOpTime = tempChunkManager->getConfigOpTime();
-        invariant(cmOpTime >= _configOpTime);
-        invariant(cmOpTime >= ci.getCM()->getConfigOpTime());
-
         ci.resetCM(tempChunkManager.release());
     }
 
@@ -443,7 +427,7 @@ bool DBConfig::load(OperationContext* txn) {
 }
 
 bool DBConfig::_load(OperationContext* txn) {
-    auto status = grid.catalogManager(txn)->getDatabase(_name);
+    StatusWith<DatabaseType> status = grid.catalogManager(txn)->getDatabase(_name);
     if (status == ErrorCodes::DatabaseNotFound) {
         return false;
     }
@@ -451,38 +435,24 @@ bool DBConfig::_load(OperationContext* txn) {
     // All other errors are connectivity, etc so throw an exception.
     uassertStatusOK(status.getStatus());
 
-    const auto& dbOpTimePair = status.getValue();
-    const auto& dbt = dbOpTimePair.value;
+    DatabaseType dbt = status.getValue();
     invariant(_name == dbt.getName());
     _primaryId = dbt.getPrimary();
     _shardingEnabled = dbt.getSharded();
 
-    invariant(dbOpTimePair.opTime >= _configOpTime);
-    _configOpTime = dbOpTimePair.opTime;
-
     // Load all collections
     vector<CollectionType> collections;
-    repl::OpTime configOpTimeWhenLoadingColl;
-    uassertStatusOK(grid.catalogManager(txn)
-                        ->getCollections(&_name, &collections, &configOpTimeWhenLoadingColl));
+    uassertStatusOK(grid.catalogManager(txn)->getCollections(&_name, &collections));
 
     int numCollsErased = 0;
     int numCollsSharded = 0;
 
-    invariant(configOpTimeWhenLoadingColl >= _configOpTime);
-
     for (const auto& coll : collections) {
-        auto collIter = _collections.find(coll.getNs().ns());
-        if (collIter != _collections.end()) {
-            invariant(configOpTimeWhenLoadingColl >= collIter->second.getConfigOpTime());
-        }
-
         if (coll.getDropped()) {
             _collections.erase(coll.getNs().ns());
             numCollsErased++;
         } else {
-            _collections[coll.getNs().ns()] =
-                CollectionInfo(txn, coll, configOpTimeWhenLoadingColl);
+            _collections[coll.getNs().ns()] = CollectionInfo(txn, coll);
             numCollsSharded++;
         }
     }

@@ -289,7 +289,7 @@ void Balancer::_doBalanceRound(OperationContext* txn,
     invariant(candidateChunks);
 
     vector<CollectionType> collections;
-    Status collsStatus = grid.catalogManager(txn)->getCollections(nullptr, &collections, nullptr);
+    Status collsStatus = grid.catalogManager(txn)->getCollections(nullptr, &collections);
     if (!collsStatus.isOK()) {
         warning() << "Failed to retrieve the set of collections during balancing round "
                   << collsStatus;
@@ -334,8 +334,7 @@ void Balancer::_doBalanceRound(OperationContext* txn,
         grid.catalogManager(txn)->getChunks(BSON(ChunkType::ns(nss.ns())),
                                             BSON(ChunkType::min() << 1),
                                             boost::none,  // all chunks
-                                            &allNsChunks,
-                                            nullptr);
+                                            &allNsChunks);
 
         set<BSONObj> allChunkMinimums;
         map<string, vector<ChunkType>> shardToChunksMap;

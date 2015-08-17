@@ -65,13 +65,11 @@ public:
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
-    StatusWith<OpTimePair<DatabaseType>> getDatabase(const std::string& dbName) override;
+    StatusWith<DatabaseType> getDatabase(const std::string& dbName) override;
 
-    StatusWith<OpTimePair<CollectionType>> getCollection(const std::string& collNs) override;
+    StatusWith<CollectionType> getCollection(const std::string& collNs) override;
 
-    Status getCollections(const std::string* dbName,
-                          std::vector<CollectionType>* collections,
-                          repl::OpTime* optime);
+    Status getCollections(const std::string* dbName, std::vector<CollectionType>* collections);
 
     Status dropCollection(OperationContext* txn, const NamespaceString& ns) override;
 
@@ -81,8 +79,7 @@ public:
     Status getChunks(const BSONObj& query,
                      const BSONObj& sort,
                      boost::optional<int> limit,
-                     std::vector<ChunkType>* chunks,
-                     repl::OpTime* opTime) override;
+                     std::vector<ChunkType>* chunks) override;
 
     Status getTagsForCollection(const std::string& collectionNs,
                                 std::vector<TagsType>* tags) override;
