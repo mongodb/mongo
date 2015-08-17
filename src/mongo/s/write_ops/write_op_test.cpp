@@ -218,11 +218,11 @@ TEST(WriteOpTests, TargetMultiAllShards) {
     ASSERT_EQUALS(targeted.size(), 3u);
     sortByEndpoint(&targeted);
     ASSERT_EQUALS(targeted[0]->endpoint.shardName, endpointA.shardName);
-    ASSERT(ChunkVersion::isIgnoredVersion(targeted[0]->endpoint.shardVersion));
+    ASSERT(ChunkVersion::isIgnoredVersion(targeted[0]->endpoint.shardVersion.getVersion()));
     ASSERT_EQUALS(targeted[1]->endpoint.shardName, endpointB.shardName);
-    ASSERT(ChunkVersion::isIgnoredVersion(targeted[1]->endpoint.shardVersion));
+    ASSERT(ChunkVersion::isIgnoredVersion(targeted[1]->endpoint.shardVersion.getVersion()));
     ASSERT_EQUALS(targeted[2]->endpoint.shardName, endpointC.shardName);
-    ASSERT(ChunkVersion::isIgnoredVersion(targeted[2]->endpoint.shardVersion));
+    ASSERT(ChunkVersion::isIgnoredVersion(targeted[2]->endpoint.shardVersion.getVersion()));
 
     writeOp.noteWriteComplete(*targeted[0]);
     writeOp.noteWriteComplete(*targeted[1]);

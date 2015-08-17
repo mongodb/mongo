@@ -50,32 +50,24 @@ TEST(BatchedUpdateRequest, Basic) {
                 << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("b" << 2)))
                 << BatchedUpdateDocument::multi(false) << BatchedUpdateDocument::upsert(false)));
 
-    BSONObj writeConcernObj = BSON("w" << 1);
-
-    // The BSON_ARRAY macro doesn't support Timestamps.
-    BSONArrayBuilder arrBuilder;
-    arrBuilder.append(Timestamp(1, 1));
-    arrBuilder.append(OID::gen());
-    BSONArray shardVersionArray = arrBuilder.arr();
-
-    BSONObj origUpdateRequestObj =
-        BSON(BatchedUpdateRequest::collName("test")
-             << BatchedUpdateRequest::updates() << updateArray
-             << BatchedUpdateRequest::writeConcern(writeConcernObj)
-             << BatchedUpdateRequest::ordered(true) << BatchedUpdateRequest::metadata()
-             << BSON(BatchedRequestMetadata::shardName("shard0000")
-                     << BatchedRequestMetadata::shardVersion() << shardVersionArray
-                     << BatchedRequestMetadata::session(0)));
+    BSONObj origUpdateRequestObj = BSON(
+        BatchedUpdateRequest::collName("test")
+        << BatchedUpdateRequest::updates() << updateArray
+        << BatchedUpdateRequest::writeConcern(BSON("w" << 1)) << BatchedUpdateRequest::ordered(true)
+        << BatchedUpdateRequest::metadata() << BSON("shardName"
+                                                    << "shard000"
+                                                    << "shardVersion"
+                                                    << BSON_ARRAY(Timestamp(1, 2) << OID::gen())
+                                                    << "ts" << Timestamp(3, 4) << "t" << 5
+                                                    << "session" << 0LL));
 
     string errMsg;
     BatchedUpdateRequest request;
-    bool ok = request.parseBSON("foo", origUpdateRequestObj, &errMsg);
-    ASSERT_TRUE(ok);
+    ASSERT_TRUE(request.parseBSON("foo", origUpdateRequestObj, &errMsg));
 
     ASSERT_EQ("foo.test", request.getNS().ns());
 
-    BSONObj genUpdateRequestObj = request.toBSON();
-    ASSERT_EQUALS(0, genUpdateRequestObj.woCompare(origUpdateRequestObj));
+    ASSERT_EQUALS(origUpdateRequestObj, request.toBSON());
 }
 
 }  // namespace
