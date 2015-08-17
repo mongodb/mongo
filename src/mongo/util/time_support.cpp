@@ -192,6 +192,10 @@ string terseCurrentTime(bool colonsOk) {
     return buf;
 }
 
+string terseUTCCurrentTime() {
+    return terseCurrentTime(false) + "Z";
+}
+
 #define MONGO_ISO_DATE_FMT_NO_TZ "%Y-%m-%dT%H:%M:%S"
 
 namespace {

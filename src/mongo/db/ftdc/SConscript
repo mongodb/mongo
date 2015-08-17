@@ -8,7 +8,9 @@ ftdcEnv.Library(
     target='ftdc',
     source=[
         'block_compressor.cpp',
+        'collector.cpp',
         'compressor.cpp',
+        'controller.cpp',
         'decompressor.cpp',
         'file_manager.cpp',
         'file_reader.cpp',
@@ -24,10 +26,22 @@ ftdcEnv.Library(
     ],
 )
 
+env.Library(
+    target='ftdc_mongod',
+    source=[
+        'ftdc_mongod.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'ftdc'
+    ],
+)
+
 env.CppUnitTest(
     target='ftdc_test',
     source=[
         'compressor_test.cpp',
+        'controller_test.cpp',
         'file_manager_test.cpp',
         'file_writer_test.cpp',
         'ftdc_test.cpp',
@@ -37,5 +51,6 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         'ftdc',
-    ])
+    ],
+)
 

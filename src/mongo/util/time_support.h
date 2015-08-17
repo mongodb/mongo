@@ -264,6 +264,11 @@ private:
 std::string terseCurrentTime(bool colonsOk = true);
 
 /**
+ * Produces a short UTC date + time approriate for file names with Z appended.
+ */
+std::string terseUTCCurrentTime();
+
+/**
  * Formats "date" according to the ISO 8601 extended form standard, including date,
  * and time with milliseconds decimal component, in the UTC timezone.
  *

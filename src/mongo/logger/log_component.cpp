@@ -119,6 +119,8 @@ StringData LogComponent::toStringData() const {
             return createStringData("journal");
         case kWrite:
             return createStringData("write");
+        case kFTDC:
+            return createStringData("ftdc");
         case kNumLogComponents:
             return createStringData("total");
             // No default. Compiler should complain if there's a log component that's not handled.
@@ -183,6 +185,8 @@ StringData LogComponent::getNameForLog() const {
             return createStringData("JOURNAL ");
         case kWrite:
             return createStringData("WRITE   ");
+        case kFTDC:
+            return createStringData("FTDC    ");
         case kNumLogComponents:
             return createStringData("TOTAL   ");
             // No default. Compiler should complain if there's a log component that's not handled.

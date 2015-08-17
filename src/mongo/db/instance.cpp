@@ -56,6 +56,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
+#include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -1163,6 +1164,9 @@ void exitCleanly(ExitCode code) {
 
     // Grab the shutdown lock to prevent concurrent callers
     stdx::lock_guard<stdx::mutex> lockguard(shutdownLock);
+
+    // Shutdown Full-Time Data Capture
+    stopFTDC();
 
     // Global storage engine may not be started in all cases before we exit
     if (getGlobalServiceContext()->getGlobalStorageEngine() == NULL) {
