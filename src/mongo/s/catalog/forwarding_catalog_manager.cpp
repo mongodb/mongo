@@ -26,36 +26,57 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/catalog/forwarding_catalog_manager.h"
 
+#include <cstdint>
 #include <vector>
 
 #include "mongo/client/connection_string.h"
-#include "mongo/s/catalog/type_settings.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_collection.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/random.h"
 #include "mongo/s/catalog/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/legacy/catalog_manager_legacy.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/replset_dist_lock_manager.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_settings.h"
+#include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+using executor::TaskExecutor;
 
 namespace {
 std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
                                                    const ConnectionString& configCS,
                                                    ShardRegistry* shardRegistry,
-                                                   const std::string& distLockProcessId) {
+                                                   const HostAndPort& thisHost) {
     switch (configCS.type()) {
         case ConnectionString::SET: {
             auto distLockCatalog = stdx::make_unique<DistLockCatalogImpl>(
                 shardRegistry, ReplSetDistLockManager::kDistLockWriteConcernTimeout);
 
+            std::unique_ptr<SecureRandom> rng(SecureRandom::create());
+            std::string distLockProcessId = str::stream()
+                << thisHost.toString() << ':'
+                << durationCount<Seconds>(service->getClockSource()->now().toDurationSinceEpoch())
+                << ':' << static_cast<int32_t>(rng->nextInt64());
             auto distLockManager = stdx::make_unique<ReplSetDistLockManager>(
                 service,
                 distLockProcessId,
@@ -81,13 +102,59 @@ std::unique_ptr<CatalogManager> makeCatalogManager(ServiceContext* service,
 ForwardingCatalogManager::ForwardingCatalogManager(ServiceContext* service,
                                                    const ConnectionString& configCS,
                                                    ShardRegistry* shardRegistry,
-                                                   const std::string& distLockProcessId)
-    : _actual(makeCatalogManager(service, configCS, shardRegistry, distLockProcessId)) {}
+                                                   const HostAndPort& thisHost)
+    : ForwardingCatalogManager(service,
+                               makeCatalogManager(service, configCS, shardRegistry, thisHost),
+                               shardRegistry,
+                               thisHost) {}
 
-ForwardingCatalogManager::ForwardingCatalogManager(std::unique_ptr<CatalogManager> actual)
-    : _actual(std::move(actual)) {}
+ForwardingCatalogManager::ForwardingCatalogManager(ServiceContext* service,
+                                                   std::unique_ptr<CatalogManager> actual,
+                                                   ShardRegistry* shardRegistry,
+                                                   const HostAndPort& thisHost)
+    : _service(service),
+      _shardRegistry(shardRegistry),
+      _thisHost(thisHost),
+      _operationLock("CatalogOperationLock"),
+      _actual(std::move(actual)) {}
 
 ForwardingCatalogManager::~ForwardingCatalogManager() = default;
+
+Status ForwardingCatalogManager::scheduleReplaceCatalogManagerIfNeeded(
+    ConfigServerMode desiredMode, StringData replSetName, const HostAndPort& knownServer) {
+    stdx::lock_guard<stdx::mutex> lk(_observerMutex);
+    const auto currentMode = _actual->getMode();
+    if (currentMode == desiredMode) {
+        return Status::OK();
+    }
+    if (desiredMode == ConfigServerMode::SCCC) {
+        // TODO(spencer): Support downgrade.
+        return {ErrorCodes::IllegalOperation,
+                "Config server reports that it legacy SCCC mode, but we are already using "
+                "the replica set config server protocol for config server "
+                "communication.  Downgrade needed but not yet supported"};
+    }
+    invariant(desiredMode == ConfigServerMode::CSRS);
+    if (_nextConfigChangeComplete.isValid()) {
+        if (_nextConfigConnectionString.getSetName() != replSetName) {
+            severe() << "Conflicting new config server replica set names: "
+                     << _nextConfigConnectionString.getSetName() << " vs " << replSetName;
+            fassertFailed(28788);
+        }
+    } else {
+        _nextConfigConnectionString = ConnectionString::forReplicaSet(replSetName, {knownServer});
+        _nextConfigChangeComplete =
+            fassertStatusOK(28789, _shardRegistry->getExecutor()->makeEvent());
+        fassertStatusOK(
+            28787,
+            _shardRegistry->getExecutor()->scheduleWork(
+                [this](const TaskExecutor::CallbackArgs& args) { _replaceCatalogManager(args); }));
+    }
+    return {ErrorCodes::IncompatibleCatalogManager,
+            "Need to swap sharding catalog manager.  Config server "
+            "reports that it is in replica set mode, but we are still using the "
+            "legacy SCCC protocol for config server communication"};
+}
 
 CatalogManager::ConfigServerMode ForwardingCatalogManager::getMode() {
     return retry([this] { return _actual->getMode(); });
@@ -156,7 +223,10 @@ Status ForwardingCatalogManager::getCollections(const std::string* dbName,
                                                 std::vector<CollectionType>* collections,
                                                 repl::OpTime* opTime) {
     invariant(collections->empty());
-    return retry([&] { return _actual->getCollections(dbName, collections, opTime); });
+    return retry([&] {
+        collections->clear();
+        return _actual->getCollections(dbName, collections, opTime);
+    });
 }
 
 Status ForwardingCatalogManager::dropCollection(OperationContext* txn, const NamespaceString& ns) {
@@ -166,7 +236,10 @@ Status ForwardingCatalogManager::dropCollection(OperationContext* txn, const Nam
 Status ForwardingCatalogManager::getDatabasesForShard(const std::string& shardName,
                                                       std::vector<std::string>* dbs) {
     invariant(dbs->empty());
-    return retry([&] { return _actual->getDatabasesForShard(shardName, dbs); });
+    return retry([&] {
+        dbs->clear();
+        return _actual->getDatabasesForShard(shardName, dbs);
+    });
 }
 
 Status ForwardingCatalogManager::getChunks(const BSONObj& query,
@@ -175,13 +248,19 @@ Status ForwardingCatalogManager::getChunks(const BSONObj& query,
                                            std::vector<ChunkType>* chunks,
                                            repl::OpTime* opTime) {
     invariant(chunks->empty());
-    return retry([&] { return _actual->getChunks(query, sort, limit, chunks, opTime); });
+    return retry([&] {
+        chunks->clear();
+        return _actual->getChunks(query, sort, limit, chunks, opTime);
+    });
 }
 
 Status ForwardingCatalogManager::getTagsForCollection(const std::string& collectionNs,
                                                       std::vector<TagsType>* tags) {
     invariant(tags->empty());
-    return retry([&] { return _actual->getTagsForCollection(collectionNs, tags); });
+    return retry([&] {
+        tags->clear();
+        return _actual->getTagsForCollection(collectionNs, tags);
+    });
 }
 
 StatusWith<std::string> ForwardingCatalogManager::getTagForChunk(const std::string& collectionNs,
@@ -191,7 +270,10 @@ StatusWith<std::string> ForwardingCatalogManager::getTagForChunk(const std::stri
 
 Status ForwardingCatalogManager::getAllShards(std::vector<ShardType>* shards) {
     invariant(shards->empty());
-    return retry([&] { return _actual->getAllShards(shards); });
+    return retry([&] {
+        shards->clear();
+        return _actual->getAllShards(shards);
+    });
 }
 
 bool ForwardingCatalogManager::runUserManagementWriteCommand(const std::string& commandName,
@@ -235,14 +317,20 @@ Status ForwardingCatalogManager::applyChunkOpsDeprecated(const BSONArray& update
 }
 
 void ForwardingCatalogManager::logAction(const ActionLogType& actionLog) {
-    retry([&] { _actual->logAction(actionLog); });
+    retry([&] {
+        _actual->logAction(actionLog);
+        return 1;
+    });
 }
 
 void ForwardingCatalogManager::logChange(const std::string& clientAddress,
                                          const std::string& what,
                                          const std::string& ns,
                                          const BSONObj& detail) {
-    retry([&] { _actual->logChange(clientAddress, what, ns, detail); });
+    retry([&] {
+        _actual->logChange(clientAddress, what, ns, detail);
+        return 1;
+    });
 }
 
 StatusWith<SettingsType> ForwardingCatalogManager::getGlobalSettings(const std::string& key) {
@@ -255,6 +343,7 @@ void ForwardingCatalogManager::writeConfigServerDirect(const BatchedCommandReque
         BatchedCommandResponse theResponse;
         _actual->writeConfigServerDirect(request, &theResponse);
         theResponse.cloneTo(response);
+        return 1;
     });
 }
 
@@ -275,30 +364,130 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock> ForwardingCatalogManager::d
     StringData whyMessage,
     stdx::chrono::milliseconds waitFor,
     stdx::chrono::milliseconds lockTryInterval) {
-    auto theLock = getDistLockManager()->lock(name, whyMessage, waitFor, lockTryInterval);
-    if (!theLock.isOK()) {
-        return std::move(theLock.getStatus());
+    for (int i = 0; i < 2; ++i) {
+        try {
+            _operationLock.lock_shared();
+            auto guard = MakeGuard([this] { _operationLock.unlock_shared(); });
+            auto dlmLock = getDistLockManager()->lock(name, whyMessage, waitFor, lockTryInterval);
+            if (dlmLock.isOK()) {
+                guard.Dismiss();  // Don't unlock _operationLock; hold it until the returned
+                                  // ScopedDistLock goes out of scope!
+                try {
+                    return ScopedDistLock(this, std::move(dlmLock.getValue()));
+                } catch (...) {
+                    // Once the guard that unlocks _operationLock is dismissed, any exception before
+                    // this method returns is fatal.
+                    std::terminate();
+                }
+            } else if (dlmLock.getStatus() != ErrorCodes::IncompatibleCatalogManager) {
+                return dlmLock.getStatus();
+            }
+        } catch (const DBException& ex) {
+            if (ex.getCode() != ErrorCodes::IncompatibleCatalogManager) {
+                throw;
+            }
+        }
+        _waitForNewCatalogManager();
     }
-    return ScopedDistLock(std::move(theLock.getValue()));
+    MONGO_UNREACHABLE;
 }
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
+ForwardingCatalogManager::ScopedDistLock::ScopedDistLock(ForwardingCatalogManager* fcm,
+                                                         DistLockManager::ScopedDistLock theLock)
+    : _fcm(fcm), _lock(std::move(theLock)) {}
 
 ForwardingCatalogManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other)
-    : _lock(std::move(other._lock)) {}
+    : _fcm(other._fcm), _lock(std::move(other._lock)) {
+    other._fcm = nullptr;
+}
+
+ForwardingCatalogManager::ScopedDistLock::~ScopedDistLock() {
+    if (_fcm) {
+        auto guard = MakeGuard([this] { _fcm->_operationLock.unlock_shared(); });
+        DistLockManager::ScopedDistLock dlmLock = std::move(_lock);
+    }
+}
 
 ForwardingCatalogManager::ScopedDistLock& ForwardingCatalogManager::ScopedDistLock::operator=(
     ScopedDistLock&& other) {
+    invariant(!_fcm);
+    _fcm = other._fcm;
+    other._fcm = nullptr;
     _lock = std::move(other._lock);
     return *this;
 }
 
-#endif
+namespace {
+
+template <typename T>
+struct CheckForIncompatibleCatalogManager {
+    T operator()(T&& v) {
+        return std::forward<T>(v);
+    }
+};
+
+template <typename T>
+struct CheckForIncompatibleCatalogManager<StatusWith<T>> {
+    StatusWith<T> operator()(StatusWith<T>&& v) {
+        if (!v.isOK() && v.getStatus().code() == ErrorCodes::IncompatibleCatalogManager) {
+            uassertStatusOK(v);
+        }
+        return std::forward<StatusWith<T>>(v);
+    }
+};
+
+template <>
+struct CheckForIncompatibleCatalogManager<Status> {
+    Status operator()(Status&& v) {
+        if (v.code() == ErrorCodes::IncompatibleCatalogManager) {
+            uassertStatusOK(v);
+        }
+        return std::move(v);
+    }
+};
+
+template <typename T>
+T checkForIncompatibleCatalogManager(T&& v) {
+    return CheckForIncompatibleCatalogManager<T>()(std::forward<T>(v));
+}
+
+}  // namespace
 
 template <typename Callable>
 auto ForwardingCatalogManager::retry(Callable&& c) -> decltype(std::forward<Callable>(c)()) {
-    return std::forward<Callable>(c)();
+    for (int i = 0; i < 2; ++i) {
+        try {
+            rwlock_shared oplk(_operationLock);
+            return checkForIncompatibleCatalogManager(std::forward<Callable>(c)());
+        } catch (const DBException& ex) {
+            if (ex.getCode() != ErrorCodes::IncompatibleCatalogManager) {
+                throw;
+            }
+        }
+        _waitForNewCatalogManager();
+    }
+    MONGO_UNREACHABLE;
 }
 
+void ForwardingCatalogManager::_replaceCatalogManager(const TaskExecutor::CallbackArgs& args) {
+    if (!args.status.isOK()) {
+        return;
+    }
+    stdx::lock_guard<RWLock> oplk(_operationLock);
+    stdx::lock_guard<stdx::mutex> oblk(_observerMutex);
+    _actual->shutDown(/* allowNetworking */ false);
+    _actual = makeCatalogManager(_service, _nextConfigConnectionString, _shardRegistry, _thisHost);
+    _shardRegistry->updateConfigServerConnectionString(_nextConfigConnectionString);
+    fassert(28790, _actual->startup());
+    args.executor->signalEvent(_nextConfigChangeComplete);
+}
+
+void ForwardingCatalogManager::_waitForNewCatalogManager() {
+    stdx::unique_lock<stdx::mutex> oblk(_observerMutex);
+    invariant(_nextConfigChangeComplete.isValid());
+    auto configChangeComplete = _nextConfigChangeComplete;
+    oblk.unlock();
+    _shardRegistry->getExecutor()->waitForEvent(configChangeComplete);
+}
 
 }  // namespace mongo

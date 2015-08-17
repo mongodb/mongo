@@ -108,15 +108,6 @@ public:
     }
 
     /**
-     * Compares desiredMode against _catalogManager->getMode().  Returns Status::OK() if they match,
-     * returns ErrorCodes::IncompatibleCatalogManger if desiredMode is CSRS and the current mode is
-     * SCCC. If desiredMode is SCCC and current mode is CSRS returns InvalidOperation as we do not
-     * support downgrade.
-     * TODO(spencer): Support downgrade.
-     */
-    Status checkIfCatalogNeedsSwapping(CatalogManager::ConfigServerMode desiredMode);
-
-    /**
      * Clears the grid object so that it can be reused between test executions. This will not
      * be necessary if grid is hanging off the global ServiceContext and each test gets its
      * own service context.

@@ -87,8 +87,7 @@ Status initializeGlobalShardingState(const ConnectionString& configCS) {
             getGlobalServiceContext(),
             configCS,
             shardRegistry.get(),
-            str::stream() << getHostName() << ":" << serverGlobalParams.port << ":" << time(0)
-                          << ":" << rand());
+            HostAndPort(getHostName(), serverGlobalParams.port));
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

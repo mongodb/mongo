@@ -49,13 +49,16 @@ DistLockManager::ScopedDistLock::~ScopedDistLock() {
     }
 }
 
-DistLockManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other) {
+DistLockManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other) : _lockManager(nullptr) {
     *this = std::move(other);
 }
 
 DistLockManager::ScopedDistLock& DistLockManager::ScopedDistLock::operator=(
     ScopedDistLock&& other) {
     if (this != &other) {
+        if (_lockManager) {
+            _lockManager->unlock(_lockID);
+        }
         _lockID = std::move(other._lockID);
         _lockManager = other._lockManager;
         other._lockManager = nullptr;

@@ -112,7 +112,9 @@ void CatalogManagerReplSetTestFixture::setUp() {
 
     // For now initialize the global grid object. All sharding objects will be accessible
     // from there until we get rid of it.
-    grid.init(stdx::make_unique<ForwardingCatalogManager>(std::move(cm)),
+    auto shardRegistryPtr = shardRegistry.get();
+    grid.init(stdx::make_unique<ForwardingCatalogManager>(
+                  _service.get(), std::move(cm), shardRegistryPtr, HostAndPort("somehost")),
               std::move(shardRegistry),
               stdx::make_unique<ClusterCursorManager>(_service->getClockSource()));
 }

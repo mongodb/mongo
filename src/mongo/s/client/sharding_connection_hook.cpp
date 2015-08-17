@@ -112,9 +112,12 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
                               << ". Expected either 0 or 1",
                 configServerModeNumber == 0 || configServerModeNumber == 1);
 
-        status = grid.checkIfCatalogNeedsSwapping(configServerModeNumber == 0
-                                                      ? CatalogManager::ConfigServerMode::SCCC
-                                                      : CatalogManager::ConfigServerMode::CSRS);
+        BSONElement setName = isMasterResponse["setName"];
+        status = grid.catalogManager()->scheduleReplaceCatalogManagerIfNeeded(
+            configServerModeNumber == 0 ? CatalogManager::ConfigServerMode::SCCC
+                                        : CatalogManager::ConfigServerMode::CSRS,
+            setName.type() == String ? setName.valueStringData() : StringData(),
+            static_cast<DBClientConnection*>(conn)->getServerHostAndPort());
         uassertStatusOK(status);
     }
 }

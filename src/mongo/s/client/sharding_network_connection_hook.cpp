@@ -56,9 +56,12 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
         return status;
     }
 
-    return grid.checkIfCatalogNeedsSwapping(configServerModeNumber == 0
-                                                ? CatalogManager::ConfigServerMode::SCCC
-                                                : CatalogManager::ConfigServerMode::CSRS);
+    BSONElement setName = isMasterReply.data["setName"];
+    return grid.catalogManager()->scheduleReplaceCatalogManagerIfNeeded(
+        configServerModeNumber == 0 ? CatalogManager::ConfigServerMode::SCCC
+                                    : CatalogManager::ConfigServerMode::CSRS,
+        setName.type() == String ? setName.valueStringData() : StringData(),
+        remoteHost);
 }
 
 StatusWith<boost::optional<executor::RemoteCommandRequest>>
