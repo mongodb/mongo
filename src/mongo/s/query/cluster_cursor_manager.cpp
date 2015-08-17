@@ -111,6 +111,11 @@ StatusWith<boost::optional<BSONObj>> ClusterCursorManager::PinnedCursor::next() 
     return _cursor->next();
 }
 
+bool ClusterCursorManager::PinnedCursor::isTailable() const {
+    invariant(_cursor);
+    return _cursor->isTailable();
+}
+
 void ClusterCursorManager::PinnedCursor::returnCursor(CursorState cursorState) {
     invariant(_cursor);
     // Note that unpinning a cursor transfers ownership of the underlying ClusterClientCursor object

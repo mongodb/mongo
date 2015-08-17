@@ -70,6 +70,11 @@ public:
      * May block waiting for responses from remote hosts.
      */
     virtual void kill() = 0;
+
+    /**
+     * Returns whether or not this cursor is tailing a capped collection on a shard.
+     */
+    virtual bool isTailable() const = 0;
 };
 
 }  // namespace mongo

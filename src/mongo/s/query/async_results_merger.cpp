@@ -75,6 +75,12 @@ bool AsyncResultsMerger::ready_inlock() {
         return true;
     }
 
+    if (_eofNext) {
+        // We are ready to return boost::none due to reaching the end of a batch of results from a
+        // tailable cursor.
+        return true;
+    }
+
     for (const auto& remote : _remotes) {
         // First check whether any of the remotes reported an error.
         if (!remote.status.isOK()) {
@@ -95,6 +101,9 @@ bool AsyncResultsMerger::ready_inlock() {
 }
 
 bool AsyncResultsMerger::readySorted_inlock() {
+    // Tailable cursors cannot have a sort.
+    invariant(!_params.isTailable);
+
     for (const auto& remote : _remotes) {
         if (!remote.hasNext() && !remote.exhausted()) {
             return false;
@@ -123,11 +132,16 @@ StatusWith<boost::optional<BSONObj>> AsyncResultsMerger::nextReady() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     dassert(ready_inlock());
     if (_lifecycleState != kAlive) {
-        return Status(ErrorCodes::IllegalOperation, "async cluster client cursor killed");
+        return Status(ErrorCodes::IllegalOperation, "AsyncResultsMerger killed");
     }
 
     if (!_status.isOK()) {
         return _status;
+    }
+
+    if (_eofNext) {
+        _eofNext = false;
+        return {boost::none};
     }
 
     const bool hasSort = !_params.sort.isEmpty();
@@ -135,6 +149,9 @@ StatusWith<boost::optional<BSONObj>> AsyncResultsMerger::nextReady() {
 }
 
 boost::optional<BSONObj> AsyncResultsMerger::nextReadySorted() {
+    // Tailable cursors cannot have a sort.
+    invariant(!_params.isTailable);
+
     if (_mergeQueue.empty()) {
         return boost::none;
     }
@@ -166,6 +183,14 @@ boost::optional<BSONObj> AsyncResultsMerger::nextReadyUnsorted() {
         if (_remotes[_gettingFromRemote].hasNext()) {
             BSONObj front = _remotes[_gettingFromRemote].docBuffer.front();
             _remotes[_gettingFromRemote].docBuffer.pop();
+
+            if (_params.isTailable && !_remotes[_gettingFromRemote].hasNext()) {
+                // The cursor is tailable and we're about to return the last buffered result. This
+                // means that the next value returned should be boost::none to indicate the end of
+                // the batch.
+                _eofNext = true;
+            }
+
             return front;
         }
 
@@ -210,7 +235,7 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() 
     if (_lifecycleState != kAlive) {
         // Can't schedule further network operations if the ARM is being killed.
         return Status(ErrorCodes::IllegalOperation,
-                      "nextEvent() called on a killed async cluster client cursor");
+                      "nextEvent() called on a killed AsyncResultsMerger");
     }
 
     if (_currentEvent.isValid()) {
@@ -322,9 +347,18 @@ void AsyncResultsMerger::handleBatchResponse(
         _mergeQueue.push(remoteIndex);
     }
 
+    // If the cursor is tailable and we just received an empty batch, the next return value should
+    // be boost::none in order to indicate the end of the batch.
+    if (_params.isTailable && !remote.hasNext()) {
+        _eofNext = true;
+    }
+
     // If even after receiving this batch we still don't have anything buffered (i.e. the batchSize
     // was zero), then can schedule work to retrieve the next batch right away.
-    if (!remote.hasNext() && !remote.exhausted()) {
+    //
+    // We do not ask for the next batch if the cursor is tailable, as batches received from remote
+    // tailable cursors should be passed through to the client without asking for more batches.
+    if (!_params.isTailable && !remote.hasNext() && !remote.exhausted()) {
         auto nextBatchStatus = askForNextBatch_inlock(remoteIndex);
         if (!nextBatchStatus.isOK()) {
             remote.status = nextBatchStatus;

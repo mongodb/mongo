@@ -289,16 +289,6 @@ Status prepareExecution(OperationContext* opCtx,
                           "error processing query: " + canonicalQuery->toString() +
                               " tailable cursor requested on non capped collection");
         }
-
-        // If a sort is specified it must be equal to expectedSort.
-        const BSONObj expectedSort = BSON("$natural" << 1);
-        const BSONObj& actualSort = canonicalQuery->getParsed().getSort();
-        if (!actualSort.isEmpty() && !(actualSort == expectedSort)) {
-            return Status(ErrorCodes::BadValue,
-                          "error processing query: " + canonicalQuery->toString() +
-                              " invalid sort specified for tailable cursor: " +
-                              actualSort.toString());
-        }
     }
 
     // Try to look up a cached solution for the query.

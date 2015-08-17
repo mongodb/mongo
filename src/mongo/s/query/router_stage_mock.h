@@ -56,8 +56,14 @@ public:
      */
     void queueError(Status status);
 
+    /**
+     * Queues an explicit boost::none response. The mock stage will also return boost::none
+     * automatically after emptying the queue of responses.
+     */
+    void queueEOF();
+
 private:
-    std::queue<StatusWith<BSONObj>> _resultsQueue;
+    std::queue<StatusWith<boost::optional<BSONObj>>> _resultsQueue;
 };
 
 }  // namespace mongo

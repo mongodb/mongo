@@ -103,6 +103,12 @@ public:
      * If we have reached the end of the stream of results, returns boost::none along with an ok
      * status.
      *
+     * If this AsyncResultsMerger is fetching results from a remote cursor tailing a capped
+     * collection, may return boost::none before end-of-stream. (Tailable cursors remain open even
+     * when there are no further results, and may subsequently return more results when they become
+     * available.) The calling code is responsible for handling multiple boost::none return values,
+     * keeping the cursor open in the tailable case.
+     *
      * If there has been an error received from one of the shards, or there is an error in
      * processing results from a shard, then a non-ok status is returned.
      *
@@ -267,6 +273,10 @@ private:
     Status _status = Status::OK();
 
     executor::TaskExecutor::EventHandle _currentEvent;
+
+    // For tailable cursors, set to true if the next result returned from nextReady() should be
+    // boost::none.
+    bool _eofNext = false;
 
     //
     // Killing
