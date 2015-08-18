@@ -399,6 +399,28 @@ TEST(CanonicalQueryTest, IsValidTextAndSnapshot) {
     ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *lpq));
 }
 
+TEST(CanonicalQueryTest, IsValidSortKeyMetaProjection) {
+    // Passing a sortKey meta-projection without a sort is an error.
+    {
+        const bool isExplain = false;
+        auto lpq = assertGet(LiteParsedQuery::makeFromFindCommand(
+            nss, fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}}"), isExplain));
+        auto cq = CanonicalQuery::canonicalize(lpq.release());
+        ASSERT_NOT_OK(cq.getStatus());
+    }
+
+    // Should be able to successfully create a CQ when there is a sort.
+    {
+        const bool isExplain = false;
+        auto lpq = assertGet(LiteParsedQuery::makeFromFindCommand(
+            nss,
+            fromjson("{find: 'testcoll', projection: {foo: {$meta: 'sortKey'}}, sort: {bar: 1}}"),
+            isExplain));
+        auto cq = CanonicalQuery::canonicalize(lpq.release());
+        ASSERT_OK(cq.getStatus());
+    }
+}
+
 //
 // Tests for CanonicalQuery::sortTree
 //

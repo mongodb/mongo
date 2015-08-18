@@ -158,11 +158,12 @@ public:
     static const std::string queryOptionMaxTimeMS;
 
     // Names of the $meta projection values.
-    static const std::string metaTextScore;
     static const std::string metaGeoNearDistance;
     static const std::string metaGeoNearPoint;
-    static const std::string metaRecordId;
     static const std::string metaIndexKey;
+    static const std::string metaRecordId;
+    static const std::string metaSortKey;
+    static const std::string metaTextScore;
 
     const NamespaceString& nss() const {
         return _nss;

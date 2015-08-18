@@ -762,6 +762,16 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
             }
         }
 
+        // If there's no sort stage but we have a sortKey meta-projection, we need to add a stage to
+        // generate the sort key computed data.
+        if (!hasSortStage && query.getProj()->wantSortKey()) {
+            SortKeyGeneratorNode* keyGenNode = new SortKeyGeneratorNode();
+            keyGenNode->queryObj = lpq.getFilter();
+            keyGenNode->sortSpec = lpq.getSort();
+            keyGenNode->children.push_back(solnRoot);
+            solnRoot = keyGenNode;
+        }
+
         // We now know we have whatever data is required for the projection.
         ProjectionNode* projNode = new ProjectionNode();
         projNode->children.push_back(solnRoot);

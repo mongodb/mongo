@@ -49,11 +49,12 @@ public:
      * document / query.
      */
     enum MetaProjection {
-        META_TEXT_SCORE,
         META_GEONEAR_DIST,
         META_GEONEAR_POINT,
-        META_RECORDID,
         META_IX_KEY,
+        META_RECORDID,
+        META_SORT_KEY,
+        META_TEXT_SCORE,
     };
 
     /**

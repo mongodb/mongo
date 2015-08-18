@@ -66,6 +66,7 @@ Status ParsedProjection::make(const BSONObj& spec,
 
     bool wantGeoNearPoint = false;
     bool wantGeoNearDistance = false;
+    bool wantSortKey = false;
 
     // Until we see a positional or elemMatch operator we're normal.
     ArrayOpType arrayOpType = ARRAY_OP_NORMAL;
@@ -150,7 +151,8 @@ Status ParsedProjection::make(const BSONObj& spec,
                     e2.valuestr() != LiteParsedQuery::metaRecordId &&
                     e2.valuestr() != LiteParsedQuery::metaIndexKey &&
                     e2.valuestr() != LiteParsedQuery::metaGeoNearDistance &&
-                    e2.valuestr() != LiteParsedQuery::metaGeoNearPoint) {
+                    e2.valuestr() != LiteParsedQuery::metaGeoNearPoint &&
+                    e2.valuestr() != LiteParsedQuery::metaSortKey) {
                     return Status(ErrorCodes::BadValue, "unsupported $meta operator: " + e2.str());
                 }
 
@@ -161,6 +163,8 @@ Status ParsedProjection::make(const BSONObj& spec,
                     wantGeoNearDistance = true;
                 } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
                     wantGeoNearPoint = true;
+                } else if (e2.valuestr() == LiteParsedQuery::metaSortKey) {
+                    wantSortKey = true;
                 }
             } else {
                 return Status(ErrorCodes::BadValue,
@@ -242,9 +246,10 @@ Status ParsedProjection::make(const BSONObj& spec,
     // missing."
     pp->_requiresDocument = include || hasNonSimple || hasDottedField;
 
-    // Add geoNear projections.
+    // Add meta-projections.
     pp->_wantGeoNearPoint = wantGeoNearPoint;
     pp->_wantGeoNearDistance = wantGeoNearDistance;
+    pp->_wantSortKey = wantSortKey;
 
     // If it's possible to compute the projection in a covered fashion, populate _requiredFields
     // so the planner can perform projection analysis.

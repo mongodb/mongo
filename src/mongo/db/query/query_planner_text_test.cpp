@@ -412,4 +412,20 @@ TEST_F(QueryPlannerTest, TextDiacriticSensitive) {
     assertSolutionExists("{text: {search: 'blah', diacriticSensitive: true}}");
 }
 
+TEST_F(QueryPlannerTest, SortKeyMetaProjectionWithTextScoreMetaSort) {
+    addIndex(BSON("_fts"
+                  << "text"
+                  << "_ftsx" << 1));
+
+    runQuerySortProj(fromjson("{$text: {$search: 'foo'}}"),
+                     fromjson("{a: {$meta: 'textScore'}}"),
+                     fromjson("{a: {$meta: 'textScore'}, b: {$meta: 'sortKey'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {a: {$meta: 'textScore'}, b: {$meta: 'sortKey'}}, node: "
+        "{sort: {limit: 0, pattern: {a: {$meta: 'textScore'}}, node: "
+        "{sortKeyGen: {node: {text: {search: 'foo'}}}}}}}}");
+}
+
 }  // namespace

@@ -49,11 +49,12 @@ const char* LiteParsedQuery::kFindCommandReadPrefField("$readPreference");
 const string LiteParsedQuery::cmdOptionMaxTimeMS("maxTimeMS");
 const string LiteParsedQuery::queryOptionMaxTimeMS("$maxTimeMS");
 
-const string LiteParsedQuery::metaTextScore("textScore");
 const string LiteParsedQuery::metaGeoNearDistance("geoNearDistance");
 const string LiteParsedQuery::metaGeoNearPoint("geoNearPoint");
-const string LiteParsedQuery::metaRecordId("recordId");
 const string LiteParsedQuery::metaIndexKey("indexKey");
+const string LiteParsedQuery::metaRecordId("recordId");
+const string LiteParsedQuery::metaSortKey("sortKey");
+const string LiteParsedQuery::metaTextScore("textScore");
 
 const long long LiteParsedQuery::kDefaultBatchSize = 101;
 

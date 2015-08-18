@@ -224,4 +224,21 @@ TEST(ProjectionExecTest, TransformMetaTextScore) {
                   "{a: 'hello', b: 100}");
 }
 
+TEST(ProjectionExecTest, TransformMetaSortKey) {
+    testTransform("{b: {$meta: 'sortKey'}}",
+                  "{}",
+                  "{a: 'hello'}",
+                  new mongo::SortKeyComputedData(BSON("" << 99)),
+                  true,
+                  "{a: 'hello', b: {'': 99}}");
+
+    // Projected meta field should overwrite existing field.
+    testTransform("{a: {$meta: 'sortKey'}}",
+                  "{}",
+                  "{a: 'hello'}",
+                  new mongo::SortKeyComputedData(BSON("" << 99)),
+                  true,
+                  "{a: {'': 99}}");
+}
+
 }  // namespace

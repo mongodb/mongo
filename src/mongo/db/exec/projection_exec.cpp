@@ -125,6 +125,8 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
                 verify(String == e2.type());
                 if (e2.valuestr() == LiteParsedQuery::metaTextScore) {
                     _meta[e.fieldName()] = META_TEXT_SCORE;
+                } else if (e2.valuestr() == LiteParsedQuery::metaSortKey) {
+                    _meta[e.fieldName()] = META_SORT_KEY;
                 } else if (e2.valuestr() == LiteParsedQuery::metaRecordId) {
                     _meta[e.fieldName()] = META_RECORDID;
                 } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
@@ -313,6 +315,14 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
             } else {
                 bob.append(it->first, 0.0);
             }
+        } else if (META_SORT_KEY == it->second) {
+            if (!member->hasComputed(WSM_SORT_KEY)) {
+                return Status(ErrorCodes::InternalError,
+                              "sortKey meta-projection requested but no data available");
+            }
+            const SortKeyComputedData* sortKeyData =
+                static_cast<const SortKeyComputedData*>(member->getComputed(WSM_SORT_KEY));
+            bob.append(it->first, sortKeyData->getSortKey());
         } else if (META_RECORDID == it->second) {
             bob.append(it->first, static_cast<long long>(member->loc.repr()));
         }

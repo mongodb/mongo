@@ -335,6 +335,10 @@ Status CanonicalQuery::init(LiteParsedQuery* lpq,
         _proj.reset(pp);
     }
 
+    if (_proj && _proj->wantSortKey() && _pq->getSort().isEmpty()) {
+        return Status(ErrorCodes::BadValue, "cannot use sortKey $meta projection without a sort");
+    }
+
     return Status::OK();
 }
 
