@@ -113,12 +113,12 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 		WT_ERR(__wt_struct_size(session, &size, cursor->value_format,
-		    cst->stats[WT_STAT_KEY_OFFSET(cst)].desc,
+		    cst->stats_desc(WT_STAT_KEY_OFFSET(cst)),
 		    cst->pv.data, cst->v));
 		WT_ERR(__wt_buf_initsize(session, &cursor->value, size));
 		WT_ERR(__wt_struct_pack(session, cursor->value.mem, size,
 		    cursor->value_format,
-		    cst->stats[WT_STAT_KEY_OFFSET(cst)].desc,
+		    cst->stats_desc(WT_STAT_KEY_OFFSET(cst)),
 		    cst->pv.data, cst->v));
 
 		item = va_arg(ap, WT_ITEM *);
@@ -130,7 +130,7 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 		 * pointer support isn't documented, but it's a cheap test.
 		 */
 		if ((p = va_arg(ap, const char **)) != NULL)
-			*p = cst->stats[WT_STAT_KEY_OFFSET(cst)].desc;
+			*p = cst->stats_desc(WT_STAT_KEY_OFFSET(cst));
 		if ((p = va_arg(ap, const char **)) != NULL)
 			*p = cst->pv.data;
 		if ((v = va_arg(ap, uint64_t *)) != NULL)
@@ -215,7 +215,7 @@ __curstat_next(WT_CURSOR *cursor)
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		WT_ERR(WT_NOTFOUND);
 	}
-	cst->v = cst->stats[WT_STAT_KEY_OFFSET(cst)].v;
+	cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -254,7 +254,7 @@ __curstat_prev(WT_CURSOR *cursor)
 		WT_ERR(WT_NOTFOUND);
 	}
 
-	cst->v = cst->stats[WT_STAT_KEY_OFFSET(cst)].v;
+	cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -308,7 +308,7 @@ __curstat_search(WT_CURSOR *cursor)
 	if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
 		WT_ERR(WT_NOTFOUND);
 
-	cst->v = cst->stats[WT_STAT_KEY_OFFSET(cst)].v;
+	cst->v = (uint64_t)cst->stats[WT_STAT_KEY_OFFSET(cst)];
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -354,13 +354,14 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	 * Optionally clear the connection statistics.
 	 */
 	__wt_conn_stat_init(session);
-	cst->u.conn_stats = conn->stats;
+	__wt_stat_connection_aggregate(conn->stats, &cst->u.conn_stats);
 	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
-		__wt_stat_refresh_connection_stats(&conn->stats);
+		__wt_stat_connection_clear_all(conn->stats);
 
-	cst->stats = (WT_STATS *)&cst->u.conn_stats;
+	cst->stats = (int64_t *)&cst->u.conn_stats;
 	cst->stats_base = WT_CONNECTION_STATS_BASE;
-	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
+	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(int64_t);
+	cst->stats_desc = __wt_stat_connection_desc;
 }
 
 /*
@@ -383,7 +384,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 		filename = uri;
 		if (!WT_PREFIX_SKIP(filename, "file:"))
 			return (EINVAL);
-		__wt_stat_init_dsrc_stats(&cst->u.dsrc_stats);
+		__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
 		WT_RET(__wt_block_manager_size(
 		    session, filename, &cst->u.dsrc_stats));
 		__wt_curstat_dsrc_final(cst);
@@ -398,9 +399,10 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	 * Optionally clear the data source statistics.
 	 */
 	if ((ret = __wt_btree_stat_init(session, cst)) == 0) {
-		cst->u.dsrc_stats = dhandle->stats;
+		__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
+		__wt_stat_dsrc_aggregate(dhandle->stats, &cst->u.dsrc_stats);
 		if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
-			__wt_stat_refresh_dsrc_stats(&dhandle->stats);
+			__wt_stat_dsrc_clear_all(dhandle->stats);
 		__wt_curstat_dsrc_final(cst);
 	}
 
@@ -417,10 +419,10 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 void
 __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst)
 {
-
-	cst->stats = (WT_STATS *)&cst->u.dsrc_stats;
+	cst->stats = (int64_t *)&cst->u.dsrc_stats;
 	cst->stats_base = WT_DSRC_STATS_BASE;
-	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
+	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(int64_t);
+	cst->stats_desc = __wt_stat_dsrc_desc;
 }
 
 /*

@@ -185,8 +185,6 @@ struct __wt_lsm_tree {
 	WT_RWLOCK *rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
-	WT_DSRC_STATS stats;		/* LSM-level statistics */
-
 	uint64_t dsk_gen;
 
 	uint64_t ckpt_throttle;		/* Rate limiting due to checkpoints */
@@ -223,6 +221,25 @@ struct __wt_lsm_tree {
 	u_int nold_chunks;		/* Number of old chunks */
 	int freeing_old_chunks;		/* Whether chunks are being freed */
 	uint32_t merge_aggressiveness;	/* Increase amount of work per merge */
+
+	/*
+	 * We maintain a set of statistics outside of the normal statistics
+	 * area, copying them into place when a statistics cursor is created.
+	 */
+#define	WT_LSM_TREE_STAT_INCR(session, fld) do {			\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
+		++(fld);						\
+} while (0)
+#define	WT_LSM_TREE_STAT_INCRV(session, fld, v) do {			\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
+		(fld) += (int64_t)(v);					\
+} while (0)
+	int64_t bloom_false_positive;
+	int64_t bloom_hit;
+	int64_t bloom_miss;
+	int64_t lsm_checkpoint_throttle;
+	int64_t lsm_lookup_no_bloom;
+	int64_t lsm_merge_throttle;
 
 #define	WT_LSM_TREE_ACTIVE		0x01	/* Workers are active */
 #define	WT_LSM_TREE_AGGRESSIVE_TIMER	0x02	/* Timer for merge aggression */

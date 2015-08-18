@@ -7,14 +7,21 @@
 # currently open'.
 # NOTE: All statistics descriptions must have a prefix string followed by ':'.
 #
-# Optional configuration flags:
-#       no_clear        Value not cleared when statistics cleared
-#       no_scale        Don't scale value per second in the logging tool script
-#
 # Data-source statistics are normally aggregated across the set of underlying
 # objects. Additional optionaly configuration flags are available:
 #       no_aggregate    Ignore the value when aggregating statistics
 #       max_aggregate   Take the maximum value when aggregating statistics
+#
+# Optional configuration flags:
+#       no_clear        Value not cleared when statistics cleared
+#       no_scale        Don't scale value per second in the logging tool script
+#
+# The no_clear flag is a little complicated: it means we don't clear the values
+# when resetting statistics after each run (necessary when the WiredTiger engine
+# is updating values that persist over multiple runs, for example the count of
+# cursors), but it also causes the underlying display routines to not treat the
+# change between displays as relative to the number of seconds, that is, it's an
+# absolute value. The no_clear flag should be set in either case.
 
 from operator import attrgetter
 import sys

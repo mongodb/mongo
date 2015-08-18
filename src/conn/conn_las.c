@@ -16,10 +16,10 @@ void
 __wt_las_stats_update(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_CONNECTION_STATS *stats;
+	WT_CONNECTION_STATS **stats;
 
 	conn = S2C(session);
-	stats = &conn->stats;
+	stats = conn->stats;
 
 	/*
 	 * Lookaside table statistics are copied from the underlying lookaside
@@ -29,12 +29,12 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	if ((session = conn->las_session) == NULL || session->dhandle == NULL)
 		return;
 
-	WT_STAT_SET(stats, lookaside_cursor_insert,
-	    WT_STAT(&session->dhandle->stats, cursor_insert));
-	WT_STAT_SET(stats, lookaside_cursor_insert_bytes,
-	    WT_STAT(&session->dhandle->stats, cursor_insert_bytes));
-	WT_STAT_SET(stats, lookaside_cursor_remove,
-	    WT_STAT(&session->dhandle->stats, cursor_remove));
+	WT_STAT_SET(session, stats, lookaside_cursor_insert,
+	    WT_STAT_READ(session->dhandle->stats, cursor_insert));
+	WT_STAT_SET(session, stats, lookaside_cursor_insert_bytes,
+	    WT_STAT_READ(session->dhandle->stats, cursor_insert_bytes));
+	WT_STAT_SET(session, stats, lookaside_cursor_remove,
+	    WT_STAT_READ(session->dhandle->stats, cursor_remove));
 }
 
 /*
