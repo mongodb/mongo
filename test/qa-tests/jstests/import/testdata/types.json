@@ -23,5 +23,5 @@
     "number_long_type" : NumberLong(5000), 
     "minkey_type" : { "$minKey" : 1 }, 
     "maxkey_type" : { "$maxKey" : 1 },
-    "regex_type" : { "$regex" : "\\.", "$options" : "" } }
+    "regex_type" : { "$regex" : "\\.", "$options" : "" } 
 }
