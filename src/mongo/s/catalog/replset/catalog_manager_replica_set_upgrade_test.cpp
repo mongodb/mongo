@@ -189,8 +189,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
         ASSERT_OK(versionDocRes.getStatus());
         const VersionType& versionDoc = versionDocRes.getValue();
 
+        ASSERT_EQ(MIN_COMPATIBLE_CONFIG_VERSION, versionDoc.getMinCompatibleVersion());
         ASSERT_EQ(CURRENT_CONFIG_VERSION, versionDoc.getCurrentVersion());
-        ASSERT_EQ(CURRENT_CONFIG_VERSION, versionDoc.getMinCompatibleVersion());
         ASSERT_TRUE(versionDoc.isClusterIdSet());
         ASSERT_FALSE(versionDoc.isExcludingMongoVersionsSet());
         ASSERT_FALSE(versionDoc.isUpgradeIdSet());

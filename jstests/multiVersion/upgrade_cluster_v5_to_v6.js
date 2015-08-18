@@ -75,17 +75,6 @@ st.upgradeCluster(MongoRunner.versionIterator(["2.6","3.0"]));
 st.restartMongoses();
 
 //
-// Make sure 3.2 mongoses won't start in 2.6/3.0 cluster
-//
-
-jsTest.log("Starting v3.2 mongos in 2.6/3.0 cluster....");
-
-mongos = MongoRunner.runMongos({ binVersion : "3.2", configdb : configConnStr });
-assert.eq(null, mongos);
-
-jsTest.log("3.2 mongoses did not start or upgrade in 2.6/3.0 cluster (which is correct).");
-
-//
 // Upgrade 2.6/3.0 cluster to only 3.0
 //
 
@@ -95,35 +84,23 @@ st.upgradeCluster("3.0");
 st.restartMongoses();
 
 //
-// Make sure 3.2 mongoses will successfully upgrade in 3.0 cluster
+// Upgrade 3.0 cluster to only 3.2
 //
 
-jsTest.log("Starting v3.2 mongos in 3.0 cluster....");
-
-mongos = MongoRunner.runMongos({ binVersion : "3.2", configdb : configConnStr });
-assert.eq(null, mongos);
-
-mongos = MongoRunner.runMongos({ binVersion : "3.2", configdb : configConnStr, upgrade : "" });
-assert.eq(null, mongos);
-
-jsTest.log("3.2 mongoses started in 3.0 cluster.");
+st.upgradeCluster("3.2");
+st.restartMongoses();
 
 //
 // Verify cluster version is correct
 //
 
-configDB = st.s.getDB('config'); // Get a new db since a restart happened.
-version = configDB.getCollection('version').findOne();
-printjson(version);
-
-assert.eq(version.minCompatibleVersion, 6);
-assert.eq(version.currentVersion, 7);
-assert.eq(clusterID, version.clusterId); // clusterId shouldn't change
-assert.eq(version.excluding, undefined);
-
-// Make sure that you can't run 2.6 mongos
-mongos = MongoRunner.runMongos({ binVersion : "2.6", configdb : configConnStr });
+// Make sure that you can't run 2.4 mongos
+mongos = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr });
 assert.eq(null, mongos);
+
+// Make sure that you can run 2.6 mongos
+mongos = MongoRunner.runMongos({ binVersion : "2.6", configdb : configConnStr });
+assert.neq(null, mongos);
 
 // Make sure that you can run 3.0 mongos
 mongos = MongoRunner.runMongos({ binVersion : "3.0", configdb : configConnStr });
@@ -141,6 +118,5 @@ st.stop();
 
 };
 
-// TODO: SERVER-19592 Revisit after reverting version bump
-//runTest(false);
-//runTest(true);
+runTest(false);
+runTest(true);

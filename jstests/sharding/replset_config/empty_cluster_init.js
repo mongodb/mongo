@@ -4,18 +4,11 @@
 // version initialization.
 //
 
-jsTest.log("Start config servers...")
-
-var configSvrA = MongoRunner.runMongod({ verbose : 2 });
-var configSvrB = MongoRunner.runMongod({ verbose : 2 });
-var configSvrC = MongoRunner.runMongod({ verbose : 2 });
-
-var configConnStr = [configSvrA.host, configSvrB.host, configSvrC.host].join(",");
-
-var configConn = configSvrA;
-
-// Start profiling the config db
-configConn.getDB("config").setProfilingLevel(2);
+var configRS = new ReplSetTest({ name: "configRS", nodes: 3, useHostName: true });
+configRS.startSet({ configsvr: '', storageEngine: 'wiredTiger' });
+var replConfig = configRS.getReplSetConfig();
+replConfig.configsvr = true;
+configRS.initiate(replConfig);
 
 //
 // Start a bunch of mongoses which will probably interfere
@@ -25,10 +18,9 @@ jsTest.log("Starting first set of mongoses in parallel...");
 
 var mongoses = [];
 for (var i = 0; i < 3; i++) {
-    var mongos = MongoRunner.runMongos({ binVersion : "latest", 
-                                         configdb : configConnStr,
+    var mongos = MongoRunner.runMongos({ binVersion: "latest",
+                                         configdb: configRS.getURL(),
                                          waitForConnect : false });
-    
     mongoses.push(mongos);
 }
 
@@ -56,10 +48,9 @@ var version = mongosConn.getCollection("config.version").findOne();
 jsTest.log("Starting second set of mongoses...");
 
 for (var i = 0; i < 3; i++) {
-    var mongos = MongoRunner.runMongos({ binVersion : "latest", 
-                                         configdb : configConnStr,
-                                         waitForConnect : false });
-    
+    var mongos = MongoRunner.runMongos({ binVersion: "latest",
+                                         configdb: configRS.getURL(),
+                                         waitForConnect: false });
     mongoses.push(mongos);
 }
 
@@ -74,37 +65,25 @@ assert.soon(function() {
         printjson(e);
         return false;
     }
-}, "Later mongos " + mongoses[ mongoses.length - 1 ].host + " did not start.", 5 * 60 * 1000 );
+}, "Later mongos " + mongoses[mongoses.length - 1].host + " did not start.", 5 * 60 * 1000);
 
 // Shut down our mongoses now that we've tested them
 for (var i = 0; i < mongoses.length; i++) {
     MongoRunner.stopMongos(mongoses[i]);
 }
 
-jsTest.log("Mongoses stopped...");
-
 //
 // Check version and that the version was only updated once
 //
 
-printjson(version);
-
-assert.eq(version.minCompatibleVersion, 5);
-assert.eq(version.currentVersion, 6);
+assert.eq(5, version.minCompatibleVersion);
+assert.eq(6, version.currentVersion);
 assert(version.clusterId);
-assert.eq(version.excluding, undefined);
+assert.eq(undefined, version.excluding);
 
-jsTest.log("Ensuring config.version collection only written once...");
+var oplog = configRS.getPrimary().getDB('local').oplog.rs;
+var updates = oplog.find({ ns: "config.version" }).toArray();
+assert.eq(1, updates.length, 'ops to config.version: ' + tojson(updates));
 
-var updates = configConn.getDB("config").system.profile.find({ op : "update", 
-                                                               ns : "config.version" }).toArray();
-printjson(updates);
-assert.eq(updates.length, 1);
-
-MongoRunner.stopMongod(configSvrA);
-MongoRunner.stopMongod(configSvrB);
-MongoRunner.stopMongod(configSvrC);
-
-jsTest.log("DONE!");
-
+configRS.stopSet(15);
 

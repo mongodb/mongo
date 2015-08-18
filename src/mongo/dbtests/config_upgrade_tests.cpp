@@ -215,6 +215,22 @@ TEST_F(ConfigUpgradeTests, ClusterIDVersion) {
     ASSERT_EQUALS(newVersion.getClusterId(), clusterId);
 }
 
+TEST_F(ConfigUpgradeTests, InitialUpgrade) {
+    //
+    // Tests initializing the config server to the initial version
+    //
+
+    string errMsg;
+    ASSERT_OK(grid.catalogManager(&_txn)->checkAndUpgrade(false));
+
+    VersionType version;
+    ASSERT_OK(getConfigVersion(grid.catalogManager(&_txn), &version));
+
+    ASSERT_EQUALS(MIN_COMPATIBLE_CONFIG_VERSION, version.getMinCompatibleVersion());
+    ASSERT_EQUALS(CURRENT_CONFIG_VERSION, version.getCurrentVersion());
+    ASSERT_TRUE(version.getClusterId().isSet());
+}
+
 TEST_F(ConfigUpgradeTests, BadVersionUpgrade) {
     //
     // Tests that we can't upgrade from a config version we don't have an upgrade path for

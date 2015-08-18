@@ -1080,13 +1080,10 @@ Status CatalogManagerReplicaSet::checkAndUpgrade(bool checkOnly) {
     if (versionInfo.getCurrentVersion() == UpgradeHistory_EmptyVersion) {
         VersionType newVersion;
         newVersion.setClusterId(OID::gen());
-
-        // For v3.2, only v3.2 binaries can talk to RS Config servers.
-        newVersion.setMinCompatibleVersion(CURRENT_CONFIG_VERSION);
+        newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
         newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
 
         BSONObj versionObj(newVersion.toBSON());
-
         return update(VersionType::ConfigNS,
                       versionObj,
                       versionObj,
