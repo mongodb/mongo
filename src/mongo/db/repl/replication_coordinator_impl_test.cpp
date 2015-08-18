@@ -1186,8 +1186,13 @@ private:
     }
 };
 
+TEST_F(ReplCoordTest, UpdateTermNotReplMode) {
+    init(ReplSettings());
+    ASSERT_TRUE(ReplicationCoordinator::modeNone == getReplCoord()->getReplicationMode());
+    ASSERT_EQUALS(ErrorCodes::BadValue, getReplCoord()->updateTerm(0).code());
+}
+
 TEST_F(ReplCoordTest, UpdateTerm) {
-    ReplCoordTest::setUp();
     init("mySet/test1:1234,test2:1234,test3:1234");
 
     assertStartSuccess(
@@ -1211,19 +1216,20 @@ TEST_F(ReplCoordTest, UpdateTerm) {
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // lower term, no change
-    getReplCoord()->updateTerm(0);
+    ASSERT_OK(getReplCoord()->updateTerm(0));
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // same term, no change
-    getReplCoord()->updateTerm(1);
+    ASSERT_OK(getReplCoord()->updateTerm(1));
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // higher term, step down and change term
     Handle cbHandle;
-    getReplCoord()->updateTerm_forTest(2);
+    ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(2).code());
     ASSERT_EQUALS(2, getReplCoord()->getTerm());
+    getReplCoord()->waitForStepDownFinish_forTest();
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
 

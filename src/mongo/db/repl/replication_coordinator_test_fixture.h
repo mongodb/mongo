@@ -68,9 +68,6 @@ public:
      */
     static ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBSON);
 
-    ReplCoordTest();
-    virtual ~ReplCoordTest();
-
 protected:
     virtual void setUp();
     virtual void tearDown();
@@ -191,15 +188,15 @@ protected:
 private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
     // Owned by ReplicationCoordinatorImpl
-    TopologyCoordinatorImpl* _topo;
+    TopologyCoordinatorImpl* _topo = nullptr;
     // Owned by ReplicationCoordinatorImpl
-    executor::NetworkInterfaceMock* _net;
+    executor::NetworkInterfaceMock* _net = nullptr;
     // Owned by ReplicationCoordinatorImpl
-    StorageInterfaceMock* _storage;
+    StorageInterfaceMock* _storage = nullptr;
     // Owned by ReplicationCoordinatorImpl
-    ReplicationCoordinatorExternalStateMock* _externalState;
+    ReplicationCoordinatorExternalStateMock* _externalState = nullptr;
     ReplSettings _settings;
-    bool _callShutdown;
+    bool _callShutdown = false;
 };
 
 }  // namespace repl

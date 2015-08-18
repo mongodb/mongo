@@ -356,7 +356,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
             term = lastVoteTerm;
         }
     }
-    _updateTerm_incallback(term, nullptr);
+    _updateTerm_incallback(term);
 
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -1637,7 +1637,7 @@ void ReplicationCoordinatorImpl::_processReplSetMetadata_incallback(
         return;
     }
     _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
-    _updateTerm_incallback(replMetadata.getTerm(), nullptr);
+    _updateTerm_incallback(replMetadata.getTerm());
 }
 
 bool ReplicationCoordinatorImpl::getMaintenanceMode() {
@@ -2894,14 +2894,14 @@ void ReplicationCoordinatorImpl::_getTerm_helper(const ReplicationExecutor::Call
 }
 
 Status ReplicationCoordinatorImpl::updateTerm(long long term) {
-    if (!isV1ElectionProtocol()) {
-        // Do not update if not in V1 protocol.
-        return Status::OK();
-    }
-
     // Term is only valid if we are replicating.
     if (getReplicationMode() != modeReplSet) {
         return {ErrorCodes::BadValue, "cannot supply 'term' without active replication"};
+    }
+
+    if (!isV1ElectionProtocol()) {
+        // Do not update if not in V1 protocol.
+        return Status::OK();
     }
 
     bool updated = false;
@@ -2910,8 +2910,7 @@ Status ReplicationCoordinatorImpl::updateTerm(long long term) {
                                               this,
                                               stdx::placeholders::_1,
                                               term,
-                                              &updated,
-                                              nullptr));
+                                              &updated));
     if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return cbh.getStatus();
     }
@@ -2925,37 +2924,17 @@ Status ReplicationCoordinatorImpl::updateTerm(long long term) {
     return Status::OK();
 }
 
-bool ReplicationCoordinatorImpl::updateTerm_forTest(long long term) {
-    bool updated = false;
-    Handle cbHandle;
-    CBHStatus cbh =
-        _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_updateTerm_helper,
-                                              this,
-                                              stdx::placeholders::_1,
-                                              term,
-                                              &updated,
-                                              &cbHandle));
-    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return false;
-    }
-    fassert(28673, cbh.getStatus());
-    _replExecutor.wait(cbh.getValue());
-    _replExecutor.wait(cbHandle);
-    return updated;
-}
-
 void ReplicationCoordinatorImpl::_updateTerm_helper(const ReplicationExecutor::CallbackArgs& cbData,
                                                     long long term,
-                                                    bool* updated,
-                                                    Handle* cbHandle) {
+                                                    bool* updated) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
 
-    *updated = _updateTerm_incallback(term, cbHandle);
+    *updated = _updateTerm_incallback(term);
 }
 
-bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term, Handle* cbHandle) {
+bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term) {
     bool updated = _topCoord->updateTerm(term);
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -2965,15 +2944,7 @@ bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term, Handle* 
     if (updated && getMemberState().primary()) {
         log() << "stepping down from primary, because a new term has begun";
         _topCoord->prepareForStepDown();
-        CBHStatus cbh = _replExecutor.scheduleWorkWithGlobalExclusiveLock(
-            stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish, this, stdx::placeholders::_1));
-        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return true;
-        }
-        fassert(28672, cbh.getStatus());
-        if (cbHandle) {
-            *cbHandle = cbh.getValue();
-        }
+        _stepDownStart();
     }
     return updated;
 }

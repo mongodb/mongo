@@ -306,8 +306,6 @@ public:
      */
     Status setLastOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
 
-    bool updateTerm_forTest(long long term);
-
     /**
      * If called after _startElectSelfV1(), blocks until all asynchronous
      * activities associated with election complete.
@@ -900,7 +898,7 @@ private:
      */
     void _requestRemotePrimaryStepdown(const HostAndPort& target);
 
-    void _heartbeatStepDownStart();
+    void _stepDownStart();
 
     /**
      * Completes a step-down of the current node.  Must be run with a global
@@ -983,12 +981,11 @@ private:
      */
     void _updateTerm_helper(const ReplicationExecutor::CallbackArgs& cbData,
                             long long term,
-                            bool* updated,
-                            Handle* cbHandle);
+                            bool* updated);
     /**
      * Returns true if the term increased.
      */
-    bool _updateTerm_incallback(long long term, Handle* cbHandle);
+    bool _updateTerm_incallback(long long term);
 
     /**
      * Callback that processes the ReplSetMetadata returned from a command run against another

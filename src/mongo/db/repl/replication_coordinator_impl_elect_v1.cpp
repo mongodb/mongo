@@ -181,7 +181,7 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     }
 
     log() << "dry election run succeeded, running for election";
-    _updateTerm_incallback(originalTerm + 1, nullptr);
+    _updateTerm_incallback(originalTerm + 1);
     // Secure our vote for ourself first
     _topCoord->voteForMyselfV1();
 
@@ -298,8 +298,7 @@ void ReplicationCoordinatorImpl::_onElectionWinnerDeclarerComplete() {
     if (!endResult.isOK()) {
         log() << "stepping down from primary, because: " << endResult;
         _topCoord->prepareForStepDown();
-        _replExecutor.scheduleWorkWithGlobalExclusiveLock(
-            stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish, this, stdx::placeholders::_1));
+        _stepDownStart();
     }
 
     lossGuard.dismiss();

@@ -142,7 +142,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
 
     if (responseStatus.isOK()) {
         networkTime = cbData.response.getValue().elapsedMillis;
-        _updateTerm_incallback(hbStatusResponse.getValue().getTerm(), nullptr);
+        _updateTerm_incallback(hbStatusResponse.getValue().getTerm());
     } else {
         log() << "Error in heartbeat request to " << target << "; " << responseStatus;
         if (!resp.isEmpty()) {
@@ -215,7 +215,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
             break;
         case HeartbeatResponseAction::StepDownSelf:
             invariant(action.getPrimaryConfigIndex() == _selfIndex);
-            _heartbeatStepDownStart();
+            log() << "Stepping down from primary in response to heartbeat";
+            _stepDownStart();
             break;
         case HeartbeatResponseAction::StepDownRemotePrimary: {
             invariant(action.getPrimaryConfigIndex() != _selfIndex);
@@ -259,10 +260,15 @@ void ReplicationCoordinatorImpl::_requestRemotePrimaryStepdown(const HostAndPort
     }
 }
 
-void ReplicationCoordinatorImpl::_heartbeatStepDownStart() {
-    log() << "Stepping down from primary in response to heartbeat";
+void ReplicationCoordinatorImpl::_stepDownStart() {
     const StatusWith<ReplicationExecutor::EventHandle> stepDownFinishEvh =
         _replExecutor.makeEvent();
+    if (!stepDownFinishEvh.isOK()) {
+        if (stepDownFinishEvh.getStatus() != ErrorCodes::ShutdownInProgress) {
+            fassert(28672, stepDownFinishEvh.getStatus());
+        }
+        return;
+    }
     _stepDownFinishedEvent = stepDownFinishEvh.getValue();
     _replExecutor.scheduleWorkWithGlobalExclusiveLock(
         stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish, this, stdx::placeholders::_1));

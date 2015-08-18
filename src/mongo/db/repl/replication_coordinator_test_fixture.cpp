@@ -67,9 +67,6 @@ ReplicaSetConfig ReplCoordTest::assertMakeRSConfig(const BSONObj& configBson) {
     return config;
 }
 
-ReplCoordTest::ReplCoordTest() : _callShutdown(false) {}
-ReplCoordTest::~ReplCoordTest() {}
-
 void ReplCoordTest::setUp() {
     _settings.replSet = "mySet/node1:12345,node2:54321";
 }
