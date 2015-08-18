@@ -32,6 +32,7 @@ script
   CONF=/etc/mongod.conf
   DAEMON=/usr/bin/mongod
   DAEMONUSER=${DAEMONUSER:-mongodb}
+  DAEMONGROUP=${DAEMONGROUP:-mongodb}
 
   if [ -f /etc/default/mongod ]; then . /etc/default/mongod; fi
 
@@ -50,7 +51,7 @@ script
   if [ "x$ENABLE_MONGOD" = "xyes" ]
   then
     exec start-stop-daemon --start \
-        --chuid $DAEMONUSER \
+        --chuid $DAEMONUSER:$DAEMONGROUP \
         --pidfile /var/run/mongodb.pid \
         --make-pidfile \
         --exec $NUMACTL $DAEMON $DAEMON_OPTS
