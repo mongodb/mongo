@@ -632,7 +632,7 @@ __evict_clear_all_walks(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	SLIST_FOREACH(dhandle, &conn->dhlh, l)
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
 		if (WT_PREFIX_MATCH(dhandle->name, "file:"))
 			WT_WITH_DHANDLE(session,
 			    dhandle, WT_TRET(__evict_clear_walk(session)));
@@ -968,14 +968,14 @@ retry:	while (slot < max_entries && ret == 0) {
 			if ((dhandle = cache->evict_file_next) != NULL)
 				cache->evict_file_next = NULL;
 			else
-				dhandle = SLIST_FIRST(&conn->dhlh);
+				dhandle = TAILQ_FIRST(&conn->dhqh);
 		} else {
 			if (incr) {
 				WT_ASSERT(session, dhandle->session_inuse > 0);
 				(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
 				incr = 0;
 			}
-			dhandle = SLIST_NEXT(dhandle, l);
+			dhandle = TAILQ_NEXT(dhandle, q);
 		}
 
 		/* If we reach the end of the list, we're done. */
@@ -1557,7 +1557,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	total_bytes = 0;
 
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;

@@ -38,8 +38,8 @@ struct __wt_keyed_encryptor {
 	size_t size_const;		/* The result of the sizing callback */
 	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
 					/* Linked list of encryptors */
-	SLIST_ENTRY(__wt_keyed_encryptor) hashl;
-	SLIST_ENTRY(__wt_keyed_encryptor) l;
+	TAILQ_ENTRY(__wt_keyed_encryptor) hashq;
+	TAILQ_ENTRY(__wt_keyed_encryptor) q;
 };
 
 /*
@@ -82,9 +82,9 @@ struct __wt_named_encryptor {
 	const char *name;		/* Name of encryptor */
 	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
 					/* Locked: list of encryptors by key */
-	SLIST_HEAD(__wt_keyedhash, __wt_keyed_encryptor)
-				keyedhashlh[WT_HASH_ARRAY_SIZE];
-	SLIST_HEAD(__wt_keyed_lh, __wt_keyed_encryptor) keyedlh;
+	TAILQ_HEAD(__wt_keyedhash, __wt_keyed_encryptor)
+				keyedhashqh[WT_HASH_ARRAY_SIZE];
+	TAILQ_HEAD(__wt_keyed_qh, __wt_keyed_encryptor) keyedqh;
 					/* Linked list of encryptors */
 	TAILQ_ENTRY(__wt_named_encryptor) q;
 };
@@ -119,14 +119,15 @@ struct __wt_named_extractor {
  * main queue and the hashed queue.
  */
 #define	WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket) do {		\
-	SLIST_INSERT_HEAD(&(conn)->dhlh, dhandle, l);			\
-	SLIST_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashl);	\
+	TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);			\
+	TAILQ_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashq);	\
+	++conn->dhandle_count;						\
 } while (0)
 
 #define	WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket) do {		\
-	SLIST_REMOVE(&(conn)->dhlh, dhandle, __wt_data_handle, l);	\
-	SLIST_REMOVE(&(conn)->dhhash[bucket],				\
-	    dhandle, __wt_data_handle, hashl);				\
+	TAILQ_REMOVE(&(conn)->dhqh, dhandle, q);			\
+	TAILQ_REMOVE(&(conn)->dhhash[bucket], dhandle, hashq);		\
+	--conn->dhandle_count;						\
 } while (0)
 
 /*
@@ -134,14 +135,13 @@ struct __wt_named_extractor {
  * main queue and the hashed queue.
  */
 #define	WT_CONN_BLOCK_INSERT(conn, block, bucket) do {			\
-	SLIST_INSERT_HEAD(&(conn)->blocklh, block, l);			\
-	SLIST_INSERT_HEAD(&(conn)->blockhash[bucket], block, hashl);	\
+	TAILQ_INSERT_HEAD(&(conn)->blockqh, block, q);			\
+	TAILQ_INSERT_HEAD(&(conn)->blockhash[bucket], block, hashq);	\
 } while (0)
 
 #define	WT_CONN_BLOCK_REMOVE(conn, block, bucket) do {			\
-	SLIST_REMOVE(&(conn)->blocklh, block, __wt_block, l);		\
-	SLIST_REMOVE(							\
-	    &(conn)->blockhash[bucket], block, __wt_block, hashl);	\
+	TAILQ_REMOVE(&(conn)->blockqh, block, q);			\
+	TAILQ_REMOVE(&(conn)->blockhash[bucket], block, hashq);		\
 } while (0)
 
 /*
@@ -149,13 +149,13 @@ struct __wt_named_extractor {
  * main queue and the hashed queue.
  */
 #define	WT_CONN_FILE_INSERT(conn, fh, bucket) do {			\
-	SLIST_INSERT_HEAD(&(conn)->fhlh, fh, l);			\
-	SLIST_INSERT_HEAD(&(conn)->fhhash[bucket], fh, hashl);		\
+	TAILQ_INSERT_HEAD(&(conn)->fhqh, fh, q);			\
+	TAILQ_INSERT_HEAD(&(conn)->fhhash[bucket], fh, hashq);		\
 } while (0)
 
 #define	WT_CONN_FILE_REMOVE(conn, fh, bucket) do {			\
-	SLIST_REMOVE(&(conn)->fhlh, fh, __wt_fh, l);			\
-	SLIST_REMOVE(&(conn)->fhhash[bucket], fh, __wt_fh, hashl);	\
+	TAILQ_REMOVE(&(conn)->fhqh, fh, q);				\
+	TAILQ_REMOVE(&(conn)->fhhash[bucket], fh, hashq);		\
 } while (0)
 
 /*
@@ -219,21 +219,22 @@ struct __wt_connection_impl {
 	 * URI.
 	 */
 					/* Locked: data handle hash array */
-	SLIST_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
+	TAILQ_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
 					/* Locked: data handle list */
-	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;
+	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) dhqh;
 					/* Locked: LSM handle list. */
 	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 					/* Locked: file list */
-	SLIST_HEAD(__wt_fhhash, __wt_fh) fhhash[WT_HASH_ARRAY_SIZE];
-	SLIST_HEAD(__wt_fh_lh, __wt_fh) fhlh;
+	TAILQ_HEAD(__wt_fhhash, __wt_fh) fhhash[WT_HASH_ARRAY_SIZE];
+	TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
 					/* Locked: library list */
 	TAILQ_HEAD(__wt_dlh_qh, __wt_dlh) dlhqh;
 
 	WT_SPINLOCK block_lock;		/* Locked: block manager list */
-	SLIST_HEAD(__wt_blockhash, __wt_block) blockhash[WT_HASH_ARRAY_SIZE];
-	SLIST_HEAD(__wt_block_lh, __wt_block) blocklh;
+	TAILQ_HEAD(__wt_blockhash, __wt_block) blockhash[WT_HASH_ARRAY_SIZE];
+	TAILQ_HEAD(__wt_block_qh, __wt_block) blockqh;
 
+	u_int dhandle_count;		/* Locked: handles in the queue */
 	u_int open_btree_count;		/* Locked: open writable btree count */
 	uint32_t next_file_id;		/* Locked: file ID counter */
 	uint32_t open_file_count;	/* Atomic: open file handle count */

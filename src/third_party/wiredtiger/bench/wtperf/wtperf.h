@@ -122,7 +122,7 @@ struct __truncate_struct {
 struct __truncate_queue_entry {
 	char *key;			/* Truncation point */
 	uint64_t diff;			/* Number of items to be truncated*/
-	STAILQ_ENTRY(__truncate_queue_entry) q;
+	TAILQ_ENTRY(__truncate_queue_entry) q;
 };
 typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 
@@ -178,7 +178,7 @@ struct __config {			/* Configuration structure */
 	u_int		 has_truncate;  /* if there is a truncate workload */
 
 	/* Queue head for use with the Truncate Logic */
-	STAILQ_HEAD(__truncate_qh, __truncate_queue_entry) stone_head;
+	TAILQ_HEAD(__truncate_qh, __truncate_queue_entry) stone_head;
 
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT

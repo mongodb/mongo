@@ -113,12 +113,12 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 		WT_ERR(__wt_struct_size(session, &size, cursor->value_format,
-		    cst->stats_first[WT_STAT_KEY_OFFSET(cst)].desc,
+		    cst->stats[WT_STAT_KEY_OFFSET(cst)].desc,
 		    cst->pv.data, cst->v));
 		WT_ERR(__wt_buf_initsize(session, &cursor->value, size));
 		WT_ERR(__wt_struct_pack(session, cursor->value.mem, size,
 		    cursor->value_format,
-		    cst->stats_first[WT_STAT_KEY_OFFSET(cst)].desc,
+		    cst->stats[WT_STAT_KEY_OFFSET(cst)].desc,
 		    cst->pv.data, cst->v));
 
 		item = va_arg(ap, WT_ITEM *);
@@ -130,7 +130,7 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 		 * pointer support isn't documented, but it's a cheap test.
 		 */
 		if ((p = va_arg(ap, const char **)) != NULL)
-			*p = cst->stats_first[WT_STAT_KEY_OFFSET(cst)].desc;
+			*p = cst->stats[WT_STAT_KEY_OFFSET(cst)].desc;
 		if ((p = va_arg(ap, const char **)) != NULL)
 			*p = cst->pv.data;
 		if ((v = va_arg(ap, uint64_t *)) != NULL)
@@ -215,7 +215,7 @@ __curstat_next(WT_CURSOR *cursor)
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		WT_ERR(WT_NOTFOUND);
 	}
-	cst->v = cst->stats_first[WT_STAT_KEY_OFFSET(cst)].v;
+	cst->v = cst->stats[WT_STAT_KEY_OFFSET(cst)].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -254,7 +254,7 @@ __curstat_prev(WT_CURSOR *cursor)
 		WT_ERR(WT_NOTFOUND);
 	}
 
-	cst->v = cst->stats_first[WT_STAT_KEY_OFFSET(cst)].v;
+	cst->v = cst->stats[WT_STAT_KEY_OFFSET(cst)].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -308,7 +308,7 @@ __curstat_search(WT_CURSOR *cursor)
 	if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
 		WT_ERR(WT_NOTFOUND);
 
-	cst->v = cst->stats_first[WT_STAT_KEY_OFFSET(cst)].v;
+	cst->v = cst->stats[WT_STAT_KEY_OFFSET(cst)].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
 	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
@@ -358,7 +358,7 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
 		__wt_stat_refresh_connection_stats(&conn->stats);
 
-	cst->stats_first = cst->stats = (WT_STATS *)&cst->u.conn_stats;
+	cst->stats = (WT_STATS *)&cst->u.conn_stats;
 	cst->stats_base = WT_CONNECTION_STATS_BASE;
 	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
 }
@@ -418,7 +418,7 @@ void
 __wt_curstat_dsrc_final(WT_CURSOR_STAT *cst)
 {
 
-	cst->stats_first = cst->stats = (WT_STATS *)&cst->u.dsrc_stats;
+	cst->stats = (WT_STATS *)&cst->u.dsrc_stats;
 	cst->stats_base = WT_DSRC_STATS_BASE;
 	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 }
