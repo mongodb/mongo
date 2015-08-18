@@ -52,15 +52,6 @@ __las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 	    session, WT_LASFILE_URI, NULL, open_cursor_cfg, cursorp));
 
 	/*
-	 * Sessions associated with a lookaside cursor should never be tapped
-	 * for eviction. Presumably this is getting set when those sessions
-	 * are created, but it costs us nothing to do it here as well (and in
-	 * the case of the first-created, shared, connection-level lookaside
-	 * cursor, it has not yet been done).
-	 */
-	F_SET(session, WT_SESSION_NO_EVICTION);
-
-	/*
 	 * Set special flags for the lookaside file: the lookaside flag (used,
 	 * for example, to avoid writing records during reconciliation), also
 	 * turn off checkpoints and logging.
@@ -100,11 +91,14 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	 * available.
 	 *
 	 * Open an internal session, used for the shared lookaside cursor.
+	 *
+	 * Sessions associated with a lookaside cursor should never be tapped
+	 * for eviction.
 	 */
 	WT_RET(__wt_open_internal_session(
 	    conn, "lookaside file", 1, 1, &conn->las_session));
 	session = conn->las_session;
-	F_SET(session, WT_SESSION_LOOKASIDE_CURSOR);
+	F_SET(session, WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION);
 
 	/* Discard any previous incarnation of the file. */
 	WT_RET(__wt_session_drop(session, WT_LASFILE_URI, drop_cfg));
@@ -181,6 +175,13 @@ __wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *reset_evict)
 
 	*cursorp = NULL;
 
+	/*
+	 * We don't want to get tapped for eviction after we start using the
+	 * lookaside cursor; save a copy of the current eviction state, we'll
+	 * turn eviction off before we return.
+	 */
+	*reset_evict = F_ISSET(session, WT_SESSION_NO_EVICTION) ? 0 : 1;
+
 	conn = S2C(session);
 
 	/* Eviction and sweep threads have their own lookaside file cursors. */
@@ -192,23 +193,17 @@ __wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *reset_evict)
 		}
 
 		*cursorp = session->las_cursor;
-		return (0);
+	} else {
+		/* Lock the shared lookaside cursor. */
+		__wt_spin_lock(session, &conn->las_lock);
+
+		*cursorp = conn->las_cursor;
 	}
 
-	/* Lock the shared lookaside cursor. */
-	__wt_spin_lock(session, &conn->las_lock);
-
-	/*
-	 * We don't want to get tapped for eviction anywhere in this process;
-	 * save a copy of the current eviction state and turn eviction off.
-	 */
-	*reset_evict = 0;
-	if (!F_ISSET(session, WT_SESSION_NO_EVICTION)) {
-		*reset_evict = 1;
+	/* Turn eviction off. */
+	if (*reset_evict)
 		F_SET(session, WT_SESSION_NO_EVICTION);
-	}
 
-	*cursorp = conn->las_cursor;
 	return (0);
 }
 
@@ -233,10 +228,6 @@ __wt_las_cursor_close(
 	/* Reset the cursor. */
 	ret = cursor->reset(cursor);
 
-	/* Eviction and sweep threads have their own lookaside file cursors. */
-	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR))
-		return (ret);
-
 	/*
 	 * We turned off eviction while the lookaside cursor was in use, restore
 	 * the session's flags.
@@ -244,8 +235,12 @@ __wt_las_cursor_close(
 	if (reset_evict)
 		F_CLR(session, WT_SESSION_NO_EVICTION);
 
-	/* Unlock the shared lookaside cursor. */
-	__wt_spin_unlock(session, &conn->las_lock);
+	/*
+	 * Eviction and sweep threads have their own lookaside file cursors;
+	 * else, unlock the shared lookaside cursor.
+	 */
+	if (!F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR))
+		__wt_spin_unlock(session, &conn->las_lock);
 
 	return (ret);
 }
