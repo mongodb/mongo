@@ -1211,6 +1211,9 @@ private:
 
     // Cached copy of the current config protocol version.
     AtomicInt64 _protVersion;  // (S)
+
+    // Prevents a busy loop of cancelling heartbeats when we have no sync source.
+    bool _justLostSyncSource = true;  // (M)
 };
 
 }  // namespace repl

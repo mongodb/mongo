@@ -2505,6 +2505,18 @@ void ReplicationCoordinatorImpl::_chooseNewSyncSource(
         return;
     }
     *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(), lastTimestampFetched);
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    // If no sync source is found, schedule new heartbeats immediately to update our member state,
+    // allowing us to make informed sync source decisions.
+    if (newSyncSource->empty() && _justLostSyncSource && _selfIndex >= 0 &&
+        !_getMemberState_inlock().primary()) {
+        _cancelHeartbeats();
+        _startHeartbeats();
+        _justLostSyncSource = false;
+    } else {
+        _justLostSyncSource = true;
+    }
 }
 
 HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const Timestamp& lastTimestampFetched) {

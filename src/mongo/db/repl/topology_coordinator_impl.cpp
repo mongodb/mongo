@@ -67,10 +67,6 @@ int indexOfIterator(const std::vector<T>& vec, typename std::vector<T>::const_it
     return static_cast<int>(it - vec.begin());
 }
 
-// Interval between the time the last heartbeat from a node was received successfully, or
-// the time when we gave up retrying, and when the next heartbeat should be sent to a target.
-const auto kHeartbeatInterval = Seconds{2};
-
 // Maximum number of retries for a failed heartbeat.
 const int kMaxHeartbeatRetries = 2;
 
@@ -100,22 +96,15 @@ bool _hasOnlyAuthErrorUpHeartbeats(const std::vector<MemberHeartbeatData>& hbdat
 
 }  // namespace
 
-PingStats::PingStats()
-    : count(0),
-      value(std::numeric_limits<unsigned int>::max()),
-      _numFailuresSinceLastStart(std::numeric_limits<int>::max()) {}
-
 void PingStats::start(Date_t now) {
     _lastHeartbeatStartDate = now;
     _numFailuresSinceLastStart = 0;
 }
 
-void PingStats::hit(int millis) {
+void PingStats::hit(Milliseconds millis) {
     _numFailuresSinceLastStart = std::numeric_limits<int>::max();
     ++count;
-    value = value == std::numeric_limits<unsigned int>::max()
-        ? millis
-        : static_cast<unsigned long>((value * .8) + (millis * .2));
+    value = value == Milliseconds() ? millis : Milliseconds((value * 4 + millis) / 5);
 }
 
 void PingStats::miss() {
@@ -882,32 +871,41 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
     const MemberState originalState = getMemberState();
     PingStats& hbStats = _pings[target];
     invariant(hbStats.getLastHeartbeatStartDate() != Date_t());
+    const bool isUnauthorized = (hbResponse.getStatus().code() == ErrorCodes::Unauthorized) ||
+        (hbResponse.getStatus().code() == ErrorCodes::AuthenticationFailed);
     if (!hbResponse.isOK()) {
-        hbStats.miss();
+        if (isUnauthorized) {
+            hbStats.hit(networkRoundTripTime);
+        } else {
+            hbStats.miss();
+        }
     } else {
-        hbStats.hit(durationCount<Milliseconds>(networkRoundTripTime));
+        hbStats.hit(networkRoundTripTime);
         // Log diagnostics.
         if (hbResponse.getValue().isStateDisagreement()) {
             LOG(1) << target << " thinks that we are down because they cannot send us heartbeats.";
         }
     }
 
-    const bool isUnauthorized = (hbResponse.getStatus().code() == ErrorCodes::Unauthorized) ||
-        (hbResponse.getStatus().code() == ErrorCodes::AuthenticationFailed);
+    // If a node is not PRIMARY and has no sync source, we increase the heartbeat rate in order
+    // to help it find a sync source more quickly, which helps ensure the PRIMARY will continue to
+    // see the majority of the cluster.
+    Milliseconds heartbeatInterval;
+    if (_rsConfig.getProtocolVersion() == 1 && getSyncSourceAddress().empty() && !_iAmPrimary()) {
+        heartbeatInterval = _rsConfig.getElectionTimeoutPeriod() / 2;
+    } else {
+        heartbeatInterval = _rsConfig.getHeartbeatInterval();
+    }
 
     const Milliseconds alreadyElapsed = now - hbStats.getLastHeartbeatStartDate();
     Date_t nextHeartbeatStartDate;
-    // determine next start time
-    if (_rsConfig.isInitialized() &&
-        (hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
-        (alreadyElapsed < _rsConfig.getHeartbeatTimeoutPeriodMillis())) {
-        if (isUnauthorized) {
-            nextHeartbeatStartDate = now + _rsConfig.getHeartbeatInterval();
-        } else {
-            nextHeartbeatStartDate = now;
-        }
+    // Determine next heartbeat start time.
+    if (hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries &&
+        alreadyElapsed < _rsConfig.getHeartbeatTimeoutPeriod()) {
+        // There are still retries left, let's use one.
+        nextHeartbeatStartDate = now;
     } else {
-        nextHeartbeatStartDate = now + _rsConfig.getHeartbeatInterval();
+        nextHeartbeatStartDate = now + heartbeatInterval;
     }
 
     if (hbResponse.isOK() && hbResponse.getValue().hasConfig()) {
@@ -963,7 +961,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
                       " issue for member _id:" << member.getId();
             hbData.setAuthIssue(now);
         } else if (hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries ||
-                   alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriodMillis()) {
+                   alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriod()) {
             LOG(1) << "setDownValues: heartbeat response failed for member _id:" << member.getId()
                    << ", msg:  " << hbResponse.getStatus().reason();
 
@@ -1491,9 +1489,9 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
             }
             bb.appendDate("lastHeartbeat", it->getLastHeartbeat());
             bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());
-            const int ping = _getPing(itConfig.getHostAndPort());
-            if (ping != -1) {
-                bb.append("pingMs", ping);
+            Milliseconds ping = _getPing(itConfig.getHostAndPort());
+            if (ping != Milliseconds()) {
+                bb.append("pingMs", durationCount<Milliseconds>(ping));
                 std::string s = it->getLastHeartbeatMsg();
                 if (!s.empty())
                     bb.append("lastHeartbeatMessage", s);
@@ -1910,7 +1908,7 @@ std::string TopologyCoordinatorImpl::_getUnelectableReasonString(
     return ss;
 }
 
-int TopologyCoordinatorImpl::_getPing(const HostAndPort& host) {
+Milliseconds TopologyCoordinatorImpl::_getPing(const HostAndPort& host) {
     return _pings[host].getMillis();
 }
 

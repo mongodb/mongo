@@ -2854,8 +2854,14 @@ TEST_F(ReplCoordTest, LivenessElectionTimeout) {
 
     // Confirm that the node relinquishes PRIMARY after only one node is left UP.
     const Date_t startDate1 = getNet()->now();
+    const Date_t endDate = startDate1 + Milliseconds(1980);
     getNet()->enterNetwork();
-    getNet()->runUntil(startDate1 + Milliseconds(1980));
+    while (getNet()->now() < endDate) {
+        getNet()->runUntil(endDate);
+        if (getNet()->now() < endDate) {
+            getNet()->blackHole(getNet()->getNextReadyRequest());
+        }
+    }
     getNet()->exitNetwork();
     getReplCoord()->waitForStepDownFinish_forTest();
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getReplCoord()->getMemberState().s);

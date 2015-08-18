@@ -60,8 +60,6 @@ namespace repl {
  */
 class PingStats {
 public:
-    PingStats();
-
     /**
      * Records that a new heartbeat request started at "now".
      *
@@ -74,7 +72,7 @@ public:
      * Records that a heartbeat request completed successfully, and that "millis" milliseconds
      * were spent for a single network roundtrip plus remote processing time.
      */
-    void hit(int millis);
+    void hit(Milliseconds millis);
 
     /**
      * Records that a heartbeat request failed.
@@ -91,7 +89,7 @@ public:
     /**
      * Gets the weighted average round trip time for heartbeat messages to the target.
      */
-    unsigned int getMillis() const {
+    Milliseconds getMillis() const {
         return value;
     }
 
@@ -114,10 +112,10 @@ public:
     }
 
 private:
-    unsigned int count;
-    unsigned int value;
+    unsigned int count = 0;
+    Milliseconds value;
     Date_t _lastHeartbeatStartDate;
-    int _numFailuresSinceLastStart;
+    int _numFailuresSinceLastStart = std::numeric_limits<int>::max();
 };
 
 class TopologyCoordinatorImpl : public TopologyCoordinator {
@@ -282,7 +280,7 @@ private:
     int _getTotalPings();
 
     // Returns the current "ping" value for the given member by their address
-    int _getPing(const HostAndPort& host);
+    Milliseconds _getPing(const HostAndPort& host);
 
     // Determines if we will veto the member specified by "args.id", given that the last op
     // we have applied locally is "lastOpApplied".
