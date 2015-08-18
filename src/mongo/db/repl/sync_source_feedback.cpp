@@ -137,8 +137,8 @@ Status SyncSourceFeedback::updateUpstream(OperationContext* txn) {
         log() << "SyncSourceFeedback error sending update, response: " << res.toString() << endl;
         // blacklist sync target for .5 seconds and find a new one, unless we were rejected due
         // to the syncsource having a newer config
-        if (status != ErrorCodes::InvalidReplicaSetConfig || res["cfgver"].eoo() ||
-            res["cfgver"].numberLong() < replCoord->getConfig().getConfigVersion()) {
+        if (status != ErrorCodes::InvalidReplicaSetConfig || res["configVersion"].eoo() ||
+            res["configVersion"].numberLong() < replCoord->getConfig().getConfigVersion()) {
             replCoord->blacklistSyncSource(_syncTarget, Date_t::now() + Milliseconds(500));
             BackgroundSync::get()->clearSyncTarget();
             _resetConnection();

@@ -48,7 +48,7 @@ conf.version++;
 reconfig(rst, conf);
 // This write may block until all nodes finish upgrade, because replSetUpdatePosition may be
 // rejected by the primary for mismatched config version before secondaries get reconfig.
-// This will make secondaries blacklist the primary for 0.5 seconds.
+// This will make secondaries wait for 0.5 seconds and retry.
 assert.writeOK(primaryColl.bar.insert({x: 2}, {writeConcern: {w: 3}}));
 
 // Check optime format in protocol version 1, which is an object including the term.
