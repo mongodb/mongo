@@ -164,18 +164,6 @@ public:
     }
 };
 
-template <typename T>
-void assertThrowsStatus(stdx::future<T>&& fut, const Status& s) {
-    ASSERT([&] {
-        try {
-            std::forward<stdx::future<T>>(fut).get();
-            return false;
-        } catch (const DBException& ex) {
-            return ex.toStatus() == s;
-        }
-    }());
-}
-
 TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
     bool validateCalled = false;
     bool hostCorrect = false;
@@ -201,7 +189,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
             return Status::OK();
         }));
 
-    stdx::promise<RemoteCommandResponse> done;
+    stdx::promise<void> done;
+    bool statusCorrect = false;
     auto doneFuture = done.get_future();
 
     net().startCommand({},
@@ -210,11 +199,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
                         BSON("foo"
                              << "bar")},
                        [&](StatusWith<RemoteCommandResponse> result) {
-                           try {
-                               done.set_value(uassertStatusOK(result));
-                           } catch (...) {
-                               done.set_exception(std::current_exception());
-                           }
+                           statusCorrect = (result == validationFailedStatus);
+                           done.set_value();
                        });
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -233,7 +219,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
                            });
 
     // we should stop here.
-    assertThrowsStatus(std::move(doneFuture), validationFailedStatus);
+    doneFuture.get();
+    ASSERT(statusCorrect);
     ASSERT(validateCalled);
     ASSERT(hostCorrect);
     ASSERT(isMasterReplyCorrect);
@@ -260,7 +247,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
             return Status::OK();
         }));
 
-    stdx::promise<RemoteCommandResponse> done;
+    stdx::promise<void> done;
+    bool statusCorrect = false;
     auto doneFuture = done.get_future();
 
     net().startCommand({},
@@ -269,11 +257,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
                         BSON("foo"
                              << "bar")},
                        [&](StatusWith<RemoteCommandResponse> result) {
-                           try {
-                               done.set_value(uassertStatusOK(result));
-                           } catch (...) {
-                               done.set_exception(std::current_exception());
-                           }
+                           statusCorrect = (result == makeRequestError);
+                           done.set_value();
                        });
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -290,8 +275,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
                            });
 
     // We should stop here.
-    assertThrowsStatus(std::move(doneFuture), makeRequestError);
-
+    doneFuture.get();
+    ASSERT(statusCorrect);
     ASSERT(makeRequestCalled);
     ASSERT(!handleReplyCalled);
 }
@@ -312,20 +297,27 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
             return Status::OK();
         }));
 
-    stdx::promise<RemoteCommandResponse> done;
+    stdx::promise<void> done;
     auto doneFuture = done.get_future();
+    bool statusCorrect = false;
 
     auto commandRequest = BSON("foo"
                                << "bar");
 
+    auto commandReply = BSON("foo"
+                             << "boo"
+                             << "ok" << 1.0);
+
+    auto metadata = BSON("aaa"
+                         << "bbb");
+
     net().startCommand({},
                        {testHost, "blah", commandRequest},
                        [&](StatusWith<RemoteCommandResponse> result) {
-                           try {
-                               done.set_value(uassertStatusOK(result));
-                           } catch (...) {
-                               done.set_exception(std::current_exception());
-                           }
+                           statusCorrect =
+                               (result.isOK() && (result.getValue().data == commandReply) &&
+                                (result.getValue().metadata == metadata));
+                           done.set_value();
                        });
 
 
@@ -342,12 +334,6 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
                                return response;
                            });
 
-    auto commandReply = BSON("foo"
-                             << "boo"
-                             << "ok" << 1.0);
-
-    auto metadata = BSON("aaa"
-                         << "bbb");
 
     // Simulate user command.
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
@@ -361,9 +347,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
                            });
 
     // We should get back the reply now.
-    auto reply = doneFuture.get();
-    ASSERT_EQ(reply.data, commandReply);
-    ASSERT_EQ(reply.metadata, metadata);
+    doneFuture.get();
+    ASSERT(statusCorrect);
 }
 
 TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
@@ -399,18 +384,16 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
             return handleReplyError;
         }));
 
-    stdx::promise<RemoteCommandResponse> done;
+    stdx::promise<void> done;
     auto doneFuture = done.get_future();
+    bool statusCorrect = false;
     auto commandRequest = BSON("foo"
                                << "bar");
     net().startCommand({},
                        {testHost, "blah", commandRequest},
                        [&](StatusWith<RemoteCommandResponse> result) {
-                           try {
-                               done.set_value(uassertStatusOK(result));
-                           } catch (...) {
-                               done.set_exception(std::current_exception());
-                           }
+                           statusCorrect = (result == handleReplyError);
+                           done.set_value();
                        });
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -438,8 +421,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
                                return response;
                            });
 
-    assertThrowsStatus(std::move(doneFuture), handleReplyError);
-
+    doneFuture.get();
+    ASSERT(statusCorrect);
     ASSERT(makeRequestCalled);
     ASSERT(handleReplyCalled);
     ASSERT(handleReplyArgumentCorrect);
