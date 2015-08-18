@@ -43,8 +43,7 @@
     "number_long_type" :18,
     "minkey_type" : -1, 
     "maxkey_type" : 127,
-    "regex_type" : 11, 
-    
+    "regex_type" : 11,
 };
 
     
