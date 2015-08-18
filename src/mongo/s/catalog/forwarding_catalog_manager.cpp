@@ -101,6 +101,10 @@ void ForwardingCatalogManager::shutDown() {
     _actual->shutDown();
 }
 
+Status ForwardingCatalogManager::enableSharding(const std::string& dbName) {
+    return retry([&] { return _actual->enableSharding(dbName); });
+}
+
 Status ForwardingCatalogManager::shardCollection(OperationContext* txn,
                                                  const std::string& ns,
                                                  const ShardKeyPattern& fieldsAndOrder,
@@ -112,14 +116,32 @@ Status ForwardingCatalogManager::shardCollection(OperationContext* txn,
     });
 }
 
+StatusWith<std::string> ForwardingCatalogManager::addShard(
+    OperationContext* txn,
+    const std::string* shardProposedName,
+    const ConnectionString& shardConnectionString,
+    const long long maxSize) {
+    return retry(
+        [&] { return _actual->addShard(txn, shardProposedName, shardConnectionString, maxSize); });
+}
+
 StatusWith<ShardDrainingStatus> ForwardingCatalogManager::removeShard(OperationContext* txn,
                                                                       const std::string& name) {
     return retry([&] { return _actual->removeShard(txn, name); });
 }
 
+Status ForwardingCatalogManager::updateDatabase(const std::string& dbName, const DatabaseType& db) {
+    return retry([&] { return _actual->updateDatabase(dbName, db); });
+}
+
 StatusWith<OpTimePair<DatabaseType>> ForwardingCatalogManager::getDatabase(
     const std::string& dbName) {
     return retry([&] { return _actual->getDatabase(dbName); });
+}
+
+Status ForwardingCatalogManager::updateCollection(const std::string& collNs,
+                                                  const CollectionType& coll) {
+    return retry([&] { return _actual->updateCollection(collNs, coll); });
 }
 
 StatusWith<OpTimePair<CollectionType>> ForwardingCatalogManager::getCollection(
@@ -233,19 +255,16 @@ void ForwardingCatalogManager::writeConfigServerDirect(const BatchedCommandReque
     });
 }
 
+Status ForwardingCatalogManager::createDatabase(const std::string& dbName) {
+    return retry([&] { return _actual->createDatabase(dbName); });
+}
+
 DistLockManager* ForwardingCatalogManager::getDistLockManager() {
     return retry([&] { return _actual->getDistLockManager(); });
 }
 
 Status ForwardingCatalogManager::checkAndUpgrade(bool checkOnly) {
     return retry([&] { return _actual->checkAndUpgrade(checkOnly); });
-}
-
-Status ForwardingCatalogManager::_checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) {
-    return retry([&] { return _actual->_checkDbDoesNotExist(dbName, db); });
-}
-StatusWith<std::string> ForwardingCatalogManager::_generateNewShardName() {
-    return retry([&] { return _actual->_generateNewShardName(); });
 }
 
 StatusWith<ForwardingCatalogManager::ScopedDistLock> ForwardingCatalogManager::distLock(

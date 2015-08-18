@@ -119,7 +119,7 @@ public:
      *  - DatabaseDifferCase - database already exists, but with a different case
      *  - ShardNotFound - could not find a shard to place the DB on
      */
-    Status enableSharding(const std::string& dbName);
+    virtual Status enableSharding(const std::string& dbName) = 0;
 
     /**
      * Shards a collection. Assumes that the database is enabled for sharding.
@@ -159,7 +159,7 @@ public:
     virtual StatusWith<std::string> addShard(OperationContext* txn,
                                              const std::string* shardProposedName,
                                              const ConnectionString& shardConnectionString,
-                                             const long long maxSize);
+                                             const long long maxSize) = 0;
 
     /**
      * Tries to remove a shard. To completely remove a shard from a sharded cluster,
@@ -175,7 +175,7 @@ public:
     /**
      * Updates or creates the metadata for a given database.
      */
-    virtual Status updateDatabase(const std::string& dbName, const DatabaseType& db);
+    virtual Status updateDatabase(const std::string& dbName, const DatabaseType& db) = 0;
 
     /**
      * Retrieves the metadata for a given database, if it exists.
@@ -192,7 +192,7 @@ public:
     /**
      * Updates or creates the metadata for a given collection.
      */
-    virtual Status updateCollection(const std::string& collNs, const CollectionType& coll);
+    virtual Status updateCollection(const std::string& collNs, const CollectionType& coll) = 0;
 
     /**
      * Retrieves the metadata for a given collection, if it exists.
@@ -375,12 +375,14 @@ public:
      *  - DatabaseDifferCase - database already exists, but with a different case
      *  - ShardNotFound - could not find a shard to place the DB on
      */
-    Status createDatabase(const std::string& dbName);
+    virtual Status createDatabase(const std::string& dbName) = 0;
 
     /**
      * Directly inserts a document in the specified namespace on the config server (only the
      * config or admin databases). If the document does not have _id field, the field will be
      * added.
+     *
+     * This is a thin wrapper around writeConfigServerDirect.
      *
      * NOTE: Should not be used in new code. Instead add a new metadata operation to the
      *       interface.
@@ -390,6 +392,8 @@ public:
     /**
      * Updates a document in the specified namespace on the config server (only the config or
      * admin databases).
+     *
+     * This is a thin wrapper around writeConfigServerDirect.
      *
      * NOTE: Should not be used in new code. Instead add a new metadata operation to the
      *       interface.
@@ -404,6 +408,8 @@ public:
     /**
      * Removes a document from the specified namespace on the config server (only the config
      * or admin databases).
+     *
+     * This is a thin wrapper around writeConfigServerDirect.
      *
      * NOTE: Should not be used in new code. Instead add a new metadata operation to the
      *       interface.
@@ -421,12 +427,6 @@ public:
     virtual Status checkAndUpgrade(bool checkOnly) = 0;
 
 protected:
-    /**
-     * Selects an optimal shard on which to place a newly created database from the set of
-     * available shards. Will return ShardNotFound if shard could not be found.
-     */
-    static StatusWith<ShardId> selectShardForNewDatabase(ShardRegistry* shardRegistry);
-
     CatalogManager() = default;
 
     /**
@@ -437,24 +437,6 @@ protected:
      * be cached.
      */
     virtual DistLockManager* getDistLockManager() = 0;
-
-private:
-    /**
-     * Checks that the given database name doesn't already exist in the config.databases
-     * collection, including under different casing. Optional db can be passed and will
-     * be set with the database details if the given dbName exists.
-     *
-     * Returns OK status if the db does not exist.
-     * Some known errors include:
-     *  NamespaceExists if it exists with the same casing
-     *  DatabaseDifferCase if it exists under different casing.
-     */
-    virtual Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) = 0;
-
-    /**
-     * Generates a unique name to be given to a newly added shard.
-     */
-    virtual StatusWith<std::string> _generateNewShardName() = 0;
 };
 
 }  // namespace mongo

@@ -63,6 +63,8 @@ public:
 
     void shutDown() override;
 
+    Status enableSharding(const std::string& dbName) override;
+
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
                            const ShardKeyPattern& fieldsAndOrder,
@@ -70,10 +72,19 @@ public:
                            const std::vector<BSONObj>& initPoints,
                            const std::set<ShardId>& initShardsIds) override;
 
+    StatusWith<std::string> addShard(OperationContext* txn,
+                                     const std::string* shardProposedName,
+                                     const ConnectionString& shardConnectionString,
+                                     const long long maxSize) override;
+
     StatusWith<ShardDrainingStatus> removeShard(OperationContext* txn,
                                                 const std::string& name) override;
 
+    Status updateDatabase(const std::string& dbName, const DatabaseType& db) override;
+
     StatusWith<OpTimePair<DatabaseType>> getDatabase(const std::string& dbName) override;
+
+    Status updateCollection(const std::string& collNs, const CollectionType& coll) override;
 
     StatusWith<OpTimePair<CollectionType>> getCollection(const std::string& collNs) override;
 
@@ -128,6 +139,8 @@ public:
     void writeConfigServerDirect(const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;
 
+    Status createDatabase(const std::string& dbName) override;
+
     DistLockManager* getDistLockManager() override;
 
     Status checkAndUpgrade(bool checkOnly) override;
@@ -163,9 +176,6 @@ public:
         stdx::chrono::milliseconds lockTryInterval = DistLockManager::kDefaultLockRetryInterval);
 
 private:
-    Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) override;
-    StatusWith<std::string> _generateNewShardName() override;
-
     template <typename Callable>
     auto retry(Callable&& c) -> decltype(std::forward<Callable>(c)());
 

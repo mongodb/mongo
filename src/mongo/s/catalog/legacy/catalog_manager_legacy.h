@@ -30,7 +30,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/catalog_manager_common.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -40,7 +40,7 @@ namespace mongo {
 /**
  * Implements the catalog manager using the legacy 3-config server protocol.
  */
-class CatalogManagerLegacy final : public CatalogManager {
+class CatalogManagerLegacy final : public CatalogManagerCommon {
 public:
     CatalogManagerLegacy();
     ~CatalogManagerLegacy();

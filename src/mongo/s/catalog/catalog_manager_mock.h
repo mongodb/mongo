@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/catalog_manager_common.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 
 namespace mongo {
@@ -36,7 +36,7 @@ namespace mongo {
 /**
  * A dummy implementation of CatalogManager for testing purposes.
  */
-class CatalogManagerMock : public CatalogManager {
+class CatalogManagerMock : public CatalogManagerCommon {
 public:
     CatalogManagerMock();
     ~CatalogManagerMock();

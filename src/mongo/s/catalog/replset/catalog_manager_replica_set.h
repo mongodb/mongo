@@ -31,7 +31,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/catalog/catalog_manager.h"
+#include "mongo/s/catalog/catalog_manager_common.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -43,7 +43,7 @@ class VersionType;
 /**
  * Implements the catalog manager for talking to replica set config servers.
  */
-class CatalogManagerReplicaSet final : public CatalogManager {
+class CatalogManagerReplicaSet final : public CatalogManagerCommon {
 public:
     explicit CatalogManagerReplicaSet(std::unique_ptr<DistLockManager> distLockManager);
     virtual ~CatalogManagerReplicaSet();
