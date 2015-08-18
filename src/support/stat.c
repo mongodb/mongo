@@ -444,6 +444,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search.desc = "cursor: cursor search calls";
 	stats->cursor_search_near.desc = "cursor: cursor search near calls";
 	stats->cursor_update.desc = "cursor: cursor update calls";
+	stats->dh_conn_handle_count.desc =
+	    "data-handle: connection data handles currently active";
 	stats->dh_sweep_ref.desc =
 	    "data-handle: connection sweep candidate became referenced";
 	stats->dh_sweep_close.desc =

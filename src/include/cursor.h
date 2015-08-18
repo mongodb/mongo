@@ -304,7 +304,6 @@ struct __wt_cursor_stat {
 	int	notpositioned;		/* Cursor not positioned */
 
 	WT_STATS *stats;		/* Stats owned by the cursor */
-	WT_STATS *stats_first;		/* First stats reference */
 	int	  stats_base;		/* Base statistics value */
 	int	  stats_count;		/* Count of stats elements */
 
@@ -325,12 +324,10 @@ struct __wt_cursor_stat {
 
 /*
  * WT_CURSOR_STATS --
- *	Return a reference to a statistic cursor's stats structures; use the
- * WT_CURSOR.stats_first field instead of WT_CURSOR.stats because the latter
- * is NULL when non-cursor memory is used to hold the statistics.
+ *	Return a reference to a statistic cursor's stats structures.
  */
 #define	WT_CURSOR_STATS(cursor)						\
-	(((WT_CURSOR_STAT *)cursor)->stats_first)
+	(((WT_CURSOR_STAT *)cursor)->stats)
 
 struct __wt_cursor_table {
 	WT_CURSOR iface;
