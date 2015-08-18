@@ -61,8 +61,8 @@ __split_stash_add(
 	stash->p = p;
 	stash->len = len;
 
-	__wt_atomic_add64(conn->split_stashed_bytes, len);
-	__wt_atomic_add64(conn->split_stashed_objects, 1);
+	(void)__wt_atomic_add64(&conn->split_stashed_bytes, len);
+	(void)__wt_atomic_add64(&conn->split_stashed_objects, 1);
 
 	/* See if we can free any previous entries. */
 	if (session->split_stash_cnt > 1)
@@ -99,8 +99,8 @@ __wt_split_stash_discard(WT_SESSION_IMPL *session)
 		 * It's a bad thing if another thread is in this memory after
 		 * we free it, make sure nothing good happens to that thread.
 		 */
-		__wt_atomic_sub64(conn->split_stashed_bytes, stash->len);
-		__wt_atomic_sub64(conn->split_stashed_objects, 1);
+		(void)__wt_atomic_sub64(&conn->split_stashed_bytes, stash->len);
+		(void)__wt_atomic_sub64(&conn->split_stashed_objects, 1);
 		__wt_overwrite_and_free_len(session, stash->p, stash->len);
 	}
 
