@@ -534,11 +534,14 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
         }
 
         if (now - slaveInfo.lastUpdate >= _rsConfig.getElectionTimeoutPeriod()) {
+            int memberIndex = _rsConfig.findMemberIndexByConfigId(slaveInfo.memberId);
+            if (memberIndex == -1) {
+                continue;
+            }
+
             slaveInfo.down = true;
             HeartbeatResponseAction action =
-                _topCoord->setMemberAsDown(now,
-                                           _rsConfig.findMemberIndexByConfigId(slaveInfo.memberId),
-                                           _getMyLastOptime_inlock());
+                _topCoord->setMemberAsDown(now, memberIndex, _getMyLastOptime_inlock());
             _handleHeartbeatResponseAction(action, makeStatusWith<ReplSetHeartbeatResponse>());
         }
     }

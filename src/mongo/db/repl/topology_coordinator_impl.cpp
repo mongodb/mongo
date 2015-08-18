@@ -990,6 +990,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::setMemberAsDown(Date_t now,
                                                                  const int memberIndex,
                                                                  const OpTime& myLastOpApplied) {
     invariant(memberIndex != _selfIndex);
+    invariant(memberIndex != -1);
     MemberHeartbeatData& hbData = _hbdata[memberIndex];
     hbData.setDownValues(now, "no response within election timeout period");
 
