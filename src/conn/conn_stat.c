@@ -42,13 +42,24 @@ __stat_sources_free(WT_SESSION_IMPL *session, char ***sources)
 void
 __wt_conn_stat_init(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
+	WT_CONNECTION_STATS **stats;
+
+	conn = S2C(session);
+	stats = conn->stats;
+
 	__wt_async_stats_update(session);
 	__wt_cache_stats_update(session);
 	__wt_txn_stats_update(session);
 
-	WT_CONN_STAT(session, dh_conn_handle_count) =
-	    S2C(session)->dhandle_count;
-	WT_CONN_STAT(session, file_open) = S2C(session)->open_file_count;
+	WT_STAT_SET(session, stats, file_open, conn->open_file_count);
+	WT_STAT_SET(session,
+	    stats, session_cursor_open, conn->open_cursor_count);
+	WT_STAT_SET(session, stats, dh_conn_handle_count, conn->dhandle_count);
+	WT_STAT_SET(session,
+	    stats, rec_split_stashed_objects, conn->split_stashed_objects);
+	WT_STAT_SET(session,
+	    stats, rec_split_stashed_bytes, conn->split_stashed_bytes);
 }
 
 /*
@@ -137,11 +148,11 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
+	WT_CURSOR_STAT *cst;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_STATS *stats;
-	u_int i;
-	uint64_t max;
+	int64_t *stats;
+	int i;
 	const char *uri;
 	const char *cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
@@ -165,15 +176,14 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 	 */
 	switch (ret = __wt_curstat_open(session, uri, cfg, &cursor)) {
 	case 0:
-		max = conn_stats ?
-		    sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS) :
-		    sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
-		for (i = 0,
-		    stats = WT_CURSOR_STATS(cursor); i <  max; ++i, ++stats)
+		cst = (WT_CURSOR_STAT *)cursor;
+		for (stats = cst->stats, i = 0; i <  cst->stats_count; ++i)
 			WT_ERR(__wt_fprintf(conn->stat_fp,
-			    "%s %" PRIu64 " %s %s\n",
-			    conn->stat_stamp,
-			    stats->v, name, stats->desc));
+			    "%s %" PRId64 " %s %s\n",
+			    conn->stat_stamp, stats[i],
+			    name, conn_stats ?
+			    __wt_stat_connection_desc(i) :
+			    __wt_stat_dsrc_desc(i)));
 		WT_ERR(cursor->close(cursor));
 		break;
 	case EBUSY:

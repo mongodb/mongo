@@ -493,6 +493,7 @@ desc
 dest
 destSize
 dev
+dh
 dhandle
 dhandles
 dir
