@@ -1264,7 +1264,6 @@ bool CatalogManagerReplicaSet::_runReadCommand(const std::string& dbname,
 
     auto resultStatus = _runCommandOnConfig(target.getValue(), dbname, cmdObj);
     if (!resultStatus.isOK()) {
-        log() << "DANNENPRINT: " << resultStatus.getStatus();
         return Command::appendCommandStatus(*result, resultStatus.getStatus());
     }
 
