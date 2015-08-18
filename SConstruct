@@ -450,7 +450,17 @@ asio = has_option( "asio" )
 
 usePCH = has_option( "usePCH" )
 
-env = Environment( BUILD_DIR=variantDir,
+# On 3.0 and beyond, we honor several scons Variables on the command
+# line.  Those don't exist on 2.6, but it is easy to get in the habit
+# of using them. By default SCons silently ignores them, which can be
+# very confusing if you say 'scons CC=clang' on the v2.6 branch, for
+# instance. We create an empty Variables object here and feed it to
+# the Environment constructor so that we can ask for any unknown
+# variables (and all should be), below.
+env_vars = Variables()
+
+env = Environment( variables=env_vars,
+                   BUILD_DIR=variantDir,
                    DIST_ARCHIVE_SUFFIX='.tgz',
                    EXTRAPATH=get_option("extrapath"),
                    MODULE_BANNERS=[],
@@ -471,6 +481,12 @@ env = Environment( BUILD_DIR=variantDir,
                    CONFIGUREDIR = '#' + scons_data_dir + '/sconf_temp',
                    CONFIGURELOG = '#' + scons_data_dir + '/config.log'
                    )
+
+# Report any unknown variables as an error.
+unknown_vars = env_vars.UnknownVariables()
+if unknown_vars:
+    print "Unknown variables specified: {0}".format(", ".join(unknown_vars.keys()))
+    Exit(1)
 
 if has_option("cache"):
     EnsureSConsVersion( 2, 3, 0 )
