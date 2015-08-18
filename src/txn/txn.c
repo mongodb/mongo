@@ -182,9 +182,6 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
 	txn_state->snap_min = snap_min;
 
-	if (WT_TXNID_LT(txn_global->last_running + 100, snap_min))
-		txn_global->last_running = snap_min;
-
 	WT_ASSERT(session, txn_global->scan_count > 0);
 	(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
 
