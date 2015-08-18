@@ -119,8 +119,6 @@ struct __wt_named_extractor {
  * main queue and the hashed queue.
  */
 #define	WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket) do {		\
-	/* Don't allow readers to see a partially constructed handle. */\
-	WT_WRITE_BARRIER();						\
 	TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);			\
 	TAILQ_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashq);	\
 	++conn->dhandle_count;						\
@@ -137,8 +135,6 @@ struct __wt_named_extractor {
  * main queue and the hashed queue.
  */
 #define	WT_CONN_BLOCK_INSERT(conn, block, bucket) do {			\
-	/* Don't allow readers to see a partially constructed handle. */\
-	WT_WRITE_BARRIER();						\
 	TAILQ_INSERT_HEAD(&(conn)->blockqh, block, q);			\
 	TAILQ_INSERT_HEAD(&(conn)->blockhash[bucket], block, hashq);	\
 } while (0)
@@ -153,8 +149,6 @@ struct __wt_named_extractor {
  * main queue and the hashed queue.
  */
 #define	WT_CONN_FILE_INSERT(conn, fh, bucket) do {			\
-	/* Don't allow readers to see a partially constructed handle. */\
-	WT_WRITE_BARRIER();						\
 	TAILQ_INSERT_HEAD(&(conn)->fhqh, fh, q);			\
 	TAILQ_INSERT_HEAD(&(conn)->fhhash[bucket], fh, hashq);		\
 } while (0)
