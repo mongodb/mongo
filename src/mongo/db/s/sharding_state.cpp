@@ -385,6 +385,14 @@ void ShardingState::mergeChunks(OperationContext* txn,
     _collMetadata[ns] = cloned;
 }
 
+bool ShardingState::inCriticalMigrateSection() {
+    return _migrationSourceManager.getInCriticalSection();
+}
+
+bool ShardingState::waitTillNotInCriticalSection(int maxSecondsToWait) {
+    return _migrationSourceManager.waitTillNotInCriticalSection(maxSecondsToWait);
+}
+
 void ShardingState::resetMetadata(const string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 

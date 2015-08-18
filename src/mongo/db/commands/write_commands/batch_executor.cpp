@@ -333,9 +333,6 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
 
         ShardingState* shardingState = ShardingState::get(_txn);
 
-        // Make sure our shard name is set or is the same as what was set previously
-        shardingState->setShardName(requestMetadata->getShardName());
-
         //
         // First, we refresh metadata if we need to based on the requested version.
         //

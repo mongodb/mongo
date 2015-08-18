@@ -54,8 +54,6 @@
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/migration_destination_manager.h"
-#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/write_concern.h"
@@ -92,9 +90,6 @@ const WriteConcernOptions DefaultWriteConcern(2, WriteConcernOptions::NONE, kDef
 
 Tee* migrateLog = RamLog::get("migrate");
 
-MigrationSourceManager migrateSourceManager;
-MigrationDestinationManager migrateDestManager;
-
 /**
  * Returns the default write concern for migration cleanup (at donor shard) and cloning documents
  * (on the destination shard).
@@ -122,6 +117,7 @@ struct MigrateStatusHolder {
         _isAnotherMigrationActive =
             !_migrateSourceManager->start(txn, ns, min, max, shardKeyPattern);
     }
+
     ~MigrateStatusHolder() {
         if (!_isAnotherMigrationActive) {
             _migrateSourceManager->done(_txn);
@@ -145,30 +141,26 @@ MONGO_FP_DECLARE(failMigrationCommit);
 MONGO_FP_DECLARE(failMigrationConfigWritePrepare);
 MONGO_FP_DECLARE(failMigrationApplyOps);
 
-class ChunkCommandHelper : public Command {
+class TransferModsCommand : public Command {
 public:
-    ChunkCommandHelper(const char* name) : Command(name) {}
+    TransferModsCommand() : Command("_transferMods") {}
 
-    virtual void help(std::stringstream& help) const {
-        help << "internal - should not be called directly";
-    }
-    virtual bool slaveOk() const {
-        return false;
-    }
-    virtual bool adminOnly() const {
-        return true;
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
-};
-
-class TransferModsCommand : public ChunkCommandHelper {
-public:
     void help(std::stringstream& h) const {
         h << "internal";
     }
-    TransferModsCommand() : ChunkCommandHelper("_transferMods") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -176,24 +168,38 @@ public:
         actions.addAction(ActionType::internal);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
+
     bool run(OperationContext* txn,
              const string&,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        return migrateSourceManager.transferMods(txn, errmsg, result);
+        return ShardingState::get(txn)->migrationSourceManager()->transferMods(txn, errmsg, result);
     }
 
 } transferModsCommand;
 
-
-class InitialCloneCommand : public ChunkCommandHelper {
+class InitialCloneCommand : public Command {
 public:
+    InitialCloneCommand() : Command("_migrateClone") {}
+
     void help(std::stringstream& h) const {
         h << "internal";
     }
-    InitialCloneCommand() : ChunkCommandHelper("_migrateClone") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -201,13 +207,14 @@ public:
         actions.addAction(ActionType::internal);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
+
     bool run(OperationContext* txn,
              const string&,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        return migrateSourceManager.clone(txn, errmsg, result);
+        return ShardingState::get(txn)->migrationSourceManager()->clone(txn, errmsg, result);
     }
 
 } initialCloneCommand;
@@ -387,11 +394,14 @@ public:
             errmsg = "need to specify maxChunkSizeBytes";
             return false;
         }
+
         const long long maxChunkSize = maxSizeElem.numberLong();  // in bytes
+
+        ShardingState* const shardingState = ShardingState::get(txn);
 
         // This could be the first call that enables sharding - make sure we initialize the
         // sharding state for this shard.
-        if (!ShardingState::get(txn)->enabled()) {
+        if (!shardingState->enabled()) {
             if (cmdObj["configdb"].type() != String) {
                 errmsg = "sharding not enabled";
                 warning() << errmsg;
@@ -399,11 +409,11 @@ public:
             }
 
             const string configdb = cmdObj["configdb"].String();
-            ShardingState::get(txn)->initialize(configdb);
+            shardingState->initialize(configdb);
         }
 
         // Initialize our current shard name in the shard state if needed
-        ShardingState::get(txn)->setShardName(fromShardName);
+        shardingState->setShardName(fromShardName);
 
         // Make sure we're as up-to-date as possible with shard information
         // This catches the case where we had to previously changed a shard's host by
@@ -421,7 +431,7 @@ public:
 
         // 2.
 
-        if (migrateSourceManager.isActive()) {
+        if (shardingState->migrationSourceManager()->isActive()) {
             errmsg = "migration already in progress";
             warning() << errmsg;
             return false;
@@ -452,8 +462,7 @@ public:
 
         // Always refresh our metadata remotely
         ChunkVersion origShardVersion;
-        Status refreshStatus =
-            ShardingState::get(txn)->refreshMetadataNow(txn, ns, &origShardVersion);
+        Status refreshStatus = shardingState->refreshMetadataNow(txn, ns, &origShardVersion);
 
         if (!refreshStatus.isOK()) {
             errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
@@ -492,7 +501,7 @@ public:
 
         // Get collection metadata
         const std::shared_ptr<CollectionMetadata> origCollMetadata(
-            ShardingState::get(txn)->getCollectionMetadata(ns));
+            shardingState->getCollectionMetadata(ns));
 
         // With nonzero shard version, we must have metadata
         invariant(NULL != origCollMetadata);
@@ -525,7 +534,8 @@ public:
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep2);
 
         // 3.
-        MigrateStatusHolder statusHolder(txn, &migrateSourceManager, ns, min, max, shardKeyPattern);
+        MigrateStatusHolder statusHolder(
+            txn, shardingState->migrationSourceManager(), ns, min, max, shardKeyPattern);
 
         if (statusHolder.isAnotherMigrationActive()) {
             errmsg = "moveChunk is already in progress from this shard";
@@ -558,7 +568,8 @@ public:
         {
             // See comment at the top of the function for more information on what
             // synchronization is used here.
-            if (!migrateSourceManager.storeCurrentLocs(txn, maxChunkSize, errmsg, result)) {
+            if (!shardingState->migrationSourceManager()->storeCurrentLocs(
+                    txn, maxChunkSize, errmsg, result)) {
                 warning() << errmsg;
                 return false;
             }
@@ -577,8 +588,7 @@ public:
             recvChunkStartBuilder.append("min", min);
             recvChunkStartBuilder.append("max", max);
             recvChunkStartBuilder.append("shardKeyPattern", shardKeyPattern);
-            recvChunkStartBuilder.append("configServer",
-                                         ShardingState::get(txn)->getConfigServer(txn));
+            recvChunkStartBuilder.append("configServer", shardingState->getConfigServer(txn));
             recvChunkStartBuilder.append("secondaryThrottle", isSecondaryThrottle);
 
             // Follow the same convention in moveChunk.
@@ -652,7 +662,8 @@ public:
             }
 
             LOG(0) << "moveChunk data transfer progress: " << res
-                   << " my mem used: " << migrateSourceManager.mbUsed() << migrateLog;
+                   << " my mem used: " << shardingState->migrationSourceManager()->mbUsed()
+                   << migrateLog;
 
             if (!ok || res["state"].String() == "fail") {
                 warning() << "moveChunk error transferring data caused migration abort: " << res
@@ -665,7 +676,7 @@ public:
             if (res["state"].String() == "steady")
                 break;
 
-            if (migrateSourceManager.mbUsed() > (500 * 1024 * 1024)) {
+            if (shardingState->migrationSourceManager()->mbUsed() > (500 * 1024 * 1024)) {
                 // This is too much memory for us to use for this so we're going to abort
                 // the migrate
                 ScopedDbConnection conn(toShardCS);
@@ -700,7 +711,7 @@ public:
         log() << "About to check if it is safe to enter critical section";
 
         // Ensure all cloned docs have actually been transferred
-        std::size_t locsRemaining = migrateSourceManager.cloneLocsRemaining();
+        std::size_t locsRemaining = shardingState->migrationSourceManager()->cloneLocsRemaining();
         if (locsRemaining != 0) {
             errmsg = str::stream() << "moveChunk cannot enter critical section before all data is"
                                    << " cloned, " << locsRemaining << " locs were not transferred"
@@ -727,7 +738,7 @@ public:
             // 5.a
             // we're under the collection lock here, so no other migrate can change maxVersion
             // or CollectionMetadata state
-            migrateSourceManager.setInCriticalSection(true);
+            shardingState->migrationSourceManager()->setInCriticalSection(true);
             ChunkVersion myVersion = origCollVersion;
             myVersion.incMajor();
 
@@ -735,12 +746,12 @@ public:
                 ScopedTransaction transaction(txn, MODE_IX);
                 Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
                 Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
-                verify(myVersion > ShardingState::get(txn)->getVersion(ns));
+                verify(myVersion > shardingState->getVersion(ns));
 
                 // bump the metadata's version up and "forget" about the chunk being moved
                 // this is not the commit point but in practice the state in this shard won't
                 // until the commit it done
-                ShardingState::get(txn)->donateChunk(txn, ns, min, max, myVersion);
+                shardingState->donateChunk(txn, ns, min, max, myVersion);
             }
 
             log() << "moveChunk setting version to: " << myVersion << migrateLog;
@@ -777,7 +788,7 @@ public:
 
                     // revert the chunk manager back to the state before "forgetting" about the
                     // chunk
-                    ShardingState::get(txn)->undoDonateChunk(txn, ns, origCollMetadata);
+                    shardingState->undoDonateChunk(txn, ns, origCollMetadata);
                 }
                 log() << "Shard version successfully reset to clean up failed migration";
 
@@ -831,7 +842,7 @@ public:
             // well.  we can figure that out by grabbing the metadata installed on 5.a
 
             const std::shared_ptr<CollectionMetadata> bumpedCollMetadata(
-                ShardingState::get(txn)->getCollectionMetadata(ns));
+                shardingState->getCollectionMetadata(ns));
             if (bumpedCollMetadata->getNumChunks() > 0) {
                 // get another chunk on that shard
                 ChunkType bumpChunk;
@@ -902,7 +913,7 @@ public:
 
                 if (MONGO_FAIL_POINT(failMigrationApplyOps)) {
                     throw SocketException(SocketException::RECV_ERROR,
-                                          ShardingState::get(txn)->getConfigServer(txn));
+                                          shardingState->getConfigServer(txn));
                 }
             } catch (const DBException& ex) {
                 warning() << ex << migrateLog;
@@ -926,7 +937,7 @@ public:
 
                     // Revert the metadata back to the state before "forgetting"
                     // about the chunk.
-                    ShardingState::get(txn)->undoDonateChunk(txn, ns, origCollMetadata);
+                    shardingState->undoDonateChunk(txn, ns, origCollMetadata);
                 }
 
                 log() << "Shard version successfully reset to clean up failed migration";
@@ -981,7 +992,7 @@ public:
                 }
             }
 
-            migrateSourceManager.setInCriticalSection(false);
+            shardingState->migrationSourceManager()->setInCriticalSection(false);
 
             // 5.d
             BSONObjBuilder commitInfo;
@@ -994,7 +1005,7 @@ public:
                 txn->getClient()->clientAddress(true), "moveChunk.commit", ns, commitInfo.obj());
         }
 
-        migrateSourceManager.done(txn);
+        shardingState->migrationSourceManager()->done(txn);
         timing.done(5);
 
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
@@ -1072,13 +1083,21 @@ public:
  *   writeConcern: {} // applies to individual writes.
  * }
  */
-class RecvChunkStartCommand : public ChunkCommandHelper {
+class RecvChunkStartCommand : public Command {
 public:
+    RecvChunkStartCommand() : Command("_recvChunkStart") {}
+
     void help(std::stringstream& h) const {
         h << "internal";
     }
 
-    RecvChunkStartCommand() : ChunkCommandHelper("_recvChunkStart") {}
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
 
     virtual bool isWriteCommandForConfigServer() const {
         return false;
@@ -1098,9 +1117,11 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
+        ShardingState* const shardingState = ShardingState::get(txn);
+
         // Active state of TO-side migrations (MigrateStatus) is serialized by distributed
         // collection lock.
-        if (migrateDestManager.getActive()) {
+        if (shardingState->migrationDestinationManager()->getActive()) {
             errmsg = "migrate already in progress";
             return false;
         }
@@ -1118,10 +1139,10 @@ public:
             return false;
         }
 
-        if (!ShardingState::get(txn)->enabled()) {
+        if (!shardingState->enabled()) {
             if (!cmdObj["configServer"].eoo()) {
                 dassert(cmdObj["configServer"].type() == String);
-                ShardingState::get(txn)->initialize(cmdObj["configServer"].String());
+                shardingState->initialize(cmdObj["configServer"].String());
             } else {
                 errmsg = str::stream()
                     << "cannot start recv'ing chunk, "
@@ -1134,7 +1155,7 @@ public:
 
         if (!cmdObj["toShardName"].eoo()) {
             dassert(cmdObj["toShardName"].type() == String);
-            ShardingState::get(txn)->setShardName(cmdObj["toShardName"].String());
+            shardingState->setShardName(cmdObj["toShardName"].String());
         }
 
         string ns = cmdObj.firstElement().String();
@@ -1146,7 +1167,7 @@ public:
         // consistent and predictable, generally we'd refresh anyway, and to be paranoid.
         ChunkVersion currentVersion;
 
-        Status status = ShardingState::get(txn)->refreshMetadataNow(txn, ns, &currentVersion);
+        Status status = shardingState->refreshMetadataNow(txn, ns, &currentVersion);
         if (!status.isOK()) {
             errmsg = str::stream() << "cannot start recv'ing chunk "
                                    << "[" << min << "," << max << ")" << causedBy(status.reason());
@@ -1212,7 +1233,7 @@ public:
 
         const string fromShard(cmdObj["from"].String());
 
-        Status startStatus = migrateDestManager.start(
+        Status startStatus = shardingState->migrationDestinationManager()->start(
             ns, fromShard, min, max, shardKeyPattern, currentVersion.epoch(), writeConcern);
 
         if (!startStatus.isOK()) {
@@ -1225,12 +1246,26 @@ public:
 
 } recvChunkStartCmd;
 
-class RecvChunkStatusCommand : public ChunkCommandHelper {
+class RecvChunkStatusCommand : public Command {
 public:
+    RecvChunkStatusCommand() : Command("_recvChunkStatus") {}
+
     void help(std::stringstream& h) const {
         h << "internal";
     }
-    RecvChunkStatusCommand() : ChunkCommandHelper("_recvChunkStatus") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -1238,24 +1273,39 @@ public:
         actions.addAction(ActionType::internal);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
+
     bool run(OperationContext* txn,
              const string&,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        migrateDestManager.report(result);
+        ShardingState::get(txn)->migrationDestinationManager()->report(result);
         return 1;
     }
 
 } recvChunkStatusCommand;
 
-class RecvChunkCommitCommand : public ChunkCommandHelper {
+class RecvChunkCommitCommand : public Command {
 public:
+    RecvChunkCommitCommand() : Command("_recvChunkCommit") {}
+
     void help(std::stringstream& h) const {
         h << "internal";
     }
-    RecvChunkCommitCommand() : ChunkCommandHelper("_recvChunkCommit") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -1263,25 +1313,40 @@ public:
         actions.addAction(ActionType::internal);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
+
     bool run(OperationContext* txn,
              const string&,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        bool ok = migrateDestManager.startCommit();
-        migrateDestManager.report(result);
+        bool ok = ShardingState::get(txn)->migrationDestinationManager()->startCommit();
+        ShardingState::get(txn)->migrationDestinationManager()->report(result);
         return ok;
     }
 
 } recvChunkCommitCommand;
 
-class RecvChunkAbortCommand : public ChunkCommandHelper {
+class RecvChunkAbortCommand : public Command {
 public:
+    RecvChunkAbortCommand() : Command("_recvChunkAbort") {}
+
     void help(std::stringstream& h) const {
         h << "internal";
     }
-    RecvChunkAbortCommand() : ChunkCommandHelper("_recvChunkAbort") {}
+
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    virtual bool isWriteCommandForConfigServer() const {
+        return false;
+    }
+
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {
@@ -1289,26 +1354,19 @@ public:
         actions.addAction(ActionType::internal);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
+
     bool run(OperationContext* txn,
              const string&,
              BSONObj& cmdObj,
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        migrateDestManager.abort();
-        migrateDestManager.report(result);
+        ShardingState::get(txn)->migrationDestinationManager()->abort();
+        ShardingState::get(txn)->migrationDestinationManager()->report(result);
         return true;
     }
 
 } recvChunkAbortCommand;
-
-bool ShardingState::inCriticalMigrateSection() {
-    return migrateSourceManager.getInCriticalSection();
-}
-
-bool ShardingState::waitTillNotInCriticalSection(int maxSecondsToWait) {
-    return migrateSourceManager.waitTillNotInCriticalSection(maxSecondsToWait);
-}
 
 void logOpForSharding(OperationContext* txn,
                       const char* opstr,
@@ -1316,7 +1374,8 @@ void logOpForSharding(OperationContext* txn,
                       const BSONObj& obj,
                       BSONObj* patt,
                       bool notInActiveChunk) {
-    migrateSourceManager.logOp(txn, opstr, ns, obj, patt, notInActiveChunk);
+    ShardingState::get(txn)->migrationSourceManager()->logOp(
+        txn, opstr, ns, obj, patt, notInActiveChunk);
 }
 
 }  // namespace mongo

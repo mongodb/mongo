@@ -50,16 +50,13 @@ TEST(BatchedUpdateRequest, Basic) {
                 << BatchedUpdateDocument::updateExpr(BSON("$set" << BSON("b" << 2)))
                 << BatchedUpdateDocument::multi(false) << BatchedUpdateDocument::upsert(false)));
 
-    BSONObj origUpdateRequestObj = BSON(
-        BatchedUpdateRequest::collName("test")
-        << BatchedUpdateRequest::updates() << updateArray
-        << BatchedUpdateRequest::writeConcern(BSON("w" << 1)) << BatchedUpdateRequest::ordered(true)
-        << BatchedUpdateRequest::metadata() << BSON("shardName"
-                                                    << "shard000"
-                                                    << "shardVersion"
-                                                    << BSON_ARRAY(Timestamp(1, 2) << OID::gen())
-                                                    << "ts" << Timestamp(3, 4) << "t" << 5
-                                                    << "session" << 0LL));
+    BSONObj origUpdateRequestObj =
+        BSON(BatchedUpdateRequest::collName("test")
+             << BatchedUpdateRequest::updates() << updateArray
+             << BatchedUpdateRequest::writeConcern(BSON("w" << 1))
+             << BatchedUpdateRequest::ordered(true) << BatchedUpdateRequest::metadata()
+             << BSON("shardVersion" << BSON_ARRAY(Timestamp(1, 2) << OID::gen()) << "ts"
+                                    << Timestamp(3, 4) << "t" << 5 << "session" << 0LL));
 
     string errMsg;
     BatchedUpdateRequest request;

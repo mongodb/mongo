@@ -34,6 +34,8 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -74,6 +76,14 @@ public:
 
     std::string getConfigServer(OperationContext* txn);
     std::string getShardName();
+
+    MigrationSourceManager* migrationSourceManager() {
+        return &_migrationSourceManager;
+    }
+
+    MigrationDestinationManager* migrationDestinationManager() {
+        return &_migrationDestManager;
+    }
 
     // Initialize sharding state and begin authenticating outgoing connections and handling
     // shard versions.  If this is not run before sharded operations occur auth will not work
@@ -299,7 +309,13 @@ private:
                              bool useRequestedVersion,
                              ChunkVersion* latestShardVersion);
 
-    // protects state below
+    // Manages the state of the migration donor shard
+    MigrationSourceManager _migrationSourceManager;
+
+    // Manages the state of the migration recipient shard
+    MigrationDestinationManager _migrationDestManager;
+
+    // Protects state below
     stdx::mutex _mutex;
 
     // Whether ::initialize has been called

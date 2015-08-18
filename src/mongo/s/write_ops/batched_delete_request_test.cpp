@@ -46,16 +46,13 @@ TEST(BatchedDeleteRequest, Basic) {
         BSON(BatchedDeleteDocument::query(BSON("a" << 1)) << BatchedDeleteDocument::limit(1))
         << BSON(BatchedDeleteDocument::query(BSON("b" << 1)) << BatchedDeleteDocument::limit(1)));
 
-    BSONObj origDeleteRequestObj = BSON(
-        BatchedDeleteRequest::collName("test")
-        << BatchedDeleteRequest::deletes() << deleteArray
-        << BatchedDeleteRequest::writeConcern(BSON("w" << 1)) << BatchedDeleteRequest::ordered(true)
-        << BatchedDeleteRequest::metadata() << BSON("shardName"
-                                                    << "shard000"
-                                                    << "shardVersion"
-                                                    << BSON_ARRAY(Timestamp(1, 2) << OID::gen())
-                                                    << "ts" << Timestamp(3, 4) << "t" << 5
-                                                    << "session" << 0LL));
+    BSONObj origDeleteRequestObj =
+        BSON(BatchedDeleteRequest::collName("test")
+             << BatchedDeleteRequest::deletes() << deleteArray
+             << BatchedDeleteRequest::writeConcern(BSON("w" << 1))
+             << BatchedDeleteRequest::ordered(true) << BatchedDeleteRequest::metadata()
+             << BSON("shardVersion" << BSON_ARRAY(Timestamp(1, 2) << OID::gen()) << "ts"
+                                    << Timestamp(3, 4) << "t" << 5 << "session" << 0LL));
 
     string errMsg;
     BatchedDeleteRequest request;

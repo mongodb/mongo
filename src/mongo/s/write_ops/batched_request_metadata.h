@@ -39,7 +39,6 @@ namespace mongo {
 
 class BatchedRequestMetadata {
 public:
-    static const BSONField<std::string> shardName;
     static const BSONField<ChunkVersion> shardVersion;
     static const BSONField<long long> session;
 
@@ -58,13 +57,6 @@ public:
 
     void cloneTo(BatchedRequestMetadata* other) const;
 
-    //
-    // individual field accessors
-    //
-
-    void setShardName(StringData shardName);
-    const std::string& getShardName() const;
-
     void setShardVersion(const ChunkVersionAndOpTime& shardVersion);
     bool isShardVersionSet() const;
     const ChunkVersion& getShardVersion() const;
@@ -76,10 +68,6 @@ public:
     long long getSession() const;
 
 private:
-    // (O)  shard name we're sending this batch to
-    std::string _shardName;
-    bool _isShardNameSet;
-
     // (O)  version for this collection on a given shard
     boost::optional<ChunkVersionAndOpTime> _shardVersion;
 

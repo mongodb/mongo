@@ -40,10 +40,8 @@ using std::string;
 namespace {
 
 TEST(BatchedRequestMetadata, Basic) {
-    BSONObj metadataObj(BSON("shardName"
-                             << "shard0000"
-                             << "shardVersion" << BSON_ARRAY(Timestamp(1, 2) << OID::gen()) << "ts"
-                             << Timestamp(3, 4) << "t" << 5 << "session" << 0LL));
+    BSONObj metadataObj(BSON("shardVersion" << BSON_ARRAY(Timestamp(1, 2) << OID::gen()) << "ts"
+                                            << Timestamp(3, 4) << "t" << 5 << "session" << 0LL));
 
     string errMsg;
     BatchedRequestMetadata metadata;

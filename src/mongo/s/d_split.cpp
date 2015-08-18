@@ -34,15 +34,12 @@
 #include <string>
 #include <vector>
 
-#include "mongo/client/connpool.h"
-#include "mongo/client/dbclientcursor.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
@@ -67,7 +64,6 @@
 namespace mongo {
 
 using std::unique_ptr;
-using std::endl;
 using std::ostringstream;
 using std::set;
 using std::string;
@@ -204,7 +200,7 @@ public:
                 ostringstream os;
                 os << "found missing value in key " << currKey << " for doc: "
                    << (obj.hasField("_id") ? obj.toString() : obj["_id"].toString());
-                log() << "checkShardingIndex for '" << ns << "' failed: " << os.str() << endl;
+                log() << "checkShardingIndex for '" << ns << "' failed: " << os.str();
 
                 errmsg = os.str();
                 return false;
@@ -377,8 +373,8 @@ public:
                 return true;
             }
 
-            log() << "request split points lookup for chunk " << ns << " " << min << " -->> " << max
-                  << endl;
+            log() << "request split points lookup for chunk " << ns << " " << min << " -->> "
+                  << max;
 
             // We'll use the average object size and number of object to find approximately how many
             // keys each chunk should have. We'll split at half the maxChunkSize or maxChunkObjects,
@@ -387,7 +383,7 @@ public:
             long long keyCount = maxChunkSize / (2 * avgRecSize);
             if (maxChunkObjects && (maxChunkObjects < keyCount)) {
                 log() << "limiting split vector to " << maxChunkObjects << " (from " << keyCount
-                      << ") objects " << endl;
+                      << ") objects ";
                 keyCount = maxChunkObjects;
             }
 
@@ -440,15 +436,15 @@ public:
                             splitKeys.push_back(currKey.getOwned());
                             currCount = 0;
                             numChunks++;
-                            LOG(4) << "picked a split key: " << currKey << endl;
+                            LOG(4) << "picked a split key: " << currKey;
                         }
                     }
 
                     // Stop if we have enough split points.
                     if (maxSplitPoints && (numChunks >= maxSplitPoints)) {
                         log() << "max number of requested split points reached (" << numChunks
-                              << ") before the end of chunk " << ns << " " << min << " -->> " << max
-                              << endl;
+                              << ") before the end of chunk " << ns << " " << min << " -->> "
+                              << max;
                         break;
                     }
 
@@ -467,7 +463,7 @@ public:
                 keyCount = currCount / 2;
                 currCount = 0;
                 log() << "splitVector doing another cycle because of force, keyCount now: "
-                      << keyCount << endl;
+                      << keyCount;
 
                 exec = InternalPlanner::indexScan(txn,
                                                   collection,
@@ -492,7 +488,7 @@ public:
                  it != tooFrequentKeys.end();
                  ++it) {
                 warning() << "possible low cardinality key detected in " << ns << " - key is "
-                          << prettyKey(idx->keyPattern(), *it) << endl;
+                          << prettyKey(idx->keyPattern(), *it);
             }
 
             // Remove the sentinel at the beginning before returning
@@ -501,8 +497,7 @@ public:
             if (timer.millis() > serverGlobalParams.slowMS) {
                 warning() << "Finding the split vector for " << ns << " over " << keyPattern
                           << " keyCount: " << keyCount << " numSplits: " << splitKeys.size()
-                          << " lookedAt: " << currCount << " took " << timer.millis() << "ms"
-                          << endl;
+                          << " lookedAt: " << currCount << " took " << timer.millis() << "ms";
             }
 
             // Warning: we are sending back an array of keys but are currently limited to
@@ -603,14 +598,14 @@ public:
         // Get sharding state up-to-date
         //
 
-        ShardingState* shardingState = ShardingState::get(txn);
+        ShardingState* const shardingState = ShardingState::get(txn);
 
         // This could be the first call that enables sharding - make sure we initialize the
         // sharding state for this shard.
         if (!shardingState->enabled()) {
             if (cmdObj["configdb"].type() != String) {
                 errmsg = "sharding not enabled";
-                warning() << errmsg << endl;
+                warning() << errmsg;
                 return false;
             }
 
@@ -620,12 +615,6 @@ public:
 
         // Initialize our current shard name in the shard state if needed
         shardingState->setShardName(shardName);
-
-        auto configLocStatus = ConnectionString::parse(shardingState->getConfigServer(txn));
-        if (!configLocStatus.isOK()) {
-            warning() << configLocStatus.getStatus();
-            return false;
-        }
 
         log() << "received splitChunk request: " << cmdObj;
 
@@ -647,8 +636,7 @@ public:
 
         // Always check our version remotely
         ChunkVersion shardVersion;
-        Status refreshStatus = ShardingState::get(getGlobalServiceContext())
-                                   ->refreshMetadataNow(txn, ns, &shardVersion);
+        Status refreshStatus = shardingState->refreshMetadataNow(txn, ns, &shardVersion);
 
         if (!refreshStatus.isOK()) {
             errmsg = str::stream() << "splitChunk cannot split chunk "
@@ -687,7 +675,7 @@ public:
 
         // Get collection metadata
         const std::shared_ptr<CollectionMetadata> collMetadata(
-            ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(ns));
+            shardingState->getCollectionMetadata(ns));
         // With nonzero shard version, we must have metadata
         invariant(NULL != collMetadata);
 
@@ -716,7 +704,7 @@ public:
 
         BSONObjBuilder logDetail;
         appendShortVersion(logDetail.subobjStart("before"), origChunk);
-        LOG(1) << "before split on " << origChunk << endl;
+        LOG(1) << "before split on " << origChunk;
         OwnedPointerVector<ChunkType> newChunks;
 
         ChunkVersion nextChunkVersion = collVersion;
@@ -733,7 +721,7 @@ public:
                                        << "[" << min << ", " << max << ")"
                                        << " is not allowed";
 
-                warning() << errmsg << endl;
+                warning() << errmsg;
                 return false;
             }
 
@@ -823,14 +811,13 @@ public:
             // other chunk version, so it's also implicitly the newCollVersion
             ChunkVersion newShardVersion = collVersion;
 
-            // Increment the minor version once,
-            // ShardingState::get(getGlobalServiceContext())->splitChunk increments once
-            // per split point (resulting in the correct final shard/collection version)
+            // Increment the minor version once, splitChunk increments once per split point
+            // (resulting in the correct final shard/collection version)
+            //
             // TODO: Revisit this interface, it's a bit clunky
             newShardVersion.incMinor();
 
-            ShardingState::get(getGlobalServiceContext())
-                ->splitChunk(txn, ns, min, max, splitKeys, newShardVersion);
+            shardingState->splitChunk(txn, ns, min, max, splitKeys, newShardVersion);
         }
 
         //
