@@ -387,7 +387,8 @@ void CatalogManagerReplSetTestFixture::expectCount(const HostAndPort& configHost
         ASSERT_EQUALS(expectedNs.toString(), nss.toString());
 
         if (expectedQuery.isEmpty()) {
-            ASSERT_TRUE(request.cmdObj["query"].eoo());
+            auto queryElem = request.cmdObj["query"];
+            ASSERT_TRUE(queryElem.eoo() || queryElem.Obj().isEmpty());
         } else {
             ASSERT_EQUALS(expectedQuery, request.cmdObj["query"].Obj());
         }

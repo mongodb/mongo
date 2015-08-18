@@ -1157,27 +1157,21 @@ StatusWith<VersionType> CatalogManagerReplicaSet::_getConfigVersion(OperationCon
     }
 
     if (queryResults.empty()) {
-        auto cmdStatus = _runCommandOnConfig(readHost, "admin", BSON("listDatabases" << 1));
-        if (!cmdStatus.isOK()) {
-            return cmdStatus.getStatus();
+        auto countStatus =
+            _runCountCommandOnConfig(readHost, NamespaceString(ShardType::ConfigNS), BSONObj());
+
+        if (!countStatus.isOK()) {
+            return countStatus.getStatus();
         }
 
-        const BSONObj& cmdResult = cmdStatus.getValue();
-
-        Status cmdResultStatus = getStatusFromCommandResult(cmdResult);
-        if (!cmdResultStatus.isOK()) {
-            return cmdResultStatus;
-        }
-
-        for (const auto& dbEntry : cmdResult["databases"].Obj()) {
-            const string& dbName = dbEntry["name"].String();
-
-            if (dbName != "local" && dbName != "admin") {
-                VersionType versionInfo;
-                versionInfo.setMinCompatibleVersion(UpgradeHistory_UnreportedVersion);
-                versionInfo.setCurrentVersion(UpgradeHistory_UnreportedVersion);
-                return versionInfo;
-            }
+        const auto& shardCount = countStatus.getValue();
+        if (shardCount > 0) {
+            // Version document doesn't exist, but config.shards is not empty. Assuming that
+            // the current config metadata is pre v2.4.
+            VersionType versionInfo;
+            versionInfo.setMinCompatibleVersion(UpgradeHistory_UnreportedVersion);
+            versionInfo.setCurrentVersion(UpgradeHistory_UnreportedVersion);
+            return versionInfo;
         }
 
         VersionType versionInfo;

@@ -152,21 +152,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    onCommand([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(HostAndPort("config:123"), request.target);
-        ASSERT_EQ("admin", request.dbname);
-        ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
-
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
-
-        return fromjson(R"({
-                    databases: [
-                        { name: "local" }
-                    ],
-                    totalSize: 12,
-                    ok: 1
-                })");
-    });
+    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
@@ -216,22 +202,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfigWithAdmin
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    onCommand([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(HostAndPort("config:123"), request.target);
-        ASSERT_EQ("admin", request.dbname);
-        ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
-
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
-
-        return fromjson(R"({
-                    databases: [
-                        { name: "local" },
-                        { name: "admin" }
-                    ],
-                    totalSize: 12,
-                    ok: 1
-                })");
-    });
+    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQ(HostAndPort("config:123"), request.target);
@@ -265,21 +236,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeWriteError) {
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    onCommand([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(HostAndPort("config:123"), request.target);
-        ASSERT_EQ("admin", request.dbname);
-        ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
-
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
-
-        return fromjson(R"({
-                    databases: [
-                        { name: "local" }
-                    ],
-                    totalSize: 12,
-                    ok: 1
-                })");
-    });
+    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
 
     onCommand([](const RemoteCommandRequest& request) {
         return fromjson(R"({
@@ -308,22 +265,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocNonEmptyConfigServer
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
-    onCommand([](const RemoteCommandRequest& request) {
-        ASSERT_EQ(HostAndPort("config:123"), request.target);
-        ASSERT_EQ("admin", request.dbname);
-        ASSERT_EQ(BSON("listDatabases" << 1), request.cmdObj);
-
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
-
-        return fromjson(R"({
-                    databases: [
-                        { name: "local" },
-                        { name: "config" }
-                    ],
-                    totalSize: 12,
-                    ok: 1
-                })");
-    });
+    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 1);
 
     future.timed_get(kFutureTimeout);
 }
