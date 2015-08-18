@@ -82,9 +82,7 @@ using std::vector;
 namespace {
 
 // Used to obtain mutex that guards modifications to persistent authorization data
-const auto getAuthzDataMutex = ServiceContext::declareDecoration<stdx::timed_mutex>();
-
-const Seconds authzDataMutexAcquisitionTimeout{5};
+const auto getAuthzDataMutex = ServiceContext::declareDecoration<stdx::mutex>();
 
 BSONArray roleSetToBSONArray(const unordered_set<RoleName>& roles) {
     BSONArrayBuilder rolesArrayBuilder;
@@ -711,12 +709,7 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         status = requireAuthSchemaVersion26Final(txn, authzManager);
         if (!status.isOK()) {
@@ -825,12 +818,7 @@ public:
         }
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -898,13 +886,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
-
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         Status status = requireAuthSchemaVersion26Final(txn, authzManager);
         if (!status.isOK()) {
@@ -977,12 +959,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         Status status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -1046,12 +1023,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         Status status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -1126,12 +1098,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         Status status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -1375,12 +1342,7 @@ public:
         roleObjBuilder.append("roles", rolesVectorToBSONArray(args.roles));
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -1464,12 +1426,7 @@ public:
         }
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -1540,12 +1497,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         Status status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -1653,12 +1605,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         Status status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -1791,12 +1738,7 @@ public:
         }
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -1873,12 +1815,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         Status status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -1970,12 +1907,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         Status status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -2136,12 +2068,7 @@ public:
         }
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireAuthSchemaVersion26Final(txn, authzManager);
@@ -2766,12 +2693,7 @@ public:
         }
 
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::unique_lock<stdx::timed_mutex> lk(getAuthzDataMutex(serviceContext),
-                                                authzDataMutexAcquisitionTimeout);
-        if (!lk) {
-            return appendCommandStatus(
-                result, Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
-        }
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireAuthSchemaVersion26Final(txn, authzManager);
