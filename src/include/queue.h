@@ -44,6 +44,11 @@ extern "C" {
  * and the linear performance for removal of elements from simpler macros proved
  * to be more trouble than the memory savings were worth.
  *
+ * Additionally, we've altered the TAILQ_INSERT_XXX functions to include a write
+ * barrier, in order to ensure we never insert a partially built structure onto
+ * a list (this is required because the spinlocks we use don't necessarily imply
+ * a write barrier).
+ *
  * We #undef all of the macros because there are incompatible versions of this
  * file and these macros on various systems.  What makes the problem worse is
  * they are included and/or defined by system include files which we may have
@@ -162,6 +167,7 @@ struct {								\
 } while (0)
 
 #define	TAILQ_INSERT_AFTER(head, listelm, elm, field) do {		\
+	WT_WRITE_BARRIER();						\
 	if ((TAILQ_NEXT((elm), field) = TAILQ_NEXT((listelm), field)) != NULL)\
 		TAILQ_NEXT((elm), field)->field.tqe_prev =		\
 		    &TAILQ_NEXT((elm), field);				\
@@ -176,6 +182,7 @@ struct {								\
 } while (0)
 
 #define	TAILQ_INSERT_BEFORE(listelm, elm, field) do {			\
+	WT_WRITE_BARRIER();						\
 	(elm)->field.tqe_prev = (listelm)->field.tqe_prev;		\
 	TAILQ_NEXT((elm), field) = (listelm);				\
 	*(listelm)->field.tqe_prev = (elm);				\
@@ -185,6 +192,7 @@ struct {								\
 } while (0)
 
 #define	TAILQ_INSERT_HEAD(head, elm, field) do {			\
+	WT_WRITE_BARRIER();						\
 	if ((TAILQ_NEXT((elm), field) = TAILQ_FIRST((head))) != NULL)	\
 		TAILQ_FIRST((head))->field.tqe_prev =			\
 		    &TAILQ_NEXT((elm), field);				\
@@ -197,6 +205,7 @@ struct {								\
 } while (0)
 
 #define	TAILQ_INSERT_TAIL(head, elm, field) do {			\
+	WT_WRITE_BARRIER();						\
 	TAILQ_NEXT((elm), field) = NULL;				\
 	(elm)->field.tqe_prev = (head)->tqh_last;			\
 	*(head)->tqh_last = (elm);					\
