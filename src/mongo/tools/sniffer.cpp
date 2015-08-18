@@ -65,8 +65,9 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/util/net/message.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"
+#include "mongo/rpc/command_reply.h"
+#include "mongo/rpc/command_request.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/quick_exit.h"
@@ -291,6 +292,38 @@ void processMessage(Connection& c, Message& m) {
 
     try {
         switch (m.operation()) {
+            case mongo::dbCommand: {
+                mongo::rpc::CommandRequest c(&m);
+                out() << "\tcommand: " << c.getCommandName() << " ";
+                out() << "database: " << c.getDatabase() << " ";
+                out() << "metadata: " << c.getMetadata().toString() << " ";
+                out() << "commandArgs: " << c.getCommandArgs() << " ";
+                out() << "inputDocs: [ ";
+                mongo::rpc::DocumentRange docs = c.getInputDocs();
+                if (docs.begin() != docs.end()) {
+                    out() << endl;
+                }
+                for (const auto& doc : docs) {
+                    out() << doc.toString() << "," << endl;
+                }
+                out() << "]" << endl;
+                break;
+            }
+            case mongo::dbCommandReply: {
+                mongo::rpc::CommandReply c(&m);
+                out() << "\tcommandReply: " << c.getCommandReply() << " ";
+                out() << "metadata: " << c.getMetadata().toString() << " ";
+                out() << "outputDocs: [ ";
+                mongo::rpc::DocumentRange docs = c.getOutputDocs();
+                if (docs.begin() != docs.end()) {
+                    out() << endl;
+                }
+                for (const auto& doc : docs) {
+                    out() << doc.toString() << endl;
+                }
+                out() << "]" << endl;
+                break;
+            }
             case mongo::opReply: {
                 mongo::QueryResult::View r = m.singleData().view2ptr();
 
