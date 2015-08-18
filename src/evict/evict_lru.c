@@ -1584,13 +1584,13 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 		}
 		session->dhandle = NULL;
 
-		(void)__wt_fprintf(fp, "\n" "cache dump: %s%s%s%s:"
-		    " %" PRIu64 " intl pages, %" PRIu64 " leaf pages,"
-		    " %" PRIu64 "MB, %" PRIu64 "MB dirty\n",
+		(void)__wt_fprintf(fp, "\n" "cache dump: %s%s%s%s\n\t"
+		    " %" PRIu64 " internal pages, %" PRIu64 " leaf pages,"
+		    " %" PRIu64 "MB, %" PRIu64 "MB dirty\n==============\n",
 		    dhandle->name,
 		    dhandle->checkpoint == NULL ? "" : " [",
 		    dhandle->checkpoint == NULL ? "" : dhandle->checkpoint,
-		    dhandle->checkpoint == NULL ? "" : "]\n\n",
+		    dhandle->checkpoint == NULL ? "" : "]",
 		    file_intl_pages, file_leaf_pages,
 		    file_bytes >> 20, file_dirty >> 20);
 
