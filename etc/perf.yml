@@ -57,7 +57,7 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${build_variant}/${revision}/perf_regression_check.py-${build_id}
+        remote_file: perf-3.0/${build_variant}/${revision}/perf_regression_check.py-${build_id}
         bucket: mciuploads
         local_file: src/perf_regression_check.py
     - command: shell.exec
@@ -151,7 +151,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/buildscripts/perf_regression_check.py
-        remote_file: perf/${build_variant}/${revision}/perf_regression_check.py-${build_id}
+        remote_file: perf-3.0/${build_variant}/${revision}/perf_regression_check.py-${build_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
