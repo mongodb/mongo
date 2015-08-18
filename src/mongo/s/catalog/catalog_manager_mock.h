@@ -41,8 +41,8 @@ public:
     CatalogManagerMock();
     ~CatalogManagerMock();
 
-    ServerGlobalParams::ConfigServerMode getMode() override {
-        return ServerGlobalParams::ConfigServerMode::NONE;
+    ConfigServerMode getMode() override {
+        return ConfigServerMode::NONE;
     }
 
     Status startup() override;

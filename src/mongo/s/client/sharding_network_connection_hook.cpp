@@ -31,7 +31,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/server_options.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/s/grid.h"
@@ -58,8 +57,8 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
     }
 
     return grid.checkIfCatalogNeedsSwapping(configServerModeNumber == 0
-                                                ? ServerGlobalParams::ConfigServerMode::SCCC
-                                                : ServerGlobalParams::ConfigServerMode::CSRS);
+                                                ? CatalogManager::ConfigServerMode::SCCC
+                                                : CatalogManager::ConfigServerMode::CSRS);
 }
 
 StatusWith<boost::optional<executor::RemoteCommandRequest>>

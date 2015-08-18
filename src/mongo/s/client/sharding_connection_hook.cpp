@@ -40,7 +40,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
-#include "mongo/db/server_options.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/s/client/scc_fast_query_handler.h"
 #include "mongo/s/cluster_last_error_info.h"
@@ -114,8 +113,8 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
                 configServerModeNumber == 0 || configServerModeNumber == 1);
 
         status = grid.checkIfCatalogNeedsSwapping(configServerModeNumber == 0
-                                                      ? ServerGlobalParams::ConfigServerMode::SCCC
-                                                      : ServerGlobalParams::ConfigServerMode::CSRS);
+                                                      ? CatalogManager::ConfigServerMode::SCCC
+                                                      : CatalogManager::ConfigServerMode::CSRS);
         uassertStatusOK(status);
     }
 }

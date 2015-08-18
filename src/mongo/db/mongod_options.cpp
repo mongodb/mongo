@@ -44,9 +44,10 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
-#include "mongo/util/log.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
@@ -1199,8 +1200,8 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         params["sharding.clusterRole"].as<std::string>() == "configsvr") {
         serverGlobalParams.configsvr = true;
         serverGlobalParams.configsvrMode = replSettings.replSet.empty()
-            ? ServerGlobalParams::ConfigServerMode::SCCC
-            : ServerGlobalParams::ConfigServerMode::CSRS;
+            ? CatalogManager::ConfigServerMode::SCCC
+            : CatalogManager::ConfigServerMode::CSRS;
         mmapv1GlobalOptions.smallfiles = true;  // config server implies small files
 
         // If we haven't explicitly specified a journal option, default journaling to true for
@@ -1228,7 +1229,7 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
                           "Bad value for sharding.configsvrMode.  "
                           " Only supported value is \"sccc\"");
         }
-        serverGlobalParams.configsvrMode = ServerGlobalParams::ConfigServerMode::SCCC;
+        serverGlobalParams.configsvrMode = CatalogManager::ConfigServerMode::SCCC;
     }
 
     if (params.count("sharding.archiveMovedChunks")) {

@@ -45,8 +45,8 @@ public:
     CatalogManagerLegacy();
     ~CatalogManagerLegacy();
 
-    ServerGlobalParams::ConfigServerMode getMode() override {
-        return ServerGlobalParams::ConfigServerMode::SCCC;
+    ConfigServerMode getMode() override {
+        return ConfigServerMode::SCCC;
     }
 
     /**

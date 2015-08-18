@@ -41,6 +41,7 @@
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/server_options.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
@@ -5096,7 +5097,7 @@ TEST_F(TopoCoordTest, ProcessDeclareElectionWinner) {
 TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommitted) {
     serverGlobalParams.configsvr = true;
     TopologyCoordinatorImpl::Options options;
-    options.configServerMode = ServerGlobalParams::ConfigServerMode::CSRS;
+    options.configServerMode = CatalogManager::ConfigServerMode::CSRS;
     options.storageEngineSupportsReadCommitted = false;
     setOptions(options);
 
@@ -5115,7 +5116,7 @@ TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommitted) {
 TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommittedButInSCCCMode) {
     serverGlobalParams.configsvr = true;
     TopologyCoordinatorImpl::Options options;
-    options.configServerMode = ServerGlobalParams::ConfigServerMode::SCCC;
+    options.configServerMode = CatalogManager::ConfigServerMode::SCCC;
     options.storageEngineSupportsReadCommitted = false;
     setOptions(options);
 
@@ -5137,7 +5138,7 @@ TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommittedButInSCCCMode) {
 TEST_F(TopoCoordTest, GetMemberStateValidConfigSvr) {
     serverGlobalParams.configsvr = true;
     TopologyCoordinatorImpl::Options options;
-    options.configServerMode = ServerGlobalParams::ConfigServerMode::CSRS;
+    options.configServerMode = CatalogManager::ConfigServerMode::CSRS;
     options.storageEngineSupportsReadCommitted = true;
     setOptions(options);
 

@@ -51,7 +51,7 @@ public:
                              const std::string& distLockProcessId);
     virtual ~ForwardingCatalogManager();
 
-    ServerGlobalParams::ConfigServerMode getMode() override;
+    ConfigServerMode getMode() override;
 
     Status startup() override;
 

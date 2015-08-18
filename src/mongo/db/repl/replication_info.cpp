@@ -227,9 +227,9 @@ public:
 
         appendReplicationInfo(txn, result, 0);
 
-        if (serverGlobalParams.configsvrMode == ServerGlobalParams::ConfigServerMode::CSRS) {
+        if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::CSRS) {
             result.append("configsvr", 1);
-        } else if (serverGlobalParams.configsvrMode == ServerGlobalParams::ConfigServerMode::SCCC) {
+        } else if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::SCCC) {
             result.append("configsvr", 0);
         }
 

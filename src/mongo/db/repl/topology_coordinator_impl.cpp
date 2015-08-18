@@ -46,7 +46,7 @@
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rslog.h"
-#include "mongo/db/server_parameters.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -1972,15 +1972,15 @@ MemberState TopologyCoordinatorImpl::getMemberState() const {
     }
 
     if (_rsConfig.isConfigServer()) {
-        if (_options.configServerMode == ServerGlobalParams::ConfigServerMode::NONE) {
+        if (_options.configServerMode == CatalogManager::ConfigServerMode::NONE) {
             return MemberState::RS_REMOVED;
         }
-        if (_options.configServerMode == ServerGlobalParams::ConfigServerMode::CSRS &&
+        if (_options.configServerMode == CatalogManager::ConfigServerMode::CSRS &&
             !_options.storageEngineSupportsReadCommitted) {
             return MemberState::RS_REMOVED;
         }
     } else {
-        if (_options.configServerMode != ServerGlobalParams::ConfigServerMode::NONE) {
+        if (_options.configServerMode != CatalogManager::ConfigServerMode::NONE) {
             return MemberState::RS_REMOVED;
         }
     }

@@ -31,7 +31,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/server_options.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -41,7 +41,6 @@ namespace mongo {
 
 class BSONObj;
 class CatalogCache;
-class CatalogManager;
 class DBConfig;
 class OperationContext;
 class SettingsType;
@@ -113,13 +112,13 @@ public:
     }
 
     /**
-     * Compares desiredMode against _catalogManagerMode.  Returns Status::OK() if they match,
+     * Compares desiredMode against _catalogManager->getMode().  Returns Status::OK() if they match,
      * returns ErrorCodes::IncompatibleCatalogManger if desiredMode is CSRS and the current mode is
      * SCCC. If desiredMode is SCCC and current mode is CSRS returns InvalidOperation as we do not
      * support downgrade.
      * TODO(spencer): Support downgrade.
      */
-    Status checkIfCatalogNeedsSwapping(ServerGlobalParams::ConfigServerMode desiredMode);
+    Status checkIfCatalogNeedsSwapping(CatalogManager::ConfigServerMode desiredMode);
 
     /**
      * Clears the grid object so that it can be reused between test executions. This will not

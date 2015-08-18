@@ -39,7 +39,7 @@
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/server_options.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -128,8 +128,7 @@ public:
 
         // Whether or not this node is running as a config server, and if so whether it was started
         // with --configsvrMode=SCCC.
-        ServerGlobalParams::ConfigServerMode configServerMode{
-            ServerGlobalParams::ConfigServerMode::NONE};
+        CatalogManager::ConfigServerMode configServerMode{CatalogManager::ConfigServerMode::NONE};
 
         // Whether or not the storage engine supports read committed.
         bool storageEngineSupportsReadCommitted{true};
