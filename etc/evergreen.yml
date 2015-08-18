@@ -1739,6 +1739,33 @@ buildvariants:
     distros:
     - rhel55-test
 
+- name: linux-64-repeated-execution
+  stepback: false
+  display_name: z Linux 64-bit Repeated Execution
+  modules: ~
+  run_on:
+  - rhel55-test
+  batchtime: 1440 # 1 day
+  expansions:
+    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --continueOnFailure --repeat=10 --shuffle
+  tasks:
+  - name: compile
+    distros:
+    - rhel55
+  - name: jsCore
+  - name: jsCore_WT
+  - name: jstestfuzz
+  - name: parallel_WT
+  - name: concurrency
+  - name: concurrency_WT
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded_WT
+
 - name: linux-64-debug
   display_name: Linux 64-bit DEBUG
   modules: ~
