@@ -8,6 +8,450 @@
 
 #include "wt_internal.h"
 
+static void __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
+static void __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
+static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
+static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __inmem_row_leaf_entries(
+	WT_SESSION_IMPL *, const WT_PAGE_HEADER *, uint32_t *);
+
+/*
+ * __evict_force_check --
+ *	Check if a page matches the criteria for forced eviction.
+ */
+static int
+__evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	/* Pages are usually small enough, check that first. */
+	if (page->memory_footprint < btree->maxmempage)
+		return (0);
+
+	/* Leaf pages only. */
+	if (WT_PAGE_IS_INTERNAL(page))
+		return (0);
+
+	/*
+	 * It's hard to imagine a page with a huge memory footprint that has
+	 * never been modified, but check to be sure.
+	 */
+	if (page->modify == NULL)
+		return (0);
+
+	/* Trigger eviction on the next page release. */
+	__wt_page_evict_soon(page);
+
+	/* Bump the oldest ID, we're about to do some visibility checks. */
+	__wt_txn_update_oldest(session, 0);
+
+	/* If eviction cannot succeed, don't try. */
+	return (__wt_page_can_evict(session, page, 1, NULL));
+}
+
+/*
+ * __wt_page_in_func --
+ *	Acquire a hazard pointer to a page; if the page is not in-memory,
+ *	read it from the disk and build an in-memory version.
+ */
+int
+__wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    )
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_PAGE *page;
+	u_int sleep_cnt, wait_cnt;
+	int busy, cache_work, force_attempts, oldgen;
+
+	btree = S2BT(session);
+
+	for (force_attempts = oldgen = 0, wait_cnt = 0;;) {
+		switch (ref->state) {
+		case WT_REF_DISK:
+		case WT_REF_DELETED:
+			if (LF_ISSET(WT_READ_CACHE))
+				return (WT_NOTFOUND);
+
+			/*
+			 * The page isn't in memory, attempt to read it.
+			 * Make sure there is space in the cache.
+			 */
+			WT_RET(__wt_cache_eviction_check(session, 1, NULL));
+			WT_RET(__wt_cache_read(session, ref));
+			oldgen = LF_ISSET(WT_READ_WONT_NEED) ||
+			    F_ISSET(session, WT_SESSION_NO_CACHE);
+			continue;
+		case WT_REF_READING:
+			if (LF_ISSET(WT_READ_CACHE))
+				return (WT_NOTFOUND);
+			if (LF_ISSET(WT_READ_NO_WAIT))
+				return (WT_NOTFOUND);
+
+			/* Waiting on another thread's read, stall. */
+			WT_STAT_FAST_CONN_INCR(session, page_read_blocked);
+			goto stall;
+		case WT_REF_LOCKED:
+			if (LF_ISSET(WT_READ_NO_WAIT))
+				return (WT_NOTFOUND);
+
+			/* Waiting on eviction, stall. */
+			WT_STAT_FAST_CONN_INCR(session, page_locked_blocked);
+			goto stall;
+		case WT_REF_SPLIT:
+			return (WT_RESTART);
+		case WT_REF_MEM:
+			/*
+			 * The page is in memory.
+			 *
+			 * Get a hazard pointer if one is required. We cannot
+			 * be evicting if no hazard pointer is required, we're
+			 * done.
+			 */
+			if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
+				goto skip_evict;
+
+			/*
+			 * The expected reason we can't get a hazard pointer is
+			 * because the page is being evicted, yield, try again.
+			 */
+#ifdef HAVE_DIAGNOSTIC
+			WT_RET(
+			    __wt_hazard_set(session, ref, &busy, file, line));
+#else
+			WT_RET(__wt_hazard_set(session, ref, &busy));
+#endif
+			if (busy) {
+				WT_STAT_FAST_CONN_INCR(
+				    session, page_busy_blocked);
+				break;
+			}
+
+			/*
+			 * If eviction is configured for this file, check to see
+			 * if the page qualifies for forced eviction and update
+			 * the page's generation number. If eviction isn't being
+			 * done on this file, we're done.
+			 */
+			if (LF_ISSET(WT_READ_NO_EVICT) ||
+			    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
+			    F_ISSET(btree, WT_BTREE_NO_EVICTION))
+				goto skip_evict;
+
+			/*
+			 * Forcibly evict pages that are too big.
+			 */
+			page = ref->page;
+			if (force_attempts < 10 &&
+			    __evict_force_check(session, page)) {
+				++force_attempts;
+				ret = __wt_page_release_evict(session, ref);
+				/* If forced eviction fails, stall. */
+				if (ret == EBUSY) {
+					ret = 0;
+					WT_STAT_FAST_CONN_INCR(session,
+					    page_forcible_evict_blocked);
+					goto stall;
+				}
+				WT_RET(ret);
+
+				/*
+				 * The result of a successful forced eviction
+				 * is a page-state transition (potentially to
+				 * an in-memory page we can use, or a restart
+				 * return for our caller), continue the outer
+				 * page-acquisition loop.
+				 */
+				continue;
+			}
+
+			/*
+			 * If we read the page and we are configured to not
+			 * trash the cache, set the oldest read generation so
+			 * the page is forcibly evicted as soon as possible.
+			 *
+			 * Otherwise, update the page's read generation.
+			 */
+			if (oldgen && page->read_gen == WT_READGEN_NOTSET)
+				__wt_page_evict_soon(page);
+			else if (!LF_ISSET(WT_READ_NO_GEN) &&
+			    page->read_gen != WT_READGEN_OLDEST &&
+			    page->read_gen < __wt_cache_read_gen(session))
+				page->read_gen =
+				    __wt_cache_read_gen_bump(session);
+skip_evict:
+			/*
+			 * Check if we need an autocommit transaction.
+			 * Starting a transaction can trigger eviction, so skip
+			 * it if eviction isn't permitted.
+			 */
+			return (LF_ISSET(WT_READ_NO_EVICT) ? 0 :
+			    __wt_txn_autocommit_check(session));
+		WT_ILLEGAL_VALUE(session);
+		}
+
+		/*
+		 * We failed to get the page -- yield before retrying, and if
+		 * we've yielded enough times, start sleeping so we don't burn
+		 * CPU to no purpose.
+		 */
+		if (++wait_cnt < 1000)
+			__wt_yield();
+		else {
+			if (0) {
+stall:				wait_cnt += 1000;
+			}
+
+			/*
+			 * If stalling, check if the cache needs help. If we do
+			 * work for the cache, substitute that for a sleep.
+			 */
+			WT_RET(
+			    __wt_cache_eviction_check(session, 1, &cache_work));
+			if (!cache_work) {
+				sleep_cnt = WT_MIN(wait_cnt, 10000);
+				wait_cnt *= 2;
+				WT_STAT_FAST_CONN_INCRV(
+				    session, page_sleep, sleep_cnt);
+				__wt_sleep(0, sleep_cnt);
+			}
+		}
+	}
+}
+
+/*
+ * __wt_page_alloc --
+ *	Create or read a page into the cache.
+ */
+int
+__wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
+    uint64_t recno, uint32_t alloc_entries, int alloc_refs, WT_PAGE **pagep)
+{
+	WT_CACHE *cache;
+	WT_DECL_RET;
+	WT_PAGE *page;
+	WT_PAGE_INDEX *pindex;
+	size_t size;
+	uint32_t i;
+	void *p;
+
+	*pagep = NULL;
+
+	cache = S2C(session)->cache;
+	page = NULL;
+
+	size = sizeof(WT_PAGE);
+	switch (type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		break;
+	case WT_PAGE_COL_VAR:
+		/*
+		 * Variable-length column-store leaf page: allocate memory to
+		 * describe the page's contents with the initial allocation.
+		 */
+		size += alloc_entries * sizeof(WT_COL);
+		break;
+	case WT_PAGE_ROW_LEAF:
+		/*
+		 * Row-store leaf page: allocate memory to describe the page's
+		 * contents with the initial allocation.
+		 */
+		size += alloc_entries * sizeof(WT_ROW);
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	WT_RET(__wt_calloc(session, 1, size, &page));
+
+	page->type = type;
+	page->read_gen = WT_READGEN_NOTSET;
+
+	switch (type) {
+	case WT_PAGE_COL_FIX:
+		page->pg_fix_recno = recno;
+		page->pg_fix_entries = alloc_entries;
+		break;
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		page->pg_intl_recno = recno;
+
+		/*
+		 * Internal pages have an array of references to objects so they
+		 * can split.  Allocate the array of references and optionally,
+		 * the objects to which they point.
+		 */
+		WT_ERR(__wt_calloc(session, 1,
+		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *),
+		    &p));
+		size +=
+		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *);
+		pindex = p;
+		pindex->index = (WT_REF **)((WT_PAGE_INDEX *)p + 1);
+		pindex->entries = alloc_entries;
+		WT_INTL_INDEX_SET(page, pindex);
+		if (alloc_refs)
+			for (i = 0; i < pindex->entries; ++i) {
+				WT_ERR(__wt_calloc_one(
+				    session, &pindex->index[i]));
+				size += sizeof(WT_REF);
+			}
+		if (0) {
+err:			if ((pindex = WT_INTL_INDEX_GET_SAFE(page)) != NULL) {
+				for (i = 0; i < pindex->entries; ++i)
+					__wt_free(session, pindex->index[i]);
+				__wt_free(session, pindex);
+			}
+			__wt_free(session, page);
+			return (ret);
+		}
+		break;
+	case WT_PAGE_COL_VAR:
+		page->pg_var_recno = recno;
+		page->pg_var_d = (WT_COL *)((uint8_t *)page + sizeof(WT_PAGE));
+		page->pg_var_entries = alloc_entries;
+		break;
+	case WT_PAGE_ROW_LEAF:
+		page->pg_row_d = (WT_ROW *)((uint8_t *)page + sizeof(WT_PAGE));
+		page->pg_row_entries = alloc_entries;
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	/* Increment the cache statistics. */
+	__wt_cache_page_inmem_incr(session, page, size);
+	(void)WT_ATOMIC_ADD8(cache->bytes_read, size);
+	(void)WT_ATOMIC_ADD8(cache->pages_inmem, 1);
+
+	*pagep = page;
+	return (0);
+}
+
+/*
+ * __wt_page_inmem --
+ *	Build in-memory page information.
+ */
+int
+__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
+    const void *image, size_t memsize, uint32_t flags, WT_PAGE **pagep)
+{
+	WT_DECL_RET;
+	WT_PAGE *page;
+	const WT_PAGE_HEADER *dsk;
+	uint32_t alloc_entries;
+	size_t size;
+
+	*pagep = NULL;
+
+	dsk = image;
+	alloc_entries = 0;
+
+	/*
+	 * Figure out how many underlying objects the page references so we can
+	 * allocate them along with the page.
+	 */
+	switch (dsk->type) {
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_VAR:
+		/*
+		 * Column-store leaf page entries map one-to-one to the number
+		 * of physical entries on the page (each physical entry is a
+		 * value item).
+		 *
+		 * Column-store internal page entries map one-to-one to the
+		 * number of physical entries on the page (each entry is a
+		 * location cookie).
+		 */
+		alloc_entries = dsk->u.entries;
+		break;
+	case WT_PAGE_ROW_INT:
+		/*
+		 * Row-store internal page entries map one-to-two to the number
+		 * of physical entries on the page (each entry is a key and
+		 * location cookie pair).
+		 */
+		alloc_entries = dsk->u.entries / 2;
+		break;
+	case WT_PAGE_ROW_LEAF:
+		/*
+		 * If the "no empty values" flag is set, row-store leaf page
+		 * entries map one-to-one to the number of physical entries
+		 * on the page (each physical entry is a key or value item).
+		 * If that flag is not set, there are more keys than values,
+		 * we have to walk the page to figure it out.
+		 */
+		if (F_ISSET(dsk, WT_PAGE_EMPTY_V_ALL))
+			alloc_entries = dsk->u.entries;
+		else if (F_ISSET(dsk, WT_PAGE_EMPTY_V_NONE))
+			alloc_entries = dsk->u.entries / 2;
+		else
+			WT_RET(__inmem_row_leaf_entries(
+			    session, dsk, &alloc_entries));
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	/* Allocate and initialize a new WT_PAGE. */
+	WT_RET(__wt_page_alloc(
+	    session, dsk->type, dsk->recno, alloc_entries, 1, &page));
+	page->dsk = dsk;
+	F_SET_ATOMIC(page, flags);
+
+	/*
+	 * Track the memory allocated to build this page so we can update the
+	 * cache statistics in a single call. If the disk image is in allocated
+	 * memory, start with that.
+	 */
+	size = LF_ISSET(WT_PAGE_DISK_ALLOC) ? memsize : 0;
+
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		__inmem_col_fix(session, page);
+		break;
+	case WT_PAGE_COL_INT:
+		__inmem_col_int(session, page);
+		break;
+	case WT_PAGE_COL_VAR:
+		WT_ERR(__inmem_col_var(session, page, &size));
+		break;
+	case WT_PAGE_ROW_INT:
+		WT_ERR(__inmem_row_int(session, page, &size));
+		break;
+	case WT_PAGE_ROW_LEAF:
+		WT_ERR(__inmem_row_leaf(session, page));
+		break;
+	WT_ILLEGAL_VALUE_ERR(session);
+	}
+
+	/* Update the page's in-memory size and the cache statistics. */
+	__wt_cache_page_inmem_incr(session, page, size);
+
+	/* Link the new internal page to the parent. */
+	if (ref != NULL) {
+		switch (page->type) {
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_ROW_INT:
+			page->pg_intl_parent_ref = ref;
+			break;
+		}
+		ref->page = page;
+	}
+
+	*pagep = page;
+	return (0);
+
+err:	__wt_page_out(session, &page);
+	return (ret);
+}
+
 /*
  * __inmem_col_fix --
  *	Build in-memory index for fixed-length column-store leaf pages.
@@ -361,231 +805,4 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * loaded, they're instantiated on demand.
 	 */
 	return (0);
-}
-
-/*
- * __wt_page_alloc --
- *	Create or read a page into the cache.
- */
-int
-__wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
-    uint64_t recno, uint32_t alloc_entries, int alloc_refs, WT_PAGE **pagep)
-{
-	WT_CACHE *cache;
-	WT_DECL_RET;
-	WT_PAGE *page;
-	WT_PAGE_INDEX *pindex;
-	size_t size;
-	uint32_t i;
-	void *p;
-
-	*pagep = NULL;
-
-	cache = S2C(session)->cache;
-	page = NULL;
-
-	size = sizeof(WT_PAGE);
-	switch (type) {
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		break;
-	case WT_PAGE_COL_VAR:
-		/*
-		 * Variable-length column-store leaf page: allocate memory to
-		 * describe the page's contents with the initial allocation.
-		 */
-		size += alloc_entries * sizeof(WT_COL);
-		break;
-	case WT_PAGE_ROW_LEAF:
-		/*
-		 * Row-store leaf page: allocate memory to describe the page's
-		 * contents with the initial allocation.
-		 */
-		size += alloc_entries * sizeof(WT_ROW);
-		break;
-	WT_ILLEGAL_VALUE(session);
-	}
-
-	WT_RET(__wt_calloc(session, 1, size, &page));
-
-	page->type = type;
-	page->read_gen = WT_READGEN_NOTSET;
-
-	switch (type) {
-	case WT_PAGE_COL_FIX:
-		page->pg_fix_recno = recno;
-		page->pg_fix_entries = alloc_entries;
-		break;
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		page->pg_intl_recno = recno;
-
-		/*
-		 * Internal pages have an array of references to objects so they
-		 * can split.  Allocate the array of references and optionally,
-		 * the objects to which they point.
-		 */
-		WT_ERR(__wt_calloc(session, 1,
-		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *),
-		    &p));
-		size +=
-		    sizeof(WT_PAGE_INDEX) + alloc_entries * sizeof(WT_REF *);
-		pindex = p;
-		pindex->index = (WT_REF **)((WT_PAGE_INDEX *)p + 1);
-		pindex->entries = alloc_entries;
-		WT_INTL_INDEX_SET(page, pindex);
-		if (alloc_refs)
-			for (i = 0; i < pindex->entries; ++i) {
-				WT_ERR(__wt_calloc_one(
-				    session, &pindex->index[i]));
-				size += sizeof(WT_REF);
-			}
-		if (0) {
-err:			if ((pindex = WT_INTL_INDEX_GET_SAFE(page)) != NULL) {
-				for (i = 0; i < pindex->entries; ++i)
-					__wt_free(session, pindex->index[i]);
-				__wt_free(session, pindex);
-			}
-			__wt_free(session, page);
-			return (ret);
-		}
-		break;
-	case WT_PAGE_COL_VAR:
-		page->pg_var_recno = recno;
-		page->pg_var_d = (WT_COL *)((uint8_t *)page + sizeof(WT_PAGE));
-		page->pg_var_entries = alloc_entries;
-		break;
-	case WT_PAGE_ROW_LEAF:
-		page->pg_row_d = (WT_ROW *)((uint8_t *)page + sizeof(WT_PAGE));
-		page->pg_row_entries = alloc_entries;
-		break;
-	WT_ILLEGAL_VALUE(session);
-	}
-
-	/* Increment the cache statistics. */
-	__wt_cache_page_inmem_incr(session, page, size);
-	(void)WT_ATOMIC_ADD8(cache->bytes_read, size);
-	(void)WT_ATOMIC_ADD8(cache->pages_inmem, 1);
-
-	*pagep = page;
-	return (0);
-}
-
-/*
- * __wt_page_inmem --
- *	Build in-memory page information.
- */
-int
-__wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
-    const void *image, size_t memsize, uint32_t flags, WT_PAGE **pagep)
-{
-	WT_DECL_RET;
-	WT_PAGE *page;
-	const WT_PAGE_HEADER *dsk;
-	uint32_t alloc_entries;
-	size_t size;
-
-	*pagep = NULL;
-
-	dsk = image;
-	alloc_entries = 0;
-
-	/*
-	 * Figure out how many underlying objects the page references so we can
-	 * allocate them along with the page.
-	 */
-	switch (dsk->type) {
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_VAR:
-		/*
-		 * Column-store leaf page entries map one-to-one to the number
-		 * of physical entries on the page (each physical entry is a
-		 * value item).
-		 *
-		 * Column-store internal page entries map one-to-one to the
-		 * number of physical entries on the page (each entry is a
-		 * location cookie).
-		 */
-		alloc_entries = dsk->u.entries;
-		break;
-	case WT_PAGE_ROW_INT:
-		/*
-		 * Row-store internal page entries map one-to-two to the number
-		 * of physical entries on the page (each entry is a key and
-		 * location cookie pair).
-		 */
-		alloc_entries = dsk->u.entries / 2;
-		break;
-	case WT_PAGE_ROW_LEAF:
-		/*
-		 * If the "no empty values" flag is set, row-store leaf page
-		 * entries map one-to-one to the number of physical entries
-		 * on the page (each physical entry is a key or value item).
-		 * If that flag is not set, there are more keys than values,
-		 * we have to walk the page to figure it out.
-		 */
-		if (F_ISSET(dsk, WT_PAGE_EMPTY_V_ALL))
-			alloc_entries = dsk->u.entries;
-		else if (F_ISSET(dsk, WT_PAGE_EMPTY_V_NONE))
-			alloc_entries = dsk->u.entries / 2;
-		else
-			WT_RET(__inmem_row_leaf_entries(
-			    session, dsk, &alloc_entries));
-		break;
-	WT_ILLEGAL_VALUE(session);
-	}
-
-	/* Allocate and initialize a new WT_PAGE. */
-	WT_RET(__wt_page_alloc(
-	    session, dsk->type, dsk->recno, alloc_entries, 1, &page));
-	page->dsk = dsk;
-	F_SET_ATOMIC(page, flags);
-
-	/*
-	 * Track the memory allocated to build this page so we can update the
-	 * cache statistics in a single call. If the disk image is in allocated
-	 * memory, start with that.
-	 */
-	size = LF_ISSET(WT_PAGE_DISK_ALLOC) ? memsize : 0;
-
-	switch (page->type) {
-	case WT_PAGE_COL_FIX:
-		__inmem_col_fix(session, page);
-		break;
-	case WT_PAGE_COL_INT:
-		__inmem_col_int(session, page);
-		break;
-	case WT_PAGE_COL_VAR:
-		WT_ERR(__inmem_col_var(session, page, &size));
-		break;
-	case WT_PAGE_ROW_INT:
-		WT_ERR(__inmem_row_int(session, page, &size));
-		break;
-	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__inmem_row_leaf(session, page));
-		break;
-	WT_ILLEGAL_VALUE_ERR(session);
-	}
-
-	/* Update the page's in-memory size and the cache statistics. */
-	__wt_cache_page_inmem_incr(session, page, size);
-
-	/* Link the new internal page to the parent. */
-	if (ref != NULL) {
-		switch (page->type) {
-		case WT_PAGE_COL_INT:
-		case WT_PAGE_ROW_INT:
-			page->pg_intl_parent_ref = ref;
-			break;
-		}
-		ref->page = page;
-	}
-
-	*pagep = page;
-	return (0);
-
-err:	__wt_page_out(session, &page);
-	return (ret);
 }
