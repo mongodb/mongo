@@ -93,6 +93,7 @@ DIETIME=10                   # Time to wait for the server to die, in seconds
                             # 'restart' will not work
 
 DAEMONUSER=${DAEMONUSER:-mongodb}
+DAEMONGROUP=${DAEMONGROUP:-mongodb}
 
 set -e
 
@@ -140,7 +141,7 @@ start_server() {
 
             # Start the process using the wrapper
             start-stop-daemon --background --start --quiet --pidfile $PIDFILE \
-                        --make-pidfile --chuid $DAEMONUSER \
+                        --make-pidfile --chuid $DAEMONUSER:$DAEMONGROUP \
                         --exec $NUMACTL $DAEMON $DAEMON_OPTS
             errcode=$?
 	return $errcode
