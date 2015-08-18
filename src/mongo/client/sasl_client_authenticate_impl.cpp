@@ -167,7 +167,7 @@ void asyncSaslConversation(auth::RunCommandHook runCommand,
                            const std::shared_ptr<SaslClientSession>& session,
                            const BSONObj& saslCommandPrefix,
                            const BSONObj& inputObj,
-                           StringData targetDatabase,
+                           std::string targetDatabase,
                            int saslLogLevel,
                            auth::AuthCompletionHandler handler) {
     // Extract payload from previous step
@@ -199,7 +199,7 @@ void asyncSaslConversation(auth::RunCommandHook runCommand,
         commandBuilder.append(conversationId);
 
     auto request = RemoteCommandRequest();
-    request.dbname = targetDatabase.toString();
+    request.dbname = targetDatabase;
     request.cmdObj = commandBuilder.obj();
 
     // Asynchronously continue the conversation
@@ -236,7 +236,7 @@ void asyncSaslConversation(auth::RunCommandHook runCommand,
                                   session,
                                   std::move(saslFollowupCommandPrefix),
                                   std::move(serverResponse),
-                                  targetDatabase,
+                                  std::move(targetDatabase),
                                   saslLogLevel,
                                   handler);
         });
