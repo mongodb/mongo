@@ -1564,6 +1564,7 @@ void TopologyCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* response)
         }
     }
 
+    response->setReplSetName(_rsConfig.getReplSetName());
     if (myState.removed()) {
         response->markAsNoConfig();
         return;

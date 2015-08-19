@@ -118,6 +118,10 @@ void IsMasterResponse::addToBSON(BSONObjBuilder* builder) const {
         builder->append(kArbitersFieldName, arbiters);
     }
 
+    if (_setNameSet) {
+        builder->append(kSetNameFieldName, _setName);
+    }
+
     if (_shutdownInProgress) {
         builder->append(kCodeFieldName, ErrorCodes::ShutdownInProgress);
         builder->append(kErrmsgFieldName, "replication shutdown in progress");
@@ -132,8 +136,6 @@ void IsMasterResponse::addToBSON(BSONObjBuilder* builder) const {
         return;
     }
 
-    invariant(_setNameSet);
-    builder->append(kSetNameFieldName, _setName);
     invariant(_setVersionSet);
     builder->append(kSetVersionFieldName, static_cast<int>(_setVersion));
     invariant(_isMasterSet);
