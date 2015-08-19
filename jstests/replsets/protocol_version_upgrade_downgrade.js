@@ -11,6 +11,10 @@ rst.startSet();
 var conf = rst.getReplSetConfig();
 conf.settings = conf.settings || { };
 conf.protocolVersion = 0;
+// The first node will always be the primary.
+conf.members[0].priority = 1;
+conf.members[1].priority = 0;
+conf.members[2].priority = 0;
 rst.initiate(conf);
 rst.awaitSecondaryNodes();
 
