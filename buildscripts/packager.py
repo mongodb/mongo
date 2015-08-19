@@ -499,12 +499,12 @@ def make_deb_repo(repo, distro, build_os, spec):
     # done.
     s="""Origin: mongodb
 Label: mongodb
-Suite: mongodb
+Suite: %s
 Codename: %s/mongodb-org
 Architectures: amd64
 Components: %s
 Description: MongoDB packages
-""" % (distro.repo_os_version(build_os), distro.repo_component())
+""" % (distro.repo_os_version(build_os), distro.repo_os_version(build_os), distro.repo_component())
     if os.path.exists(repo+"../../Release"):
         os.unlink(repo+"../../Release")
     if os.path.exists(repo+"../../Release.gpg"):
