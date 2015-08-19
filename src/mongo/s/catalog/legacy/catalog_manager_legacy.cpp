@@ -397,7 +397,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
             return status;
         }
 
-        Shard::reloadShardInfo();
+        grid.shardRegistry()->reload();
         conn.done();
 
         // Record start in changelog
@@ -424,7 +424,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
         }
 
         grid.shardRegistry()->remove(name);
-        Shard::reloadShardInfo();
+        grid.shardRegistry()->reload();
         conn.done();
 
         // Record finish in changelog

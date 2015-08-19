@@ -417,7 +417,7 @@ public:
         // Make sure we're as up-to-date as possible with shard information
         // This catches the case where we had to previously changed a shard's host by
         // removing/adding a shard with the same name
-        Shard::reloadShardInfo();
+        grid.shardRegistry()->reload();
 
         MoveTimingHelper timing(
             txn, "from", ns, min, max, 6 /* steps */, &errmsg, toShardName, fromShardName);

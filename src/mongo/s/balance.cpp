@@ -444,7 +444,7 @@ bool Balancer::_init() {
         // checks that each shard is indeed a different process (no hostname mixup)
         // these checks are redundant in that they're redone at every new round but we want to do
         // them initially here so to catch any problem soon
-        Shard::reloadShardInfo();
+        grid.shardRegistry()->reload();
         _checkOIDs();
 
         log() << "config servers and shards contacted successfully";
@@ -498,7 +498,7 @@ void Balancer::run() {
             BSONObj balancerResult;
 
             // use fresh shard state
-            Shard::reloadShardInfo();
+            grid.shardRegistry()->reload();
 
             // refresh chunk size (even though another balancer might be active)
             Chunk::refreshChunkSize(txn.get());

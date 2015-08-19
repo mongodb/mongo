@@ -82,8 +82,6 @@ public:
      */
     std::string toString() const;
 
-    static void reloadShardInfo();
-
 private:
     /**
      * Identifier of the shard as obtained from the configuration data (i.e. shard0000).

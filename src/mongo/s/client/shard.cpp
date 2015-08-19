@@ -62,8 +62,4 @@ std::string Shard::toString() const {
     return _id + ":" + _cs.toString();
 }
 
-void Shard::reloadShardInfo() {
-    grid.shardRegistry()->reload();
-}
-
 }  // namespace mongo
