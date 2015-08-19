@@ -45,9 +45,8 @@ namespace moe = mongo::optionenvironment;
 
 struct MongosGlobalParams {
     ConnectionString configdbs;
-    bool upgrade;
 
-    MongosGlobalParams() : upgrade(false) {}
+    MongosGlobalParams() = default;
 };
 
 extern MongosGlobalParams mongosGlobalParams;

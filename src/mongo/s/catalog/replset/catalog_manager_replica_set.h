@@ -123,7 +123,7 @@ public:
 
     DistLockManager* getDistLockManager() override;
 
-    Status checkAndUpgrade(bool checkOnly) override;
+    Status initConfigVersion() override;
 
 private:
     Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) override;

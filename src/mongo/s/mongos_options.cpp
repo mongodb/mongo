@@ -95,10 +95,6 @@ Status addMongosOptions(moe::OptionSection* options) {
         .setSources(moe::SourceAllLegacy);
 
     sharding_options.addOptionChaining(
-                         "upgrade", "upgrade", moe::Switch, "upgrade meta data version")
-        .setSources(moe::SourceAllLegacy);
-
-    sharding_options.addOptionChaining(
         "sharding.chunkSize", "chunkSize", moe::Int, "maximum amount of data per chunk");
 
     sharding_options.addOptionChaining("net.http.JSONPEnabled",
@@ -277,10 +273,6 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
     if (configServers.size() < 3) {
         warning() << "running with less than 3 config servers should be done only for testing "
                      "purposes and is not recommended for production";
-    }
-
-    if (params.count("upgrade")) {
-        mongosGlobalParams.upgrade = params["upgrade"].as<bool>();
     }
 
     return Status::OK();

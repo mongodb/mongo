@@ -52,7 +52,7 @@ using CatalogManagerReplSetTest = CatalogManagerReplSetTestFixture;
 TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
-    auto future = launchAsync([this] { ASSERT_OK(catalogManager()->checkAndUpgrade(true)); });
+    auto future = launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion()); });
 
     onFindCommand([this](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -81,7 +81,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeTargetError) {
     configTargeter()->setFindHostReturnValue({ErrorCodes::InternalError, "Bad test network"});
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->checkAndUpgrade(true);
+        auto status = catalogManager()->initConfigVersion();
         ASSERT_EQ(ErrorCodes::InternalError, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -93,7 +93,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeClusterMultiVersion) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->checkAndUpgrade(true);
+        auto status = catalogManager()->initConfigVersion();
         ASSERT_EQ(ErrorCodes::RemoteValidationError, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -124,7 +124,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeInvalidConfigVersionDoc) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->checkAndUpgrade(true);
+        auto status = catalogManager()->initConfigVersion();
         ASSERT_EQ(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -146,7 +146,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeInvalidConfigVersionDoc) {
 TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
-    auto future = launchAsync([this] { ASSERT_OK(catalogManager()->checkAndUpgrade(true)); });
+    auto future = launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion()); });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
@@ -209,7 +209,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
 TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfigWithAdmin) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
-    auto future = launchAsync([this] { ASSERT_OK(catalogManager()->checkAndUpgrade(true)); });
+    auto future = launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion()); });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
@@ -255,7 +255,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeWriteError) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->checkAndUpgrade(true);
+        auto status = catalogManager()->initConfigVersion();
         ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -298,7 +298,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocNonEmptyConfigServer
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->checkAndUpgrade(true);
+        auto status = catalogManager()->initConfigVersion();
         ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -329,7 +329,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeTooOld) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->checkAndUpgrade(true);
+        auto status = catalogManager()->initConfigVersion();
         ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion, status.code());
         ASSERT_FALSE(status.reason().empty());
     });

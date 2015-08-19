@@ -174,7 +174,7 @@ StatusWith<std::string> CatalogManagerMock::_generateNewShardName() {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status CatalogManagerMock::checkAndUpgrade(bool checkOnly) {
+Status CatalogManagerMock::initConfigVersion() {
     return Status::OK();
 }
 

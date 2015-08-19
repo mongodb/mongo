@@ -223,7 +223,7 @@ Status CatalogManagerLegacy::startup() {
     return status;
 }
 
-Status CatalogManagerLegacy::checkAndUpgrade(bool checkOnly) {
+Status CatalogManagerLegacy::initConfigVersion() {
     return checkAndInitConfigVersion(this, getDistLockManager());
 }
 

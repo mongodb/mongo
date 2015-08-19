@@ -424,7 +424,7 @@ public:
      * A new version document will be created if the current cluster config is empty. Otherwise,
      * checkOnly should be false to perform the upgrade.
      */
-    virtual Status checkAndUpgrade(bool checkOnly) = 0;
+    virtual Status initConfigVersion() = 0;
 
 protected:
     CatalogManager() = default;

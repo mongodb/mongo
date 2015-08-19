@@ -196,20 +196,16 @@ DBClientBase* createDirectClient(OperationContext* txn) {
 
 using namespace mongo;
 
-static Status initializeSharding(OperationContext* txn, bool doUpgrade) {
+static Status initializeSharding(OperationContext* txn) {
     Status status = initializeGlobalShardingState(mongosGlobalParams.configdbs);
     if (!status.isOK()) {
         return status;
     }
 
     auto catalogManager = grid.catalogManager(txn);
-    status = catalogManager->checkAndUpgrade(!doUpgrade);
+    status = catalogManager->initConfigVersion();
     if (!status.isOK()) {
         return status;
-    }
-
-    if (doUpgrade) {
-        return Status::OK();
     }
 
     status = catalogManager->startup();
@@ -220,7 +216,7 @@ static Status initializeSharding(OperationContext* txn, bool doUpgrade) {
     return Status::OK();
 }
 
-static ExitCode runMongosServer(bool doUpgrade) {
+static ExitCode runMongosServer() {
     Client::initThread("mongosMain");
     printShardingVersionInfo(false);
 
@@ -240,13 +236,10 @@ static ExitCode runMongosServer(bool doUpgrade) {
 
     {
         auto txn = cc().makeOperationContext();
-        Status status = initializeSharding(txn.get(), doUpgrade);
+        Status status = initializeSharding(txn.get());
         if (!status.isOK()) {
             error() << "Error initializing sharding system: " << status;
             return EXIT_SHARDING_ERROR;
-        }
-        if (doUpgrade) {
-            return EXIT_CLEAN;
         }
 
         ConfigServer::reloadSettings(txn.get());
@@ -332,7 +325,7 @@ static int _main() {
     }
 #endif
 
-    ExitCode exitCode = runMongosServer(mongosGlobalParams.upgrade);
+    ExitCode exitCode = runMongosServer();
 
     // To maintain backwards compatibility, we exit with EXIT_NET_ERROR if the listener loop
     // returns.
@@ -349,7 +342,7 @@ static ExitCode initService() {
     ntservice::reportStatus(SERVICE_RUNNING);
     log() << "Service running";
 
-    ExitCode exitCode = runMongosServer(mongosGlobalParams.upgrade);
+    ExitCode exitCode = runMongosServer();
 
     // ignore EXIT_NET_ERROR on clean shutdown since we return this when the listening socket
     // is closed

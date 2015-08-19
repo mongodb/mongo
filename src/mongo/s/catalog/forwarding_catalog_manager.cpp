@@ -363,8 +363,8 @@ DistLockManager* ForwardingCatalogManager::getDistLockManager() {
     return retry([&] { return _actual->getDistLockManager(); });
 }
 
-Status ForwardingCatalogManager::checkAndUpgrade(bool checkOnly) {
-    return retry([&] { return _actual->checkAndUpgrade(checkOnly); });
+Status ForwardingCatalogManager::initConfigVersion() {
+    return retry([&] { return _actual->initConfigVersion(); });
 }
 
 StatusWith<ForwardingCatalogManager::ScopedDistLock> ForwardingCatalogManager::distLock(

@@ -162,7 +162,7 @@ public:
 
     DistLockManager* getDistLockManager() override;
 
-    Status checkAndUpgrade(bool checkOnly) override;
+    Status initConfigVersion() override;
 
     class ScopedDistLock {
         MONGO_DISALLOW_COPYING(ScopedDistLock);

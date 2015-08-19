@@ -1063,7 +1063,7 @@ StatusWith<long long> CatalogManagerReplicaSet::_runCountCommandOnConfig(const H
     return result;
 }
 
-Status CatalogManagerReplicaSet::checkAndUpgrade(bool checkOnly) {
+Status CatalogManagerReplicaSet::initConfigVersion() {
     auto versionStatus = _getConfigVersion();
     if (!versionStatus.isOK()) {
         return versionStatus.getStatus();
