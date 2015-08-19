@@ -74,7 +74,7 @@ def print_file_stats(session):
 def print_overflow_pages(session):
     ostatcursor = session.open_cursor("statistics:table:access")
     val = ostatcursor[stat.dsrc.btree_overflow]
-    if val != 0 :
+    if val != 0:
         print str(val[0]) + '=' + str(val[1])
     ostatcursor.close()
 
@@ -84,7 +84,7 @@ def print_derived_stats(session):
     ckpt_size = dstatcursor[stat.dsrc.block_checkpoint_size][1]
     file_size = dstatcursor[stat.dsrc.block_size][1]
     percent = 0
-    if file_size != 0 :
+    if file_size != 0:
         percent = 100 * ((float(file_size) - float(ckpt_size)) / float(file_size))
     print "Table is %" + str(percent) + " fragmented"
 
@@ -101,7 +101,7 @@ def print_derived_stats(session):
 def print_cursor(mycursor):
     while mycursor.next() == 0:
         val = mycursor.get_value()
-        if val[1] != '0' :
+        if val[1] != '0':
             print str(val[0]) + '=' + str(val[1])
 
 if __name__ == "__main__":
