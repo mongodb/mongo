@@ -106,6 +106,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& path,
     ss << "cache_size=" << cacheSizeGB << "G,";
     ss << "session_max=20000,";
     ss << "eviction=(threads_max=4),";
+    ss << "config_base=false,";
     ss << "statistics=(fast),";
     // The setting may have a later setting override it if not using the journal.  We make it
     // unconditional here because even nojournal may need this setting if it is a transition
