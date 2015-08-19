@@ -104,7 +104,7 @@ public:
      */
     virtual Status setReadFromMajorityCommittedSnapshot() {
         return {ErrorCodes::CommandNotSupported,
-                "Current storage engine does not support $readMajorityTemporaryName"};
+                "Current storage engine does not support majority readConcerns"};
     }
 
     /**

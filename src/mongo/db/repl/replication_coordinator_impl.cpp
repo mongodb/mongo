@@ -827,6 +827,11 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
     Timer timer;
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     bool isMajorityReadConcern = settings.getLevel() == ReadConcernLevel::kMajorityReadConcern;
+    if (isMajorityReadConcern && !_externalState->snapshotsEnabled()) {
+        return ReadConcernResponse(Status(ErrorCodes::CommandNotSupported,
+                "Current storage engine does not support majority readConcerns"));
+    }
+
     auto loopCondition = [this, isMajorityReadConcern, ts] {
         return isMajorityReadConcern
             ? !_currentCommittedSnapshot || ts > _currentCommittedSnapshot->opTime
