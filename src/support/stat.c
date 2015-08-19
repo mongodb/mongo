@@ -68,7 +68,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"cursor: remove calls",
 	"cursor: cursor-remove key bytes removed",
 	"cursor: reset calls",
-	"cursor: number operations restarted",
+	"cursor: restarted searches",
 	"cursor: search calls",
 	"cursor: search near calls",
 	"cursor: update calls",
@@ -178,10 +178,10 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cursor_update_bytes = 0;
 	stats->cursor_insert = 0;
 	stats->cursor_next = 0;
-	stats->cursor_restart = 0;
 	stats->cursor_prev = 0;
 	stats->cursor_remove = 0;
 	stats->cursor_reset = 0;
+	stats->cursor_restart = 0;
 	stats->cursor_search = 0;
 	stats->cursor_search_near = 0;
 	stats->cursor_update = 0;
@@ -335,14 +335,14 @@ __wt_stat_dsrc_aggregate_single(
 	    from->cursor_insert;
 	to->cursor_next +=
 	    from->cursor_next;
-	to->cursor_restart +=
-	    from->cursor_restart;
 	to->cursor_prev +=
 	    from->cursor_prev;
 	to->cursor_remove +=
 	    from->cursor_remove;
 	to->cursor_reset +=
 	    from->cursor_reset;
+	to->cursor_restart +=
+	    from->cursor_restart;
 	to->cursor_search +=
 	    from->cursor_search;
 	to->cursor_search_near +=
@@ -526,14 +526,14 @@ __wt_stat_dsrc_aggregate(
 	    (int64_t)WT_STAT_READ(from, cursor_insert);
 	to->cursor_next +=
 	    (int64_t)WT_STAT_READ(from, cursor_next);
-	to->cursor_restart +=
-	    (int64_t)WT_STAT_READ(from, cursor_restart);
 	to->cursor_prev +=
 	    (int64_t)WT_STAT_READ(from, cursor_prev);
 	to->cursor_remove +=
 	    (int64_t)WT_STAT_READ(from, cursor_remove);
 	to->cursor_reset +=
 	    (int64_t)WT_STAT_READ(from, cursor_reset);
+	to->cursor_restart +=
+	    (int64_t)WT_STAT_READ(from, cursor_restart);
 	to->cursor_search +=
 	    (int64_t)WT_STAT_READ(from, cursor_search);
 	to->cursor_search_near +=
@@ -662,7 +662,7 @@ static const char * const __stats_connection_desc[] = {
 	"cursor: cursor prev calls",
 	"cursor: cursor remove calls",
 	"cursor: cursor reset calls",
-	"cursor: number operations restarted",
+	"cursor: cursor restarted searches",
 	"cursor: cursor search calls",
 	"cursor: cursor search near calls",
 	"cursor: cursor update calls",
@@ -843,10 +843,10 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cursor_prev = 0;
 	stats->cursor_remove = 0;
 	stats->cursor_reset = 0;
+	stats->cursor_restart = 0;
 	stats->cursor_search = 0;
 	stats->cursor_search_near = 0;
 	stats->cursor_update = 0;
-	stats->cursor_restart = 0;
 		/* not clearing dh_conn_handle_count */
 	stats->dh_sweep_ref = 0;
 	stats->dh_sweep_close = 0;
@@ -1072,14 +1072,14 @@ __wt_stat_connection_aggregate(
 	    (int64_t)WT_STAT_READ(from, cursor_remove);
 	to->cursor_reset +=
 	    (int64_t)WT_STAT_READ(from, cursor_reset);
+	to->cursor_restart +=
+	    (int64_t)WT_STAT_READ(from, cursor_restart);
 	to->cursor_search +=
 	    (int64_t)WT_STAT_READ(from, cursor_search);
 	to->cursor_search_near +=
 	    (int64_t)WT_STAT_READ(from, cursor_search_near);
 	to->cursor_update +=
 	    (int64_t)WT_STAT_READ(from, cursor_update);
-	to->cursor_restart +=
-	    (int64_t)WT_STAT_READ(from, cursor_restart);
 	to->dh_conn_handle_count +=
 	    (int64_t)WT_STAT_READ(from, dh_conn_handle_count);
 	to->dh_sweep_ref +=

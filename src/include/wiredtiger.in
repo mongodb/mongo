@@ -3664,7 +3664,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CURSOR_REMOVE			1059
 /*! cursor: cursor reset calls */
 #define	WT_STAT_CONN_CURSOR_RESET			1060
-/*! cursor: number operations restarted */
+/*! cursor: cursor restarted searches */
 #define	WT_STAT_CONN_CURSOR_RESTART			1061
 /*! cursor: cursor search calls */
 #define	WT_STAT_CONN_CURSOR_SEARCH			1062
@@ -3969,7 +3969,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2063
 /*! cursor: reset calls */
 #define	WT_STAT_DSRC_CURSOR_RESET			2064
-/*! cursor: number operations restarted */
+/*! cursor: restarted searches */
 #define	WT_STAT_DSRC_CURSOR_RESTART			2065
 /*! cursor: search calls */
 #define	WT_STAT_DSRC_CURSOR_SEARCH			2066
