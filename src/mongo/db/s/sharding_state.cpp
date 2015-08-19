@@ -140,7 +140,7 @@ string ShardingState::getShardName() {
     return _shardName;
 }
 
-void ShardingState::initialize(const string& server) {
+void ShardingState::initialize(OperationContext* txn, const string& server) {
     uassert(18509,
             "Unable to obtain host name during sharding initialization.",
             !getHostName().empty());
@@ -156,7 +156,7 @@ void ShardingState::initialize(const string& server) {
     ShardedConnectionInfo::addHook();
 
     ConnectionString configServerCS = uassertStatusOK(ConnectionString::parse(server));
-    uassertStatusOK(initializeGlobalShardingState(configServerCS));
+    uassertStatusOK(initializeGlobalShardingState(txn, configServerCS, false));
 
     _enabled = true;
 }

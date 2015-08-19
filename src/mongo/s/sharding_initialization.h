@@ -31,12 +31,15 @@
 namespace mongo {
 
 class ConnectionString;
+class OperationContext;
 class Status;
 
 /**
  * Takes in the connection string for reaching the config servers and initializes the global
  * CatalogManager, ShardingRegistry, and grid objects.
  */
-Status initializeGlobalShardingState(const ConnectionString& configCS);
+Status initializeGlobalShardingState(OperationContext* txn,
+                                     const ConnectionString& configCS,
+                                     bool allowNetworking);
 
 }  // namespace mongo

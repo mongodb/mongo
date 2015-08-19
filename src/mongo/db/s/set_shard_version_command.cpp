@@ -328,7 +328,7 @@ private:
         }
 
         if (locked) {
-            ShardingState::get(txn)->initialize(configdb);
+            ShardingState::get(txn)->initialize(txn, configdb);
             return true;
         }
 

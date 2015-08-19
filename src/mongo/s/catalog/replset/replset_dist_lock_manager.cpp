@@ -70,7 +70,9 @@ ReplSetDistLockManager::ReplSetDistLockManager(ServiceContext* globalContext,
 ReplSetDistLockManager::~ReplSetDistLockManager() = default;
 
 void ReplSetDistLockManager::startUp() {
-    _execThread = stdx::make_unique<stdx::thread>(&ReplSetDistLockManager::doTask, this);
+    if (!_execThread) {
+        _execThread = stdx::make_unique<stdx::thread>(&ReplSetDistLockManager::doTask, this);
+    }
 }
 
 void ReplSetDistLockManager::shutDown(bool allowNetworking) {

@@ -614,7 +614,7 @@ public:
             }
 
             const string configdb = cmdObj["configdb"].String();
-            shardingState->initialize(configdb);
+            shardingState->initialize(txn, configdb);
         }
 
         // Initialize our current shard name in the shard state if needed

@@ -152,7 +152,7 @@ public:
                 return false;
             }
 
-            shardingState->initialize(config);
+            shardingState->initialize(txn, config);
         }
 
         // ShardName is optional, but might not be set yet

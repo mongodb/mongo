@@ -94,7 +94,8 @@ public:
 
     /**
      * Performs implementation-specific startup tasks. Must be run after the catalog manager
-     * has been installed into the global 'grid' object.
+     * has been installed into the global 'grid' object. Implementation do not need to guarantee
+     * thread safety so callers should employ proper synchronization when calling this method.
      */
     virtual Status startup(OperationContext* txn, bool allowNetworking) = 0;
 

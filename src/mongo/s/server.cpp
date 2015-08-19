@@ -199,18 +199,13 @@ DBClientBase* createDirectClient(OperationContext* txn) {
 using namespace mongo;
 
 static Status initializeSharding(OperationContext* txn) {
-    Status status = initializeGlobalShardingState(mongosGlobalParams.configdbs);
+    Status status = initializeGlobalShardingState(txn, mongosGlobalParams.configdbs, true);
     if (!status.isOK()) {
         return status;
     }
 
     auto catalogManager = grid.catalogManager(txn);
     status = catalogManager->initConfigVersion(txn);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = catalogManager->startup(txn, true);
     if (!status.isOK()) {
         return status;
     }

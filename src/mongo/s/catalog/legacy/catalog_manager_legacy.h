@@ -55,6 +55,9 @@ public:
      */
     Status init(const ConnectionString& configCS);
 
+    /**
+     * Can terminate the server if called more than once.
+     */
     Status startup(OperationContext* txn, bool allowNetworking) override;
 
     void shutDown(OperationContext* txn, bool allowNetworking) override;

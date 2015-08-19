@@ -88,7 +88,17 @@ public:
 
     virtual ~DistLockManager() = default;
 
+    /**
+     * Performs bootstrapping for the manager. Implementation do not need to guarantee
+     * thread safety so callers should employ proper synchronization when calling this method.
+     */
     virtual void startUp() = 0;
+
+    /**
+     * Cleanup the manager's resources. Pass false to allowNetworking in order to do work that
+     * involves sending network messages. Implementation do not need to guarantee thread safety
+     * so callers should employ proper synchronization when calling this method.
+     */
     virtual void shutDown(bool allowNetworking) = 0;
 
     /**

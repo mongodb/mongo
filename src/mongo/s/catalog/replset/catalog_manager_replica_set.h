@@ -52,6 +52,9 @@ public:
         return ConfigServerMode::CSRS;
     }
 
+    /**
+     * Safe to call multiple times as long as they
+     */
     Status startup(OperationContext* txn, bool allowNetworking) override;
 
     void shutDown(OperationContext* txn, bool allowNetworking) override;

@@ -408,7 +408,7 @@ public:
             }
 
             const string configdb = cmdObj["configdb"].String();
-            shardingState->initialize(configdb);
+            shardingState->initialize(txn, configdb);
         }
 
         // Initialize our current shard name in the shard state if needed
@@ -1144,7 +1144,7 @@ public:
         if (!shardingState->enabled()) {
             if (!cmdObj["configServer"].eoo()) {
                 dassert(cmdObj["configServer"].type() == String);
-                shardingState->initialize(cmdObj["configServer"].String());
+                shardingState->initialize(txn, cmdObj["configServer"].String());
             } else {
                 errmsg = str::stream()
                     << "cannot start recv'ing chunk, "
