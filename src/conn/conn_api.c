@@ -1837,7 +1837,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	cfg[1] = config;
 
 	/* Capture the config_base setting file for later use. */
-	WT_RET(__wt_config_gets(session, cfg, "config_base", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "config_base", &cval));
 	config_base_set = cval.val;
 
 	/* Configure error messages so we get them right early. */
@@ -1878,7 +1878,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    (int)sizeof(version), ENOMEM);
 	__conn_config_append(cfg, version);
 
-	/* Ignore the baseconfig file if we config_base set to false. */
+	/* Ignore the base_config file if we config_base set to false. */
 	if (config_base_set)
 		WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, i1));
 	__conn_config_append(cfg, config);

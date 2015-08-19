@@ -37,17 +37,18 @@ class test_baseconfig(wttest.WiredTigerTestCase):
         os.mkdir("A")
         conn = wiredtiger.wiredtiger_open("A", 'create')
         self.assertTrue(os.path.exists("A/WiredTiger.basecfg"))
-	with open("A/WiredTiger.basecfg", "a") as basecfg_file:
+        with open("A/WiredTiger.basecfg", "a") as basecfg_file:
             basecfg_file.write("foo!")
-	conn.close()
+        conn.close()
 
-        # Open a database, we should assert here as the basecfg is invalud	
+        # Open a database, we should assert here as the basecfg is invalid
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError,
             lambda: wiredtiger.wiredtiger_open("A", ''),
             '/unknown configuration key/')
 
-	conn = wiredtiger.wiredtiger_open("A", "create,config_base=false")
+        conn = wiredtiger.wiredtiger_open("A", "create,config_base=false")
+        conn.close()
 
 if __name__ == '__main__':
     wttest.run()
