@@ -70,18 +70,14 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
 #ifdef MONGO_CONFIG_SSL
         if (SSLManagerInterface* manager = getSSLManager()) {
             auto factory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
-            return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
+            return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory), std::move(hook));
         }
 #endif
         auto factory = stdx::make_unique<AsyncStreamFactory>();
-        return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
+        return stdx::make_unique<NetworkInterfaceASIO>(std::move(factory), std::move(hook));
 
     } else {
-        if (hook) {
-            return stdx::make_unique<NetworkInterfaceImpl>(std::move(hook));
-        } else {
-            return stdx::make_unique<NetworkInterfaceImpl>();
-        }
+        return stdx::make_unique<NetworkInterfaceImpl>(std::move(hook));
     }
 }
 
