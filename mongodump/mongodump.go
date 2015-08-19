@@ -67,6 +67,8 @@ func (dump *MongoDump) ValidateOptions() error {
 		return fmt.Errorf("cannot dump using a queryFile without a specified collection")
 	case dump.InputOptions.Query != "" && dump.InputOptions.QueryFile != "":
 		return fmt.Errorf("either query or queryFile can be specified as a query option, not both")
+	case dump.InputOptions.Query != "" && dump.InputOptions.TableScan:
+		return fmt.Errorf("cannot use --forceTableScan when specifying --query")
 	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.Namespace.DB == "":
 		return fmt.Errorf("must specify a database when running with dumpDbUsersAndRoles")
 	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.Namespace.Collection != "":

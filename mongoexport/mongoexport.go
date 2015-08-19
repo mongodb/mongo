@@ -94,6 +94,10 @@ func (exp *MongoExport) ValidateSettings() error {
 		return fmt.Errorf("invalid output type '%v', choose 'json' or 'csv'", exp.OutputOpts.Type)
 	}
 
+	if exp.InputOpts.Query != "" && exp.InputOpts.ForceTableScan {
+		return fmt.Errorf("cannot use --forceTableScan when specifying --query")
+	}
+
 	if exp.InputOpts.Query != "" && exp.InputOpts.QueryFile != "" {
 		return fmt.Errorf("either --query or --queryFile can be specified as a query option")
 	}
