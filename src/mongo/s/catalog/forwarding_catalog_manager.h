@@ -70,6 +70,11 @@ public:
                                                  StringData replSetName,
                                                  const HostAndPort& knownServer);
 
+    /**
+     * Blocking method, which will waits for a previously scheduled catalog manager change to
+     * complete. It is illegal to call unless scheduleReplaceCatalogManagerIfNeeded has been called.
+     */
+    void waitForCatalogManagerChange();
 
     ConfigServerMode getMode() override;
 
@@ -189,7 +194,6 @@ private:
     auto retry(Callable&& c) -> decltype(std::forward<Callable>(c)());
 
     void _replaceCatalogManager(const executor::TaskExecutor::CallbackArgs& args);
-    void _waitForNewCatalogManager();
 
     ServiceContext* _service;
     ShardRegistry* _shardRegistry;

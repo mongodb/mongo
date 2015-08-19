@@ -156,6 +156,14 @@ Status ForwardingCatalogManager::scheduleReplaceCatalogManagerIfNeeded(
             "legacy SCCC protocol for config server communication"};
 }
 
+void ForwardingCatalogManager::waitForCatalogManagerChange() {
+    stdx::unique_lock<stdx::mutex> oblk(_observerMutex);
+    invariant(_nextConfigChangeComplete.isValid());
+    auto configChangeComplete = _nextConfigChangeComplete;
+    oblk.unlock();
+    _shardRegistry->getExecutor()->waitForEvent(configChangeComplete);
+}
+
 CatalogManager::ConfigServerMode ForwardingCatalogManager::getMode() {
     return retry([this] { return _actual->getMode(); });
 }
@@ -387,7 +395,8 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock> ForwardingCatalogManager::d
                 throw;
             }
         }
-        _waitForNewCatalogManager();
+
+        waitForCatalogManagerChange();
     }
     MONGO_UNREACHABLE;
 }
@@ -464,7 +473,8 @@ auto ForwardingCatalogManager::retry(Callable&& c) -> decltype(std::forward<Call
                 throw;
             }
         }
-        _waitForNewCatalogManager();
+
+        waitForCatalogManagerChange();
     }
     MONGO_UNREACHABLE;
 }
@@ -480,14 +490,6 @@ void ForwardingCatalogManager::_replaceCatalogManager(const TaskExecutor::Callba
     _shardRegistry->updateConfigServerConnectionString(_nextConfigConnectionString);
     fassert(28790, _actual->startup());
     args.executor->signalEvent(_nextConfigChangeComplete);
-}
-
-void ForwardingCatalogManager::_waitForNewCatalogManager() {
-    stdx::unique_lock<stdx::mutex> oblk(_observerMutex);
-    invariant(_nextConfigChangeComplete.isValid());
-    auto configChangeComplete = _nextConfigChangeComplete;
-    oblk.unlock();
-    _shardRegistry->getExecutor()->waitForEvent(configChangeComplete);
 }
 
 }  // namespace mongo

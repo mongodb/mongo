@@ -337,6 +337,8 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& r) {
         return;
 
     int loops = 5;
+    bool cmChangeAttempted = false;
+
     while (true) {
         BSONObjBuilder builder;
         try {
@@ -371,7 +373,7 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& r) {
             BSONObj x = builder.done();
             replyToQuery(0, r.p(), r.m(), x);
             return;
-        } catch (StaleConfigException& e) {
+        } catch (const StaleConfigException& e) {
             if (loops <= 0)
                 throw e;
 
@@ -386,11 +388,18 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& r) {
             ShardConnection::checkMyConnectionVersions(txn, staleNS);
             if (loops < 4)
                 versionManager.forceRemoteCheckShardVersionCB(txn, staleNS);
-        } catch (AssertionException& e) {
-            Command::appendCommandStatus(builder, e.toStatus());
-            BSONObj x = builder.done();
-            replyToQuery(0, r.p(), r.m(), x);
-            return;
+        } catch (const DBException& e) {
+            if (e.getCode() == ErrorCodes::IncompatibleCatalogManager) {
+                fassert(28791, !cmChangeAttempted);
+                cmChangeAttempted = true;
+
+                grid.catalogManager()->waitForCatalogManagerChange();
+            } else {
+                Command::appendCommandStatus(builder, e.toStatus());
+                BSONObj x = builder.done();
+                replyToQuery(0, r.p(), r.m(), x);
+                return;
+            }
         }
     }
 }

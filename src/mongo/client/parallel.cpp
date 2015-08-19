@@ -254,7 +254,7 @@ void ParallelSortClusteredCursor::explain(BSONObjBuilder& b) {
 
 ParallelSortClusteredCursor::ParallelSortClusteredCursor(const QuerySpec& qSpec,
                                                          const CommandInfo& cInfo)
-    : _qSpec(qSpec), _cInfo(cInfo), _totalTries(0) {
+    : _qSpec(qSpec), _cInfo(cInfo), _totalTries(0), _cmChangeAttempted(false) {
     _done = false;
     _didInit = false;
 
@@ -867,6 +867,15 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
             }
             throw;
         } catch (DBException& e) {
+            if (e.getCode() == ErrorCodes::IncompatibleCatalogManager) {
+                fassert(28792, !_cmChangeAttempted);
+                _cmChangeAttempted = true;
+
+                grid.catalogManager()->waitForCatalogManagerChange();
+                startInit(txn);
+                return;
+            }
+
             warning() << "db exception when initializing on " << shardId
                       << ", current connection state is " << mdata.toBSON() << causedBy(e);
             e._shard = shardId;
