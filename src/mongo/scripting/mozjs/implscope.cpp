@@ -711,7 +711,20 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
         return false;
 
     if (_status.isOK()) {
-        _status = Status(ErrorCodes::UnknownError, "Unknown Failure from JSInterpreter");
+        JS::RootedValue excn(_context);
+        if (JS_GetPendingException(_context, &excn) && excn.isObject()) {
+            str::stream ss;
+
+            JS::RootedValue stack(_context);
+
+            ObjectWrapper(_context, excn).getValue("stack", &stack);
+
+            ss << ValueWriter(_context, excn).toString() << " :\n"
+               << ValueWriter(_context, stack).toString();
+            _status = Status(ErrorCodes::JSInterpreterFailure, ss);
+        } else {
+            _status = Status(ErrorCodes::UnknownError, "Unknown Failure from JSInterpreter");
+        }
     }
 
     _error = _status.reason();
