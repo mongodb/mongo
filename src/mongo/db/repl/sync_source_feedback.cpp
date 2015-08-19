@@ -57,9 +57,6 @@ using std::string;
 
 namespace repl {
 
-SyncSourceFeedback::SyncSourceFeedback() : _positionChanged(false), _shutdownSignaled(false) {}
-SyncSourceFeedback::~SyncSourceFeedback() {}
-
 void SyncSourceFeedback::_resetConnection() {
     LOG(1) << "resetting connection in sync source feedback";
     _connection.reset();
@@ -95,6 +92,10 @@ bool SyncSourceFeedback::_connect(OperationContext* txn, const HostAndPort& host
         return false;
     }
 
+    // Update keepalive value from config.
+    auto rsConfig = repl::ReplicationCoordinator::get(txn)->getConfig();
+    _keepAliveInterval = rsConfig.getElectionTimeoutPeriod() / 2;
+
     return hasConnection();
 }
 
@@ -105,7 +106,7 @@ void SyncSourceFeedback::forwardSlaveProgress() {
 }
 
 Status SyncSourceFeedback::updateUpstream(OperationContext* txn) {
-    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+    auto replCoord = repl::ReplicationCoordinator::get(txn);
     if (replCoord->getMemberState().primary()) {
         // primary has no one to update to
         return Status::OK();
@@ -154,16 +155,9 @@ void SyncSourceFeedback::shutdown() {
     _cond.notify_all();
 }
 
-
-void SyncSourceFeedback::setKeepAliveInterval(Milliseconds keepAliveInterval) {
-    stdx::unique_lock<stdx::mutex> lock(_mtx);
-    _keepAliveInterval = keepAliveInterval;
-}
-
 void SyncSourceFeedback::run() {
     Client::initThread("SyncSourceFeedback");
 
-    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
     while (true) {  // breaks once _shutdownSignaled is true
         {
             stdx::unique_lock<stdx::mutex> lock(_mtx);
@@ -181,7 +175,7 @@ void SyncSourceFeedback::run() {
         }
 
         auto txn = cc().makeOperationContext();
-        MemberState state = replCoord->getMemberState();
+        MemberState state = ReplicationCoordinator::get(txn.get())->getMemberState();
         if (state.primary() || state.startup()) {
             _resetConnection();
             continue;

@@ -42,9 +42,6 @@ namespace repl {
 
 class SyncSourceFeedback {
 public:
-    SyncSourceFeedback();
-    ~SyncSourceFeedback();
-
     /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of slave
     /// replication progress.
     void forwardSlaveProgress();
@@ -58,9 +55,6 @@ public:
 
     /// Signals the run() method to terminate.
     void shutdown();
-
-    /// Updates the _keepAliveInterval to "keepAliveInterval".
-    void setKeepAliveInterval(Milliseconds keepAliveInterval);
 
 private:
     void _resetConnection();
@@ -93,11 +87,11 @@ private:
     // used to alert our thread of changes which need to be passed up the chain
     stdx::condition_variable _cond;
     /// _keepAliveInterval indicates how frequently to forward progress in the absence of updates.
-    Milliseconds _keepAliveInterval;
+    Milliseconds _keepAliveInterval = Milliseconds(100);
     // used to indicate a position change which has not yet been pushed along
-    bool _positionChanged;
+    bool _positionChanged = false;
     // Once this is set to true the _run method will terminate
-    bool _shutdownSignaled;
+    bool _shutdownSignaled = false;
 };
 }  // namespace repl
 }  // namespace mongo

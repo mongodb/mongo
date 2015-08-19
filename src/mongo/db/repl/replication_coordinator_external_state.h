@@ -106,11 +106,6 @@ public:
     virtual void forwardSlaveProgress() = 0;
 
     /**
-     * Simple wrapper around SyncSourceFeedback::setKeepAliveInterval.
-     */
-    virtual void setForwardSlaveProgressKeepAliveInterval(Milliseconds keepAliveInterval) = 0;
-
-    /**
      * Queries the singleton document in local.me.  If it exists and our hostname has not
      * changed since we wrote, returns the RID stored in the object.  If the document does not
      * exist or our hostname doesn't match what was recorded in local.me, generates a new OID

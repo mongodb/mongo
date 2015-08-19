@@ -62,8 +62,6 @@ void ReplicationCoordinatorExternalStateMock::initiateOplog(OperationContext* tx
                                                             bool updateReplOpTime) {}
 void ReplicationCoordinatorExternalStateMock::shutdown() {}
 void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
-void ReplicationCoordinatorExternalStateMock::setForwardSlaveProgressKeepAliveInterval(
-    Milliseconds keepAliveInterval) {}
 
 OID ReplicationCoordinatorExternalStateMock::ensureMe(OperationContext*) {
     return OID::gen();

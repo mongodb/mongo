@@ -2307,8 +2307,6 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& n
         log() << "This node is not a member of the config";
     }
 
-    _externalState->setForwardSlaveProgressKeepAliveInterval(_rsConfig.getElectionTimeoutPeriod() /
-                                                             2);
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
     _updateSlaveInfoFromConfig_inlock();
     if (_selfIndex >= 0) {

@@ -175,11 +175,6 @@ void ReplicationCoordinatorExternalStateImpl::logTransitionToPrimaryToOplog(Oper
         txn, "logging transition to primary to oplog", "local.oplog.rs");
 }
 
-void ReplicationCoordinatorExternalStateImpl::setForwardSlaveProgressKeepAliveInterval(
-    Milliseconds keepAliveInterval) {
-    _syncSourceFeedback.setKeepAliveInterval(keepAliveInterval);
-}
-
 void ReplicationCoordinatorExternalStateImpl::forwardSlaveProgress() {
     _syncSourceFeedback.forwardSlaveProgress();
 }
