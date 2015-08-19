@@ -1,5 +1,17 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_263 Upgrading to Version 2.6.3
+
+<dl>
+<dt>Changes when config_base=false</dt>
+<dd>
+Setting the config_base flag to false directly (I.E. not via the
+WIREDTIGER_CONFIG environment variable) will now stop any existing basecfg file
+from being read when opening a connection. This may cause WiredTiger to open
+a connection when changing versions when previously an error would be returned.
+</dd>
+
+</dl><hr>
 @section version_262 Upgrading to Version 2.6.2
 
 <dl>
