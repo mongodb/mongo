@@ -8,7 +8,7 @@ limit cpu unlimited unlimited
 limit as unlimited unlimited
 limit nofile 64000 64000
 limit rss unlimited unlimited
-limit nproc 32000 32000
+limit nproc 64000 64000
 
 kill timeout 300 # wait 300s between SIGTERM and SIGKILL.
 
