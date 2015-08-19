@@ -93,7 +93,7 @@ def print_derived_stats(session):
     app_update = int(dstatcursor[stat.dsrc.cursor_update_bytes][1])
     fs_writes  = int(dstatcursor[stat.dsrc.cache_bytes_write][1])
 
-    if(app_insert + app_remove + app_update != 0):
+    if app_insert + app_remove + app_update != 0:
         print "Write amplification is " + '{:.2f}'.format(fs_writes / (app_insert + app_remove + app_update))
     dstatcursor.close()
 
