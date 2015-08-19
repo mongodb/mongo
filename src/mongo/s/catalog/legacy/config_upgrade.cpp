@@ -35,6 +35,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/syncclusterconnection.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
@@ -60,12 +61,9 @@ using std::string;
 using std::vector;
 using str::stream;
 
-// Implemented in the respective steps' .cpp file
-bool makeConfigVersionDocument(CatalogManager* catalogManager, std::string* errMsg) {
-    string dummy;
-    if (!errMsg)
-        errMsg = &dummy;
+namespace {
 
+Status makeConfigVersionDocument(CatalogManager* catalogManager) {
     //
     // Even though the initial config write is a single-document update, that single document
     // is on multiple config servers and requests can interleave.  The upgrade lock prevents
@@ -83,26 +81,18 @@ bool makeConfigVersionDocument(CatalogManager* catalogManager, std::string* errM
     versionInfo.setCurrentVersion(CURRENT_CONFIG_VERSION);
     versionInfo.setClusterId(newClusterId);
 
-    verify(versionInfo.validate().isOK());
+    invariantOK(versionInfo.validate());
 
     // If the cluster has not previously been initialized, we need to set the version before
     // using so subsequent mongoses use the config data the same way.  This requires all three
     // config servers online initially.
-    Status result = catalogManager->update(VersionType::ConfigNS,
-                                           BSON("_id" << 1),
-                                           versionInfo.toBSON(),
-                                           true,   // upsert
-                                           false,  // multi
-                                           NULL);
-    if (!result.isOK()) {
-        *errMsg = stream() << "error writing initial config version: " << result.reason();
-        return false;
-    }
-
-    return true;
+    return catalogManager->update(VersionType::ConfigNS,
+                                  BSON("_id" << 1),
+                                  versionInfo.toBSON(),
+                                  true,   // upsert
+                                  false,  // multi
+                                  NULL);
 }
-
-namespace {
 
 struct VersionRange {
     VersionRange(int _minCompatibleVersion, int _currentVersion)
@@ -178,32 +168,30 @@ VersionStatus isConfigVersionCompatible(const VersionType& versionInfo, string* 
 }
 
 // Checks that all config servers are online
-bool _checkConfigServersAlive(const ConnectionString& configLoc, string* errMsg) {
-    bool resultOk;
+Status _checkConfigServersAlive(const ConnectionString& configLoc) {
     BSONObj result;
     try {
-        ScopedDbConnection conn(configLoc, 30);
-        if (conn->type() == ConnectionString::SYNC) {
+        if (configLoc.type() == ConnectionString::SYNC) {
+            ScopedDbConnection conn(configLoc, 30);
             // TODO: Dynamic cast is bad, we need a better way of managing this op
             // via the heirarchy (or not)
             SyncClusterConnection* scc = dynamic_cast<SyncClusterConnection*>(conn.get());
             fassert(16729, scc != NULL);
-            return scc->prepare(*errMsg);
+            std::string errMsg;
+            if (!scc->prepare(errMsg)) {
+                return {ErrorCodes::HostUnreachable, errMsg};
+            }
+            conn.done();
+            return Status::OK();
         } else {
-            resultOk = conn->runCommand("admin", BSON("fsync" << 1), result);
+            ScopedDbConnection conn(configLoc, 30);
+            conn->runCommand("admin", BSON("fsync" << 1), result);
+            conn.done();
+            return getStatusFromCommandResult(result);
         }
-        conn.done();
     } catch (const DBException& e) {
-        *errMsg = e.toString();
-        return false;
+        return e.toStatus();
     }
-
-    if (!resultOk) {
-        *errMsg = DBClientWithCommands::getLastErrorString(result);
-        return false;
-    }
-
-    return true;
 }
 
 }  // namespace
@@ -265,45 +253,35 @@ Status getConfigVersion(CatalogManager* catalogManager, VersionType* versionInfo
     return Status::OK();
 }
 
-bool checkAndInitConfigVersion(CatalogManager* catalogManager,
-                               DistLockManager* distLockManager,
-                               string* errMsg) {
-    string dummy;
-    if (!errMsg) {
-        errMsg = &dummy;
-    }
-
+Status checkAndInitConfigVersion(CatalogManager* catalogManager, DistLockManager* distLockManager) {
     VersionType versionInfo;
-    Status getConfigStatus = getConfigVersion(catalogManager, &versionInfo);
-    if (!getConfigStatus.isOK()) {
-        *errMsg = stream() << "could not load config version for upgrade"
-                           << causedBy(getConfigStatus);
-        return false;
+    Status status = getConfigVersion(catalogManager, &versionInfo);
+    if (!status.isOK()) {
+        return status;
     }
 
-    VersionStatus comp = isConfigVersionCompatible(versionInfo, errMsg);
+    string errMsg;
+    VersionStatus comp = isConfigVersionCompatible(versionInfo, &errMsg);
 
     if (comp == VersionStatus_Incompatible)
-        return false;
+        return {ErrorCodes::IncompatibleShardingMetadata, errMsg};
     if (comp == VersionStatus_Compatible)
-        return true;
+        return Status::OK();
 
     invariant(comp == VersionStatus_NeedUpgrade);
 
     if (versionInfo.getCurrentVersion() != UpgradeHistory_EmptyVersion) {
-        *errMsg = stream() << "newer version " << CURRENT_CONFIG_VERSION
-                           << " of mongo config metadata is required, "
-                           << "current version is " << versionInfo.getCurrentVersion();
-        return false;
+        return {ErrorCodes::IncompatibleShardingMetadata,
+                stream() << "newer version " << CURRENT_CONFIG_VERSION
+                         << " of mongo config metadata is required, "
+                         << "current version is " << versionInfo.getCurrentVersion()};
     }
 
     // Contact the config servers to make sure all are online - otherwise we wait a long time
     // for locks.
-    if (!_checkConfigServersAlive(grid.shardRegistry()->getConfigServerConnectionString(),
-                                  errMsg)) {
-        *errMsg = stream() << "all config servers must be reachable for initial"
-                           << " config database creation" << causedBy(errMsg);
-        return false;
+    status = _checkConfigServersAlive(grid.shardRegistry()->getConfigServerConnectionString());
+    if (!status.isOK()) {
+        return status;
     }
 
     //
@@ -315,11 +293,10 @@ bool checkAndInitConfigVersion(CatalogManager* catalogManager,
 
     string whyMessage(stream() << "initializing config database to new format v"
                                << CURRENT_CONFIG_VERSION);
-    auto lockTimeout = stdx::chrono::milliseconds(20 * 60 * 1000);
+    auto lockTimeout = stdx::chrono::minutes(20);
     auto scopedDistLock = distLockManager->lock("configUpgrade", whyMessage, lockTimeout);
     if (!scopedDistLock.isOK()) {
-        *errMsg = scopedDistLock.getStatus().toString();
-        return false;
+        return scopedDistLock.getStatus();
     }
 
     //
@@ -328,19 +305,18 @@ bool checkAndInitConfigVersion(CatalogManager* catalogManager,
     // if this is the case.
     //
 
-    getConfigStatus = getConfigVersion(catalogManager, &versionInfo);
-    if (!getConfigStatus.isOK()) {
-        *errMsg = stream() << "could not reload config version for upgrade"
-                           << causedBy(getConfigStatus);
-        return false;
+    status = getConfigVersion(catalogManager, &versionInfo);
+    if (!status.isOK()) {
+        return status;
     }
 
-    comp = isConfigVersionCompatible(versionInfo, errMsg);
+    comp = isConfigVersionCompatible(versionInfo, &errMsg);
 
-    if (comp == VersionStatus_Incompatible)
-        return false;
+    if (comp == VersionStatus_Incompatible) {
+        return {ErrorCodes::IncompatibleShardingMetadata, errMsg};
+    }
     if (comp == VersionStatus_Compatible)
-        return true;
+        return Status::OK();
 
     invariant(comp == VersionStatus_NeedUpgrade);
 
@@ -351,13 +327,13 @@ bool checkAndInitConfigVersion(CatalogManager* catalogManager,
 
     log() << "initializing config server version to " << CURRENT_CONFIG_VERSION;
 
-    if (!makeConfigVersionDocument(catalogManager, errMsg)) {
-        return false;
-    }
+    status = makeConfigVersionDocument(catalogManager);
+    if (!status.isOK())
+        return status;
 
     log() << "initialization of config server to v" << CURRENT_CONFIG_VERSION << " successful";
 
-    return true;
+    return Status::OK();
 }
 
 }  // namespace mongo

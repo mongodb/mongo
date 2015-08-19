@@ -224,15 +224,7 @@ Status CatalogManagerLegacy::startup() {
 }
 
 Status CatalogManagerLegacy::checkAndUpgrade(bool checkOnly) {
-    string errMsg;
-
-    if (!checkAndInitConfigVersion(this, getDistLockManager(), &errMsg)) {
-        return Status(ErrorCodes::IncompatibleShardingMetadata,
-                      str::stream() << "error upgrading config database to v"
-                                    << CURRENT_CONFIG_VERSION << causedBy(errMsg));
-    }
-
-    return Status::OK();
+    return checkAndInitConfigVersion(this, getDistLockManager());
 }
 
 Status CatalogManagerLegacy::_startConfigServerChecker() {
