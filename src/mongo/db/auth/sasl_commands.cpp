@@ -35,6 +35,8 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/audit.h"
@@ -69,6 +71,8 @@ public:
     virtual void addRequiredPrivileges(const std::string&,
                                        const BSONObj&,
                                        std::vector<Privilege>*) {}
+
+    void redactForLogging(mutablebson::Document* cmdObj) override;
 
     virtual bool run(OperationContext* txn,
                      const std::string& db,
@@ -267,6 +271,13 @@ CmdSaslStart::~CmdSaslStart() {}
 
 void CmdSaslStart::help(std::stringstream& os) const {
     os << "First step in a SASL authentication conversation.";
+}
+
+void CmdSaslStart::redactForLogging(mutablebson::Document* cmdObj) {
+    mutablebson::Element element = mutablebson::findFirstChildNamed(cmdObj->root(), "payload");
+    if (element.ok()) {
+        element.setValueString("xxx");
+    }
 }
 
 bool CmdSaslStart::run(OperationContext* txn,
