@@ -101,7 +101,7 @@ public:
     /**
      * Performs necessary cleanup when shutting down cleanly.
      */
-    virtual void shutDown() = 0;
+    virtual void shutDown(bool allowNetworking = true) = 0;
 
     /**
      * Returns what type of catalog manager this is - CSRS for the CatalogManagerReplicaSet and

@@ -47,7 +47,7 @@ public:
 
     Status startup() override;
 
-    void shutDown() override;
+    void shutDown(bool allowNetworking) override;
 
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,

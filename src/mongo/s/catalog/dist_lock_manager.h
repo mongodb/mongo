@@ -89,7 +89,7 @@ public:
     virtual ~DistLockManager() = default;
 
     virtual void startUp() = 0;
-    virtual void shutDown() = 0;
+    virtual void shutDown(bool allowNetworking) = 0;
 
     /**
      * Tries multiple times to lock, using the specified lock try interval, until

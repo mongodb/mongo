@@ -73,7 +73,8 @@ void ReplSetDistLockManager::startUp() {
     _execThread = stdx::make_unique<stdx::thread>(&ReplSetDistLockManager::doTask, this);
 }
 
-void ReplSetDistLockManager::shutDown() {
+void ReplSetDistLockManager::shutDown(bool allowNetworking) {
+    invariant(allowNetworking);
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _isShutDown = true;

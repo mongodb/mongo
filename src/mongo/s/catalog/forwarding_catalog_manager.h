@@ -61,7 +61,7 @@ public:
 
     Status startup() override;
 
-    void shutDown() override;
+    void shutDown(bool allowNetworking = true) override;
 
     Status enableSharding(const std::string& dbName) override;
 

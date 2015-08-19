@@ -112,7 +112,7 @@ protected:
     void tearDown() override {
         // Don't care about what shutDown passes to stopPing here.
         _mockCatalog->expectStopPing([](StringData) {}, Status::OK());
-        _mgr.shutDown();
+        _mgr.shutDown(true);
     }
 
     TickSourceMock _tickSource;
@@ -447,7 +447,7 @@ TEST_F(RSDistLockMgrWithMockTickSource, LockFailsAfterRetry) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown();
+    getMgr()->shutDown(true);
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that
@@ -588,7 +588,7 @@ TEST_F(ReplSetDistLockManagerFixture, MustUnlockOnLockError) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown();
+    getMgr()->shutDown(true);
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that
@@ -638,7 +638,7 @@ TEST_F(ReplSetDistLockManagerFixture, LockPinging) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown();
+    getMgr()->shutDown(true);
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that
@@ -721,7 +721,7 @@ TEST_F(ReplSetDistLockManagerFixture, UnlockUntilNoError) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown();
+    getMgr()->shutDown(true);
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that
@@ -817,7 +817,7 @@ TEST_F(ReplSetDistLockManagerFixture, MultipleQueuedUnlock) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown();
+    getMgr()->shutDown(true);
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that
@@ -841,7 +841,7 @@ TEST_F(ReplSetDistLockManagerFixture, CleanupPingOnShutdown) {
         stopPingCalled = true;
     }, Status::OK());
 
-    getMgr()->shutDown();
+    getMgr()->shutDown(true);
     ASSERT_TRUE(stopPingCalled);
 }
 
@@ -1605,7 +1605,7 @@ TEST_F(ReplSetDistLockManagerFixture, LockOvertakingResultsInError) {
     // Join the background thread before trying to call asserts. Shutdown calls
     // stopPing and we don't care in this test.
     getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-    getMgr()->shutDown();
+    getMgr()->shutDown(true);
 
     // No assert until shutDown has been called to make sure that the background thread
     // won't be trying to access the local variables that were captured by lamdas that

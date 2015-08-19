@@ -76,7 +76,7 @@ public:
     /**
      * Kills all ping threads and wait for them to cleanup.
      */
-    void shutdown();
+    void shutdown(bool allowNetworking);
 
 private:
     /**
@@ -136,6 +136,7 @@ private:
     // Contains all lock ids to keeping on retrying to unlock until success.
     std::list<DistLockHandle> _unlockList;  // (M)
 
-    bool _inShutdown = false;  // (M)
+    bool _inShutdown = false;                // (M)
+    bool _allowNetworkingInShutdown = true;  // (M)
 };
 }

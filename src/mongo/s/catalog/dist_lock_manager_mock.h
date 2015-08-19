@@ -43,7 +43,7 @@ public:
     virtual ~DistLockManagerMock() = default;
 
     virtual void startUp() override;
-    virtual void shutDown() override;
+    virtual void shutDown(bool allowNetworking) override;
 
     virtual StatusWith<DistLockManager::ScopedDistLock> lock(
         StringData name,

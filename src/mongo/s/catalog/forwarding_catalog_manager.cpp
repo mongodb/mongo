@@ -97,8 +97,11 @@ Status ForwardingCatalogManager::startup() {
     return retry([this] { return _actual->startup(); });
 }
 
-void ForwardingCatalogManager::shutDown() {
-    _actual->shutDown();
+void ForwardingCatalogManager::shutDown(bool allowNetworking) {
+    retry([this, allowNetworking] {
+        _actual->shutDown(allowNetworking);
+        return 1;
+    });
 }
 
 Status ForwardingCatalogManager::enableSharding(const std::string& dbName) {

@@ -58,7 +58,7 @@ void LegacyDistLockManager::startUp() {
     _pinger = stdx::make_unique<LegacyDistLockPinger>();
 }
 
-void LegacyDistLockManager::shutDown() {
+void LegacyDistLockManager::shutDown(bool allowNetworking) {
     stdx::unique_lock<stdx::mutex> sl(_mutex);
     _isStopped = true;
 
@@ -67,7 +67,7 @@ void LegacyDistLockManager::shutDown() {
     }
 
     if (_pinger) {
-        _pinger->shutdown();
+        _pinger->shutdown(allowNetworking);
     }
 }
 

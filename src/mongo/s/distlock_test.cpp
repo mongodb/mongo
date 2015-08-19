@@ -339,7 +339,7 @@ public:
         result.append("errors", errors);
         result.append("timeMS", t.millis());
 
-        pinger.shutdown();
+        pinger.shutdown(true);
 
         return !errors;
     }

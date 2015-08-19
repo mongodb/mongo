@@ -287,10 +287,11 @@ void LegacyDistLockPinger::stopPing(const ConnectionString& conn, const string& 
     }
 }
 
-void LegacyDistLockPinger::shutdown() {
+void LegacyDistLockPinger::shutdown(bool allowNetworking) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _inShutdown = true;
+        _allowNetworkingInShutdown = allowNetworking;
         _pingStoppedCV.notify_all();
     }
 
@@ -327,6 +328,10 @@ void LegacyDistLockPinger::acknowledgeStopPing(const ConnectionString& addr,
 
         _kill.erase(pingId);
         _seen.erase(pingId);
+
+        if (!_allowNetworkingInShutdown) {
+            return;
+        }
     }
 
     try {

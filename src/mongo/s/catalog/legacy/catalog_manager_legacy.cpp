@@ -239,7 +239,7 @@ Status CatalogManagerLegacy::_startConfigServerChecker() {
     return Status::OK();
 }
 
-void CatalogManagerLegacy::shutDown() {
+void CatalogManagerLegacy::shutDown(bool allowNetworking) {
     LOG(1) << "CatalogManagerLegacy::shutDown() called.";
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -252,7 +252,7 @@ void CatalogManagerLegacy::shutDown() {
         _consistencyCheckerThread.join();
 
     invariant(_distLockManager);
-    _distLockManager->shutDown();
+    _distLockManager->shutDown(allowNetworking);
 }
 
 Status CatalogManagerLegacy::shardCollection(OperationContext* txn,

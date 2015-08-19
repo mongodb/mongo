@@ -49,7 +49,7 @@ Status CatalogManagerMock::startup() {
     return Status::OK();
 }
 
-void CatalogManagerMock::shutDown() {}
+void CatalogManagerMock::shutDown(bool allowNetworking) {}
 
 Status CatalogManagerMock::shardCollection(OperationContext* txn,
                                            const string& ns,

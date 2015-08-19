@@ -117,7 +117,8 @@ Status CatalogManagerReplicaSet::startup() {
     return Status::OK();
 }
 
-void CatalogManagerReplicaSet::shutDown() {
+void CatalogManagerReplicaSet::shutDown(bool allowNetworking) {
+    invariant(allowNetworking);
     LOG(1) << "CatalogManagerReplicaSet::shutDown() called.";
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -125,7 +126,7 @@ void CatalogManagerReplicaSet::shutDown() {
     }
 
     invariant(_distLockManager);
-    _distLockManager->shutDown();
+    _distLockManager->shutDown(allowNetworking);
 }
 
 Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
