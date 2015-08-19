@@ -72,7 +72,8 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
 
         if (_hook) {
             // Run the validation hook.
-            auto validHost = _hook->validateHost(op->request().target, commandReply);
+            auto validHost = callNoexcept(
+                *_hook, &NetworkConnectionHook::validateHost, op->request().target, commandReply);
             if (!validHost.isOK()) {
                 return _completeOperation(op, validHost);
             }

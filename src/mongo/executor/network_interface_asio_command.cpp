@@ -277,7 +277,8 @@ void NetworkInterfaceASIO::_runConnectionHook(AsyncOp* op) {
         return _beginCommunication(op);
     }
 
-    auto swOptionalRequest = _hook->makeRequest(op->request().target);
+    auto swOptionalRequest =
+        callNoexcept(*_hook, &NetworkConnectionHook::makeRequest, op->request().target);
 
     if (!swOptionalRequest.isOK()) {
         return _completeOperation(op, swOptionalRequest.getStatus());
@@ -298,8 +299,10 @@ void NetworkInterfaceASIO::_runConnectionHook(AsyncOp* op) {
             return _completeOperation(op, response.getStatus());
         }
 
-        auto handleStatus =
-            _hook->handleReply(op->request().target, std::move(response.getValue()));
+        auto handleStatus = callNoexcept(*_hook,
+                                         &NetworkConnectionHook::handleReply,
+                                         op->request().target,
+                                         std::move(response.getValue()));
 
         if (!handleStatus.isOK()) {
             return _completeOperation(op, handleStatus);

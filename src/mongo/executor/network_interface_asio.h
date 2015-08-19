@@ -273,5 +273,14 @@ private:
     stdx::condition_variable _isExecutorRunnableCondition;
 };
 
+template <typename T, typename R, typename... MethodArgs, typename... DeducedArgs>
+R callNoexcept(T& obj, R (T::*method)(MethodArgs...), DeducedArgs&&... args) {
+    try {
+        return (obj.*method)(std::forward<DeducedArgs>(args)...);
+    } catch (...) {
+        std::terminate();
+    }
+}
+
 }  // namespace executor
 }  // namespace mongo
