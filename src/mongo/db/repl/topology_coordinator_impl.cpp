@@ -440,6 +440,13 @@ void TopologyCoordinatorImpl::prepareFreshResponse(
     const OpTime& lastOpApplied,
     BSONObjBuilder* response,
     Status* result) {
+    if (_rsConfig.getProtocolVersion() != 0) {
+        *result = Status(ErrorCodes::BadValue,
+                         str::stream() << "replset: incompatible replset protocol version: "
+                                       << _rsConfig.getProtocolVersion());
+        return;
+    }
+
     if (_selfIndex == -1) {
         *result = Status(ErrorCodes::ReplicaSetNotFound,
                          "Cannot participate in elections because not initialized");
@@ -558,6 +565,12 @@ void TopologyCoordinatorImpl::prepareElectResponse(
     const OpTime& lastOpApplied,
     BSONObjBuilder* response,
     Status* result) {
+    if (_rsConfig.getProtocolVersion() != 0) {
+        *result = Status(ErrorCodes::BadValue,
+                         str::stream() << "replset: incompatible replset protocol version: "
+                                       << _rsConfig.getProtocolVersion());
+        return;
+    }
     if (_selfIndex == -1) {
         *result = Status(ErrorCodes::ReplicaSetNotFound,
                          "Cannot participate in election because not initialized");
@@ -977,8 +990,13 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
                << ", msg:  " << hbr.getHbMsg();
         hbData.setUpValues(now, member.getHostAndPort(), hbr);
     }
-    HeartbeatResponseAction nextAction =
-        _updatePrimaryFromHBData(memberIndex, originalState, now, myLastOpApplied);
+
+    HeartbeatResponseAction nextAction;
+    if (_rsConfig.getProtocolVersion() == 0) {
+        nextAction = _updatePrimaryFromHBData(memberIndex, originalState, now, myLastOpApplied);
+    } else {
+        nextAction = _updatePrimaryFromHBDataV1(memberIndex, originalState, now, myLastOpApplied);
+    }
 
     nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
     return nextAction;
@@ -989,10 +1007,125 @@ HeartbeatResponseAction TopologyCoordinatorImpl::setMemberAsDown(Date_t now,
                                                                  const OpTime& myLastOpApplied) {
     invariant(memberIndex != _selfIndex);
     invariant(memberIndex != -1);
+    invariant(_currentPrimaryIndex == _selfIndex);
     MemberHeartbeatData& hbData = _hbdata[memberIndex];
     hbData.setDownValues(now, "no response within election timeout period");
 
-    return _updatePrimaryFromHBData(memberIndex, MemberState(), now, myLastOpApplied);
+    if (CannotSeeMajority & _getMyUnelectableReason(now, myLastOpApplied)) {
+        if (_stepDownPending) {
+            return HeartbeatResponseAction::makeNoAction();
+        }
+        _stepDownPending = true;
+        log() << "can't see a majority of the set, relinquishing primary";
+        return HeartbeatResponseAction::makeStepDownSelfAction(_selfIndex);
+    }
+
+    return HeartbeatResponseAction::makeNoAction();
+}
+
+HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBDataV1(
+    int updatedConfigIndex,
+    const MemberState& originalState,
+    Date_t now,
+    const OpTime& lastOpApplied) {
+    // This method has two interrelated responsibilities, performed in two phases.
+    //
+    // First, it updates the local notion of which remote node, if any is primary.
+    //
+    // Second, if there is no remote primary, and the local node is not primary, it considers
+    // whether or not to stand for election.
+    invariant(updatedConfigIndex != _selfIndex);
+
+    // We are missing from the config, so do not participate in primary maintenance or election.
+    if (_selfIndex == -1) {
+        return HeartbeatResponseAction::makeNoAction();
+    }
+
+    ////////////////////
+    // Phase 1
+    ////////////////////
+
+    // If we believe the node whose data was just updated is primary, confirm that
+    // the updated data supports that notion.  If not, erase our notion of who is primary.
+    if (updatedConfigIndex == _currentPrimaryIndex) {
+        const MemberHeartbeatData& updatedHBData = _hbdata[updatedConfigIndex];
+        if (!updatedHBData.up() || !updatedHBData.getState().primary()) {
+            _currentPrimaryIndex = -1;
+        }
+    }
+
+    // Scan the member list's heartbeat data for who is primary, and update _currentPrimaryIndex.
+    if (_currentPrimaryIndex != _selfIndex) {
+        int remotePrimaryIndex = -1;
+        for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin();
+             it != _hbdata.end();
+             ++it) {
+            const int itIndex = indexOfIterator(_hbdata, it);
+            if (itIndex == _selfIndex) {
+                continue;
+            }
+
+            if (it->getState().primary() && it->up()) {
+                if (remotePrimaryIndex != -1) {
+                    // Two other nodes think they are primary (asynchronously polled)
+                    // -- wait for things to settle down.
+                    warning() << "two remote primaries (transiently)";
+                    return HeartbeatResponseAction::makeNoAction();
+                }
+                remotePrimaryIndex = itIndex;
+            }
+        }
+
+        if (remotePrimaryIndex != -1) {
+            // Clear last heartbeat message on ourselves.
+            setMyHeartbeatMessage(now, "");
+
+            _currentPrimaryIndex = remotePrimaryIndex;
+            return HeartbeatResponseAction::makeNoAction();
+        }
+    }
+
+    ////////////////////
+    // Phase 2
+    ////////////////////
+
+    // We do not believe any remote to be primary.
+
+    // If we are primary, check if we can still see majority of the set; stepdown if we can't.
+    if (_iAmPrimary()) {
+        if (CannotSeeMajority & _getMyUnelectableReason(now, lastOpApplied)) {
+            if (_stepDownPending) {
+                return HeartbeatResponseAction::makeNoAction();
+            }
+            _stepDownPending = true;
+            log() << "can't see a majority of the set, relinquishing primary";
+            return HeartbeatResponseAction::makeStepDownSelfAction(_selfIndex);
+        }
+
+        LOG(2) << "Choosing to remain primary";
+        return HeartbeatResponseAction::makeNoAction();
+    }
+
+    fassert(28798, _currentPrimaryIndex == -1);
+
+    const MemberState currentState = getMemberState();
+    if (originalState.recovering() && currentState.secondary()) {
+        // We just transitioned from RECOVERING to SECONDARY, this can only happen if we
+        // received a heartbeat with an auth error when previously all the heartbeats we'd
+        // received had auth errors.  In this case, don't return makeElectAction() because
+        // that could cause the election to start before the ReplicationCoordinator has updated
+        // its notion of the member state to SECONDARY.  Instead return noAction so that the
+        // ReplicationCoordinator knows to update its tracking of the member state off of the
+        // TopologyCoordinator, and leave starting the election until the next heartbeat comes
+        // back.
+        return HeartbeatResponseAction::makeNoAction();
+    }
+
+    // At this point, there is no primary anywhere.  Check to see if we should become a candidate.
+    if (!checkShouldStandForElection(now, lastOpApplied)) {
+        return HeartbeatResponseAction::makeNoAction();
+    }
+    return HeartbeatResponseAction::makeElectAction();
 }
 
 HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(
@@ -1490,7 +1623,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
             bb.appendDate("lastHeartbeat", it->getLastHeartbeat());
             bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());
             Milliseconds ping = _getPing(itConfig.getHostAndPort());
-            if (ping != Milliseconds()) {
+            if (ping != UninitializedPing) {
                 bb.append("pingMs", durationCount<Milliseconds>(ping));
                 std::string s = it->getLastHeartbeatMsg();
                 if (!s.empty())

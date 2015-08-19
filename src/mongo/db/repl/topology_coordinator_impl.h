@@ -52,6 +52,8 @@ class ReplSetMetadata;
 
 namespace repl {
 
+const static Milliseconds UninitializedPing{};
+
 /**
  * Represents a latency measurement for each replica set member based on heartbeat requests.
  * The measurement is an average weighted 80% to the old value, and 20% to the new value.
@@ -113,7 +115,7 @@ public:
 
 private:
     unsigned int count = 0;
-    Milliseconds value;
+    Milliseconds value = UninitializedPing;
     Date_t _lastHeartbeatStartDate;
     int _numFailuresSinceLastStart = std::numeric_limits<int>::max();
 };
@@ -331,12 +333,18 @@ private:
 
     /**
      * Performs updating "_currentPrimaryIndex" for processHeartbeatResponse(), and determines if an
-     * election should commence.
+     * election or stepdown should commence.
+     * _updatePrimaryFromHBDataV1() is a simplified version of _updatePrimaryFromHBData() to be used
+     * when in ProtocolVersion1.
      */
     HeartbeatResponseAction _updatePrimaryFromHBData(int updatedConfigIndex,
                                                      const MemberState& originalState,
                                                      Date_t now,
                                                      const OpTime& lastOpApplied);
+    HeartbeatResponseAction _updatePrimaryFromHBDataV1(int updatedConfigIndex,
+                                                       const MemberState& originalState,
+                                                       Date_t now,
+                                                       const OpTime& lastOpApplied);
 
     /**
      * Updates _hbdata based on the newConfig, ensuring that every member in the newConfig
