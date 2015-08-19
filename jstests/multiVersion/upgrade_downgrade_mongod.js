@@ -495,8 +495,6 @@
                 numCapped: 10,
                 numColl: 50,
                 partial: 5,
-                // Remove this next line when SERVER-19100 is fixed
-                failedConn: true
             },
             init: [
                 init_replication,
@@ -528,33 +526,30 @@
         //     verify: [verify_ttl_partial]
         // },
 
-        // Enable these 2 tests when SERVER-19100 is fixed
         // Downgrade with wiredTiger - fullTextSearch index
-        // {
-        //     name: "Downgrade - wiredTiger: fullTextSearch index",
-        //     fromBinVersion: "latest",
-        //     toBinVersion: "last-stable",
-        //     storageEngine: "wiredTiger",
-        //     data: {
-        //         indexNames: {_id_: 1},
-        //         failedConn: true
-        //     },
-        //     init: [init_fullTextSearch],
-        //     verify: [verify_fullTextSearch]
-        // },
-        // // Downgrade with wiredTiger - geo index
-        // {
-        //     name: "Downgrade - wiredTiger: geo index",
-        //     fromBinVersion: "latest",
-        //     toBinVersion: "last-stable",
-        //     storageEngine: "wiredTiger",
-        //     data: {
-        //         indexNames: {_id_: 1},
-        //         failedConn: true
-        //     },
-        //     init: [init_geo],
-        //     verify: [verify_geo]
-        // },
+        {
+            name: "Downgrade - wiredTiger: fullTextSearch index",
+            fromBinVersion: "latest",
+            toBinVersion: "last-stable",
+            storageEngine: "wiredTiger",
+            data: {
+                indexNames: {_id_: 1},
+            },
+            init: [init_fullTextSearch],
+            verify: [verify_fullTextSearch]
+        },
+        // Downgrade with wiredTiger - geo index
+        {
+            name: "Downgrade - wiredTiger: geo index",
+            fromBinVersion: "latest",
+            toBinVersion: "last-stable",
+            storageEngine: "wiredTiger",
+            data: {
+                indexNames: {_id_: 1},
+            },
+            init: [init_geo],
+            verify: [verify_geo]
+        },
     ];
 
     var conn;
