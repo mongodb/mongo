@@ -167,7 +167,7 @@ TEST(RecordStoreTestHarness, GetRandomIteratorSingleton) {
         cursor->detachFromOperationContext();
         opCtx = harnessHelper->newOperationContext();
         cursor->reattachToOperationContext(opCtx.get());
-        cursor->restore();
+        ASSERT_TRUE(cursor->restore());
 
         auto record = cursor->next();
         ASSERT_EQUALS(record->id, idToRetrieve);
