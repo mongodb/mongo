@@ -264,7 +264,7 @@ bool ChunkManager::_load(OperationContext* txn,
     repl::OpTime opTime;
     std::vector<ChunkType> chunks;
     uassertStatusOK(grid.catalogManager(txn)->getChunks(
-        diffQuery.query, diffQuery.sort, boost::none, &chunks, &opTime));
+        txn, diffQuery.query, diffQuery.sort, boost::none, &chunks, &opTime));
 
     invariant(opTime >= _configOpTime);
     _configOpTime = opTime;
@@ -426,8 +426,13 @@ void ChunkManager::createFirstChunks(OperationContext* txn,
 
         BSONObj chunkObj = chunkBuilder.obj();
 
-        Status result = grid.catalogManager(txn)->update(
-            ChunkType::ConfigNS, BSON(ChunkType::name(temp.genID())), chunkObj, true, false, NULL);
+        Status result = grid.catalogManager(txn)->update(txn,
+                                                         ChunkType::ConfigNS,
+                                                         BSON(ChunkType::name(temp.genID())),
+                                                         chunkObj,
+                                                         true,
+                                                         false,
+                                                         NULL);
 
         version.incMinor();
 

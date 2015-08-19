@@ -244,7 +244,7 @@ void ClusterWriter::write(OperationContext* txn,
     const string dbName = nss.db().toString();
 
     if (dbName == "config" || dbName == "admin") {
-        grid.catalogManager(txn)->writeConfigServerDirect(request, response);
+        grid.catalogManager(txn)->writeConfigServerDirect(txn, request, response);
     } else {
         ChunkManagerTargeter targeter(request.getTargetingNSS());
         Status targetInitStatus = targeter.init(txn);

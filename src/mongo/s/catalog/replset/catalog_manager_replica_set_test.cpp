@@ -86,7 +86,8 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionExisting) {
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
     auto future = launchAsync([this, &expectedColl] {
-        return assertGet(catalogManager()->getCollection(expectedColl.getNs().ns()));
+        return assertGet(
+            catalogManager()->getCollection(operationContext(), expectedColl.getNs().ns()));
     });
 
     onFindWithMetadataCommand([this, &expectedColl, newOpTime](
@@ -124,7 +125,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionNotExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->getCollection("NonExistent");
+        auto status = catalogManager()->getCollection(operationContext(), "NonExistent");
         ASSERT_EQUALS(status.getStatus(), ErrorCodes::NamespaceNotFound);
     });
 
@@ -145,7 +146,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseExisting) {
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
     auto future = launchAsync([this, &expectedDb] {
-        return assertGet(catalogManager()->getDatabase(expectedDb.getName()));
+        return assertGet(catalogManager()->getDatabase(operationContext(), expectedDb.getName()));
     });
 
     onFindWithMetadataCommand([this, &expectedDb, newOpTime](const RemoteCommandRequest& request) {
@@ -179,7 +180,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseNotExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        auto dbResult = catalogManager()->getDatabase("NonExistent");
+        auto dbResult = catalogManager()->getDatabase(operationContext(), "NonExistent");
         ASSERT_EQ(dbResult.getStatus(), ErrorCodes::DatabaseNotFound);
     });
 
@@ -199,7 +200,8 @@ TEST_F(CatalogManagerReplSetTest, UpdateCollection) {
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
     auto future = launchAsync([this, collection] {
-        auto status = catalogManager()->updateCollection(collection.getNs().toString(), collection);
+        auto status = catalogManager()->updateCollection(
+            operationContext(), collection.getNs().toString(), collection);
         ASSERT_OK(status);
     });
 
@@ -220,7 +222,8 @@ TEST_F(CatalogManagerReplSetTest, UpdateCollectionNotMaster) {
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
     auto future = launchAsync([this, collection] {
-        auto status = catalogManager()->updateCollection(collection.getNs().toString(), collection);
+        auto status = catalogManager()->updateCollection(
+            operationContext(), collection.getNs().toString(), collection);
         ASSERT_EQUALS(ErrorCodes::NotMaster, status);
     });
 
@@ -250,7 +253,8 @@ TEST_F(CatalogManagerReplSetTest, UpdateCollectionNotMasterFromTargeter) {
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
     auto future = launchAsync([this, collection] {
-        auto status = catalogManager()->updateCollection(collection.getNs().toString(), collection);
+        auto status = catalogManager()->updateCollection(
+            operationContext(), collection.getNs().toString(), collection);
         ASSERT_EQUALS(ErrorCodes::NotMaster, status);
     });
 
@@ -271,7 +275,8 @@ TEST_F(CatalogManagerReplSetTest, UpdateCollectionNotMasterRetrySuccess) {
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
     auto future = launchAsync([this, collection] {
-        auto status = catalogManager()->updateCollection(collection.getNs().toString(), collection);
+        auto status = catalogManager()->updateCollection(
+            operationContext(), collection.getNs().toString(), collection);
         ASSERT_OK(status);
     });
 
@@ -408,8 +413,12 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
         vector<ChunkType> chunks;
         OpTime opTime;
 
-        ASSERT_OK(catalogManager()->getChunks(
-            chunksQuery, BSON(ChunkType::version() << -1), 1, &chunks, &opTime));
+        ASSERT_OK(catalogManager()->getChunks(operationContext(),
+                                              chunksQuery,
+                                              BSON(ChunkType::version() << -1),
+                                              1,
+                                              &chunks,
+                                              &opTime));
         ASSERT_EQ(2U, chunks.size());
         ASSERT_EQ(newOpTime, opTime);
 
@@ -457,8 +466,8 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSNoSortNoLimit) {
     auto future = launchAsync([this, &chunksQuery] {
         vector<ChunkType> chunks;
 
-        ASSERT_OK(
-            catalogManager()->getChunks(chunksQuery, BSONObj(), boost::none, &chunks, nullptr));
+        ASSERT_OK(catalogManager()->getChunks(
+            operationContext(), chunksQuery, BSONObj(), boost::none, &chunks, nullptr));
         ASSERT_EQ(0U, chunks.size());
 
         return chunks;
@@ -497,8 +506,8 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSInvalidChunk) {
 
     auto future = launchAsync([this, &chunksQuery] {
         vector<ChunkType> chunks;
-        Status status =
-            catalogManager()->getChunks(chunksQuery, BSONObj(), boost::none, &chunks, nullptr);
+        Status status = catalogManager()->getChunks(
+            operationContext(), chunksQuery, BSONObj(), boost::none, &chunks, nullptr);
 
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
         ASSERT_EQ(0U, chunks.size());
@@ -533,7 +542,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommand) {
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
         bool ok = catalogManager()->runUserManagementReadCommand(
-            "test", BSON("usersInfo" << 1), &responseBuilder);
+            operationContext(), "test", BSON("usersInfo" << 1), &responseBuilder);
         ASSERT_TRUE(ok);
 
         BSONObj response = responseBuilder.obj();
@@ -561,7 +570,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommandUnsatisfiedReadPre
 
     BSONObjBuilder responseBuilder;
     bool ok = catalogManager()->runUserManagementReadCommand(
-        "test", BSON("usersInfo" << 1), &responseBuilder);
+        operationContext(), "test", BSON("usersInfo" << 1), &responseBuilder);
     ASSERT_FALSE(ok);
 
     Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
@@ -582,7 +591,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandDistLockHeld) {
         Status(ErrorCodes::LockBusy, "lock already held"));
 
     BSONObjBuilder responseBuilder;
-    bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
+    bool ok = catalogManager()->runUserManagementWriteCommand(operationContext(),
+                                                              "dropUser",
                                                               "test",
                                                               BSON("dropUser"
                                                                    << "test"),
@@ -607,7 +617,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandSuccess) {
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
+        bool ok = catalogManager()->runUserManagementWriteCommand(operationContext(),
+                                                                  "dropUser",
                                                                   "test",
                                                                   BSON("dropUser"
                                                                        << "test"),
@@ -651,7 +662,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMaster) {
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
+        bool ok = catalogManager()->runUserManagementWriteCommand(operationContext(),
+                                                                  "dropUser",
                                                                   "test",
                                                                   BSON("dropUser"
                                                                        << "test"),
@@ -694,7 +706,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMasterRetrySuc
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        bool ok = catalogManager()->runUserManagementWriteCommand("dropUser",
+        bool ok = catalogManager()->runUserManagementWriteCommand(operationContext(),
+                                                                  "dropUser",
                                                                   "test",
                                                                   BSON("dropUser"
                                                                        << "test"),
@@ -742,7 +755,8 @@ TEST_F(CatalogManagerReplSetTest, GetGlobalSettingsBalancerDoc) {
     st1.setBalancerStopped(true);
 
     auto future = launchAsync([this] {
-        return assertGet(catalogManager()->getGlobalSettings(SettingsType::BalancerDocKey));
+        return assertGet(
+            catalogManager()->getGlobalSettings(operationContext(), SettingsType::BalancerDocKey));
     });
 
     onFindCommand([this, st1](const RemoteCommandRequest& request) {
@@ -774,7 +788,8 @@ TEST_F(CatalogManagerReplSetTest, GetGlobalSettingsChunkSizeDoc) {
     st1.setChunkSizeMB(80);
 
     auto future = launchAsync([this] {
-        return assertGet(catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey));
+        return assertGet(
+            catalogManager()->getGlobalSettings(operationContext(), SettingsType::ChunkSizeDocKey));
     });
 
     onFindCommand([this, st1](const RemoteCommandRequest& request) {
@@ -801,7 +816,8 @@ TEST_F(CatalogManagerReplSetTest, GetGlobalSettingsInvalidDoc) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        const auto balSettings = catalogManager()->getGlobalSettings("invalidKey");
+        const auto balSettings =
+            catalogManager()->getGlobalSettings(operationContext(), "invalidKey");
 
         ASSERT_EQ(balSettings.getStatus(), ErrorCodes::FailedToParse);
     });
@@ -833,7 +849,7 @@ TEST_F(CatalogManagerReplSetTest, GetGlobalSettingsNonExistent) {
 
     auto future = launchAsync([this] {
         const auto chunkSizeSettings =
-            catalogManager()->getGlobalSettings(SettingsType::ChunkSizeDocKey);
+            catalogManager()->getGlobalSettings(operationContext(), SettingsType::ChunkSizeDocKey);
 
         ASSERT_EQ(chunkSizeSettings.getStatus(), ErrorCodes::NoMatchingDocument);
     });
@@ -890,7 +906,8 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsNoDb) {
         vector<CollectionType> collections;
 
         OpTime opTime;
-        const auto status = catalogManager()->getCollections(nullptr, &collections, &opTime);
+        const auto status =
+            catalogManager()->getCollections(operationContext(), nullptr, &collections, &opTime);
 
         ASSERT_OK(status);
         ASSERT_EQ(newOpTime, opTime);
@@ -949,7 +966,8 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsWithDb) {
         string dbName = "test";
         vector<CollectionType> collections;
 
-        const auto status = catalogManager()->getCollections(&dbName, &collections, nullptr);
+        const auto status =
+            catalogManager()->getCollections(operationContext(), &dbName, &collections, nullptr);
 
         ASSERT_OK(status);
         return collections;
@@ -988,7 +1006,8 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsInvalidCollectionType) {
         string dbName = "test";
         vector<CollectionType> collections;
 
-        const auto status = catalogManager()->getCollections(&dbName, &collections, nullptr);
+        const auto status =
+            catalogManager()->getCollections(operationContext(), &dbName, &collections, nullptr);
 
         ASSERT_EQ(ErrorCodes::FailedToParse, status);
         ASSERT_EQ(0U, collections.size());
@@ -1041,7 +1060,8 @@ TEST_F(CatalogManagerReplSetTest, GetDatabasesForShardValid) {
 
     auto future = launchAsync([this] {
         vector<string> dbs;
-        const auto status = catalogManager()->getDatabasesForShard("shard0000", &dbs);
+        const auto status =
+            catalogManager()->getDatabasesForShard(operationContext(), "shard0000", &dbs);
 
         ASSERT_OK(status);
         return dbs;
@@ -1075,7 +1095,8 @@ TEST_F(CatalogManagerReplSetTest, GetDatabasesForShardInvalidDoc) {
 
     auto future = launchAsync([this] {
         vector<string> dbs;
-        const auto status = catalogManager()->getDatabasesForShard("shard0000", &dbs);
+        const auto status =
+            catalogManager()->getDatabasesForShard(operationContext(), "shard0000", &dbs);
 
         ASSERT_EQ(ErrorCodes::TypeMismatch, status);
         ASSERT_EQ(0U, dbs.size());
@@ -1113,7 +1134,8 @@ TEST_F(CatalogManagerReplSetTest, GetTagsForCollection) {
     auto future = launchAsync([this] {
         vector<TagsType> tags;
 
-        ASSERT_OK(catalogManager()->getTagsForCollection("TestDB.TestColl", &tags));
+        ASSERT_OK(
+            catalogManager()->getTagsForCollection(operationContext(), "TestDB.TestColl", &tags));
         ASSERT_EQ(2U, tags.size());
 
         return tags;
@@ -1147,7 +1169,8 @@ TEST_F(CatalogManagerReplSetTest, GetTagsForCollectionNoTags) {
     auto future = launchAsync([this] {
         vector<TagsType> tags;
 
-        ASSERT_OK(catalogManager()->getTagsForCollection("TestDB.TestColl", &tags));
+        ASSERT_OK(
+            catalogManager()->getTagsForCollection(operationContext(), "TestDB.TestColl", &tags));
         ASSERT_EQ(0U, tags.size());
 
         return tags;
@@ -1163,7 +1186,8 @@ TEST_F(CatalogManagerReplSetTest, GetTagsForCollectionInvalidTag) {
 
     auto future = launchAsync([this] {
         vector<TagsType> tags;
-        Status status = catalogManager()->getTagsForCollection("TestDB.TestColl", &tags);
+        Status status =
+            catalogManager()->getTagsForCollection(operationContext(), "TestDB.TestColl", &tags);
 
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
         ASSERT_EQ(0U, tags.size());
@@ -1200,8 +1224,9 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkOneTagFound) {
     chunk.setShard("shard0000");
     ASSERT_OK(chunk.validate());
 
-    auto future = launchAsync(
-        [this, chunk] { return assertGet(catalogManager()->getTagForChunk("test.coll", chunk)); });
+    auto future = launchAsync([this, chunk] {
+        return assertGet(catalogManager()->getTagForChunk(operationContext(), "test.coll", chunk));
+    });
 
     onFindCommand([this, chunk](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -1244,8 +1269,9 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkNoTagFound) {
     chunk.setShard("shard0000");
     ASSERT_OK(chunk.validate());
 
-    auto future = launchAsync(
-        [this, chunk] { return assertGet(catalogManager()->getTagForChunk("test.coll", chunk)); });
+    auto future = launchAsync([this, chunk] {
+        return assertGet(catalogManager()->getTagForChunk(operationContext(), "test.coll", chunk));
+    });
 
     onFindCommand([this, chunk](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -1283,7 +1309,8 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkInvalidTagDoc) {
     ASSERT_OK(chunk.validate());
 
     auto future = launchAsync([this, chunk] {
-        const auto tagResult = catalogManager()->getTagForChunk("test.coll", chunk);
+        const auto tagResult =
+            catalogManager()->getTagForChunk(operationContext(), "test.coll", chunk);
 
         ASSERT_EQ(ErrorCodes::FailedToParse, tagResult.getStatus());
     });
@@ -1321,7 +1348,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateDatabase) {
     dbt.setSharded(true);
 
     auto future = launchAsync([this, dbt] {
-        auto status = catalogManager()->updateDatabase(dbt.getName(), dbt);
+        auto status = catalogManager()->updateDatabase(operationContext(), dbt.getName(), dbt);
         ASSERT_OK(status);
     });
 
@@ -1364,7 +1391,7 @@ TEST_F(CatalogManagerReplSetTest, UpdateDatabaseHostUnreachable) {
     dbt.setSharded(false);
 
     auto future = launchAsync([this, dbt] {
-        auto status = catalogManager()->updateDatabase(dbt.getName(), dbt);
+        auto status = catalogManager()->updateDatabase(operationContext(), dbt.getName(), dbt);
         ASSERT_EQ(ErrorCodes::HostUnreachable, status);
     });
 
@@ -1396,7 +1423,8 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecated) {
                                                 << "second precondition"));
 
     auto future = launchAsync([this, updateOps, preCondition] {
-        auto status = catalogManager()->applyChunkOpsDeprecated(updateOps, preCondition);
+        auto status =
+            catalogManager()->applyChunkOpsDeprecated(operationContext(), updateOps, preCondition);
         ASSERT_OK(status);
     });
 
@@ -1428,7 +1456,8 @@ TEST_F(CatalogManagerReplSetTest, ApplyChunkOpsDeprecatedCommandFailed) {
                                                 << "second precondition"));
 
     auto future = launchAsync([this, updateOps, preCondition] {
-        auto status = catalogManager()->applyChunkOpsDeprecated(updateOps, preCondition);
+        auto status =
+            catalogManager()->applyChunkOpsDeprecated(operationContext(), updateOps, preCondition);
         ASSERT_EQUALS(ErrorCodes::BadValue, status);
     });
 
@@ -1507,7 +1536,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
 
 
     future = launchAsync([this, dbname] {
-        Status status = catalogManager()->createDatabase(dbname);
+        Status status = catalogManager()->createDatabase(operationContext(), dbname);
         ASSERT_OK(status);
     });
 
@@ -1607,7 +1636,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDistLockHeld) {
         },
         Status(ErrorCodes::LockBusy, "lock already held"));
 
-    Status status = catalogManager()->createDatabase(dbname);
+    Status status = catalogManager()->createDatabase(operationContext(), dbname);
     ASSERT_EQUALS(ErrorCodes::LockBusy, status);
 }
 
@@ -1625,7 +1654,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDBExists) {
 
 
     auto future = launchAsync([this, dbname] {
-        Status status = catalogManager()->createDatabase(dbname);
+        Status status = catalogManager()->createDatabase(operationContext(), dbname);
         ASSERT_EQUALS(ErrorCodes::NamespaceExists, status);
     });
 
@@ -1664,7 +1693,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDBExistsDifferentCase) {
 
 
     auto future = launchAsync([this, dbname] {
-        Status status = catalogManager()->createDatabase(dbname);
+        Status status = catalogManager()->createDatabase(operationContext(), dbname);
         ASSERT_EQUALS(ErrorCodes::DatabaseDifferCase, status);
     });
 
@@ -1702,7 +1731,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseNoShards) {
 
 
     auto future = launchAsync([this, dbname] {
-        Status status = catalogManager()->createDatabase(dbname);
+        Status status = catalogManager()->createDatabase(operationContext(), dbname);
         ASSERT_EQUALS(ErrorCodes::ShardNotFound, status);
     });
 
@@ -1791,7 +1820,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
 
 
     future = launchAsync([this, dbname] {
-        Status status = catalogManager()->createDatabase(dbname);
+        Status status = catalogManager()->createDatabase(operationContext(), dbname);
         ASSERT_EQUALS(ErrorCodes::NamespaceExists, status);
     });
 
@@ -1903,7 +1932,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
         Status::OK());
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->enableSharding("test");
+        auto status = catalogManager()->enableSharding(operationContext(), "test");
         ASSERT_OK(status);
     });
 
@@ -1983,7 +2012,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingLockBusy) {
         [](StringData, StringData, stdx::chrono::milliseconds, stdx::chrono::milliseconds) {},
         {ErrorCodes::LockBusy, "lock taken"});
 
-    auto status = catalogManager()->enableSharding("test");
+    auto status = catalogManager()->enableSharding(operationContext(), "test");
     ASSERT_EQ(ErrorCodes::LockBusy, status.code());
 }
 
@@ -2002,7 +2031,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExistsWithDifferentCase) {
         Status::OK());
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->enableSharding("test");
+        auto status = catalogManager()->enableSharding(operationContext(), "test");
         ASSERT_EQ(ErrorCodes::DatabaseDifferCase, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -2031,7 +2060,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExists) {
         Status::OK());
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->enableSharding("test");
+        auto status = catalogManager()->enableSharding(operationContext(), "test");
         ASSERT_OK(status);
     });
 
@@ -2088,7 +2117,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExistsInvalidFormat) {
         Status::OK());
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->enableSharding("test");
+        auto status = catalogManager()->enableSharding(operationContext(), "test");
         ASSERT_EQ(ErrorCodes::TypeMismatch, status.code());
     });
 
@@ -2110,7 +2139,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExistsNoShards) {
         Status::OK());
 
     auto future = launchAsync([this] {
-        auto status = catalogManager()->enableSharding("test");
+        auto status = catalogManager()->enableSharding(operationContext(), "test");
         ASSERT_EQ(ErrorCodes::ShardNotFound, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -2131,8 +2160,8 @@ TEST_F(CatalogManagerReplSetTest, BasicReadAfterOpTime) {
     for (int x = 0; x < 3; x++) {
         auto future = launchAsync([this] {
             BSONObjBuilder responseBuilder;
-            ASSERT_TRUE(
-                catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
+            ASSERT_TRUE(catalogManager()->runReadCommand(
+                operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
         });
 
         const OpTime newOpTime(Timestamp(x + 2, x + 6), x + 5);
@@ -2165,7 +2194,8 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
     // Initialize the internal config OpTime
     auto future1 = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
+        ASSERT_TRUE(catalogManager()->runReadCommand(
+            operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
     });
 
     OpTime highestOpTime;
@@ -2193,7 +2223,8 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
     // Return an older OpTime
     auto future2 = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
+        ASSERT_TRUE(catalogManager()->runReadCommand(
+            operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
     });
 
     const OpTime oldOpTime(Timestamp(3, 10), 5);
@@ -2218,7 +2249,8 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
     // Check that older OpTime does not override highest OpTime
     auto future3 = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
+        ASSERT_TRUE(catalogManager()->runReadCommand(
+            operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
     });
 
     onCommandWithMetadata([this, &oldOpTime, &highestOpTime](const RemoteCommandRequest& request) {
@@ -2242,8 +2274,9 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
 TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeFindThenCmd) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    auto future1 = launchAsync(
-        [this] { ASSERT_OK(catalogManager()->getGlobalSettings("chunksize").getStatus()); });
+    auto future1 = launchAsync([this] {
+        ASSERT_OK(catalogManager()->getGlobalSettings(operationContext(), "chunksize").getStatus());
+    });
 
     OpTime highestOpTime;
     const OpTime newOpTime(Timestamp(7, 6), 5);
@@ -2271,7 +2304,8 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeFindThenCmd) {
     // Return an older OpTime
     auto future2 = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
+        ASSERT_TRUE(catalogManager()->runReadCommand(
+            operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
     });
 
     const OpTime oldOpTime(Timestamp(3, 10), 5);
@@ -2296,7 +2330,8 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeCmdThenFind) {
     // Initialize the internal config OpTime
     auto future1 = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        ASSERT_TRUE(catalogManager()->runReadCommand("test", BSON("dummy" << 1), &responseBuilder));
+        ASSERT_TRUE(catalogManager()->runReadCommand(
+            operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
     });
 
     OpTime highestOpTime;
@@ -2322,8 +2357,9 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeCmdThenFind) {
     highestOpTime = newOpTime;
 
     // Return an older OpTime
-    auto future2 = launchAsync(
-        [this] { ASSERT_OK(catalogManager()->getGlobalSettings("chunksize").getStatus()); });
+    auto future2 = launchAsync([this] {
+        ASSERT_OK(catalogManager()->getGlobalSettings(operationContext(), "chunksize").getStatus());
+    });
 
     const OpTime oldOpTime(Timestamp(3, 10), 5);
 

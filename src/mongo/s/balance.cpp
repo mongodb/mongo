@@ -89,7 +89,7 @@ int Balancer::_moveChunks(OperationContext* txn,
         // If the balancer was disabled since we started this round, don't start new chunks
         // moves.
         const auto balSettingsResult =
-            grid.catalogManager(txn)->getGlobalSettings(SettingsType::BalancerDocKey);
+            grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::BalancerDocKey);
 
         const bool isBalSettingsAbsent =
             balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
@@ -204,7 +204,8 @@ void Balancer::_ping(OperationContext* txn, bool waiting) {
     mType.setWaiting(waiting);
     mType.setMongoVersion(versionString);
 
-    grid.catalogManager(txn)->update(MongosType::ConfigNS,
+    grid.catalogManager(txn)->update(txn,
+                                     MongosType::ConfigNS,
                                      BSON(MongosType::name(_myid)),
                                      BSON("$set" << mType.toBSON()),
                                      true,
@@ -288,7 +289,8 @@ void Balancer::_doBalanceRound(OperationContext* txn,
     invariant(candidateChunks);
 
     vector<CollectionType> collections;
-    Status collsStatus = grid.catalogManager(txn)->getCollections(nullptr, &collections, nullptr);
+    Status collsStatus =
+        grid.catalogManager(txn)->getCollections(txn, nullptr, &collections, nullptr);
     if (!collsStatus.isOK()) {
         warning() << "Failed to retrieve the set of collections during balancing round "
                   << collsStatus;
@@ -330,7 +332,8 @@ void Balancer::_doBalanceRound(OperationContext* txn,
         }
 
         std::vector<ChunkType> allNsChunks;
-        grid.catalogManager(txn)->getChunks(BSON(ChunkType::ns(nss.ns())),
+        grid.catalogManager(txn)->getChunks(txn,
+                                            BSON(ChunkType::ns(nss.ns())),
                                             BSON(ChunkType::min() << 1),
                                             boost::none,  // all chunks
                                             &allNsChunks,
@@ -366,7 +369,7 @@ void Balancer::_doBalanceRound(OperationContext* txn,
         {
             vector<TagsType> collectionTags;
             uassertStatusOK(
-                grid.catalogManager(txn)->getTagsForCollection(nss.ns(), &collectionTags));
+                grid.catalogManager(txn)->getTagsForCollection(txn, nss.ns(), &collectionTags));
             for (const auto& tt : collectionTags) {
                 ranges.push_back(
                     TagRange(tt.getMinKey().getOwned(), tt.getMaxKey().getOwned(), tt.getTag()));
@@ -503,8 +506,8 @@ void Balancer::run() {
             // refresh chunk size (even though another balancer might be active)
             Chunk::refreshChunkSize(txn.get());
 
-            auto balSettingsResult =
-                grid.catalogManager(txn.get())->getGlobalSettings(SettingsType::BalancerDocKey);
+            auto balSettingsResult = grid.catalogManager(txn.get())->getGlobalSettings(
+                txn.get(), SettingsType::BalancerDocKey);
             const bool isBalSettingsAbsent =
                 balSettingsResult.getStatus() == ErrorCodes::NoMatchingDocument;
             if (!balSettingsResult.isOK() && !isBalSettingsAbsent) {
@@ -529,8 +532,8 @@ void Balancer::run() {
             uassert(13258, "oids broken after resetting!", _checkOIDs());
 
             {
-                auto scopedDistLock =
-                    grid.catalogManager(txn.get())->distLock("balancer", "doing balance round");
+                auto scopedDistLock = grid.catalogManager(txn.get())
+                                          ->distLock(txn.get(), "balancer", "doing balance round");
 
                 if (!scopedDistLock.isOK()) {
                     LOG(1) << "skipping balancing round" << causedBy(scopedDistLock.getStatus());
@@ -572,7 +575,7 @@ void Balancer::run() {
                                      _balancedLastTime);
                 actionLog.setTime(jsTime());
 
-                grid.catalogManager(txn.get())->logAction(actionLog);
+                grid.catalogManager(txn.get())->logAction(txn.get(), actionLog);
 
                 LOG(1) << "*** end of balancing round";
             }
@@ -591,7 +594,7 @@ void Balancer::run() {
             actionLog.setDetails(string(e.what()), balanceRoundTimer.millis(), 0, 0);
             actionLog.setTime(jsTime());
 
-            grid.catalogManager(txn.get())->logAction(actionLog);
+            grid.catalogManager(txn.get())->logAction(txn.get(), actionLog);
 
             // Sleep a fair amount before retrying because of the error
             sleepsecs(sleepTime);

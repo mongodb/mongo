@@ -95,7 +95,8 @@ bool tryMoveToOtherShard(OperationContext* txn,
     map<string, vector<ChunkType>> shardToChunkMap;
     DistributionStatus::populateShardToChunksMap(shardInfo, *chunkMgr, &shardToChunkMap);
 
-    StatusWith<string> tagStatus = grid.catalogManager(txn)->getTagForChunk(manager.getns(), chunk);
+    StatusWith<string> tagStatus =
+        grid.catalogManager(txn)->getTagForChunk(txn, manager.getns(), chunk);
     if (!tagStatus.isOK()) {
         warning() << "Not auto-moving chunk because of an error encountered while "
                   << "checking tag for chunk: " << tagStatus.getStatus();
@@ -580,7 +581,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) const {
 
         bool shouldBalance = grid.getConfigShouldBalance(txn);
         if (shouldBalance) {
-            auto status = grid.catalogManager(txn)->getCollection(_manager->getns());
+            auto status = grid.catalogManager(txn)->getCollection(txn, _manager->getns());
             if (!status.isOK()) {
                 log() << "Auto-split for " << _manager->getns()
                       << " failed to load collection metadata due to " << status.getStatus();
@@ -707,7 +708,8 @@ void Chunk::markAsJumbo(OperationContext* txn) const {
     // at least this mongos won't try and keep moving
     _jumbo = true;
 
-    Status result = grid.catalogManager(txn)->update(ChunkType::ConfigNS,
+    Status result = grid.catalogManager(txn)->update(txn,
+                                                     ChunkType::ConfigNS,
                                                      BSON(ChunkType::name(genID())),
                                                      BSON("$set" << BSON(ChunkType::jumbo(true))),
                                                      false,  // upsert
@@ -720,7 +722,7 @@ void Chunk::markAsJumbo(OperationContext* txn) const {
 
 void Chunk::refreshChunkSize(OperationContext* txn) {
     auto chunkSizeSettingsResult =
-        grid.catalogManager(txn)->getGlobalSettings(SettingsType::ChunkSizeDocKey);
+        grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::ChunkSizeDocKey);
     if (!chunkSizeSettingsResult.isOK()) {
         log() << chunkSizeSettingsResult.getStatus();
         return;

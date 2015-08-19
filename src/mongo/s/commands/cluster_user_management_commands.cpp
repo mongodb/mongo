@@ -79,7 +79,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         return grid.catalogManager(txn)
-            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+            ->runUserManagementWriteCommand(txn, this->name, dbname, cmdObj, &result);
     }
 
     virtual void redactForLogging(mutablebson::Document* cmdObj) {
@@ -121,8 +121,8 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -172,8 +172,8 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -212,8 +212,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -260,8 +260,8 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -308,8 +308,8 @@ public:
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -352,7 +352,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return grid.catalogManager(txn)->runUserManagementReadCommand(dbname, cmdObj, &result);
+        return grid.catalogManager(txn)->runUserManagementReadCommand(txn, dbname, cmdObj, &result);
     }
 
 } cmdUsersInfo;
@@ -386,7 +386,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         return grid.catalogManager(txn)
-            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+            ->runUserManagementWriteCommand(txn, this->name, dbname, cmdObj, &result);
     }
 
 } cmdCreateRole;
@@ -419,8 +419,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -459,8 +459,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -499,8 +499,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -539,8 +539,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -579,8 +579,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -622,8 +622,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -666,8 +666,8 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const bool ok = grid.catalogManager(txn)
-                            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+        const bool ok = grid.catalogManager(txn)->runUserManagementWriteCommand(
+            txn, this->name, dbname, cmdObj, &result);
 
         AuthorizationManager* authzManager = getGlobalAuthorizationManager();
         invariant(authzManager);
@@ -710,7 +710,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        return grid.catalogManager(txn)->runUserManagementReadCommand(dbname, cmdObj, &result);
+        return grid.catalogManager(txn)->runUserManagementReadCommand(txn, dbname, cmdObj, &result);
     }
 
 } cmdRolesInfo;
@@ -798,7 +798,7 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         return grid.catalogManager(txn)
-            ->runUserManagementWriteCommand(this->name, dbname, cmdObj, &result);
+            ->runUserManagementWriteCommand(txn, this->name, dbname, cmdObj, &result);
     }
 
 } cmdMergeAuthzCollections;

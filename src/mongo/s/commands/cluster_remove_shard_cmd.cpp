@@ -102,7 +102,7 @@ public:
         }
 
         vector<string> databases;
-        catalogManager->getDatabasesForShard(s->getId(), &databases);
+        catalogManager->getDatabasesForShard(txn, s->getId(), &databases);
 
         // Get BSONObj containing:
         // 1) note about moving or dropping databases in a shard
@@ -132,7 +132,8 @@ public:
                 break;
             case ShardDrainingStatus::ONGOING: {
                 vector<ChunkType> chunks;
-                Status status = catalogManager->getChunks(BSON(ChunkType::shard(s->getId())),
+                Status status = catalogManager->getChunks(txn,
+                                                          BSON(ChunkType::shard(s->getId())),
                                                           BSONObj(),
                                                           boost::none,  // return all
                                                           &chunks,

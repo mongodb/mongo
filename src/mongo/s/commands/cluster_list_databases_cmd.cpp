@@ -163,7 +163,7 @@ public:
             // get config db from the config servers
             BSONObjBuilder builder;
 
-            if (!catalogManager->runReadCommand("config", BSON("dbstats" << 1), &builder)) {
+            if (!catalogManager->runReadCommand(txn, "config", BSON("dbstats" << 1), &builder)) {
                 bb.append(BSON("name"
                                << "config"));
             } else {
@@ -184,7 +184,7 @@ public:
             // get admin db from the config servers
             BSONObjBuilder builder;
 
-            if (!catalogManager->runReadCommand("admin", BSON("dbstats" << 1), &builder)) {
+            if (!catalogManager->runReadCommand(txn, "admin", BSON("dbstats" << 1), &builder)) {
                 bb.append(BSON("name"
                                << "admin"));
             } else {

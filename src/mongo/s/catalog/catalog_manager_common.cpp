@@ -315,7 +315,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
 
     // Check that none of the existing shard candidate's dbs exist already
     for (const string& dbName : dbNamesStatus.getValue()) {
-        auto dbt = getDatabase(dbName);
+        auto dbt = getDatabase(txn, dbName);
         if (dbt.isOK()) {
             const auto& dbDoc = dbt.getValue().value;
             return Status(ErrorCodes::OperationFailed,
@@ -344,7 +344,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
 
     log() << "going to add shard: " << shardType.toString();
 
-    Status result = insert(ShardType::ConfigNS, shardType.toBSON(), NULL);
+    Status result = insert(txn, ShardType::ConfigNS, shardType.toBSON(), NULL);
     if (!result.isOK()) {
         log() << "error adding shard: " << shardType.toBSON() << " err: " << result.reason();
         return result;
@@ -360,7 +360,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
         dbt.setPrimary(shardType.getName());
         dbt.setSharded(false);
 
-        Status status = updateDatabase(dbName, dbt);
+        Status status = updateDatabase(txn, dbName, dbt);
         if (!status.isOK()) {
             log() << "adding shard " << shardConnectionString.toString()
                   << " even though could not add database " << dbName;
@@ -372,17 +372,19 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
     shardDetails.append("name", shardType.getName());
     shardDetails.append("host", shardConnectionString.toString());
 
-    logChange(txn->getClient()->clientAddress(true), "addShard", "", shardDetails.obj());
+    logChange(txn, txn->getClient()->clientAddress(true), "addShard", "", shardDetails.obj());
 
     return shardType.getName();
 }
 
-Status CatalogManagerCommon::updateCollection(const std::string& collNs,
+Status CatalogManagerCommon::updateCollection(OperationContext* txn,
+                                              const std::string& collNs,
                                               const CollectionType& coll) {
     fassert(28634, coll.validate());
 
     BatchedCommandResponse response;
-    Status status = update(CollectionType::ConfigNS,
+    Status status = update(txn,
+                           CollectionType::ConfigNS,
                            BSON(CollectionType::fullNs(collNs)),
                            coll.toBSON(),
                            true,   // upsert
@@ -397,11 +399,14 @@ Status CatalogManagerCommon::updateCollection(const std::string& collNs,
     return Status::OK();
 }
 
-Status CatalogManagerCommon::updateDatabase(const std::string& dbName, const DatabaseType& db) {
+Status CatalogManagerCommon::updateDatabase(OperationContext* txn,
+                                            const std::string& dbName,
+                                            const DatabaseType& db) {
     fassert(28616, db.validate());
 
     BatchedCommandResponse response;
-    Status status = update(DatabaseType::ConfigNS,
+    Status status = update(txn,
+                           DatabaseType::ConfigNS,
                            BSON(DatabaseType::name(dbName)),
                            db.toBSON(),
                            true,   // upsert
@@ -416,7 +421,7 @@ Status CatalogManagerCommon::updateDatabase(const std::string& dbName, const Dat
     return Status::OK();
 }
 
-Status CatalogManagerCommon::createDatabase(const std::string& dbName) {
+Status CatalogManagerCommon::createDatabase(OperationContext* txn, const std::string& dbName) {
     invariant(nsIsDbOnly(dbName));
 
     // The admin and config databases should never be explicitly created. They "just exist",
@@ -453,7 +458,7 @@ Status CatalogManagerCommon::createDatabase(const std::string& dbName) {
     db.setSharded(false);
 
     BatchedCommandResponse response;
-    status = insert(DatabaseType::ConfigNS, db.toBSON(), &response);
+    status = insert(txn, DatabaseType::ConfigNS, db.toBSON(), &response);
 
     if (status.code() == ErrorCodes::DuplicateKey) {
         return Status(ErrorCodes::NamespaceExists, "database " + dbName + " already exists");
@@ -500,7 +505,7 @@ StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(ShardRegistr
     return candidateShardId;
 }
 
-Status CatalogManagerCommon::enableSharding(const std::string& dbName) {
+Status CatalogManagerCommon::enableSharding(OperationContext* txn, const std::string& dbName) {
     invariant(nsIsDbOnly(dbName));
 
     DatabaseType db;
@@ -538,7 +543,7 @@ Status CatalogManagerCommon::enableSharding(const std::string& dbName) {
 
     log() << "Enabling sharding for database [" << dbName << "] in config db";
 
-    return updateDatabase(dbName, db);
+    return updateDatabase(txn, dbName, db);
 }
 
 }  // namespace mongo

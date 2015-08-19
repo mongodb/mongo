@@ -93,8 +93,8 @@ public:
      */
     bool getConfigShouldBalance(OperationContext* txn) const;
 
-    ForwardingCatalogManager* catalogManager(OperationContext* txn);
-    ForwardingCatalogManager* catalogManager();  // TODO(spencer): remove
+    ForwardingCatalogManager* catalogManager(OperationContext* txn);  // TODO(spencer): remove
+    ForwardingCatalogManager* catalogManager();
 
     CatalogCache* catalogCache() {
         return _catalogCache.get();

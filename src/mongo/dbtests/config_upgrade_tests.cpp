@@ -221,7 +221,7 @@ TEST_F(ConfigUpgradeTests, InitialUpgrade) {
     //
 
     string errMsg;
-    ASSERT_OK(grid.catalogManager(&_txn)->initConfigVersion());
+    ASSERT_OK(grid.catalogManager(&_txn)->initConfigVersion(&_txn));
 
     VersionType version;
     ASSERT_OK(getConfigVersion(grid.catalogManager(&_txn), &version));
@@ -242,7 +242,7 @@ TEST_F(ConfigUpgradeTests, BadVersionUpgrade) {
 
     // Default version (not upgradeable)
     ASSERT_EQ(ErrorCodes::IncompatibleShardingMetadata,
-              grid.catalogManager(&_txn)->initConfigVersion());
+              grid.catalogManager(&_txn)->initConfigVersion(&_txn));
 }
 
 }  // namespace

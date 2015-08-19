@@ -442,7 +442,7 @@ public:
 
         string whyMessage(str::stream() << "migrating chunk [" << minKey << ", " << maxKey
                                         << ") in " << ns);
-        auto scopedDistLock = grid.catalogManager(txn)->distLock(ns, whyMessage);
+        auto scopedDistLock = grid.catalogManager(txn)->distLock(txn, ns, whyMessage);
 
         if (!scopedDistLock.isOK()) {
             errmsg = stream() << "could not acquire collection lock for " << ns
@@ -456,8 +456,8 @@ public:
         BSONObj chunkInfo =
             BSON("min" << min << "max" << max << "from" << fromShardName << "to" << toShardName);
 
-        grid.catalogManager(txn)
-            ->logChange(txn->getClient()->clientAddress(true), "moveChunk.start", ns, chunkInfo);
+        grid.catalogManager(txn)->logChange(
+            txn, txn->getClient()->clientAddress(true), "moveChunk.start", ns, chunkInfo);
 
         // Always refresh our metadata remotely
         ChunkVersion origShardVersion;
@@ -907,8 +907,8 @@ public:
                                       PrepareConfigsFailedCode);
                 }
 
-                applyOpsStatus =
-                    grid.catalogManager(txn)->applyChunkOpsDeprecated(updates.arr(), preCond.arr());
+                applyOpsStatus = grid.catalogManager(txn)
+                                     ->applyChunkOpsDeprecated(txn, updates.arr(), preCond.arr());
 
                 if (MONGO_FAIL_POINT(failMigrationApplyOps)) {
                     throw SocketException(SocketException::RECV_ERROR,
@@ -961,7 +961,8 @@ public:
                 try {
                     std::vector<ChunkType> newestChunk;
                     Status status = grid.catalogManager(txn)
-                                        ->getChunks(BSON(ChunkType::ns(ns)),
+                                        ->getChunks(txn,
+                                                    BSON(ChunkType::ns(ns)),
                                                     BSON(ChunkType::DEPRECATED_lastmod() << -1),
                                                     1,
                                                     &newestChunk,
@@ -1000,8 +1001,11 @@ public:
                 commitInfo.appendElements(res["counts"].Obj());
             }
 
-            grid.catalogManager(txn)->logChange(
-                txn->getClient()->clientAddress(true), "moveChunk.commit", ns, commitInfo.obj());
+            grid.catalogManager(txn)->logChange(txn,
+                                                txn->getClient()->clientAddress(true),
+                                                "moveChunk.commit",
+                                                ns,
+                                                commitInfo.obj());
         }
 
         shardingState->migrationSourceManager()->done(txn);

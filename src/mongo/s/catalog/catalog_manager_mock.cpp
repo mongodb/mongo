@@ -45,11 +45,11 @@ CatalogManagerMock::CatalogManagerMock() {
 }
 CatalogManagerMock::~CatalogManagerMock() = default;
 
-Status CatalogManagerMock::startup() {
+Status CatalogManagerMock::startup(OperationContext* txn) {
     return Status::OK();
 }
 
-void CatalogManagerMock::shutDown(bool allowNetworking) {}
+void CatalogManagerMock::shutDown(OperationContext* txn, bool allowNetworking) {}
 
 Status CatalogManagerMock::shardCollection(OperationContext* txn,
                                            const string& ns,
@@ -72,23 +72,30 @@ StatusWith<ShardDrainingStatus> CatalogManagerMock::removeShard(OperationContext
     return ShardDrainingStatus::COMPLETED;
 }
 
-Status CatalogManagerMock::updateDatabase(const string& dbName, const DatabaseType& db) {
+Status CatalogManagerMock::updateDatabase(OperationContext* txn,
+                                          const string& dbName,
+                                          const DatabaseType& db) {
     return Status::OK();
 }
 
-StatusWith<OpTimePair<DatabaseType>> CatalogManagerMock::getDatabase(const string& dbName) {
+StatusWith<OpTimePair<DatabaseType>> CatalogManagerMock::getDatabase(OperationContext* txn,
+                                                                     const string& dbName) {
     return OpTimePair<DatabaseType>();
 }
 
-Status CatalogManagerMock::updateCollection(const string& collNs, const CollectionType& coll) {
+Status CatalogManagerMock::updateCollection(OperationContext* txn,
+                                            const string& collNs,
+                                            const CollectionType& coll) {
     return Status::OK();
 }
 
-StatusWith<OpTimePair<CollectionType>> CatalogManagerMock::getCollection(const string& collNs) {
+StatusWith<OpTimePair<CollectionType>> CatalogManagerMock::getCollection(OperationContext* txn,
+                                                                         const string& collNs) {
     return OpTimePair<CollectionType>();
 }
 
-Status CatalogManagerMock::getCollections(const string* dbName,
+Status CatalogManagerMock::getCollections(OperationContext* txn,
+                                          const string* dbName,
                                           vector<CollectionType>* collections,
                                           repl::OpTime* optime) {
     return Status::OK();
@@ -98,11 +105,14 @@ Status CatalogManagerMock::dropCollection(OperationContext* txn, const Namespace
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status CatalogManagerMock::getDatabasesForShard(const string& shardName, vector<string>* dbs) {
+Status CatalogManagerMock::getDatabasesForShard(OperationContext* txn,
+                                                const string& shardName,
+                                                vector<string>* dbs) {
     return Status::OK();
 }
 
-Status CatalogManagerMock::getChunks(const BSONObj& filter,
+Status CatalogManagerMock::getChunks(OperationContext* txn,
+                                     const BSONObj& filter,
                                      const BSONObj& sort,
                                      boost::optional<int> limit,
                                      std::vector<ChunkType>* chunks,
@@ -110,12 +120,14 @@ Status CatalogManagerMock::getChunks(const BSONObj& filter,
     return Status::OK();
 }
 
-Status CatalogManagerMock::getTagsForCollection(const string& collectionNs,
+Status CatalogManagerMock::getTagsForCollection(OperationContext* txn,
+                                                const string& collectionNs,
                                                 vector<TagsType>* tags) {
     return Status::OK();
 }
 
-StatusWith<string> CatalogManagerMock::getTagForChunk(const string& collectionNs,
+StatusWith<string> CatalogManagerMock::getTagForChunk(OperationContext* txn,
+                                                      const string& collectionNs,
                                                       const ChunkType& chunk) {
     return string();
 }
@@ -124,42 +136,49 @@ Status CatalogManagerMock::getAllShards(vector<ShardType>* shards) {
     return Status::OK();
 }
 
-bool CatalogManagerMock::runUserManagementWriteCommand(const string& commandName,
+bool CatalogManagerMock::runUserManagementWriteCommand(OperationContext* txn,
+                                                       const string& commandName,
                                                        const string& dbname,
                                                        const BSONObj& cmdObj,
                                                        BSONObjBuilder* result) {
     return true;
 }
 
-bool CatalogManagerMock::runReadCommand(const std::string& dbname,
+bool CatalogManagerMock::runReadCommand(OperationContext* txn,
+                                        const std::string& dbname,
                                         const BSONObj& cmdObj,
                                         BSONObjBuilder* result) {
     return true;
 }
 
-bool CatalogManagerMock::runUserManagementReadCommand(const string& dbname,
+bool CatalogManagerMock::runUserManagementReadCommand(OperationContext* txn,
+                                                      const string& dbname,
                                                       const BSONObj& cmdObj,
                                                       BSONObjBuilder* result) {
     return true;
 }
 
-Status CatalogManagerMock::applyChunkOpsDeprecated(const BSONArray& updateOps,
+Status CatalogManagerMock::applyChunkOpsDeprecated(OperationContext* txn,
+                                                   const BSONArray& updateOps,
                                                    const BSONArray& preCondition) {
     return Status::OK();
 }
 
-void CatalogManagerMock::logAction(const ActionLogType& actionLog) {}
+void CatalogManagerMock::logAction(OperationContext* txn, const ActionLogType& actionLog) {}
 
-void CatalogManagerMock::logChange(const string& clientAddress,
+void CatalogManagerMock::logChange(OperationContext* txn,
+                                   const string& clientAddress,
                                    const string& what,
                                    const string& ns,
                                    const BSONObj& detail) {}
 
-StatusWith<SettingsType> CatalogManagerMock::getGlobalSettings(const string& key) {
+StatusWith<SettingsType> CatalogManagerMock::getGlobalSettings(OperationContext* txn,
+                                                               const string& key) {
     return SettingsType();
 }
 
-void CatalogManagerMock::writeConfigServerDirect(const BatchedCommandRequest& request,
+void CatalogManagerMock::writeConfigServerDirect(OperationContext* txn,
+                                                 const BatchedCommandRequest& request,
                                                  BatchedCommandResponse* response) {}
 
 DistLockManager* CatalogManagerMock::getDistLockManager() {
@@ -174,7 +193,7 @@ StatusWith<std::string> CatalogManagerMock::_generateNewShardName() {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status CatalogManagerMock::initConfigVersion() {
+Status CatalogManagerMock::initConfigVersion(OperationContext* txn) {
     return Status::OK();
 }
 

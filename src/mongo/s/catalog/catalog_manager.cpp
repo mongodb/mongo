@@ -74,7 +74,8 @@ Status getStatus(const BatchedCommandResponse& response) {
 
 }  // namespace
 
-Status CatalogManager::insert(const string& ns,
+Status CatalogManager::insert(OperationContext* txn,
+                              const string& ns,
                               const BSONObj& doc,
                               BatchedCommandResponse* response) {
     unique_ptr<BatchedInsertRequest> insert(new BatchedInsertRequest());
@@ -93,11 +94,12 @@ Status CatalogManager::insert(const string& ns,
     unique_ptr<BatchedCommandRequest> requestWithIds(BatchedCommandRequest::cloneWithIds(request));
     const BatchedCommandRequest& requestToSend = requestWithIds.get() ? *requestWithIds : request;
 
-    writeConfigServerDirect(requestToSend, response);
+    writeConfigServerDirect(txn, requestToSend, response);
     return getStatus(*response);
 }
 
-Status CatalogManager::update(const string& ns,
+Status CatalogManager::update(OperationContext* txn,
+                              const string& ns,
                               const BSONObj& query,
                               const BSONObj& update,
                               bool upsert,
@@ -121,11 +123,12 @@ Status CatalogManager::update(const string& ns,
         response = &dummyResponse;
     }
 
-    writeConfigServerDirect(request, response);
+    writeConfigServerDirect(txn, request, response);
     return getStatus(*response);
 }
 
-Status CatalogManager::remove(const string& ns,
+Status CatalogManager::remove(OperationContext* txn,
+                              const string& ns,
                               const BSONObj& query,
                               int limit,
                               BatchedCommandResponse* response) {
@@ -145,7 +148,7 @@ Status CatalogManager::remove(const string& ns,
         response = &dummyResponse;
     }
 
-    writeConfigServerDirect(request, response);
+    writeConfigServerDirect(txn, request, response);
     return getStatus(*response);
 }
 

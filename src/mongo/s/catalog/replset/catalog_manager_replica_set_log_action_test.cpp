@@ -109,8 +109,9 @@ TEST_F(LogActionTest, LogActionNoRetryAfterSuccessfulCreate) {
     expectedActionLog.setWhat("moved a chunk");
     expectedActionLog.setDetails(boost::none, 0, 1, 1);
 
-    auto future =
-        launchAsync([this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
+    auto future = launchAsync([this, &expectedActionLog] {
+        catalogManager()->logAction(operationContext(), expectedActionLog);
+    });
 
     expectActionLogCreate(BSON("ok" << 1));
     expectActionLogInsert(expectedActionLog);
@@ -119,8 +120,9 @@ TEST_F(LogActionTest, LogActionNoRetryAfterSuccessfulCreate) {
     future.timed_get(kFutureTimeout);
 
     // Now log another action and confirm that we don't re-attempt to create the collection
-    future =
-        launchAsync([this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
+    future = launchAsync([this, &expectedActionLog] {
+        catalogManager()->logAction(operationContext(), expectedActionLog);
+    });
 
     expectActionLogInsert(expectedActionLog);
 
@@ -137,8 +139,9 @@ TEST_F(LogActionTest, LogActionNoRetryCreateIfAlreadyExists) {
     expectedActionLog.setWhat("moved a chunk");
     expectedActionLog.setDetails(boost::none, 0, 1, 1);
 
-    auto future =
-        launchAsync([this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
+    auto future = launchAsync([this, &expectedActionLog] {
+        catalogManager()->logAction(operationContext(), expectedActionLog);
+    });
 
     BSONObjBuilder createResponseBuilder;
     Command::appendCommandStatus(createResponseBuilder,
@@ -150,8 +153,9 @@ TEST_F(LogActionTest, LogActionNoRetryCreateIfAlreadyExists) {
     future.timed_get(kFutureTimeout);
 
     // Now log another action and confirm that we don't re-attempt to create the collection
-    future =
-        launchAsync([this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
+    future = launchAsync([this, &expectedActionLog] {
+        catalogManager()->logAction(operationContext(), expectedActionLog);
+    });
 
     expectActionLogInsert(expectedActionLog);
 
@@ -168,8 +172,9 @@ TEST_F(LogActionTest, LogActionCreateFailure) {
     expectedActionLog.setWhat("moved a chunk");
     expectedActionLog.setDetails(boost::none, 0, 1, 1);
 
-    auto future =
-        launchAsync([this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
+    auto future = launchAsync([this, &expectedActionLog] {
+        catalogManager()->logAction(operationContext(), expectedActionLog);
+    });
 
     BSONObjBuilder createResponseBuilder;
     Command::appendCommandStatus(createResponseBuilder,
@@ -181,8 +186,9 @@ TEST_F(LogActionTest, LogActionCreateFailure) {
     future.timed_get(kFutureTimeout);
 
     // Now log another action and confirm that we *do* attempt to re-create the collection
-    future =
-        launchAsync([this, &expectedActionLog] { catalogManager()->logAction(expectedActionLog); });
+    future = launchAsync([this, &expectedActionLog] {
+        catalogManager()->logAction(operationContext(), expectedActionLog);
+    });
 
     expectActionLogCreate(BSON("ok" << 1));
     expectActionLogInsert(expectedActionLog);

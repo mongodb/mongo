@@ -68,7 +68,7 @@ StatusWith<std::shared_ptr<DBConfig>> Grid::implicitCreateDb(OperationContext* t
     }
 
     if (status == ErrorCodes::DatabaseNotFound) {
-        auto statusCreateDb = catalogManager(txn)->createDatabase(dbName);
+        auto statusCreateDb = catalogManager(txn)->createDatabase(txn, dbName);
         if (statusCreateDb.isOK() || statusCreateDb == ErrorCodes::NamespaceExists) {
             return catalogCache()->getDatabase(txn, dbName);
         }
@@ -106,7 +106,7 @@ bool Grid::shouldBalance(const SettingsType& balancerSettings) const {
 
 bool Grid::getConfigShouldBalance(OperationContext* txn) const {
     auto balSettingsResult =
-        grid.catalogManager(txn)->getGlobalSettings(SettingsType::BalancerDocKey);
+        grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::BalancerDocKey);
     if (!balSettingsResult.isOK()) {
         warning() << balSettingsResult.getStatus();
         return false;

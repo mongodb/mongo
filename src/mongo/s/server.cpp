@@ -203,12 +203,12 @@ static Status initializeSharding(OperationContext* txn) {
     }
 
     auto catalogManager = grid.catalogManager(txn);
-    status = catalogManager->initConfigVersion();
+    status = catalogManager->initConfigVersion(txn);
     if (!status.isOK()) {
         return status;
     }
 
-    status = catalogManager->startup();
+    status = catalogManager->startup(txn);
     if (!status.isOK()) {
         return status;
     }
@@ -447,7 +447,7 @@ void mongo::exitCleanly(ExitCode code) {
         }
 
         auto catalogMgr = grid.catalogManager(txn);
-        catalogMgr->shutDown();
+        catalogMgr->shutDown(txn);
     }
 
     mongo::dbexit(code);

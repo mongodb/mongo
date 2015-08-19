@@ -92,24 +92,26 @@ MetadataLoader::MetadataLoader() = default;
 
 MetadataLoader::~MetadataLoader() = default;
 
-Status MetadataLoader::makeCollectionMetadata(CatalogManager* catalogManager,
+Status MetadataLoader::makeCollectionMetadata(OperationContext* txn,
+                                              CatalogManager* catalogManager,
                                               const string& ns,
                                               const string& shard,
                                               const CollectionMetadata* oldMetadata,
                                               CollectionMetadata* metadata) const {
-    Status status = _initCollection(catalogManager, ns, shard, metadata);
+    Status status = _initCollection(txn, catalogManager, ns, shard, metadata);
     if (!status.isOK() || metadata->getKeyPattern().isEmpty()) {
         return status;
     }
 
-    return initChunks(catalogManager, ns, shard, oldMetadata, metadata);
+    return initChunks(txn, catalogManager, ns, shard, oldMetadata, metadata);
 }
 
-Status MetadataLoader::_initCollection(CatalogManager* catalogManager,
+Status MetadataLoader::_initCollection(OperationContext* txn,
+                                       CatalogManager* catalogManager,
                                        const string& ns,
                                        const string& shard,
                                        CollectionMetadata* metadata) const {
-    auto coll = catalogManager->getCollection(ns);
+    auto coll = catalogManager->getCollection(txn, ns);
     if (!coll.isOK()) {
         return coll.getStatus();
     }
@@ -129,7 +131,8 @@ Status MetadataLoader::_initCollection(CatalogManager* catalogManager,
     return Status::OK();
 }
 
-Status MetadataLoader::initChunks(CatalogManager* catalogManager,
+Status MetadataLoader::initChunks(OperationContext* txn,
+                                  CatalogManager* catalogManager,
                                   const string& ns,
                                   const string& shard,
                                   const CollectionMetadata* oldMetadata,
@@ -175,7 +178,7 @@ Status MetadataLoader::initChunks(CatalogManager* catalogManager,
         std::vector<ChunkType> chunks;
         const auto diffQuery = differ.configDiffQuery();
         Status status = catalogManager->getChunks(
-            diffQuery.query, diffQuery.sort, boost::none, &chunks, nullptr);
+            txn, diffQuery.query, diffQuery.sort, boost::none, &chunks, nullptr);
         if (!status.isOK()) {
             if (status == ErrorCodes::HostUnreachable) {
                 // Make our metadata invalid

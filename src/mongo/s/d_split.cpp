@@ -623,7 +623,7 @@ public:
 
         string whyMessage(str::stream() << "splitting chunk [" << minKey << ", " << maxKey
                                         << ") in " << ns);
-        auto scopedDistLock = grid.catalogManager(txn)->distLock(ns, whyMessage);
+        auto scopedDistLock = grid.catalogManager(txn)->distLock(txn, ns, whyMessage);
 
         if (!scopedDistLock.isOK()) {
             errmsg = str::stream() << "could not acquire collection lock for " << ns
@@ -792,7 +792,7 @@ public:
         // 4. apply the batch of updates to remote and local metadata
         //
         Status applyOpsStatus =
-            grid.catalogManager(txn)->applyChunkOpsDeprecated(updates.arr(), preCond.arr());
+            grid.catalogManager(txn)->applyChunkOpsDeprecated(txn, updates.arr(), preCond.arr());
         if (!applyOpsStatus.isOK()) {
             return appendCommandStatus(result, applyOpsStatus);
         }
@@ -828,8 +828,8 @@ public:
             appendShortVersion(logDetail.subobjStart("left"), *newChunks[0]);
             appendShortVersion(logDetail.subobjStart("right"), *newChunks[1]);
 
-            grid.catalogManager(txn)
-                ->logChange(txn->getClient()->clientAddress(true), "split", ns, logDetail.obj());
+            grid.catalogManager(txn)->logChange(
+                txn, txn->getClient()->clientAddress(true), "split", ns, logDetail.obj());
         } else {
             BSONObj beforeDetailObj = logDetail.obj();
             BSONObj firstDetailObj = beforeDetailObj.getOwned();
@@ -842,8 +842,11 @@ public:
                 chunkDetail.append("of", newChunksSize);
                 appendShortVersion(chunkDetail.subobjStart("chunk"), *newChunks[i]);
 
-                grid.catalogManager(txn)->logChange(
-                    txn->getClient()->clientAddress(true), "multi-split", ns, chunkDetail.obj());
+                grid.catalogManager(txn)->logChange(txn,
+                                                    txn->getClient()->clientAddress(true),
+                                                    "multi-split",
+                                                    ns,
+                                                    chunkDetail.obj());
             }
         }
 

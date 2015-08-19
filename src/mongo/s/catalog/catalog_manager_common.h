@@ -48,18 +48,22 @@ class CatalogManagerCommon : public CatalogManager {
 public:
     virtual ~CatalogManagerCommon() = default;
 
-    Status enableSharding(const std::string& dbName) override;
+    Status enableSharding(OperationContext* txn, const std::string& dbName) override;
 
     StatusWith<std::string> addShard(OperationContext* txn,
                                      const std::string* shardProposedName,
                                      const ConnectionString& shardConnectionString,
                                      const long long maxSize) override;
 
-    Status updateDatabase(const std::string& dbName, const DatabaseType& db) override;
+    Status updateDatabase(OperationContext* txn,
+                          const std::string& dbName,
+                          const DatabaseType& db) override;
 
-    Status updateCollection(const std::string& collNs, const CollectionType& coll) override;
+    Status updateCollection(OperationContext* txn,
+                            const std::string& collNs,
+                            const CollectionType& coll) override;
 
-    Status createDatabase(const std::string& dbName) override;
+    Status createDatabase(OperationContext* txn, const std::string& dbName) override;
 
 protected:
     /**

@@ -455,6 +455,7 @@ public:
             {
                 // Take distributed lock to prevent split / migration.
                 auto scopedDistLock = grid.catalogManager(txn)->distLock(
+                    txn,
                     finalColLong,
                     "mr-post-process",
                     stdx::chrono::milliseconds(-1),  // retry indefinitely

@@ -63,7 +63,7 @@ using str::stream;
 
 namespace {
 
-Status makeConfigVersionDocument(CatalogManager* catalogManager) {
+Status makeConfigVersionDocument(OperationContext* txn, CatalogManager* catalogManager) {
     //
     // Even though the initial config write is a single-document update, that single document
     // is on multiple config servers and requests can interleave.  The upgrade lock prevents
@@ -86,7 +86,8 @@ Status makeConfigVersionDocument(CatalogManager* catalogManager) {
     // If the cluster has not previously been initialized, we need to set the version before
     // using so subsequent mongoses use the config data the same way.  This requires all three
     // config servers online initially.
-    return catalogManager->update(VersionType::ConfigNS,
+    return catalogManager->update(txn,
+                                  VersionType::ConfigNS,
                                   BSON("_id" << 1),
                                   versionInfo.toBSON(),
                                   true,   // upsert
@@ -253,7 +254,9 @@ Status getConfigVersion(CatalogManager* catalogManager, VersionType* versionInfo
     return Status::OK();
 }
 
-Status checkAndInitConfigVersion(CatalogManager* catalogManager, DistLockManager* distLockManager) {
+Status checkAndInitConfigVersion(OperationContext* txn,
+                                 CatalogManager* catalogManager,
+                                 DistLockManager* distLockManager) {
     VersionType versionInfo;
     Status status = getConfigVersion(catalogManager, &versionInfo);
     if (!status.isOK()) {
@@ -327,7 +330,7 @@ Status checkAndInitConfigVersion(CatalogManager* catalogManager, DistLockManager
 
     log() << "initializing config server version to " << CURRENT_CONFIG_VERSION;
 
-    status = makeConfigVersionDocument(catalogManager);
+    status = makeConfigVersionDocument(txn, catalogManager);
     if (!status.isOK())
         return status;
 

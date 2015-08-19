@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/client/connection_string.h"
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/catalog/dist_lock_catalog_impl.h"
@@ -165,22 +166,23 @@ void ForwardingCatalogManager::waitForCatalogManagerChange() {
 }
 
 CatalogManager::ConfigServerMode ForwardingCatalogManager::getMode() {
-    return retry([this] { return _actual->getMode(); });
+    stdx::lock_guard<stdx::mutex> lk(_observerMutex);
+    return _actual->getMode();
 }
 
-Status ForwardingCatalogManager::startup() {
-    return retry([this] { return _actual->startup(); });
+Status ForwardingCatalogManager::startup(OperationContext* txn) {
+    return retry([this, txn] { return _actual->startup(txn); });
 }
 
-void ForwardingCatalogManager::shutDown(bool allowNetworking) {
-    retry([this, allowNetworking] {
-        _actual->shutDown(allowNetworking);
+void ForwardingCatalogManager::shutDown(OperationContext* txn, bool allowNetworking) {
+    retry([this, txn, allowNetworking] {
+        _actual->shutDown(txn, allowNetworking);
         return 1;
     });
 }
 
-Status ForwardingCatalogManager::enableSharding(const std::string& dbName) {
-    return retry([&] { return _actual->enableSharding(dbName); });
+Status ForwardingCatalogManager::enableSharding(OperationContext* txn, const std::string& dbName) {
+    return retry([&] { return _actual->enableSharding(txn, dbName); });
 }
 
 Status ForwardingCatalogManager::shardCollection(OperationContext* txn,
@@ -208,32 +210,36 @@ StatusWith<ShardDrainingStatus> ForwardingCatalogManager::removeShard(OperationC
     return retry([&] { return _actual->removeShard(txn, name); });
 }
 
-Status ForwardingCatalogManager::updateDatabase(const std::string& dbName, const DatabaseType& db) {
-    return retry([&] { return _actual->updateDatabase(dbName, db); });
+Status ForwardingCatalogManager::updateDatabase(OperationContext* txn,
+                                                const std::string& dbName,
+                                                const DatabaseType& db) {
+    return retry([&] { return _actual->updateDatabase(txn, dbName, db); });
 }
 
 StatusWith<OpTimePair<DatabaseType>> ForwardingCatalogManager::getDatabase(
-    const std::string& dbName) {
-    return retry([&] { return _actual->getDatabase(dbName); });
+    OperationContext* txn, const std::string& dbName) {
+    return retry([&] { return _actual->getDatabase(txn, dbName); });
 }
 
-Status ForwardingCatalogManager::updateCollection(const std::string& collNs,
+Status ForwardingCatalogManager::updateCollection(OperationContext* txn,
+                                                  const std::string& collNs,
                                                   const CollectionType& coll) {
-    return retry([&] { return _actual->updateCollection(collNs, coll); });
+    return retry([&] { return _actual->updateCollection(txn, collNs, coll); });
 }
 
 StatusWith<OpTimePair<CollectionType>> ForwardingCatalogManager::getCollection(
-    const std::string& collNs) {
-    return retry([&] { return _actual->getCollection(collNs); });
+    OperationContext* txn, const std::string& collNs) {
+    return retry([&] { return _actual->getCollection(txn, collNs); });
 }
 
-Status ForwardingCatalogManager::getCollections(const std::string* dbName,
+Status ForwardingCatalogManager::getCollections(OperationContext* txn,
+                                                const std::string* dbName,
                                                 std::vector<CollectionType>* collections,
                                                 repl::OpTime* opTime) {
     invariant(collections->empty());
     return retry([&] {
         collections->clear();
-        return _actual->getCollections(dbName, collections, opTime);
+        return _actual->getCollections(txn, dbName, collections, opTime);
     });
 }
 
@@ -241,16 +247,18 @@ Status ForwardingCatalogManager::dropCollection(OperationContext* txn, const Nam
     return retry([&] { return _actual->dropCollection(txn, ns); });
 }
 
-Status ForwardingCatalogManager::getDatabasesForShard(const std::string& shardName,
+Status ForwardingCatalogManager::getDatabasesForShard(OperationContext* txn,
+                                                      const std::string& shardName,
                                                       std::vector<std::string>* dbs) {
     invariant(dbs->empty());
     return retry([&] {
         dbs->clear();
-        return _actual->getDatabasesForShard(shardName, dbs);
+        return _actual->getDatabasesForShard(txn, shardName, dbs);
     });
 }
 
-Status ForwardingCatalogManager::getChunks(const BSONObj& query,
+Status ForwardingCatalogManager::getChunks(OperationContext* txn,
+                                           const BSONObj& query,
                                            const BSONObj& sort,
                                            boost::optional<int> limit,
                                            std::vector<ChunkType>* chunks,
@@ -258,22 +266,24 @@ Status ForwardingCatalogManager::getChunks(const BSONObj& query,
     invariant(chunks->empty());
     return retry([&] {
         chunks->clear();
-        return _actual->getChunks(query, sort, limit, chunks, opTime);
+        return _actual->getChunks(txn, query, sort, limit, chunks, opTime);
     });
 }
 
-Status ForwardingCatalogManager::getTagsForCollection(const std::string& collectionNs,
+Status ForwardingCatalogManager::getTagsForCollection(OperationContext* txn,
+                                                      const std::string& collectionNs,
                                                       std::vector<TagsType>* tags) {
     invariant(tags->empty());
     return retry([&] {
         tags->clear();
-        return _actual->getTagsForCollection(collectionNs, tags);
+        return _actual->getTagsForCollection(txn, collectionNs, tags);
     });
 }
 
-StatusWith<std::string> ForwardingCatalogManager::getTagForChunk(const std::string& collectionNs,
+StatusWith<std::string> ForwardingCatalogManager::getTagForChunk(OperationContext* txn,
+                                                                 const std::string& collectionNs,
                                                                  const ChunkType& chunk) {
-    return retry([&] { return _actual->getTagForChunk(collectionNs, chunk); });
+    return retry([&] { return _actual->getTagForChunk(txn, collectionNs, chunk); });
 }
 
 Status ForwardingCatalogManager::getAllShards(std::vector<ShardType>* shards) {
@@ -284,90 +294,100 @@ Status ForwardingCatalogManager::getAllShards(std::vector<ShardType>* shards) {
     });
 }
 
-bool ForwardingCatalogManager::runUserManagementWriteCommand(const std::string& commandName,
+bool ForwardingCatalogManager::runUserManagementWriteCommand(OperationContext* txn,
+                                                             const std::string& commandName,
                                                              const std::string& dbname,
                                                              const BSONObj& cmdObj,
                                                              BSONObjBuilder* result) {
     return retry([&] {
         BSONObjBuilder builder;
         const bool success =
-            _actual->runUserManagementWriteCommand(commandName, dbname, cmdObj, &builder);
+            _actual->runUserManagementWriteCommand(txn, commandName, dbname, cmdObj, &builder);
         result->appendElements(builder.done());
         return success;
     });
 }
 
-bool ForwardingCatalogManager::runReadCommand(const std::string& dbname,
+bool ForwardingCatalogManager::runReadCommand(OperationContext* txn,
+                                              const std::string& dbname,
                                               const BSONObj& cmdObj,
                                               BSONObjBuilder* result) {
     return retry([&] {
         BSONObjBuilder builder;
-        const bool success = _actual->runReadCommand(dbname, cmdObj, &builder);
+        const bool success = _actual->runReadCommand(txn, dbname, cmdObj, &builder);
         result->appendElements(builder.done());
         return success;
     });
 }
 
-bool ForwardingCatalogManager::runUserManagementReadCommand(const std::string& dbname,
+bool ForwardingCatalogManager::runUserManagementReadCommand(OperationContext* txn,
+                                                            const std::string& dbname,
                                                             const BSONObj& cmdObj,
                                                             BSONObjBuilder* result) {
     return retry([&] {
         BSONObjBuilder builder;
-        const bool success = _actual->runUserManagementReadCommand(dbname, cmdObj, &builder);
+        const bool success = _actual->runUserManagementReadCommand(txn, dbname, cmdObj, &builder);
         result->appendElements(builder.done());
         return success;
     });
 }
 
-Status ForwardingCatalogManager::applyChunkOpsDeprecated(const BSONArray& updateOps,
+Status ForwardingCatalogManager::applyChunkOpsDeprecated(OperationContext* txn,
+                                                         const BSONArray& updateOps,
                                                          const BSONArray& preCondition) {
-    return retry([&] { return _actual->applyChunkOpsDeprecated(updateOps, preCondition); });
+    return retry([&] { return _actual->applyChunkOpsDeprecated(txn, updateOps, preCondition); });
 }
 
-void ForwardingCatalogManager::logAction(const ActionLogType& actionLog) {
+void ForwardingCatalogManager::logAction(OperationContext* txn, const ActionLogType& actionLog) {
     retry([&] {
-        _actual->logAction(actionLog);
+        _actual->logAction(txn, actionLog);
         return 1;
     });
 }
 
-void ForwardingCatalogManager::logChange(const std::string& clientAddress,
+void ForwardingCatalogManager::logChange(OperationContext* txn,
+                                         const std::string& clientAddress,
                                          const std::string& what,
                                          const std::string& ns,
                                          const BSONObj& detail) {
     retry([&] {
-        _actual->logChange(clientAddress, what, ns, detail);
+        _actual->logChange(txn, clientAddress, what, ns, detail);
         return 1;
     });
 }
 
-StatusWith<SettingsType> ForwardingCatalogManager::getGlobalSettings(const std::string& key) {
-    return retry([&] { return _actual->getGlobalSettings(key); });
+StatusWith<SettingsType> ForwardingCatalogManager::getGlobalSettings(OperationContext* txn,
+                                                                     const std::string& key) {
+    return retry([&] { return _actual->getGlobalSettings(txn, key); });
 }
 
-void ForwardingCatalogManager::writeConfigServerDirect(const BatchedCommandRequest& request,
+void ForwardingCatalogManager::writeConfigServerDirect(OperationContext* txn,
+                                                       const BatchedCommandRequest& request,
                                                        BatchedCommandResponse* response) {
     retry([&] {
         BatchedCommandResponse theResponse;
-        _actual->writeConfigServerDirect(request, &theResponse);
+        _actual->writeConfigServerDirect(txn, request, &theResponse);
         theResponse.cloneTo(response);
         return 1;
     });
 }
 
-Status ForwardingCatalogManager::createDatabase(const std::string& dbName) {
-    return retry([&] { return _actual->createDatabase(dbName); });
+Status ForwardingCatalogManager::createDatabase(OperationContext* txn, const std::string& dbName) {
+    return retry([&] { return _actual->createDatabase(txn, dbName); });
 }
 
 DistLockManager* ForwardingCatalogManager::getDistLockManager() {
-    return retry([&] { return _actual->getDistLockManager(); });
+    warning() << "getDistLockManager called on ForwardingCatalogManager which should never happen!";
+    stdx::lock_guard<stdx::mutex> lk(_observerMutex);
+    return _actual->getDistLockManager();
 }
 
-Status ForwardingCatalogManager::initConfigVersion() {
-    return retry([&] { return _actual->initConfigVersion(); });
+Status ForwardingCatalogManager::initConfigVersion(OperationContext* txn) {
+    return retry([&] { return _actual->initConfigVersion(txn); });
 }
 
 StatusWith<ForwardingCatalogManager::ScopedDistLock> ForwardingCatalogManager::distLock(
+    OperationContext* txn,
     StringData name,
     StringData whyMessage,
     stdx::chrono::milliseconds waitFor,
@@ -376,7 +396,8 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock> ForwardingCatalogManager::d
         try {
             _operationLock.lock_shared();
             auto guard = MakeGuard([this] { _operationLock.unlock_shared(); });
-            auto dlmLock = getDistLockManager()->lock(name, whyMessage, waitFor, lockTryInterval);
+            auto dlmLock =
+                _actual->getDistLockManager()->lock(name, whyMessage, waitFor, lockTryInterval);
             if (dlmLock.isOK()) {
                 guard.Dismiss();  // Don't unlock _operationLock; hold it until the returned
                                   // ScopedDistLock goes out of scope!
@@ -483,12 +504,15 @@ void ForwardingCatalogManager::_replaceCatalogManager(const TaskExecutor::Callba
     if (!args.status.isOK()) {
         return;
     }
+    Client::initThreadIfNotAlready();
+    auto txn = cc().makeOperationContext();
+
     stdx::lock_guard<RWLock> oplk(_operationLock);
     stdx::lock_guard<stdx::mutex> oblk(_observerMutex);
-    _actual->shutDown(/* allowNetworking */ false);
+    _actual->shutDown(txn.get(), /* allowNetworking */ false);
     _actual = makeCatalogManager(_service, _nextConfigConnectionString, _shardRegistry, _thisHost);
     _shardRegistry->updateConfigServerConnectionString(_nextConfigConnectionString);
-    fassert(28790, _actual->startup());
+    fassert(28790, _actual->startup(txn.get()));
     args.executor->signalEvent(_nextConfigChangeComplete);
 }
 

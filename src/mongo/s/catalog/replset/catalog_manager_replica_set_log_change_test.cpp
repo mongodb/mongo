@@ -64,8 +64,11 @@ TEST_F(LogChangeTest, NoRetryAfterSuccessfulCreate) {
     configTargeter()->setFindHostReturnValue(configHost);
 
     auto future = launchAsync([this] {
-        catalogManager()->logChange(
-            "client", "moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4));
+        catalogManager()->logChange(operationContext(),
+                                    "client",
+                                    "moved a chunk",
+                                    "foo.bar",
+                                    BSON("min" << 3 << "max" << 4));
     });
 
     expectChangeLogCreate(configHost, BSON("ok" << 1));
@@ -81,8 +84,11 @@ TEST_F(LogChangeTest, NoRetryAfterSuccessfulCreate) {
 
     // Now log another change and confirm that we don't re-attempt to create the collection
     future = launchAsync([this] {
-        catalogManager()->logChange(
-            "client", "moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5));
+        catalogManager()->logChange(operationContext(),
+                                    "client",
+                                    "moved a second chunk",
+                                    "foo.bar",
+                                    BSON("min" << 4 << "max" << 5));
     });
 
     expectChangeLogInsert(configHost,
@@ -101,8 +107,11 @@ TEST_F(LogChangeTest, NoRetryCreateIfAlreadyExists) {
     configTargeter()->setFindHostReturnValue(configHost);
 
     auto future = launchAsync([this] {
-        catalogManager()->logChange(
-            "client", "moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4));
+        catalogManager()->logChange(operationContext(),
+                                    "client",
+                                    "moved a chunk",
+                                    "foo.bar",
+                                    BSON("min" << 3 << "max" << 4));
     });
 
     BSONObjBuilder createResponseBuilder;
@@ -121,8 +130,11 @@ TEST_F(LogChangeTest, NoRetryCreateIfAlreadyExists) {
 
     // Now log another change and confirm that we don't re-attempt to create the collection
     future = launchAsync([this] {
-        catalogManager()->logChange(
-            "client", "moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5));
+        catalogManager()->logChange(operationContext(),
+                                    "client",
+                                    "moved a second chunk",
+                                    "foo.bar",
+                                    BSON("min" << 4 << "max" << 5));
     });
 
     expectChangeLogInsert(configHost,
@@ -141,8 +153,11 @@ TEST_F(LogChangeTest, CreateFailure) {
     configTargeter()->setFindHostReturnValue(configHost);
 
     auto future = launchAsync([this] {
-        catalogManager()->logChange(
-            "client", "moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4));
+        catalogManager()->logChange(operationContext(),
+                                    "client",
+                                    "moved a chunk",
+                                    "foo.bar",
+                                    BSON("min" << 3 << "max" << 4));
     });
 
     BSONObjBuilder createResponseBuilder;
@@ -155,8 +170,11 @@ TEST_F(LogChangeTest, CreateFailure) {
 
     // Now log another change and confirm that we *do* attempt to create the collection
     future = launchAsync([this] {
-        catalogManager()->logChange(
-            "client", "moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5));
+        catalogManager()->logChange(operationContext(),
+                                    "client",
+                                    "moved a second chunk",
+                                    "foo.bar",
+                                    BSON("min" << 4 << "max" << 5));
     });
 
     expectChangeLogCreate(configHost, BSON("ok" << 1));

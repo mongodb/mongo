@@ -132,7 +132,7 @@ void CollectionInfo::save(OperationContext* txn, const string& ns) {
         coll.setUpdatedAt(Date_t::now());
     }
 
-    uassertStatusOK(grid.catalogManager(txn)->updateCollection(ns, coll));
+    uassertStatusOK(grid.catalogManager(txn)->updateCollection(txn, ns, coll));
     _dirty = false;
 }
 
@@ -317,7 +317,8 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     vector<ChunkType> newestChunk;
     if (oldVersion.isSet() && !forceReload) {
         uassertStatusOK(
-            grid.catalogManager(txn)->getChunks(BSON(ChunkType::ns(ns)),
+            grid.catalogManager(txn)->getChunks(txn,
+                                                BSON(ChunkType::ns(ns)),
                                                 BSON(ChunkType::DEPRECATED_lastmod() << -1),
                                                 1,
                                                 &newestChunk,
@@ -440,7 +441,7 @@ bool DBConfig::load(OperationContext* txn) {
 }
 
 bool DBConfig::_load(OperationContext* txn) {
-    auto status = grid.catalogManager(txn)->getDatabase(_name);
+    auto status = grid.catalogManager(txn)->getDatabase(txn, _name);
     if (status == ErrorCodes::DatabaseNotFound) {
         return false;
     }
@@ -461,7 +462,7 @@ bool DBConfig::_load(OperationContext* txn) {
     vector<CollectionType> collections;
     repl::OpTime configOpTimeWhenLoadingColl;
     uassertStatusOK(grid.catalogManager(txn)
-                        ->getCollections(&_name, &collections, &configOpTimeWhenLoadingColl));
+                        ->getCollections(txn, &_name, &collections, &configOpTimeWhenLoadingColl));
 
     int numCollsErased = 0;
     int numCollsSharded = 0;
@@ -497,7 +498,7 @@ void DBConfig::_save(OperationContext* txn, bool db, bool coll) {
         dbt.setPrimary(_primaryId);
         dbt.setSharded(_shardingEnabled);
 
-        uassertStatusOK(grid.catalogManager(txn)->updateDatabase(_name, dbt));
+        uassertStatusOK(grid.catalogManager(txn)->updateDatabase(txn, _name, dbt));
     }
 
     if (coll) {
@@ -537,14 +538,14 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
      */
 
     log() << "DBConfig::dropDatabase: " << _name;
-    grid.catalogManager(txn)
-        ->logChange(txn->getClient()->clientAddress(true), "dropDatabase.start", _name, BSONObj());
+    grid.catalogManager(txn)->logChange(
+        txn, txn->getClient()->clientAddress(true), "dropDatabase.start", _name, BSONObj());
 
     // 1
     grid.catalogCache()->invalidate(_name);
 
-    Status result = grid.catalogManager(txn)
-                        ->remove(DatabaseType::ConfigNS, BSON(DatabaseType::name(_name)), 0, NULL);
+    Status result = grid.catalogManager(txn)->remove(
+        txn, DatabaseType::ConfigNS, BSON(DatabaseType::name(_name)), 0, NULL);
     if (!result.isOK()) {
         errmsg = result.reason();
         log() << "could not drop '" << _name << "': " << errmsg;
@@ -600,7 +601,7 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
     LOG(1) << "\t dropped primary db for: " << _name;
 
     grid.catalogManager(txn)
-        ->logChange(txn->getClient()->clientAddress(true), "dropDatabase", _name, BSONObj());
+        ->logChange(txn, txn->getClient()->clientAddress(true), "dropDatabase", _name, BSONObj());
 
     return true;
 }
@@ -679,7 +680,7 @@ void DBConfig::getAllShardedCollections(set<string>& namespaces) {
 
 void ConfigServer::reloadSettings(OperationContext* txn) {
     auto catalogManager = grid.catalogManager(txn);
-    auto chunkSizeResult = catalogManager->getGlobalSettings(SettingsType::ChunkSizeDocKey);
+    auto chunkSizeResult = catalogManager->getGlobalSettings(txn, SettingsType::ChunkSizeDocKey);
     if (chunkSizeResult.isOK()) {
         const int csize = chunkSizeResult.getValue().getChunkSizeMB();
         LOG(1) << "Found MaxChunkSize: " << csize;
@@ -690,7 +691,8 @@ void ConfigServer::reloadSettings(OperationContext* txn) {
     } else if (chunkSizeResult.getStatus() == ErrorCodes::NoMatchingDocument) {
         const int chunkSize = Chunk::MaxChunkSize / (1024 * 1024);
         Status result =
-            grid.catalogManager(txn)->insert(SettingsType::ConfigNS,
+            grid.catalogManager(txn)->insert(txn,
+                                             SettingsType::ConfigNS,
                                              BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)
                                                   << SettingsType::chunkSizeMB(chunkSize)),
                                              NULL);
@@ -801,7 +803,8 @@ void ConfigServer::replicaSetChange(const string& setName, const string& newConn
                 fassertStatusOK(28783, ConnectionString::parse(newConnectionString)));
         } else {
             Status result = grid.catalogManager(txn.get())
-                                ->update(ShardType::ConfigNS,
+                                ->update(txn.get(),
+                                         ShardType::ConfigNS,
                                          BSON(ShardType::name(s->getId())),
                                          BSON("$set" << BSON(ShardType::host(newConnectionString))),
                                          false,  // upsert

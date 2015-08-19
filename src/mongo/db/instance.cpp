@@ -1170,7 +1170,7 @@ void exitCleanly(ExitCode code) {
 
     auto catalogMgr = grid.catalogManager(txn);
     if (catalogMgr) {
-        catalogMgr->shutDown();
+        catalogMgr->shutDown(txn);
     }
 
     // We should always be able to acquire the global lock at shutdown.

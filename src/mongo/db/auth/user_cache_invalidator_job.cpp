@@ -92,7 +92,7 @@ StatusWith<OID> getCurrentCacheGeneration(OperationContext* txn) {
     try {
         BSONObjBuilder result;
         const bool ok = grid.catalogManager(txn)->runUserManagementReadCommand(
-            "admin", BSON("_getUserCacheGeneration" << 1), &result);
+            txn, "admin", BSON("_getUserCacheGeneration" << 1), &result);
         if (!ok) {
             return Command::getStatusFromCommandResult(result.obj());
         }

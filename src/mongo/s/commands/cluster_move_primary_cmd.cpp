@@ -147,7 +147,7 @@ public:
 
         string whyMessage(str::stream() << "Moving primary shard of " << dbname);
         auto catalogManager = grid.catalogManager(txn);
-        auto scopedDistLock = catalogManager->distLock(dbname + "-movePrimary", whyMessage);
+        auto scopedDistLock = catalogManager->distLock(txn, dbname + "-movePrimary", whyMessage);
 
         if (!scopedDistLock.isOK()) {
             return appendCommandStatus(result, scopedDistLock.getStatus());
@@ -160,8 +160,11 @@ public:
         BSONObj moveStartDetails =
             _buildMoveEntry(dbname, fromShard->toString(), toShard->toString(), shardedColls);
 
-        catalogManager->logChange(
-            txn->getClient()->clientAddress(true), "movePrimary.start", dbname, moveStartDetails);
+        catalogManager->logChange(txn,
+                                  txn->getClient()->clientAddress(true),
+                                  "movePrimary.start",
+                                  dbname,
+                                  moveStartDetails);
 
         BSONArrayBuilder barr;
         barr.append(shardedColls);
@@ -240,7 +243,7 @@ public:
             _buildMoveEntry(dbname, oldPrimary, toShard->toString(), shardedColls);
 
         catalogManager->logChange(
-            txn->getClient()->clientAddress(true), "movePrimary", dbname, moveFinishDetails);
+            txn, txn->getClient()->clientAddress(true), "movePrimary", dbname, moveFinishDetails);
         return true;
     }
 
