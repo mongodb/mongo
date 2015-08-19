@@ -116,6 +116,10 @@ func (dump *MongoDump) Init() error {
 		return err
 	}
 
+	if dump.isMongos && dump.OutputOptions.Oplog {
+		return fmt.Errorf("can't use --oplog option when dumping from a mongos.")
+	}
+
 	// ensure we allow secondary reads on mongods and disable TCP timeouts
 	flags := db.DisableSocketTimeout
 	if dump.isMongos {
