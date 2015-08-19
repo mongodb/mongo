@@ -549,8 +549,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	if (ret == WT_RESTART)
+err:	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
 		goto retry;
+	}
 	/* Insert doesn't maintain a position across calls, clear resources. */
 	if (ret == 0)
 		WT_TRET(__curfile_leave(cbt));
@@ -624,8 +627,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	if (ret == WT_RESTART)
+err:	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
 		goto retry;
+	}
 	WT_TRET(__curfile_leave(cbt));
 	if (ret != 0)
 		WT_TRET(__cursor_reset(cbt));
@@ -702,8 +708,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	if (ret == WT_RESTART)
+err:	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
 		goto retry;
+	}
 	/*
 	 * If the cursor is configured to overwrite and the record is not
 	 * found, that is exactly what we want.
@@ -790,8 +799,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	if (ret == WT_RESTART)
+err:	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
 		goto retry;
+	}
 
 	/*
 	 * If successful, point the cursor at internal copies of the data.  We
@@ -1008,6 +1020,10 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 			if ((ret = rmfunc(session, start, 1)) != 0)
 				break;
 		}
+		if (ret == WT_RESTART) {
+			WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+			WT_STAT_FAST_DATA_INCR(session, cursor_restart);
+		}
 	} while (ret == WT_RESTART);
 
 	WT_RET_NOTFOUND_OK(ret);
@@ -1058,6 +1074,10 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 			if (*value != 0 &&
 			    (ret = rmfunc(session, start, 1)) != 0)
 				break;
+		}
+		if (ret == WT_RESTART) {
+			WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+			WT_STAT_FAST_DATA_INCR(session, cursor_restart);
 		}
 	} while (ret == WT_RESTART);
 
