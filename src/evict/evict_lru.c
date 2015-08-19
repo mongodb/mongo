@@ -972,7 +972,8 @@ retry:	while (slot < max_entries && ret == 0) {
 		} else {
 			if (incr) {
 				WT_ASSERT(session, dhandle->session_inuse > 0);
-				(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
+				(void)__wt_atomic_subi32(
+				    &dhandle->session_inuse, 1);
 				incr = 0;
 			}
 			dhandle = TAILQ_NEXT(dhandle, q);
@@ -1016,7 +1017,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		btree->evict_walk_skips = 0;
 		prev_slot = slot;
 
-		(void)WT_ATOMIC_ADD4(dhandle->session_inuse, 1);
+		(void)__wt_atomic_addi32(&dhandle->session_inuse, 1);
 		incr = 1;
 		__wt_spin_unlock(session, &conn->dhandle_lock);
 		dhandle_locked = 0;
@@ -1051,7 +1052,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		cache->evict_file_next = dhandle;
 
 		WT_ASSERT(session, dhandle->session_inuse > 0);
-		(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
+		(void)__wt_atomic_subi32(&dhandle->session_inuse, 1);
 		incr = 0;
 	}
 
@@ -1320,8 +1321,8 @@ __evict_get_ref(
 		 * multiple attempts to evict it.  For pages that are already
 		 * being evicted, this operation will fail and we will move on.
 		 */
-		if (!WT_ATOMIC_CAS4(
-		    evict->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
+		if (!__wt_atomic_casv32(
+		    &evict->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 			__evict_list_clear(session, evict);
 			continue;
 		}
@@ -1330,7 +1331,7 @@ __evict_get_ref(
 		 * Increment the busy count in the btree handle to prevent it
 		 * from being closed under us.
 		 */
-		(void)WT_ATOMIC_ADD4(evict->btree->evict_busy, 1);
+		(void)__wt_atomic_addv32(&evict->btree->evict_busy, 1);
 
 		*btreep = evict->btree;
 		*refp = evict->ref;
@@ -1409,7 +1410,7 @@ __evict_page(WT_SESSION_IMPL *session, int is_server)
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, ref));
 
-	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
+	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
 	WT_RET(ret);
 

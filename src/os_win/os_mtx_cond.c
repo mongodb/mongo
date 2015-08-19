@@ -51,7 +51,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 	locked = 0;
 
 	/* Fast path if already signalled. */
-	if (WT_ATOMIC_ADD4(cond->waiters, 1) == 0)
+	if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
 		return (0);
 
 	/*
@@ -97,7 +97,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 		}
 	}
 
-	(void)WT_ATOMIC_SUB4(cond->waiters, 1);
+	(void)__wt_atomic_subi32(&cond->waiters, 1);
 
 	if (locked)
 		LeaveCriticalSection(&cond->mtx);
@@ -130,7 +130,7 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 	if (cond->waiters == -1)
 		return (0);
 
-	if (cond->waiters > 0 || !WT_ATOMIC_CAS4(cond->waiters, 0, -1)) {
+	if (cond->waiters > 0 || !__wt_atomic_casi32(&cond->waiters, 0, -1)) {
 		EnterCriticalSection(&cond->mtx);
 		locked = 1;
 		WakeAllConditionVariable(&cond->cond);

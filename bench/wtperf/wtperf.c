@@ -100,7 +100,7 @@ static uint64_t	 wtperf_value_range(CONFIG *);
 static inline uint64_t
 get_next_incr(CONFIG *cfg)
 {
-	return (WT_ATOMIC_ADD8(cfg->insert_key, 1));
+	return (__wt_atomic_add64(&cfg->insert_key, 1));
 }
 
 static void
@@ -151,7 +151,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	switch (type) {
 	case WT_AOP_COMPACT:
 		tables = (uint32_t *)op->app_private;
-		WT_ATOMIC_ADD4(*tables, (uint32_t)-1);
+		(void)__wt_atomic_add32(tables, (uint32_t)-1);
 		break;
 	case WT_AOP_INSERT:
 		trk = &thread->insert;
@@ -186,7 +186,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		return (0);
 	if (ret == 0 || (ret == WT_NOTFOUND && type != WT_AOP_INSERT)) {
 		if (!cfg->in_warmup)
-			(void)WT_ATOMIC_ADD8(trk->ops, 1);
+			(void)__wt_atomic_add64(&trk->ops, 1);
 		return (0);
 	}
 err:

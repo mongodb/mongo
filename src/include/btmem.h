@@ -656,14 +656,6 @@ struct __wt_page {
  * to the readers.  If the evicting thread does not find a hazard pointer,
  * the page is evicted.
  */
-typedef enum __wt_page_state {
-	WT_REF_DISK=0,			/* Page is on disk */
-	WT_REF_DELETED,			/* Page is on disk, but deleted */
-	WT_REF_LOCKED,			/* Page locked for exclusive access */
-	WT_REF_MEM,			/* Page is in cache and valid */
-	WT_REF_READING,			/* Page being read */
-	WT_REF_SPLIT			/* Parent page split (WT_REF dead) */
-} WT_PAGE_STATE;
 
 /*
  * WT_PAGE_DELETED --
@@ -691,7 +683,13 @@ struct __wt_ref {
 	WT_PAGE * volatile home;	/* Reference page */
 	uint32_t pindex_hint;		/* Reference page index hint */
 
-	volatile WT_PAGE_STATE state;	/* Page state */
+#define	WT_REF_DISK	0		/* Page is on disk */
+#define	WT_REF_DELETED	1		/* Page is on disk, but deleted */
+#define	WT_REF_LOCKED	2		/* Page locked for exclusive access */
+#define	WT_REF_MEM	3		/* Page is in cache and valid */
+#define	WT_REF_READING	4		/* Page being read */
+#define	WT_REF_SPLIT	5		/* Parent page split (WT_REF dead) */
+	volatile uint32_t state;	/* Page state */
 
 	/*
 	 * Address: on-page cell if read from backing block, off-page WT_ADDR
@@ -958,7 +956,7 @@ struct __wt_insert {
 #define	WT_PAGE_ALLOC_AND_SWAP(s, page, dest, v, count)	do {		\
 	if (((v) = (dest)) == NULL) {					\
 		WT_ERR(__wt_calloc_def(s, count, &(v)));		\
-		if (WT_ATOMIC_CAS8(dest, NULL, v))			\
+		if (__wt_atomic_cas_ptr(&dest, NULL, v))		\
 			__wt_cache_page_inmem_incr(			\
 			    s, page, (count) * sizeof(*(v)));		\
 		else							\

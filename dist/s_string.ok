@@ -395,6 +395,7 @@ bzalloc
 bzfree
 bzip
 calloc
+cas
 catfmt
 cd
 centric
@@ -798,6 +799,7 @@ progname
 ps
 psp
 pthread
+ptr
 pushms
 putK
 putV

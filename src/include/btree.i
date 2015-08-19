@@ -49,17 +49,17 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	WT_ASSERT(session, size < WT_EXABYTE);
 
 	cache = S2C(session)->cache;
-	(void)WT_ATOMIC_ADD8(cache->bytes_inmem, size);
-	(void)WT_ATOMIC_ADD8(page->memory_footprint, size);
+	(void)__wt_atomic_add64(&cache->bytes_inmem, size);
+	(void)__wt_atomic_add64(&page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
-		(void)WT_ATOMIC_ADD8(cache->bytes_dirty, size);
-		(void)WT_ATOMIC_ADD8(page->modify->bytes_dirty, size);
+		(void)__wt_atomic_add64(&cache->bytes_dirty, size);
+		(void)__wt_atomic_add64(&page->modify->bytes_dirty, size);
 	}
 	/* Track internal and overflow size in cache. */
 	if (WT_PAGE_IS_INTERNAL(page))
-		(void)WT_ATOMIC_ADD8(cache->bytes_internal, size);
+		(void)__wt_atomic_add64(&cache->bytes_internal, size);
 	else if (page->type == WT_PAGE_OVFL)
-		(void)WT_ATOMIC_ADD8(cache->bytes_overflow, size);
+		(void)__wt_atomic_add64(&cache->bytes_overflow, size);
 }
 
 /* 
@@ -73,8 +73,8 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 #ifdef HAVE_DIAGNOSTIC
 #define	WT_CACHE_DECR(session, f, sz) do {				\
 	static int __first = 1;						\
-	if (WT_ATOMIC_SUB8(f, sz) > WT_EXABYTE) {			\
-		(void)WT_ATOMIC_ADD8(f, sz);				\
+	if (__wt_atomic_sub64(&f, sz) > WT_EXABYTE) {			\
+		(void)__wt_atomic_add64(&f, sz);			\
 		if (__first) {						\
 			__wt_errx(session,				\
 			    "%s underflow: decrementing %" WT_SIZET_FMT,\
@@ -85,8 +85,8 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 } while (0)
 #else
 #define	WT_CACHE_DECR(s, f, sz) do {					\
-	if (WT_ATOMIC_SUB8(f, sz) > WT_EXABYTE)				\
-		(void)WT_ATOMIC_ADD8(f, sz);				\
+	if (__wt_atomic_sub64(&f, sz) > WT_EXABYTE)			\
+		(void)__wt_atomic_add64(&f, sz);			\
 } while (0)
 #endif
 
@@ -128,8 +128,8 @@ __wt_cache_page_byte_dirty_decr(
 		 */
 		orig = page->modify->bytes_dirty;
 		decr = WT_MIN(size, orig);
-		if (WT_ATOMIC_CAS8(
-		    page->modify->bytes_dirty, orig, orig - decr)) {
+		if (__wt_atomic_cas64(
+		    &page->modify->bytes_dirty, orig, orig - decr)) {
 			WT_CACHE_DECR(session, cache->bytes_dirty, decr);
 			break;
 		}
@@ -172,15 +172,15 @@ __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 	size_t size;
 
 	cache = S2C(session)->cache;
-	(void)WT_ATOMIC_ADD8(cache->pages_dirty, 1);
+	(void)__wt_atomic_add64(&cache->pages_dirty, 1);
 
 	/*
 	 * Take care to read the memory_footprint once in case we are racing
 	 * with updates.
 	 */
 	size = page->memory_footprint;
-	(void)WT_ATOMIC_ADD8(cache->bytes_dirty, size);
-	(void)WT_ATOMIC_ADD8(page->modify->bytes_dirty, size);
+	(void)__wt_atomic_add64(&cache->bytes_dirty, size);
+	(void)__wt_atomic_add64(&page->modify->bytes_dirty, size);
 }
 
 /*
@@ -202,7 +202,7 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 		   "count went negative");
 		cache->pages_dirty = 0;
 	} else
-		(void)WT_ATOMIC_SUB8(cache->pages_dirty, 1);
+		(void)__wt_atomic_sub64(&cache->pages_dirty, 1);
 
 	modify = page->modify;
 	if (modify != NULL && modify->bytes_dirty != 0)
@@ -244,8 +244,8 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	/* Update pages and bytes evicted. */
-	(void)WT_ATOMIC_ADD8(cache->bytes_evict, page->memory_footprint);
-	(void)WT_ATOMIC_ADD8(cache->pages_evict, 1);
+	(void)__wt_atomic_add64(&cache->bytes_evict, page->memory_footprint);
+	(void)__wt_atomic_add64(&cache->pages_evict, 1);
 }
 
 /*
@@ -306,7 +306,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Every time the page transitions from clean to dirty, update the cache
 	 * and transactional information.
 	 */
-	if (WT_ATOMIC_ADD4(page->modify->write_gen, 1) == 1) {
+	if (__wt_atomic_add32(&page->modify->write_gen, 1) == 1) {
 		__wt_cache_dirty_incr(session, page);
 
 		/*
@@ -1059,14 +1059,14 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * reference without first locking the page, it could be evicted in
 	 * between.
 	 */
-	locked = WT_ATOMIC_CAS4(ref->state, WT_REF_MEM, WT_REF_LOCKED);
+	locked = __wt_atomic_casv32(&ref->state, WT_REF_MEM, WT_REF_LOCKED);
 	if ((ret = __wt_hazard_clear(session, page)) != 0 || !locked) {
 		if (locked)
 			ref->state = WT_REF_MEM;
 		return (ret == 0 ? EBUSY : ret);
 	}
 
-	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
+	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
 
 	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
 	if ((ret = __wt_evict_page(session, ref)) == 0) {
@@ -1083,7 +1083,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	} else
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
 
-	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
+	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
 	return (ret);
 }
