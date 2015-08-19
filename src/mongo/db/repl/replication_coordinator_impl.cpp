@@ -652,6 +652,7 @@ void ReplicationCoordinatorImpl::_updateSlaveInfoOptime_inlock(SlaveInfo* slaveI
                                                                const OpTime& opTime) {
     slaveInfo->opTime = opTime;
     slaveInfo->lastUpdate = _replExecutor.now();
+    slaveInfo->down = false;
 
     _updateLastCommittedOpTime_inlock();
     // Wake up any threads waiting for replication that now have their replication

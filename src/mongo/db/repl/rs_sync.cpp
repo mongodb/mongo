@@ -90,8 +90,8 @@ void runSyncThread() {
         // trying to sync with other replicas.
         // TODO(spencer): Use a condition variable to await loading a config
         if (replCoord->getMemberState().startup()) {
-            warning() << "did not receive a valid config yet, sleeping 5 seconds ";
-            sleepsecs(5);
+            warning() << "did not receive a valid config yet";
+            sleepsecs(1);
             continue;
         }
 

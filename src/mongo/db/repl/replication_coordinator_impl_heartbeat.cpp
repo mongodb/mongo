@@ -546,9 +546,16 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
             }
 
             slaveInfo.down = true;
-            HeartbeatResponseAction action =
-                _topCoord->setMemberAsDown(now, memberIndex, _getMyLastOptime_inlock());
-            _handleHeartbeatResponseAction(action, makeStatusWith<ReplSetHeartbeatResponse>());
+
+            if (_memberState.primary()) {
+                // Only adjust hbdata if we are primary, since only the primary has a full view of
+                // the entire cluster.
+                // Secondaries might not see other secondaries in the cluster if they are not
+                // downstream.
+                HeartbeatResponseAction action =
+                    _topCoord->setMemberAsDown(now, memberIndex, _getMyLastOptime_inlock());
+                _handleHeartbeatResponseAction(action, makeStatusWith<ReplSetHeartbeatResponse>());
+            }
         }
     }
     _scheduleNextLivenessUpdate_inlock();
