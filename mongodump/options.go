@@ -48,7 +48,7 @@ type OutputOptions struct {
 	Gzip                       bool     `long:"gzip" description:"compress archive our collection output with Gzip"`
 	Repair                     bool     `long:"repair" description:"try to recover documents from damaged data files (not supported by all storage engines)"`
 	Oplog                      bool     `long:"oplog" description:"use oplog for taking a point-in-time snapshot"`
-	Archive                    string   `long:"archive" optional:"true" optional-value:"-" description:"dump in to the specified dump-archive instead of a directory"`
+	Archive                    string   `long:"archive" optional:"true" optional-value:"-" description:"dump as an archive to the specified path. If flag is specified without a value, archive is written to stdout"`
 	DumpDBUsersAndRoles        bool     `long:"dumpDbUsersAndRoles" description:"dump user and role definitions for the specified database"`
 	ExcludedCollections        []string `long:"excludeCollection" description:"collection to exclude from the dump (may be specified multiple times to exclude additional collections)"`
 	ExcludedCollectionPrefixes []string `long:"excludeCollectionsWithPrefix" description:"exclude all collections from the dump that have the given prefix (may be specified multiple times to exclude additional prefixes)"`

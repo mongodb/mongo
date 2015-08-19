@@ -15,7 +15,7 @@ type InputOptions struct {
 	Objcheck               bool   `long:"objcheck" description:"validate all objects before inserting"`
 	OplogReplay            bool   `long:"oplogReplay" description:"replay oplog for point-in-time restore"`
 	OplogLimit             string `long:"oplogLimit" description:"only include oplog entries before the provided Timestamp (seconds[:ordinal])"`
-	Archive                string `long:"archive" optional:"true" optional-value:"-" description:"restore from a dump-archive stream or file"`
+	Archive                string `long:"archive" optional:"true" optional-value:"-" description:"restore dump from the specified archive file.  If flag is specified without a value, archive is read from stdin"`
 	RestoreDBUsersAndRoles bool   `long:"restoreDbUsersAndRoles" description:"restore user and role definitions for the given database"`
 	Directory              string `long:"dir" description:"input directory, use '-' for stdin"`
 	Gzip                   bool   `long:"gzip" description:"decompress gzipped input"`
