@@ -157,12 +157,13 @@ var checkSyncingFrom = function(node, target) {
     return status.syncingTo == target;
 }
 
-print("sync from primary");
-result = replTest.nodes[3].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[0]});
+print("sync from another passive");
+result = replTest.nodes[3].getDB("admin").runCommand(
+        {replSetSyncFrom: replTest.host+":"+replTest.ports[2]});
 printjson(result)
 assert.eq(result.ok, 1);
 assert.soon(function() {
-    return checkSyncingFrom(nodes[3], replTest.host+":"+replTest.ports[0])
+    return checkSyncingFrom(nodes[3], replTest.host+":"+replTest.ports[2])
 });
 
 print("wait for sync again");
@@ -180,12 +181,13 @@ wait(function() {
             friendlyEqual(status.members[2].optime, status.members[4].optime);
   });
 
-print("sync from another passive");
-result = replTest.nodes[3].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[2]});
+print("sync from primary");
+result = replTest.nodes[3].getDB("admin").runCommand(
+        {replSetSyncFrom: replTest.host+":"+replTest.ports[0]});
 printjson(result)
 assert.eq(result.ok, 1);
 assert.soon(function() {
-    return checkSyncingFrom(nodes[3], replTest.host+":"+replTest.ports[2])
+    return checkSyncingFrom(nodes[3], replTest.host+":"+replTest.ports[0])
 });
 
 /**
@@ -212,9 +214,7 @@ config.members[3].slaveDelay = 40;
 config.members[3].priority = 0;
 config.version++;
 replTest.awaitReplication(60000);
-try {
-    assert.commandWorked(replTest.getMaster().getDB("admin").runCommand({replSetReconfig:config}));
-} catch (x) { /* expected */ }
+reconfig(replTest, config);
 
 replTest.awaitReplication(60000);
 printjson(replTest.status());
