@@ -245,23 +245,5 @@ TEST_F(ConfigUpgradeTests, BadVersionUpgrade) {
               grid.catalogManager(&_txn)->initConfigVersion());
 }
 
-TEST_F(ConfigUpgradeTests, CheckMongoVersion) {
-    //
-    // Tests basic detection of existing mongos and mongod versions from mongos ping
-    // and shard info.  Fuller tests require conns to multiple version mongos processes, not
-    // done here.
-    //
-
-    storeShardsAndPings(5, 10);  // 5 shards, 10 pings
-
-    // Our version is >= 2.2, so this works
-    Status status = checkClusterMongoVersions(grid.catalogManager(&_txn), "2.2");
-    ASSERT(status.isOK());
-
-    // Our version is < 9.9, so this doesn't work (until we hit v99.99)
-    status = checkClusterMongoVersions(grid.catalogManager(&_txn), "99.99");
-    ASSERT(status.code() == ErrorCodes::RemoteValidationError);
-}
-
 }  // namespace
 }  // namespace mongo
