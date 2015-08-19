@@ -190,8 +190,9 @@ TEST_F(ReplCoordElectV1Test, Elect1NodeSuccess) {
                                                      << "node1:12345")) << "protocolVersion" << 1),
                        HostAndPort("node1", 12345));
 
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(10, 0), 0));
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
-
+    getReplCoord()->waitForElectionFinish_forTest();
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
     ASSERT(getReplCoord()->isWaitingForApplierToDrain());

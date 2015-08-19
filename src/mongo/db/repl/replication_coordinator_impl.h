@@ -398,7 +398,8 @@ private:
         kActionNone,
         kActionCloseAllConnections,  // Also indicates that we should clear sharding state.
         kActionFollowerModeStateChange,
-        kActionWinElection
+        kActionWinElection,
+        kActionStartSingleNodeElection
     };
 
     // Struct that holds information about clients waiting for replication.

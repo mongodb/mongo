@@ -2106,6 +2106,10 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
             invariant(_rsConfig.getNumMembers() == 1 && _selfIndex == 0 &&
                       _rsConfig.getMemberAt(0).isElectable());
+            if (isV1ElectionProtocol()) {
+                // Start election in protocol version 1
+                return kActionStartSingleNodeElection;
+            }
             return kActionWinElection;
         }
         return kActionNone;
@@ -2141,7 +2145,12 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         // overriding requirement is to elect this singleton node primary.
         invariant(_rsConfig.getNumMembers() == 1 && _selfIndex == 0 &&
                   _rsConfig.getMemberAt(0).isElectable());
-        result = kActionWinElection;
+        if (isV1ElectionProtocol()) {
+            // Start election in protocol version 1
+            result = kActionStartSingleNodeElection;
+        } else {
+            result = kActionWinElection;
+        }
     }
 
     if (newState.readable() && !_memberState.readable()) {
@@ -2210,6 +2219,11 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             _performPostMemberStateUpdateAction(nextAction);
             break;
         }
+        case kActionStartSingleNodeElection:
+            // In protocol version 1, single node replset will run an election instead of
+            // kActionWinElection as in protocol version 0.
+            _startElectSelfV1();
+            break;
         default:
             severe() << "Unknown post member state update action " << static_cast<int>(action);
             fassertFailed(26010);
