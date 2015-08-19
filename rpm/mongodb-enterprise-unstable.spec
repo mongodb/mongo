@@ -5,7 +5,7 @@ Obsoletes: mongodb-enterprise-unstable,mongo-enterprise-unstable
 Version: %{dynamic_version}
 Release: %{dynamic_release}%{?dist}
 Summary: MongoDB open source document-oriented database system (enterprise metapackage)
-License: AGPL 3.0
+License: Commercial
 URL: http://www.mongodb.org
 Group: Applications/Databases
 Requires: mongodb-enterprise-unstable-server = %{version}, mongodb-enterprise-unstable-shell = %{version}, mongodb-enterprise-unstable-mongos = %{version}, mongodb-enterprise-unstable-tools = %{version}

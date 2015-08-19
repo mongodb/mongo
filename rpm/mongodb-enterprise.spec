@@ -6,7 +6,7 @@ Provides: mongo-10gen-enterprise
 Version: %{dynamic_version}
 Release: %{dynamic_release}%{?dist}
 Summary: MongoDB open source document-oriented database system (enterprise metapackage)
-License: AGPL 3.0
+License: Commercial
 URL: http://www.mongodb.org
 Group: Applications/Databases
 Requires: mongodb-enterprise-server = %{version}, mongodb-enterprise-shell = %{version}, mongodb-enterprise-mongos = %{version}, mongodb-enterprise-tools = %{version}
