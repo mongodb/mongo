@@ -277,7 +277,7 @@ typedef struct {
 
 	WT_SALVAGE_COOKIE *salvage;	/* If it's a salvage operation */
 
-	int tested_ref_state;		/* Debugging information */
+	uint32_t tested_ref_state;	/* Debugging information */
 } WT_RECONCILE;
 
 static void __rec_bnd_cleanup(WT_SESSION_IMPL *, WT_RECONCILE *, int);
@@ -1100,8 +1100,8 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * to see if the delete is visible to us.  Lock down the
 			 * structure.
 			 */
-			if (!WT_ATOMIC_CAS4(
-			    ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+			if (!__wt_atomic_casv32(
+			    &ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
 			ret = __rec_child_deleted(session, r, ref, statep);
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
@@ -5069,7 +5069,7 @@ err:			__wt_scr_free(session, &tkey);
 		    TXNID_LT(btree->rec_max_txn, r->max_txn))
 			btree->rec_max_txn = r->max_txn;
 
-		if (WT_ATOMIC_CAS4(mod->write_gen, r->orig_write_gen, 0))
+		if (__wt_atomic_cas32(&mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
 	}
 

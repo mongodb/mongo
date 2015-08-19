@@ -82,7 +82,7 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	writers = l->s.writers;
 	old = (pad << 48) + (users << 32) + (users << 16) + writers;
 	new = (pad << 48) + ((users + 1) << 32) + ((users + 1) << 16) + writers;
-	return (WT_ATOMIC_CAS_VAL8(l->u, old, new) == old ? 0 : EBUSY);
+	return (__wt_atomic_cas64(&l->u, old, new) ? 0 : EBUSY);
 }
 
 /*
@@ -102,7 +102,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	l = &rwlock->rwlock;
-	me = WT_ATOMIC_FETCH_ADD8(l->u, (uint64_t)1 << 32);
+	me = __wt_atomic_fetch_add64(&l->u, (uint64_t)1 << 32);
 	val = (uint16_t)(me >> 32);
 	for (pause_cnt = 0; val != l->s.readers;) {
 		/*
@@ -138,7 +138,7 @@ __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	    session, WT_VERB_MUTEX, "rwlock: read unlock %s", rwlock->name));
 
 	l = &rwlock->rwlock;
-	WT_ATOMIC_ADD2(l->s.writers, 1);
+	(void)__wt_atomic_add16(&l->s.writers, 1);
 
 	return (0);
 }
@@ -163,7 +163,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	users = l->s.users;
 	old = (pad << 48) + (users << 32) + (readers << 16) + users;
 	new = (pad << 48) + ((users + 1) << 32) + (readers << 16) + users;
-	return (WT_ATOMIC_CAS_VAL8(l->u, old, new) == old ? 0 : EBUSY);
+	return (__wt_atomic_cas64(&l->u, old, new) ? 0 : EBUSY);
 }
 
 /*
@@ -187,7 +187,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * the write lock.
 	 */
 	l = &rwlock->rwlock;
-	me = WT_ATOMIC_FETCH_ADD8(l->u, (uint64_t)1 << 32);
+	me = __wt_atomic_fetch_add64(&l->u, (uint64_t)1 << 32);
 	val = (uint16_t)(me >> 32);
 	while (val != l->s.writers)
 		WT_PAUSE();

@@ -448,7 +448,8 @@ next:		switch (direction) {
 			 * update the page's memory footprint, on failure, free
 			 * the allocated memory.
 			 */
-			if (WT_ATOMIC_CAS8(WT_ROW_KEY_COPY(rip), copy, ikey))
+			if (__wt_atomic_cas_ptr(
+			    (void *)&WT_ROW_KEY_COPY(rip), copy, ikey))
 				__wt_cache_page_inmem_incr(session,
 				    page, sizeof(WT_IKEY) + ikey->size);
 			else
@@ -525,7 +526,7 @@ __wt_row_ikey(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, oldv == 0 || (oldv & WT_IK_FLAG) != 0);
 	WT_ASSERT(session, ref->state != WT_REF_SPLIT);
 	WT_ASSERT(session,
-	    WT_ATOMIC_CAS8(ref->key.ikey, (WT_IKEY *)oldv, ikey));
+	    __wt_atomic_cas_ptr(&ref->key.ikey, (WT_IKEY *)oldv, ikey));
 	}
 #else
 	ref->key.ikey = ikey;

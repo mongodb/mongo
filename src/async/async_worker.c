@@ -67,7 +67,7 @@ retry:
 	 * a race, try again.
 	 */
 	my_consume = last_consume + 1;
-	if (!WT_ATOMIC_CAS8(async->alloc_tail, last_consume, my_consume))
+	if (!__wt_atomic_cas64(&async->alloc_tail, last_consume, my_consume))
 		goto retry;
 	/*
 	 * This item of work is ours to process.  Clear it out of the
@@ -81,7 +81,7 @@ retry:
 	WT_ASSERT(session, async->cur_queue > 0);
 	WT_ASSERT(session, *op != NULL);
 	WT_ASSERT(session, (*op)->state == WT_ASYNCOP_ENQUEUED);
-	(void)WT_ATOMIC_SUB4(async->cur_queue, 1);
+	(void)__wt_atomic_sub32(&async->cur_queue, 1);
 	(*op)->state = WT_ASYNCOP_WORKING;
 
 	if (*op == &async->flush_op)
@@ -316,7 +316,7 @@ __wt_async_worker(void *arg)
 			 * the queue.
 			 */
 			WT_ORDERED_READ(flush_gen, async->flush_gen);
-			if (WT_ATOMIC_ADD4(async->flush_count, 1) ==
+			if (__wt_atomic_add32(&async->flush_count, 1) ==
 			    conn->async_workers) {
 				/*
 				 * We're last.  All workers accounted for so

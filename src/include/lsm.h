@@ -171,11 +171,11 @@ struct __wt_lsm_tree {
 	const char *collator_name;
 	int collator_owned;
 
-	int refcnt;			/* Number of users of the tree */
-	int8_t exclusive;		/* Tree is locked exclusively */
+	uint32_t refcnt;		/* Number of users of the tree */
+	uint8_t exclusive;		/* Tree is locked exclusively */
 
 #define	LSM_TREE_MAX_QUEUE	100
-	int queue_ref;
+	uint32_t queue_ref;
 	WT_RWLOCK *rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
@@ -215,7 +215,7 @@ struct __wt_lsm_tree {
 	WT_LSM_CHUNK **old_chunks;	/* Array of old LSM chunks */
 	size_t old_alloc;		/* Space allocated for old chunks */
 	u_int nold_chunks;		/* Number of old chunks */
-	int freeing_old_chunks;		/* Whether chunks are being freed */
+	uint32_t freeing_old_chunks;	/* Whether chunks are being freed */
 	uint32_t merge_aggressiveness;	/* Increase amount of work per merge */
 
 #define	WT_LSM_TREE_ACTIVE		0x01	/* Workers are active */

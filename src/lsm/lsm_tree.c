@@ -134,7 +134,7 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 		 * is no need to decrement the reference count since discard
 		 * is unconditional.
 		 */
-		(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
+		(void)__wt_atomic_add32(&lsm_tree->refcnt, 1);
 		WT_TRET(__lsm_tree_close(session, lsm_tree));
 		WT_TRET(__lsm_tree_discard(session, lsm_tree, 1));
 	}
@@ -474,15 +474,17 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				 * Make sure we win the race to switch on the
 				 * exclusive flag.
 				 */
-				if (!WT_ATOMIC_CAS1(lsm_tree->exclusive, 0, 1))
+				if (!__wt_atomic_cas8(
+				    &lsm_tree->exclusive, 0, 1))
 					return (EBUSY);
 				/* Make sure there are no readers */
-				if (!WT_ATOMIC_CAS4(lsm_tree->refcnt, 0, 1)) {
+				if (!__wt_atomic_cas32(
+				    &lsm_tree->refcnt, 0, 1)) {
 					lsm_tree->exclusive = 0;
 					return (EBUSY);
 				}
 			} else {
-				(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
+				(void)__wt_atomic_add32(&lsm_tree->refcnt, 1);
 
 				/*
 				 * We got a reference, check if an exclusive
@@ -491,8 +493,8 @@ __lsm_tree_find(WT_SESSION_IMPL *session,
 				if (lsm_tree->exclusive) {
 					WT_ASSERT(session,
 					    lsm_tree->refcnt > 0);
-					(void)WT_ATOMIC_SUB4(
-					    lsm_tree->refcnt, 1);
+					(void)__wt_atomic_sub32(
+					    &lsm_tree->refcnt, 1);
 					return (EBUSY);
 				}
 			}
@@ -553,7 +555,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));
 
 	/* Start the LSM manager thread if it isn't running. */
-	if (WT_ATOMIC_CAS4(conn->lsm_manager.lsm_workers, 0, 1))
+	if (__wt_atomic_cas32(&conn->lsm_manager.lsm_workers, 0, 1))
 		WT_RET(__wt_lsm_manager_start(session));
 
 	/* Make sure no one beat us to it. */
@@ -632,7 +634,7 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
 	if (lsm_tree->exclusive)
 		lsm_tree->exclusive = 0;
-	(void)WT_ATOMIC_SUB4(lsm_tree->refcnt, 1);
+	(void)__wt_atomic_sub32(&lsm_tree->refcnt, 1);
 }
 
 /* How aggressively to ramp up or down throttle due to level 0 merging */
@@ -827,7 +829,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	/* Update the throttle time. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 0);
 
-	new_id = WT_ATOMIC_ADD4(lsm_tree->last, 1);
+	new_id = __wt_atomic_add32(&lsm_tree->last, 1);
 
 	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
 	    nchunks + 1, &lsm_tree->chunk));
@@ -1085,7 +1087,7 @@ __wt_lsm_tree_truncate(
 
 	/* Create the new chunk. */
 	WT_ERR(__wt_calloc_one(session, &chunk));
-	chunk->id = WT_ATOMIC_ADD4(lsm_tree->last, 1);
+	chunk->id = __wt_atomic_add32(&lsm_tree->last, 1);
 	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 
 	/* Mark all chunks old. */
@@ -1195,7 +1197,8 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	WT_LSM_TREE *lsm_tree;
 	time_t begin, end;
 	uint64_t progress;
-	int i, compacting, flushing, locked, ref;
+	uint32_t i;
+	int compacting, flushing, locked, ref;
 
 	compacting = flushing = locked = ref = 0;
 	chunk = NULL;
@@ -1258,7 +1261,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 * If we have a chunk, we want to look for it to be on-disk.
 		 * So we need to add a reference to keep it available.
 		 */
-		(void)WT_ATOMIC_ADD4(chunk->refcnt, 1);
+		(void)__wt_atomic_add32(&chunk->refcnt, 1);
 		ref = 1;
 	}
 
@@ -1306,7 +1309,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 				    "Start compacting progress %" PRIu64,
 				    name, chunk->id,
 				    lsm_tree->merge_progressing));
-				(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
+				(void)__wt_atomic_sub32(&chunk->refcnt, 1);
 				flushing = ref = 0;
 				compacting = 1;
 				F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
@@ -1360,7 +1363,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 err:
 	/* Ensure anything we set is cleared. */
 	if (ref)
-		(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
+		(void)__wt_atomic_sub32(&chunk->refcnt, 1);
 	if (compacting) {
 		F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
 		lsm_tree->merge_aggressiveness = 0;

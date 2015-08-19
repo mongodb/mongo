@@ -259,7 +259,7 @@ __wt_lsm_manager_free_work_unit(
 	if (entry != NULL) {
 		WT_ASSERT(session, entry->lsm_tree->queue_ref > 0);
 
-		(void)WT_ATOMIC_SUB4(entry->lsm_tree->queue_ref, 1);
+		(void)__wt_atomic_sub32(&entry->lsm_tree->queue_ref, 1);
 		__wt_free(session, entry);
 	}
 }
@@ -673,7 +673,7 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	entry->type = type;
 	entry->flags = flags;
 	entry->lsm_tree = lsm_tree;
-	(void)WT_ATOMIC_ADD4(lsm_tree->queue_ref, 1);
+	(void)__wt_atomic_add32(&lsm_tree->queue_ref, 1);
 	WT_STAT_FAST_CONN_INCR(session, lsm_work_units_created);
 
 	if (type == WT_LSM_WORK_SWITCH)

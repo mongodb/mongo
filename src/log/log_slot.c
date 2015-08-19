@@ -104,7 +104,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int64_t cur_state, new_state, old_state;
+	int64_t new_state, old_state;
 	uint32_t allocated_slot, slot_attempts;
 
 	conn = S2C(session);
@@ -118,8 +118,8 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 find_slot:
 	allocated_slot = __wt_random(&session->rnd) % WT_SLOT_ACTIVE;
 	slot = log->slot_array[allocated_slot];
-	old_state = slot->slot_state;
 join_slot:
+	old_state = slot->slot_state;
 	/*
 	 * WT_LOG_SLOT_READY and higher means the slot is available for
 	 * joining.  Any other state means it is in use and transitioning
@@ -150,13 +150,11 @@ join_slot:
 		}
 		goto find_slot;
 	}
-	cur_state = WT_ATOMIC_CAS_VAL8(slot->slot_state, old_state, new_state);
 	/*
 	 * We lost a race to add our size into this slot.  Check the state
 	 * and try again.
 	 */
-	if (cur_state != old_state) {
-		old_state = cur_state;
+	if (!__wt_atomic_casiv64(&slot->slot_state, old_state, new_state)) {
 		WT_STAT_FAST_CONN_INCR(session, log_slot_races);
 		goto join_slot;
 	}
@@ -232,7 +230,8 @@ retry:
 	newslot->slot_state = WT_LOG_SLOT_READY;
 	newslot->slot_index = slot->slot_index;
 	log->slot_array[newslot->slot_index] = &log->slot_pool[pool_i];
-	old_state = WT_ATOMIC_STORE8(slot->slot_state, WT_LOG_SLOT_PENDING);
+	old_state =
+	    __wt_atomic_storeiv64(&slot->slot_state, WT_LOG_SLOT_PENDING);
 	slot->slot_group_size = (uint64_t)(old_state - WT_LOG_SLOT_READY);
 	/*
 	 * Note that this statistic may be much bigger than in reality,
@@ -288,14 +287,11 @@ __wt_log_slot_wait(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 int64_t
 __wt_log_slot_release(WT_LOGSLOT *slot, uint64_t size)
 {
-	int64_t newsize;
-
 	/*
 	 * Add my size into the state.  When it reaches WT_LOG_SLOT_DONE
 	 * all participatory threads have completed copying their piece.
 	 */
-	newsize = WT_ATOMIC_ADD8(slot->slot_state, (int64_t)size);
-	return (newsize);
+	return (__wt_atomic_addiv64(&slot->slot_state, (int64_t)size));
 }
 
 /*
