@@ -347,8 +347,8 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_DECL_RET;
 	WT_ITEM tmp;
 	WT_PAGE *page;
-	WT_PAGE_STATE previous_state;
 	size_t addr_size;
+	uint32_t previous_state;
 	int need_las_remove;
 	const uint8_t *addr;
 
@@ -367,9 +367,9 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * WT_REF_LOCKED, for deleted pages.  If successful, we've won the
 	 * race, read the page.
 	 */
-	if (WT_ATOMIC_CAS4(ref->state, WT_REF_DISK, WT_REF_READING))
+	if (__wt_atomic_casv32(&ref->state, WT_REF_DISK, WT_REF_READING))
 		previous_state = WT_REF_DISK;
-	else if (WT_ATOMIC_CAS4(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+	else if (__wt_atomic_casv32(&ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		previous_state = WT_REF_DELETED;
 	else
 		return (0);

@@ -49,7 +49,7 @@ __session_discard_dhandle(
 	TAILQ_REMOVE(&session->dhandles, dhandle_cache, q);
 	TAILQ_REMOVE(&session->dhhash[bucket], dhandle_cache, hashq);
 
-	(void)WT_ATOMIC_SUB4(dhandle_cache->dhandle->session_ref, 1);
+	(void)__wt_atomic_sub32(&dhandle_cache->dhandle->session_ref, 1);
 
 	__wt_overwrite_and_free(session, dhandle_cache);
 }
@@ -393,7 +393,7 @@ __session_find_shared_dhandle(
     WT_SESSION_IMPL *session, const char *uri, const char *checkpoint)
 {
 	WT_RET(__wt_conn_dhandle_find(session, uri, checkpoint));
-	(void)WT_ATOMIC_ADD4(session->dhandle->session_ref, 1);
+	(void)__wt_atomic_add32(&session->dhandle->session_ref, 1);
 	return (0);
 }
 

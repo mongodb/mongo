@@ -61,8 +61,8 @@ __split_stash_add(
 	stash->p = p;
 	stash->len = len;
 
-	WT_ATOMIC_ADD8(conn->split_stashed_bytes, len);
-	WT_ATOMIC_ADD8(conn->split_stashed_objects, 1);
+	(void)__wt_atomic_add64(&conn->split_stashed_bytes, len);
+	(void)__wt_atomic_add64(&conn->split_stashed_objects, 1);
 
 	/* See if we can free any previous entries. */
 	if (session->split_stash_cnt > 1)
@@ -99,8 +99,8 @@ __wt_split_stash_discard(WT_SESSION_IMPL *session)
 		 * It's a bad thing if another thread is in this memory after
 		 * we free it, make sure nothing good happens to that thread.
 		 */
-		WT_ATOMIC_SUB8(conn->split_stashed_bytes, stash->len);
-		WT_ATOMIC_SUB8(conn->split_stashed_objects, 1);
+		(void)__wt_atomic_sub64(&conn->split_stashed_bytes, stash->len);
+		(void)__wt_atomic_sub64(&conn->split_stashed_objects, 1);
 		__wt_overwrite_and_free_len(session, stash->p, stash->len);
 	}
 
@@ -561,7 +561,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 */
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
 	WT_INTL_INDEX_SET(parent, alloc_index);
-	split_gen = WT_ATOMIC_ADD8(S2C(session)->split_gen, 1);
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
 	panic = 1;
 
 #ifdef HAVE_DIAGNOSTIC
@@ -936,8 +936,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
 		if (next_ref->state == WT_REF_DELETED &&
 		    __wt_delete_page_skip(session, next_ref) &&
-		    WT_ATOMIC_CAS4(next_ref->state,
-		    WT_REF_DELETED, WT_REF_SPLIT))
+		    __wt_atomic_casv32(
+		    &next_ref->state, WT_REF_DELETED, WT_REF_SPLIT))
 			deleted_entries++;
 	}
 
@@ -997,7 +997,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
 	WT_INTL_INDEX_SET(parent, alloc_index);
-	split_gen = WT_ATOMIC_ADD8(S2C(session)->split_gen, 1);
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
 	alloc_index = NULL;
 
 #ifdef HAVE_DIAGNOSTIC

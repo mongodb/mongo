@@ -89,7 +89,7 @@ for line in open('../src/include/wiredtiger.in', 'r'):
 f.close()
 compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
 
-def print_func(name, list):
+def print_func(name, handle, list):
     '''Print the structures/functions for the stat.c file.'''
     f.write('\n')
     f.write('static const char * const __stats_' + name + '_desc[] = {\n')
@@ -102,23 +102,27 @@ const char *
 __wt_stat_''' + name + '''_desc(int slot)
 {
 \treturn (__stats_''' + name + '''_desc[slot]);
-}''')
+}
+''')
 
     f.write('''
 void
 __wt_stat_''' + name + '_init_single(WT_' + name.upper() + '''_STATS *stats)
 {
 \tmemset(stats, 0, sizeof(*stats));
-}''')
+}
+''')
 
     f.write('''
 void
-__wt_stat_''' + name + '_init(WT_' + name.upper() + '''_STATS **stats)
+__wt_stat_''' + name + '_init(' + handle + ''' *handle)
 {
-\tu_int i;
+\tint i;
 
-\tfor (i = 0; i < WT_COUNTER_SLOTS; ++i)
-\t\t__wt_stat_''' + name + '''_init_single(stats[i]);
+\tfor (i = 0; i < WT_COUNTER_SLOTS; ++i) {
+\t\thandle->stats[i] = &handle->stat_array[i];
+\t\t__wt_stat_''' + name + '''_init_single(handle->stats[i]);
+\t}
 }
 ''')
 
@@ -196,8 +200,8 @@ f = open(tmp_file, 'w')
 f.write('/* DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write('#include "wt_internal.h"\n')
 
-print_func('dsrc', dsrc_stats)
-print_func('connection', connection_stats)
+print_func('dsrc', 'WT_DATA_HANDLE', dsrc_stats)
+print_func('connection', 'WT_CONNECTION_IMPL', connection_stats)
 f.close()
 compare_srcfile(tmp_file, '../src/support/stat.c')
 
