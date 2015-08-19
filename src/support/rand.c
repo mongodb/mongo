@@ -84,8 +84,11 @@ __wt_random(WT_RAND_STATE volatile * rnd_state)
 	 * to initialize the state, or initializes with a seed that results in a
 	 * short period.
 	 */
-	if (z == 0 || w == 0)
-		__wt_random_init(rnd_state);
+	if (z == 0 || w == 0) {
+		__wt_random_init(&rnd);
+		w = M_W(rnd);
+		z = M_Z(rnd);
+	}
 
 	M_Z(rnd) = z = 36969 * (z & 65535) + (z >> 16);
 	M_W(rnd) = w = 18000 * (w & 65535) + (w >> 16);
