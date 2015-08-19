@@ -1570,7 +1570,6 @@ void TopologyCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* response)
         return;
     }
 
-    response->setReplSetName(_rsConfig.getReplSetName());
     response->setReplSetVersion(_rsConfig.getConfigVersion());
     response->setIsMaster(myState.primary());
     response->setIsSecondary(myState.secondary());
