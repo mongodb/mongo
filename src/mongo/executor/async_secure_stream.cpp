@@ -56,7 +56,7 @@ void AsyncSecureStream::connect(const asio::ip::tcp::resolver::iterator endpoint
                             if (ec) {
                                 return _userHandler(ec);
                             }
-                            return _handleConnect(ec, std::move(iter));
+                            return _handleConnect(std::move(iter));
                         });
 }
 
@@ -68,7 +68,7 @@ void AsyncSecureStream::read(asio::mutable_buffer buffer, StreamHandler&& stream
     asio::async_read(_stream, asio::buffer(buffer), std::move(streamHandler));
 }
 
-void AsyncSecureStream::_handleConnect(std::error_code ec, asio::ip::tcp::resolver::iterator iter) {
+void AsyncSecureStream::_handleConnect(asio::ip::tcp::resolver::iterator iter) {
     _stream.async_handshake(decltype(_stream)::client,
                             [this, iter](std::error_code ec) {
                                 if (ec) {

@@ -51,7 +51,7 @@ public:
     void read(asio::mutable_buffer buffer, StreamHandler&& streamHandler);
 
 private:
-    void _handleConnect(std::error_code ec, asio::ip::tcp::resolver::iterator iter);
+    void _handleConnect(asio::ip::tcp::resolver::iterator iter);
 
     void _handleHandshake(std::error_code ec, const std::string& hostName);
 
