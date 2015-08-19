@@ -22,7 +22,9 @@ var st;
     var dataCollectionName = testDBName + ".data";
     var csrsName = jsTestName() + "-csrs";
     var numCsrsMembers;
-    if (TestData.storageEngine == "wiredTiger") {  // TODO(schwerin): SERVER-19739
+    if (TestData.storageEngine == "wiredTiger" || TestData.storageEngine == "") {
+        // TODO(schwerin): SERVER-19739 Support testing CSRS with storage engines other than wired
+        // tiger, when such other storage engines support majority read concern.
         numCsrsMembers = 3;
     } else {
         numCsrsMembers = 4;
@@ -173,7 +175,8 @@ var st;
         csrsStatus = csrs[0].adminCommand({replSetGetStatus: 1});
         var i;
         for (i = 0; i < csrsStatus.members.length; ++i) {
-            if (TestData.storageEngine == "mmapv1") { // TODO(schwerin): SERVER-19739
+            if (TestData.storageEngine != "wiredTiger" && TestData.storageEngine != "") {
+                // NOTE: "" means default storage engine, which is WiredTiger.
                 if (csrsStatus.members[i].name == csrs[0].name &&
                     csrsStatus.members[i].stateStr != "REMOVED") {
 
@@ -181,7 +184,7 @@ var st;
                 }
             }
             if (csrsStatus.members[i].stateStr == "PRIMARY") {
-                return true;
+                return csrs[i].adminCommand({ismaster: 1}).ismaster;
             }
         }
         return false;
