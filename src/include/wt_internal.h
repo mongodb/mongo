@@ -55,11 +55,6 @@ extern "C" {
 #include <windows.h>
 #endif
 
-/*******************************************
- * WiredTiger externally maintained include files.
- *******************************************/
-#include "queue.h"
-
 /*
  * DO NOT EDIT: automatically built by dist/s_typedef.
  * Forward type declarations for internal types: BEGIN
@@ -284,6 +279,8 @@ union __wt_rand_state;
 #include "msvc.h"
 #endif
 #include "hardware.h"
+
+#include "queue.h"
 
 #ifdef _WIN32
 #include "os_windows.h"
