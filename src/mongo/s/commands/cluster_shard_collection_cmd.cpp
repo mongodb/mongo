@@ -171,7 +171,7 @@ public:
         // The rest of the checks require a connection to the primary db
         ConnectionString shardConnString;
         {
-            const auto shard = grid.shardRegistry()->getShard(config->getPrimaryId());
+            const auto shard = grid.shardRegistry()->getShard(txn, config->getPrimaryId());
             shardConnString = shard->getConnString();
         }
 
@@ -416,7 +416,7 @@ public:
             int i = 0;
             for (ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c, ++i) {
                 const ShardId& shardId = shardIds[i % numShards];
-                const auto to = grid.shardRegistry()->getShard(shardId);
+                const auto to = grid.shardRegistry()->getShard(txn, shardId);
                 if (!to) {
                     continue;
                 }

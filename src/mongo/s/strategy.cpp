@@ -113,12 +113,12 @@ static bool doShardedIndexQuery(OperationContext* txn, Request& r, const QuerySp
 
     ShardPtr shard;
     ChunkManagerPtr cm;
-    config->getChunkManagerOrPrimary(indexNSSQuery.ns(), cm, shard);
+    config->getChunkManagerOrPrimary(txn, indexNSSQuery.ns(), cm, shard);
     if (cm) {
         set<ShardId> shardIds;
         cm->getAllShardIds(&shardIds);
         verify(shardIds.size() > 0);
-        shard = grid.shardRegistry()->getShard(*shardIds.begin());
+        shard = grid.shardRegistry()->getShard(txn, *shardIds.begin());
     }
 
     ShardConnection dbcon(shard->getConnString(), r.getns());
@@ -304,7 +304,7 @@ void Strategy::queryOp(OperationContext* txn, Request& r) {
         // Remote cursors are stored remotely, we shouldn't need this around.
         unique_ptr<ParallelSortClusteredCursor> cursorDeleter(cursor);
 
-        ShardPtr shard = cursor->getQueryShard();
+        ShardPtr shard = grid.shardRegistry()->getShard(txn, cursor->getQueryShardId());
         verify(shard.get());
         DBClientCursorPtr shardCursor = cursor->getShardCursor(shard->getId());
 
@@ -491,7 +491,7 @@ Status Strategy::commandOpUnsharded(OperationContext* txn,
         return Status(ErrorCodes::IllegalOperation, ss);
     }
 
-    const auto primaryShard = grid.shardRegistry()->getShard(conf->getPrimaryId());
+    const auto primaryShard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
 
     BSONObj shardResult;
     try {
@@ -577,7 +577,7 @@ void Strategy::getMore(OperationContext* txn, Request& r) {
 
     ShardPtr primary;
     ChunkManagerPtr info;
-    config->getChunkManagerOrPrimary(ns, info, primary);
+    config->getChunkManagerOrPrimary(txn, ns, info, primary);
 
     //
     // TODO: Cleanup cursor cache, consolidate into single codepath

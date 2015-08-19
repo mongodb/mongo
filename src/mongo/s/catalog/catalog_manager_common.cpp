@@ -330,7 +330,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
 
     // If a name for a shard wasn't provided, generate one
     if (shardType.getName().empty()) {
-        StatusWith<string> result = _generateNewShardName();
+        StatusWith<string> result = _generateNewShardName(txn);
         if (!result.isOK()) {
             return Status(ErrorCodes::OperationFailed, "error generating new shard name");
         }
@@ -351,7 +351,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
     }
 
     // Make sure the new shard is visible
-    grid.shardRegistry()->reload();
+    grid.shardRegistry()->reload(txn);
 
     // Add all databases which were discovered on the new shard
     for (const string& dbName : dbNamesStatus.getValue()) {
@@ -437,13 +437,13 @@ Status CatalogManagerCommon::createDatabase(OperationContext* txn, const std::st
     }
 
     // check for case sensitivity violations
-    Status status = _checkDbDoesNotExist(dbName, nullptr);
+    Status status = _checkDbDoesNotExist(txn, dbName, nullptr);
     if (!status.isOK()) {
         return status;
     }
 
     // Database does not exist, pick a shard and create a new entry
-    auto newShardIdStatus = selectShardForNewDatabase(grid.shardRegistry());
+    auto newShardIdStatus = selectShardForNewDatabase(txn, grid.shardRegistry());
     if (!newShardIdStatus.isOK()) {
         return newShardIdStatus.getStatus();
     }
@@ -468,12 +468,13 @@ Status CatalogManagerCommon::createDatabase(OperationContext* txn, const std::st
 }
 
 // static
-StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(ShardRegistry* shardRegistry) {
+StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(OperationContext* txn,
+                                                                    ShardRegistry* shardRegistry) {
     vector<ShardId> allShardIds;
 
     shardRegistry->getAllShardIds(&allShardIds);
     if (allShardIds.empty()) {
-        shardRegistry->reload();
+        shardRegistry->reload(txn);
         shardRegistry->getAllShardIds(&allShardIds);
 
         if (allShardIds.empty()) {
@@ -483,7 +484,8 @@ StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(ShardRegistr
 
     ShardId candidateShardId = allShardIds[0];
 
-    auto candidateSizeStatus = shardutil::retrieveTotalShardSize(candidateShardId, shardRegistry);
+    auto candidateSizeStatus =
+        shardutil::retrieveTotalShardSize(txn, candidateShardId, shardRegistry);
     if (!candidateSizeStatus.isOK()) {
         return candidateSizeStatus.getStatus();
     }
@@ -491,7 +493,7 @@ StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(ShardRegistr
     for (size_t i = 1; i < allShardIds.size(); i++) {
         const ShardId shardId = allShardIds[i];
 
-        const auto sizeStatus = shardutil::retrieveTotalShardSize(shardId, shardRegistry);
+        const auto sizeStatus = shardutil::retrieveTotalShardSize(txn, shardId, shardRegistry);
         if (!sizeStatus.isOK()) {
             return sizeStatus.getStatus();
         }
@@ -519,10 +521,10 @@ Status CatalogManagerCommon::enableSharding(OperationContext* txn, const std::st
     }
 
     // Check for case sensitivity violations
-    Status status = _checkDbDoesNotExist(dbName, &db);
+    Status status = _checkDbDoesNotExist(txn, dbName, &db);
     if (status.isOK()) {
         // Database does not exist, create a new entry
-        auto newShardIdStatus = selectShardForNewDatabase(grid.shardRegistry());
+        auto newShardIdStatus = selectShardForNewDatabase(txn, grid.shardRegistry());
         if (!newShardIdStatus.isOK()) {
             return newShardIdStatus.getStatus();
         }

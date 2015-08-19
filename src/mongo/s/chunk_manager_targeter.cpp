@@ -273,7 +273,7 @@ Status ChunkManagerTargeter::init(OperationContext* txn) {
     }
 
     shared_ptr<DBConfig> config = status.getValue();
-    config->getChunkManagerOrPrimary(_nss.ns(), _manager, _primary);
+    config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
 
     return Status::OK();
 }
@@ -642,7 +642,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
     }
 
     shared_ptr<DBConfig> config = status.getValue();
-    config->getChunkManagerOrPrimary(_nss.ns(), _manager, _primary);
+    config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
 
     // We now have the latest metadata from the cache.
 
@@ -716,7 +716,7 @@ Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refre
         } catch (const DBException& ex) {
             return Status(ErrorCodes::UnknownError, ex.toString());
         }
-        config->getChunkManagerOrPrimary(_nss.ns(), _manager, _primary);
+        config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
     } else if (refreshType == RefreshType_ReloadDatabase) {
         try {
             // Dumps the db info, reloads it all, synchronization between threads happens
@@ -727,7 +727,7 @@ Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refre
             return Status(ErrorCodes::UnknownError, ex.toString());
         }
 
-        config->getChunkManagerOrPrimary(_nss.ns(), _manager, _primary);
+        config->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
     }
 
     return Status::OK();

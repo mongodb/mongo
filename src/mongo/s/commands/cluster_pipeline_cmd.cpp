@@ -110,7 +110,7 @@ public:
         shared_ptr<DBConfig> conf = status.getValue();
 
         if (!conf->isShardingEnabled()) {
-            return aggPassthrough(conf, cmdObj, result, options);
+            return aggPassthrough(txn, conf, cmdObj, result, options);
         }
 
         intrusive_ptr<ExpressionContext> mergeCtx =
@@ -131,7 +131,7 @@ public:
         }
 
         if (!conf->isSharded(fullns)) {
-            return aggPassthrough(conf, cmdObj, result, options);
+            return aggPassthrough(txn, conf, cmdObj, result, options);
         }
 
         // If the first $match stage is an exact match on the shard key, we only have to send it
@@ -234,7 +234,7 @@ public:
         const auto& mergingShardId = needPrimaryShardMerger
             ? conf->getPrimaryId()
             : shardResults[prng.nextInt32(shardResults.size())].shardTargetId;
-        const auto mergingShard = grid.shardRegistry()->getShard(mergingShardId);
+        const auto mergingShard = grid.shardRegistry()->getShard(txn, mergingShardId);
         ShardConnection conn(mergingShard->getConnString(), outputNsOrEmpty);
         BSONObj mergedResults =
             aggRunCommand(conn.get(), dbname, mergeCmd.freeze().toBson(), options);
@@ -261,7 +261,8 @@ private:
     // returned cursors with mongos's cursorCache.
     BSONObj aggRunCommand(DBClientBase* conn, const string& db, BSONObj cmd, int queryOptions);
 
-    bool aggPassthrough(shared_ptr<DBConfig> conf,
+    bool aggPassthrough(OperationContext* txn,
+                        shared_ptr<DBConfig> conf,
                         BSONObj cmd,
                         BSONObjBuilder& result,
                         int queryOptions);
@@ -398,12 +399,13 @@ BSONObj PipelineCommand::aggRunCommand(DBClientBase* conn,
     return result;
 }
 
-bool PipelineCommand::aggPassthrough(shared_ptr<DBConfig> conf,
+bool PipelineCommand::aggPassthrough(OperationContext* txn,
+                                     shared_ptr<DBConfig> conf,
                                      BSONObj cmd,
                                      BSONObjBuilder& out,
                                      int queryOptions) {
     // Temporary hack. See comment on declaration for details.
-    const auto shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
+    const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
     ShardConnection conn(shard->getConnString(), "");
     BSONObj result = aggRunCommand(conn.get(), conf->name(), cmd, queryOptions);
     conn.done();

@@ -288,7 +288,7 @@ public:
         // Now only check top-level shard connections
         for (const ShardId& shardId : all) {
             try {
-                const auto shard = grid.shardRegistry()->getShard(shardId);
+                const auto shard = grid.shardRegistry()->getShard(txn, shardId);
                 if (!shard) {
                     continue;
                 }

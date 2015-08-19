@@ -86,7 +86,7 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
 
     std::list<std::shared_ptr<Future::CommandResult>> futures;
     for (const ShardId& shardId : shardIds) {
-        const auto shard = grid.shardRegistry()->getShard(shardId);
+        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
         if (!shard) {
             continue;
         }

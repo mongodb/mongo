@@ -83,7 +83,7 @@ private:
      *
      * This method throws on a network exception
      */
-    bool _init();
+    bool _init(OperationContext* txn);
 
     /**
      * Gathers all the necessary information about shards and chunks, and decides whether there are
@@ -118,7 +118,7 @@ private:
      * @return true if all the servers listed in configdb as being shards are reachable and are
      *         distinct processes
      */
-    bool _checkOIDs();
+    bool _checkOIDs(OperationContext* txn);
 };
 
 extern Balancer balancer;

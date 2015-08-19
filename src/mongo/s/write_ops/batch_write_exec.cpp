@@ -180,7 +180,7 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                 // Figure out what host we need to dispatch our targeted batch
                 ConnectionString shardHost;
                 Status resolveStatus =
-                    _resolver->chooseWriteHost(nextBatch->getEndpoint().shardName, &shardHost);
+                    _resolver->chooseWriteHost(txn, nextBatch->getEndpoint().shardName, &shardHost);
                 if (!resolveStatus.isOK()) {
                     ++_stats->numResolveErrors;
 

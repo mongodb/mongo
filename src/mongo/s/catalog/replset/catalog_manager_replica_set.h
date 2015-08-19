@@ -98,7 +98,7 @@ public:
                                            const std::string& collectionNs,
                                            const ChunkType& chunk) override;
 
-    Status getAllShards(std::vector<ShardType>* shards) override;
+    Status getAllShards(OperationContext* txn, std::vector<ShardType>* shards) override;
 
     bool runUserManagementWriteCommand(OperationContext* txn,
                                        const std::string& commandName,
@@ -140,11 +140,14 @@ public:
     Status initConfigVersion(OperationContext* txn) override;
 
 private:
-    Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) override;
+    Status _checkDbDoesNotExist(OperationContext* txn,
+                                const std::string& dbName,
+                                DatabaseType* db) override;
 
-    StatusWith<std::string> _generateNewShardName() override;
+    StatusWith<std::string> _generateNewShardName(OperationContext* txn) override;
 
-    bool _runReadCommand(const std::string& dbname,
+    bool _runReadCommand(OperationContext* txn,
+                         const std::string& dbname,
                          const BSONObj& cmdObj,
                          const ReadPreferenceSetting& settings,
                          BSONObjBuilder* result);
@@ -179,7 +182,7 @@ private:
     /**
      * Returns the current cluster schema/protocol version.
      */
-    StatusWith<VersionType> _getConfigVersion();
+    StatusWith<VersionType> _getConfigVersion(OperationContext* txn);
 
     /**
      * Returns the highest last known config server opTime.

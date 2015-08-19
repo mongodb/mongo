@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+class OperationContext;
+
 /**
  * Namespace for the collection of static methods used by commands in the implementation of
  * explain on mongos.
@@ -67,7 +69,8 @@ public:
      *
      * On success, the output is added to the BSONObj builder 'out'.
      */
-    static Status buildExplainResult(const std::vector<Strategy::CommandResult>& shardResults,
+    static Status buildExplainResult(OperationContext* txn,
+                                     const std::vector<Strategy::CommandResult>& shardResults,
                                      const char* mongosStageName,
                                      long long millisElapsed,
                                      BSONObjBuilder* out);
@@ -95,7 +98,8 @@ private:
      * The planner info will display 'mongosStageName' as the name of the execution stage
      * performed by mongos after gathering results from the shards.
      */
-    static void buildPlannerInfo(const std::vector<Strategy::CommandResult>& shardResults,
+    static void buildPlannerInfo(OperationContext* txn,
+                                 const std::vector<Strategy::CommandResult>& shardResults,
                                  const char* mongosStageName,
                                  BSONObjBuilder* out);
 

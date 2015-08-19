@@ -59,6 +59,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'common',
+        '$BUILD_DIR/mongo/db/service_context',
     ]
 )
 

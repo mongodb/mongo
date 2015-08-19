@@ -66,11 +66,11 @@ public:
         return chunk.getShard() == _currShard;
     }
 
-    virtual pair<BSONObj, BSONObj> rangeFor(const ChunkType& chunk) const {
+    virtual pair<BSONObj, BSONObj> rangeFor(OperationContext* txn, const ChunkType& chunk) const {
         return make_pair(chunk.getMin(), chunk.getMax());
     }
 
-    virtual string shardFor(const string& name) const {
+    virtual string shardFor(OperationContext* txn, const string& name) const {
         return name;
     }
 
@@ -193,7 +193,7 @@ Status MetadataLoader::initChunks(OperationContext* txn,
         // last time).  If not, something has changed on the config server (potentially between
         // when we read the collection data and when we read the chunks data).
         //
-        int diffsApplied = differ.calculateConfigDiff(chunks);
+        int diffsApplied = differ.calculateConfigDiff(txn, chunks);
         if (diffsApplied > 0) {
             // Chunks found, return ok
             LOG(2) << "loaded " << diffsApplied << " chunks into new metadata for " << ns

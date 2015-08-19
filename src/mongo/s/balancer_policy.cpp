@@ -66,8 +66,10 @@ namespace {
  *  ShardNotFound if shard by that id is not available on the registry
  *  NoSuchKey if the version could not be retrieved
  */
-std::string retrieveShardMongoDVersion(ShardId shardId, ShardRegistry* shardRegistry) {
-    auto shard = shardRegistry->getShard(shardId);
+std::string retrieveShardMongoDVersion(OperationContext* txn,
+                                       ShardId shardId,
+                                       ShardRegistry* shardRegistry) {
+    auto shard = shardRegistry->getShard(txn, shardId);
     if (!shard) {
         uassertStatusOK({ErrorCodes::ShardNotFound, "Shard not found"});
     }
@@ -276,7 +278,7 @@ void DistributionStatus::dump() const {
 Status DistributionStatus::populateShardInfoMap(OperationContext* txn, ShardInfoMap* shardInfo) {
     try {
         vector<ShardType> shards;
-        Status status = grid.catalogManager(txn)->getAllShards(&shards);
+        Status status = grid.catalogManager(txn)->getAllShards(txn, &shards);
         if (!status.isOK()) {
             return status;
         }
@@ -285,10 +287,10 @@ Status DistributionStatus::populateShardInfoMap(OperationContext* txn, ShardInfo
             std::set<std::string> dummy;
 
             const long long shardSizeBytes = uassertStatusOK(
-                shardutil::retrieveTotalShardSize(shardData.getName(), grid.shardRegistry()));
+                shardutil::retrieveTotalShardSize(txn, shardData.getName(), grid.shardRegistry()));
 
             const std::string shardMongodVersion =
-                retrieveShardMongoDVersion(shardData.getName(), grid.shardRegistry());
+                retrieveShardMongoDVersion(txn, shardData.getName(), grid.shardRegistry());
 
             ShardInfo newShardEntry(shardData.getMaxSizeMB(),
                                     shardSizeBytes / 1024 / 1024,

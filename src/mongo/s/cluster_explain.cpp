@@ -191,7 +191,8 @@ const char* ClusterExplain::getStageNameForReadOp(
 }
 
 // static
-void ClusterExplain::buildPlannerInfo(const vector<Strategy::CommandResult>& shardResults,
+void ClusterExplain::buildPlannerInfo(OperationContext* txn,
+                                      const vector<Strategy::CommandResult>& shardResults,
                                       const char* mongosStageName,
                                       BSONObjBuilder* out) {
     BSONObjBuilder queryPlannerBob(out->subobjStart("queryPlanner"));
@@ -209,7 +210,7 @@ void ClusterExplain::buildPlannerInfo(const vector<Strategy::CommandResult>& sha
 
         singleShardBob.append("shardName", shardResults[i].shardTargetId);
         {
-            const auto shard = grid.shardRegistry()->getShard(shardResults[i].shardTargetId);
+            const auto shard = grid.shardRegistry()->getShard(txn, shardResults[i].shardTargetId);
             singleShardBob.append("connectionString", shard->getConnString().toString());
         }
         appendIfRoom(&singleShardBob, serverInfo, "serverInfo");
@@ -331,7 +332,8 @@ void ClusterExplain::buildExecStats(const vector<Strategy::CommandResult>& shard
 }
 
 // static
-Status ClusterExplain::buildExplainResult(const vector<Strategy::CommandResult>& shardResults,
+Status ClusterExplain::buildExplainResult(OperationContext* txn,
+                                          const vector<Strategy::CommandResult>& shardResults,
                                           const char* mongosStageName,
                                           long long millisElapsed,
                                           BSONObjBuilder* out) {
@@ -341,7 +343,7 @@ Status ClusterExplain::buildExplainResult(const vector<Strategy::CommandResult>&
         return validateStatus;
     }
 
-    buildPlannerInfo(shardResults, mongosStageName, out);
+    buildPlannerInfo(txn, shardResults, mongosStageName, out);
     buildExecStats(shardResults, mongosStageName, millisElapsed, out);
 
     return Status::OK();

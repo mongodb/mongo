@@ -139,7 +139,7 @@ public:
                                            const std::string& collectionNs,
                                            const ChunkType& chunk) override;
 
-    Status getAllShards(std::vector<ShardType>* shards) override;
+    Status getAllShards(OperationContext* txn, std::vector<ShardType>* shards) override;
 
     bool runUserManagementWriteCommand(OperationContext* txn,
                                        const std::string& commandName,

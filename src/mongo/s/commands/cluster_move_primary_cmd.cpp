@@ -126,7 +126,7 @@ public:
             return false;
         }
 
-        shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(to);
+        shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(txn, to);
         if (!toShard) {
             string msg(str::stream() << "Could not move database '" << dbname << "' to shard '"
                                      << to << "' because the shard does not exist");
@@ -134,7 +134,7 @@ public:
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
 
-        shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(config->getPrimaryId());
+        shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(txn, config->getPrimaryId());
         invariant(fromShard);
 
         if (fromShard->getConnString().sameLogicalEndpoint(toShard->getConnString())) {

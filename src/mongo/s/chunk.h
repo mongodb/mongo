@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 
@@ -62,7 +63,7 @@ public:
         autoSplitInternal
     };
 
-    Chunk(const ChunkManager* info, BSONObj from);
+    Chunk(OperationContext* txn, const ChunkManager* info, ChunkType from);
     Chunk(const ChunkManager* info,
           const BSONObj& min,
           const BSONObj& max,
@@ -161,7 +162,7 @@ public:
      *
      * @param medianKey the key that divides this chunk, if there is one, or empty
      */
-    void pickMedianKey(BSONObj& medianKey) const;
+    void pickMedianKey(OperationContext* txn, BSONObj& medianKey) const;
 
     /**
      * Ask the mongod holding this chunk to figure out the split points.
@@ -170,7 +171,8 @@ public:
      * @param maxPoints limits the number of split points that are needed, zero is max (optional)
      * @param maxObjs limits the number of objects in each chunk, zero is as max (optional)
      */
-    void pickSplitVector(std::vector<BSONObj>& splitPoints,
+    void pickSplitVector(OperationContext* txn,
+                         std::vector<BSONObj>& splitPoints,
                          long long chunkSize,
                          int maxPoints = 0,
                          int maxObjs = 0) const;
@@ -197,12 +199,6 @@ public:
                        bool waitForDelete,
                        int maxTimeMS,
                        BSONObj& res) const;
-
-    /**
-     * @return size of shard in bytes
-     *  talks to mongod to do this
-     */
-    long getPhysicalSize() const;
 
     /**
      * marks this chunk as a jumbo chunk
@@ -261,7 +257,7 @@ private:
     /**
      * Returns the connection string for the shard on which this chunk resides.
      */
-    std::string _getShardConnectionString() const;
+    std::string _getShardConnectionString(OperationContext* txn) const;
 
     // if min/max key is pos/neg infinity
     bool _minIsInf() const;
@@ -293,7 +289,7 @@ private:
      *          is simply an ordered list of ascending/descending field names. Examples:
      *          {a : 1, b : -1} is not special. {a : "hashed"} is.
      */
-    BSONObj _getExtremeKey(bool doSplitAtLower) const;
+    BSONObj _getExtremeKey(OperationContext* txn, bool doSplitAtLower) const;
 
     /**
      * Determines the appropriate split points for this chunk.
@@ -301,7 +297,9 @@ private:
      * @param atMedian perform a single split at the middle of this chunk.
      * @param splitPoints out parameter containing the chosen split points. Can be empty.
      */
-    void determineSplitPoints(bool atMedian, std::vector<BSONObj>* splitPoints) const;
+    void determineSplitPoints(OperationContext* txn,
+                              bool atMedian,
+                              std::vector<BSONObj>* splitPoints) const;
 
     /**
      * initializes _dataWritten with a random value so that a mongos restart

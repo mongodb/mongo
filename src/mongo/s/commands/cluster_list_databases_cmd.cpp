@@ -94,7 +94,7 @@ public:
         grid.shardRegistry()->getAllShardIds(&shardIds);
 
         for (const ShardId& shardId : shardIds) {
-            const auto s = grid.shardRegistry()->getShard(shardId);
+            const auto s = grid.shardRegistry()->getShard(txn, shardId);
             if (!s) {
                 continue;
             }

@@ -86,7 +86,7 @@ public:
                      BSONObjBuilder& result) {
         const string target = cmdObj.firstElement().valuestrsafe();
 
-        const auto s = grid.shardRegistry()->getShard(target);
+        const auto s = grid.shardRegistry()->getShard(txn, target);
         if (!s) {
             string msg(str::stream() << "Could not drop shard '" << target
                                      << "' because it does not exist");

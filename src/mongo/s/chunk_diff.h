@@ -38,6 +38,7 @@ namespace mongo {
 
 class ChunkType;
 struct ChunkVersion;
+class OperationContext;
 
 class ConfigDiffTrackerBase {
 public:
@@ -113,7 +114,7 @@ public:
     // Applies changes to the config data from a vector of chunks passed in. Also includes minor
     // version changes for particular major-version chunks if explicitly specified.
     // Returns the number of diffs processed, or -1 if the diffs were inconsistent.
-    int calculateConfigDiff(const std::vector<ChunkType>& chunks);
+    int calculateConfigDiff(OperationContext* txn, const std::vector<ChunkType>& chunks);
 
     // Returns the query needed to find new changes to a collection from the config server
     // Needed only if a custom connection is required to the config server
@@ -133,9 +134,10 @@ protected:
         return true;
     }
 
-    virtual std::pair<BSONObj, ValType> rangeFor(const ChunkType& chunk) const = 0;
+    virtual std::pair<BSONObj, ValType> rangeFor(OperationContext* txn,
+                                                 const ChunkType& chunk) const = 0;
 
-    virtual ShardId shardFor(const std::string& name) const = 0;
+    virtual ShardId shardFor(OperationContext* txn, const std::string& name) const = 0;
 
 private:
     void _assertAttached() const;

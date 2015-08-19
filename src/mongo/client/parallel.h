@@ -194,7 +194,7 @@ public:
      * Returns the single shard with an open cursor.
      * It is an error to call this if getNumQueryShards() > 1
      */
-    std::shared_ptr<Shard> getQueryShard();
+    ShardId getQueryShardId();
 
     /**
      * Returns primary shard with an open cursor.
@@ -203,9 +203,6 @@ public:
     std::shared_ptr<Shard> getPrimary();
 
     DBClientCursorPtr getShardCursor(const ShardId& shardId);
-
-    BSONObj toBSON() const;
-    std::string toString() const;
 
     void explain(BSONObjBuilder& b);
 
@@ -251,7 +248,8 @@ private:
      * set connection and the primary cannot be reached, the version
      * will not be set if the slaveOk flag is set.
      */
-    void setupVersionAndHandleSlaveOk(PCStatePtr state /* in & out */,
+    void setupVersionAndHandleSlaveOk(OperationContext* txn,
+                                      PCStatePtr state /* in & out */,
                                       const ShardId& shardId,
                                       std::shared_ptr<Shard> primary /* in */,
                                       const NamespaceString& ns,

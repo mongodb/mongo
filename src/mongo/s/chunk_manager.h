@@ -171,7 +171,8 @@ public:
 
 
     // Helpers for load
-    void calcInitSplitsAndShards(const ShardId& primaryShardId,
+    void calcInitSplitsAndShards(OperationContext* txn,
+                                 const ShardId& primaryShardId,
                                  const std::vector<BSONObj>* initPoints,
                                  const std::set<ShardId>* initShardIds,
                                  std::vector<BSONObj>* splitPoints,

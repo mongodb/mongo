@@ -89,13 +89,14 @@ public:
         return false;
     }
 
-    pair<BSONObj, shared_ptr<Chunk>> rangeFor(const ChunkType& chunk) const final {
-        shared_ptr<Chunk> c(new Chunk(_manager, chunk.toBSON()));
+    pair<BSONObj, shared_ptr<Chunk>> rangeFor(OperationContext* txn,
+                                              const ChunkType& chunk) const final {
+        shared_ptr<Chunk> c(new Chunk(txn, _manager, chunk));
         return make_pair(chunk.getMax(), c);
     }
 
-    string shardFor(const string& hostName) const final {
-        const auto shard = grid.shardRegistry()->getShard(hostName);
+    string shardFor(OperationContext* txn, const string& hostName) const final {
+        const auto shard = grid.shardRegistry()->getShard(txn, hostName);
         return shard->getId();
     }
 
@@ -269,14 +270,14 @@ bool ChunkManager::_load(OperationContext* txn,
     invariant(opTime >= _configOpTime);
     _configOpTime = opTime;
 
-    int diffsApplied = differ.calculateConfigDiff(chunks);
+    int diffsApplied = differ.calculateConfigDiff(txn, chunks);
     if (diffsApplied > 0) {
         LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << _ns
                << " with version " << _version;
 
         // Add all existing shards we find to the shards set
         for (ShardVersionMap::iterator it = shardVersions->begin(); it != shardVersions->end();) {
-            shared_ptr<Shard> shard = grid.shardRegistry()->getShard(it->first);
+            shared_ptr<Shard> shard = grid.shardRegistry()->getShard(txn, it->first);
             if (shard) {
                 shardIds.insert(it->first);
                 ++it;
@@ -339,7 +340,8 @@ void ChunkManager::_printChunks() const {
     }
 }
 
-void ChunkManager::calcInitSplitsAndShards(const ShardId& primaryShardId,
+void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
+                                           const ShardId& primaryShardId,
                                            const vector<BSONObj>* initPoints,
                                            const set<ShardId>* initShardIds,
                                            vector<BSONObj>* splitPoints,
@@ -353,7 +355,7 @@ void ChunkManager::calcInitSplitsAndShards(const ShardId& primaryShardId,
 
     if (!initPoints || !initPoints->size()) {
         // discover split points
-        const auto primaryShard = grid.shardRegistry()->getShard(primaryShardId);
+        const auto primaryShard = grid.shardRegistry()->getShard(txn, primaryShardId);
         auto targetStatus =
             primaryShard->getTargeter()->findHost({ReadPreference::PrimaryPreferred, TagSet{}});
         uassertStatusOK(targetStatus);
@@ -368,7 +370,7 @@ void ChunkManager::calcInitSplitsAndShards(const ShardId& primaryShardId,
         uassertStatusOK(bsonExtractIntegerField(result.getValue(), "n", &numObjects));
 
         if (numObjects > 0)
-            c.pickSplitVector(*splitPoints, Chunk::MaxChunkSize);
+            c.pickSplitVector(txn, *splitPoints, Chunk::MaxChunkSize);
 
         // since docs already exists, must use primary shard
         shardIds->push_back(primaryShardId);
@@ -403,7 +405,7 @@ void ChunkManager::createFirstChunks(OperationContext* txn,
 
     vector<BSONObj> splitPoints;
     vector<ShardId> shardIds;
-    calcInitSplitsAndShards(primaryShardId, initPoints, initShardIds, &splitPoints, &shardIds);
+    calcInitSplitsAndShards(txn, primaryShardId, initPoints, initShardIds, &splitPoints, &shardIds);
 
 
     // this is the first chunk; start the versioning from scratch

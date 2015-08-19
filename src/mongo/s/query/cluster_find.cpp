@@ -113,7 +113,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         chunkManager->getShardIdsForQuery(shardIds, query.getParsed().getFilter());
 
         for (auto id : shardIds) {
-            shards.emplace_back(shardRegistry->getShard(id));
+            shards.emplace_back(shardRegistry->getShard(txn, id));
         }
     }
 
@@ -233,7 +233,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
 
     std::shared_ptr<ChunkManager> chunkManager;
     std::shared_ptr<Shard> primary;
-    dbConfig.getValue()->getChunkManagerOrPrimary(query.nss().ns(), chunkManager, primary);
+    dbConfig.getValue()->getChunkManagerOrPrimary(txn, query.nss().ns(), chunkManager, primary);
 
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.

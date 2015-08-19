@@ -88,7 +88,7 @@ public:
     }
 
     RemoteCommandTargeterMock* targeter() {
-        return RemoteCommandTargeterMock::get(_shardRegistry->getShard("config")->getTargeter());
+        return RemoteCommandTargeterMock::get(_shardRegistry->getConfigShard()->getTargeter());
     }
 
     DistLockCatalogImpl* catalog() {

@@ -332,7 +332,8 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
 
     setupShards(vector<ShardType>{shard});
 
-    RemoteCommandTargeterMock::get(grid.shardRegistry()->getShard(shard.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        grid.shardRegistry()->getShard(operationContext(), shard.getName())->getTargeter())
         ->setFindHostReturnValue(shardHost);
 
     string ns = "db1.foo";
@@ -459,11 +460,14 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
 
     setupShards(vector<ShardType>{shard0, shard1, shard2});
 
-    RemoteCommandTargeterMock::get(grid.shardRegistry()->getShard(shard0.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        grid.shardRegistry()->getShard(operationContext(), shard0.getName())->getTargeter())
         ->setFindHostReturnValue(shard0Host);
-    RemoteCommandTargeterMock::get(grid.shardRegistry()->getShard(shard1.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        grid.shardRegistry()->getShard(operationContext(), shard1.getName())->getTargeter())
         ->setFindHostReturnValue(shard1Host);
-    RemoteCommandTargeterMock::get(grid.shardRegistry()->getShard(shard2.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        grid.shardRegistry()->getShard(operationContext(), shard2.getName())->getTargeter())
         ->setFindHostReturnValue(shard2Host);
 
     string ns = "db1.foo";
@@ -628,7 +632,8 @@ TEST_F(ShardCollectionTest, withInitialData) {
 
     setupShards(vector<ShardType>{shard});
 
-    RemoteCommandTargeterMock::get(grid.shardRegistry()->getShard(shard.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        grid.shardRegistry()->getShard(operationContext(), shard.getName())->getTargeter())
         ->setFindHostReturnValue(shardHost);
 
     string ns = "db1.foo";

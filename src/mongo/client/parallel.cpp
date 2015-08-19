@@ -457,43 +457,6 @@ BSONObj ParallelConnectionMetadata::toBSON() const {
                         << "init" << initialized << "finish" << finished << "errored" << errored);
 }
 
-BSONObj ParallelSortClusteredCursor::toBSON() const {
-    BSONObjBuilder b;
-
-    b.append("tries", _totalTries);
-
-    {
-        BSONObjBuilder bb;
-        for (map<ShardId, PCMData>::const_iterator i = _cursorMap.begin(), end = _cursorMap.end();
-             i != end;
-             ++i) {
-            const auto shard = grid.shardRegistry()->getShard(i->first);
-            if (!shard) {
-                continue;
-            }
-
-            bb.append(shard->toString(), i->second.toBSON());
-        }
-        b.append("cursors", bb.obj().getOwned());
-    }
-
-    {
-        BSONObjBuilder bb;
-        for (map<string, int>::const_iterator i = _staleNSMap.begin(), end = _staleNSMap.end();
-             i != end;
-             ++i) {
-            bb.append(i->first, i->second);
-        }
-        b.append("staleTries", bb.obj().getOwned());
-    }
-
-    return b.obj().getOwned();
-}
-
-string ParallelSortClusteredCursor::toString() const {
-    return str::stream() << "PCursor : " << toBSON();
-}
-
 void ParallelSortClusteredCursor::fullInit(OperationContext* txn) {
     startInit(txn);
     finishInit(txn);
@@ -546,7 +509,8 @@ void ParallelSortClusteredCursor::_handleStaleNS(OperationContext* txn,
     }
 }
 
-void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(PCStatePtr state,
+void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(OperationContext* txn,
+                                                               PCStatePtr state,
                                                                const ShardId& shardId,
                                                                std::shared_ptr<Shard> primary,
                                                                const NamespaceString& ns,
@@ -562,7 +526,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(PCStatePtr state,
 
     // Setup conn
     if (!state->conn) {
-        const auto shard = grid.shardRegistry()->getShard(shardId);
+        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
         state->conn.reset(new ShardConnection(shard->getConnString(), ns.ns(), manager));
     }
 
@@ -653,7 +617,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
         auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
         if (status.getStatus().code() != ErrorCodes::DatabaseNotFound) {
             config = uassertStatusOK(status);
-            config->getChunkManagerOrPrimary(nss.ns(), manager, primary);
+            config->getChunkManagerOrPrimary(txn, nss.ns(), manager, primary);
         }
     }
 
@@ -735,7 +699,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
             mdata.pcState.reset(new PCState());
             PCStatePtr state = mdata.pcState;
 
-            setupVersionAndHandleSlaveOk(state, shardId, primary, nss, vinfo, manager);
+            setupVersionAndHandleSlaveOk(txn, state, shardId, primary, nss, vinfo, manager);
 
             const string& ns = _qSpec.ns();
 
@@ -1127,7 +1091,7 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
         _cursors[index].reset(mdata.pcState->cursor.get(), &mdata);
 
         {
-            const auto shard = grid.shardRegistry()->getShard(i->first);
+            const auto shard = grid.shardRegistry()->getShard(txn, i->first);
             _servers.insert(shard->getConnString().toString());
         }
 
@@ -1153,8 +1117,8 @@ int ParallelSortClusteredCursor::getNumQueryShards() {
     return _cursorMap.size();
 }
 
-std::shared_ptr<Shard> ParallelSortClusteredCursor::getQueryShard() {
-    return grid.shardRegistry()->getShard(_cursorMap.begin()->first);
+ShardId ParallelSortClusteredCursor::getQueryShardId() {
+    return _cursorMap.begin()->first;
 }
 
 void ParallelSortClusteredCursor::getQueryShardIds(set<ShardId>& shardIds) {

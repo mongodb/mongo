@@ -143,7 +143,7 @@ public:
         const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
 
         return ClusterExplain::buildExplainResult(
-            shardResults, mongosStageName, millisElapsed, out);
+            txn, shardResults, mongosStageName, millisElapsed, out);
     }
 
     bool run(OperationContext* txn,

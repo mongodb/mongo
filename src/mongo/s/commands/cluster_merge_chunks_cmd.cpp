@@ -183,7 +183,7 @@ public:
 
         // Throws, but handled at level above.  Don't want to rewrap to preserve exception
         // formatting.
-        const auto shard = grid.shardRegistry()->getShard(firstChunk->getShardId());
+        const auto shard = grid.shardRegistry()->getShard(txn, firstChunk->getShardId());
         if (!shard) {
             return appendCommandStatus(
                 result,

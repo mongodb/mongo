@@ -100,30 +100,36 @@ public:
     }
 
 protected:
-    bool passthrough(shared_ptr<DBConfig> conf, const BSONObj& cmdObj, BSONObjBuilder& result) {
-        return _passthrough(conf->name(), conf, cmdObj, 0, result);
+    bool passthrough(OperationContext* txn,
+                     shared_ptr<DBConfig> conf,
+                     const BSONObj& cmdObj,
+                     BSONObjBuilder& result) {
+        return _passthrough(txn, conf->name(), conf, cmdObj, 0, result);
     }
 
-    bool adminPassthrough(shared_ptr<DBConfig> conf,
+    bool adminPassthrough(OperationContext* txn,
+                          shared_ptr<DBConfig> conf,
                           const BSONObj& cmdObj,
                           BSONObjBuilder& result) {
-        return _passthrough("admin", conf, cmdObj, 0, result);
+        return _passthrough(txn, "admin", conf, cmdObj, 0, result);
     }
 
-    bool passthrough(shared_ptr<DBConfig> conf,
+    bool passthrough(OperationContext* txn,
+                     shared_ptr<DBConfig> conf,
                      const BSONObj& cmdObj,
                      int options,
                      BSONObjBuilder& result) {
-        return _passthrough(conf->name(), conf, cmdObj, options, result);
+        return _passthrough(txn, conf->name(), conf, cmdObj, options, result);
     }
 
 private:
-    bool _passthrough(const string& db,
+    bool _passthrough(OperationContext* txn,
+                      const string& db,
                       shared_ptr<DBConfig> conf,
                       const BSONObj& cmdObj,
                       int options,
                       BSONObjBuilder& result) {
-        const auto shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
+        const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
         ShardConnection conn(shard->getConnString(), "");
 
         BSONObj res;
@@ -155,7 +161,7 @@ public:
         shared_ptr<DBConfig> conf = status.getValue();
 
         if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
-            shardIds.push_back(conf->getShardId(fullns));
+            shardIds.push_back(conf->getShardId(txn, fullns));
         } else {
             grid.shardRegistry()->getAllShardIds(&shardIds);
         }
@@ -177,7 +183,7 @@ public:
 
         auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(txn, dbName));
         if (!conf->isSharded(fullns)) {
-            return passthrough(conf, cmdObj, options, result);
+            return passthrough(txn, conf, cmdObj, options, result);
         }
 
         return appendCommandStatus(
@@ -407,7 +413,7 @@ public:
 
         shared_ptr<DBConfig> conf = status.getValue();
 
-        return passthrough(conf, cmdObj, result);
+        return passthrough(txn, conf, cmdObj, result);
     }
 
 } createCmd;
@@ -445,7 +451,7 @@ public:
         const auto& db = status.getValue();
         if (!db->isShardingEnabled() || !db->isSharded(fullns)) {
             log() << "\tdrop going to do passthrough";
-            return passthrough(db, cmdObj, result);
+            return passthrough(txn, db, cmdObj, result);
         }
 
         uassertStatusOK(grid.catalogManager(txn)->dropCollection(txn, NamespaceString(fullns)));
@@ -486,14 +492,14 @@ public:
         uassert(13138, "You can't rename a sharded collection", !confFrom->isSharded(fullnsFrom));
         uassert(13139, "You can't rename to a sharded collection", !confTo->isSharded(fullnsTo));
 
-        const ShardId& shardTo = confTo->getShardId(fullnsTo);
-        const ShardId& shardFrom = confFrom->getShardId(fullnsFrom);
+        const ShardId& shardTo = confTo->getShardId(txn, fullnsTo);
+        const ShardId& shardFrom = confFrom->getShardId(txn, fullnsFrom);
 
         uassert(13137,
                 "Source and destination collections must be on same shard",
                 shardFrom == shardTo);
 
-        return adminPassthrough(confFrom, cmdObj, result);
+        return adminPassthrough(txn, confFrom, cmdObj, result);
     }
 } renameCollectionCmd;
 
@@ -526,7 +532,7 @@ public:
 
         const string fromhost = cmdObj.getStringField("fromhost");
         if (!fromhost.empty()) {
-            return adminPassthrough(confTo, cmdObj, result);
+            return adminPassthrough(txn, confTo, cmdObj, result);
         } else {
             const string fromdb = cmdObj.getStringField("fromdb");
             uassert(13399, "need a fromdb argument", !fromdb.empty());
@@ -545,12 +551,12 @@ public:
             }
 
             {
-                const auto& shard = grid.shardRegistry()->getShard(confFrom->getPrimaryId());
+                const auto& shard = grid.shardRegistry()->getShard(txn, confFrom->getPrimaryId());
                 b.append("fromhost", shard->getConnString().toString());
             }
             BSONObj fixed = b.obj();
 
-            return adminPassthrough(confTo, fixed, result);
+            return adminPassthrough(txn, confTo, fixed, result);
         }
     }
 
@@ -580,7 +586,7 @@ public:
             result.appendBool("sharded", false);
             result.append("primary", conf->getPrimaryId());
 
-            return passthrough(conf, cmdObj, result);
+            return passthrough(txn, conf, cmdObj, result);
         }
 
         result.appendBool("sharded", true);
@@ -603,7 +609,7 @@ public:
         cm->getAllShardIds(&shardIds);
 
         for (const ShardId& shardId : shardIds) {
-            const auto shard = grid.shardRegistry()->getShard(shardId);
+            const auto shard = grid.shardRegistry()->getShard(txn, shardId);
             if (!shard) {
                 continue;
             }
@@ -741,7 +747,7 @@ public:
 
         auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(txn, dbName));
         if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
-            return passthrough(conf, cmdObj, result);
+            return passthrough(txn, conf, cmdObj, result);
         }
 
         ChunkManagerPtr cm = conf->getChunkManager(txn, fullns);
@@ -772,7 +778,7 @@ public:
         set<ShardId> shardIds;
         cm->getShardIdsForRange(shardIds, min, max);
         for (const ShardId& shardId : shardIds) {
-            const auto shard = grid.shardRegistry()->getShard(shardId);
+            const auto shard = grid.shardRegistry()->getShard(txn, shardId);
             if (!shard) {
                 continue;
             }
@@ -859,7 +865,7 @@ public:
         shardResults.push_back(singleResult);
 
         return ClusterExplain::buildExplainResult(
-            shardResults, ClusterExplain::kSingleShard, millisElapsed, out);
+            txn, shardResults, ClusterExplain::kSingleShard, millisElapsed, out);
     }
 
 } groupCmd;
@@ -931,7 +937,7 @@ public:
 
         shared_ptr<DBConfig> conf = status.getValue();
         if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
-            return passthrough(conf, cmdObj, options, result);
+            return passthrough(txn, conf, cmdObj, options, result);
         }
 
         ChunkManagerPtr cm = conf->getChunkManager(txn, fullns);
@@ -945,7 +951,7 @@ public:
         int size = 32;
 
         for (const ShardId& shardId : shardIds) {
-            const auto shard = grid.shardRegistry()->getShard(shardId);
+            const auto shard = grid.shardRegistry()->getShard(txn, shardId);
             if (!shard) {
                 continue;
             }
@@ -1011,7 +1017,7 @@ public:
         const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
 
         return ClusterExplain::buildExplainResult(
-            shardResults, mongosStageName, millisElapsed, out);
+            txn, shardResults, mongosStageName, millisElapsed, out);
     }
 } disinctCmd;
 
@@ -1046,7 +1052,7 @@ public:
 
         auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(txn, dbName));
         if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
-            return passthrough(conf, cmdObj, result);
+            return passthrough(txn, conf, cmdObj, result);
         }
 
         ChunkManagerPtr cm = conf->getChunkManager(txn, fullns);
@@ -1174,7 +1180,7 @@ public:
 
         auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(txn, dbName));
         if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
-            return passthrough(conf, cmdObj, options, result);
+            return passthrough(txn, conf, cmdObj, options, result);
         }
 
         ChunkManagerPtr cm = conf->getChunkManager(txn, fullns);
@@ -1193,7 +1199,7 @@ public:
         list<shared_ptr<Future::CommandResult>> futures;
         BSONArrayBuilder shardArray;
         for (const ShardId& shardId : shardIds) {
-            const auto shard = grid.shardRegistry()->getShard(shardId);
+            const auto shard = grid.shardRegistry()->getShard(txn, shardId);
             if (!shard) {
                 continue;
             }
@@ -1344,7 +1350,7 @@ public:
         }
 
         shared_ptr<DBConfig> conf = status.getValue();
-        return passthrough(conf, cmdObj, result);
+        return passthrough(txn, conf, cmdObj, result);
     }
 } evalCmd;
 
@@ -1384,9 +1390,9 @@ public:
         }
 
         shared_ptr<DBConfig> conf = status.getValue();
-        bool retval = passthrough(conf, cmdObj, result);
+        bool retval = passthrough(txn, conf, cmdObj, result);
 
-        const auto shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
+        const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
         Status storeCursorStatus =
             storePossibleCursor(shard->getConnString().toString(), result.asTempObj());
         if (!storeCursorStatus.isOK()) {
@@ -1416,9 +1422,9 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(txn, dbName));
-        bool retval = passthrough(conf, cmdObj, result);
+        bool retval = passthrough(txn, conf, cmdObj, result);
 
-        const auto shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
+        const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
         Status storeCursorStatus =
             storePossibleCursor(shard->getConnString().toString(), result.asTempObj());
         if (!storeCursorStatus.isOK()) {

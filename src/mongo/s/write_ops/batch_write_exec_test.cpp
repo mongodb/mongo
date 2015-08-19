@@ -52,7 +52,7 @@ namespace {
  */
 class MockSingleShardBackend {
 public:
-    MockSingleShardBackend(const NamespaceString& nss) {
+    MockSingleShardBackend(OperationContext* txn, const NamespaceString& nss) {
         // Initialize targeting to a mock shard
         ShardEndpoint endpoint("shard", ChunkVersion::IGNORED());
         vector<MockRange*> mockRanges;
@@ -61,7 +61,7 @@ public:
         targeter.init(mockRanges);
 
         // Get the connection string for the mock shard
-        resolver.chooseWriteHost(mockRanges.front()->endpoint.shardName, &shardHost);
+        resolver.chooseWriteHost(txn, mockRanges.front()->endpoint.shardName, &shardHost);
 
         // Executor using the mock backend
         exec.reset(new BatchWriteExec(&targeter, &resolver, &dispatcher));
@@ -92,7 +92,7 @@ TEST(BatchWriteExecTests, SingleOp) {
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
 
-    MockSingleShardBackend backend(nss);
+    MockSingleShardBackend backend(&txn, nss);
 
     BatchedCommandRequest request(BatchedCommandRequest::BatchType_Insert);
     request.setNS(nss);
@@ -117,7 +117,7 @@ TEST(BatchWriteExecTests, SingleOpError) {
     OperationContextNoop txn;
     NamespaceString nss("foo.bar");
 
-    MockSingleShardBackend backend(nss);
+    MockSingleShardBackend backend(&txn, nss);
 
     vector<MockWriteResult*> mockResults;
     BatchedCommandResponse errResponse;
@@ -168,7 +168,7 @@ TEST(BatchWriteExecTests, StaleOp) {
     // Do single-target, single doc batch write op
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
-    MockSingleShardBackend backend(nss);
+    MockSingleShardBackend backend(&txn, nss);
 
     vector<MockWriteResult*> mockResults;
     WriteErrorDetail error;
@@ -203,7 +203,7 @@ TEST(BatchWriteExecTests, MultiStaleOp) {
     // Do single-target, single doc batch write op
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
-    MockSingleShardBackend backend(nss);
+    MockSingleShardBackend backend(&txn, nss);
 
     vector<MockWriteResult*> mockResults;
     WriteErrorDetail error;
@@ -243,7 +243,7 @@ TEST(BatchWriteExecTests, TooManyStaleOp) {
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
     request.getInsertRequest()->addToDocuments(BSON("x" << 2));
 
-    MockSingleShardBackend backend(nss);
+    MockSingleShardBackend backend(&txn, nss);
 
     vector<MockWriteResult*> mockResults;
     WriteErrorDetail error;
@@ -282,7 +282,7 @@ TEST(BatchWriteExecTests, ManyStaleOpWithMigration) {
     // Do single-target, single doc batch write op
     request.getInsertRequest()->addToDocuments(BSON("x" << 1));
 
-    MockSingleShardBackend backend(nss);
+    MockSingleShardBackend backend(&txn, nss);
 
     vector<MockWriteResult*> mockResults;
     WriteErrorDetail error;

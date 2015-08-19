@@ -300,7 +300,7 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
     collectionDetail.append("collection", ns);
     string dbPrimaryShardStr;
     {
-        const auto shard = grid.shardRegistry()->getShard(dbPrimaryShardId);
+        const auto shard = grid.shardRegistry()->getShard(txn, dbPrimaryShardId);
         dbPrimaryShardStr = shard->toString();
     }
     collectionDetail.append("primary", dbPrimaryShardStr);
@@ -341,7 +341,7 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
         }
 
         try {
-            const auto shard = grid.shardRegistry()->getShard(dbPrimaryShardId);
+            const auto shard = grid.shardRegistry()->getShard(txn, dbPrimaryShardId);
             ShardConnection conn(shard->getConnString(), ns);
             bool isVersionSet = conn.setVersion();
             conn.done();
@@ -401,7 +401,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
             return status;
         }
 
-        grid.shardRegistry()->reload();
+        grid.shardRegistry()->reload(txn);
         conn.done();
 
         // Record start in changelog
@@ -431,7 +431,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
         }
 
         grid.shardRegistry()->remove(name);
-        grid.shardRegistry()->reload();
+        grid.shardRegistry()->reload(txn);
         conn.done();
 
         // Record finish in changelog
@@ -540,7 +540,7 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
         txn, txn->getClient()->clientAddress(true), "dropCollection.start", ns.ns(), BSONObj());
 
     vector<ShardType> allShards;
-    Status status = getAllShards(&allShards);
+    Status status = getAllShards(txn, &allShards);
     if (!status.isOK()) {
         return status;
     }
@@ -560,7 +560,7 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
 
     for (const auto& shardEntry : allShards) {
         auto dropResult = shardRegistry->runCommandWithNotMasterRetries(
-            shardEntry.getName(), ns.db().toString(), BSON("drop" << ns.coll()));
+            txn, shardEntry.getName(), ns.db().toString(), BSON("drop" << ns.coll()));
 
         if (!dropResult.isOK()) {
             return dropResult.getStatus();
@@ -625,7 +625,7 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
             true);
 
         auto ssvResult = shardRegistry->runCommandWithNotMasterRetries(
-            shardEntry.getName(), "admin", ssv.toBSON());
+            txn, shardEntry.getName(), "admin", ssv.toBSON());
 
         if (!ssvResult.isOK()) {
             return ssvResult.getStatus();
@@ -637,7 +637,7 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
         }
 
         auto unsetShardingStatus = shardRegistry->runCommandWithNotMasterRetries(
-            shardEntry.getName(), "admin", BSON("unsetSharding" << 1));
+            txn, shardEntry.getName(), "admin", BSON("unsetSharding" << 1));
 
         if (!unsetShardingStatus.isOK()) {
             return unsetShardingStatus.getStatus();
@@ -918,7 +918,7 @@ StatusWith<string> CatalogManagerLegacy::getTagForChunk(OperationContext* txn,
     return status.getStatus();
 }
 
-Status CatalogManagerLegacy::getAllShards(vector<ShardType>* shards) {
+Status CatalogManagerLegacy::getAllShards(OperationContext* txn, vector<ShardType>* shards) {
     ScopedDbConnection conn(_configServerConnectionString, 30.0);
     std::unique_ptr<DBClientCursor> cursor(
         _safeCursor(conn->query(ShardType::ConfigNS, BSONObj())));
@@ -1118,7 +1118,9 @@ void CatalogManagerLegacy::writeConfigServerDirect(OperationContext* txn,
     exec.executeBatch(request, response);
 }
 
-Status CatalogManagerLegacy::_checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) {
+Status CatalogManagerLegacy::_checkDbDoesNotExist(OperationContext* txn,
+                                                  const std::string& dbName,
+                                                  DatabaseType* db) {
     ScopedDbConnection conn(_configServerConnectionString, 30);
 
     BSONObjBuilder b;
@@ -1153,7 +1155,7 @@ Status CatalogManagerLegacy::_checkDbDoesNotExist(const std::string& dbName, Dat
     return Status::OK();
 }
 
-StatusWith<string> CatalogManagerLegacy::_generateNewShardName() {
+StatusWith<string> CatalogManagerLegacy::_generateNewShardName(OperationContext* txn) {
     BSONObj o;
     {
         ScopedDbConnection conn(_configServerConnectionString, 30);

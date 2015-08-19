@@ -140,7 +140,7 @@ public:
             return false;
         }
 
-        const auto to = grid.shardRegistry()->getShard(toString);
+        const auto to = grid.shardRegistry()->getShard(txn, toString);
         if (!to) {
             string msg(str::stream() << "Could not move chunk in '" << nss.ns() << "' to shard '"
                                      << toString << "' because that shard does not exist");
@@ -208,7 +208,7 @@ public:
         }
 
         {
-            const auto from = grid.shardRegistry()->getShard(chunk->getShardId());
+            const auto from = grid.shardRegistry()->getShard(txn, chunk->getShardId());
             if (from->getId() == to->getId()) {
                 errmsg = "that chunk is already on that shard";
                 return false;

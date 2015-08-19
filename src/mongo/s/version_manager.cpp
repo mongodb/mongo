@@ -108,7 +108,8 @@ private:
 /**
  * Sends the setShardVersion command on the specified connection.
  */
-bool setShardVersion(DBClientBase& conn,
+bool setShardVersion(OperationContext* txn,
+                     DBClientBase& conn,
                      const string& ns,
                      const ConnectionString& configServer,
                      ChunkVersion version,
@@ -118,7 +119,7 @@ bool setShardVersion(DBClientBase& conn,
     ShardId shardId;
     ConnectionString shardCS;
     {
-        const auto shard = grid.shardRegistry()->getShard(conn.getServerAddress());
+        const auto shard = grid.shardRegistry()->getShard(txn, conn.getServerAddress());
         shardId = shard->getId();
         shardCS = shard->getConnString();
     }
@@ -205,14 +206,15 @@ bool initShardVersionEmptyNS(OperationContext* txn, DBClientBase* conn_in) {
         // Check to see if this is actually a shard and not a single config server
         // NOTE: Config servers are registered only by the name "config" in the shard cache, not
         // by host, so lookup by host will fail unless the host is also a shard.
-        const auto shard = grid.shardRegistry()->getShard(conn->getServerAddress());
+        const auto shard = grid.shardRegistry()->getShard(txn, conn->getServerAddress());
         if (!shard) {
             return false;
         }
 
         LOG(1) << "initializing shard connection to " << shard->toString();
 
-        ok = setShardVersion(*conn,
+        ok = setShardVersion(txn,
+                             *conn,
                              "",
                              grid.shardRegistry()->getConfigServerConnectionString(),
                              ChunkVersion(),
@@ -301,7 +303,7 @@ bool checkShardVersion(OperationContext* txn,
     shared_ptr<Shard> primary;
     shared_ptr<ChunkManager> manager;
 
-    conf->getChunkManagerOrPrimary(ns, manager, primary);
+    conf->getChunkManagerOrPrimary(txn, ns, manager, primary);
 
     unsigned long long officialSequenceNumber = 0;
 
@@ -313,7 +315,7 @@ bool checkShardVersion(OperationContext* txn,
         return false;
     }
 
-    const auto shard = grid.shardRegistry()->getShard(conn->getServerAddress());
+    const auto shard = grid.shardRegistry()->getShard(txn, conn->getServerAddress());
     uassert(ErrorCodes::ShardNotFound,
             str::stream() << conn->getServerAddress() << " is not recognized as a shard",
             shard);
@@ -368,7 +370,8 @@ bool checkShardVersion(OperationContext* txn,
            << ", current chunk manager iteration is " << officialSequenceNumber;
 
     BSONObj result;
-    if (setShardVersion(*conn,
+    if (setShardVersion(txn,
+                        *conn,
                         ns,
                         grid.shardRegistry()->getConfigServerConnectionString(),
                         version,

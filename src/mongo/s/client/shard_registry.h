@@ -46,6 +46,7 @@ class BSONObjBuilder;
 class CatalogManager;
 struct HostAndPort;
 class NamespaceString;
+class OperationContext;
 class RemoteCommandTargeterFactory;
 class Shard;
 class ShardType;
@@ -123,12 +124,17 @@ public:
         return _configServerCS;
     }
 
-    void reload();
+    void reload(OperationContext* txn);
 
     /**
      * Returns shared pointer to shard object with given shard id.
      */
-    std::shared_ptr<Shard> getShard(const ShardId& shardId);
+    std::shared_ptr<Shard> getShard(OperationContext* txn, const ShardId& shardId);
+
+    /**
+     * Returns shared pointer to the shard object representing the config servers.
+     */
+    std::shared_ptr<Shard> getConfigShard();
 
     /**
      * Instantiates a new detached shard connection, which does not appear in the list of shards
@@ -196,14 +202,23 @@ public:
      * response object for any kind of command-specific failure.  The only exception is
      * NotMaster errors, which we intercept and follow the rules described above for handling.
      */
-    StatusWith<BSONObj> runCommandWithNotMasterRetries(const ShardId& shard,
+    StatusWith<BSONObj> runCommandWithNotMasterRetries(OperationContext* txn,
+                                                       const ShardId& shard,
                                                        const std::string& dbname,
                                                        const BSONObj& cmdObj);
 
-    StatusWith<CommandResponse> runCommandWithNotMasterRetries(const ShardId& shardId,
+    StatusWith<CommandResponse> runCommandWithNotMasterRetries(OperationContext* txn,
+                                                               const ShardId& shardId,
                                                                const std::string& dbname,
                                                                const BSONObj& cmdObj,
                                                                const BSONObj& metadata);
+
+    StatusWith<BSONObj> runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
+                                                               const BSONObj& cmdObj);
+
+    StatusWith<CommandResponse> runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
+                                                                       const BSONObj& cmdObj,
+                                                                       const BSONObj& metadata);
 
 private:
     typedef std::map<ShardId, std::shared_ptr<Shard>> ShardMap;
@@ -219,6 +234,11 @@ private:
     void _addConfigShard_inlock();
 
     std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
+
+    StatusWith<CommandResponse> _runCommandWithNotMasterRetries(RemoteCommandTargeter* targeter,
+                                                                const std::string& dbname,
+                                                                const BSONObj& cmdObj,
+                                                                const BSONObj& metadata);
 
     // Factory to obtain remote command targeters for shards
     const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;

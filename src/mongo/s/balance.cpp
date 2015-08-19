@@ -213,7 +213,7 @@ void Balancer::_ping(OperationContext* txn, bool waiting) {
                                      NULL);
 }
 
-bool Balancer::_checkOIDs() {
+bool Balancer::_checkOIDs(OperationContext* txn) {
     vector<ShardId> all;
     grid.shardRegistry()->getAllShardIds(&all);
 
@@ -221,7 +221,7 @@ bool Balancer::_checkOIDs() {
     map<int, string> oids;
 
     for (const ShardId& shardId : all) {
-        const auto s = grid.shardRegistry()->getShard(shardId);
+        const auto s = grid.shardRegistry()->getShard(txn, shardId);
         if (!s) {
             continue;
         }
@@ -242,7 +242,7 @@ bool Balancer::_checkOIDs() {
                 uassertStatusOK(grid.shardRegistry()->runCommand(
                     shardHost, "admin", BSON("features" << 1 << "oidReset" << 1)));
 
-                const auto otherShard = grid.shardRegistry()->getShard(oids[x]);
+                const auto otherShard = grid.shardRegistry()->getShard(txn, oids[x]);
                 if (otherShard) {
                     const auto otherShardHost = uassertStatusOK(otherShard->getTargeter()->findHost(
                         {ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
@@ -439,7 +439,7 @@ void Balancer::_doBalanceRound(OperationContext* txn,
     }
 }
 
-bool Balancer::_init() {
+bool Balancer::_init(OperationContext* txn) {
     try {
         log() << "about to contact config servers and shards";
 
@@ -447,8 +447,8 @@ bool Balancer::_init() {
         // checks that each shard is indeed a different process (no hostname mixup)
         // these checks are redundant in that they're redone at every new round but we want to do
         // them initially here so to catch any problem soon
-        grid.shardRegistry()->reload();
-        _checkOIDs();
+        grid.shardRegistry()->reload(txn);
+        _checkOIDs(txn);
 
         log() << "config servers and shards contacted successfully";
 
@@ -474,7 +474,8 @@ void Balancer::run() {
     // This is the body of a BackgroundJob so if we throw here we're basically ending the balancer
     // thread prematurely.
     while (!inShutdown()) {
-        if (!_init()) {
+        auto txn = cc().makeOperationContext();
+        if (!_init(txn.get())) {
             log() << "will retry to initialize balancer in one minute";
             sleepsecs(60);
             continue;
@@ -501,7 +502,7 @@ void Balancer::run() {
             BSONObj balancerResult;
 
             // use fresh shard state
-            grid.shardRegistry()->reload();
+            grid.shardRegistry()->reload(txn.get());
 
             // refresh chunk size (even though another balancer might be active)
             Chunk::refreshChunkSize(txn.get());
@@ -529,7 +530,7 @@ void Balancer::run() {
                 continue;
             }
 
-            uassert(13258, "oids broken after resetting!", _checkOIDs());
+            uassert(13258, "oids broken after resetting!", _checkOIDs(txn.get()));
 
             {
                 auto scopedDistLock = grid.catalogManager(txn.get())

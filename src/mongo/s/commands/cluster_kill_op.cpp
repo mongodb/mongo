@@ -99,7 +99,7 @@ public:
         log() << "want to kill op: " << opToKill;
 
         // Will throw if shard id is not found
-        auto shard = grid.shardRegistry()->getShard(shardIdent);
+        auto shard = grid.shardRegistry()->getShard(txn, shardIdent);
         if (!shard) {
             return appendCommandStatus(
                 result,

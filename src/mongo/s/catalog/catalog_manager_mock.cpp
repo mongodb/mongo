@@ -132,7 +132,7 @@ StatusWith<string> CatalogManagerMock::getTagForChunk(OperationContext* txn,
     return string();
 }
 
-Status CatalogManagerMock::getAllShards(vector<ShardType>* shards) {
+Status CatalogManagerMock::getAllShards(OperationContext* txn, vector<ShardType>* shards) {
     return Status::OK();
 }
 
@@ -185,11 +185,13 @@ DistLockManager* CatalogManagerMock::getDistLockManager() {
     return _mockDistLockMgr.get();
 }
 
-Status CatalogManagerMock::_checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) {
+Status CatalogManagerMock::_checkDbDoesNotExist(OperationContext* txn,
+                                                const std::string& dbName,
+                                                DatabaseType* db) {
     return Status::OK();
 }
 
-StatusWith<std::string> CatalogManagerMock::_generateNewShardName() {
+StatusWith<std::string> CatalogManagerMock::_generateNewShardName(OperationContext* txn) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

@@ -54,7 +54,9 @@ public:
      * Returns ReplicaSetNotFound if the replica set is not being tracked
      * Returns !OK with message if the shard host could not be found for other reasons.
      */
-    Status chooseWriteHost(const std::string& shardName, ConnectionString* shardHost) const;
+    Status chooseWriteHost(OperationContext* txn,
+                           const std::string& shardName,
+                           ConnectionString* shardHost) const override;
 
     /**
      * Resolves a replica set connection string to a master or returns an error.

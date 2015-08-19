@@ -145,7 +145,8 @@ public:
 
     // Atomically returns *either* the chunk manager *or* the primary shard for the collection,
     // neither if the collection doesn't exist.
-    void getChunkManagerOrPrimary(const std::string& ns,
+    void getChunkManagerOrPrimary(OperationContext* txn,
+                                  const std::string& ns,
                                   std::shared_ptr<ChunkManager>& manager,
                                   std::shared_ptr<Shard>& primary);
 
@@ -161,7 +162,7 @@ public:
     /**
      * Returns shard id for primary shard for the database for which this DBConfig represents.
      */
-    const ShardId& getShardId(const std::string& ns);
+    const ShardId& getShardId(OperationContext* txn, const std::string& ns);
 
     void setPrimary(OperationContext* txn, const std::string& s);
 

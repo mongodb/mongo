@@ -127,7 +127,7 @@ void splitIfNeeded(OperationContext* txn, const NamespaceString& nss, const Targ
 
     ChunkManagerPtr chunkManager;
     shared_ptr<Shard> dummyShard;
-    config->getChunkManagerOrPrimary(nss.ns(), chunkManager, dummyShard);
+    config->getChunkManagerOrPrimary(txn, nss.ns(), chunkManager, dummyShard);
 
     if (!chunkManager) {
         return;

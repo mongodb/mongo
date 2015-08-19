@@ -286,7 +286,7 @@ public:
      * Retrieves all shards in this sharded cluster.
      * Returns a !OK status if an error occurs.
      */
-    virtual Status getAllShards(std::vector<ShardType>* shards) = 0;
+    virtual Status getAllShards(OperationContext* txn, std::vector<ShardType>* shards) = 0;
 
     /**
      * Runs a user management command on the config servers, potentially synchronizing through

@@ -90,7 +90,7 @@ public:
         shared_ptr<Shard> shard;
 
         if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
-            shard = grid.shardRegistry()->getShard(conf->getPrimaryId());
+            shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
         } else {
             shared_ptr<ChunkManager> chunkMgr = _getChunkManager(txn, conf, ns);
 
@@ -104,7 +104,7 @@ public:
             BSONObj shardKey = status.getValue();
             ChunkPtr chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
 
-            shard = grid.shardRegistry()->getShard(chunk->getShardId());
+            shard = grid.shardRegistry()->getShard(txn, chunk->getShardId());
         }
 
         BSONObjBuilder explainCmd;
@@ -114,7 +114,7 @@ public:
         Timer timer;
 
         BSONObjBuilder result;
-        bool ok = _runCommand(conf, shard->getId(), ns, explainCmd.obj(), result);
+        bool ok = _runCommand(txn, conf, shard->getId(), ns, explainCmd.obj(), result);
         long long millisElapsed = timer.millis();
 
         if (!ok) {
@@ -132,7 +132,7 @@ public:
         shardResults.push_back(cmdResult);
 
         return ClusterExplain::buildExplainResult(
-            shardResults, ClusterExplain::kSingleShard, millisElapsed, out);
+            txn, shardResults, ClusterExplain::kSingleShard, millisElapsed, out);
     }
 
     virtual bool run(OperationContext* txn,
@@ -147,7 +147,7 @@ public:
         // require that the parsing be pulled into this function.
         auto conf = uassertStatusOK(grid.implicitCreateDb(txn, dbName));
         if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
-            return _runCommand(conf, conf->getPrimaryId(), ns, cmdObj, result);
+            return _runCommand(txn, conf, conf->getPrimaryId(), ns, cmdObj, result);
         }
 
         shared_ptr<ChunkManager> chunkMgr = _getChunkManager(txn, conf, ns);
@@ -163,7 +163,7 @@ public:
         BSONObj shardKey = status.getValue();
         ChunkPtr chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
 
-        bool ok = _runCommand(conf, chunk->getShardId(), ns, cmdObj, result);
+        bool ok = _runCommand(txn, conf, chunk->getShardId(), ns, cmdObj, result);
         if (ok) {
             // check whether split is necessary (using update object for size heuristic)
             if (Chunk::ShouldAutoSplit) {
@@ -203,14 +203,15 @@ private:
         return shardKey;
     }
 
-    bool _runCommand(shared_ptr<DBConfig> conf,
+    bool _runCommand(OperationContext* txn,
+                     shared_ptr<DBConfig> conf,
                      const ShardId& shardId,
                      const string& ns,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) const {
         BSONObj res;
 
-        const auto shard = grid.shardRegistry()->getShard(shardId);
+        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
         ShardConnection conn(shard->getConnString(), ns);
         bool ok = conn->runCommand(conf->name(), cmdObj, res);
         conn.done();

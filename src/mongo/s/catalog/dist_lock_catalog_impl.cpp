@@ -157,7 +157,7 @@ DistLockCatalogImpl::DistLockCatalogImpl(ShardRegistry* shardRegistry,
 DistLockCatalogImpl::~DistLockCatalogImpl() = default;
 
 RemoteCommandTargeter* DistLockCatalogImpl::_targeter() {
-    return _client->getShard("config")->getTargeter();
+    return _client->getConfigShard()->getTargeter();
 }
 
 StatusWith<LockpingsType> DistLockCatalogImpl::getPing(StringData processID) {
@@ -203,8 +203,8 @@ Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {
     request.setUpsert(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandWithNotMasterRetries(
-        "config", _locksNS.db().toString(), request.toBSON());
+    auto resultStatus =
+        _client->runCommandOnConfigWithNotMasterRetries(_locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -234,8 +234,8 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(StringData lockID,
     request.setShouldReturnNew(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandWithNotMasterRetries(
-        "config", _locksNS.db().toString(), request.toBSON());
+    auto resultStatus =
+        _client->runCommandOnConfigWithNotMasterRetries(_locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -287,8 +287,8 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
     request.setShouldReturnNew(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandWithNotMasterRetries(
-        "config", _locksNS.db().toString(), request.toBSON());
+    auto resultStatus =
+        _client->runCommandOnConfigWithNotMasterRetries(_locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -319,8 +319,8 @@ Status DistLockCatalogImpl::unlock(const OID& lockSessionID) {
         BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandWithNotMasterRetries(
-        "config", _locksNS.db().toString(), request.toBSON());
+    auto resultStatus =
+        _client->runCommandOnConfigWithNotMasterRetries(_locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -448,8 +448,8 @@ Status DistLockCatalogImpl::stopPing(StringData processId) {
         FindAndModifyRequest::makeRemove(_lockPingNS, BSON(LockpingsType::process() << processId));
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandWithNotMasterRetries(
-        "config", _locksNS.db().toString(), request.toBSON());
+    auto resultStatus =
+        _client->runCommandOnConfigWithNotMasterRetries(_locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();

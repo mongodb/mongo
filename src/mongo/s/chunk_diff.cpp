@@ -109,7 +109,8 @@ typename ConfigDiffTracker<ValType>::RangeOverlap ConfigDiffTracker<ValType>::ov
 }
 
 template <class ValType>
-int ConfigDiffTracker<ValType>::calculateConfigDiff(const std::vector<ChunkType>& chunks) {
+int ConfigDiffTracker<ValType>::calculateConfigDiff(OperationContext* txn,
+                                                    const std::vector<ChunkType>& chunks) {
     _assertAttached();
 
     // Apply the chunk changes to the ranges and versions
@@ -149,7 +150,7 @@ int ConfigDiffTracker<ValType>::calculateConfigDiff(const std::vector<ChunkType>
         }
 
         // Chunk version changes
-        ShardId shard = shardFor(chunk.getShard());
+        ShardId shard = shardFor(txn, chunk.getShard());
 
         typename MaxChunkVersionMap::const_iterator shardVersionIt = _maxShardVersions->find(shard);
         if (shardVersionIt == _maxShardVersions->end() || shardVersionIt->second < chunkVersion) {
@@ -181,7 +182,7 @@ int ConfigDiffTracker<ValType>::calculateConfigDiff(const std::vector<ChunkType>
             return -1;
         }
 
-        _currMap->insert(rangeFor(chunk));
+        _currMap->insert(rangeFor(txn, chunk));
     }
 
     return _validDiffs;

@@ -164,10 +164,10 @@ bool DBConfig::isSharded(const string& ns) {
     return i->second.isSharded();
 }
 
-const ShardId& DBConfig::getShardId(const string& ns) {
+const ShardId& DBConfig::getShardId(OperationContext* txn, const string& ns) {
     uassert(28679, "ns can't be sharded", !isSharded(ns));
 
-    uassert(10178, "no primary!", grid.shardRegistry()->getShard(_primaryId));
+    uassert(10178, "no primary!", grid.shardRegistry()->getShard(txn, _primaryId));
     return _primaryId;
 }
 
@@ -220,7 +220,8 @@ bool DBConfig::removeSharding(OperationContext* txn, const string& ns) {
 
 // Handles weird logic related to getting *either* a chunk manager *or* the collection primary
 // shard
-void DBConfig::getChunkManagerOrPrimary(const string& ns,
+void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
+                                        const string& ns,
                                         std::shared_ptr<ChunkManager>& manager,
                                         std::shared_ptr<Shard>& primary) {
     // The logic here is basically that at any time, our collection can become sharded or
@@ -239,7 +240,7 @@ void DBConfig::getChunkManagerOrPrimary(const string& ns,
         // No namespace
         if (i == _collections.end()) {
             // If we don't know about this namespace, it's unsharded by default
-            primary = grid.shardRegistry()->getShard(_primaryId);
+            primary = grid.shardRegistry()->getShard(txn, _primaryId);
         } else {
             CollectionInfo& cInfo = i->second;
 
@@ -250,7 +251,7 @@ void DBConfig::getChunkManagerOrPrimary(const string& ns,
             if (_shardingEnabled && cInfo.isSharded()) {
                 manager = cInfo.getCM();
             } else {
-                primary = grid.shardRegistry()->getShard(_primaryId);
+                primary = grid.shardRegistry()->getShard(txn, _primaryId);
             }
         }
     }
@@ -428,7 +429,7 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
 }
 
 void DBConfig::setPrimary(OperationContext* txn, const std::string& s) {
-    const auto shard = grid.shardRegistry()->getShard(s);
+    const auto shard = grid.shardRegistry()->getShard(txn, s);
 
     stdx::lock_guard<stdx::mutex> lk(_lock);
     _primaryId = shard->getId();
@@ -572,7 +573,7 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
 
     // 3
     {
-        const auto shard = grid.shardRegistry()->getShard(_primaryId);
+        const auto shard = grid.shardRegistry()->getShard(txn, _primaryId);
         ScopedDbConnection conn(shard->getConnString(), 30.0);
         BSONObj res;
         if (!conn->dropDatabase(_name, &res)) {
@@ -584,7 +585,7 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
 
     // 4
     for (const ShardId& shardId : shardIds) {
-        const auto shard = grid.shardRegistry()->getShard(shardId);
+        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
         if (!shard) {
             continue;
         }

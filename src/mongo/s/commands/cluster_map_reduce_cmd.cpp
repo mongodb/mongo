@@ -266,7 +266,7 @@ public:
         if (!shardedInput && !shardedOutput && !customOutDB) {
             LOG(1) << "simple MR, just passthrough";
 
-            const auto shard = grid.shardRegistry()->getShard(confIn->getPrimaryId());
+            const auto shard = grid.shardRegistry()->getShard(txn, confIn->getPrimaryId());
             ShardConnection conn(shard->getConnString(), "");
 
             BSONObj res;
@@ -312,7 +312,7 @@ public:
                 // Need to gather list of all servers even if an error happened
                 string server;
                 {
-                    const auto shard = grid.shardRegistry()->getShard(mrResult.shardTargetId);
+                    const auto shard = grid.shardRegistry()->getShard(txn, mrResult.shardTargetId);
                     server = shard->getConnString().toString();
                 }
                 servers.insert(server);
@@ -403,7 +403,7 @@ public:
         BSONObj singleResult;
 
         if (!shardedOutput) {
-            const auto shard = grid.shardRegistry()->getShard(confOut->getPrimaryId());
+            const auto shard = grid.shardRegistry()->getShard(txn, confOut->getPrimaryId());
             LOG(1) << "MR with single shard output, NS=" << finalColLong
                    << " primary=" << shard->toString();
 
@@ -481,7 +481,8 @@ public:
                 for (const auto& mrResult : mrCommandResults) {
                     string server;
                     {
-                        const auto shard = grid.shardRegistry()->getShard(mrResult.shardTargetId);
+                        const auto shard =
+                            grid.shardRegistry()->getShard(txn, mrResult.shardTargetId);
                         server = shard->getConnString().toString();
                     }
                     singleResult = mrResult.result;

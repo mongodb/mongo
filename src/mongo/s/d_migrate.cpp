@@ -417,7 +417,7 @@ public:
         // Make sure we're as up-to-date as possible with shard information
         // This catches the case where we had to previously changed a shard's host by
         // removing/adding a shard with the same name
-        grid.shardRegistry()->reload();
+        grid.shardRegistry()->reload(txn);
 
         MoveTimingHelper timing(
             txn, "from", ns, min, max, 6 /* steps */, &errmsg, toShardName, fromShardName);
@@ -547,7 +547,7 @@ public:
 
         // Resolve the shard connection strings.
         {
-            std::shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(fromShardName);
+            std::shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(txn, fromShardName);
             uassert(28674,
                     str::stream() << "Source shard " << fromShardName
                                   << " is missing. This indicates metadata corruption.",
@@ -555,7 +555,7 @@ public:
 
             fromShardCS = fromShard->getConnString();
 
-            std::shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(toShardName);
+            std::shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(txn, toShardName);
             uassert(28675,
                     str::stream() << "Destination shard " << toShardName
                                   << " is missing. This indicates metadata corruption.",

@@ -33,6 +33,7 @@
 #include <utility>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_diff.h"
@@ -61,11 +62,11 @@ public:
         return true;
     }
 
-    virtual pair<BSONObj, BSONObj> rangeFor(const ChunkType& chunk) const {
+    virtual pair<BSONObj, BSONObj> rangeFor(OperationContext* txn, const ChunkType& chunk) const {
         return make_pair(chunk.getMin(), chunk.getMax());
     }
 
-    virtual ShardId shardFor(const string& name) const {
+    virtual ShardId shardFor(OperationContext* txn, const string& name) const {
         return name;
     }
 };
@@ -82,7 +83,7 @@ public:
         return false;
     }
 
-    virtual pair<BSONObj, BSONObj> rangeFor(const ChunkType& chunk) const {
+    virtual pair<BSONObj, BSONObj> rangeFor(OperationContext* txn, const ChunkType& chunk) const {
         return make_pair(chunk.getMax(), chunk.getMin());
     }
 };
@@ -108,6 +109,7 @@ protected:
     ~ChunkDiffUnitTest() = default;
 
     void runTest(bool isInverse) {
+        OperationContextNoop txn;
         int numShards = 10;
         int numInitialChunks = 5;
 
@@ -173,7 +175,7 @@ protected:
         convertBSONArrayToChunkTypes(chunks, &chunksVector);
 
         // Validate initial load
-        differ->calculateConfigDiff(chunksVector);
+        differ->calculateConfigDiff(&txn, chunksVector);
         validate(isInverse, chunksVector, ranges, maxVersion, maxShardVersions);
 
         // Generate a lot of diffs, and keep validating that updating from the diffs always gives us
@@ -328,7 +330,7 @@ protected:
             std::vector<ChunkType> chunksVector;
             convertBSONArrayToChunkTypes(chunks, &chunksVector);
 
-            differ->calculateConfigDiff(chunksVector);
+            differ->calculateConfigDiff(&txn, chunksVector);
 
             validate(isInverse, chunksVector, ranges, maxVersion, maxShardVersions);
         }

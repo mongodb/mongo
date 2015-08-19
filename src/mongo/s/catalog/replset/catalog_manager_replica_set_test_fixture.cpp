@@ -197,7 +197,7 @@ void CatalogManagerReplSetTestFixture::onFindWithMetadataCommand(
 }
 
 void CatalogManagerReplSetTestFixture::setupShards(const std::vector<ShardType>& shards) {
-    auto future = launchAsync([this] { shardRegistry()->reload(); });
+    auto future = launchAsync([this] { shardRegistry()->reload(operationContext()); });
 
     expectGetShards(shards);
 

@@ -323,7 +323,7 @@ TEST_F(CatalogManagerReplSetTest, GetAllShardsValid) {
 
     auto future = launchAsync([this] {
         vector<ShardType> shards;
-        ASSERT_OK(catalogManager()->getAllShards(&shards));
+        ASSERT_OK(catalogManager()->getAllShards(operationContext(), &shards));
         return shards;
     });
 
@@ -358,7 +358,7 @@ TEST_F(CatalogManagerReplSetTest, GetAllShardsWithInvalidShard) {
 
     auto future = launchAsync([this] {
         vector<ShardType> shards;
-        Status status = catalogManager()->getAllShards(&shards);
+        Status status = catalogManager()->getAllShards(operationContext(), &shards);
 
         ASSERT_EQ(ErrorCodes::FailedToParse, status);
         ASSERT_EQ(0U, shards.size());
@@ -1496,7 +1496,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
     s2.setHost("ShardHost2:27017");
 
     // Prime the shard registry with information about the existing shards
-    auto future = launchAsync([this] { shardRegistry()->reload(); });
+    auto future = launchAsync([this] { shardRegistry()->reload(operationContext()); });
 
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
@@ -1518,11 +1518,14 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
     future.timed_get(kFutureTimeout);
 
     // Set up all the target mocks return values.
-    RemoteCommandTargeterMock::get(shardRegistry()->getShard(s0.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        shardRegistry()->getShard(operationContext(), s0.getName())->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s0.getHost()));
-    RemoteCommandTargeterMock::get(shardRegistry()->getShard(s1.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        shardRegistry()->getShard(operationContext(), s1.getName())->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s1.getHost()));
-    RemoteCommandTargeterMock::get(shardRegistry()->getShard(s2.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        shardRegistry()->getShard(operationContext(), s2.getName())->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s2.getHost()));
 
 
@@ -1781,7 +1784,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
     s2.setHost("ShardHost2:27017");
 
     // Prime the shard registry with information about the existing shards
-    auto future = launchAsync([this] { shardRegistry()->reload(); });
+    auto future = launchAsync([this] { shardRegistry()->reload(operationContext()); });
 
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
@@ -1802,11 +1805,14 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
     future.timed_get(kFutureTimeout);
 
     // Set up all the target mocks return values.
-    RemoteCommandTargeterMock::get(shardRegistry()->getShard(s0.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        shardRegistry()->getShard(operationContext(), s0.getName())->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s0.getHost()));
-    RemoteCommandTargeterMock::get(shardRegistry()->getShard(s1.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        shardRegistry()->getShard(operationContext(), s1.getName())->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s1.getHost()));
-    RemoteCommandTargeterMock::get(shardRegistry()->getShard(s2.getName())->getTargeter())
+    RemoteCommandTargeterMock::get(
+        shardRegistry()->getShard(operationContext(), s2.getName())->getTargeter())
         ->setFindHostReturnValue(HostAndPort(s2.getHost()));
 
 
@@ -1917,8 +1923,8 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
 
     setupShards(vector<ShardType>{shard});
 
-    RemoteCommandTargeterMock* shardTargeter =
-        RemoteCommandTargeterMock::get(shardRegistry()->getShard("shard0")->getTargeter());
+    RemoteCommandTargeterMock* shardTargeter = RemoteCommandTargeterMock::get(
+        shardRegistry()->getShard(operationContext(), "shard0")->getTargeter());
     shardTargeter->setFindHostReturnValue(HostAndPort("shard0:12"));
 
     distLock()->expectLock(

@@ -94,9 +94,9 @@ void ShardRegistry::shutdown() {
     _executor->join();
 }
 
-void ShardRegistry::reload() {
+void ShardRegistry::reload(OperationContext* txn) {
     vector<ShardType> shards;
-    Status status = grid.catalogManager()->getAllShards(&shards);
+    Status status = grid.catalogManager()->getAllShards(txn, &shards);
     uassert(13632,
             str::stream() << "could not get updated shard list from config server due to "
                           << status.toString(),
@@ -126,16 +126,22 @@ void ShardRegistry::reload() {
     }
 }
 
-shared_ptr<Shard> ShardRegistry::getShard(const ShardId& shardId) {
+shared_ptr<Shard> ShardRegistry::getShard(OperationContext* txn, const ShardId& shardId) {
     shared_ptr<Shard> shard = _findUsingLookUp(shardId);
     if (shard) {
         return shard;
     }
 
     // If we can't find the shard, we might just need to reload the cache
-    reload();
+    reload(txn);
 
     return _findUsingLookUp(shardId);
+}
+
+shared_ptr<Shard> ShardRegistry::getConfigShard() {
+    shared_ptr<Shard> shard = _findUsingLookUp("config");
+    invariant(shard);
+    return shard;
 }
 
 unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& connStr) const {
@@ -404,10 +410,29 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithMetadata
     return cmdResponse;
 }
 
-StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(const ShardId& shardId,
+StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
+                                                                          const BSONObj& cmdObj) {
+    auto status = runCommandOnConfigWithNotMasterRetries(dbname, cmdObj, rpc::makeEmptyMetadata());
+
+    if (!status.isOK()) {
+        return status.getStatus();
+    }
+
+    return status.getValue().response;
+}
+
+StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandOnConfigWithNotMasterRetries(
+    const std::string& dbname, const BSONObj& cmdObj, const BSONObj& metadata) {
+    auto configShard = getConfigShard();
+    return _runCommandWithNotMasterRetries(configShard->getTargeter(), dbname, cmdObj, metadata);
+}
+
+StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationContext* txn,
+                                                                  const ShardId& shardId,
                                                                   const std::string& dbname,
                                                                   const BSONObj& cmdObj) {
-    auto status = runCommandWithNotMasterRetries(shardId, dbname, cmdObj, rpc::makeEmptyMetadata());
+    auto status =
+        runCommandWithNotMasterRetries(txn, shardId, dbname, cmdObj, rpc::makeEmptyMetadata());
 
     if (!status.isOK()) {
         return status.getStatus();
@@ -417,11 +442,20 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(const ShardId&
 }
 
 StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithNotMasterRetries(
+    OperationContext* txn,
     const ShardId& shardId,
     const std::string& dbname,
     const BSONObj& cmdObj,
     const BSONObj& metadata) {
-    auto targeter = getShard(shardId)->getTargeter();
+    auto shard = getShard(txn, shardId);
+    return _runCommandWithNotMasterRetries(shard->getTargeter(), dbname, cmdObj, metadata);
+}
+
+StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMasterRetries(
+    RemoteCommandTargeter* targeter,
+    const std::string& dbname,
+    const BSONObj& cmdObj,
+    const BSONObj& metadata) {
     const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet{});
 
     for (int i = 0; i < kNotMasterNumRetries; ++i) {

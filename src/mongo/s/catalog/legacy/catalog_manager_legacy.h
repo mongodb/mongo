@@ -101,7 +101,7 @@ public:
                                            const std::string& collectionNs,
                                            const ChunkType& chunk) override;
 
-    Status getAllShards(std::vector<ShardType>* shards) override;
+    Status getAllShards(OperationContext* txn, std::vector<ShardType>* shards) override;
 
     /**
      * Grabs a distributed lock and runs the command on all config servers.
@@ -146,9 +146,11 @@ public:
     Status initConfigVersion(OperationContext* txn) override;
 
 private:
-    Status _checkDbDoesNotExist(const std::string& dbName, DatabaseType* db) override;
+    Status _checkDbDoesNotExist(OperationContext* txn,
+                                const std::string& dbName,
+                                DatabaseType* db) override;
 
-    StatusWith<std::string> _generateNewShardName() override;
+    StatusWith<std::string> _generateNewShardName(OperationContext* txn) override;
 
     /**
      * Starts the thread that periodically checks data consistency amongst the config servers.
