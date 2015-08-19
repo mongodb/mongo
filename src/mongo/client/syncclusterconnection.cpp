@@ -128,7 +128,10 @@ bool SyncClusterConnection::prepare(string& errmsg) {
             if (singleErr.size() == 0)
                 continue;
 
-        } catch (DBException& e) {
+        } catch (const DBException& e) {
+            if (e.getCode() == ErrorCodes::IncompatibleCatalogManager) {
+                throw;
+            }
             singleErr = e.toString();
         }
         ok = false;
