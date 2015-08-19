@@ -398,13 +398,12 @@ err:	__wt_scr_free(session, &buf);
 void
 __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 {
+	WT_UNUSED(session);
+
 	/*
-	 * We're looking inside the live system's structure, which normally
-	 * requires locking: the chances of a corrupted read are probably
-	 * non-existent, and it's statistics information regardless, but it
-	 * isn't like this is a common function for an application to call.
+	 * Reading from the live system's structure normally requires locking,
+	 * but it's an 8B statistics read, there's no need.
 	 */
-	__wt_spin_lock(session, &block->live_lock);
 	stats->allocation_size = block->allocsize;
 	stats->block_checkpoint_size = (int64_t)block->live.ckpt_size;
 	stats->block_magic = WT_BLOCK_MAGIC;
@@ -412,7 +411,6 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 	stats->block_minor = WT_BLOCK_MINOR_VERSION;
 	stats->block_reuse_bytes = (int64_t)block->live.avail.bytes;
 	stats->block_size = block->fh->size;
-	__wt_spin_unlock(session, &block->live_lock);
 }
 
 /*
