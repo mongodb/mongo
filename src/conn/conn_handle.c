@@ -45,9 +45,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_conn_config_init(session));
 
 	/* Statistics. */
-	for (i = 0; i < WT_COUNTER_SLOTS; ++i)
-		conn->stats[i] = &conn->stat_array[i];
-	__wt_stat_connection_init(conn->stats);
+	__wt_stat_connection_init(conn);
 
 	/* Locks. */
 	WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));

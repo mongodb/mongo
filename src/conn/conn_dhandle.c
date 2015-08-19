@@ -55,6 +55,8 @@ __conn_dhandle_alloc(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_spin_init(
 	    session, &dhandle->close_lock, "data handle close"));
 
+	__wt_stat_dsrc_init(dhandle);
+
 	*dhandlep = dhandle;
 	return (0);
 
