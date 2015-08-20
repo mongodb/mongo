@@ -2747,7 +2747,8 @@ TEST_F(ReplCoordTest, LivenessForwardingForChainedMember) {
         BSONObj entry = entryElement.Obj();
         long long memberId = entry["memberId"].Number();
         memberIds.insert(memberId);
-        ASSERT_EQUALS(optime.getTimestamp(), entry["optime"].timestamp());
+        OpTime entryOpTime = OpTime::parseFromBSON(entry["optime"].Obj()).getValue();
+        ASSERT_EQUALS(optime, entryOpTime);
     }
     ASSERT_EQUALS(2U, memberIds.size());
 
@@ -2772,7 +2773,8 @@ TEST_F(ReplCoordTest, LivenessForwardingForChainedMember) {
         BSONObj entry = entryElement.Obj();
         long long memberId = entry["memberId"].Number();
         memberIds2.insert(memberId);
-        ASSERT_EQUALS(optime.getTimestamp(), entry["optime"].timestamp());
+        OpTime entryOpTime = OpTime::parseFromBSON(entry["optime"].Obj()).getValue();
+        ASSERT_EQUALS(optime, entryOpTime);
     }
     ASSERT_EQUALS(1U, memberIds2.size());
 }

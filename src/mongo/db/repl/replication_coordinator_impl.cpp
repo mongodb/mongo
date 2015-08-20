@@ -1519,7 +1519,12 @@ bool ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(BSONObjBuil
 
         BSONObjBuilder entry(arrayBuilder.subobjStart());
         entry.append("_id", itr->rid);
-        entry.append("optime", itr->opTime.getTimestamp());
+        if (_isV1ElectionProtocol_inlock()) {
+            BSONObjBuilder opTimeBuilder(entry.subobjStart("optime"));
+            itr->opTime.append(&opTimeBuilder);
+        } else {
+            entry.append("optime", itr->opTime.getTimestamp());
+        }
         entry.append("memberId", itr->memberId);
         entry.append("cfgver", _rsConfig.getConfigVersion());
     }
