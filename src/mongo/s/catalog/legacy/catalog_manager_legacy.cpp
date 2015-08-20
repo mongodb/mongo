@@ -928,7 +928,7 @@ bool CatalogManagerLegacy::runUserManagementWriteCommand(const string& commandNa
                                                          const string& dbname,
                                                          const BSONObj& cmdObj,
                                                          BSONObjBuilder* result) {
-    DBClientMultiCommand dispatcher;
+    DBClientMultiCommand dispatcher(true);
     for (const ConnectionString& configServer : _configServers) {
         dispatcher.addCommand(configServer, dbname, cmdObj);
     }
@@ -1079,7 +1079,7 @@ void CatalogManagerLegacy::writeConfigServerDirect(const BatchedCommandRequest& 
         return;
     }
 
-    DBClientMultiCommand dispatcher;
+    DBClientMultiCommand dispatcher(true);
     if (_configServers.size() > 1) {
         // We can't support no-_id upserts to multiple config servers - the _ids will differ
         if (BatchedCommandRequest::containsNoIDUpsert(request)) {

@@ -45,7 +45,12 @@ class ShardConnection;
  */
 class DBClientMultiCommand : public MultiCommandDispatch {
 public:
-    DBClientMultiCommand();
+    /**
+     * Specifies whether this multi command instance will be used for talking to the config server,
+     * in which case, the dispatcher will not attempt to do the set shard version initialization.
+     */
+    DBClientMultiCommand(bool isConfig = false);
+
     ~DBClientMultiCommand();
 
     void addCommand(const ConnectionString& endpoint,
@@ -77,6 +82,9 @@ private:
     };
 
     typedef std::deque<PendingCommand*> PendingQueue;
+
+    const bool _isConfig;
+
     PendingQueue _pendingCommands;
 };
 

@@ -117,7 +117,7 @@ static void recvAsCmd(DBClientBase* conn, Message* toRecv, BSONObj* result) {
     *result = reply->getCommandReply();
 }
 
-DBClientMultiCommand::DBClientMultiCommand() = default;
+DBClientMultiCommand::DBClientMultiCommand(bool isConfig) : _isConfig(isConfig) {}
 
 DBClientMultiCommand::~DBClientMultiCommand() {
     // Cleanup anything outstanding, do *not* return stuff to the pool, that might error
@@ -151,15 +151,17 @@ void DBClientMultiCommand::sendAll() {
 
             command->conn = stdx::make_unique<ShardConnection>(command->endpoint, "");
 
+            DBClientBase* const actualConn =
+                (!_isConfig ? command->conn->get() : command->conn->getRawConn());
+
             // Sanity check if we're sending a batch write that we're talking to a new-enough
             // server.
             massert(28563,
                     str::stream() << "cannot send batch write operation to server "
-                                  << command->conn->get()->toString(),
-                    !isBatchWriteCommand(command->cmdObj) ||
-                        hasBatchWriteFeature(command->conn->get()));
+                                  << actualConn->toString(),
+                    !isBatchWriteCommand(command->cmdObj) || hasBatchWriteFeature(actualConn));
 
-            sayAsCmd(command->conn->get(), command->dbName, command->cmdObj);
+            sayAsCmd(actualConn, command->dbName, command->cmdObj);
         } catch (const DBException& ex) {
             command->status = ex.toStatus();
             command->conn.reset();
@@ -186,7 +188,10 @@ Status DBClientMultiCommand::recvAny(ConnectionString* endpoint, BSONSerializabl
         Message toRecv;
         BSONObj result;
 
-        recvAsCmd(command->conn->get(), &toRecv, &result);
+        DBClientBase* const actualConn =
+            (!_isConfig ? command->conn->get() : command->conn->getRawConn());
+
+        recvAsCmd(actualConn, &toRecv, &result);
         command->conn->done();
         command->conn.reset();
 
