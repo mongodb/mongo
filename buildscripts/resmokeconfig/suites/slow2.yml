@@ -8,9 +8,6 @@ selector:
 
 executor:
   js_test:
-    config:
-      shell_options:
-        readMode: commands
     hooks:
     - class: CleanEveryN
       n: 1
