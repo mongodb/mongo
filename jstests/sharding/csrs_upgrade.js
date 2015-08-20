@@ -53,6 +53,17 @@ var st;
         assert.commandWorked(runNextSplit(snode));
     };
 
+    var waitUntilMaster = function (dnode) {
+        var isMasterReply;
+        assert.soon(function () {
+            isMasterReply = dnode.adminCommand({ismaster: 1});
+            return isMasterReply.ismaster;
+        }, function () {
+            return "Expected " + dnode.name + " to respond ismaster:true, but got " +
+                tojson(isMasterReply);
+        });
+    };
+
     /**
      * Runs a config.version read, then splits the data collection and expects the read to succed
      * and the split to fail.
@@ -127,6 +138,7 @@ var st;
     csrs0Opts.configsvrMode = "sccc";
     MongoRunner.stopMongod(st.c0);
     csrs.push(MongoRunner.runMongod(csrs0Opts));
+    waitUntilMaster(csrs[0]);
 
     assertCanSplit(st.s0, "using SCCC protocol when first config server is a 1-node replica set");
 
