@@ -1,18 +1,15 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_263 Upgrading to Version 2.6.3
+@section version_262 Upgrading to Version 2.6.2
 
 <dl>
-<dt>Changes when config_base=false</dt>
+<dt>Change to config_base=false</dt>
 <dd>
-Setting the config_base flag to false directly (I.E. not via the
-WIREDTIGER_CONFIG environment variable) will now stop any existing basecfg file
-from being read when opening a connection. This may cause WiredTiger to open
-a connection when changing versions when previously an error would be returned.
+If \c config_base=false in the config passed directly to ::wiredtiger_open,
+any existing base configuration file will now be ignored.  If an application
+was relying on this behavior, a connection will be opened with different
+settings after upgrading, which could lead to errors or unexpected behavior.
 </dd>
-
-</dl><hr>
-@section version_262 Upgrading to Version 2.6.2
 
 <dl>
 <dt>WT_SESSION.verify</dt>
