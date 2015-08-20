@@ -18,5 +18,8 @@ function test( want , msg ){
 test( 0 , "A1" );
 assert.eq( 3 , t.find().count() , "A2" );
 assert.eq( 3 , t.find( {} ).count() , "A3" );
-assert.eq( 2, t.find( {} ).limit( 2 ).itcount() , "A4" );
+
+// This cursor should remain open on the server.
+var cursor = t.find( {} ).batchSize( 2 );
+cursor.next();
 test( 1 , "B1" );
