@@ -286,7 +286,7 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
     invariant(!_indexCatalog.haveAnyIndexes());  // eventually can implement, just not done
 
     if (_mustTakeCappedLockOnInsert)
-        synchronizeOnCappedInFlightResource(txn->lockState());
+        synchronizeOnCappedInFlightResource(txn->lockState(), _ns);
 
     StatusWith<RecordId> loc = _recordStore->insertRecord(txn, doc, _enforceQuota(enforceQuota));
     if (!loc.isOK())
@@ -327,7 +327,7 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
     }
 
     if (_mustTakeCappedLockOnInsert)
-        synchronizeOnCappedInFlightResource(txn->lockState());
+        synchronizeOnCappedInFlightResource(txn->lockState(), _ns);
 
     StatusWith<RecordId> res = _insertDocument(txn, docToInsert, enforceQuota);
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
@@ -358,7 +358,7 @@ StatusWith<RecordId> Collection::insertDocument(OperationContext* txn,
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
     if (_mustTakeCappedLockOnInsert)
-        synchronizeOnCappedInFlightResource(txn->lockState());
+        synchronizeOnCappedInFlightResource(txn->lockState(), _ns);
 
     StatusWith<RecordId> loc =
         _recordStore->insertRecord(txn, doc.objdata(), doc.objsize(), _enforceQuota(enforceQuota));

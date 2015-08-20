@@ -36,6 +36,7 @@
 namespace mongo {
 
 class StringData;
+class NamespaceString;
 
 class Lock {
 public:
@@ -286,5 +287,5 @@ public:
  * WUOW. This ensures that a MODE_X lock on this resource will wait for all in-flight capped
  * inserts to either commit or rollback and block new ones from starting.
  */
-void synchronizeOnCappedInFlightResource(Locker* txn);
+void synchronizeOnCappedInFlightResource(Locker* txn, const NamespaceString& cappedNs);
 }

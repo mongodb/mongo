@@ -144,7 +144,7 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
                                            ReplicationCoordinator* replCoord,
                                            const char* opstr,
                                            ReplicationCoordinator::Mode replicationMode) {
-    synchronizeOnCappedInFlightResource(txn->lockState());
+    synchronizeOnCappedInFlightResource(txn->lockState(), oplog->ns());
 
     long long hashNew = 0;
     long long term = OpTime::kProtocolVersionV0Term;
@@ -983,8 +983,10 @@ void SnapshotThread::run() {
             SnapshotName name(0);  // assigned real value in block.
             {
                 // Make sure there are no in-flight capped inserts while we create our snapshot.
-                Lock::ResourceLock cappedInsertLock(
-                    txn->lockState(), resourceCappedInFlight, MODE_X);
+                Lock::ResourceLock cappedInsertLockForOtherDb(
+                    txn->lockState(), resourceCappedInFlightForOtherDb, MODE_X);
+                Lock::ResourceLock cappedInsertLockForLocalDb(
+                    txn->lockState(), resourceCappedInFlightForLocalDb, MODE_X);
 
                 // Reserve the name immediately before we take our snapshot. This ensures that all
                 // names that compare lower must be from points in time visible to this named
