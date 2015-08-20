@@ -61,7 +61,7 @@ def log2chr(val):
         return chr(ord('0') + p)
     else:
         return chr(ord('a') + p - 10)
-    
+
 megabyte = 1024 * 1024
 
 def check_scenarios(scenes):

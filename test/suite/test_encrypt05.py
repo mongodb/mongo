@@ -93,7 +93,7 @@ class test_encrypt05(wttest.WiredTigerTestCase):
             diff = n - len(self.bigvalue)
             rchr = ''.join(chr(r.randint(1, 255)) for i in range(diff))
             return self.bigvalue + rchr
- 
+
     # Create a table, add key/values with specific lengths, then verify them.
     def test_encrypt(self):
         params = 'key_format=S,value_format=S'

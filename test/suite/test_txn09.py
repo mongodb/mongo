@@ -139,7 +139,7 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
         for i, ot in enumerate(zip(ops, txns)):
             ok, txn = ot
             op, k = ok
-            
+
             # Close and reopen the connection and cursor, toggling the log
             self.log_enabled = not self.log_enabled
             self.reopen_conn()

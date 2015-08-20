@@ -52,7 +52,7 @@ class test_durability01(wttest.WiredTigerTestCase, suite_subprocess):
         session = self.setUpSessionOpen(conn)
         session.verify(self.uri)
         conn.close()
-        
+
     def test_durability(self):
         '''Check for missing metadata checkpoints'''
 

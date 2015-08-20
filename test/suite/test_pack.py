@@ -43,7 +43,7 @@ class test_pack(wttest.WiredTigerTestCase):
             y = cursor.get_value()
             self.tty(' ' + name + ':  ' + str(x) + ' => ' + str(y))
         cursor.reset()
-        
+
     def check(self, fmt, *v):
         v = list(v)
         fmtname = re.sub('([A-Z])', r'_\1', fmt)

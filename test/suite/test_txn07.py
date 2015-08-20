@@ -171,7 +171,7 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
             ok, txn = ot
             # print '%d: %s(%d)[%s]' % (i, ok[0], ok[1], txn)
             op, k = ok
-            
+
             # print '%d: %s(%d)[%s]' % (i, ok[0], ok[1], txn)
             if op == 'stop':
                 c.set_key(k)

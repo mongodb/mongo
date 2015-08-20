@@ -84,7 +84,7 @@ class test_jsondump02(wttest.WiredTigerTestCase):
                 cursor[insert[0]] = insert[1]
         finally:
             cursor.close()
-        
+
     # Create JSON cursors and test them directly.
     def test_json_cursor(self):
         """
@@ -140,50 +140,50 @@ class test_jsondump02(wttest.WiredTigerTestCase):
 
         # bad tokens
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.load_json(self.table_uri2, 
+            lambda: self.load_json(self.table_uri2,
               (('<>abc?', '9'),)),
             '/unknown token/')
 
         # bad tokens
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.load_json(self.table_uri2, 
+            lambda: self.load_json(self.table_uri2,
               (('"abc\u"', ''),)),
             '/invalid Unicode/')
 
         # bad tokens
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.load_json(self.table_uri2, 
+            lambda: self.load_json(self.table_uri2,
               (('"abc', ''),)),
             '/unterminated string/')
 
         # bad syntax
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.load_json(self.table_uri2, 
+            lambda: self.load_json(self.table_uri2,
               (('"stuff" "jibberish"', '"value0" "more jibberish"'),)),
             '/expected key name.*\"key0\"/')
 
         # bad types
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.load_json(self.table_uri2, 
+            lambda: self.load_json(self.table_uri2,
               (('"key0" : "KEY002"', '"value0" : "xyz",\n"value1" : "str0"'),)),
             '/expected unsigned JSON <int>, got <string>/')
 
         # bad types
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.load_json(self.table_uri2, 
+            lambda: self.load_json(self.table_uri2,
               (('"key0" : "KEY002"', '"value0" : 123,\n"value1" : 456'),)),
             '/expected JSON <string>, got <integer>/')
 
         # extra stuff
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.load_json(self.table_uri2, 
+            lambda: self.load_json(self.table_uri2,
               (('"key0" : "KEY002"',
                 '"value0" : 123,\n"value1" : "str0",'),)),
             '/expected JSON <EOF>, got \',\'/')
 
         # fields out of order currently not supported
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.load_json(self.table_uri2, 
+            lambda: self.load_json(self.table_uri2,
               (('"key0" : "KEY002"', '"value1" : "str0",\n"value0" : 123'),)),
             '/expected value name.*\"value0\"/')
 
@@ -192,17 +192,17 @@ class test_jsondump02(wttest.WiredTigerTestCase):
             '\\u', '\\ux', '\\u0', '\\u0F', '\\u0FA', '\\u0FAx',  '\\u0FA\\x')
         for uni in invalid_unicode:
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                lambda: self.load_json(self.table_uri2, 
+                lambda: self.load_json(self.table_uri2,
                   (('"key0" : "KEY002"', '"value0" : 123,\n"value1" : "'
                     + uni + '"'),)),
                 '/invalid Unicode/')
 
         # this one should work
-        self.load_json(self.table_uri2, 
+        self.load_json(self.table_uri2,
               (('"key0" : "KEY002"', '"value0" : 345,\n"value1" : "str2"'),))
 
         # extraneous/missing space is okay
-        self.load_json(self.table_uri2, 
+        self.load_json(self.table_uri2,
               (('  "key0"\n:\t"KEY003"    ',
                 '"value0":456,"value1"\n\n\r\n:\t\n"str3"'),))
 
