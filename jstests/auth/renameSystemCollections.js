@@ -72,25 +72,6 @@ assert.eq(CodeUnauthorized, res.code);
 assert.eq(null, adminDB.system.users.findOne({user: backdoorUserDoc.user}));
 assert.neq(null, adminDB.system.users.findOne({user:'userAdmin'}));
 
-adminDB.auth('root', 'password');
-adminDB.users.drop();
-adminDB.users.insert(backdoorUserDoc);
-
-jsTestLog("Test that with root you CANNOT rename to/from system.users");
-var res = adminDB.system.users.renameCollection("users");
-assert.eq(0, res.ok);
-assert.eq(CodeUnauthorized, res.code);
-assert.eq(5, adminDB.system.users.count());
-
-adminDB.users.drop();
-adminDB.users.insert(backdoorUserDoc);
-var res = adminDB.users.renameCollection("system.users");
-assert.eq(0, res.ok);
-assert.eq(CodeUnauthorized, res.code);
-
-assert.eq(null, adminDB.system.users.findOne({user: backdoorUserDoc.user}));
-assert.neq(null, adminDB.system.users.findOne({user:'userAdmin'}));
-
 adminDB.auth('rootier', 'password');
 
 jsTestLog("Test that with __system you CAN rename to/from system.users");
