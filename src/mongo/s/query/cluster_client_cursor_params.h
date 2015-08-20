@@ -71,6 +71,9 @@ struct ClusterClientCursorParams {
     // Limits the number of results returned by the ClusterClientCursor to this many. Optional.
     // Should be forwarded to the remote hosts in 'cmdObj'.
     boost::optional<long long> limit;
+
+    // Whether this cursor is tailing a capped collection.
+    bool isTailable = false;
 };
 
 }  // mongo

@@ -81,6 +81,7 @@ protected:
         params.limit = lpq->getLimit();
         params.batchSize = getMoreBatchSize ? getMoreBatchSize : lpq->getBatchSize();
         params.skip = lpq->getSkip();
+        params.isTailable = lpq->isTailable();
 
         for (const auto& hostAndPort : remotes) {
             ClusterClientCursorParams::Remote remoteParams;
@@ -733,6 +734,71 @@ TEST_F(AsyncResultsMergerTest, KillCalledTwice) {
     ASSERT(killedEvent2.isValid());
     executor->waitForEvent(killedEvent1);
     executor->waitForEvent(killedEvent2);
+}
+
+TEST_F(AsyncResultsMergerTest, TailableBasic) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
+    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    std::vector<GetMoreResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+    responses.emplace_back(_nss, CursorId(123), batch1);
+    scheduleNetworkResponses(responses);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()));
+
+    // In the tailable case, we expect boost::none after every batch.
+    ASSERT_TRUE(arm->ready());
+    ASSERT(!unittest::assertGet(arm->nextReady()));
+
+    ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    responses.clear();
+    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}")};
+    responses.emplace_back(_nss, CursorId(123), batch2);
+    scheduleNetworkResponses(responses);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT(!unittest::assertGet(arm->nextReady()));
+
+    auto killedEvent = arm->kill();
+    executor->waitForEvent(killedEvent);
+}
+
+TEST_F(AsyncResultsMergerTest, TailableEmptyBatch) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
+    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Remote responds with an empty batch and a non-zero cursor id.
+    std::vector<GetMoreResponse> responses;
+    std::vector<BSONObj> batch;
+    responses.emplace_back(_nss, CursorId(123), batch);
+    scheduleNetworkResponses(responses);
+    executor->waitForEvent(readyEvent);
+
+    // After receiving an empty batch, the ARM should return boost::none.
+    ASSERT_TRUE(arm->ready());
+    ASSERT(!unittest::assertGet(arm->nextReady()));
+
+    auto killedEvent = arm->kill();
+    executor->waitForEvent(killedEvent);
 }
 
 }  // namespace

@@ -87,5 +87,15 @@
     assert.eq(cmdRes.cursor.firstBatch.length, 1);
     assert.eq(cmdRes.cursor.firstBatch[0], {_id: 5});
 
+    // Tailable option should result in a failure because the collection is not capped.
+    cmdRes = db.runCommand({find: coll.getName(), tailable: true});
+    assert.commandFailed(cmdRes);
+
+    // $natural sort.
+    cmdRes = db.runCommand({find: coll.getName(), sort: {$natural: 1}});
+    assert.eq(cmdRes.cursor.id, NumberLong(0));
+    assert.eq(cmdRes.cursor.ns, coll.getFullName());
+    assert.eq(cmdRes.cursor.firstBatch.length, 6);
+
     st.stop();
 })();

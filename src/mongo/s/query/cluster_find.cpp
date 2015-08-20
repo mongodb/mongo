@@ -121,8 +121,18 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     params.limit = query.getParsed().getLimit();
     params.batchSize = query.getParsed().getBatchSize();
     params.limit = query.getParsed().getLimit();
-    params.sort = query.getParsed().getSort();
     params.skip = query.getParsed().getSkip();
+    params.isTailable = query.getParsed().isTailable();
+
+    // $natural sort is actually a hint to use a collection scan, and shouldn't be treated like a
+    // sort on mongos. Including a $natural anywhere in the sort spec results in the whole sort
+    // being considered a hint to use a collection scan.
+    if (!query.getParsed().getSort().hasField("$natural")) {
+        params.sort = query.getParsed().getSort();
+    }
+
+    // Tailable cursors can't have a sort, which should have already been validated.
+    invariant(params.sort.isEmpty() || !params.isTailable);
 
     const auto lpqToForward = transformQueryForShards(query.getParsed());
 
@@ -173,7 +183,9 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
 
         if (!next.getValue()) {
             // We reached end-of-stream.
-            cursorState = ClusterCursorManager::CursorState::Exhausted;
+            if (!pinnedCursor.isTailable()) {
+                cursorState = ClusterCursorManager::CursorState::Exhausted;
+            }
             break;
         }
 
@@ -261,7 +273,9 @@ StatusWith<GetMoreResponse> ClusterFind::runGetMore(OperationContext* txn,
 
         if (!next.getValue()) {
             // We reached end-of-stream.
-            cursorState = ClusterCursorManager::CursorState::Exhausted;
+            if (!pinnedCursor.getValue().isTailable()) {
+                cursorState = ClusterCursorManager::CursorState::Exhausted;
+            }
             break;
         }
 
