@@ -54,7 +54,8 @@ baseEnv.Library('base', [
                     "$BUILD_DIR/mongo/db/common",
                     "$BUILD_DIR/mongo/db/fts/unicode/unicode",
                     "$BUILD_DIR/mongo/platform/platform",
-                    "$BUILD_DIR/third_party/shim_stemmer"
+                    "$BUILD_DIR/mongo/util/md5",
+                    "$BUILD_DIR/third_party/shim_stemmer",
                     ])
 
 env.Library( 'server_common', [

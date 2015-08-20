@@ -36,6 +36,7 @@
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -56,10 +57,22 @@ BSONElement nullElt;
 // from the concatenation of the first 32 characters
 // and the hex string of the murmur3 hash value of the entire
 // term value.
-const size_t termKeyPrefixLength = 32U;
+const size_t termKeyPrefixLengthV2 = 32U;
 // 128-bit hash value expressed in hex = 32 characters
-const size_t termKeySuffixLength = 32U;
-const size_t termKeyLength = termKeyPrefixLength + termKeySuffixLength;
+const size_t termKeySuffixLengthV2 = 32U;
+const size_t termKeyLengthV2 = termKeyPrefixLengthV2 + termKeySuffixLengthV2;
+
+// TextIndexVersion 3.
+// If the term is longer than 256 characters, it may
+// result in the generated key being too large
+// for the index. In that case, we generate a 256-character key
+// from the concatenation of the first 224 characters
+// and the hex string of the md5 hash value of the entire
+// term value.
+const size_t termKeyPrefixLengthV3 = 224U;
+// 128-bit hash value expressed in hex = 32 characters
+const size_t termKeySuffixLengthV3 = 32U;
+const size_t termKeyLengthV3 = termKeyPrefixLengthV3 + termKeySuffixLengthV3;
 
 /**
  * Returns size of buffer required to store term in index key.
@@ -70,15 +83,22 @@ const size_t termKeyLength = termKeyPrefixLength + termKeySuffixLength;
 int guessTermSize(const std::string& term, TextIndexVersion textIndexVersion) {
     if (TEXT_INDEX_VERSION_1 == textIndexVersion) {
         return term.size();
-    } else {
-        invariant(TEXT_INDEX_VERSION_2 <= textIndexVersion);
-        if (term.size() <= termKeyPrefixLength) {
+    } else if (TEXT_INDEX_VERSION_2 == textIndexVersion) {
+        if (term.size() <= termKeyPrefixLengthV2) {
             return term.size();
         }
-        return termKeyLength;
+
+        return termKeyLengthV2;
+    } else {
+        invariant(TEXT_INDEX_VERSION_3 == textIndexVersion);
+        if (term.size() <= termKeyPrefixLengthV3) {
+            return term.size();
+        }
+
+        return termKeyLengthV3;
     }
 }
-}
+}  // namespace
 
 MONGO_INITIALIZER(FTSIndexFormat)(InitializerContext* context) {
     BSONObjBuilder b;
@@ -183,11 +203,10 @@ void FTSIndexFormat::_appendIndexKey(BSONObjBuilder& b,
         b.append("", term);
         b.append("", weight);
     }
-    // See comments at the top of file for termKeyPrefixLength.
-    // Apply hash for text index version 2 and above to long terms (longer than 32 characters).
-    else {
-        invariant(TEXT_INDEX_VERSION_2 <= textIndexVersion);
-        if (term.size() <= termKeyPrefixLength) {
+    // See comments at the top of file for termKeyPrefixLengthV2.
+    // Apply hash for text index version 2 to long terms (longer than 32 characters).
+    else if (TEXT_INDEX_VERSION_2 == textIndexVersion) {
+        if (term.size() <= termKeyPrefixLengthV2) {
             b.append("", term);
         } else {
             union {
@@ -197,8 +216,18 @@ void FTSIndexFormat::_appendIndexKey(BSONObjBuilder& b,
             uint32_t seed = 0;
             MurmurHash3_x64_128(term.data(), term.size(), seed, t.hash);
             string keySuffix = mongo::toHexLower(t.data, sizeof(t.data));
-            invariant(termKeySuffixLength == keySuffix.size());
-            b.append("", term.substr(0, termKeyPrefixLength) + keySuffix);
+            invariant(termKeySuffixLengthV2 == keySuffix.size());
+            b.append("", term.substr(0, termKeyPrefixLengthV2) + keySuffix);
+        }
+        b.append("", weight);
+    } else {
+        invariant(TEXT_INDEX_VERSION_3 == textIndexVersion);
+        if (term.size() <= termKeyPrefixLengthV3) {
+            b.append("", term);
+        } else {
+            string keySuffix = md5simpledigest(term);
+            invariant(termKeySuffixLengthV3 == keySuffix.size());
+            b.append("", term.substr(0, termKeyPrefixLengthV3) + keySuffix);
         }
         b.append("", weight);
     }
