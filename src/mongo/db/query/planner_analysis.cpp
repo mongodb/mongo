@@ -761,6 +761,13 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
                 }
             }
         }
+        // If we don't have a covered project, and we're not allowed to put an uncovered one in,
+        // bail out.
+        if (solnRoot->fetched() &&
+            (params.options & QueryPlannerParams::NO_UNCOVERED_PROJECTIONS)) {
+            delete solnRoot;
+            return nullptr;
+        }
 
         // If there's no sort stage but we have a sortKey meta-projection, we need to add a stage to
         // generate the sort key computed data.

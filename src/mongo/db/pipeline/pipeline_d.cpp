@@ -93,6 +93,34 @@ private:
 };
 }
 
+namespace {
+StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
+    OperationContext* txn,
+    Collection* collection,
+    const intrusive_ptr<ExpressionContext>& pExpCtx,
+    BSONObj queryObj,
+    BSONObj projectionObj,
+    BSONObj sortObj,
+    const size_t plannerOpts) {
+    const WhereCallbackReal whereCallback(pExpCtx->opCtx, pExpCtx->ns.db());
+
+    auto cq =
+        CanonicalQuery::canonicalize(pExpCtx->ns, queryObj, sortObj, projectionObj, whereCallback);
+
+    if (!cq.isOK()) {
+        // Return an error instead of uasserting, since there are cases where the combination of
+        // sort and projection will result in a bad query, but when we try with a different
+        // combination it will be ok. e.g. a sort by {$meta: 'textScore'}, without any projection
+        // will fail, but will succeed when the corresponding '$meta' projection is passed in
+        // another attempt.
+        return {cq.getStatus()};
+    }
+
+    return getExecutor(
+        txn, collection, std::move(cq.getValue()), PlanExecutor::YIELD_AUTO, plannerOpts);
+}
+}  // namespace
+
 shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
     OperationContext* txn,
     Collection* collection,
@@ -101,7 +129,7 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
     // get the full "namespace" name
     const string& fullName = pExpCtx->ns.ns();
 
-    // We will be modifying the source vector as we go
+    // We will be modifying the source vector as we go.
     Pipeline::SourceContainer& sources = pPipeline->sources;
 
     // Inject a MongodImplementation to sources that need them.
@@ -135,12 +163,9 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
     }
 
     // Find the set of fields in the source documents depended on by this pipeline.
-    const DepsTracker deps = pPipeline->getDependencies(queryObj);
+    DepsTracker deps = pPipeline->getDependencies(queryObj);
 
-    // Passing query an empty projection since it is faster to use ParsedDeps::extractFields().
-    // This will need to change to support covering indexes (SERVER-12015). There is an
-    // exception for textScore since that can only be retrieved by a query projection.
-    const BSONObj projectionForQuery = deps.needTextScore ? deps.toProjection() : BSONObj();
+    BSONObj projForQuery = deps.toProjection();
 
     /*
       Look for an initial sort; we'll try to add this to the
@@ -160,67 +185,8 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
     }
 
     // Create the PlanExecutor.
-    //
-    // If we try to create a PlanExecutor that includes both the match and the
-    // sort, and the two are incompatible wrt the available indexes, then
-    // we don't get a PlanExecutor back.
-    //
-    // So we try to use both first.  If that fails, try again, without the
-    // sort.
-    //
-    // If we don't have a sort, jump straight to just creating a PlanExecutor.
-    // without the sort.
-    //
-    // If we are able to incorporate the sort into the PlanExecutor, remove it
-    // from the head of the pipeline.
-    //
-    // LATER - we should be able to find this out before we create the
-    // cursor.  Either way, we can then apply other optimizations there
-    // are tickets for, such as SERVER-4507.
-    const size_t runnerOptions = QueryPlannerParams::DEFAULT |
-        QueryPlannerParams::INCLUDE_SHARD_FILTER | QueryPlannerParams::NO_BLOCKING_SORT;
-    std::shared_ptr<PlanExecutor> exec;
-    bool sortInRunner = false;
-
-    const WhereCallbackReal whereCallback(pExpCtx->opCtx, pExpCtx->ns.db());
-
-    if (sortStage) {
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            pExpCtx->ns, queryObj, sortObj, projectionForQuery, whereCallback);
-
-        if (statusWithCQ.isOK()) {
-            auto statusWithPlanExecutor = getExecutor(txn,
-                                                      collection,
-                                                      std::move(statusWithCQ.getValue()),
-                                                      PlanExecutor::YIELD_AUTO,
-                                                      runnerOptions);
-            if (statusWithPlanExecutor.isOK()) {
-                // success: The PlanExecutor will handle sorting for us using an index.
-                exec = std::move(statusWithPlanExecutor.getValue());
-                sortInRunner = true;
-
-                sources.pop_front();
-                if (sortStage->getLimitSrc()) {
-                    // need to reinsert coalesced $limit after removing $sort
-                    sources.push_front(sortStage->getLimitSrc());
-                }
-            }
-        }
-    }
-
-    if (!exec.get()) {
-        const BSONObj noSort;
-        auto statusWithCQ = CanonicalQuery::canonicalize(
-            pExpCtx->ns, queryObj, noSort, projectionForQuery, whereCallback);
-        uassertStatusOK(statusWithCQ.getStatus());
-
-        exec = uassertStatusOK(getExecutor(txn,
-                                           collection,
-                                           std::move(statusWithCQ.getValue()),
-                                           PlanExecutor::YIELD_AUTO,
-                                           runnerOptions));
-    }
-
+    auto exec = prepareExecutor(
+        txn, collection, pPipeline, pExpCtx, sortStage, deps, queryObj, &sortObj, &projForQuery);
 
     // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved. We
     // deregister the PlanExecutor so that it can be registered with ClientCursor.
@@ -233,18 +199,116 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
 
     // Note the query, sort, and projection for explain.
     pSource->setQuery(queryObj);
-    if (sortInRunner)
-        pSource->setSort(sortObj);
+    pSource->setSort(sortObj);
+    if (!projForQuery.isEmpty()) {
+        pSource->setProjection(projForQuery, boost::none);
+    } else {
+        // There may be fewer dependencies now if the sort was covered.
+        if (!sortObj.isEmpty()) {
+            deps = pPipeline->getDependencies(queryObj);
+        }
 
-    pSource->setProjection(deps.toProjection(), deps.toParsedDeps());
+        pSource->setProjection(deps.toProjection(), deps.toParsedDeps());
+    }
 
     while (!sources.empty() && pSource->coalesce(sources.front())) {
         sources.pop_front();
     }
 
     pPipeline->addInitialSource(pSource);
-
     return exec;
+}
+
+std::shared_ptr<PlanExecutor> PipelineD::prepareExecutor(
+    OperationContext* txn,
+    Collection* collection,
+    const intrusive_ptr<Pipeline>& pipeline,
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const intrusive_ptr<DocumentSourceSort>& sortStage,
+    const DepsTracker& deps,
+    const BSONObj& queryObj,
+    BSONObj* sortObj,
+    BSONObj* projectionObj) {
+    // The query system has the potential to use an index to provide a non-blocking sort and/or to
+    // use the projection to generate a covered plan. If this is possible, it is more efficient to
+    // let the query system handle those parts of the pipeline. If not, it is more efficient to use
+    // a $sort and/or a ParsedDeps object. Thus, we will determine whether the query system can
+    // provide a non-blocking sort or a covered projection before we commit to a PlanExecutor.
+    //
+    // To determine if the query system can provide a non-blocking sort, we pass the
+    // NO_BLOCKING_SORT planning option, meaning 'getExecutor' will not produce a PlanExecutor if
+    // the query system would use a blocking sort stage.
+    //
+    // To determine if the query system can provide a covered projection, we pass the
+    // NO_UNCOVERED_PROJECTS planning option, meaning 'getExecutor' will not produce a PlanExecutor
+    // if the query system would need to fetch the document to do the projection. The following
+    // logic uses the above strategies, with multiple calls to 'attemptToGetExecutor' to determine
+    // the most efficient way to handle the $sort and $project stages.
+    //
+    // LATER - We should attempt to determine if the results from the query are returned in some
+    // order so we can then apply other optimizations there are tickets for, such as SERVER-4507.
+    size_t plannerOpts = QueryPlannerParams::DEFAULT | QueryPlannerParams::INCLUDE_SHARD_FILTER |
+        QueryPlannerParams::NO_BLOCKING_SORT;
+
+    // The only way to get a text score is to let the query system handle the projection. In all
+    // other cases, unless the query system can do an index-covered projection and avoid going to
+    // the raw record at all, it is faster to have ParsedDeps filter the fields we need.
+    if (!deps.needTextScore) {
+        plannerOpts |= QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
+    }
+
+    std::shared_ptr<PlanExecutor> exec;
+
+    BSONObj emptyProjection;
+    if (sortStage) {
+        // See if the query system can provide a non-blocking sort.
+        auto swExecutorSort = attemptToGetExecutor(
+            txn, collection, expCtx, queryObj, emptyProjection, *sortObj, plannerOpts);
+
+        if (swExecutorSort.isOK()) {
+            // Success! Now see if the query system can also cover the projection.
+            auto swExecutorSortAndProj = attemptToGetExecutor(
+                txn, collection, expCtx, queryObj, *projectionObj, *sortObj, plannerOpts);
+
+            if (swExecutorSortAndProj.isOK()) {
+                // Success! We have a non-blocking sort and a covered projection.
+                exec = std::move(swExecutorSortAndProj.getValue());
+            } else {
+                // The query system couldn't cover the projection.
+                *projectionObj = BSONObj();
+                exec = std::move(swExecutorSort.getValue());
+            }
+
+            // We know the sort is being handled by the query system, so remove the $sort stage.
+            pipeline->sources.pop_front();
+
+            if (sortStage->getLimitSrc()) {
+                // We need to reinsert the coalesced $limit after removing the $sort.
+                pipeline->sources.push_front(sortStage->getLimitSrc());
+            }
+            return exec;
+        }
+        // The query system can't provide a non-blocking sort.
+        *sortObj = BSONObj();
+    }
+
+    // Either there was no $sort stage, or the query system could not provide a non-blocking
+    // sort.
+    dassert(sortObj->isEmpty());
+
+    // See if the query system can cover the projection.
+    auto swExecutorProj = attemptToGetExecutor(
+        txn, collection, expCtx, queryObj, *projectionObj, *sortObj, plannerOpts);
+    if (swExecutorProj.isOK()) {
+        // Success! We have a covered projection.
+        return std::move(swExecutorProj.getValue());
+    }
+
+    // The query system couldn't provide a covered projection.
+    *projectionObj = BSONObj();
+    // If this doesn't work, nothing will.
+    return uassertStatusOK(attemptToGetExecutor(
+        txn, collection, expCtx, queryObj, *projectionObj, *sortObj, plannerOpts));
 }
 
 }  // namespace mongo

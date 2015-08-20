@@ -34,10 +34,13 @@
 namespace mongo {
 class Collection;
 class DocumentSourceCursor;
+class DocumentSourceSort;
 struct ExpressionContext;
 class OperationContext;
 class Pipeline;
 class PlanExecutor;
+class BSONObj;
+struct DepsTracker;
 
 /*
   PipelineD is an extension of the Pipeline class, but with additional
@@ -79,6 +82,26 @@ public:
 
 private:
     PipelineD();  // does not exist:  prevent instantiation
+
+    /**
+     * Creates a PlanExecutor to be used in the initial cursor source. If the query system can use
+     * an index to provide a more efficient sort or projection, the sort and/or projection will be
+     * incorporated into the PlanExecutor.
+     *
+     * 'sortObj' will be set to an empty object if the query system cannot provide a non-blocking
+     * sort, and 'projectionObj' will be set to an empty object if the query system cannot provide a
+     * covered projection.
+     */
+    static std::shared_ptr<PlanExecutor> prepareExecutor(
+        OperationContext* txn,
+        Collection* collection,
+        const boost::intrusive_ptr<Pipeline>& pipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
+        const DepsTracker& deps,
+        const BSONObj& queryObj,
+        BSONObj* sortObj,
+        BSONObj* projectionObj);
 };
 
 }  // namespace mongo

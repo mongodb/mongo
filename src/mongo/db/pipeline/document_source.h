@@ -366,9 +366,8 @@ public:
     /**
      * Informs this object of projection and dependency information.
      *
-     * @param projection A projection specification describing the fields needed by the rest of
-     *                   the pipeline.
-     * @param deps The output of DepsTracker::toParsedDeps
+     * @param projection The projection that has been passed down to the query system.
+     * @param deps The output of DepsTracker::toParsedDeps.
      */
     void setProjection(const BSONObj& projection, const boost::optional<ParsedDeps>& deps);
 
