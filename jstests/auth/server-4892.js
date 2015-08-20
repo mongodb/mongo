@@ -66,7 +66,7 @@ with_mongod( ['--auth'], function runTest( mongod ) {
 
     expectNumLiveCursors( mongod, 0 );
 
-    var cursor = somedb.data.find({}, ['_id']).batchSize(1);
+    var cursor = somedb.data.find({}, {'_id': 1}).batchSize(1);
     cursor.next();
     expectNumLiveCursors( mongod, 1 );
 

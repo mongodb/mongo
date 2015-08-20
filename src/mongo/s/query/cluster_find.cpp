@@ -215,7 +215,11 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
     invariant(results);
 
     auto dbConfig = grid.catalogCache()->getDatabase(txn, query.nss().db().toString());
-    if (!dbConfig.isOK()) {
+    if (dbConfig.getStatus() == ErrorCodes::DatabaseNotFound) {
+        // If the database doesn't exist, we successfully return an empty result set without
+        // creating a cursor.
+        return CursorId(0);
+    } else if (!dbConfig.isOK()) {
         return dbConfig.getStatus();
     }
 
