@@ -37,6 +37,25 @@ if (!db.serverStatus().storageEngine.supportsCommittedReads) {
     return;
 }
 
+// Ensure killOp will work on an op that is waiting for snapshots to be created
+var blockedReader = startParallelShell(
+        "db.readMajority.runCommand('find', {batchSize: 2, readConcern: {level: 'majority'}});",
+        testServer.port);
+
+assert.soon(function() {
+    var curOps = db.currentOp(true);
+    jsTestLog("curOp output: " + tojson(curOps));
+    for (var i in curOps.inprog) {
+        var op = curOps.inprog[i];
+        if (op.op === 'query' && op.ns === "test.$cmd" && op.query.find === 'readMajority') {
+            db.killOp(op.opid);
+            return true;
+        }
+    }
+    return false;
+}, "could not kill an op that was waiting for a snapshot", 60 * 1000);
+blockedReader();
+
 var snapshot1 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
 assert.commandWorked(db.runCommand({create: "readMajority"}));
 var snapshot2 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;

@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/s/d_state.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -73,40 +74,63 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn, const 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
                                                    const NamespaceString& nss)
     : _txn(txn), _transaction(txn, MODE_IS), _autoColl(txn, nss, MODE_IS) {
-    // We have both the DB and collection locked, which the prerequisite to do a stable shard
-    // version check
-    ensureShardVersionOKOrThrow(_txn, nss.ns());
+    {
+        auto curOp = CurOp::get(_txn);
+        stdx::lock_guard<Client> lk(*_txn->getClient());
 
-    auto curOp = CurOp::get(_txn);
-    stdx::lock_guard<Client> lk(*_txn->getClient());
-
-    // TODO: OldClientContext legacy, needs to be removed
-    curOp->ensureStarted();
-    curOp->setNS_inlock(nss.ns());
-
-    // At this point, we are locked in shared mode for the database by the DB lock in the
-    // constructor, so it is safe to load the DB pointer.
-    if (_autoColl.getDb()) {
         // TODO: OldClientContext legacy, needs to be removed
-        curOp->enter_inlock(nss.ns().c_str(), _autoColl.getDb()->getProfilingLevel());
-    }
+        curOp->ensureStarted();
+        curOp->setNS_inlock(nss.ns());
 
-    if (getCollection()) {
-        if (auto minSnapshot = getCollection()->getMinimumVisibleSnapshot()) {
-            if (auto mySnapshot = _txn->recoveryUnit()->getMajorityCommittedSnapshot()) {
-                while (mySnapshot < minSnapshot) {
-                    // Wait until a snapshot is available.
-                    repl::ReplicationCoordinator::get(_txn)->waitForNewSnapshot(_txn);
-
-                    Status status = _txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-                    uassert(28786,
-                            "failed to set read from majority-committed snapshot",
-                            status.isOK());
-                    mySnapshot = _txn->recoveryUnit()->getMajorityCommittedSnapshot();
-                }
-            }
+        // At this point, we are locked in shared mode for the database by the DB lock in the
+        // constructor, so it is safe to load the DB pointer.
+        if (_autoColl.getDb()) {
+            // TODO: OldClientContext legacy, needs to be removed
+            curOp->enter_inlock(nss.ns().c_str(), _autoColl.getDb()->getProfilingLevel());
         }
     }
+
+    // We have both the DB and collection locked, which is the prerequisite to do a stable shard
+    // version check, but we'd like to do the check after we have a satisfactory snapshot.
+    ON_BLOCK_EXIT([&]() { ensureShardVersionOKOrThrow(_txn, nss.ns()); });
+
+    if (!getCollection()) {
+        return;
+    }
+    auto minSnapshot = getCollection()->getMinimumVisibleSnapshot();
+    if (!minSnapshot) {
+        return;
+    }
+    auto mySnapshot = _txn->recoveryUnit()->getMajorityCommittedSnapshot();
+    if (!mySnapshot) {
+        return;
+    }
+    if (mySnapshot > minSnapshot) {
+        return;
+    }
+
+    // Save lock state for yielding.
+    Locker* locker = _txn->lockState();
+    Locker::LockSnapshot lockStateBackup;
+    massert(28795,
+            str::stream() << "Unable to yield to wait for readConcern=majority "
+            << "snapshot to be available for " << nss.ns(),
+            locker->saveLockStateAndUnlock(&lockStateBackup));
+    ON_BLOCK_EXIT([&]() { locker->restoreLockState(lockStateBackup); });
+
+    // Wait until a snapshot is available.
+    while (mySnapshot < minSnapshot) {
+        repl::ReplicationCoordinator::get(_txn)->waitForNewSnapshot(_txn);
+
+        Status status = _txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+        uassert(28786,
+                "failed to set read from majority-committed snapshot",
+                status.isOK());
+        mySnapshot = _txn->recoveryUnit()->getMajorityCommittedSnapshot();
+    }
+
+    stdx::lock_guard<Client> lk(*_txn->getClient());
+    CurOp::get(_txn)->yielded();
 }
 
 AutoGetCollectionForRead::~AutoGetCollectionForRead() {
