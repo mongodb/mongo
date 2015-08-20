@@ -1794,6 +1794,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
+	int64_t config_base_set;
 	const char *enc_cfg[] = { NULL, NULL };
 	char version[64];
 
@@ -1835,6 +1836,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open);
 	cfg[1] = config;
 
+	/* Capture the config_base setting file for later use. */
+	WT_ERR(__wt_config_gets(session, cfg, "config_base", &cval));
+	config_base_set = cval.val;
+
 	/* Configure error messages so we get them right early. */
 	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
 	if (cval.len != 0)
@@ -1872,7 +1877,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR) >=
 	    (int)sizeof(version), ENOMEM);
 	__conn_config_append(cfg, version);
-	WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, i1));
+
+	/* Ignore the base_config file if we config_base set to false. */
+	if (config_base_set != 0)
+		WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, i1));
 	__conn_config_append(cfg, config);
 	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, i2));
 	WT_ERR(__conn_config_env(session, cfg, i3));

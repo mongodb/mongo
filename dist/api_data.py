@@ -981,8 +981,10 @@ methods = {
     connection_runtime_config +
     common_wiredtiger_open + [
     Config('config_base', 'true', r'''
-        write the base configuration file if creating the database,
-        see @ref config_base for more information''',
+        write the base configuration file if creating the database.  If
+        \c false in the config passed directly to ::wiredtiger_open, will
+        ignore any existing base configuration file in addition to not creating
+        one.  See @ref config_base for more information''',
         type='boolean'),
     Config('create', 'false', r'''
         create the database if it does not exist''',
@@ -1011,8 +1013,10 @@ methods = {
     connection_runtime_config +
     common_wiredtiger_open + [
     Config('config_base', 'true', r'''
-        write the base configuration file if creating the database,
-        see @ref config_base for more information''',
+        write the base configuration file if creating the database.  If
+        \c false in the config passed directly to ::wiredtiger_open, will
+        ignore any existing base configuration file in addition to not creating
+        one.  See @ref config_base for more information''',
         type='boolean'),
     Config('create', 'false', r'''
         create the database if it does not exist''',

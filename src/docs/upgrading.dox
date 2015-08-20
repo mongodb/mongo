@@ -3,6 +3,15 @@
 @section version_262 Upgrading to Version 2.6.2
 
 <dl>
+<dt>Change to config_base=false</dt>
+<dd>
+If \c config_base=false in the config passed directly to ::wiredtiger_open,
+any existing base configuration file will now be ignored.  If an application
+was relying on this behavior, a connection will be opened with different
+settings after upgrading, which could lead to errors or unexpected behavior.
+</dd>
+
+<dl>
 <dt>WT_SESSION.verify</dt>
 <dd>
 The WT_SESSION.verify method in this release has a new configuration
