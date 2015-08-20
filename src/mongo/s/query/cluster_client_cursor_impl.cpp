@@ -41,7 +41,7 @@ namespace mongo {
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
                                                  ClusterClientCursorParams params)
-    : _isTailable(params.isTailable), _root(buildMergerPlan(executor, std::move(params))) {}
+    : _root(buildMergerPlan(executor, std::move(params))) {}
 
 StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
     return _root->next();
@@ -49,10 +49,6 @@ StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
 
 void ClusterClientCursorImpl::kill() {
     _root->kill();
-}
-
-bool ClusterClientCursorImpl::isTailable() const {
-    return _isTailable;
 }
 
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(

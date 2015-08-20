@@ -153,12 +153,6 @@ public:
         StatusWith<boost::optional<BSONObj>> next();
 
         /**
-         * Returns whether or not the underlying cursor is tailing a capped collection.  Cannot be
-         * called after returnCursor() is called.  A cursor must be owned.
-         */
-        bool isTailable() const;
-
-        /**
          * Transfers ownership of the underlying cursor back to the manager.  A cursor must be
          * owned, and a cursor will no longer be owned after this method completes.
          *

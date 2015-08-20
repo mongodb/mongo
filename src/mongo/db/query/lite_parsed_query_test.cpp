@@ -177,30 +177,6 @@ TEST(LiteParsedQueryTest, MinFieldsLessThanMax) {
                       .getStatus());
 }
 
-TEST(LiteParsedQueryTest, ForbidTailableWithNonNaturalSort) {
-    BSONObj cmdObj = fromjson(
-        "{find: 'testns',"
-        "tailable: true,"
-        "sort: {a: 1}}");
-    const NamespaceString nss("test.testns");
-    bool isExplain = false;
-    auto result = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(LiteParsedQueryTest, AllowTailableWithNaturalSort) {
-    BSONObj cmdObj = fromjson(
-        "{find: 'testns',"
-        "tailable: true,"
-        "sort: {$natural: 1}}");
-    const NamespaceString nss("test.testns");
-    bool isExplain = false;
-    auto result = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
-    ASSERT_OK(result.getStatus());
-    ASSERT_TRUE(result.getValue()->isTailable());
-    ASSERT_EQ(result.getValue()->getSort(), BSON("$natural" << 1));
-}
-
 // Helper function which returns the Status of creating a LiteParsedQuery object with the given
 // parameters.
 void assertLiteParsedQuerySuccess(const BSONObj& query, const BSONObj& proj, const BSONObj& sort) {

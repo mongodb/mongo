@@ -66,10 +66,6 @@ void ClusterClientCursorMock::kill() {
     }
 }
 
-bool ClusterClientCursorMock::isTailable() const {
-    return false;
-}
-
 void ClusterClientCursorMock::queueResult(BSONObj obj) {
     _resultsQueue.push({obj});
 }

@@ -106,37 +106,6 @@ TEST(RouterStageLimitTest, LimitStagePropagatesError) {
     ASSERT_EQ(secondResult.getStatus().reason(), "bad thing happened");
 }
 
-TEST(RouterStageLimitTest, LimitStageToleratesMidStreamEOF) {
-    // Here we're mocking the tailable case, where there may be a boost::none returned before the
-    // remote cursor is closed. Our goal is to make sure that the limit stage handles this properly,
-    // not counting boost::none towards the limit.
-    auto mockStage = stdx::make_unique<RouterStageMock>();
-    mockStage->queueResult(BSON("a" << 1));
-    mockStage->queueEOF();
-    mockStage->queueResult(BSON("a" << 2));
-    mockStage->queueResult(BSON("a" << 3));
-
-    auto limitStage = stdx::make_unique<RouterStageLimit>(std::move(mockStage), 2);
-
-    auto firstResult = limitStage->next();
-    ASSERT_OK(firstResult.getStatus());
-    ASSERT(firstResult.getValue());
-    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 1));
-
-    auto secondResult = limitStage->next();
-    ASSERT_OK(secondResult.getStatus());
-    ASSERT(!secondResult.getValue());
-
-    auto thirdResult = limitStage->next();
-    ASSERT_OK(thirdResult.getStatus());
-    ASSERT(thirdResult.getValue());
-    ASSERT_EQ(*thirdResult.getValue(), BSON("a" << 2));
-
-    auto fourthResult = limitStage->next();
-    ASSERT_OK(fourthResult.getStatus());
-    ASSERT(!fourthResult.getValue());
-}
-
 }  // namespace
 
 }  // namespace mongo

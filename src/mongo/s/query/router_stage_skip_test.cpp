@@ -148,30 +148,6 @@ TEST(RouterStageSkipTest, ErrorAfterSkippingResults) {
     ASSERT_EQ(secondResult.getStatus().reason(), "bad thing happened");
 }
 
-TEST(RouterStageSkipTest, SkipStageToleratesMidStreamEOF) {
-    // Skip stage must propagate a boost::none, but not count it towards the skip value.
-    auto mockStage = stdx::make_unique<RouterStageMock>();
-    mockStage->queueResult(BSON("a" << 1));
-    mockStage->queueEOF();
-    mockStage->queueResult(BSON("a" << 2));
-    mockStage->queueResult(BSON("a" << 3));
-
-    auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 2);
-
-    auto firstResult = skipStage->next();
-    ASSERT_OK(firstResult.getStatus());
-    ASSERT(!firstResult.getValue());
-
-    auto secondResult = skipStage->next();
-    ASSERT_OK(secondResult.getStatus());
-    ASSERT(secondResult.getValue());
-    ASSERT_EQ(*secondResult.getValue(), BSON("a" << 3));
-
-    auto thirdResult = skipStage->next();
-    ASSERT_OK(thirdResult.getStatus());
-    ASSERT(!thirdResult.getValue());
-}
-
 }  // namespace
 
 }  // namespace mongo

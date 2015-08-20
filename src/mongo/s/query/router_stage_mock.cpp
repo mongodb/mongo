@@ -42,10 +42,6 @@ void RouterStageMock::queueError(Status status) {
     _resultsQueue.push({status});
 }
 
-void RouterStageMock::queueEOF() {
-    _resultsQueue.push({boost::none});
-}
-
 StatusWith<boost::optional<BSONObj>> RouterStageMock::next() {
     if (_resultsQueue.empty()) {
         return {boost::none};
@@ -53,7 +49,12 @@ StatusWith<boost::optional<BSONObj>> RouterStageMock::next() {
 
     auto out = _resultsQueue.front();
     _resultsQueue.pop();
-    return out;
+
+    if (!out.isOK()) {
+        return out.getStatus();
+    }
+
+    return boost::optional<BSONObj>(out.getValue());
 }
 
 void RouterStageMock::kill() {

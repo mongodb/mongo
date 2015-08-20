@@ -49,9 +49,7 @@ StatusWith<boost::optional<BSONObj>> RouterStageLimit::next() {
         return childResult;
     }
 
-    if (childResult.getValue()) {
-        ++_returnedSoFar;
-    }
+    ++_returnedSoFar;
     return childResult;
 }
 

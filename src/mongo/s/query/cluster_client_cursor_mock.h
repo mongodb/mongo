@@ -47,8 +47,6 @@ public:
 
     void kill() final;
 
-    bool isTailable() const final;
-
     /**
      * Queues a BSONObj to be returned.
      */
