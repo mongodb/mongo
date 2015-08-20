@@ -56,8 +56,6 @@ void DBInfo::getProperty(JSContext* cx,
 
     ObjectWrapper parentWrapper(cx, parent);
 
-    std::string sname = IdWrapper(cx, id).toString();
-
     // 2nd look into real values, may be cached collection object
     if (!vp.isUndefined()) {
         if (vp.isObject()) {
@@ -77,7 +75,10 @@ void DBInfo::getProperty(JSContext* cx,
     } else if (parentWrapper.hasField(id)) {
         parentWrapper.getValue(id, vp);
         return;
-    } else if (sname.length() == 0 || sname[0] == '_') {
+    }
+
+    std::string sname = IdWrapper(cx, id).toString();
+    if (sname.length() == 0 || sname[0] == '_') {
         // if starts with '_' we dont return collection, one must use getCollection()
         return;
     }
