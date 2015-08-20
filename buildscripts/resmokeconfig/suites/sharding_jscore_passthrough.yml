@@ -54,6 +54,9 @@ selector:
 
 executor:
   js_test:
+    config:
+      shell_options:
+        readMode: commands
     fixture:
       class: ShardedClusterFixture
       mongos_options:
