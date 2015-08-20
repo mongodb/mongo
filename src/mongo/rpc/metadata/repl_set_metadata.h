@@ -100,10 +100,8 @@ public:
     }
 
 private:
-    repl::OpTime _lastOpCommitted =
-        repl::OpTime(Timestamp(0, 0), repl::OpTime::kProtocolVersionV0Term);
-    repl::OpTime _lastOpVisible =
-        repl::OpTime(Timestamp(0, 0), repl::OpTime::kProtocolVersionV0Term);
+    repl::OpTime _lastOpCommitted = repl::OpTime(Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+    repl::OpTime _lastOpVisible = repl::OpTime(Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
     long long _currentTerm = -1;
     long long _configVersion = -1;
     int _currentPrimaryIndex = -1;

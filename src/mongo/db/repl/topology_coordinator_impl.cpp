@@ -113,7 +113,7 @@ void PingStats::miss() {
 
 TopologyCoordinatorImpl::TopologyCoordinatorImpl(Options options)
     : _role(Role::follower),
-      _term(0),
+      _term(OpTime::kInitialTerm),
       _currentPrimaryIndex(-1),
       _forceSyncSourceIndex(-1),
       _options(std::move(options)),

@@ -728,7 +728,7 @@ Status ReplicationCoordinatorImpl::setLastOptimeForSlave(const OID& rid, const T
             getReplicationMode() == modeMasterSlave);
 
     // term == -1 for master-slave
-    OpTime opTime(ts, OpTime::kProtocolVersionV0Term);
+    OpTime opTime(ts, OpTime::kUninitializedTerm);
     SlaveInfo* slaveInfo = _findSlaveInfoByRID_inlock(rid);
     if (slaveInfo) {
         if (slaveInfo->opTime < opTime) {

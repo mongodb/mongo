@@ -353,7 +353,7 @@ bool ReplicationCoordinatorMock::isV1ElectionProtocol() {
 void ReplicationCoordinatorMock::summarizeAsHtml(ReplSetHtmlSummary* output) {}
 
 long long ReplicationCoordinatorMock::getTerm() {
-    return OpTime::kDefaultTerm;
+    return OpTime::kInitialTerm;
 }
 
 Status ReplicationCoordinatorMock::updateTerm(long long term) {

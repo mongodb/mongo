@@ -1199,7 +1199,7 @@ private:
     boost::optional<SnapshotInfo> _currentCommittedSnapshot;  // (M)
 
     // The cached current term. It's in sync with the term in topology coordinator.
-    long long _cachedTerm = OpTime::kProtocolVersionV0Term;  // (M)
+    long long _cachedTerm = OpTime::kUninitializedTerm;  // (M)
 
     // Callback Handle used to cancel a scheduled LivenessTimeout callback.
     ReplicationExecutor::CallbackHandle _handleLivenessTimeoutCbh;  // (M)

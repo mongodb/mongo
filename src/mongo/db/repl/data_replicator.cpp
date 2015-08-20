@@ -1353,7 +1353,7 @@ void DataReplicator::_rollbackOperations(const CallbackArgs& cbData) {
     }
     invariant(cbData.txn);
 
-    OpTime lastOpTimeWritten(getLastTimestampApplied(), OpTime::kDefaultTerm);
+    OpTime lastOpTimeWritten(getLastTimestampApplied(), OpTime::kInitialTerm);
     HostAndPort syncSource = getSyncSource();
     auto rollbackStatus = _opts.rollbackFn(cbData.txn, lastOpTimeWritten, syncSource);
     if (!rollbackStatus.isOK()) {

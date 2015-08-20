@@ -168,7 +168,7 @@ public:
             // TODO(siyuan) Fix mongos to supply wOpTimeTerm, then parse out that value here
         } else {
             // TODO(siyuan) Don't use the default term after fixing mongos.
-            lastOpTime = repl::OpTime(lastTimestamp, repl::OpTime::kDefaultTerm);
+            lastOpTime = repl::OpTime(lastTimestamp, repl::OpTime::kInitialTerm);
         }
 
         OID electionId;

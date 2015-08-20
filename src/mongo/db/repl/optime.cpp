@@ -66,7 +66,7 @@ void OpTime::append(BSONObjBuilder* builder) const {
     builder->append(kTimestampFieldName, _timestamp);
 
     // Don't add term in protocol version 0.
-    if (_term != kProtocolVersionV0Term) {
+    if (_term != kUninitializedTerm) {
         builder->append(kTermFieldName, _term);
     }
 }
@@ -79,7 +79,7 @@ StatusWith<OpTime> OpTime::parseFromBSON(const BSONObj& obj) {
 
     // Default to -1 if the term is absent.
     long long term;
-    status = bsonExtractIntegerFieldWithDefault(obj, kTermFieldName, kProtocolVersionV0Term, &term);
+    status = bsonExtractIntegerFieldWithDefault(obj, kTermFieldName, kUninitializedTerm, &term);
     if (!status.isOK())
         return status;
 

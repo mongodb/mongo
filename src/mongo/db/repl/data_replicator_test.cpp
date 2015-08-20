@@ -506,7 +506,7 @@ TEST_F(InitialSyncTest, Failpoint) {
                                                          << "node3:12345")));
 
     Timestamp time1(100, 1);
-    OpTime opTime1(time1, OpTime::kDefaultTerm);
+    OpTime opTime1(time1, OpTime::kInitialTerm);
     _myLastOpTime = opTime1;
     _memberState = MemberState::RS_SECONDARY;
 
@@ -855,7 +855,7 @@ TEST_F(SteadyStateTest, PauseDataReplicator) {
     };
 
     auto& dr = getDR();
-    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kDefaultTerm);
+    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kInitialTerm);
     _memberState = MemberState::RS_SECONDARY;
 
     auto net = getNet();
@@ -935,7 +935,7 @@ TEST_F(SteadyStateTest, ApplyOneOperation) {
         barrier.countDownAndWait();
     };
 
-    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kDefaultTerm);
+    _myLastOpTime = OpTime(operationToApply["ts"].timestamp(), OpTime::kInitialTerm);
     _memberState = MemberState::RS_SECONDARY;
 
     auto net = getNet();

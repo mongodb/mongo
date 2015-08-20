@@ -147,7 +147,7 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
     synchronizeOnCappedInFlightResource(txn->lockState(), oplog->ns());
 
     long long hashNew = 0;
-    long long term = OpTime::kProtocolVersionV0Term;
+    long long term = OpTime::kUninitializedTerm;
 
     // Fetch term out of the newOpMutex.
     if (replicationMode == ReplicationCoordinator::modeReplSet &&

@@ -379,7 +379,7 @@ private:
 
     // This node's election term.  The term is used as part of the consensus algorithm to elect
     // and maintain one primary (leader) node in the cluster.
-    long long _term = 0;
+    long long _term;
 
     // the index of the member we currently believe is primary, if one exists, otherwise -1
     int _currentPrimaryIndex;
