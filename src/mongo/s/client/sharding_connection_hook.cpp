@@ -40,6 +40,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/s/client/scc_fast_query_handler.h"
 #include "mongo/s/cluster_last_error_info.h"
@@ -95,8 +96,9 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
         }
     } else if (conn->type() == ConnectionString::MASTER) {
         BSONObj isMasterResponse;
-        conn->runCommand("admin", BSON("ismaster" << 1), isMasterResponse);
-
+        if (!conn->runCommand("admin", BSON("ismaster" << 1), isMasterResponse)) {
+            uassertStatusOK(getStatusFromCommandResult(isMasterResponse));
+        }
 
         long long configServerModeNumber;
         Status status =
