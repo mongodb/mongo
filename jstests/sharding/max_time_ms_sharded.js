@@ -89,6 +89,8 @@ configureMaxTimeNeverTimeOut("alwaysOn");
 
 // Positive test.  ~10s operation, 5s limit.  The operation takes ~10s because each shard processes
 // 25 batches of ~200ms each, and mongos never runs getmore in parallel on shards.
+// TODO: Re-enable once SERVER-19410 is implemented.
+/*
 cursor = coll.find({$where: function() { sleep(100); return true; }});
 cursor.batchSize(2);
 cursor.maxTimeMS(5*1000);
@@ -98,6 +100,7 @@ assert.doesNotThrow(function() { cursor.next(); },
 assert.throws(function() { cursor.itcount(); },
               [],
               "expected mongos to abort getmore due to time limit");
+*/
 
 // Negative test.  Same as above (~10s operation), with a high (1-day) limit.
 cursor = coll.find({$where: function() { sleep(100); return true; }});
