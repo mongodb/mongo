@@ -1005,26 +1005,27 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 	 * instantiated the end cursor, so we know that page is pinned in memory
 	 * and we can proceed without concern.
 	 */
-	do {
-		WT_RET(__wt_btcur_remove(start));
-		/*
-		 * Reset ret each time through so that we don't loop forever in
-		 * the cursor equals case.
-		 */
-		for (ret = 0;;) {
-			if (stop != NULL && __cursor_equals(start, stop))
-				break;
-			if ((ret = __wt_btcur_next(start, 1)) != 0)
-				break;
-			start->compare = 0;	/* Exact match */
-			if ((ret = rmfunc(session, start, 1)) != 0)
-				break;
-		}
-		if (ret == WT_RESTART) {
-			WT_STAT_FAST_CONN_INCR(session, cursor_restart);
-			WT_STAT_FAST_DATA_INCR(session, cursor_restart);
-		}
-	} while (ret == WT_RESTART);
+retry:	WT_RET(__wt_btcur_remove(start));
+
+	/*
+	 * Reset ret each time through so that we don't loop forever in
+	 * the cursor equals case.
+	 */
+	for (ret = 0;;) {
+		if (stop != NULL && __cursor_equals(start, stop))
+			break;
+		if ((ret = __wt_btcur_next(start, 1)) != 0)
+			break;
+		start->compare = 0;	/* Exact match */
+		if ((ret = rmfunc(session, start, 1)) != 0)
+			break;
+	}
+
+	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
+		goto retry;
+	}
 
 	WT_RET_NOTFOUND_OK(ret);
 	return (0);
@@ -1058,28 +1059,28 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 	 * other thread of control; in that case, repeat the full search to
 	 * refresh the page's modification information.
 	 */
-	do {
-		WT_RET(__wt_btcur_remove(start));
-		/*
-		 * Reset ret each time through so that we don't loop forever in
-		 * the cursor equals case.
-		 */
-		for (ret = 0;;) {
-			if (stop != NULL && __cursor_equals(start, stop))
-				break;
-			if ((ret = __wt_btcur_next(start, 1)) != 0)
-				break;
-			start->compare = 0;	/* Exact match */
-			value = (uint8_t *)start->iface.value.data;
-			if (*value != 0 &&
-			    (ret = rmfunc(session, start, 1)) != 0)
-				break;
-		}
-		if (ret == WT_RESTART) {
-			WT_STAT_FAST_CONN_INCR(session, cursor_restart);
-			WT_STAT_FAST_DATA_INCR(session, cursor_restart);
-		}
-	} while (ret == WT_RESTART);
+retry:	WT_RET(__wt_btcur_remove(start));
+	/*
+	 * Reset ret each time through so that we don't loop forever in
+	 * the cursor equals case.
+	 */
+	for (ret = 0;;) {
+		if (stop != NULL && __cursor_equals(start, stop))
+			break;
+		if ((ret = __wt_btcur_next(start, 1)) != 0)
+			break;
+		start->compare = 0;	/* Exact match */
+		value = (uint8_t *)start->iface.value.data;
+		if (*value != 0 &&
+		    (ret = rmfunc(session, start, 1)) != 0)
+			break;
+	}
+
+	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
+		goto retry;
+	}
 
 	WT_RET_NOTFOUND_OK(ret);
 	return (0);
