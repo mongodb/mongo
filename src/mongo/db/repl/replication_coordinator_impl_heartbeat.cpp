@@ -509,7 +509,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats() {
         }
         _scheduleHeartbeatToTarget(_rsConfig.getMemberAt(i).getHostAndPort(), i, now);
     }
-    if (_isV1ElectionProtocol_inlock()) {
+    if (isV1ElectionProtocol()) {
         _scheduleNextLivenessUpdate_inlock();
     }
 }
@@ -554,7 +554,7 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate() {
 }
 
 void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
-    if (!_isV1ElectionProtocol_inlock()) {
+    if (!isV1ElectionProtocol()) {
         return;
     }
     // Scan liveness table for earliest date; schedule a run at (that date plus election timeout).

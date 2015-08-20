@@ -1579,7 +1579,7 @@ void ReplicationCoordinatorImpl::appendSlaveInfoData(BSONObjBuilder* result) {
              ++itr) {
             BSONObjBuilder entry(replicationProgress.subobjStart());
             entry.append("rid", itr->rid);
-            if (_isV1ElectionProtocol_inlock()) {
+            if (isV1ElectionProtocol()) {
                 BSONObjBuilder opTime(entry.subobjStart("optime"));
                 opTime.append("ts", itr->opTime.getTimestamp());
                 opTime.append("term", itr->opTime.getTerm());
@@ -2298,6 +2298,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& n
     OpTime myOptime = _getMyLastOptime_inlock();
     _topCoord->updateConfig(newConfig, myIndex, _replExecutor.now(), myOptime);
     _rsConfig = newConfig;
+    _protVersion.store(_rsConfig.getProtocolVersion());
     log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
     _selfIndex = myIndex;
     if (_selfIndex >= 0) {
@@ -2789,13 +2790,8 @@ void ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish(
     _topCoord->prepareReplResponseMetadata(metadata, lastVisibleOpTime, getLastCommittedOpTime());
 }
 
-bool ReplicationCoordinatorImpl::_isV1ElectionProtocol_inlock() {
-    return _rsConfig.getProtocolVersion() == 1;
-}
-
 bool ReplicationCoordinatorImpl::isV1ElectionProtocol() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _isV1ElectionProtocol_inlock();
+    return _protVersion.load() == 1;
 }
 
 Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,

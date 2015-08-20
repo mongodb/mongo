@@ -1033,11 +1033,6 @@ private:
      */
     void _cancelAndRescheduleLivenessUpdate_inlock(int updatedMemberId);
 
-    /**
-     * Bottom half of isV1ElectionProtocol.
-     */
-    bool _isV1ElectionProtocol_inlock();
-
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -1215,6 +1210,9 @@ private:
     // scheduled.  We need this so that we don't needlessly cancel and reschedule the callback on
     // every liveness update.
     int _earliestMemberId = -1;  // (M)
+
+    // Cached copy of the current config protocol version.
+    AtomicInt64 _protVersion;  // (S)
 };
 
 }  // namespace repl
