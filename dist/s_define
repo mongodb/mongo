@@ -4,18 +4,23 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-# List of files to search.
+# List of source files to search.
 l=`sed -e 's,#.*,,' -e '/^$/d' -e 's,^,../,' filelist`
 l="$l `echo ../src/include/*.i ../src/utilities/*.c ../test/*/*.c`"
+
+# List of include files for source #defines.
+# Ignore the queue.h file, we don't use most of it.
+dl="../src/include/*.[hi] ../src/include/*.in"
+dl=`echo $dl | sed 's/ [^ ]*queue.h//'`
 
 (
 # Copy out the list of #defines we don't use, but it's OK.
 sed -e '/^$/d' -e '/^#/d' < s_define.list
 
-# Get the list of #defines.
-# Ignore the list of configuration objects
-# Ignore the list of statistic "keys" generated for applications.
-search=`cat ../src/include/*.[hi] ../src/include/*.in |
+# Search the list of include files for #defines
+# Ignore configuration objects #defines
+# Ignore statistic "keys" generated for applications #defines
+search=`cat $dl |
     sed -e '/configuration section: BEGIN/,/configuration section: END/d' \
         -e '/Statistics section: BEGIN/,/Statistics section: END/d' |
     egrep '^#define' |

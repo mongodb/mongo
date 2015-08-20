@@ -46,6 +46,11 @@ else
 		cat $t
 	fi
 
+	if ! expr "$f" : 'src/include/queue\.h' > /dev/null &&
+	    egrep 'STAILQ_|SLIST_|\bLIST_' $f ; then
+		echo "$f: use TAILQ for all lists"
+	fi
+
 	if ! expr "$f" : 'src/os_posix/.*' > /dev/null &&
 	   ! expr "$f" : 'src/os_win/.*' > /dev/null &&
 	   ! expr "$f" : 'src/include/extern.h' > /dev/null &&

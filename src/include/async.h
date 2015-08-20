@@ -6,20 +6,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-typedef enum {
-	WT_ASYNCOP_ENQUEUED,	/* Placed on the work queue */
-	WT_ASYNCOP_FREE,	/* Able to be allocated to user */
-	WT_ASYNCOP_READY,	/* Allocated and ready for user to use */
-	WT_ASYNCOP_WORKING	/* Operation in progress by worker */
-} WT_ASYNC_STATE;
-
-typedef enum {
-	WT_ASYNC_FLUSH_NONE=0,		/* No flush in progress */
-	WT_ASYNC_FLUSH_COMPLETE,	/* Notify flush caller it's done */
-	WT_ASYNC_FLUSH_IN_PROGRESS,	/* Prevent other callers */
-	WT_ASYNC_FLUSHING		/* Notify workers */
-} WT_ASYNC_FLUSH_STATE;
-
 #define	MAX_ASYNC_SLEEP_USECS	100000	/* Maximum sleep waiting for work */
 #define	MAX_ASYNC_YIELD		200	/* Maximum number of yields for work */
 
@@ -31,7 +17,7 @@ typedef enum {
  *	The URI/config/format cache.
  */
 struct __wt_async_format {
-	STAILQ_ENTRY(__wt_async_format) q;
+	TAILQ_ENTRY(__wt_async_format) q;
 	const char	*config;
 	uint64_t	cfg_hash;		/* Config hash */
 	const char	*uri;
@@ -53,7 +39,13 @@ struct __wt_async_op_impl {
 	uint64_t	unique_id;	/* Unique identifier. */
 
 	WT_ASYNC_FORMAT *format;	/* Format structure */
-	WT_ASYNC_STATE	state;		/* Op state */
+
+#define	WT_ASYNCOP_ENQUEUED	0	/* Placed on the work queue */
+#define	WT_ASYNCOP_FREE		1	/* Able to be allocated to user */
+#define	WT_ASYNCOP_READY	2	/* Allocated, ready for user to use */
+#define	WT_ASYNCOP_WORKING	3	/* Operation in progress by worker */
+	uint32_t	state;
+
 	WT_ASYNC_OPTYPE	optype;		/* Operation type */
 };
 
@@ -88,10 +80,16 @@ struct __wt_async {
 	uint64_t		 alloc_tail;	/* Next slot to dequeue */
 	uint64_t		 tail_slot;	/* Worker slot consumed */
 
-	STAILQ_HEAD(__wt_async_format_qh, __wt_async_format) formatqh;
-	int			 cur_queue;	/* Currently enqueued */
-	int			 max_queue;	/* Maximum enqueued */
-	WT_ASYNC_FLUSH_STATE	 flush_state;	/* Queue flush state */
+	TAILQ_HEAD(__wt_async_format_qh, __wt_async_format) formatqh;
+	uint32_t		 cur_queue;	/* Currently enqueued */
+	uint32_t		 max_queue;	/* Maximum enqueued */
+
+#define	WT_ASYNC_FLUSH_NONE		0	/* No flush in progress */
+#define	WT_ASYNC_FLUSH_COMPLETE		1	/* Notify flush caller done */
+#define	WT_ASYNC_FLUSH_IN_PROGRESS	2	/* Prevent other callers */
+#define	WT_ASYNC_FLUSHING		3	/* Notify workers */
+	uint32_t	 	 flush_state;
+
 	/* Notify any waiting threads when flushing is done. */
 	WT_CONDVAR		*flush_cond;
 	WT_ASYNC_OP_IMPL	 flush_op;	/* Special flush op */
@@ -112,7 +110,7 @@ struct __wt_async {
  *	has a cache of async cursors to reuse for operations.
  */
 struct __wt_async_cursor {
-	STAILQ_ENTRY(__wt_async_cursor) q;	/* Worker cache */
+	TAILQ_ENTRY(__wt_async_cursor) q;	/* Worker cache */
 	uint64_t	cfg_hash;		/* Config hash */
 	uint64_t	uri_hash;		/* URI hash */
 	WT_CURSOR	*c;			/* WT cursor */
@@ -124,6 +122,6 @@ struct __wt_async_cursor {
  */
 struct __wt_async_worker_state {
 	uint32_t	id;
-	STAILQ_HEAD(__wt_cursor_qh, __wt_async_cursor)	cursorqh;
+	TAILQ_HEAD(__wt_cursor_qh, __wt_async_cursor)	cursorqh;
 	uint32_t	num_cursors;
 };

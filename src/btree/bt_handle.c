@@ -352,8 +352,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	    session, &btree->ovfl_lock, "btree overflow lock"));
 	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush lock"));
 
-	__wt_stat_init_dsrc_stats(&btree->dhandle->stats);
-
 	btree->write_gen = ckpt->write_gen;		/* Write generation */
 	btree->modified = 0;				/* Clean */
 

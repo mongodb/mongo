@@ -607,7 +607,8 @@ __evict_request_walk_clear(WT_SESSION_IMPL *session)
 
 	F_SET(session, WT_SESSION_CLEAR_EVICT_WALK);
 
-	while (btree->evict_ref != NULL && ret == 0) {
+	while (ret == 0 && (btree->evict_ref != NULL ||
+	    cache->evict_file_next == session->dhandle)) {
 		F_SET(cache, WT_CACHE_CLEAR_WALKS);
 		ret = __wt_cond_wait(
 		    session, cache->evict_waiter_cond, 100000);
@@ -631,7 +632,7 @@ __evict_clear_all_walks(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	SLIST_FOREACH(dhandle, &conn->dhlh, l)
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
 		if (WT_PREFIX_MATCH(dhandle->name, "file:"))
 			WT_WITH_DHANDLE(session,
 			    dhandle, WT_TRET(__evict_clear_walk(session)));
@@ -967,14 +968,15 @@ retry:	while (slot < max_entries && ret == 0) {
 			if ((dhandle = cache->evict_file_next) != NULL)
 				cache->evict_file_next = NULL;
 			else
-				dhandle = SLIST_FIRST(&conn->dhlh);
+				dhandle = TAILQ_FIRST(&conn->dhqh);
 		} else {
 			if (incr) {
 				WT_ASSERT(session, dhandle->session_inuse > 0);
-				(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
+				(void)__wt_atomic_subi32(
+				    &dhandle->session_inuse, 1);
 				incr = 0;
 			}
-			dhandle = SLIST_NEXT(dhandle, l);
+			dhandle = TAILQ_NEXT(dhandle, q);
 		}
 
 		/* If we reach the end of the list, we're done. */
@@ -1015,7 +1017,7 @@ retry:	while (slot < max_entries && ret == 0) {
 		btree->evict_walk_skips = 0;
 		prev_slot = slot;
 
-		(void)WT_ATOMIC_ADD4(dhandle->session_inuse, 1);
+		(void)__wt_atomic_addi32(&dhandle->session_inuse, 1);
 		incr = 1;
 		__wt_spin_unlock(session, &conn->dhandle_lock);
 		dhandle_locked = 0;
@@ -1046,8 +1048,11 @@ retry:	while (slot < max_entries && ret == 0) {
 	}
 
 	if (incr) {
+		/* Remember the file we should visit first, next loop. */
+		cache->evict_file_next = dhandle;
+
 		WT_ASSERT(session, dhandle->session_inuse > 0);
-		(void)WT_ATOMIC_SUB4(dhandle->session_inuse, 1);
+		(void)__wt_atomic_subi32(&dhandle->session_inuse, 1);
 		incr = 0;
 	}
 
@@ -1059,21 +1064,17 @@ retry:	while (slot < max_entries && ret == 0) {
 	/*
 	 * Walk the list of files a few times if we don't find enough pages.
 	 * Try two passes through all the files, give up when we have some
-	 * candidates and we aren't finding more.  Take care not to skip files
-	 * on subsequent passes.
+	 * candidates and we aren't finding more.
 	 */
 	if (!F_ISSET(cache, WT_CACHE_CLEAR_WALKS) && ret == 0 &&
 	    slot < max_entries && (retries < 2 ||
 	    (!LF_ISSET(WT_EVICT_PASS_WOULD_BLOCK) && retries < 10 &&
 	    (slot == cache->evict_entries || slot > start_slot)))) {
-		cache->evict_file_next = NULL;
 		start_slot = slot;
 		++retries;
 		goto retry;
 	}
 
-	/* Remember the file we should visit first, next loop. */
-	cache->evict_file_next = dhandle;
 	cache->evict_entries = slot;
 	return (ret);
 }
@@ -1320,8 +1321,8 @@ __evict_get_ref(
 		 * multiple attempts to evict it.  For pages that are already
 		 * being evicted, this operation will fail and we will move on.
 		 */
-		if (!WT_ATOMIC_CAS4(
-		    evict->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
+		if (!__wt_atomic_casv32(
+		    &evict->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 			__evict_list_clear(session, evict);
 			continue;
 		}
@@ -1330,7 +1331,7 @@ __evict_get_ref(
 		 * Increment the busy count in the btree handle to prevent it
 		 * from being closed under us.
 		 */
-		(void)WT_ATOMIC_ADD4(evict->btree->evict_busy, 1);
+		(void)__wt_atomic_addv32(&evict->btree->evict_busy, 1);
 
 		*btreep = evict->btree;
 		*refp = evict->ref;
@@ -1409,7 +1410,7 @@ __evict_page(WT_SESSION_IMPL *session, int is_server)
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, ref));
 
-	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
+	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
 	WT_RET(ret);
 
@@ -1557,7 +1558,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	total_bytes = 0;
 
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;

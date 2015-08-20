@@ -395,6 +395,7 @@ bzalloc
 bzfree
 bzip
 calloc
+cas
 catfmt
 cd
 centric
@@ -493,6 +494,7 @@ desc
 dest
 destSize
 dev
+dh
 dhandle
 dhandles
 dir
@@ -797,6 +799,7 @@ progname
 ps
 psp
 pthread
+ptr
 pushms
 putK
 putV

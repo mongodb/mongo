@@ -258,7 +258,7 @@ __wt_lsm_manager_free_work_unit(
 	if (entry != NULL) {
 		WT_ASSERT(session, entry->lsm_tree->queue_ref > 0);
 
-		(void)WT_ATOMIC_SUB4(entry->lsm_tree->queue_ref, 1);
+		(void)__wt_atomic_sub32(&entry->lsm_tree->queue_ref, 1);
 		__wt_free(session, entry);
 	}
 }
@@ -273,7 +273,7 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
-	WT_LSM_WORK_UNIT *current, *next;
+	WT_LSM_WORK_UNIT *current;
 	WT_SESSION *wt_session;
 	uint32_t i;
 	uint64_t removed;
@@ -297,23 +297,17 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 		manager->lsm_worker_cookies[0].tid = 0;
 
 		/* Release memory from any operations left on the queue. */
-		for (current = TAILQ_FIRST(&manager->switchqh);
-		    current != NULL; current = next) {
-			next = TAILQ_NEXT(current, q);
+		while ((current = TAILQ_FIRST(&manager->switchqh)) != NULL) {
 			TAILQ_REMOVE(&manager->switchqh, current, q);
 			++removed;
 			__wt_lsm_manager_free_work_unit(session, current);
 		}
-		for (current = TAILQ_FIRST(&manager->appqh);
-		    current != NULL; current = next) {
-			next = TAILQ_NEXT(current, q);
+		while ((current = TAILQ_FIRST(&manager->appqh)) != NULL) {
 			TAILQ_REMOVE(&manager->appqh, current, q);
 			++removed;
 			__wt_lsm_manager_free_work_unit(session, current);
 		}
-		for (current = TAILQ_FIRST(&manager->managerqh);
-		    current != NULL; current = next) {
-			next = TAILQ_NEXT(current, q);
+		while ((current = TAILQ_FIRST(&manager->managerqh)) != NULL) {
 			TAILQ_REMOVE(&manager->managerqh, current, q);
 			++removed;
 			__wt_lsm_manager_free_work_unit(session, current);
@@ -645,9 +639,9 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	 * on close, the flag is cleared and then the queue reference count
 	 * is checked.
 	 */
-	(void)WT_ATOMIC_ADD4(lsm_tree->queue_ref, 1);
+	(void)__wt_atomic_add32(&lsm_tree->queue_ref, 1);
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
-		(void)WT_ATOMIC_SUB4(lsm_tree->queue_ref, 1);
+		(void)__wt_atomic_sub32(&lsm_tree->queue_ref, 1);
 		return (0);
 	}
 
@@ -674,6 +668,6 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	return (0);
 err:
 	if (!pushed)
-		(void)WT_ATOMIC_SUB4(lsm_tree->queue_ref, 1);
+		(void)__wt_atomic_sub32(&lsm_tree->queue_ref, 1);
 	return (ret);
 }

@@ -432,7 +432,7 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 		    "requires connection encryption to be set");
 	hash = __wt_hash_city64(keyid->str, keyid->len);
 	bucket = hash % WT_HASH_ARRAY_SIZE;
-	SLIST_FOREACH(kenc, &nenc->keyedhashlh[bucket], l)
+	TAILQ_FOREACH(kenc, &nenc->keyedhashqh[bucket], q)
 		if (WT_STRING_MATCH(kenc->keyid, keyid->str, keyid->len))
 			goto out;
 
@@ -450,8 +450,8 @@ __wt_encryptor_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval,
 	WT_ERR(encryptor->sizing(encryptor, &session->iface,
 	    &kenc->size_const));
 	kenc->encryptor = encryptor;
-	SLIST_INSERT_HEAD(&nenc->keyedlh, kenc, l);
-	SLIST_INSERT_HEAD(&nenc->keyedhashlh[bucket], kenc, hashl);
+	TAILQ_INSERT_HEAD(&nenc->keyedqh, kenc, q);
+	TAILQ_INSERT_HEAD(&nenc->keyedhashqh[bucket], kenc, hashq);
 
 out:	__wt_spin_unlock(session, &conn->encryptor_lock);
 	*kencryptorp = kenc;
@@ -506,9 +506,9 @@ __conn_add_encryptor(WT_CONNECTION *wt_conn,
 	WT_ERR(__wt_calloc_one(session, &nenc));
 	WT_ERR(__wt_strdup(session, name, &nenc->name));
 	nenc->encryptor = encryptor;
-	SLIST_INIT(&nenc->keyedlh);
+	TAILQ_INIT(&nenc->keyedqh);
 	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
-		SLIST_INIT(&nenc->keyedhashlh[i]);
+		TAILQ_INIT(&nenc->keyedhashqh[i]);
 
 	TAILQ_INSERT_TAIL(&conn->encryptqh, nenc, q);
 	nenc = NULL;
@@ -537,15 +537,14 @@ __wt_conn_remove_encryptor(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	while ((nenc = TAILQ_FIRST(&conn->encryptqh)) != NULL) {
-		while ((kenc = SLIST_FIRST(&nenc->keyedlh)) != NULL) {
+		while ((kenc = TAILQ_FIRST(&nenc->keyedqh)) != NULL) {
 			/* Call any termination method. */
 			if (kenc->owned && kenc->encryptor->terminate != NULL)
 				WT_TRET(kenc->encryptor->terminate(
 				    kenc->encryptor, (WT_SESSION *)session));
 
 			/* Remove from the connection's list, free memory. */
-			SLIST_REMOVE(
-			    &nenc->keyedlh, kenc, __wt_keyed_encryptor, l);
+			TAILQ_REMOVE(&nenc->keyedqh, kenc, q);
 			__wt_free(session, kenc->keyid);
 			__wt_free(session, kenc);
 		}
@@ -1795,6 +1794,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
+	int64_t config_base_set;
 	const char *enc_cfg[] = { NULL, NULL };
 	char version[64];
 
@@ -1836,6 +1836,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open);
 	cfg[1] = config;
 
+	/* Capture the config_base setting file for later use. */
+	WT_ERR(__wt_config_gets(session, cfg, "config_base", &cval));
+	config_base_set = cval.val;
+
 	/* Configure error messages so we get them right early. */
 	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
 	if (cval.len != 0)
@@ -1873,7 +1877,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR) >=
 	    (int)sizeof(version), ENOMEM);
 	__conn_config_append(cfg, version);
-	WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, i1));
+
+	/* Ignore the base_config file if we config_base set to false. */
+	if (config_base_set != 0)
+		WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, i1));
 	__conn_config_append(cfg, config);
 	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, i2));
 	WT_ERR(__conn_config_env(session, cfg, i3));

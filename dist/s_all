@@ -2,7 +2,7 @@
 
 # Run standard scripts.
 t=__wt.$$
-t_pfx=__s_all_tmp
+t_pfx=__s_all_tmp_
 trap 'rm -f $t *.pyc __tmp __wt.* __s_all_tmp*' 0 1 2 3 13 15
 
 # We require python which may not be installed.

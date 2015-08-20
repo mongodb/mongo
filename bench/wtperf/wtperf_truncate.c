@@ -112,7 +112,7 @@ setup_truncate(CONFIG *cfg, CONFIG_THREAD *thread, WT_SESSION *session) {
 			truncate_item->key = truncate_key;
 			truncate_item->diff =
 			    (trunc_cfg->stone_gap * i) - trunc_cfg->last_key;
-			STAILQ_INSERT_TAIL( &cfg->stone_head, truncate_item, q);
+			TAILQ_INSERT_TAIL( &cfg->stone_head, truncate_item, q);
 			trunc_cfg->last_key = trunc_cfg->stone_gap * i;
 			trunc_cfg->num_stones++;
 		}
@@ -166,7 +166,7 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 		generate_key(cfg, truncate_key, trunc_cfg->last_key);
 		truncate_item->key = truncate_key;
 		truncate_item->diff = trunc_cfg->stone_gap;
-		STAILQ_INSERT_TAIL(&cfg->stone_head, truncate_item, q);
+		TAILQ_INSERT_TAIL(&cfg->stone_head, truncate_item, q);
 		trunc_cfg->num_stones++;
 	}
 
@@ -175,9 +175,9 @@ run_truncate(CONFIG *cfg, CONFIG_THREAD *thread,
 	    trunc_cfg->expected_total <= thread->workload->truncate_count)
 		return (0);
 
-	truncate_item = STAILQ_FIRST(&cfg->stone_head);
+	truncate_item = TAILQ_FIRST(&cfg->stone_head);
 	trunc_cfg->num_stones--;
-	STAILQ_REMOVE_HEAD(&cfg->stone_head, q);
+	TAILQ_REMOVE(&cfg->stone_head, truncate_item, q);
 	cursor->set_key(cursor,truncate_item->key);
 	if ((ret = cursor->search(cursor)) != 0) {
 		lprintf(cfg, ret, 0, "Truncate search: failed");
@@ -207,9 +207,9 @@ void
 cleanup_truncate_config(CONFIG *cfg) {
 	TRUNCATE_QUEUE_ENTRY *truncate_item;
 
-	while (!STAILQ_EMPTY(&cfg->stone_head)) {
-		truncate_item = STAILQ_FIRST(&cfg->stone_head);
-		STAILQ_REMOVE_HEAD(&cfg->stone_head, q);
+	while (!TAILQ_EMPTY(&cfg->stone_head)) {
+		truncate_item = TAILQ_FIRST(&cfg->stone_head);
+		TAILQ_REMOVE(&cfg->stone_head, truncate_item, q);
 		free(truncate_item->key);
 		free(truncate_item);
 	}

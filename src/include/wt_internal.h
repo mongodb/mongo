@@ -55,11 +55,6 @@ extern "C" {
 #include <windows.h>
 #endif
 
-/*******************************************
- * WiredTiger externally maintained include files.
- *******************************************/
-#include "queue.h"
-
 /*
  * DO NOT EDIT: automatically built by dist/s_typedef.
  * Forward type declarations for internal types: BEGIN
@@ -250,8 +245,6 @@ struct __wt_size;
     typedef struct __wt_size WT_SIZE;
 struct __wt_split_stash;
     typedef struct __wt_split_stash WT_SPLIT_STASH;
-struct __wt_stats;
-    typedef struct __wt_stats WT_STATS;
 struct __wt_table;
     typedef struct __wt_table WT_TABLE;
 struct __wt_txn;
@@ -284,6 +277,8 @@ union __wt_rand_state;
 #include "msvc.h"
 #endif
 #include "hardware.h"
+
+#include "queue.h"
 
 #ifdef _WIN32
 #include "os_windows.h"
