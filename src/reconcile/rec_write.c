@@ -345,6 +345,7 @@ static int  __rec_update_las(
 		WT_SESSION_IMPL *, WT_RECONCILE *, uint32_t, WT_BOUNDARY *);
 static int  __rec_write_init(WT_SESSION_IMPL *,
 		WT_REF *, uint32_t, WT_SALVAGE_COOKIE *, void *);
+static int  __rec_write_status(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_write_wrapup_err(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
@@ -469,6 +470,10 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 		break;
 	WT_ILLEGAL_VALUE_SET(session);
 	}
+
+	/* Get the final status for the reconciliation. */
+	if (ret == 0)
+		ret = __rec_write_status(session, r, page);
 
 	/* Wrap up the page reconciliation. */
 	if (ret == 0)
@@ -3460,6 +3465,7 @@ __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 
 	WT_RET(__rec_split_finish(session, r));
 	WT_RET(__rec_write_wrapup(session, r, r->page));
+	WT_RET(__rec_write_status(session, r, r->page));
 
 	/* Mark the page's parent and the tree dirty. */
 	parent = r->ref->home;
@@ -5182,6 +5188,81 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 }
 
 /*
+ * __rec_write_status --
+ *	Return the final status for reconciliation.
+ */
+static int
+__rec_write_status(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+	WT_PAGE_MODIFY *mod;
+
+	btree = S2BT(session);
+	mod = page->modify;
+
+	/*
+	 * Return based on how we were called (eviction or checkpoint) and if
+	 * we cleaned the page.
+	 */
+	if (r->leave_dirty) {
+		/*
+		 * Update the page's first unwritten transaction ID.
+		 */
+		mod->first_dirty_txn = r->first_dirty_txn;
+
+		/*
+		 * The page remains dirty.
+		 *
+		 * Any checkpoint call cleared the tree's modified flag before
+		 * writing pages, so we must explicitly reset it.  We insert a
+		 * barrier after the change for clarity (the requirement is the
+		 * flag be set before a subsequent checkpoint reads it, and
+		 * as the current checkpoint is waiting on this reconciliation
+		 * to complete, there's no risk of that happening)
+		 */
+		btree->modified = 1;
+		WT_FULL_BARRIER();
+
+		/* If evicting, we've failed. */
+		if (F_ISSET(r, WT_EVICTING))
+			return (EBUSY);
+	} else {
+		/*
+		 * Track the page's maximum transaction ID (used to decide if
+		 * we're likely to be able to evict this page in the future).
+		 */
+		mod->rec_max_txn = r->max_txn;
+
+		/*
+		 * Track the tree's maximum transaction ID (used to decide if
+		 * it's safe to discard the tree). Reconciliation for eviction
+		 * is multi-threaded, only update the tree's maximum transaction
+		 * ID when doing a checkpoint. That's sufficient, we only care
+		 * about the maximum transaction ID of current updates in the
+		 * tree, and checkpoint visits every dirty page in the tree.
+		 */
+		if (!F_ISSET(r, WT_EVICTING) &&
+		    WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
+			btree->rec_max_txn = r->max_txn;
+
+		/*
+		 * The page only might be clean; if the write generation is
+		 * unchanged since reconciliation started, it's clean.
+		 *
+		 * If the write generation changed, the page has been written
+		 * since reconciliation started and remains dirty; if evicting,
+		 * we've failed.
+		 */
+		if (__wt_atomic_cas32(&mod->write_gen, r->orig_write_gen, 0))
+			__wt_cache_dirty_decr(session, page);
+		else if (F_ISSET(r, WT_EVICTING))
+			return (EBUSY);
+	}
+
+	return (0);
+}
+
+/*
  * __rec_split_discard --
  *	Discard the pages resulting from a previous split.
  */
@@ -5477,66 +5558,6 @@ err:			__wt_scr_free(session, &tkey);
 		F_SET(mod, WT_PM_REC_MULTIBLOCK);
 		break;
 	}
-
-	/*
-	 * Return based on how we were called (eviction or checkpoint) and if
-	 * we cleaned the page.
-	 */
-	if (r->leave_dirty) {
-		/*
-		 * Update the page's first unwritten transaction ID.
-		 */
-		mod->first_dirty_txn = r->first_dirty_txn;
-
-		/*
-		 * The page remains dirty.
-		 *
-		 * Any checkpoint call cleared the tree's modified flag before
-		 * writing pages, so we must explicitly reset it.  We insert a
-		 * barrier after the change for clarity (the requirement is the
-		 * flag be set before a subsequent checkpoint reads it, and
-		 * as the current checkpoint is waiting on this reconciliation
-		 * to complete, there's no risk of that happening)
-		 */
-		btree->modified = 1;
-		WT_FULL_BARRIER();
-
-		/* If evicting, we've failed. */
-		if (F_ISSET(r, WT_EVICTING))
-			return (EBUSY);
-	} else {
-		/*
-		 * Track the page's maximum transaction ID (used to decide if
-		 * we're likely to be able to evict this page in the future).
-		 */
-		mod->rec_max_txn = r->max_txn;
-
-		/*
-		 * Track the tree's maximum transaction ID (used to decide if
-		 * it's safe to discard the tree). Reconciliation for eviction
-		 * is multi-threaded, only update the tree's maximum transaction
-		 * ID when doing a checkpoint. That's sufficient, we only care
-		 * about the maximum transaction ID of current updates in the
-		 * tree, and checkpoint visits every dirty page in the tree.
-		 */
-		if (!F_ISSET(r, WT_EVICTING) &&
-		    WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
-			btree->rec_max_txn = r->max_txn;
-
-		/*
-		 * The page only might be clean; if the write generation is
-		 * unchanged since reconciliation started, it's clean.
-		 *
-		 * If the write generation changed, the page has been written
-		 * since reconciliation started and remains dirty; if evicting,
-		 * we've failed.
-		 */
-		if (__wt_atomic_cas32(&mod->write_gen, r->orig_write_gen, 0))
-			__wt_cache_dirty_decr(session, page);
-		else if (F_ISSET(r, WT_EVICTING))
-			return (EBUSY);
-	}
-
 	return (0);
 }
 
