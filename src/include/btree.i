@@ -153,7 +153,7 @@ __wt_cache_page_byte_dirty_decr(
 		if (__wt_atomic_cassize(
 		    &page->modify->bytes_dirty, orig, orig - decr)) {
 			__wt_cache_decr_check_uint64(session,
-			    cache->bytes_dirty, decr, "WT_CACHE.bytes_dirty");
+			    &cache->bytes_dirty, decr, "WT_CACHE.bytes_dirty");
 			break;
 		}
 	}
@@ -173,18 +173,18 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	WT_ASSERT(session, size < WT_EXABYTE);
 
 	__wt_cache_decr_check_uint64(
-	    session, cache->bytes_inmem, size, "WT_CACHE.bytes_inmem");
+	    session, &cache->bytes_inmem, size, "WT_CACHE.bytes_inmem");
 	__wt_cache_decr_check_size(
-	    session, page->memory_footprint, size, "WT_PAGE.memory_footprint");
+	    session, &page->memory_footprint, size, "WT_PAGE.memory_footprint");
 	if (__wt_page_is_modified(page))
 		__wt_cache_page_byte_dirty_decr(session, page, size);
 	/* Track internal and overflow size in cache. */
 	if (WT_PAGE_IS_INTERNAL(page))
 		__wt_cache_decr_check_uint64(session,
-		    cache->bytes_internal, size, "WT_CACHE.bytes_internal");
+		    &cache->bytes_internal, size, "WT_CACHE.bytes_internal");
 	else if (page->type == WT_PAGE_OVFL)
 		__wt_cache_decr_check_uint64(session,
-		    cache->bytes_overflow, size, "WT_CACHE.bytes_overflow");
+		    &cache->bytes_overflow, size, "WT_CACHE.bytes_overflow");
 }
 
 /*
@@ -252,12 +252,13 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update the bytes in-memory to reflect the eviction. */
 	__wt_cache_decr_check_uint64(session,
-	    cache->bytes_inmem, page->memory_footprint, "WT_CACHE.bytes_inmem");
+	    &cache->bytes_inmem,
+	    page->memory_footprint, "WT_CACHE.bytes_inmem");
 
 	/* Update the bytes_internal value to reflect the eviction */
 	if (WT_PAGE_IS_INTERNAL(page))
 		__wt_cache_decr_check_uint64(session,
-		    cache->bytes_internal,
+		    &cache->bytes_internal,
 		    page->memory_footprint, "WT_CACHE.bytes_internal");
 
 	/* Update the cache's dirty-byte count. */
@@ -269,7 +270,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 			cache->bytes_dirty = 0;
 		} else
 			__wt_cache_decr_check_uint64(session,
-			    cache->bytes_dirty,
+			    &cache->bytes_dirty,
 			    modify->bytes_dirty, "WT_CACHE.bytes_dirty");
 	}
 
