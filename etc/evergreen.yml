@@ -4028,6 +4028,24 @@ buildvariants:
   - name: tool
   - name: tool_WT
 
+  - name: ubuntu1410-asan
+  display_name: z ASAN SSL Ubuntu 1410 64-bit
+  run_on:
+  - ubuntu1410-build
+  stepback: false
+  batchtime: 1440 # 1 day
+  expansions:
+    tooltags: "-tags 'ssl'"
+    asan_symbolizer: ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-3.5
+    enable_lsan: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
+    compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
+    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: -j1 --continueOnFailure  # Avoid starting too many mongod's under ASAN build.
+  tasks:
+  - name: compile
+  - name: jstestfuzz
+
 - name: ubuntu1410-fast-clang
   display_name: z Clang/libc++ Ubuntu 1410 64-bit SSL
   run_on:
