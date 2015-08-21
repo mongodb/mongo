@@ -48,7 +48,7 @@ class test_bug008(wttest.WiredTigerTestCase):
 
         # Populate the tree and reopen the connection, forcing it to disk
         # and moving the records to an on-page format.
-        simple_populate(self, uri, self.fmt, 100) 
+        simple_populate(self, uri, self.fmt, 100)
         self.reopen_conn()
 
         # Begin a transaction, and add some additional records.
@@ -105,7 +105,7 @@ class test_bug008(wttest.WiredTigerTestCase):
 
         # Populate the tree and reopen the connection, forcing it to disk
         # and moving the records to an on-page format.
-        simple_populate(self, uri, self.fmt, 100) 
+        simple_populate(self, uri, self.fmt, 100)
         self.reopen_conn()
 
         # Add some additional visible records.

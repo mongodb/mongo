@@ -172,7 +172,7 @@ class test_schema02(wttest.WiredTigerTestCase):
             cursor[(i, 'key' + str(i))] = \
                 ('val' + str(square), square, 'val' + str(cube), cube)
         cursor.close()
-        
+
     def check_entries(self):
         cursor = self.session.open_cursor('table:main', None, None)
         # spot check via search
@@ -203,7 +203,7 @@ class test_schema02(wttest.WiredTigerTestCase):
             i += 1
         cursor.close()
         self.assertEqual(i, n)
-        
+
     def test_colgroups(self):
         self.session.create("table:main", "key_format=iS,value_format=SiSi,"
                             "columns=(ikey,Skey,S1,i2,S3,i4),colgroups=(c1,c2)")

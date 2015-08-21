@@ -86,7 +86,7 @@ class test_encrypt03(wttest.WiredTigerTestCase):
     def test_encrypt(self):
         params = 'key_format=S,value_format=S,encryption=(name='
         if self.file_encrypt != None:
-            params += self.file_encrypt 
+            params += self.file_encrypt
         if self.file_encrypt_args != None:
             params += ',keyid=' + self.file_encrypt_args
         params += ')'

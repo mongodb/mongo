@@ -113,7 +113,7 @@ class test_cursor04(wttest.WiredTigerTestCase):
             self.assertEqual(direction, 0)
             self.assertEqual(cursor.get_key(), origkey)
             self.assertEqual(cursor.get_value(), 0)
-        
+
     def test_searches(self):
         """
         Create entries, and read back in a cursor: key=string, value=string
@@ -174,7 +174,7 @@ class test_cursor04(wttest.WiredTigerTestCase):
             self.assertEqual(cmp, 0)
             self.assertEqual(cursor.get_key(), self.genkey(0))
             self.assertEqual(cursor.get_value(), 0)
-            
+
         cursor.set_key(self.genkey(5))
         self.expect_either(cursor, 4, 6)
 

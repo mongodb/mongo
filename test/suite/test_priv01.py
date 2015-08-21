@@ -131,7 +131,7 @@ class test_priv01(wttest.WiredTigerTestCase):
                 lambda: self.common_test(None, edir, None),
                 '/WIREDTIGER_HOME environment variable set but\
  process lacks privileges to use that environment variable/')
-    
+
     def test_env_conf_priv(self):
         edir = 'envdir'
         os.mkdir(edir)
