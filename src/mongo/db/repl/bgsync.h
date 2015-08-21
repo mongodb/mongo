@@ -177,6 +177,7 @@ private:
                           const HostAndPort& source,
                           OpTime lastOpTimeFetched,
                           long long lastFetchedHash,
+                          Milliseconds fetcherMaxTimeMS,
                           Status* remoteOplogStartStatus);
 
     /**

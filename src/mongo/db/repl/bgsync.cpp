@@ -74,7 +74,6 @@ namespace {
 const char hashFieldName[] = "h";
 int SleepToAllowBatchingMillis = 2;
 const int BatchIsSmallish = 40000;  // bytes
-const Milliseconds fetcherMaxTimeMS(2000);
 
 /**
  * Checks the criteria for rolling back.
@@ -310,6 +309,13 @@ void BackgroundSync::_produce(OperationContext* txn, executor::TaskExecutor* tas
 
     const Milliseconds oplogSocketTimeout(OplogReader::kSocketTimeout);
 
+    const auto isV1ElectionProtocol = _replCoord->isV1ElectionProtocol();
+    // Under protocol version 1, make the awaitData timeout (maxTimeMS) dependent on the election
+    // timeout. This enables the sync source to communicate liveness of the primary to secondaries.
+    // Under protocol version 0, use a default timeout of 2 seconds for awaitData.
+    const Milliseconds fetcherMaxTimeMS(
+        isV1ElectionProtocol ? _replCoord->getConfig().getElectionTimeoutPeriod() / 2 : Seconds(2));
+
     // Prefer host in oplog reader to _syncSourceHost because _syncSourceHost may be cleared
     // if sync source feedback fails.
     const HostAndPort source = syncSourceReader.getHost();
@@ -327,7 +333,9 @@ void BackgroundSync::_produce(OperationContext* txn, executor::TaskExecutor* tas
                                       stdx::cref(source),
                                       lastOpTimeFetched,
                                       lastHashFetched,
+                                      fetcherMaxTimeMS,
                                       &remoteOplogStartStatus);
+
 
     BSONObjBuilder cmdBob;
     cmdBob.append("find", nsToCollectionSubstring(rsOplogName));
@@ -338,7 +346,7 @@ void BackgroundSync::_produce(OperationContext* txn, executor::TaskExecutor* tas
     cmdBob.append("maxTimeMS", durationCount<Milliseconds>(fetcherMaxTimeMS));
 
     BSONObjBuilder metadataBob;
-    if (_replCoord->isV1ElectionProtocol()) {
+    if (isV1ElectionProtocol) {
         cmdBob.append("term", _replCoord->getTerm());
         metadataBob.append(rpc::kReplSetMetadataFieldName, 1);
     }
@@ -388,6 +396,7 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
                                       const HostAndPort& source,
                                       OpTime lastOpTimeFetched,
                                       long long lastFetchedHash,
+                                      Milliseconds fetcherMaxTimeMS,
                                       Status* remoteOplogStartStatus) {
     // if target cut connections between connecting and querying (for
     // example, because it stepped down) we might not have a cursor
