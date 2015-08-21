@@ -46,6 +46,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/logger/log_domain.h"
 #include "mongo/logger/logger.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/threadlocal.h"
@@ -72,6 +73,25 @@ const char* strsignal(int signalNum) {
             return "UNKNOWN";
     }
 }
+
+void endProcessWithSignal(int signalNum) {
+    doMinidump();
+    quickExit(EXIT_ABRUPT);
+}
+
+#else
+
+void endProcessWithSignal(int signalNum) {
+    // This works by restoring the system-default handler for the given signal and re-raising it, in
+    // order to get the system default termination behavior (i.e., dumping core, or just exiting).
+    struct sigaction defaultedSignals;
+    memset(&defaultedSignals, 0, sizeof(defaultedSignals));
+    defaultedSignals.sa_handler = SIG_DFL;
+    sigemptyset(&defaultedSignals.sa_mask);
+    invariant(sigaction(signalNum, &defaultedSignals, nullptr) == 0);
+    raise(signalNum);
+}
+
 #endif
 
 // This should only be used with MallocFreeOSteam
@@ -207,34 +227,14 @@ void myTerminate() {
     printStackTrace(mallocFreeOStream);
     writeMallocFreeStreamToLog();
     breakpoint();
-#if defined(_WIN32)
-    doMinidump();
-    quickExit(EXIT_ABRUPT);
-#else
-    {
-        // Clear our handler for SIGABRT so the OS one (which dumps core) can execute.
-        struct sigaction defaultedSignals;
-        memset(&defaultedSignals, 0, sizeof(defaultedSignals));
-        defaultedSignals.sa_handler = SIG_DFL;
-        sigemptyset(&defaultedSignals.sa_mask);
-
-        invariant(sigaction(SIGABRT, &defaultedSignals, nullptr) == 0);
-        raise(SIGABRT);
-    }
-#endif
-    MONGO_UNREACHABLE;
+    endProcessWithSignal(SIGABRT);
 }
 
 void abruptQuit(int signalNum) {
     MallocFreeOStreamGuard lk{};
     printSignalAndBacktrace(signalNum);
     breakpoint();
-#ifdef _WIN32
-    doMinidump();
-    quickExit(EXIT_ABRUPT);
-#else
-    raise(signalNum);
-#endif
+    endProcessWithSignal(signalNum);
 }
 
 #if defined(_WIN32)
@@ -285,7 +285,7 @@ void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void*) {
         writeMallocFreeStreamToLog();
     }
 #endif
-    raise(signalNum);
+    endProcessWithSignal(signalNum);
 }
 
 #endif
@@ -317,7 +317,6 @@ void setupSynchronousSignalHandlers() {
         memset(&plainSignals, 0, sizeof(plainSignals));
         plainSignals.sa_handler = abruptQuit;
         sigemptyset(&plainSignals.sa_mask);
-        plainSignals.sa_flags = SA_RESETHAND;
 
         // ^\ is the stronger ^C. Log and quit hard without waiting for cleanup.
         invariant(sigaction(SIGQUIT, &plainSignals, nullptr) == 0);
@@ -328,7 +327,7 @@ void setupSynchronousSignalHandlers() {
         memset(&addrSignals, 0, sizeof(addrSignals));
         addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
         sigemptyset(&addrSignals.sa_mask);
-        addrSignals.sa_flags = SA_SIGINFO | SA_RESETHAND;
+        addrSignals.sa_flags = SA_SIGINFO;
 
         invariant(sigaction(SIGSEGV, &addrSignals, nullptr) == 0);
         invariant(sigaction(SIGBUS, &addrSignals, nullptr) == 0);
