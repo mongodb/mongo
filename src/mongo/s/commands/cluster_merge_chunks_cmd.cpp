@@ -38,7 +38,6 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
@@ -180,7 +179,6 @@ public:
                              grid.shardRegistry()->getConfigServerConnectionString().toString());
         remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(), firstChunk->getShardId());
 
-
         BSONObj remoteResult;
 
         // Throws, but handled at level above.  Don't want to rewrap to preserve exception
@@ -193,7 +191,7 @@ public:
                        str::stream() << "Can't find shard for chunk: " << firstChunk->toString()));
         }
 
-        ShardConnection conn(shard->getConnString(), "");
+        ScopedDbConnection conn(shard->getConnString());
         bool ok = conn->runCommand("admin", remoteCmdObjB.obj(), remoteResult);
         conn.done();
 
