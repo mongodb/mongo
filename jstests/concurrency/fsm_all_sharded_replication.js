@@ -10,6 +10,7 @@ var blacklist = [
     'distinct.js', // SERVER-13116 distinct isn't sharding aware
     'distinct_noindex.js', // SERVER-13116 distinct isn't sharding aware
     'distinct_projection.js', // SERVER-13116 distinct isn't sharding aware
+    'drop_database.js', // SERVER-17397 Drops of sharded namespaces may not fully succeed
     'reindex_background.js', // SERVER-19128 Fatal assertion during secondary index build
     'yield_sort.js', // SERVER-17011 Cursor can return objects out of order if updated during query
     'yield_sort_merge.js', // SERVER-17011 also applies, since this query uses SORT stage,
@@ -22,10 +23,16 @@ var blacklist = [
     'count_limit_skip.js',
     'count_noindex.js',
 
-    // Disabled due to SERVER-17397, 'Drops of sharded namespaces may not fully succeed'.
-    // This bug is problematic for these workloads because they reuse dropped namespaces:
-    'drop_database.js',
+    // Disabled due to SERVER-20057, 'Concurrent, sharded mapReduces can fail when temporary
+    // namespaces collide across mongos processes'
     'map_reduce_drop.js',
+    'map_reduce_inline.js',
+    'map_reduce_merge.js',
+    'map_reduce_merge_nonatomic.js',
+    'map_reduce_reduce.js',
+    'map_reduce_reduce_nonatomic.js',
+    'map_reduce_replace.js',
+    'map_reduce_replace_nonexistent.js',
 
     // Disabled due to MongoDB restrictions and/or workload restrictions
 
