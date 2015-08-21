@@ -269,6 +269,10 @@ private:
     size_t _dotIndex;
 };
 
+template <typename StreamType>
+StreamType& operator<<(StreamType& stream, const NamespaceString& value) {
+    return stream << value.ns();
+}
 
 // "database.a.b.c" -> "database"
 inline StringData nsToDatabaseSubstring(StringData ns) {
@@ -350,7 +354,7 @@ struct NamespaceDBEquals {
         return nsDBEquals(a, b);
     }
 };
-}
 
+}  // namespace mongo
 
 #include "mongo/db/namespace_string-inl.h"

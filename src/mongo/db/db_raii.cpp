@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -42,6 +43,13 @@ namespace mongo {
 
 AutoGetDb::AutoGetDb(OperationContext* txn, StringData ns, LockMode mode)
     : _dbLock(txn->lockState(), ns, mode), _db(dbHolder().get(txn, ns)) {}
+
+AutoGetCollection::AutoGetCollection(OperationContext* txn,
+                                     const NamespaceString& nss,
+                                     LockMode mode)
+    : _autoDb(txn, nss.db(), mode),
+      _collLock(txn->lockState(), nss.ns(), mode),
+      _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(nss) : nullptr) {}
 
 AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockMode mode)
     : _transaction(txn, MODE_IX),
@@ -60,48 +68,31 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* txn, StringData ns, LockM
 }
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn, const std::string& ns)
-    : _txn(txn),
-      _transaction(txn, MODE_IS),
-      _db(_txn, nsToDatabaseSubstring(ns), MODE_IS),
-      _collLock(_txn->lockState(), ns, MODE_IS),
-      _coll(NULL) {
-    _init(ns, nsToCollectionSubstring(ns));
-}
+    : AutoGetCollectionForRead(txn, NamespaceString(ns)) {}
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
                                                    const NamespaceString& nss)
-    : _txn(txn),
-      _transaction(txn, MODE_IS),
-      _db(_txn, nss.db(), MODE_IS),
-      _collLock(_txn->lockState(), nss.toString(), MODE_IS),
-      _coll(NULL) {
-    _init(nss.toString(), nss.coll());
-}
-
-void AutoGetCollectionForRead::_init(const std::string& ns, StringData coll) {
-    massert(28535, "need a non-empty collection name", !coll.empty());
-
+    : _txn(txn), _transaction(txn, MODE_IS), _autoColl(txn, nss, MODE_IS) {
     // We have both the DB and collection locked, which the prerequisite to do a stable shard
-    // version check.
-    ensureShardVersionOKOrThrow(_txn, ns);
+    // version check
+    ensureShardVersionOKOrThrow(_txn, nss.ns());
 
     auto curOp = CurOp::get(_txn);
     stdx::lock_guard<Client> lk(*_txn->getClient());
+
     // TODO: OldClientContext legacy, needs to be removed
     curOp->ensureStarted();
-    curOp->setNS_inlock(ns);
+    curOp->setNS_inlock(nss.ns());
 
     // At this point, we are locked in shared mode for the database by the DB lock in the
     // constructor, so it is safe to load the DB pointer.
-    if (_db.getDb()) {
+    if (_autoColl.getDb()) {
         // TODO: OldClientContext legacy, needs to be removed
-        curOp->enter_inlock(ns.c_str(), _db.getDb()->getProfilingLevel());
-
-        _coll = _db.getDb()->getCollection(ns);
+        curOp->enter_inlock(nss.ns().c_str(), _autoColl.getDb()->getProfilingLevel());
     }
 
-    if (_coll) {
-        if (auto minSnapshot = _coll->getMinimumVisibleSnapshot()) {
+    if (getCollection()) {
+        if (auto minSnapshot = getCollection()->getMinimumVisibleSnapshot()) {
             if (auto mySnapshot = _txn->recoveryUnit()->getMajorityCommittedSnapshot()) {
                 while (mySnapshot < minSnapshot) {
                     // Wait until a snapshot is available.
