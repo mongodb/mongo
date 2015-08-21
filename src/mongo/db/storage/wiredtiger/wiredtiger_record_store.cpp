@@ -1216,12 +1216,8 @@ private:
 
 void WiredTigerRecordStore::_changeNumRecords(OperationContext* txn, int64_t diff) {
     txn->recoveryUnit()->registerChange(new NumRecordsChange(this, diff));
-    if (diff > 0) {
-        if (_numRecords.fetchAndAdd(diff) < diff)
-            _numRecords.store(diff);
-    } else if (_numRecords.fetchAndAdd(diff) < 0) {
-        _numRecords.store(0);
-    }
+    if (_numRecords.fetchAndAdd(diff) < 0)
+        _numRecords.store(std::max(diff, int64_t(0)));
 }
 
 class WiredTigerRecordStore::DataSizeChange : public RecoveryUnit::Change {
@@ -1241,13 +1237,8 @@ void WiredTigerRecordStore::_increaseDataSize(OperationContext* txn, int64_t amo
     if (txn)
         txn->recoveryUnit()->registerChange(new DataSizeChange(this, amount));
 
-    if (_dataSize.fetchAndAdd(amount) < 0) {
-        if (amount > 0) {
-            _dataSize.store(amount);
-        } else {
-            _dataSize.store(0);
-        }
-    }
+    if (_dataSize.fetchAndAdd(amount) < 0)
+        _dataSize.store(std::max(amount, int64_t(0)));
 
     if (_sizeStorer && _sizeStorerCounter++ % 1000 == 0) {
         _sizeStorer->storeToCache(_uri, _numRecords.load(), _dataSize.load());
