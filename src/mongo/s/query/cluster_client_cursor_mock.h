@@ -49,6 +49,8 @@ public:
 
     bool isTailable() const final;
 
+    long long getNumReturnedSoFar() const final;
+
     /**
      * Queues a BSONObj to be returned.
      */
@@ -64,6 +66,9 @@ private:
     bool _exhausted = false;
     std::queue<StatusWith<BSONObj>> _resultsQueue;
     stdx::function<void(void)> _killCallback;
+
+    // Number of returned documents.
+    long long _numReturnedSoFar = 0;
 };
 
 }  // namespace mongo

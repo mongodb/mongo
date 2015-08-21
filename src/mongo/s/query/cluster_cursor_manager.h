@@ -172,6 +172,12 @@ public:
          */
         CursorId getCursorId() const;
 
+        /**
+         * Returns the number of result documents returned so far by this cursor via the next()
+         * method.
+         */
+        long long getNumReturnedSoFar() const;
+
     private:
         // ClusterCursorManager is a friend so that its methods can call the PinnedCursor
         // constructor declared below, which is private to prevent clients from calling it directly.

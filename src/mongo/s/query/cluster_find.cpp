@@ -119,8 +119,8 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
 
     ClusterClientCursorParams params(query.nss());
     params.limit = query.getParsed().getLimit();
-    params.batchSize = query.getParsed().getBatchSize();
-    params.limit = query.getParsed().getLimit();
+    params.batchSize = query.getParsed().getEffectiveBatchSize();
+    params.sort = query.getParsed().getSort();
     params.skip = query.getParsed().getSkip();
     params.isTailable = query.getParsed().isTailable();
 
@@ -268,6 +268,7 @@ StatusWith<GetMoreResponse> ClusterFind::runGetMore(OperationContext* txn,
     std::vector<BSONObj> batch;
     int bytesBuffered = 0;
     long long batchSize = request.batchSize.value_or(0);
+    long long startingFrom = pinnedCursor.getValue().getNumReturnedSoFar();
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     while (!FindCommon::enoughForGetMore(batchSize, batch.size(), bytesBuffered)) {
         auto next = pinnedCursor.getValue().next();
@@ -294,7 +295,7 @@ StatusWith<GetMoreResponse> ClusterFind::runGetMore(OperationContext* txn,
     CursorId idToReturn = (cursorState == ClusterCursorManager::CursorState::Exhausted)
         ? CursorId(0)
         : request.cursorid;
-    return GetMoreResponse(request.nss, idToReturn, std::move(batch));
+    return GetMoreResponse(request.nss, idToReturn, std::move(batch), startingFrom);
 }
 
 }  // namespace mongo

@@ -128,6 +128,11 @@ CursorId ClusterCursorManager::PinnedCursor::getCursorId() const {
     return _cursorId;
 }
 
+long long ClusterCursorManager::PinnedCursor::getNumReturnedSoFar() const {
+    invariant(_cursor);
+    return _cursor->getNumReturnedSoFar();
+}
+
 void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
     invariant(_cursor);
 

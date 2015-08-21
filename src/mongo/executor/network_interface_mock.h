@@ -139,6 +139,12 @@ public:
     NetworkOperationIterator getNextReadyRequest();
 
     /**
+     * Gets the first unscheduled request. There must be at least one unscheduled request in the
+     * queue.
+     */
+    NetworkOperationIterator getFrontOfUnscheduledQueue();
+
+    /**
      * Schedules "response" in response to "noi" at virtual time "when".
      */
     void scheduleResponse(NetworkOperationIterator noi,

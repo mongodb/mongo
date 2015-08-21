@@ -46,6 +46,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/getmore_request.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/catalog/catalog_cache.h"
@@ -179,8 +180,6 @@ void Strategy::queryOp(OperationContext* txn, Request& r) {
     // code path.
     // TODO: Delete the spigot and always use the new code.
     if (useClusterClientCursor) {
-        auto txn = cc().makeOperationContext();
-
         ReadPreferenceSetting readPreference(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
 
         BSONElement rpElem;
@@ -206,7 +205,7 @@ void Strategy::queryOp(OperationContext* txn, Request& r) {
         // otherwise we assume that a cursor with the returned id can be retrieved via the
         // ClusterCursorManager
         auto cursorId =
-            ClusterFind::runQuery(txn.get(), *canonicalQuery.getValue(), readPreference, &batch);
+            ClusterFind::runQuery(txn, *canonicalQuery.getValue(), readPreference, &batch);
         uassertStatusOK(cursorId.getStatus());
 
         // Build the response document.
@@ -536,6 +535,43 @@ void Strategy::getMore(OperationContext* txn, Request& r) {
     }
 
     uassertStatusOK(statusGetDb);
+
+    // Spigot which controls whether OP_QUERY style find on mongos uses the new ClusterClientCursor
+    // code path.
+    //
+    // TODO: Delete the spigot and always use the new code.
+    if (useClusterClientCursor) {
+        boost::optional<long long> batchSize;
+        if (ntoreturn) {
+            batchSize = ntoreturn;
+        }
+        GetMoreRequest request(NamespaceString(ns), id, batchSize, boost::none);
+
+        auto response = ClusterFind::runGetMore(txn, request);
+        uassertStatusOK(response.getStatus());
+
+        // Build the response document.
+        //
+        // TODO: this constant should be shared between mongos and mongod, and should not be inside
+        // ShardedClientCursor.
+        BufBuilder buffer(ShardedClientCursor::INIT_REPLY_BUFFER_SIZE);
+
+        int numResults = 0;
+        for (const auto& obj : response.getValue().batch) {
+            buffer.appendBuf((void*)obj.objdata(), obj.objsize());
+            ++numResults;
+        }
+
+        replyToQuery(0,
+                     r.p(),
+                     r.m(),
+                     buffer.buf(),
+                     buffer.len(),
+                     numResults,
+                     response.getValue().numReturnedSoFar.value_or(0),
+                     response.getValue().cursorId);
+        return;
+    }
 
     shared_ptr<DBConfig> config = statusGetDb.getValue();
 

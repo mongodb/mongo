@@ -49,8 +49,12 @@ const char kBatchFieldAlt[] = "firstBatch";
 
 GetMoreResponse::GetMoreResponse(NamespaceString namespaceString,
                                  CursorId id,
-                                 std::vector<BSONObj> objs)
-    : nss(std::move(namespaceString)), cursorId(id), batch(std::move(objs)) {}
+                                 std::vector<BSONObj> objs,
+                                 boost::optional<long long> nReturnedSoFar)
+    : nss(std::move(namespaceString)),
+      cursorId(id),
+      batch(std::move(objs)),
+      numReturnedSoFar(nReturnedSoFar) {}
 
 StatusWith<GetMoreResponse> GetMoreResponse::parseFromBSON(const BSONObj& cmdResponse) {
     Status cmdStatus = getStatusFromCommandResult(cmdResponse);

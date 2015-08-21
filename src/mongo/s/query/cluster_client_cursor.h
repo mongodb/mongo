@@ -75,6 +75,11 @@ public:
      * Returns whether or not this cursor is tailing a capped collection on a shard.
      */
     virtual bool isTailable() const = 0;
+
+    /**
+     * Returns the number of result documents returned so far by this cursor via the next() method.
+     */
+    virtual long long getNumReturnedSoFar() const = 0;
 };
 
 }  // namespace mongo

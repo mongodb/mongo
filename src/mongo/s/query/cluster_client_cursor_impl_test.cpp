@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,62 +26,43 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 
-#include "mongo/s/query/router_stage_limit.h"
-#include "mongo/s/query/router_stage_merge.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/query/router_stage_mock.h"
-#include "mongo/s/query/router_stage_skip.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
-                                                 ClusterClientCursorParams params)
-    : _isTailable(params.isTailable), _root(buildMergerPlan(executor, std::move(params))) {}
+namespace {
 
-ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock> root)
-    : _root(std::move(root)) {}
-
-StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
-    auto next = _root->next();
-    if (next.isOK() && next.getValue()) {
-        ++_numReturnedSoFar;
-    }
-    return next;
-}
-
-void ClusterClientCursorImpl::kill() {
-    _root->kill();
-}
-
-bool ClusterClientCursorImpl::isTailable() const {
-    return _isTailable;
-}
-
-long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
-    return _numReturnedSoFar;
-}
-
-std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
-    executor::TaskExecutor* executor, ClusterClientCursorParams params) {
-    // The first stage is always the one which merges from the remotes.
-    auto leaf = stdx::make_unique<RouterStageMerge>(executor, params);
-
-    std::unique_ptr<RouterExecStage> root = std::move(leaf);
-    if (params.skip) {
-        root = stdx::make_unique<RouterStageSkip>(std::move(root), *params.skip);
+TEST(ClusterClientCursorImpl, NumReturnedSoFar) {
+    auto mockStage = stdx::make_unique<RouterStageMock>();
+    for (int i = 1; i < 10; ++i) {
+        mockStage->queueResult(BSON("a" << i));
     }
 
-    if (params.limit) {
-        root = stdx::make_unique<RouterStageLimit>(std::move(root), *params.limit);
-    }
+    ClusterClientCursorImpl cursor(std::move(mockStage));
 
-    return root;
+    ASSERT_EQ(cursor.getNumReturnedSoFar(), 0);
+
+    for (int i = 1; i < 10; ++i) {
+        auto result = cursor.next();
+        ASSERT(result.isOK());
+        ASSERT_EQ(*result.getValue(), BSON("a" << i));
+        ASSERT_EQ(cursor.getNumReturnedSoFar(), i);
+    }
+    // Now check that if nothing is fetched the getNumReturnedSoFar stays the same.
+    auto result = cursor.next();
+    ASSERT_OK(result.getStatus());
+    ASSERT_FALSE(result.getValue());
+    ASSERT_EQ(cursor.getNumReturnedSoFar(), 9LL);
 }
+
+}  // namespace
 
 }  // namespace mongo

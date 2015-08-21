@@ -102,3 +102,13 @@ env.CppUnitTest(
         "cluster_cursor_manager",
     ],
 )
+
+env.CppUnitTest(
+    target="cluster_client_cursor_impl_test",
+    source=[
+        "cluster_client_cursor_impl_test.cpp",
+    ],
+    LIBDEPS=[
+        "cluster_client_cursor",
+    ],
+)

@@ -56,7 +56,12 @@ StatusWith<boost::optional<BSONObj>> ClusterClientCursorMock::next() {
         return out.getStatus();
     }
 
+    ++_numReturnedSoFar;
     return boost::optional<BSONObj>(out.getValue());
+}
+
+long long ClusterClientCursorMock::getNumReturnedSoFar() const {
+    return _numReturnedSoFar;
 }
 
 void ClusterClientCursorMock::kill() {

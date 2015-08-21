@@ -209,8 +209,20 @@ Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
 
     invariant(!remote.cbHandle.isValid());
 
+    // If mongod returned less docs than the requested batchSize then modify the next getMore
+    // request to fetch the remaining docs only. If the remote node has a plan with OR for top k and
+    // a full sort as is the case for the OP_QUERY find then this optimization will prevent
+    // switching to the full sort plan branch.
+    auto adjustedBatchSize = _params.batchSize;
+
+    if (remote.cursorId && _params.batchSize && *_params.batchSize > remote.fetchedCount) {
+        adjustedBatchSize = *_params.batchSize - remote.fetchedCount;
+    } else {
+        remote.fetchedCount = 0;
+    }
+
     BSONObj cmdObj = remote.cursorId
-        ? GetMoreRequest(_params.nsString, *remote.cursorId, _params.batchSize, boost::none)
+        ? GetMoreRequest(_params.nsString, *remote.cursorId, adjustedBatchSize, boost::none)
               .toBSON()
         : remote.cmdObj;
 
@@ -339,6 +351,7 @@ void AsyncResultsMerger::handleBatchResponse(
 
     for (const auto& obj : getMoreResponse.batch) {
         remote.docBuffer.push(obj);
+        ++remote.fetchedCount;
     }
 
     // If we're doing a sorted merge, then we have to make sure to put this remote onto the

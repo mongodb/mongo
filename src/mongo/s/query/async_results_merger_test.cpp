@@ -31,6 +31,7 @@
 #include "mongo/s/query/async_results_merger.h"
 
 #include "mongo/db/json.h"
+#include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/getmore_response.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -43,6 +44,7 @@ namespace mongo {
 
 namespace {
 
+using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
@@ -119,6 +121,16 @@ protected:
         }
         net->runReadyNetworkOperations();
         net->exitNetwork();
+    }
+
+    BSONObj getCommandFromNextReadyRequest() {
+        executor::NetworkInterfaceMock* net = getNet();
+        net->enterNetwork();
+        ASSERT_TRUE(net->hasReadyRequests());
+        NetworkInterfaceMock::NetworkOperationIterator noi = net->getFrontOfUnscheduledQueue();
+        BSONObj retCmd = noi->getRequest().cmdObj;
+        net->exitNetwork();
+        return retCmd;
     }
 
     void scheduleErrorResponse(Status status) {
@@ -799,6 +811,47 @@ TEST_F(AsyncResultsMergerTest, TailableEmptyBatch) {
 
     auto killedEvent = arm->kill();
     executor->waitForEvent(killedEvent);
+}
+
+TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 3}");
+    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    std::vector<GetMoreResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+    responses.emplace_back(_nss, CursorId(1), batch1);
+
+    scheduleNetworkResponses(responses);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_FALSE(arm->ready());
+
+    responses.clear();
+
+    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}")};
+    responses.emplace_back(_nss, CursorId(0), batch2);
+    readyEvent = unittest::assertGet(arm->nextEvent());
+
+    BSONObj scheduledCmd = getCommandFromNextReadyRequest();
+    auto request = GetMoreRequest::parseFromBSON("anydbname", scheduledCmd);
+    ASSERT_OK(request.getStatus());
+    ASSERT_EQ(*request.getValue().batchSize, 1LL);
+    ASSERT_EQ(request.getValue().cursorid, 1LL);
+    scheduleNetworkResponses(responses);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT(!unittest::assertGet(arm->nextReady()));
 }
 
 }  // namespace

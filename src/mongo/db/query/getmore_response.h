@@ -41,7 +41,10 @@ struct GetMoreResponse {
     /**
      * Constructs from values for each of the fields.
      */
-    GetMoreResponse(NamespaceString namspaceString, CursorId id, std::vector<BSONObj> objs);
+    GetMoreResponse(NamespaceString namspaceString,
+                    CursorId id,
+                    std::vector<BSONObj> objs,
+                    boost::optional<long long> nReturnedSoFar = boost::none);
 
     /**
      * Constructs a GetMoreResponse from the command BSON response.
@@ -57,6 +60,7 @@ struct GetMoreResponse {
     const NamespaceString nss;
     const CursorId cursorId;
     const std::vector<BSONObj> batch;
+    const boost::optional<long long> numReturnedSoFar;
 };
 
 }  // namespace mongo

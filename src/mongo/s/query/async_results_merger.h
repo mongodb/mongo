@@ -175,6 +175,10 @@ private:
 
         // Set to true once we have heard from the remote node at least once.
         bool gotFirstResponse = false;
+
+        // Count of fetched docs during ARM processing of the current batch. Used to reduce the
+        // batchSize in getMore when mongod returned less docs than the requested batchSize.
+        long long fetchedCount = 0;
     };
 
     class MergingComparator {
