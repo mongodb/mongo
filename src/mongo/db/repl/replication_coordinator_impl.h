@@ -1031,6 +1031,12 @@ private:
      */
     void _cancelAndRescheduleLivenessUpdate_inlock(int updatedMemberId);
 
+    /**
+     * Reset the term of last vote to 0 to prevent any node from voting for term 0.
+     * Blocking until last vote write finishes. Must be called without holding _mutex.
+     */
+    void _resetElectionInfoOnProtocolVersionUpgrade(const ReplicaSetConfig& newConfig);
+
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.

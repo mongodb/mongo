@@ -348,16 +348,18 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         }
     }
 
-    // Restore the current term according to the terms of last oplog entry and last vote.
-    long long term = lastOpTime.getTerm();
-    if (lastVoteStatus.isOK()) {
-        long long lastVoteTerm = lastVoteStatus.getValue().getTerm();
-        if (term < lastVoteTerm) {
-            term = lastVoteTerm;
+    long long term = OpTime::kUninitializedTerm;
+    if (localConfig.getProtocolVersion() == 1) {
+        // Restore the current term according to the terms of last oplog entry and last vote.
+        // The initial term of OpTime() is 0.
+        term = lastOpTime.getTerm();
+        if (lastVoteStatus.isOK()) {
+            long long lastVoteTerm = lastVoteStatus.getValue().getTerm();
+            if (term < lastVoteTerm) {
+                term = lastVoteTerm;
+            }
         }
     }
-    _updateTerm_incallback(term);
-
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigStartingUp);
@@ -365,6 +367,8 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
     _setMyLastOptime_inlock(&lk, lastOpTime, false);
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
+    _updateTerm_incallback(term);
+    LOG(1) << "Current term is now " << term;
     if (lk.owns_lock()) {
         lk.unlock();
     }
@@ -1519,7 +1523,7 @@ bool ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(BSONObjBuil
 
         BSONObjBuilder entry(arrayBuilder.subobjStart());
         entry.append("_id", itr->rid);
-        if (_isV1ElectionProtocol_inlock()) {
+        if (isV1ElectionProtocol()) {
             BSONObjBuilder opTimeBuilder(entry.subobjStart("optime"));
             itr->opTime.append(&opTimeBuilder);
         } else {
@@ -1975,6 +1979,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     invariant(_rsConfig.isInitialized());
     const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
     lk.unlock();
+    _resetElectionInfoOnProtocolVersionUpgrade(newConfig);
     _performPostMemberStateUpdateAction(action);
 }
 
@@ -2100,6 +2105,7 @@ void ReplicationCoordinatorImpl::_finishReplSetInitiate(
     invariant(!_rsConfig.isInitialized());
     const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
     lk.unlock();
+    _resetElectionInfoOnProtocolVersionUpgrade(newConfig);
     _performPostMemberStateUpdateAction(action);
 }
 
@@ -2320,9 +2326,11 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& n
     invariant(_settings.usingReplSets());
     _cancelHeartbeats();
     _setConfigState_inlock(kConfigSteady);
+
     // Must get this before changing our config.
     OpTime myOptime = _getMyLastOptime_inlock();
     _topCoord->updateConfig(newConfig, myIndex, _replExecutor.now(), myOptime);
+    _cachedTerm = _topCoord->getTerm();
     _rsConfig = newConfig;
     _protVersion.store(_rsConfig.getProtocolVersion());
     log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
@@ -3078,6 +3086,37 @@ void ReplicationCoordinatorImpl::waitForStepDownFinish_forTest() {
         _replExecutor.waitForEvent(_stepDownFinishedEvent);
     }
 }
+
+void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
+    const ReplicaSetConfig& newConfig) {
+    // On protocol version upgrade, reset last vote as if I just learned the term 0 from other
+    // nodes.
+    if (!_rsConfig.isInitialized() ||
+        _rsConfig.getProtocolVersion() >= newConfig.getProtocolVersion()) {
+        return;
+    }
+
+    auto cbStatus = _replExecutor.scheduleDBWork([this](const CallbackArgs& cbData) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        invariant(cbData.txn);
+
+        LastVote lastVote;
+        lastVote.setTerm(OpTime::kInitialTerm);
+        // TODO(sz) Change candidate Id to index.
+        lastVote.setCandidateId(-1);
+        auto status = _externalState->storeLocalLastVoteDocument(cbData.txn, lastVote);
+        invariant(status.isOK());
+    });
+    if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+
+    invariant(cbStatus.isOK());
+    _replExecutor.wait(cbStatus.getValue());
+}
+
 
 }  // namespace repl
 }  // namespace mongo

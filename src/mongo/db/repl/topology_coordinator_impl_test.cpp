@@ -3610,7 +3610,7 @@ TEST_F(TopoCoordTest, PrepareHeartbeatResponseV1NoConfigYet) {
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_STARTUP, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTerm());
+    ASSERT_EQUALS(-1, response.getTerm());
     ASSERT_EQUALS(-2, response.getConfigVersion());
 }
 
@@ -3628,7 +3628,7 @@ TEST_F(PrepareHeartbeatResponseV1Test, PrepareHeartbeatResponseSenderIDMissing) 
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTerm());
+    ASSERT_EQUALS(-1, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
 }
 
@@ -3647,7 +3647,7 @@ TEST_F(PrepareHeartbeatResponseV1Test, PrepareHeartbeatResponseSenderIDNotInConf
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTerm());
+    ASSERT_EQUALS(-1, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
 }
 
@@ -3667,7 +3667,7 @@ TEST_F(PrepareHeartbeatResponseV1Test, PrepareHeartbeatResponseConfigVersionLow)
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTerm());
+    ASSERT_EQUALS(-1, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
 }
 
@@ -3687,7 +3687,7 @@ TEST_F(PrepareHeartbeatResponseV1Test, PrepareHeartbeatResponseConfigVersionHigh
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTerm());
+    ASSERT_EQUALS(-1, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
 }
 
@@ -3708,7 +3708,7 @@ TEST_F(PrepareHeartbeatResponseV1Test, PrepareHeartbeatResponseAsPrimary) {
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_PRIMARY, response.getState().s);
     ASSERT_EQUALS(OpTime(Timestamp(11, 0), 0), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTerm());
+    ASSERT_EQUALS(-1, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
 }
 
@@ -3737,7 +3737,7 @@ TEST_F(PrepareHeartbeatResponseV1Test, PrepareHeartbeatResponseWithSyncSource) {
     ASSERT_EQUALS("rs0", response.getReplicaSetName());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
     ASSERT_EQUALS(OpTime(Timestamp(100, 0), 0), response.getOpTime());
-    ASSERT_EQUALS(0, response.getTerm());
+    ASSERT_EQUALS(-1, response.getTerm());
     ASSERT_EQUALS(1, response.getConfigVersion());
     ASSERT_EQUALS(HostAndPort("h2"), response.getSyncingTo());
 }

@@ -113,7 +113,7 @@ void PingStats::miss() {
 
 TopologyCoordinatorImpl::TopologyCoordinatorImpl(Options options)
     : _role(Role::follower),
-      _term(OpTime::kInitialTerm),
+      _term(OpTime::kUninitializedTerm),
       _currentPrimaryIndex(-1),
       _forceSyncSourceIndex(-1),
       _options(std::move(options)),
@@ -1850,6 +1850,18 @@ void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig,
                                            const OpTime& lastOpApplied) {
     invariant(_role != Role::candidate);
     invariant(selfIndex < newConfig.getNumMembers());
+
+    // Reset term on startup and upgrade/downgrade of protocol version.
+    if (!_rsConfig.isInitialized() ||
+        _rsConfig.getProtocolVersion() != newConfig.getProtocolVersion()) {
+        if (newConfig.getProtocolVersion() == 1) {
+            _term = OpTime::kInitialTerm;
+        } else {
+            invariant(newConfig.getProtocolVersion() == 0);
+            _term = OpTime::kUninitializedTerm;
+        }
+        LOG(1) << "Updated term in topology coordinator to " << _term << " due to new config";
+    }
 
     _updateHeartbeatDataForReconfig(newConfig, selfIndex, now);
     _rsConfig = newConfig;
