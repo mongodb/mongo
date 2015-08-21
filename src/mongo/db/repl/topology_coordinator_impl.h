@@ -150,7 +150,7 @@ public:
     virtual HostAndPort getSyncSourceAddress() const;
     virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const;
     virtual int getMaintenanceCount() const;
-    virtual long long getTerm() const;
+    virtual long long getTerm();
     virtual bool updateTerm(long long term);
     virtual void setForceSyncSourceIndex(int index);
     virtual HostAndPort chooseNewSyncSource(Date_t now, const Timestamp& lastTimestampApplied);
@@ -228,7 +228,6 @@ public:
     virtual void summarizeAsHtml(ReplSetHtmlSummary* output);
     virtual void loadLastVote(const LastVote& lastVote);
     virtual void voteForMyselfV1();
-    virtual long long getTerm();
     virtual void prepareForStepDown();
     virtual void setPrimaryIndex(long long primaryIndex);
     virtual HeartbeatResponseAction setMemberAsDown(Date_t now,

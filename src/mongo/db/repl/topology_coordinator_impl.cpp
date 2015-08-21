@@ -2270,7 +2270,8 @@ bool TopologyCoordinatorImpl::updateTerm(long long term) {
     return true;
 }
 
-long long TopologyCoordinatorImpl::getTerm() const {
+
+long long TopologyCoordinatorImpl::getTerm() {
     return _term;
 }
 
@@ -2389,10 +2390,6 @@ Status TopologyCoordinatorImpl::processReplSetDeclareElectionWinner(
 
 void TopologyCoordinatorImpl::loadLastVote(const LastVote& lastVote) {
     _lastVote = lastVote;
-}
-
-long long TopologyCoordinatorImpl::getTerm() {
-    return _term;
 }
 
 void TopologyCoordinatorImpl::voteForMyselfV1() {

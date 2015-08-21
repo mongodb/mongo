@@ -109,7 +109,7 @@ public:
      * Gets the latest term this member is aware of. If this member is the primary,
      * it's the current term of the replica set.
      */
-    virtual long long getTerm() const = 0;
+    virtual long long getTerm() = 0;
 
     /**
      * Sets the latest term this member is aware of to the higher of its current value and
@@ -425,11 +425,6 @@ public:
      * Called only during replication startup. All other updates are done internally.
      */
     virtual void loadLastVote(const LastVote& lastVote) = 0;
-
-    /**
-     * Returns the most recent term this node is aware of.
-     */
-    virtual long long getTerm() = 0;
 
     /**
      * Readies the TopologyCoordinator for stepdown.
