@@ -39,7 +39,7 @@ class test_txn03(wttest.WiredTigerTestCase):
     uri2 = 'table:' + tablename + "_2"
     key_str = "TEST_KEY1"
     data_str1 = "VAL"
-    data_str2 = "TEST_VAL1" 
+    data_str2 = "TEST_VAL1"
 
     nentries = 1000
     scenarios = check_scenarios([

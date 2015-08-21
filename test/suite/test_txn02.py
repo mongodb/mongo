@@ -217,7 +217,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         for i, ot in enumerate(zip(ops, txns)):
             ok, txn = ot
             op, k = ok
-            
+
             # Close and reopen the connection and cursor.
             if reopen == 'reopen':
                 self.reopen_conn()

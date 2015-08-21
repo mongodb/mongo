@@ -51,7 +51,7 @@ class Callback(wiredtiger.AsyncCallback):
     def notify_error(self, key, value, optype, exp, desc):
         tty_pr('ERROR: notify(' + str(key) + ',' + str(value) + ',' +
             str(optype) + '): ' + 'Expected: ' + str(exp) + ' ' + desc)
-        
+
     def notify(self, op, op_ret, flags):
 
         # Note: we are careful not to throw any errors here.  Any

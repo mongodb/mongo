@@ -149,7 +149,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         # print "tod1: " + str(tod1) + " tod2: " + str(tod2)
         # print "ref1: " + str(ref1) + " ref2: " + str(ref2)
 
-        # 
+        #
         # The files are all closed.  Check that sweep did its work even
         # in the presence of recent checkpoints.
         #
