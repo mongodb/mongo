@@ -420,9 +420,8 @@ public:
                   BatchedCommandResponse* response);
 
     /**
-     * Performs the necessary checks for version compatibility and can run the upgrade procedure.
-     * A new version document will be created if the current cluster config is empty. Otherwise,
-     * checkOnly should be false to perform the upgrade.
+     * Performs the necessary checks for version compatibility and creates a new version document
+     * if the current cluster config is empty.
      */
     virtual Status initConfigVersion() = 0;
 
