@@ -44,6 +44,12 @@ extern const char kReplSetMetadataFieldName[];
  */
 class ReplSetMetadata {
 public:
+    /**
+     * Default primary index. Also used to indicate in metadata that there is no
+     * primary.
+     */
+    static const int kNoPrimary = -1;
+
     ReplSetMetadata() = default;
     ReplSetMetadata(long long term,
                     repl::OpTime committedOpTime,
@@ -87,6 +93,7 @@ public:
 
     /**
      * Returns the index of the current primary from the perspective of the sender.
+     * Returns kNoPrimary if there is no primary.
      */
     long long getPrimaryIndex() const {
         return _currentPrimaryIndex;
@@ -104,7 +111,7 @@ private:
     repl::OpTime _lastOpVisible = repl::OpTime(Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
     long long _currentTerm = -1;
     long long _configVersion = -1;
-    int _currentPrimaryIndex = -1;
+    int _currentPrimaryIndex = kNoPrimary;
 };
 
 }  // namespace rpc

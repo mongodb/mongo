@@ -51,6 +51,10 @@ const char kTermFieldName[] = "term";
 
 }  // unnamed namespace
 
+#ifndef _MSC_EXTENSIONS
+const int ReplSetMetadata::kNoPrimary;
+#endif  // _MSC_EXTENSIONS
+
 ReplSetMetadata::ReplSetMetadata(long long term,
                                  OpTime committedOpTime,
                                  OpTime visibleOpTime,
