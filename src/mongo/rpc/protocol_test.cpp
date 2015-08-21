@@ -71,18 +71,18 @@ TEST(Protocol, FailedNegotiation) {
 TEST(Protocol, parseProtocolSetFromIsMasterReply) {
     {
         // MongoDB 3.2 (mongod)
-        auto mongod32 = BSON("maxWireVersion"
-                             << static_cast<int>(WireVersion::RELEASE_3_1_5) << "minWireVersion"
-                             << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
+        auto mongod32 =
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::FIND_COMMAND) << "minWireVersion"
+                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
 
         ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod32)), supports::kAll);
     }
     {
         // MongoDB 3.2 (mongos)
-        auto mongos32 = BSON("maxWireVersion"
-                             << static_cast<int>(WireVersion::RELEASE_3_1_5) << "minWireVersion"
-                             << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE) << "msg"
-                             << "isdbgrid");
+        auto mongos32 =
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::FIND_COMMAND) << "minWireVersion"
+                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE) << "msg"
+                                  << "isdbgrid");
 
         ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongos32)), supports::kOpQueryOnly);
     }

@@ -141,6 +141,14 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     params.remotes.resize(shards.size());
     for (size_t i = 0; i < shards.size(); ++i) {
         const auto& shard = shards[i];
+
+        // The find command cannot be used to query config server content with legacy 3-host config
+        // servers, because the new targeting logic only works for config server replica sets.
+        if (shard->isConfig() && shard->getConnString().type() == ConnectionString::SYNC) {
+            return Status(ErrorCodes::CommandNotSupported,
+                          "find command not supported without config server as a replica set");
+        }
+
         auto targeter = shard->getTargeter();
         auto hostAndPort = targeter->findHost(readPref);
         if (!hostAndPort.isOK()) {

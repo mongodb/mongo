@@ -146,8 +146,9 @@ StatusWith<ProtocolSet> parseProtocolSetFromIsMasterReply(const BSONObj& isMaste
 }
 
 bool supportsWireVersionForOpCommandInMongod(int minWireVersion, int maxWireVersion) {
-    return (minWireVersion <= WireVersion::RELEASE_3_1_5) &&
-        (maxWireVersion >= WireVersion::RELEASE_3_1_5);
+    // FIND_COMMAND versions support OP_COMMAND (in mongod but not mongos).
+    return (minWireVersion <= WireVersion::FIND_COMMAND) &&
+        (maxWireVersion >= WireVersion::FIND_COMMAND);
 }
 
 }  // namespace rpc

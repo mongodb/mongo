@@ -115,7 +115,7 @@ public:
 
         // We need to handle the isMaster received during connection.
         if (request->getCommandName() == "isMaster") {
-            commandResponse.append("maxWireVersion", WireVersion::RELEASE_3_1_5);
+            commandResponse.append("maxWireVersion", WireVersion::FIND_COMMAND);
             commandResponse.append("minWireVersion", WireVersion::RELEASE_2_4_AND_BEFORE);
         }
 
