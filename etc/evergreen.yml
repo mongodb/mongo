@@ -4028,7 +4028,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
 
-  - name: ubuntu1410-asan
+- name: ubuntu1410-asan
   display_name: z ASAN SSL Ubuntu 1410 64-bit
   run_on:
   - ubuntu1410-build
