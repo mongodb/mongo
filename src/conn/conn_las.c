@@ -16,25 +16,33 @@ void
 __wt_las_stats_update(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_CONNECTION_STATS **stats;
+	WT_CONNECTION_STATS **cstats;
+	WT_DSRC_STATS **dstats;
 
 	conn = S2C(session);
-	stats = conn->stats;
 
 	/*
 	 * Lookaside table statistics are copied from the underlying lookaside
-	 * table data-source statistics. If there's no lookaside table (yet),
-	 * the values remain 0.
+	 * table data-source statistics. If there's no lookaside table, values
+	 * remain 0. In the current system, there's always a lookaside table,
+	 * but there's no reason not to be cautious.
 	 */
-	if ((session = conn->las_session) == NULL || session->dhandle == NULL)
+	if (conn->las_cursor == NULL)
 		return;
 
-	WT_STAT_SET(session, stats, lookaside_cursor_insert,
-	    WT_STAT_READ(session->dhandle->stats, cursor_insert));
-	WT_STAT_SET(session, stats, lookaside_cursor_insert_bytes,
-	    WT_STAT_READ(session->dhandle->stats, cursor_insert_bytes));
-	WT_STAT_SET(session, stats, lookaside_cursor_remove,
-	    WT_STAT_READ(session->dhandle->stats, cursor_remove));
+	/*
+	 * KEITH: is there a cleaner way to get a reference to the underlying
+	 * data handle?
+	 */
+	cstats = conn->stats;
+	dstats = ((WT_CURSOR_BTREE *)conn->las_cursor)->btree->dhandle->stats;
+
+	WT_STAT_SET(session, cstats, lookaside_cursor_insert,
+	    WT_STAT_READ(dstats, cursor_insert));
+	WT_STAT_SET(session, cstats, lookaside_cursor_insert_bytes,
+	    WT_STAT_READ(dstats, cursor_insert_bytes));
+	WT_STAT_SET(session, cstats, lookaside_cursor_remove,
+	    WT_STAT_READ(dstats, cursor_remove));
 }
 
 /*
