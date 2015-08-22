@@ -180,11 +180,12 @@ struct __wt_connection_impl {
 	WT_SPINLOCK table_lock;		/* Table creation spinlock */
 
 	/*
-	 * We distribute the btree page locks across a set of spin locks; it
-	 * can't be an array, we impose cache-line alignment and gcc doesn't
-	 * support that for arrays.  Don't use too many: they are only held for
-	 * very short operations, each one is 64 bytes, so 256 will fill the L1
-	 * cache on most CPUs.
+	 * We distribute the btree page locks across a set of spin locks. Don't
+	 * use too many: they are only held for very short operations, each one
+	 * is 64 bytes, so 256 will fill the L1 cache on most CPUs.
+	 *
+	 * Note: this can't be an array, we impose cache-line alignment and gcc
+	 * doesn't support that for arrays smaller than the alignment.
 	 */
 #define	WT_PAGE_LOCKS(conn)	16
 	WT_SPINLOCK *page_lock;	        /* Btree page spinlocks */
