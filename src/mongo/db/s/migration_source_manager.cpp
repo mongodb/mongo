@@ -180,7 +180,7 @@ bool MigrationSourceManager::start(OperationContext* txn,
         return false;
     }
 
-    _nss = NamespaceString(ns);
+    _ns = ns;
     _min = min;
     _max = max;
     _shardKeyPattern = shardKeyPattern;
@@ -242,7 +242,7 @@ void MigrationSourceManager::logOp(OperationContext* txn,
     if (!_active)
         return;
 
-    if (_nss != ns)
+    if (_ns != ns)
         return;
 
     // no need to log if this is not an insertion, an update, or an actual deletion
@@ -270,8 +270,8 @@ void MigrationSourceManager::logOp(OperationContext* txn,
 
     if (op == 'u') {
         BSONObj fullDoc;
-        OldClientContext ctx(txn, _nss.ns(), false);
-        if (!Helpers::findById(txn, ctx.db(), _nss.ns().c_str(), idObj, fullDoc)) {
+        OldClientContext ctx(txn, _ns, false);
+        if (!Helpers::findById(txn, ctx.db(), _ns.c_str(), idObj, fullDoc)) {
             warning() << "logOpForSharding couldn't find: " << idObj << " even though should have"
                       << migrateLog;
             dassert(false);  // TODO: Abort the migration.
@@ -303,8 +303,8 @@ bool MigrationSourceManager::transferMods(OperationContext* txn,
         }
 
         // TODO: fix SERVER-16540 race
-        _xfer(txn, _nss.ns(), ctx.getDb(), &_deleted, b, "deleted", size, false);
-        _xfer(txn, _nss.ns(), ctx.getDb(), &_reload, b, "reload", size, true);
+        _xfer(txn, _ns, ctx.getDb(), &_deleted, b, "deleted", size, false);
+        _xfer(txn, _ns, ctx.getDb(), &_reload, b, "reload", size, true);
     }
 
     b.append("size", size);
@@ -316,9 +316,9 @@ bool MigrationSourceManager::storeCurrentLocs(OperationContext* txn,
                                               long long maxChunkSize,
                                               string& errmsg,
                                               BSONObjBuilder& result) {
-    AutoGetCollection autoColl(txn, _getNS(), MODE_IS);
+    AutoGetCollectionForRead ctx(txn, _getNS());
 
-    Collection* collection = autoColl.getCollection();
+    Collection* collection = ctx.getCollection();
     if (!collection) {
         errmsg = "ns not found, should be impossible";
         return false;
@@ -333,7 +333,7 @@ bool MigrationSourceManager::storeCurrentLocs(OperationContext* txn,
 
     if (idx == NULL) {
         errmsg = str::stream() << "can't find index with prefix " << _shardKeyPattern
-                               << " in storeCurrentLocs for " << _nss;
+                               << " in storeCurrentLocs for " << _ns;
         return false;
     }
 
@@ -420,7 +420,7 @@ bool MigrationSourceManager::storeCurrentLocs(OperationContext* txn,
                   << maxRecsWhenFull << " , the maximum chunk size is " << maxChunkSize
                   << " , average document size is " << avgRecSize << ". Found " << recCount
                   << " documents in chunk "
-                  << " ns: " << _nss << " " << _min << " -> " << _max << migrateLog;
+                  << " ns: " << _ns << " " << _min << " -> " << _max << migrateLog;
 
         result.appendBool("chunkTooBig", true);
         result.appendNumber("estimatedChunkSize", (long long)(recCount * avgRecSize));
@@ -440,7 +440,7 @@ bool MigrationSourceManager::clone(OperationContext* txn, string& errmsg, BSONOb
     int allocSize = 0;
 
     {
-        AutoGetCollection autoColl(txn, _getNS(), MODE_IS);
+        AutoGetCollectionForRead ctx(txn, _getNS());
 
         stdx::lock_guard<stdx::mutex> sl(_mutex);
         if (!_active) {
@@ -448,9 +448,9 @@ bool MigrationSourceManager::clone(OperationContext* txn, string& errmsg, BSONOb
             return false;
         }
 
-        Collection* collection = autoColl.getCollection();
+        Collection* collection = ctx.getCollection();
         if (!collection) {
-            errmsg = str::stream() << "collection " << _nss << " does not exist";
+            errmsg = str::stream() << "collection " << _ns << " does not exist";
             return false;
         }
 
@@ -462,7 +462,7 @@ bool MigrationSourceManager::clone(OperationContext* txn, string& errmsg, BSONOb
     bool isBufferFilled = false;
     BSONArrayBuilder clonedDocsArrayBuilder(allocSize);
     while (!isBufferFilled) {
-        AutoGetCollection autoColl(txn, _getNS(), MODE_IS);
+        AutoGetCollectionForRead ctx(txn, _getNS());
 
         stdx::lock_guard<stdx::mutex> sl(_mutex);
         if (!_active) {
@@ -471,9 +471,9 @@ bool MigrationSourceManager::clone(OperationContext* txn, string& errmsg, BSONOb
         }
 
         // TODO: fix SERVER-16540 race
-        Collection* collection = autoColl.getCollection();
+        Collection* collection = ctx.getCollection();
         if (!collection) {
-            errmsg = str::stream() << "collection " << _nss << " does not exist";
+            errmsg = str::stream() << "collection " << _ns << " does not exist";
             return false;
         }
 
@@ -597,9 +597,9 @@ void MigrationSourceManager::_xfer(OperationContext* txn,
     arr.done();
 }
 
-NamespaceString MigrationSourceManager::_getNS() const {
+std::string MigrationSourceManager::_getNS() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _nss;
+    return _ns;
 }
 
 }  // namespace mongo

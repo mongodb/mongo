@@ -34,7 +34,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
@@ -132,7 +131,7 @@ private:
                long long& size,
                bool explode);
 
-    NamespaceString _getNS() const;
+    std::string _getNS() const;
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -167,7 +166,7 @@ private:
     // If a migration is currently active.
     bool _active{false};  // (MG)
 
-    NamespaceString _nss;      // (MG)
+    std::string _ns;           // (MG)
     BSONObj _min;              // (MG)
     BSONObj _max;              // (MG)
     BSONObj _shardKeyPattern;  // (MG)
