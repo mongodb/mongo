@@ -35,6 +35,8 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	log = conn->log;
+
+	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, log->slot_pool);
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		log->slot_pool[i].slot_state = WT_LOG_SLOT_FREE;
 		log->slot_pool[i].slot_index = WT_SLOT_INVALID_INDEX;
