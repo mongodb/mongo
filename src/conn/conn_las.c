@@ -345,6 +345,17 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	for (; cnt > 0 && (ret = cursor->next(cursor)) == 0; --cnt) {
 		WT_ERR(cursor->get_key(cursor, key));
 
+		/*
+		 * If the loop terminates after completing a work unit, we will
+		 * continue the table sweep next time. Get a local copy of the
+		 * sweep key, we're going to reset the cursor; do so before
+		 * calling cursor.remove, cursor.remove can discard our hazard
+		 * pointer and the page could be evicted from underneath us.
+		 */
+		if (cnt == 1 && !WT_DATA_IN_ITEM(key))
+			WT_ERR(__wt_buf_set(
+			    session, key, key->data, key->size));
+
 		switch (((uint8_t *)key->data)[0]) {
 		case WT_LAS_RECONCILE_UPDATE:
 			if (__las_sweep_reconcile(session, key)) {
@@ -360,14 +371,6 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
 	}
-
-	/*
-	 * If the loop terminates when we've completed a work unit, we plan to
-	 * continue the table sweep next time. Take a local copy of the sweep
-	 * key, we're not going to leave the cursor positioned.
-	 */
-	if (ret == 0 && !WT_DATA_IN_ITEM(key))
-		WT_ERR(__wt_buf_set(session, key, key->data, key->size));
 
 	/*
 	 * When reaching the lookaside file end or the target number of calls,
