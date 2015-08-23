@@ -364,14 +364,12 @@ int
 __wt_reconcile(WT_SESSION_IMPL *session,
     WT_REF *ref, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
 	int split_lock;
 
-	conn = S2C(session);
 	page = ref->page;
 	mod = page->modify;
 	split_lock = 0;
