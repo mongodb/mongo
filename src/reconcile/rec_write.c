@@ -733,11 +733,9 @@ __rec_write_init(WT_SESSION_IMPL *session,
     WT_REF *ref, uint32_t flags, WT_SALVAGE_COOKIE *salvage, void *reconcilep)
 {
 	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
 	WT_PAGE *page;
 	WT_RECONCILE *r;
 
-	conn = S2C(session);
 	btree = S2BT(session);
 	page = ref->page;
 
@@ -788,16 +786,6 @@ __rec_write_init(WT_SESSION_IMPL *session,
 		 * now, turn it off.
 		 */
 		if (page->type == WT_PAGE_COL_FIX)
-			LF_CLR(WT_EVICT_LOOKASIDE);
-
-		/*
-		 * We lock this page if we're compacting the file to which this
-		 * page belongs, which can lead to deadlock. We have to acquire
-		 * a page lock in order to insert records in the lookaside file,
-		 * and if that page uses the same page-lock as this page, we can
-		 * self-deadlock.
-		 */
-		if (conn->compact_in_memory_pass)
 			LF_CLR(WT_EVICT_LOOKASIDE);
 	}
 	r->flags = flags;
