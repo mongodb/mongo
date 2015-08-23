@@ -292,20 +292,20 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	__wt_page_modify_set(session, page);
 
 	/*
-	 * If there are subsequent WT_UPDATE structures, we're evicting pages
-	 * and the page-scanning mutex isn't held, discard obsolete WT_UPDATE
-	 * structures.  Serialization is needed so only one thread does the
-	 * obsolete check at a time, and to protect updates from disappearing
-	 * under reconciliation.
+	 * If there are subsequent obsolete WT_UPDATE structures, discard them.
+	 * Serialization is needed because reconciliation reads the update list,
+	 * and obsolete updates cannot be discarded while reconciliation is in
+	 * progress. Serialization is also needed so only one thread does the
+	 * obsolete check at a time.
 	 */
 	if (upd->next != NULL &&
 	    __wt_txn_visible_all(session, page->modify->obsolete_check_txn)) {
-		F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
+		F_CAS_ATOMIC(page, WT_PAGE_RECONCILIATION, ret);
 		/* If we can't lock it, don't scan, that's okay. */
 		if (ret != 0)
 			return (0);
 		obsolete = __wt_update_obsolete_check(session, page, upd->next);
-		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
+		F_CLR_ATOMIC(page, WT_PAGE_RECONCILIATION);
 		if (obsolete != NULL) {
 			page->modify->obsolete_check_txn = WT_TXN_NONE;
 			__wt_update_obsolete_free(session, page, obsolete);
