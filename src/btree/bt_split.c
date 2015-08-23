@@ -876,17 +876,23 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * memory inside of the lock and may want to invest effort in making the
 	 * locked period shorter.
 	 *
-	 * We could race with another thread deepening our parent.  To deal
-	 * with that, read the parent pointer each time we try to lock it, and
-	 * check that it's still correct after it is locked.
+	 * We could race with another thread deepening our parent.  To deal with
+	 * that, read the parent pointer each time we try to lock it, and check
+	 * that it's still correct after it is locked.
+	 *
+	 * We're using the reconciliation lock here because not only do we need
+	 * to single-thread splits into the page, but reconciliation as part of
+	 * a checkpoint during the in-memory split process can lead to deadlock.
+	 * In other words, we need to block reconciliation anyway and there's no
+	 * advantage to using a separate lock on the page.
 	 */
 	for (;;) {
 		parent = ref->home;
-		F_CAS_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED, ret);
+		F_CAS_ATOMIC(parent, WT_PAGE_RECONCILIATION, ret);
 		if (ret == 0) {
 			if (parent == ref->home)
 				break;
-			F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
+			F_CLR_ATOMIC(parent, WT_PAGE_RECONCILIATION);
 			continue;
 		}
 		/*
@@ -1128,7 +1134,7 @@ err:	if (!complete)
 			if (next_ref->state == WT_REF_SPLIT)
 				next_ref->state = WT_REF_DELETED;
 		}
-	F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
+	F_CLR_ATOMIC(parent, WT_PAGE_RECONCILIATION);
 
 	if (hazard)
 		WT_TRET(__wt_hazard_clear(session, parent));

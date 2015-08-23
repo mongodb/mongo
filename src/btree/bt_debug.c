@@ -649,8 +649,6 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", reconciliation");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
 		__dmsg(ds, ", split-insert");
-	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_LOCKED))
-		__dmsg(ds, ", split-locked");
 
 	if (mod != NULL)
 		switch (F_ISSET(mod, WT_PM_REC_MASK)) {
