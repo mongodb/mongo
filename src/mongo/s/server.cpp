@@ -139,7 +139,7 @@ public:
             LOG(ex.isUserAssertion() ? 1 : 0) << "Assertion failed"
                                               << " while processing " << opToString(m.operation())
                                               << " op"
-                                              << " for " << r.getns() << causedBy(ex);
+                                              << " for " << r.getnsIfPresent() << causedBy(ex);
 
             if (r.expectResponse()) {
                 m.header().setId(r.id());
@@ -151,7 +151,7 @@ public:
         } catch (const DBException& ex) {
             log() << "Exception thrown"
                   << " while processing " << opToString(m.operation()) << " op"
-                  << " for " << r.getns() << causedBy(ex);
+                  << " for " << r.getnsIfPresent() << causedBy(ex);
 
             if (r.expectResponse()) {
                 m.header().setId(r.id());
