@@ -99,7 +99,7 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        std::string ns = parseNs(dbname, jsobj);
+        const NamespaceString nss = NamespaceString(parseNs(dbname, jsobj));
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
 
         if (keyPattern.isEmpty()) {
@@ -119,8 +119,9 @@ public:
             return false;
         }
 
-        AutoGetCollectionForRead ctx(txn, ns);
-        Collection* collection = ctx.getCollection();
+        AutoGetCollection autoColl(txn, nss, MODE_IS);
+
+        Collection* const collection = autoColl.getCollection();
         if (!collection) {
             errmsg = "ns not found";
             return false;
@@ -199,7 +200,7 @@ public:
                 ostringstream os;
                 os << "found missing value in key " << currKey << " for doc: "
                    << (obj.hasField("_id") ? obj.toString() : obj["_id"].toString());
-                log() << "checkShardingIndex for '" << ns << "' failed: " << os.str();
+                log() << "checkShardingIndex for '" << nss.toString() << "' failed: " << os.str();
 
                 errmsg = os.str();
                 return false;
@@ -262,7 +263,7 @@ public:
         //     access the actual data.
         //
 
-        const std::string ns = parseNs(dbname, jsobj);
+        const NamespaceString nss = NamespaceString(parseNs(dbname, jsobj));
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
 
         if (keyPattern.isEmpty()) {
@@ -295,8 +296,9 @@ public:
 
         {
             // Get the size estimate for this namespace
-            AutoGetCollectionForRead ctx(txn, ns);
-            Collection* collection = ctx.getCollection();
+            AutoGetCollection autoColl(txn, nss, MODE_IS);
+
+            Collection* const collection = autoColl.getCollection();
             if (!collection) {
                 errmsg = "ns not found";
                 return false;
@@ -372,8 +374,8 @@ public:
                 return true;
             }
 
-            log() << "request split points lookup for chunk " << ns << " " << min << " -->> "
-                  << max;
+            log() << "request split points lookup for chunk " << nss.toString() << " " << min
+                  << " -->> " << max;
 
             // We'll use the average object size and number of object to find approximately how many
             // keys each chunk should have. We'll split at half the maxChunkSize or maxChunkObjects,
@@ -442,8 +444,8 @@ public:
                     // Stop if we have enough split points.
                     if (maxSplitPoints && (numChunks >= maxSplitPoints)) {
                         log() << "max number of requested split points reached (" << numChunks
-                              << ") before the end of chunk " << ns << " " << min << " -->> "
-                              << max;
+                              << ") before the end of chunk " << nss.toString() << " " << min
+                              << " -->> " << max;
                         break;
                     }
 
@@ -486,17 +488,18 @@ public:
             for (set<BSONObj>::const_iterator it = tooFrequentKeys.begin();
                  it != tooFrequentKeys.end();
                  ++it) {
-                warning() << "possible low cardinality key detected in " << ns << " - key is "
-                          << prettyKey(idx->keyPattern(), *it);
+                warning() << "possible low cardinality key detected in " << nss.toString()
+                          << " - key is " << prettyKey(idx->keyPattern(), *it);
             }
 
             // Remove the sentinel at the beginning before returning
             splitKeys.erase(splitKeys.begin());
 
             if (timer.millis() > serverGlobalParams.slowMS) {
-                warning() << "Finding the split vector for " << ns << " over " << keyPattern
-                          << " keyCount: " << keyCount << " numSplits: " << splitKeys.size()
-                          << " lookedAt: " << currCount << " took " << timer.millis() << "ms";
+                warning() << "Finding the split vector for " << nss.toString() << " over "
+                          << keyPattern << " keyCount: " << keyCount
+                          << " numSplits: " << splitKeys.size() << " lookedAt: " << currCount
+                          << " took " << timer.millis() << "ms";
             }
 
             // Warning: we are sending back an array of keys but are currently limited to
@@ -508,6 +511,7 @@ public:
         result.append("splitKeys", splitKeys);
         return true;
     }
+
 } cmdSplitVector;
 
 class SplitChunkCommand : public Command {
@@ -552,9 +556,10 @@ public:
         // 1. check whether parameters passed to splitChunk are sound
         //
 
-        const string ns = parseNs(dbname, cmdObj);
-        if (ns.empty()) {
-            errmsg = "need to specify namespace in command";
+        const NamespaceString nss = NamespaceString(parseNs(dbname, cmdObj));
+        if (!nss.isValid()) {
+            errmsg = str::stream() << "invalid namespace '" << nss.toString()
+                                   << "' specified for command";
             return false;
         }
 
@@ -621,12 +626,11 @@ public:
         // 2. lock the collection's metadata and get highest version for the current shard
         //
 
-        string whyMessage(str::stream() << "splitting chunk [" << minKey << ", " << maxKey
-                                        << ") in " << ns);
-        auto scopedDistLock = grid.catalogManager(txn)->distLock(txn, ns, whyMessage);
-
+        const string whyMessage(str::stream() << "splitting chunk [" << minKey << ", " << maxKey
+                                              << ") in " << nss.toString());
+        auto scopedDistLock = grid.catalogManager(txn)->distLock(txn, nss.ns(), whyMessage);
         if (!scopedDistLock.isOK()) {
-            errmsg = str::stream() << "could not acquire collection lock for " << ns
+            errmsg = str::stream() << "could not acquire collection lock for " << nss.toString()
                                    << " to split chunk [" << minKey << "," << maxKey << ")"
                                    << causedBy(scopedDistLock.getStatus());
             warning() << errmsg;
@@ -635,7 +639,7 @@ public:
 
         // Always check our version remotely
         ChunkVersion shardVersion;
-        Status refreshStatus = shardingState->refreshMetadataNow(txn, ns, &shardVersion);
+        Status refreshStatus = shardingState->refreshMetadataNow(txn, nss.ns(), &shardVersion);
 
         if (!refreshStatus.isOK()) {
             errmsg = str::stream() << "splitChunk cannot split chunk "
@@ -674,7 +678,7 @@ public:
 
         // Get collection metadata
         const std::shared_ptr<CollectionMetadata> collMetadata(
-            shardingState->getCollectionMetadata(ns));
+            shardingState->getCollectionMetadata(nss.ns()));
         // With nonzero shard version, we must have metadata
         invariant(NULL != collMetadata);
 
@@ -744,9 +748,9 @@ public:
 
             // add the modified (new) chunk information as the update object
             BSONObjBuilder n(op.subobjStart("o"));
-            n.append(ChunkType::name(), Chunk::genID(ns, startKey));
+            n.append(ChunkType::name(), Chunk::genID(nss.ns(), startKey));
             nextChunkVersion.addToBSON(n, ChunkType::DEPRECATED_lastmod());
-            n.append(ChunkType::ns(), ns);
+            n.append(ChunkType::ns(), nss.ns());
             n.append(ChunkType::min(), startKey);
             n.append(ChunkType::max(), endKey);
             n.append(ChunkType::shard(), shardName);
@@ -754,7 +758,7 @@ public:
 
             // add the chunk's _id as the query part of the update statement
             BSONObjBuilder q(op.subobjStart("o2"));
-            q.append(ChunkType::name(), Chunk::genID(ns, startKey));
+            q.append(ChunkType::name(), Chunk::genID(nss.ns(), startKey));
             q.done();
 
             updates.append(op.obj());
@@ -777,7 +781,7 @@ public:
             BSONObjBuilder b;
             b.append("ns", ChunkType::ConfigNS);
             b.append("q",
-                     BSON("query" << BSON(ChunkType::ns(ns)) << "orderby"
+                     BSON("query" << BSON(ChunkType::ns(nss.ns())) << "orderby"
                                   << BSON(ChunkType::DEPRECATED_lastmod() << -1)));
             {
                 BSONObjBuilder bb(b.subobjStart("res"));
@@ -803,8 +807,8 @@ public:
 
         {
             ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock writeLk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
-            Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
+            Lock::DBLock writeLk(txn->lockState(), nss.db(), MODE_IX);
+            Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_X);
 
             // NOTE: The newShardVersion resulting from this split is higher than any
             // other chunk version, so it's also implicitly the newCollVersion
@@ -816,7 +820,7 @@ public:
             // TODO: Revisit this interface, it's a bit clunky
             newShardVersion.incMinor();
 
-            shardingState->splitChunk(txn, ns, min, max, splitKeys, newShardVersion);
+            shardingState->splitChunk(txn, nss.ns(), min, max, splitKeys, newShardVersion);
         }
 
         //
@@ -829,7 +833,7 @@ public:
             appendShortVersion(logDetail.subobjStart("right"), *newChunks[1]);
 
             grid.catalogManager(txn)->logChange(
-                txn, txn->getClient()->clientAddress(true), "split", ns, logDetail.obj());
+                txn, txn->getClient()->clientAddress(true), "split", nss.ns(), logDetail.obj());
         } else {
             BSONObj beforeDetailObj = logDetail.obj();
             BSONObj firstDetailObj = beforeDetailObj.getOwned();
@@ -845,7 +849,7 @@ public:
                 grid.catalogManager(txn)->logChange(txn,
                                                     txn->getClient()->clientAddress(true),
                                                     "multi-split",
-                                                    ns,
+                                                    nss.ns(),
                                                     chunkDetail.obj());
             }
         }
@@ -856,10 +860,11 @@ public:
             // Select chunk to move out for "top chunk optimization".
             KeyPattern shardKeyPattern(collMetadata->getKeyPattern());
 
-            AutoGetCollectionForRead ctx(txn, ns);
-            Collection* collection = ctx.getCollection();
+            AutoGetCollection autoColl(txn, nss, MODE_IS);
+
+            Collection* const collection = autoColl.getCollection();
             if (!collection) {
-                warning() << "will not perform top-chunk checking since " << ns
+                warning() << "will not perform top-chunk checking since " << nss.toString()
                           << " does not exist after splitting";
                 return true;
             }

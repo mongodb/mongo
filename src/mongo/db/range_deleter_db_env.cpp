@@ -46,7 +46,6 @@
 
 namespace mongo {
 
-using std::endl;
 using std::string;
 
 /**
@@ -75,44 +74,43 @@ bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
 
     *deletedDocs = 0;
     ShardForceVersionOkModeBlock forceVersion(txn->getClient());
-    {
-        Helpers::RemoveSaver removeSaver("moveChunk", ns, taskDetails.options.removeSaverReason);
-        Helpers::RemoveSaver* removeSaverPtr = NULL;
-        if (serverGlobalParams.moveParanoia && !taskDetails.options.removeSaverReason.empty()) {
-            removeSaverPtr = &removeSaver;
-        }
 
-        // log the opId so the user can use it to cancel the delete using killOp.
-        unsigned int opId = txn->getOpID();
-        log() << "Deleter starting delete for: " << ns << " from " << inclusiveLower << " -> "
-              << exclusiveUpper << ", with opId: " << opId << endl;
+    Helpers::RemoveSaver removeSaver("moveChunk", ns, taskDetails.options.removeSaverReason);
+    Helpers::RemoveSaver* removeSaverPtr = NULL;
+    if (serverGlobalParams.moveParanoia && !taskDetails.options.removeSaverReason.empty()) {
+        removeSaverPtr = &removeSaver;
+    }
 
-        try {
-            *deletedDocs =
-                Helpers::removeRange(txn,
-                                     KeyRange(ns, inclusiveLower, exclusiveUpper, keyPattern),
-                                     false, /*maxInclusive*/
-                                     writeConcern,
-                                     removeSaverPtr,
-                                     fromMigrate,
-                                     onlyRemoveOrphans);
+    // log the opId so the user can use it to cancel the delete using killOp.
+    unsigned int opId = txn->getOpID();
+    log() << "Deleter starting delete for: " << ns << " from " << inclusiveLower << " -> "
+          << exclusiveUpper << ", with opId: " << opId;
 
-            if (*deletedDocs < 0) {
-                *errMsg = "collection or index dropped before data could be cleaned";
-                warning() << *errMsg << endl;
+    try {
+        *deletedDocs =
+            Helpers::removeRange(txn,
+                                 KeyRange(ns, inclusiveLower, exclusiveUpper, keyPattern),
+                                 false, /*maxInclusive*/
+                                 writeConcern,
+                                 removeSaverPtr,
+                                 fromMigrate,
+                                 onlyRemoveOrphans);
 
-                return false;
-            }
-
-            log() << "rangeDeleter deleted " << *deletedDocs << " documents for " << ns << " from "
-                  << inclusiveLower << " -> " << exclusiveUpper << endl;
-        } catch (const DBException& ex) {
-            *errMsg = str::stream() << "Error encountered while deleting range: "
-                                    << "ns" << ns << " from " << inclusiveLower << " -> "
-                                    << exclusiveUpper << ", cause by:" << causedBy(ex);
+        if (*deletedDocs < 0) {
+            *errMsg = "collection or index dropped before data could be cleaned";
+            warning() << *errMsg;
 
             return false;
         }
+
+        log() << "rangeDeleter deleted " << *deletedDocs << " documents for " << ns << " from "
+              << inclusiveLower << " -> " << exclusiveUpper;
+    } catch (const DBException& ex) {
+        *errMsg = str::stream() << "Error encountered while deleting range: "
+                                << "ns" << ns << " from " << inclusiveLower << " -> "
+                                << exclusiveUpper << ", cause by:" << causedBy(ex);
+
+        return false;
     }
 
     return true;
@@ -121,12 +119,11 @@ bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
 void RangeDeleterDBEnv::getCursorIds(OperationContext* txn,
                                      StringData ns,
                                      std::set<CursorId>* openCursors) {
-    AutoGetCollectionForRead ctx(txn, ns.toString());
-    Collection* collection = ctx.getCollection();
-    if (!collection) {
+    AutoGetCollection autoColl(txn, NamespaceString(ns), MODE_IS);
+    if (!autoColl.getCollection())
         return;
-    }
 
-    collection->getCursorManager()->getCursorIds(openCursors);
+    autoColl.getCollection()->getCursorManager()->getCursorIds(openCursors);
 }
-}
+
+}  // namespace mongo
