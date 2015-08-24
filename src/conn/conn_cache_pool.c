@@ -22,7 +22,7 @@
  */
 #define	WT_CACHE_POOL_REDUCE_THRESHOLD	20
 /* Balancing passes after a bump before a connection is a candidate. */
-#define	WT_CACHE_POOL_BUMP_SKIPS	10
+#define	WT_CACHE_POOL_BUMP_SKIPS	5
 /* Balancing passes after a reduction before a connection is a candidate. */
 #define	WT_CACHE_POOL_REDUCE_SKIPS	10
 
@@ -34,9 +34,10 @@
 #define	WT_CACHE_POOL_APP_WAIT_MULTIPLIER	50
 #define	WT_CACHE_POOL_READ_MULTIPLIER	1
 
-static int __cache_pool_adjust(WT_SESSION_IMPL *, uint64_t, uint64_t, int *);
+static int __cache_pool_adjust(
+    WT_SESSION_IMPL *, uint64_t, uint64_t, int, int *);
 static int __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
-static int __cache_pool_balance(WT_SESSION_IMPL *);
+static int __cache_pool_balance(WT_SESSION_IMPL *, int);
 
 /*
  * __wt_cache_pool_config --
@@ -402,7 +403,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
  *	effectively used.
  */
 static int
-__cache_pool_balance(WT_SESSION_IMPL *session)
+__cache_pool_balance(WT_SESSION_IMPL *session, int forward)
 {
 	WT_CACHE_POOL *cp;
 	WT_DECL_RET;
@@ -430,7 +431,7 @@ __cache_pool_balance(WT_SESSION_IMPL *session)
 	while (F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE) &&
 	    F_ISSET(S2C(session)->cache, WT_CACHE_POOL_RUN)) {
 		WT_ERR(__cache_pool_adjust(
-		    session, highest, bump_threshold, &adjusted));
+		    session, highest, bump_threshold, forward, &adjusted));
 		/*
 		 * Stop if the amount of cache being used is stable, and we
 		 * aren't over capacity.
@@ -456,30 +457,39 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
 	uint64_t app_evicts, app_waits, reads;
-	uint64_t entries, highest, tmp;
+	uint64_t balanced_size, entries, highest, tmp;
 
 	cp = __wt_process.cache_pool;
-	entries = 0;
+	balanced_size = entries = 0;
 	highest = 1; /* Avoid divide by zero */
+
+	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
+		if (entry->cache_size == 0 || entry->cache == NULL)
+			continue;
+		++entries;
+	}
+
+	if (entries > 0)
+		balanced_size = cp->currently_used / entries;
 
 	/* Generate read pressure information. */
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
-		if (entry->cache_size == 0 ||
-		    entry->cache == NULL)
+		if (entry->cache_size == 0 || entry->cache == NULL)
 			continue;
 		cache = entry->cache;
-		++entries;
 
 		/*
 		 * Figure out a delta since the last time we did an assessment
 		 * for each metric we are tracking.  Watch out for wrapping
 		 * of values.
+		 *
+		 * Count pages read, assuming pages are 4KB.
 		 */
-		tmp = cache->bytes_read;
+		tmp = cache->bytes_read >> 12;
 		if (tmp >= cache->cp_saved_read)
 			reads = tmp - cache->cp_saved_read;
 		else
-			reads = (UINT64_MAX - cache->cp_saved_read) + tmp;
+			reads = tmp;
 		cache->cp_saved_read = tmp;
 
 		/* Update the application eviction count information */
@@ -506,11 +516,11 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 		    (reads * WT_CACHE_POOL_READ_MULTIPLIER);
 
 		/* Weight smaller caches higher. */
-		tmp *= (double)(cp->currently_used - entry->cache_size) /
-		    cp->currently_used;
+		tmp *= (double)balanced_size / entry->cache_size;
 
 		/* Smooth over history. */
-		cache->cp_pass_pressure = (9 * cache->cp_pass_pressure + tmp) / 10;
+		cache->cp_pass_pressure =
+		    (9 * cache->cp_pass_pressure + tmp) / 10;
 
 		if (cache->cp_pass_pressure > highest)
 			highest = cache->cp_pass_pressure;
@@ -536,7 +546,7 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
  */
 static int
 __cache_pool_adjust(WT_SESSION_IMPL *session,
-    uint64_t highest, uint64_t bump_threshold, int *adjustedp)
+    uint64_t highest, uint64_t bump_threshold, int forward, int *adjustedp)
 {
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
@@ -559,7 +569,11 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		    "\t" "cache (MB), pressure, skips, busy, %% full:"));
 	}
 
-	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
+	for (entry = forward ? TAILQ_FIRST(&cp->cache_pool_qh) :
+	    TAILQ_LAST(&cp->cache_pool_qh, __wt_cache_pool_qh);
+	    entry != NULL;
+	    entry = forward ? TAILQ_NEXT(entry, cpq) :
+	    TAILQ_PREV(entry, __wt_cache_pool_qh, cpq)) {
 		cache = entry->cache;
 		reserved = cache->cp_reserved;
 		adjustment = 0;
@@ -684,11 +698,13 @@ __wt_cache_pool_server(void *arg)
 	WT_CACHE_POOL *cp;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int forward;
 
 	session = (WT_SESSION_IMPL *)arg;
 
 	cp = __wt_process.cache_pool;
 	cache = S2C(session)->cache;
+	forward = 1;
 
 	while (F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE) &&
 	    F_ISSET(cache, WT_CACHE_POOL_RUN)) {
@@ -716,8 +732,10 @@ __wt_cache_pool_server(void *arg)
 		 * Continue even if there was an error. Details of errors are
 		 * reported in the balance function.
 		 */
-		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER))
-			(void)__cache_pool_balance(session);
+		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER)) {
+			(void)__cache_pool_balance(session, forward);
+			forward = !forward;
+		}
 	}
 
 	if (0) {
