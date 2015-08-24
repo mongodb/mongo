@@ -169,14 +169,14 @@ class WiredTigerTestCase(unittest.TestCase):
         self.captureerr = CapturedFd('stderr.txt', 'error output')
         sys.stdout = self.captureout.capture()
         sys.stderr = self.captureerr.capture()
-        
+
     def fdTearDown(self):
         # restore stderr/stdout
         self.captureout.release()
         self.captureerr.release()
         sys.stdout = WiredTigerTestCase._stdout
         sys.stderr = WiredTigerTestCase._stderr
-        
+
     def __init__(self, *args, **kwargs):
         if hasattr(self, 'scenarios'):
             assert(len(self.scenarios) == len(dict(self.scenarios)))
@@ -204,11 +204,11 @@ class WiredTigerTestCase(unittest.TestCase):
             'create,error_prefix="%s",%s' % (self.shortid(), self.conn_config))
         self.pr(`conn`)
         return conn
-        
+
     # Can be overridden
     def setUpSessionOpen(self, conn):
         return conn.open_session(None)
-        
+
     # Can be overridden
     def close_conn(self):
         """
@@ -351,7 +351,7 @@ class WiredTigerTestCase(unittest.TestCase):
         else:
             with self.expectedStderr(message):
                 self.assertRaises(exceptionType, expr)
-            
+
     def exceptionToStderr(self, expr):
         """
         Used by assertRaisesHavingMessage to convert an expression

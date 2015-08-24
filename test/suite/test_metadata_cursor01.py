@@ -107,7 +107,7 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
         self.create_table()
         cursor = self.session.open_cursor(self.metauri, None, None)
         self.assertCursorHasNoKeyValue(cursor)
-        
+
         while True:
             prevret = cursor.prev()
             if prevret != 0:
@@ -124,7 +124,7 @@ class test_metadata_cursor01(wttest.WiredTigerTestCase):
         self.create_table()
         cursor = self.session.open_cursor(self.metauri, None, None)
         self.assertCursorHasNoKeyValue(cursor)
-        
+
         # Ensure the 'special' metadata metadata is found.
         value = cursor['metadata:']
         self.assertTrue(value.find('key_format') != -1)

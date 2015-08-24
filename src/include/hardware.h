@@ -33,8 +33,8 @@
 	uint8_t __orig;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
-	    __orig, __orig | (uint8_t)(mask)));				\
+	} while (!__wt_atomic_cas8(					\
+	    &(p)->flags_atomic, __orig, __orig | (uint8_t)(mask)));	\
 } while (0)
 
 #define	F_CAS_ATOMIC(p, mask, ret) do {					\
@@ -46,16 +46,20 @@
 			ret = EBUSY;					\
 			break;						\
 		}							\
-	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
-	    __orig, __orig | (uint8_t)(mask)));				\
+	} while (!__wt_atomic_cas8(					\
+	    &(p)->flags_atomic, __orig, __orig | (uint8_t)(mask)));	\
 } while (0)
 
 #define	F_CLR_ATOMIC(p, mask)	do {					\
 	uint8_t __orig;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
-	    __orig, __orig & ~(uint8_t)(mask)));			\
+	} while (!__wt_atomic_cas8(					\
+	    &(p)->flags_atomic, __orig, __orig & ~(uint8_t)(mask)));	\
 } while (0)
 
 #define	WT_CACHE_LINE_ALIGNMENT	64	/* Cache line alignment */
+#define	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, a)			\
+	WT_ASSERT(session,						\
+	    WT_PTRDIFF(&(a)[1], &(a)[0]) >= WT_CACHE_LINE_ALIGNMENT &&	\
+	    WT_PTRDIFF(&(a)[1], &(a)[0]) % WT_CACHE_LINE_ALIGNMENT == 0)

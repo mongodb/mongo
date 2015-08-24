@@ -90,7 +90,7 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 		if (i == 0)
 			*stats = *new;
 		else
-			__wt_stat_aggregate_dsrc_stats(new, stats);
+			__wt_stat_dsrc_aggregate_single(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 
@@ -102,7 +102,7 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_curstat_open(
 		    session, buf->data, cfg, &stat_cursor));
 		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
-		__wt_stat_aggregate_dsrc_stats(new, stats);
+		__wt_stat_dsrc_aggregate_single(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 

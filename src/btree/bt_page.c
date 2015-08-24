@@ -80,10 +80,13 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 				return (WT_NOTFOUND);
 
 			/*
-			 * The page isn't in memory, attempt to read it.
-			 * Make sure there is space in the cache.
+			 * The page isn't in memory, read it. If this thread is
+			 * allowed to do eviction work, check for space in the
+			 * cache.
 			 */
-			WT_RET(__wt_cache_eviction_check(session, 1, NULL));
+			if (!LF_ISSET(WT_READ_NO_EVICT))
+				WT_RET(__wt_cache_eviction_check(
+				    session, 1, NULL));
 			WT_RET(__wt_cache_read(session, ref));
 			oldgen = LF_ISSET(WT_READ_WONT_NEED) ||
 			    F_ISSET(session, WT_SESSION_NO_CACHE);
@@ -208,18 +211,20 @@ stall:				wait_cnt += 1000;
 			}
 
 			/*
-			 * If stalling, check if the cache needs help. If we do
-			 * work for the cache, substitute that for a sleep.
+			 * If stalling and this thread is allowed to do eviction
+			 * work, check if the cache needs help. If we do work
+			 * for the cache, substitute that for a sleep.
 			 */
-			WT_RET(
-			    __wt_cache_eviction_check(session, 1, &cache_work));
-			if (!cache_work) {
-				sleep_cnt = WT_MIN(wait_cnt, 10000);
-				wait_cnt *= 2;
-				WT_STAT_FAST_CONN_INCRV(
-				    session, page_sleep, sleep_cnt);
-				__wt_sleep(0, sleep_cnt);
+			if (!LF_ISSET(WT_READ_NO_EVICT)) {
+				WT_RET(__wt_cache_eviction_check(
+				    session, 1, &cache_work));
+				if (cache_work)
+					continue;
 			}
+			sleep_cnt = WT_MIN(wait_cnt, 10000);
+			wait_cnt *= 2;
+			WT_STAT_FAST_CONN_INCRV(session, page_sleep, sleep_cnt);
+			__wt_sleep(0, sleep_cnt);
 		}
 	}
 }
@@ -326,8 +331,8 @@ err:			if ((pindex = WT_INTL_INDEX_GET_SAFE(page)) != NULL) {
 
 	/* Increment the cache statistics. */
 	__wt_cache_page_inmem_incr(session, page, size);
-	(void)WT_ATOMIC_ADD8(cache->bytes_read, size);
-	(void)WT_ATOMIC_ADD8(cache->pages_inmem, 1);
+	(void)__wt_atomic_add64(&cache->bytes_read, size);
+	(void)__wt_atomic_add64(&cache->pages_inmem, 1);
 
 	*pagep = page;
 	return (0);

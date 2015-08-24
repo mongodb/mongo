@@ -352,8 +352,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	    session, &btree->ovfl_lock, "btree overflow lock"));
 	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush lock"));
 
-	__wt_stat_init_dsrc_stats(&btree->dhandle->stats);
-
 	btree->write_gen = ckpt->write_gen;		/* Write generation */
 	btree->modified = 0;				/* Clean */
 
@@ -385,12 +383,15 @@ int
 __wt_btree_tree_open(
     WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_ITEM dsk;
 	WT_PAGE *page;
 
 	btree = S2BT(session);
+	bm = btree->bm;
 
 	/*
 	 * A buffer into which we read a root page; don't use a scratch buffer,
@@ -399,12 +400,20 @@ __wt_btree_tree_open(
 	WT_CLEAR(dsk);
 
 	/*
-	 * Read the page, then build the in-memory version of the page. Clear
-	 * any local reference to an allocated copy of the disk image on return,
-	 * the page steals it.
+	 * Read and verify the page (verify to catch encrypted objects we can't
+	 * decrypt, we read the object successfully but we can't decrypt it, and
+	 * we want to fail gracefully.
 	 */
 	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
-	WT_ERR(__wt_verify_dsk(session, (const char *)addr, &dsk));
+	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(bm->addr_string(bm, session, tmp, addr, addr_size));
+	WT_ERR(__wt_verify_dsk(session, tmp->data, &dsk));
+
+	/*
+	 * Build the in-memory version of the page. Clear our local reference to
+	 * the allocated copy of the disk image on return, the in-memory object
+	 * steals it.
+	 */
 	WT_ERR(__wt_page_inmem(session, NULL, dsk.data, dsk.memsize,
 	    WT_DATA_IN_ITEM(&dsk) ?
 	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
@@ -414,6 +423,8 @@ __wt_btree_tree_open(
 	__wt_root_ref_init(&btree->root, page, btree->type != BTREE_ROW);
 
 err:	__wt_buf_free(session, &dsk);
+	__wt_scr_free(session, &tmp);
+
 	return (ret);
 }
 

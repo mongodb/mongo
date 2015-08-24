@@ -83,7 +83,7 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Compare the original and backed-up files using the wt dump command.
     def compare(self, uri, dir_full, dir_incr):
-        # print "Compare: full URI: " + uri + " with incremental URI " 
+        # print "Compare: full URI: " + uri + " with incremental URI "
         if dir_full == None:
             full_name='original'
         else:

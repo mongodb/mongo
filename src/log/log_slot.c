@@ -67,7 +67,7 @@ retry:
 	 * Close this slot.  If we lose the race retry.
 	 */
 	__wt_epoch(session, &current->slot_fstart);
-	if (!WT_ATOMIC_CAS8(current->slot_state, old_state, new_state))
+	if (!__wt_atomic_casiv64(&current->slot_state, old_state, new_state))
 		goto retry;
 	__wt_epoch(session, &current->slot_fend);
 	/*
@@ -189,6 +189,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	log = conn->log;
+	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, log->slot_pool);
 	for (i = 0; i < WT_SLOT_POOL; i++)
 		log->slot_pool[i].slot_state = WT_LOG_SLOT_FREE;
 
@@ -328,7 +329,8 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		 * swap in our size into the state.
 		 */
 		if (WT_LOG_SLOT_OPEN(old_state) &&
-		    WT_ATOMIC_CAS8(slot->slot_state, old_state, new_state))
+		    __wt_atomic_casiv64(
+		    &slot->slot_state, old_state, new_state))
 			break;
 		else {
 			/*
@@ -374,8 +376,8 @@ __wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
 		/*
 		 * Set our offset if we are larger.
 		 */
-		if (WT_ATOMIC_CAS8(
-		    slot->slot_last_offset, cur_offset, my_start))
+		if (__wt_atomic_casiv64(
+		    &slot->slot_last_offset, cur_offset, my_start))
 			break;
 		/*
 		 * If we raced another thread updating this, try again.
@@ -387,7 +389,7 @@ __wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
 	 */
 	my_size = WT_LOG_SLOT_JOIN_REL((uint64_t)0, size, 0);
 	__wt_epoch(NULL, &slot->slot_rstart);
-	newsize = WT_ATOMIC_ADD8(slot->slot_state, my_size);
+	newsize = __wt_atomic_addiv64(&slot->slot_state, my_size);
 	__wt_epoch(NULL, &slot->slot_rend);
 	slot->slot_lastrel = newsize;
 	return (newsize);

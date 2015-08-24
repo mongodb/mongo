@@ -35,7 +35,7 @@ class checkpoint_thread(threading.Thread):
         self.conn = conn
         self.done = done
         threading.Thread.__init__(self)
- 
+
     def run(self):
         sess = self.conn.open_session()
         while not self.done.isSet():
@@ -50,7 +50,7 @@ class backup_thread(threading.Thread):
         self.conn = conn
         self.done = done
         threading.Thread.__init__(self)
- 
+
     def run(self):
         sess = self.conn.open_session()
         while not self.done.isSet():
@@ -111,7 +111,7 @@ class op_thread(threading.Thread):
         self.queue = queue
         self.done = done
         threading.Thread.__init__(self)
- 
+
     def run(self):
         sess = self.conn.open_session()
         if (len(self.uris) == 1):

@@ -62,15 +62,15 @@ class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
         self.close_conn()
         self.conn = self.setUpConnectionOpen(newdir)
         self.session = self.setUpSessionOpen(self.conn)
-        
+
     def test_recovery(self):
         ''' Check for bugs in file ID allocation. '''
 
         # Here's the strategy:
-        #    - Create a table (t1). 
-        #    - Do a clean restart. 
-        #    - Create another table (t2). 
-        #    - Insert data into t2. 
+        #    - Create a table (t1).
+        #    - Do a clean restart.
+        #    - Create another table (t2).
+        #    - Insert data into t2.
         #    - Make recovery run.
         #
         # If we aren't tracking file IDs properly, it's possible that

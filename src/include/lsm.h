@@ -74,7 +74,7 @@ struct __wt_cursor_lsm {
  * WT_LSM_CHUNK --
  *	A single chunk (file) in an LSM tree.
  */
-struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_lsm_chunk {
+struct __wt_lsm_chunk {
 	const char *uri;		/* Data source for this chunk */
 	const char *bloom_uri;		/* URI of Bloom filter, if any */
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
@@ -177,15 +177,13 @@ struct __wt_lsm_tree {
 	const char *collator_name;
 	int collator_owned;
 
-	int refcnt;			/* Number of users of the tree */
-	int8_t exclusive;		/* Tree is locked exclusively */
+	uint32_t refcnt;		/* Number of users of the tree */
+	uint8_t exclusive;		/* Tree is locked exclusively */
 
 #define	LSM_TREE_MAX_QUEUE	100
-	int queue_ref;
+	uint32_t queue_ref;
 	WT_RWLOCK *rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;
-
-	WT_DSRC_STATS stats;		/* LSM-level statistics */
 
 	uint64_t dsk_gen;
 
@@ -221,8 +219,27 @@ struct __wt_lsm_tree {
 	WT_LSM_CHUNK **old_chunks;	/* Array of old LSM chunks */
 	size_t old_alloc;		/* Space allocated for old chunks */
 	u_int nold_chunks;		/* Number of old chunks */
-	int freeing_old_chunks;		/* Whether chunks are being freed */
+	uint32_t freeing_old_chunks;	/* Whether chunks are being freed */
 	uint32_t merge_aggressiveness;	/* Increase amount of work per merge */
+
+	/*
+	 * We maintain a set of statistics outside of the normal statistics
+	 * area, copying them into place when a statistics cursor is created.
+	 */
+#define	WT_LSM_TREE_STAT_INCR(session, fld) do {			\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
+		++(fld);						\
+} while (0)
+#define	WT_LSM_TREE_STAT_INCRV(session, fld, v) do {			\
+	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
+		(fld) += (int64_t)(v);					\
+} while (0)
+	int64_t bloom_false_positive;
+	int64_t bloom_hit;
+	int64_t bloom_miss;
+	int64_t lsm_checkpoint_throttle;
+	int64_t lsm_lookup_no_bloom;
+	int64_t lsm_merge_throttle;
 
 #define	WT_LSM_TREE_ACTIVE		0x01	/* Workers are active */
 #define	WT_LSM_TREE_AGGRESSIVE_TIMER	0x02	/* Timer for merge aggression */

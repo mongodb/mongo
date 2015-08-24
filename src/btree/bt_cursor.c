@@ -549,8 +549,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	if (ret == WT_RESTART)
+err:	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
 		goto retry;
+	}
 	/* Insert doesn't maintain a position across calls, clear resources. */
 	if (ret == 0)
 		WT_TRET(__curfile_leave(cbt));
@@ -624,8 +627,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	if (ret == WT_RESTART)
+err:	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
 		goto retry;
+	}
 	WT_TRET(__curfile_leave(cbt));
 	if (ret != 0)
 		WT_TRET(__cursor_reset(cbt));
@@ -702,8 +708,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	if (ret == WT_RESTART)
+err:	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
 		goto retry;
+	}
 	/*
 	 * If the cursor is configured to overwrite and the record is not
 	 * found, that is exactly what we want.
@@ -790,8 +799,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	if (ret == WT_RESTART)
+err:	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
 		goto retry;
+	}
 
 	/*
 	 * If successful, point the cursor at internal copies of the data.  We
@@ -993,22 +1005,27 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 	 * instantiated the end cursor, so we know that page is pinned in memory
 	 * and we can proceed without concern.
 	 */
-	do {
-		WT_RET(__wt_btcur_remove(start));
-		/*
-		 * Reset ret each time through so that we don't loop forever in
-		 * the cursor equals case.
-		 */
-		for (ret = 0;;) {
-			if (stop != NULL && __cursor_equals(start, stop))
-				break;
-			if ((ret = __wt_btcur_next(start, 1)) != 0)
-				break;
-			start->compare = 0;	/* Exact match */
-			if ((ret = rmfunc(session, start, 1)) != 0)
-				break;
-		}
-	} while (ret == WT_RESTART);
+retry:	WT_RET(__wt_btcur_remove(start));
+
+	/*
+	 * Reset ret each time through so that we don't loop forever in
+	 * the cursor equals case.
+	 */
+	for (ret = 0;;) {
+		if (stop != NULL && __cursor_equals(start, stop))
+			break;
+		if ((ret = __wt_btcur_next(start, 1)) != 0)
+			break;
+		start->compare = 0;	/* Exact match */
+		if ((ret = rmfunc(session, start, 1)) != 0)
+			break;
+	}
+
+	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
+		goto retry;
+	}
 
 	WT_RET_NOTFOUND_OK(ret);
 	return (0);
@@ -1042,24 +1059,28 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 	 * other thread of control; in that case, repeat the full search to
 	 * refresh the page's modification information.
 	 */
-	do {
-		WT_RET(__wt_btcur_remove(start));
-		/*
-		 * Reset ret each time through so that we don't loop forever in
-		 * the cursor equals case.
-		 */
-		for (ret = 0;;) {
-			if (stop != NULL && __cursor_equals(start, stop))
-				break;
-			if ((ret = __wt_btcur_next(start, 1)) != 0)
-				break;
-			start->compare = 0;	/* Exact match */
-			value = (uint8_t *)start->iface.value.data;
-			if (*value != 0 &&
-			    (ret = rmfunc(session, start, 1)) != 0)
-				break;
-		}
-	} while (ret == WT_RESTART);
+retry:	WT_RET(__wt_btcur_remove(start));
+	/*
+	 * Reset ret each time through so that we don't loop forever in
+	 * the cursor equals case.
+	 */
+	for (ret = 0;;) {
+		if (stop != NULL && __cursor_equals(start, stop))
+			break;
+		if ((ret = __wt_btcur_next(start, 1)) != 0)
+			break;
+		start->compare = 0;	/* Exact match */
+		value = (uint8_t *)start->iface.value.data;
+		if (*value != 0 &&
+		    (ret = rmfunc(session, start, 1)) != 0)
+			break;
+	}
+
+	if (ret == WT_RESTART) {
+		WT_STAT_FAST_CONN_INCR(session, cursor_restart);
+		WT_STAT_FAST_DATA_INCR(session, cursor_restart);
+		goto retry;
+	}
 
 	WT_RET_NOTFOUND_OK(ret);
 	return (0);

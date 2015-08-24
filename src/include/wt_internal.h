@@ -55,11 +55,6 @@ extern "C" {
 #include <windows.h>
 #endif
 
-/*******************************************
- * WiredTiger externally maintained include files.
- *******************************************/
-#include "queue.h"
-
 /*
  * DO NOT EDIT: automatically built by dist/s_typedef.
  * Forward type declarations for internal types: BEGIN
@@ -182,12 +177,18 @@ struct __wt_insert_head;
     typedef struct __wt_insert_head WT_INSERT_HEAD;
 struct __wt_keyed_encryptor;
     typedef struct __wt_keyed_encryptor WT_KEYED_ENCRYPTOR;
+struct __wt_log;
+    typedef struct __wt_log WT_LOG;
 struct __wt_log_desc;
     typedef struct __wt_log_desc WT_LOG_DESC;
 struct __wt_log_op_desc;
     typedef struct __wt_log_op_desc WT_LOG_OP_DESC;
 struct __wt_log_rec_desc;
     typedef struct __wt_log_rec_desc WT_LOG_REC_DESC;
+struct __wt_log_record;
+    typedef struct __wt_log_record WT_LOG_RECORD;
+struct __wt_logslot;
+    typedef struct __wt_logslot WT_LOGSLOT;
 struct __wt_lsm_chunk;
     typedef struct __wt_lsm_chunk WT_LSM_CHUNK;
 struct __wt_lsm_data_source;
@@ -204,6 +205,8 @@ struct __wt_lsm_worker_cookie;
     typedef struct __wt_lsm_worker_cookie WT_LSM_WORKER_COOKIE;
 struct __wt_multi;
     typedef struct __wt_multi WT_MULTI;
+struct __wt_myslot;
+    typedef struct __wt_myslot WT_MYSLOT;
 struct __wt_named_collator;
     typedef struct __wt_named_collator WT_NAMED_COLLATOR;
 struct __wt_named_compressor;
@@ -248,10 +251,10 @@ struct __wt_session_impl;
     typedef struct __wt_session_impl WT_SESSION_IMPL;
 struct __wt_size;
     typedef struct __wt_size WT_SIZE;
+struct __wt_spinlock;
+    typedef struct __wt_spinlock WT_SPINLOCK;
 struct __wt_split_stash;
     typedef struct __wt_split_stash WT_SPLIT_STASH;
-struct __wt_stats;
-    typedef struct __wt_stats WT_STATS;
 struct __wt_table;
     typedef struct __wt_table WT_TABLE;
 struct __wt_txn;
@@ -284,6 +287,8 @@ union __wt_rand_state;
 #include "msvc.h"
 #endif
 #include "hardware.h"
+
+#include "queue.h"
 
 #ifdef _WIN32
 #include "os_windows.h"

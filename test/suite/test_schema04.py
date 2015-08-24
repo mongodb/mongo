@@ -73,7 +73,7 @@ class test_schema04(wttest.WiredTigerTestCase):
                 (i*3)%100, (i*4)%100, (i*5)%100)
             cursor.insert()
         cursor.close()
-        
+
     def check_entries(self):
         cursor = self.session.open_cursor('table:schema04', None, None)
         icursor = []

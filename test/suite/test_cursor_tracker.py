@@ -461,7 +461,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         except:
             v = '[invalid]'
         print(prefix + k + ' ' + v)
-        
+
     def cur_check(self, cursor, got, want, iskey):
         if got != want:
             if iskey:

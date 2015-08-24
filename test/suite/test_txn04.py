@@ -72,7 +72,7 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         self.txn_sync = self.sync_list[
             self.scenario_number % len(self.sync_list)]
         self.backup_dir = os.path.join(self.home, "WT_BACKUP")
-        # Set archive false on the home directory.  
+        # Set archive false on the home directory.
         conn_params = \
                 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
                 'create,error_prefix="%s: ",' % self.shortid() + \
@@ -159,7 +159,7 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.begin_transaction()
             ok, txn = ot
             op, k = ok
-            
+
             # print '%d: %s(%d)[%s]' % (i, ok[0], ok[1], txn)
             if op == 'insert' or op == 'update':
                 c[k] = i + 2
@@ -200,7 +200,7 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         self.hot_backup(self.uri, committed)
         if txn == 'commit':
             self.assertEqual(True, self.exception == 'true')
-        else: 
+        else:
             self.assertEqual(True, self.exception == 'false')
 
 if __name__ == '__main__':

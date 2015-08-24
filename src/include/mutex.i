@@ -31,7 +31,7 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 	WT_UNUSED(session);
 	WT_UNUSED(name);
 
-	*(t) = 0;
+	t->lock = 0;
 	return (0);
 }
 
@@ -44,7 +44,7 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	*(t) = 0;
+	t->lock = 0;
 }
 
 /*
@@ -56,7 +56,7 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	return (__sync_lock_test_and_set(t, 1) == 0 ? 0 : EBUSY);
+	return (__sync_lock_test_and_set(&t->lock, 1) == 0 ? 0 : EBUSY);
 }
 
 /*
@@ -70,10 +70,10 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
 	WT_UNUSED(session);
 
-	while (__sync_lock_test_and_set(t, 1)) {
-		for (i = 0; *t && i < WT_SPIN_COUNT; i++)
+	while (__sync_lock_test_and_set(&t->lock, 1)) {
+		for (i = 0; t->lock && i < WT_SPIN_COUNT; i++)
 			WT_PAUSE();
-		if (*t)
+		if (t->lock)
 			__wt_yield();
 	}
 }
@@ -87,7 +87,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	__sync_lock_release(t);
+	__sync_lock_release(&t->lock);
 }
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
