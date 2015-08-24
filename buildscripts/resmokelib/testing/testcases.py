@@ -309,6 +309,8 @@ class JSTestCase(TestCase):
         global_vars["MongoRunner.dataPath"] = data_path
         self.shell_options["global_vars"] = global_vars
 
+        shutil.rmtree(data_dir, ignore_errors=True)
+
         try:
             os.makedirs(data_dir)
         except os.error:
