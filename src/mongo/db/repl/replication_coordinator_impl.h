@@ -194,6 +194,8 @@ public:
 
     virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) override;
 
+    virtual void signalPrimaryUnavailable() override;
+
     virtual Status setMaintenanceMode(bool activate) override;
 
     virtual bool getMaintenanceMode() override;
@@ -1039,6 +1041,12 @@ private:
      * Blocking until last vote write finishes. Must be called without holding _mutex.
      */
     void _resetElectionInfoOnProtocolVersionUpgrade(const ReplicaSetConfig& newConfig);
+
+    /**
+     * Schedules work and waits for completion.
+     */
+    void _scheduleWorkAndWaitForCompletion(executor::TaskExecutor* executor,
+                                           const executor::TaskExecutor::CallbackFn& work);
 
     //
     // All member variables are labeled with one of the following codes indicating the

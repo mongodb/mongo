@@ -2658,6 +2658,52 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
     ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
 }
 
+TEST_F(ReplCoordTest, SignalPrimaryUnavailable) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "protocolVersion" << 1 << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_PRIMARY);
+    hbResp.setConfigVersion(2);
+    BSONObjBuilder respObj;
+    respObj << "ok" << 1;
+    hbResp.addToBSON(&respObj, false);
+
+    auto net = getNet();
+    net->enterNetwork();
+    net->scheduleResponse(
+        net->getNextReadyRequest(), net->now(), makeResponseStatus(respObj.obj()));
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+
+    ASSERT_EQUALS(1, getTopoCoord().getCurrentPrimaryIndex());
+
+    // Reset primary index but do not stand for election.
+    getReplCoord()->signalPrimaryUnavailable();
+    ASSERT_EQUALS(rpc::ReplSetMetadata::kNoPrimary, getTopoCoord().getCurrentPrimaryIndex());
+    ASSERT_EQUALS(TopologyCoordinator::Role::follower, getTopoCoord().getRole());
+
+    // Update our optime and follower mode to secondary so that we stand for election when
+    // primary becomes unavailable.
+    getTopoCoord().setPrimaryIndex(1);
+    auto opTime = OpTime(Timestamp(1, 0), 0);
+    getReplCoord()->setMyLastOptime(opTime);
+    ASSERT_EQUALS(opTime, getReplCoord()->getMyLastOptime());
+    ASSERT_TRUE(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->signalPrimaryUnavailable();
+    ASSERT_EQUALS(rpc::ReplSetMetadata::kNoPrimary, getTopoCoord().getCurrentPrimaryIndex());
+    ASSERT_EQUALS(TopologyCoordinator::Role::candidate, getTopoCoord().getRole());
+}
+
 TEST_F(ReplCoordTest, SnapshotCommitting) {
     init("mySet");
 

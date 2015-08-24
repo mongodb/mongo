@@ -426,7 +426,11 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
                     << metadataResult.getStatus() << ": " << queryResponse.otherFields.metadata;
             return;
         }
-        _replCoord->processReplSetMetadata(metadataResult.getValue());
+        const auto& metadata = metadataResult.getValue();
+        _replCoord->processReplSetMetadata(metadata);
+        if (metadata.getPrimaryIndex() == rpc::ReplSetMetadata::kNoPrimary) {
+            _replCoord->signalPrimaryUnavailable();
+        }
     }
 
     const auto& documents = queryResponse.documents;

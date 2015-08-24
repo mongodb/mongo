@@ -1644,6 +1644,16 @@ void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetada
     _replExecutor.wait(cbh.getValue());
 }
 
+void ReplicationCoordinatorImpl::signalPrimaryUnavailable() {
+    auto work = [this](const CallbackArgs&) {
+        _topCoord->setPrimaryIndex(-1);
+        if (_topCoord->checkShouldStandForElection(_replExecutor.now(), getMyLastOptime())) {
+            _startElectSelfV1();
+        }
+    };
+    _scheduleWorkAndWaitForCompletion(&_replExecutor, work);
+}
+
 void ReplicationCoordinatorImpl::_processReplSetMetadata_helper(
     const ReplicationExecutor::CallbackArgs& cbData, const rpc::ReplSetMetadata& replMetadata) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
@@ -3139,6 +3149,23 @@ void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
     _replExecutor.wait(cbStatus.getValue());
 }
 
+/**
+ * Schedules work and waits for completion.
+ */
+void ReplicationCoordinatorImpl::_scheduleWorkAndWaitForCompletion(
+    executor::TaskExecutor* executor, const executor::TaskExecutor::CallbackFn& work) {
+    auto cbh = executor->scheduleWork([work](const CallbackArgs& args) {
+        if (args.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        work(args);
+    });
+    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(28800, cbh.getStatus());
+    executor->wait(cbh.getValue());
+}
 
 }  // namespace repl
 }  // namespace mongo

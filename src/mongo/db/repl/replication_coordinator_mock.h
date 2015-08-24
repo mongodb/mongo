@@ -133,6 +133,8 @@ public:
 
     virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata);
 
+    virtual void signalPrimaryUnavailable() override;
+
     virtual Status setMaintenanceMode(bool activate);
 
     virtual bool getMaintenanceMode();

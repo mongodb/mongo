@@ -423,6 +423,12 @@ public:
     virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) = 0;
 
     /**
+     * Signals that the primary is unavailable based on liveness information received from
+     * a node upstream.
+     */
+    virtual void signalPrimaryUnavailable() = 0;
+
+    /**
      * Toggles maintenanceMode to the value expressed by 'activate'
      * return Status::OK if the change worked, NotSecondary if it failed because we are
      * PRIMARY, and OperationFailed if we are not currently in maintenance mode
