@@ -59,6 +59,10 @@ namespace mutablebson {
 class Document;
 }  // namespace mutablebson
 
+namespace rpc {
+class ServerSelectionMetadata;
+}  // namespace rpc
+
 /** mongodb "commands" (sent via db.$cmd.findOne(...))
     subclass to make a command.  define a singleton object for it.
     */
@@ -171,11 +175,17 @@ public:
      *
      *   2) Calling Explain::explainStages(...) on the PlanExecutor. This is the function
      *   which knows how to convert an execution stage tree into explain output.
+     *
+     * TODO: Remove the 'serverSelectionMetadata' parameter in favor of reading the
+     * ServerSelectionMetadata off 'txn'. Once OP_COMMAND is implemented in mongos, this metadata
+     * will be parsed and attached as a decoration on the OperationContext, as is already done on
+     * the mongod side.
      */
     virtual Status explain(OperationContext* txn,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
+                           const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                            BSONObjBuilder* out) const {
         return Status(ErrorCodes::IllegalOperation, "Cannot explain cmd: " + name);
     }

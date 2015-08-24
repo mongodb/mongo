@@ -6,6 +6,28 @@
 
 load("jstests/replsets/rslib.js");
 
+var assertCorrectTargeting = function(explain, isMongos, secExpected) {
+    assert.commandWorked(explain);
+
+    var serverInfo;
+    if (isMongos) {
+        serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
+    }
+    else {
+        serverInfo = explain.serverInfo;
+    }
+
+    var explainDestConn = new Mongo(serverInfo.host + ':' + serverInfo.port);
+    var isMaster = explainDestConn.getDB('admin').runCommand({ isMaster: 1 });
+
+    if (secExpected) {
+        assert(isMaster.secondary);
+    }
+    else {
+        assert(isMaster.ismaster);
+    }
+}
+
 var testAllModes = function(conn, isMongos) {
 
     // The primary is tagged with { tag: 'one' } and the secondary with
@@ -42,27 +64,36 @@ var testAllModes = function(conn, isMongos) {
         conn.setSlaveOk(false); // purely rely on readPref
         jsTest.log('Testing mode: ' + mode + ', tag sets: ' + tojson(tagSets));
 
+        // .explain().find()
         var explainableQuery = testDB.user.explain().find();
         explainableQuery.readPref(mode, tagSets);
         var explain = explainableQuery.finish();
-        assert.commandWorked(explain);
+        assertCorrectTargeting(explain, isMongos, secExpected);
 
-        var serverInfo;
-        if (isMongos) {
-            serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
-        }
-        else {
-            serverInfo = explain.serverInfo;
-        }
+        // Set read pref on the connection.
+        var oldReadPrefMode = testDB.getMongo().getReadPrefMode();
+        var oldReadPrefTagSet = testDB.getMongo().getReadPrefTagSet();
+        try {
+            testDB.getMongo().setReadPref(mode, tagSets);
 
-        var explainDestConn = new Mongo(serverInfo.host + ':' + serverInfo.port);
-        var isMaster = explainDestConn.getDB('admin').runCommand({ isMaster: 1 });
+            // .explain().count();
+            explain = testDB.user.explain().count();
+            assertCorrectTargeting(explain, isMongos, secExpected);
 
-        if (secExpected) {
-            assert(isMaster.secondary);
-        }
-        else {
-            assert(isMaster.ismaster);
+            // .explain().distinct()
+            explain = testDB.user.explain().distinct("_id");
+            assertCorrectTargeting(explain, isMongos, secExpected);
+
+            // .explain().group()
+            explain = testDB.user.explain().group({
+                key: {_id: 1},
+                reduce: function(curr, result) {},
+                initial: {}
+            });
+            assertCorrectTargeting(explain, isMongos, secExpected);
+        } finally {
+            // Restore old read pref.
+            testDB.getMongo().setReadPref(oldReadPrefMode, oldReadPrefTagSet);
         }
     });
 };

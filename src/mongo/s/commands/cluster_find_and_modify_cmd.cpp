@@ -79,6 +79,7 @@ public:
                            const std::string& dbName,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
+                           const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                            BSONObjBuilder* out) const {
         const string ns = parseNsCollectionRequired(dbName, cmdObj);
 
@@ -108,7 +109,9 @@ public:
         }
 
         BSONObjBuilder explainCmd;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmd);
+        int options = 0;
+        ClusterExplain::wrapAsExplain(
+            cmdObj, verbosity, serverSelectionMetadata, &explainCmd, &options);
 
         // Time how long it takes to run the explain command on the shard.
         Timer timer;

@@ -37,6 +37,7 @@
 #include "mongo/db/query/killcursors_request.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
@@ -50,6 +51,12 @@ AsyncResultsMerger::AsyncResultsMerger(executor::TaskExecutor* executor,
     for (const auto& remote : _params.remotes) {
         _remotes.emplace_back(remote);
     }
+
+    // Initialize command metadata to handle isSecondaryOk.
+    BSONObjBuilder metadataBuilder;
+    rpc::ServerSelectionMetadata metadata(_params.isSecondaryOk, boost::none);
+    uassertStatusOK(metadata.writeToMetadata(&metadataBuilder));
+    _metadataObj = metadataBuilder.obj();
 }
 
 AsyncResultsMerger::~AsyncResultsMerger() {
@@ -227,7 +234,7 @@ Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
         : *remote.cmdObj;
 
     executor::RemoteCommandRequest request(
-        remote.hostAndPort, _params.nsString.db().toString(), cmdObj);
+        remote.hostAndPort, _params.nsString.db().toString(), cmdObj, _metadataObj);
 
     auto callbackStatus = _executor->scheduleRemoteCommand(
         request,

@@ -843,18 +843,21 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainCommon::Verbosity verbosity,
+                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const {
         const string fullns = parseNs(dbname, cmdObj);
 
         BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+        int options = 0;
+        ClusterExplain::wrapAsExplain(
+            cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
 
         Strategy::CommandResult singleResult;
         Status commandStat = Strategy::commandOpUnsharded(
-            txn, dbname, explainCmdBob.obj(), 0, fullns, &singleResult);
+            txn, dbname, explainCmdBob.obj(), options, fullns, &singleResult);
         if (!commandStat.isOK()) {
             return commandStat;
         }
@@ -989,6 +992,7 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainCommon::Verbosity verbosity,
+                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const {
         const string fullns = parseNs(dbname, cmdObj);
 
@@ -1003,14 +1007,16 @@ public:
         }
 
         BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+        int options = 0;
+        ClusterExplain::wrapAsExplain(
+            cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
 
         vector<Strategy::CommandResult> shardResults;
         Strategy::commandOp(
-            txn, dbname, explainCmdBob.obj(), 0, fullns, targetingQuery, &shardResults);
+            txn, dbname, explainCmdBob.obj(), options, fullns, targetingQuery, &shardResults);
 
         long long millisElapsed = timer.millis();
 

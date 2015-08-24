@@ -69,6 +69,19 @@ public:
      */
     static StatusWith<CursorResponse> runGetMore(OperationContext* txn,
                                                  const GetMoreRequest& request);
+
+    /**
+     * Extracts the read preference from 'cmdObj', or determines the read pref based on 'isSlaveOk'
+     * if 'cmdObj' does not contain a read preference.
+     *
+     * Expects a read preference that has already been "unwrapped" by the mongos command handling
+     * code, e.g. { ... , $queryOptions: { $readPreference: { ... } } , ... }.
+     *
+     * Returns a non-OK status if 'cmdObj' has a read preference but the read preference does not
+     * parse correctly.
+     */
+    static StatusWith<ReadPreferenceSetting> extractUnwrappedReadPref(const BSONObj& cmdObj,
+                                                                      bool isSlaveOk);
 };
 
 }  // namespace mongo

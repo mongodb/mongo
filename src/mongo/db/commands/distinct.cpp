@@ -127,6 +127,7 @@ public:
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
+                           const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
         const string ns = parseNs(dbname, cmdObj);
         AutoGetCollectionForRead ctx(txn, ns);

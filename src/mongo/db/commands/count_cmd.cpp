@@ -88,6 +88,7 @@ public:
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
+                           const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
         auto request = CountRequest::parseFromBSON(dbname, cmdObj);
         if (!request.isOK()) {

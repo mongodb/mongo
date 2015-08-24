@@ -99,6 +99,10 @@ struct ClusterClientCursorParams {
 
     // Whether this cursor is tailing a capped collection.
     bool isTailable = false;
+
+    // Whether any of the remote nodes might be secondaries due to a read preference mode other
+    // than "primary".
+    bool isSecondaryOk = false;
 };
 
 }  // mongo

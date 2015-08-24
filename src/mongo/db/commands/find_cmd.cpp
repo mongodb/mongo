@@ -120,6 +120,7 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainCommon::Verbosity verbosity,
+                   const rpc::ServerSelectionMetadata&,
                    BSONObjBuilder* out) const override {
         const std::string fullns = parseNs(dbname, cmdObj);
         const NamespaceString nss(fullns);

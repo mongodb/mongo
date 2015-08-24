@@ -96,8 +96,9 @@ DBQuery.prototype._exec = function(){
         this._cursorSeen = 0;
 
         if (this._mongo.useReadCommands() && this._canUseFindCommand()) {
-            var findCmd = this._convertToCommand();
-            var cmdRes = this._db.runCommand(findCmd);
+            var canAttachReadPref = true;
+            var findCmd = this._convertToCommand(canAttachReadPref);
+            var cmdRes = this._db.runReadCommand(findCmd, null, this._options);
             this._cursor = new DBCommandCursor(this._mongo, cmdRes, this._batchSize);
         }
         else {
@@ -115,8 +116,11 @@ DBQuery.prototype._exec = function(){
 
 /**
  * Internal helper used to convert this cursor into the format required by the find command.
+ *
+ * If canAttachReadPref is true, may attach a read preference to the resulting command using the
+ * "wrapped form": { $query: { <cmd>: ... }, $readPreference: { ... } }.
  */
-DBQuery.prototype._convertToCommand = function() {
+DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
     var cmd = {};
 
     cmd["find"] = this._collection.getName();
@@ -161,10 +165,6 @@ DBQuery.prototype._convertToCommand = function() {
         cmd["hint"] = this._query.$hint;
     }
 
-    if ("$readPreference" in this._query) {
-       cmd["$readPreference"] = this._query.$readPreference;
-    }
-
     if ("$comment" in this._query) {
         cmd["comment"] = this._query.$comment;
     }
@@ -201,10 +201,6 @@ DBQuery.prototype._convertToCommand = function() {
         cmd["tailable"] = true;
     }
 
-    if ((this._options & DBQuery.Option.slaveOk) != 0) {
-        cmd["slaveOk"] = true;
-    }
-
     if ((this._options & DBQuery.Option.oplogReplay) != 0) {
         cmd["oplogReplay"] = true;
     }
@@ -219,6 +215,14 @@ DBQuery.prototype._convertToCommand = function() {
 
     if ((this._options & DBQuery.Option.partial) != 0) {
         cmd["partial"] = true;
+    }
+
+    if (canAttachReadPref) {
+        // If there is a readPreference, use the wrapped command form.
+        if ("$readPreference" in this._query) {
+            var prefObj = this._query.$readPreference;
+            cmd = this._db._attachReadPreferenceToCommand(cmd, prefObj);
+        }
     }
 
     return cmd;

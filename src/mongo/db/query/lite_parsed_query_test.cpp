@@ -576,7 +576,6 @@ TEST(LiteParsedQueryTest, ParseFromCommandAllFlagsTrue) {
     BSONObj cmdObj = fromjson(
         "{find: 'testns',"
         "tailable: true,"
-        "slaveOk: true,"
         "oplogReplay: true,"
         "noCursorTimeout: true,"
         "awaitData: true,"
@@ -588,7 +587,7 @@ TEST(LiteParsedQueryTest, ParseFromCommandAllFlagsTrue) {
 
     // Test that all the flags got set to true.
     ASSERT(lpq->isTailable());
-    ASSERT(lpq->isSlaveOk());
+    ASSERT(!lpq->isSlaveOk());
     ASSERT(lpq->isOplogReplay());
     ASSERT(lpq->isNoCursorTimeout());
     ASSERT(lpq->isAwaitData());

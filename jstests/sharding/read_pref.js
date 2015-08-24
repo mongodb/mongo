@@ -18,6 +18,12 @@ var doTest = function(useDollarQuerySyntax) {
     var replTest = st.rs0;
     var primaryNode = replTest.getMaster();
 
+    // The $-prefixed query syntax is only legal for compatibility mode reads, not for the
+    // find/getMore commands.
+    if (useDollarQuerySyntax && st.s.getDB("test").getMongo().useReadCommands()) {
+        return;
+    }
+
     var setupConf = function(){
         var replConf = primaryNode.getDB( 'local' ).system.replset.findOne();
         replConf.version = (replConf.version || 0) + 1;

@@ -181,7 +181,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
 
         BSONElement rpElem;
         auto readPrefExtractStatus = bsonExtractTypedField(
-            q.query, LiteParsedQuery::kFindCommandReadPrefField, mongo::Object, &rpElem);
+            q.query, LiteParsedQuery::kWrappedReadPrefField, mongo::Object, &rpElem);
 
         if (readPrefExtractStatus.isOK()) {
             auto parsedRps = ReadPreferenceSetting::fromBSON(rpElem.Obj());

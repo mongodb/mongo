@@ -29,6 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_explain.h"
 #include "mongo/s/grid.h"
@@ -101,19 +103,26 @@ bool appendElementsIfRoom(BSONObjBuilder* bob, const BSONObj& toAppend) {
 // static
 void ClusterExplain::wrapAsExplain(const BSONObj& cmdObj,
                                    ExplainCommon::Verbosity verbosity,
-                                   BSONObjBuilder* out) {
-    out->append("explain", cmdObj);
-    out->append("verbosity", ExplainCommon::verbosityString(verbosity));
-
-    // If the command has a readPreference, then pull it up to the top level.
-    if (cmdObj.hasField("$readPreference")) {
-        out->append("$queryOptions", cmdObj["$readPreference"].wrap());
-    }
+                                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                                   BSONObjBuilder* out,
+                                   int* optionsOut) {
+    BSONObjBuilder explainBuilder;
+    explainBuilder.append("explain", cmdObj);
+    explainBuilder.append("verbosity", ExplainCommon::verbosityString(verbosity));
 
     // Propagate readConcern
     if (auto readConcern = cmdObj["readConcern"]) {
-        out->append(readConcern);
+        explainBuilder.append(readConcern);
     }
+
+    const BSONObj explainCmdObj = explainBuilder.done();
+
+    // Attach metadata to the explain command in legacy format.
+    BSONObjBuilder metadataBuilder;
+    serverSelectionMetadata.writeToMetadata(&metadataBuilder);
+    const BSONObj metadataObj = metadataBuilder.done();
+    uassertStatusOK(
+        serverSelectionMetadata.downconvert(explainCmdObj, metadataObj, out, optionsOut));
 }
 
 // static

@@ -150,8 +150,14 @@ public:
      */
     static bool isQueryIsolated(const BSONObj& query);
 
-    // Name of the find command parameter used to pass read preference.
-    static const char* kFindCommandReadPrefField;
+    // Read preference is attached to commands in "wrapped" form, e.g.
+    //   { $query: { <cmd>: ... } , <kWrappedReadPrefField>: { ... } }
+    //
+    // However, mongos internally "unwraps" the read preference and adds it as a parameter to the
+    // command, e.g.
+    //  { <cmd>: ... , <kUnwrappedReadPrefField>: { <kWrappedReadPrefField>: { ... } } }
+    static const std::string kWrappedReadPrefField;
+    static const std::string kUnwrappedReadPrefField;
 
     // Names of the maxTimeMS command and query option.
     static const std::string cmdOptionMaxTimeMS;

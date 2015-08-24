@@ -74,7 +74,8 @@ protected:
      */
     void makeCursorFromFindCmd(const BSONObj& findCmd,
                                const std::vector<HostAndPort>& remotes,
-                               boost::optional<long long> getMoreBatchSize = boost::none) {
+                               boost::optional<long long> getMoreBatchSize = boost::none,
+                               bool isSecondaryOk = false) {
         const bool isExplain = true;
         const auto lpq =
             unittest::assertGet(LiteParsedQuery::makeFromFindCommand(_nss, findCmd, isExplain));
@@ -85,6 +86,7 @@ protected:
         params.batchSize = getMoreBatchSize ? getMoreBatchSize : lpq->getBatchSize();
         params.skip = lpq->getSkip();
         params.isTailable = lpq->isTailable();
+        params.isSecondaryOk = isSecondaryOk;
 
         for (const auto& hostAndPort : remotes) {
             params.remotes.emplace_back(hostAndPort, findCmd);
@@ -137,14 +139,14 @@ protected:
         net->exitNetwork();
     }
 
-    BSONObj getCommandFromNextReadyRequest() {
+    RemoteCommandRequest getFirstPendingRequest() {
         executor::NetworkInterfaceMock* net = getNet();
         net->enterNetwork();
         ASSERT_TRUE(net->hasReadyRequests());
         NetworkInterfaceMock::NetworkOperationIterator noi = net->getFrontOfUnscheduledQueue();
-        BSONObj retCmd = noi->getRequest().cmdObj;
+        RemoteCommandRequest retRequest = noi->getRequest();
         net->exitNetwork();
-        return retCmd;
+        return retRequest;
     }
 
     void scheduleErrorResponse(Status status) {
@@ -882,7 +884,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     responses.emplace_back(_nss, CursorId(0), batch2);
     readyEvent = unittest::assertGet(arm->nextEvent());
 
-    BSONObj scheduledCmd = getCommandFromNextReadyRequest();
+    BSONObj scheduledCmd = getFirstPendingRequest().cmdObj;
     auto request = GetMoreRequest::parseFromBSON("anydbname", scheduledCmd);
     ASSERT_OK(request.getStatus());
     ASSERT_EQ(*request.getValue().batchSize, 1LL);
@@ -892,6 +894,30 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
 
     ASSERT_TRUE(arm->ready());
     ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT(!unittest::assertGet(arm->nextReady()));
+}
+
+TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
+    const bool isSecondaryOk = true;
+    makeCursorFromFindCmd(findCmd, {_remotes[0]}, boost::none, isSecondaryOk);
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    BSONObj cmdRequestMetadata = getFirstPendingRequest().metadata;
+    ASSERT_EQ(cmdRequestMetadata, BSON("$secondaryOk" << 1));
+
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}")};
+    responses.emplace_back(_nss, CursorId(0), batch1);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
     ASSERT(!unittest::assertGet(arm->nextReady()));
 }

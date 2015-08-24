@@ -97,6 +97,7 @@ public:
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainCommon::Verbosity verbosity,
+                           const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                            BSONObjBuilder* out) const {
         BatchedCommandRequest request(_writeType);
 
@@ -111,7 +112,9 @@ public:
         }
 
         BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+        int options = 0;
+        ClusterExplain::wrapAsExplain(
+            cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;

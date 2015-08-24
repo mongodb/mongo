@@ -269,6 +269,10 @@ private:
 
     ClusterClientCursorParams _params;
 
+    // The metadata obj to pass along with the command request. Used to indicate that the command is
+    // ok to run on secondaries.
+    BSONObj _metadataObj;
+
     // Must be acquired before accessing any data members (other than _params, which is read-only).
     // Must also be held when calling any of the '_inlock()' helper functions.
     stdx::mutex _mutex;

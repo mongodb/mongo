@@ -28,8 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/s/query/cluster_find.h"
 
 namespace mongo {
 namespace {
@@ -126,8 +130,17 @@ public:
             return appendCommandStatus(result, explainStatus);
         }
 
+        auto readPref =
+            ClusterFind::extractUnwrappedReadPref(cmdObj, options & QueryOption_SlaveOk);
+        if (!readPref.isOK()) {
+            return appendCommandStatus(result, readPref.getStatus());
+        }
+        const bool secondaryOk = (readPref.getValue().pref != ReadPreference::PrimaryOnly);
+        rpc::ServerSelectionMetadata metadata(secondaryOk, readPref.getValue());
+
         // Actually call the nested command's explain(...) method.
-        Status explainStatus = commToExplain->explain(txn, dbName, explainObj, verbosity, &result);
+        Status explainStatus =
+            commToExplain->explain(txn, dbName, explainObj, verbosity, metadata, &result);
         if (!explainStatus.isOK()) {
             return appendCommandStatus(result, explainStatus);
         }

@@ -30,7 +30,6 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
@@ -106,6 +105,7 @@ public:
                    const std::string& dbname,
                    const BSONObj& cmdObj,
                    ExplainCommon::Verbosity verbosity,
+                   const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const final {
         const string fullns = parseNs(dbname, cmdObj);
         const NamespaceString nss(fullns);
@@ -124,19 +124,16 @@ public:
         auto& lpq = lpqStatus.getValue();
 
         BSONObjBuilder explainCmdBob;
-        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+        int options = 0;
+        ClusterExplain::wrapAsExplain(
+            cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
 
         vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(txn,
-                            dbname,
-                            explainCmdBob.obj(),
-                            lpq->getOptions(),
-                            fullns,
-                            lpq->getFilter(),
-                            &shardResults);
+        Strategy::commandOp(
+            txn, dbname, explainCmdBob.obj(), options, fullns, lpq->getFilter(), &shardResults);
 
         long long millisElapsed = timer.millis();
 
@@ -174,25 +171,17 @@ public:
         }
 
         // Extract read preference. If no read preference is specified in the query, will we pass
-        // down a "primaryOnly" read pref.
-        ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
-        BSONElement readPrefElt;
-        auto status = bsonExtractTypedField(
-            cmdObj, LiteParsedQuery::kFindCommandReadPrefField, BSONType::Object, &readPrefElt);
-        if (status.isOK()) {
-            auto statusWithReadPref = ReadPreferenceSetting::fromBSON(readPrefElt.Obj());
-            if (!statusWithReadPref.isOK()) {
-                return appendCommandStatus(result, statusWithReadPref.getStatus());
-            }
-            readPref = statusWithReadPref.getValue();
-        } else if (status != ErrorCodes::NoSuchKey) {
-            return appendCommandStatus(result, status);
+        // down a "primaryOnly" or "secondary" read pref, depending on the slaveOk setting.
+        auto readPref =
+            ClusterFind::extractUnwrappedReadPref(cmdObj, options & QueryOption_SlaveOk);
+        if (!readPref.isOK()) {
+            return appendCommandStatus(result, readPref.getStatus());
         }
 
         // Do the work to generate the first batch of results. This blocks waiting to get responses
         // from the shard(s).
         std::vector<BSONObj> batch;
-        auto cursorId = ClusterFind::runQuery(txn, *cq.getValue(), readPref, &batch);
+        auto cursorId = ClusterFind::runQuery(txn, *cq.getValue(), readPref.getValue(), &batch);
         if (!cursorId.isOK()) {
             return appendCommandStatus(result, cursorId.getStatus());
         }

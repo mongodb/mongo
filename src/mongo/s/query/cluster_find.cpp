@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/query/canonical_query.h"
@@ -128,6 +129,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     params.batchSize = query.getParsed().getEffectiveBatchSize();
     params.skip = query.getParsed().getSkip();
     params.isTailable = query.getParsed().isTailable();
+    params.isSecondaryOk = (readPref.pref != ReadPreference::PrimaryOnly);
 
     // $natural sort is actually a hint to use a collection scan, and shouldn't be treated like a
     // sort on mongos. Including a $natural anywhere in the sort spec results in the whole sort
@@ -305,6 +307,35 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
         ? CursorId(0)
         : request.cursorid;
     return CursorResponse(request.nss, idToReturn, std::move(batch), startingFrom);
+}
+
+StatusWith<ReadPreferenceSetting> ClusterFind::extractUnwrappedReadPref(const BSONObj& cmdObj,
+                                                                        const bool isSlaveOk) {
+    BSONElement queryOptionsElt;
+    auto status = bsonExtractTypedField(
+        cmdObj, LiteParsedQuery::kUnwrappedReadPrefField, BSONType::Object, &queryOptionsElt);
+    if (status.isOK()) {
+        // There must be a nested object containing the read preference if there is a queryOptions
+        // field.
+        BSONObj queryOptionsObj = queryOptionsElt.Obj();
+        invariant(queryOptionsObj[LiteParsedQuery::kWrappedReadPrefField].type() ==
+                  BSONType::Object);
+        BSONObj readPrefObj = queryOptionsObj[LiteParsedQuery::kWrappedReadPrefField].Obj();
+
+        auto readPref = ReadPreferenceSetting::fromBSON(readPrefObj);
+        if (!readPref.isOK()) {
+            return readPref.getStatus();
+        }
+        return readPref.getValue();
+    } else if (status != ErrorCodes::NoSuchKey) {
+        return status;
+    }
+
+    // If there is no explicit read preference, the value we use depends on the setting of the slave
+    // ok bit.
+    ReadPreference pref =
+        isSlaveOk ? mongo::ReadPreference::SecondaryPreferred : mongo::ReadPreference::PrimaryOnly;
+    return ReadPreferenceSetting(pref, TagSet());
 }
 
 }  // namespace mongo
