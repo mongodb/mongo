@@ -57,6 +57,9 @@ public:
     const char* getns() const {
         return _d.getns();
     }
+    const char* getnsIfPresent() const {
+        return _d.messageShouldHaveNs() ? _d.getns() : "";
+    }
     int op() const {
         return _m.operation();
     }

@@ -151,10 +151,10 @@ public:
             r.init();
             r.process();
         } catch (const AssertionException& ex) {
-            LOG(ex.isUserAssertion() ? 1 : 0) << "Assertion failed"
-                                              << " while processing " << opToString(m.operation())
-                                              << " op"
-                                              << " for " << r.getns() << causedBy(ex) << endl;
+            LOG(ex.isUserAssertion() ? 1 : 0)
+                << "Assertion failed"
+                << " while processing " << opToString(m.operation()) << " op"
+                << " for " << r.getnsIfPresent() << causedBy(ex) << endl;
 
             if (r.expectResponse()) {
                 m.header().setId(r.id());
@@ -166,7 +166,7 @@ public:
         } catch (const DBException& ex) {
             log() << "Exception thrown"
                   << " while processing " << opToString(m.operation()) << " op"
-                  << " for " << r.getns() << causedBy(ex) << endl;
+                  << " for " << r.getnsIfPresent() << causedBy(ex) << endl;
 
             if (r.expectResponse()) {
                 m.header().setId(r.id());

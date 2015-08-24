@@ -97,8 +97,8 @@ void Request::process(int attempt) {
     int msgId = (int)(_m.header().getId());
 
     Timer t;
-    LOG(3) << "Request::process begin ns: " << getns() << " msg id: " << msgId << " op: " << op
-           << " attempt: " << attempt << endl;
+    LOG(3) << "Request::process begin ns: " << getnsIfPresent() << " msg id: " << msgId
+           << " op: " << op << " attempt: " << attempt << endl;
 
     _d.markSet();
 
@@ -131,8 +131,8 @@ void Request::process(int attempt) {
         // globalOpCounters are handled by write commands.
     }
 
-    LOG(3) << "Request::process end ns: " << getns() << " msg id: " << msgId << " op: " << op
-           << " attempt: " << attempt << " " << t.millis() << "ms" << endl;
+    LOG(3) << "Request::process end ns: " << getnsIfPresent() << " msg id: " << msgId
+           << " op: " << op << " attempt: " << attempt << " " << t.millis() << "ms" << endl;
 }
 
 void Request::reply(Message& response, const string& fromServer) {
