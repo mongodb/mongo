@@ -27,23 +27,27 @@
     var numDocuments = 20;
     var bulk = primary.getDB("foo").foo.initializeUnorderedBulkOp();
     var bigString = Array(1024*1024).toString();
-    primary.getDB("foo").foo.insert({ big: bigString});
+    assert.writeOK(primary.getDB("foo").foo.insert({ big: bigString}));
     replSet.awaitReplication();
-    secondary.getDB("admin").runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
+    assert.commandWorked(
+        secondary.getDB("admin").runCommand({
+            configureFailPoint: 'rsSyncApplyStop',
+            mode: 'alwaysOn'}),
+        'failed to enable fail point on secondary');
 
     var bufferCountBefore = secondary.getDB('foo').serverStatus().metrics.repl.buffer.count;
     for (var i = 1; i < numDocuments; ++i) {
         bulk.insert({ big: bigString});
     }
-    bulk.execute();
-    print('Number of documents inserted into collection on primary: ' + numDocuments);
+    assert.writeOK(bulk.execute());
+    jsTestLog('Number of documents inserted into collection on primary: ' + numDocuments);
     assert.eq(numDocuments, primary.getDB("foo").foo.count());
 
     assert.soon(function() {
         var serverStatus = secondary.getDB('foo').serverStatus();
         var bufferCount = serverStatus.metrics.repl.buffer.count;
         var bufferCountChange = bufferCount - bufferCountBefore;
-        print('Number of operations buffered on secondary since stopping applier: ' +
+        jsTestLog('Number of operations buffered on secondary since stopping applier: ' +
               bufferCountChange);
         return bufferCountChange >= numDocuments - 1;
     }, 'secondary did not buffer operations for new inserts on primary', 30000, 1000);
@@ -54,18 +58,22 @@
     replSet.waitForState(secondary, replSet.PRIMARY, 30000);
 
     // Ensure new primary is not yet writable
+    jsTestLog('New primary should not be writable yet');
     assert.writeError(secondary.getDB("foo").flag.insert({sentinel:2}));
     assert(!secondary.getDB("admin").runCommand({"isMaster": 1}).ismaster);
 
     // Allow draining to complete
-    secondary.getDB("admin").runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+    jsTestLog('Enabling fail point on new primary to allow draining to complete');
+    assert.commandWorked(
+        secondary.getDB("admin").runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
+        'failed to disable fail point on new primary');
     primary = replSet.getPrimary();
     
     // Ensure new primary is writable
-    primary.getDB("foo").flag.insert({sentinel:1});
+    jsTestLog('New primary should be writable after draining is complete');
+    assert.writeOK(primary.getDB("foo").flag.insert({sentinel:1}));
     // Check for at least two entries. There was one prior to freezing op application on the
     // secondary and we cannot guarantee all writes reached the secondary's op queue prior to
     // shutting down the original primary.
     assert.gte(primary.getDB("foo").foo.count(), 2);
-
 })();
