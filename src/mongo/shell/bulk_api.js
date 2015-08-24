@@ -69,7 +69,7 @@ var _bulk_api_module = (function() {
       if (typeof opts.wtimeout != 'number')
         throw Error("wtimeout must be a number, not " + opts.wtimeout);
       if (NumberInt( opts.wtimeout ).toNumber() < 0)
-        throw Error("wtimeout must be a number greater than 0, not " + opts.wtimeout);
+        throw Error("wtimeout must be a number greater than or equal to 0, not " + opts.wtimeout);
     }
 
     if (typeof opts.j != 'undefined' && typeof opts.j != 'boolean')
