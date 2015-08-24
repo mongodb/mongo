@@ -65,20 +65,21 @@ struct __wt_rwlock {
 
 #if SPINLOCK_TYPE == SPINLOCK_GCC
 
-typedef volatile int WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT)
-    WT_SPINLOCK;
+struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_spinlock {
+	volatile int lock;
+};
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE ||\
 	SPINLOCK_TYPE == SPINLOCK_MSVC
 
-typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
+struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_spinlock {
 	wt_mutex_t lock;
 
 	const char *name;		/* Statistics: mutex name */
 
 	int8_t initialized;		/* Lock initialized, for cleanup */
-} WT_SPINLOCK;
+};
 
 #else
 
