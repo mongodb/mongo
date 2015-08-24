@@ -371,9 +371,11 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
         //   3) we need to yield and retry due to a WriteConflictException.
         // In all cases, the actual yielding happens here.
         if (_yieldPolicy->shouldYield()) {
-            _yieldPolicy->yield(fetcher.get());
+            if (!_yieldPolicy->yield(fetcher.get())) {
+                // A return of false from a yield should only happen if we've been killed during the
+                // yield.
+                invariant(killed());
 
-            if (killed()) {
                 if (NULL != objOut) {
                     Status status(ErrorCodes::OperationFailed,
                                   str::stream() << "Operation aborted because: " << *_killReason);
