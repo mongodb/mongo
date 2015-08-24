@@ -145,7 +145,7 @@ namespace mongo {
 
                 LOG( ex.isUserAssertion() ? 1 : 0 ) << "Assertion failed"
                     << " while processing " << opToString( m.operation() ) << " op"
-                    << " for " << r.getns() << causedBy( ex ) << endl;
+                    << " for " << r.getnsIfPresent() << causedBy( ex ) << endl;
 
                 if ( r.expectResponse() ) {
                     m.header()->id = r.id();
@@ -159,7 +159,7 @@ namespace mongo {
 
                 log() << "Exception thrown"
                       << " while processing " << opToString( m.operation() ) << " op"
-                      << " for " << r.getns() << causedBy( ex ) << endl;
+                      << " for " << r.getnsIfPresent() << causedBy( ex ) << endl;
 
                 if ( r.expectResponse() ) {
                     m.header()->id = r.id();
