@@ -147,11 +147,11 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_STAT_FAST_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
 
 	if (0) {
-corrupt:	if (F_ISSET(btree, WT_BTREE_VERIFY) ||
-		    F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
+corrupt:	if (ret == 0)
 			ret = WT_ERROR;
-		else {
-			__wt_err(session, ret == 0 ? WT_ERROR : ret, fail_msg);
+		if (!F_ISSET(btree, WT_BTREE_VERIFY) &&
+		    !F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE)) {
+			__wt_err(session, ret, fail_msg);
 			ret = __wt_illegal_value(session, btree->dhandle->name);
 		}
 	}
