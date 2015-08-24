@@ -50,10 +50,10 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	cache = S2C(session)->cache;
 	(void)__wt_atomic_add64(&cache->bytes_inmem, size);
-	(void)__wt_atomic_add64(&page->memory_footprint, size);
+	(void)__wt_atomic_addsize(&page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
 		(void)__wt_atomic_add64(&cache->bytes_dirty, size);
-		(void)__wt_atomic_add64(&page->modify->bytes_dirty, size);
+		(void)__wt_atomic_addsize(&page->modify->bytes_dirty, size);
 	}
 	/* Track internal and overflow size in cache. */
 	if (WT_PAGE_IS_INTERNAL(page))
@@ -62,33 +62,61 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 		(void)__wt_atomic_add64(&cache->bytes_overflow, size);
 }
 
-/* 
- * WT_CACHE_DECR --
- *	Macro to decrement a field by a size.
- *
- * Be defensive and don't underflow: a band-aid on a gaping wound, but underflow
- * won't make things better no matter the problem (specifically, underflow makes
- * eviction crazy trying to evict non-existent memory).
+/*
+ * __wt_cache_decr_check_size --
+ *	Decrement a size_t cache value and check for underflow.
  */
+static inline void
+__wt_cache_decr_check_size(
+    WT_SESSION_IMPL *session, size_t *vp, size_t v, const char *fld)
+{
+	if (__wt_atomic_subsize(vp, v) < WT_EXABYTE)
+		return;
+
 #ifdef HAVE_DIAGNOSTIC
-#define	WT_CACHE_DECR(session, f, sz) do {				\
-	static int __first = 1;						\
-	if (__wt_atomic_sub64(&f, sz) > WT_EXABYTE) {			\
-		(void)__wt_atomic_add64(&f, sz);			\
-		if (__first) {						\
-			__wt_errx(session,				\
-			    "%s underflow: decrementing %" WT_SIZET_FMT,\
-			    #f, sz);					\
-			__first = 0;					\
-		}							\
-	}								\
-} while (0)
+	(void)__wt_atomic_addsize(vp, v);
+
+	{
+	static int first = 1;
+
+	if (!first)
+		return;
+	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
+	first = 0;
+	}
 #else
-#define	WT_CACHE_DECR(s, f, sz) do {					\
-	if (__wt_atomic_sub64(&f, sz) > WT_EXABYTE)			\
-		(void)__wt_atomic_add64(&f, sz);			\
-} while (0)
+        WT_UNUSED(fld);
+        WT_UNUSED(session);
 #endif
+}
+
+/*
+ * __wt_cache_decr_check_uint64 --
+ *	Decrement a uint64_t cache value and check for underflow.
+ */
+static inline void
+__wt_cache_decr_check_uint64(
+    WT_SESSION_IMPL *session, uint64_t *vp, size_t v, const char *fld)
+{
+	if (__wt_atomic_sub64(vp, v) < WT_EXABYTE)
+		return;
+
+#ifdef HAVE_DIAGNOSTIC
+	(void)__wt_atomic_add64(vp, v);
+
+	{
+	static int first = 1;
+
+	if (!first)
+		return;
+	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
+	first = 0;
+	}
+#else
+        WT_UNUSED(fld);
+        WT_UNUSED(session);
+#endif
+}
 
 /*
  * __wt_cache_page_byte_dirty_decr --
@@ -128,9 +156,10 @@ __wt_cache_page_byte_dirty_decr(
 		 */
 		orig = page->modify->bytes_dirty;
 		decr = WT_MIN(size, orig);
-		if (__wt_atomic_cas64(
+		if (__wt_atomic_cassize(
 		    &page->modify->bytes_dirty, orig, orig - decr)) {
-			WT_CACHE_DECR(session, cache->bytes_dirty, decr);
+			__wt_cache_decr_check_uint64(session,
+			    &cache->bytes_dirty, decr, "WT_CACHE.bytes_dirty");
 			break;
 		}
 	}
@@ -149,15 +178,19 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	WT_ASSERT(session, size < WT_EXABYTE);
 
-	WT_CACHE_DECR(session, cache->bytes_inmem, size);
-	WT_CACHE_DECR(session, page->memory_footprint, size);
+	__wt_cache_decr_check_uint64(
+	    session, &cache->bytes_inmem, size, "WT_CACHE.bytes_inmem");
+	__wt_cache_decr_check_size(
+	    session, &page->memory_footprint, size, "WT_PAGE.memory_footprint");
 	if (__wt_page_is_modified(page))
 		__wt_cache_page_byte_dirty_decr(session, page, size);
 	/* Track internal and overflow size in cache. */
 	if (WT_PAGE_IS_INTERNAL(page))
-		WT_CACHE_DECR(session, cache->bytes_internal, size);
+		__wt_cache_decr_check_uint64(session,
+		    &cache->bytes_internal, size, "WT_CACHE.bytes_internal");
 	else if (page->type == WT_PAGE_OVFL)
-		WT_CACHE_DECR(session, cache->bytes_overflow, size);
+		__wt_cache_decr_check_uint64(session,
+		    &cache->bytes_overflow, size, "WT_CACHE.bytes_overflow");
 }
 
 /*
@@ -180,7 +213,7 @@ __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	size = page->memory_footprint;
 	(void)__wt_atomic_add64(&cache->bytes_dirty, size);
-	(void)__wt_atomic_add64(&page->modify->bytes_dirty, size);
+	(void)__wt_atomic_addsize(&page->modify->bytes_dirty, size);
 }
 
 /*
@@ -224,7 +257,15 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	modify = page->modify;
 
 	/* Update the bytes in-memory to reflect the eviction. */
-	WT_CACHE_DECR(session, cache->bytes_inmem, page->memory_footprint);
+	__wt_cache_decr_check_uint64(session,
+	    &cache->bytes_inmem,
+	    page->memory_footprint, "WT_CACHE.bytes_inmem");
+
+	/* Update the bytes_internal value to reflect the eviction */
+	if (WT_PAGE_IS_INTERNAL(page))
+		__wt_cache_decr_check_uint64(session,
+		    &cache->bytes_internal,
+		    page->memory_footprint, "WT_CACHE.bytes_internal");
 
 	/* Update the cache's dirty-byte count. */
 	if (modify != NULL && modify->bytes_dirty != 0) {
@@ -234,8 +275,9 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 			   "dirty byte count went negative");
 			cache->bytes_dirty = 0;
 		} else
-			WT_CACHE_DECR(
-			    session, cache->bytes_dirty, modify->bytes_dirty);
+			__wt_cache_decr_check_uint64(session,
+			    &cache->bytes_dirty,
+			    modify->bytes_dirty, "WT_CACHE.bytes_dirty");
 	}
 
 	/* Update pages and bytes evicted. */
