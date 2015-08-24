@@ -25,7 +25,7 @@ build() {
 	    $l |
 	    sed -e 's/WT_PACKED_STRUCT_BEGIN(\(.*\))/struct \1 {/' \
 	        -e 's/WT_COMPILER_TYPE_ALIGN(.*)[ ]*//' \
-	        -e 's/^[	 ]*//' -e 's/[	 ]*{.*//' | sort | \
+	        -e 's/^[	 ]*//' -e 's/[	 ]*{.*//' | sort -u | \
 	while read t n; do
 		upper=`echo $n | sed -e 's/^__//' | tr [a-z] [A-Z]`
 		echo "$t $n;"

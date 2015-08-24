@@ -253,8 +253,6 @@ struct __wt_size;
     typedef struct __wt_size WT_SIZE;
 struct __wt_spinlock;
     typedef struct __wt_spinlock WT_SPINLOCK;
-struct __wt_spinlock;
-    typedef struct __wt_spinlock WT_SPINLOCK;
 struct __wt_split_stash;
     typedef struct __wt_split_stash WT_SPLIT_STASH;
 struct __wt_table;
