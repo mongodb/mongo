@@ -573,7 +573,6 @@ public:
                 return false;
             }
 
-            ScopedDbConnection connTo(toShardCS);
             BSONObj res;
             bool ok;
 
@@ -596,15 +595,15 @@ public:
             }
 
             try {
+                ScopedDbConnection connTo(toShardCS);
                 ok = connTo->runCommand("admin", recvChunkStartBuilder.done(), res);
+                connTo.done();
             } catch (DBException& e) {
                 errmsg = str::stream() << "moveChunk could not contact to: shard " << toShardName
                                        << " to start transfer" << causedBy(e);
                 warning() << errmsg;
                 return false;
             }
-
-            connTo.done();
 
             if (!ok) {
                 errmsg = "moveChunk failed to engage TO-shard in the data transfer: ";

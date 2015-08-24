@@ -1,31 +1,37 @@
 // SERVER-6179: support for two $groups in sharded agg
+(function() {
 
-// Set up a sharding test.
-s = new ShardingTest( "aggregation_multiple_group", 2, 0, 2 );
-s.adminCommand( { enablesharding:"test" } );
+var s = new ShardingTest({ name: "aggregation_multiple_group", shards: 2, mongos: 1, verbose: 0 });
+s.stopBalancer();
+
+s.adminCommand({ enablesharding:"test" });
 s.ensurePrimaryShard('test', 'shard0001');
-s.adminCommand( { shardcollection:"test.data", key:{ _id:1 } } );
-s.stopBalancer()
+s.adminCommand({ shardcollection: "test.data", key:{ _id: 1 } });
 
-d = s.getDB( "test" );
+var d = s.getDB( "test" );
 
-// Populate
-for( i = 0; i < 100; ++i ) {
-    d.data.insert( { _id:i, i:i%10 } )
+// Insert _id values 0 - 99
+var N = 100;
+
+var bulkOp = d.data.initializeOrderedBulkOp();
+for(var i = 0; i < N; ++i) {
+    bulkOp.insert({ _id: i, i: i%10 });
 }
+bulkOp.execute();
 
-// Split the data into 3 chunks.
+// Split the data into 3 chunks
 s.adminCommand( { split:"test.data", middle:{ _id:33 } } );
 s.adminCommand( { split:"test.data", middle:{ _id:66 } } );
 
-// Migrate the middle chunk to another shard.
-s.adminCommand( { movechunk:"test.data", find:{ _id:50 },
-                to:s.getOther( s.getServer( "test" ) ).name } );
+// Migrate the middle chunk to another shard
+s.adminCommand({ movechunk: "test.data",
+                 find: { _id: 50 },
+                 to: s.getOther(s.getServer("test")).name });
 
 // Check that we get results rather than an error
-result = d.data.aggregate({$group: {_id: '$_id', i: {$first: '$i'}}},
-                          {$group: {_id: '$i', avg_id: {$avg: '$_id'}}},
-                          {$sort: {_id: 1}}).toArray();
+var result = d.data.aggregate({$group: {_id: '$_id', i: {$first: '$i'}}},
+                              {$group: {_id: '$i', avg_id: {$avg: '$_id'}}},
+                              {$sort: {_id: 1}}).toArray();
 expected = [
     {
         "_id" : 0,
@@ -72,3 +78,5 @@ expected = [
 assert.eq(result, expected);
 
 s.stop();
+
+})();

@@ -434,8 +434,6 @@ Status Chunk::multiSplit(OperationContext* txn, const vector<BSONObj>& m, BSONOb
     uassert(13333, "can't split a chunk in that many parts", m.size() < maxSplitPoints);
     uassert(13003, "can't split a chunk with only one distinct value", _min.woCompare(_max));
 
-    ScopedDbConnection conn(_getShardConnectionString(txn));
-
     BSONObjBuilder cmd;
     cmd.append("splitChunk", _manager->getns());
     cmd.append("keyPattern", _manager->getShardKeyPattern().toBSON());
@@ -452,6 +450,7 @@ Status Chunk::multiSplit(OperationContext* txn, const vector<BSONObj>& m, BSONOb
         res = &dummy;
     }
 
+    ShardConnection conn(_getShardConnectionString(txn), "");
     if (!conn->runCommand("admin", cmdObj, *res)) {
         string msg(str::stream() << "splitChunk failed - cmd: " << cmdObj << " result: " << *res);
         warning() << msg;
@@ -480,17 +479,15 @@ bool Chunk::moveAndCommit(OperationContext* txn,
     log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") "
           << getShardId() << " -> " << toShardId;
 
-    const auto from = grid.shardRegistry()->getShard(txn, getShardId());
-
     BSONObjBuilder builder;
     builder.append("moveChunk", _manager->getns());
-    builder.append("from", from->getConnString().toString());
+    builder.append("from", _getShardConnectionString(txn).toString());
     {
         const auto toShard = grid.shardRegistry()->getShard(txn, toShardId);
         builder.append("to", toShard->getConnString().toString());
     }
     // NEEDED FOR 2.0 COMPATIBILITY
-    builder.append("fromShard", from->getId());
+    builder.append("fromShard", getShardId());
     builder.append("toShard", toShardId);
     ///////////////////////////////
     builder.append("min", _min);
@@ -514,7 +511,7 @@ bool Chunk::moveAndCommit(OperationContext* txn,
     builder.append(LiteParsedQuery::cmdOptionMaxTimeMS, maxTimeMS);
     builder.append("epoch", _manager->getVersion().epoch());
 
-    ScopedDbConnection fromconn(from->getConnString());
+    ShardConnection fromconn(_getShardConnectionString(txn), "");
     bool worked = fromconn->runCommand("admin", builder.done(), res);
     fromconn.done();
 
@@ -625,9 +622,9 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) const {
     }
 }
 
-std::string Chunk::_getShardConnectionString(OperationContext* txn) const {
+ConnectionString Chunk::_getShardConnectionString(OperationContext* txn) const {
     const auto shard = grid.shardRegistry()->getShard(txn, getShardId());
-    return shard->getConnString().toString();
+    return shard->getConnString();
 }
 
 void Chunk::appendShortVersion(const char* name, BSONObjBuilder& b) const {
