@@ -151,7 +151,7 @@ corrupt:	if (ret == 0)
 			ret = WT_ERROR;
 		if (!F_ISSET(btree, WT_BTREE_VERIFY) &&
 		    !F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE)) {
-			__wt_err(session, ret, fail_msg);
+			__wt_err(session, ret, "%s", fail_msg);
 			ret = __wt_illegal_value(session, btree->dhandle->name);
 		}
 	}
