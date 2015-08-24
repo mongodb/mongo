@@ -58,14 +58,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 			    "configured");
 
 		WT_ERR(__wt_scr_alloc(session, 0, &etmp));
-		ret = __wt_decrypt(session,
-		    encryptor, WT_BLOCK_ENCRYPT_SKIP, ip, etmp);
-		/*
-		 * It may be file corruption, which is really, really bad, or
-		 * may be a mismatch of encryption configuration, for example,
-		 * an incorrect secretkey.
-		 */
-		if (ret != 0)
+		if ((ret = __wt_decrypt(session,
+		    encryptor, WT_BLOCK_ENCRYPT_SKIP, ip, etmp)) != 0)
 			WT_ERR(F_ISSET(btree, WT_BTREE_VERIFY) ||
 			    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK) ?
 			    WT_ERROR :
