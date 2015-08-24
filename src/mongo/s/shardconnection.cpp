@@ -411,6 +411,12 @@ void usingAShardConnection(const string& addr);
 
 void ShardConnection::_init() {
     verify(_addr.size());
+
+    // Make sure we specified a manager for the correct namespace
+    if (_ns.size() && _manager) {
+        verify(_manager->getns() == _ns);
+    }
+
     _conn = ClientConnections::threadInstance()->get(_addr, _ns);
     _finishedInit = false;
     usingAShardConnection(_addr);
@@ -422,9 +428,6 @@ void ShardConnection::_finishInit() {
     _finishedInit = true;
 
     if (versionManager.isVersionableCB(_conn)) {
-        // Make sure we specified a manager for the correct namespace
-        if (_ns.size() && _manager)
-            verify(_manager->getns() == _ns);
         _setVersion = versionManager.checkShardVersionCB(this, false, 1);
     } else {
         // Make sure we didn't specify a manager for a non-versionable connection (i.e. config)

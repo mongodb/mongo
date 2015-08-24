@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+class ShardConnection;
+
 /**
  * A DBClientMultiCommand uses the client driver (DBClientConnections) to send and recv
  * commands to different hosts in parallel.
@@ -43,7 +45,7 @@ namespace mongo {
  */
 class DBClientMultiCommand : public MultiCommandDispatch {
 public:
-    DBClientMultiCommand() : _timeoutMillis(0) {}
+    DBClientMultiCommand() {}
 
     ~DBClientMultiCommand();
 
@@ -56,8 +58,6 @@ public:
     int numPending() const;
 
     Status recvAny(ConnectionString* endpoint, BSONSerializable* response);
-
-    void setTimeoutMillis(int milliSecs);
 
 private:
     // All info associated with an pre- or in-flight command
@@ -72,7 +72,7 @@ private:
         const BSONObj cmdObj;
 
         // Where to send it
-        DBClientBase* conn;
+        boost::scoped_ptr<ShardConnection> conn;
 
         // If anything goes wrong
         Status status;
@@ -80,6 +80,5 @@ private:
 
     typedef std::deque<PendingCommand*> PendingQueue;
     PendingQueue _pendingCommands;
-    int _timeoutMillis;
 };
 }

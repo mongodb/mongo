@@ -49,11 +49,7 @@ using std::string;
 DBClientMultiCommand::PendingCommand::PendingCommand(const ConnectionString& endpoint,
                                                      const StringData& dbName,
                                                      const BSONObj& cmdObj)
-    : endpoint(endpoint),
-      dbName(dbName.toString()),
-      cmdObj(cmdObj),
-      conn(NULL),
-      status(Status::OK()) {}
+    : endpoint(endpoint), dbName(dbName.toString()), cmdObj(cmdObj), status(Status::OK()) {}
 
 void DBClientMultiCommand::addCommand(const ConnectionString& endpoint,
                                       const StringData& dbName,
@@ -128,39 +124,26 @@ void DBClientMultiCommand::sendAll() {
          it != _pendingCommands.end();
          ++it) {
         PendingCommand* command = *it;
-        dassert(NULL == command->conn);
+        dassert(!command->conn);
 
         try {
             dassert(command->endpoint.type() == ConnectionString::MASTER ||
                     command->endpoint.type() == ConnectionString::CUSTOM);
 
-            // TODO: Fix the pool up to take millis directly
-            int timeoutSecs = _timeoutMillis / 1000;
-            command->conn = shardConnectionPool.get(command->endpoint, timeoutSecs);
+            command->conn.reset(new ShardConnection(command->endpoint.toString(), ""));
 
             // Sanity check if we're sending a batch write that we're talking to a new-enough
             // server.
             massert(28563,
                     str::stream() << "cannot send batch write operation to server "
-                                  << command->conn->toString(),
-                    !isBatchWriteCommand(command->cmdObj) || hasBatchWriteFeature(command->conn));
+                                  << command->conn->get()->toString(),
+                    !isBatchWriteCommand(command->cmdObj) ||
+                        hasBatchWriteFeature(command->conn.get()->getRawConn()));
 
-            sayAsCmd(command->conn, command->dbName, command->cmdObj);
+            sayAsCmd(command->conn->get(), command->dbName, command->cmdObj);
         } catch (const DBException& ex) {
             command->status = ex.toStatus();
-
-            if (NULL != command->conn) {
-                // Confusingly, the pool needs to know about failed connections so that it can
-                // invalidate other connections which might be bad.  But if the connection
-                // doesn't seem bad, don't send it back, because we don't want to reuse it.
-                if (!command->conn->isFailed()) {
-                    delete command->conn;
-                } else {
-                    shardConnectionPool.release(command->endpoint.toString(), command->conn);
-                }
-
-                command->conn = NULL;
-            }
+            command->conn.reset();
         }
     }
 }
@@ -177,33 +160,23 @@ Status DBClientMultiCommand::recvAny(ConnectionString* endpoint, BSONSerializabl
     if (!command->status.isOK())
         return command->status;
 
-    dassert(NULL != command->conn);
+    dassert(command->conn);
 
     try {
         // Holds the data and BSONObj for the command result
         Message toRecv;
         BSONObj result;
 
-        recvAsCmd(command->conn, &toRecv, &result);
-
-        shardConnectionPool.release(command->endpoint.toString(), command->conn);
-        command->conn = NULL;
+        recvAsCmd(command->conn->get(), &toRecv, &result);
+        command->conn->done();
+        command->conn.reset();
 
         string errMsg;
         if (!response->parseBSON(result, &errMsg) || !response->isValid(&errMsg)) {
             return Status(ErrorCodes::FailedToParse, errMsg);
         }
     } catch (const DBException& ex) {
-        // Confusingly, the pool needs to know about failed connections so that it can
-        // invalidate other connections which might be bad.  But if the connection doesn't seem
-        // bad, don't send it back, because we don't want to reuse it.
-        if (!command->conn->isFailed()) {
-            delete command->conn;
-        } else {
-            shardConnectionPool.release(command->endpoint.toString(), command->conn);
-        }
-        command->conn = NULL;
-
+        command->conn.reset();
         return ex.toStatus();
     }
 
@@ -217,16 +190,12 @@ DBClientMultiCommand::~DBClientMultiCommand() {
          ++it) {
         PendingCommand* command = *it;
 
-        if (NULL != command->conn)
-            delete command->conn;
+        if (command->conn)
+            command->conn.reset();
         delete command;
         command = NULL;
     }
 
     _pendingCommands.clear();
-}
-
-void DBClientMultiCommand::setTimeoutMillis(int milliSecs) {
-    _timeoutMillis = milliSecs;
 }
 }
