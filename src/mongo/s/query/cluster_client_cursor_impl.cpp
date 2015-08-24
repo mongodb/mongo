@@ -35,6 +35,7 @@
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"
 #include "mongo/s/query/router_stage_mock.h"
+#include "mongo/s/query/router_stage_remove_sortkey.h"
 #include "mongo/s/query/router_stage_skip.h"
 #include "mongo/stdx/memory.h"
 
@@ -79,6 +80,10 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
 
     if (params.limit) {
         root = stdx::make_unique<RouterStageLimit>(std::move(root), *params.limit);
+    }
+
+    if (!params.sort.isEmpty()) {
+        root = stdx::make_unique<RouterStageRemoveSortKey>(std::move(root));
     }
 
     return root;

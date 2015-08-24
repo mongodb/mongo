@@ -55,6 +55,9 @@ namespace mongo {
 
 namespace {
 
+static const BSONObj kSortKeyMetaProjection = BSON("$meta"
+                                                   << "sortKey");
+
 /**
  * Given the LiteParsedQuery 'lpq' being executed by mongos, returns a copy of the query which is
  * suitable for forwarding to the targeted hosts.
@@ -72,9 +75,18 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
         newNToReturn = *lpq.getNToReturn() + lpq.getSkip().value_or(0);
     }
 
+    // If there is a sort, we send a sortKey meta-projection to the remote node.
+    BSONObj newProjection = lpq.getProj();
+    if (!lpq.getSort().isEmpty()) {
+        BSONObjBuilder projectionBuilder;
+        projectionBuilder.appendElements(lpq.getProj());
+        projectionBuilder.append(ClusterClientCursorParams::kSortKeyField, kSortKeyMetaProjection);
+        newProjection = projectionBuilder.obj();
+    }
+
     return LiteParsedQuery::makeAsFindCmd(lpq.nss(),
                                           lpq.getFilter(),
-                                          lpq.getProj(),
+                                          newProjection,
                                           lpq.getSort(),
                                           lpq.getHint(),
                                           boost::none,  // Don't forward skip.
@@ -133,7 +145,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     // sort on mongos. Including a $natural anywhere in the sort spec results in the whole sort
     // being considered a hint to use a collection scan.
     if (!query.getParsed().getSort().hasField("$natural")) {
-        params.sort = query.getParsed().getSort();
+        params.sort = FindCommon::transformSortSpec(query.getParsed().getSort());
     }
 
     // Tailable cursors can't have a sort, which should have already been validated.
@@ -226,6 +238,14 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                                            const ReadPreferenceSetting& readPref,
                                            std::vector<BSONObj>* results) {
     invariant(results);
+
+    // Projection on the reserved sort key field is illegal in mongos.
+    if (query.getParsed().getProj().hasField(ClusterClientCursorParams::kSortKeyField)) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Projection contains illegal field '"
+                              << ClusterClientCursorParams::kSortKeyField
+                              << "': " << query.getParsed().getProj()};
+    }
 
     auto dbConfig = grid.catalogCache()->getDatabase(txn, query.nss().db().toString());
     if (dbConfig.getStatus() == ErrorCodes::DatabaseNotFound) {
