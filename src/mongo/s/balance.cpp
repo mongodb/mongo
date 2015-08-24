@@ -548,7 +548,7 @@ void Balancer::run() {
 
                 std::unique_ptr<WriteConcernOptions> writeConcern;
                 if (balancerConfig.isKeySet()) {  // if balancer doc exists.
-                    writeConcern = std::move(balancerConfig.getWriteConcern());
+                    writeConcern = balancerConfig.getWriteConcern();
                 }
 
                 LOG(1) << "*** start balancing round. "

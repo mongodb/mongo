@@ -52,8 +52,8 @@ CommandReply::CommandReply(const Message* message) : _message(message) {
     const char* messageEnd = begin + length;
     ConstDataRangeCursor cur(begin, messageEnd);
 
-    _metadata = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
-    _commandReply = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
+    _metadata = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
+    _commandReply = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
     _outputDocs = DocumentRange(cur.data(), messageEnd);
 }
 

@@ -89,8 +89,8 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
             (_commandName.size() >= kMinCommandNameLength) &&
                 (_commandName.size() <= kMaxCommandNameLength));
 
-    _metadata = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
-    _commandArgs = std::move(uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val);
+    _metadata = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
+    _commandArgs = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
     _inputDocs = DocumentRange{cur.data(), messageEnd};
 }
 

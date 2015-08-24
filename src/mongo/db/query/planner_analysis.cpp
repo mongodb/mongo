@@ -213,7 +213,7 @@ void explodeScan(IndexScanNode* isn,
 
         // Copy the filter, if there is one.
         if (isn->filter.get()) {
-            child->filter = std::move(isn->filter->shallowClone());
+            child->filter = isn->filter->shallowClone();
         }
 
         // Create child bounds.
@@ -674,7 +674,7 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
         KeepMutationsNode* keep = new KeepMutationsNode();
 
         // We must run the entire expression tree to make sure the document is still valid.
-        keep->filter = std::move(query.root()->shallowClone());
+        keep->filter = query.root()->shallowClone();
 
         if (STAGE_SORT == solnRoot->getType()) {
             // We want to insert the invalidated results before the sort stage, if there is one.

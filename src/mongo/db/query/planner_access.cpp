@@ -119,7 +119,7 @@ QuerySolutionNode* QueryPlannerAccess::makeCollectionScan(const CanonicalQuery& 
     // Make the (only) node, a collection scan.
     CollectionScanNode* csn = new CollectionScanNode();
     csn->name = query.ns();
-    csn->filter = std::move(query.root()->shallowClone());
+    csn->filter = query.root()->shallowClone();
     csn->tailable = tailable;
     csn->maxScan = query.getParsed().getMaxScan();
 
@@ -931,7 +931,7 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedAnd(const CanonicalQuery& que
     // XXX: This block is a hack to accommodate the storage layer concurrency model.
     std::unique_ptr<MatchExpression> clonedRoot;
     if (params.options & QueryPlannerParams::CANNOT_TRIM_IXISECT) {
-        clonedRoot = std::move(root->shallowClone());
+        clonedRoot = root->shallowClone();
     }
 
     vector<QuerySolutionNode*> ixscanNodes;
@@ -1249,7 +1249,7 @@ QuerySolutionNode* QueryPlannerAccess::scanWholeIndex(const IndexEntry& index,
         isn->direction = -1;
     }
 
-    unique_ptr<MatchExpression> filter = std::move(query.root()->shallowClone());
+    unique_ptr<MatchExpression> filter = query.root()->shallowClone();
 
     // If it's find({}) remove the no-op root.
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
@@ -1288,7 +1288,7 @@ void QueryPlannerAccess::addFilterToSolutionNode(QuerySolutionNode* node,
             verify(MatchExpression::OR == type);
             listFilter = make_unique<OrMatchExpression>();
         }
-        unique_ptr<MatchExpression> oldFilter = std::move(node->filter->shallowClone());
+        unique_ptr<MatchExpression> oldFilter = node->filter->shallowClone();
         listFilter->add(oldFilter.release());
         listFilter->add(match);
         node->filter = std::move(listFilter);
@@ -1383,7 +1383,7 @@ QuerySolutionNode* QueryPlannerAccess::makeIndexScan(const IndexEntry& index,
     isn->bounds.endKey = endKey;
     isn->bounds.endKeyInclusive = false;
 
-    unique_ptr<MatchExpression> filter = std::move(query.root()->shallowClone());
+    unique_ptr<MatchExpression> filter = query.root()->shallowClone();
 
     // If it's find({}) remove the no-op root.
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {

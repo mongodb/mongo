@@ -353,7 +353,7 @@ vector<PlanStageStats*> MultiPlanStage::generateCandidateStats() {
             continue;
         }
 
-        unique_ptr<PlanStageStats> stats = std::move(_candidates[ix].root->getStats());
+        unique_ptr<PlanStageStats> stats = _candidates[ix].root->getStats();
         candidateStats.push_back(stats.release());
     }
 

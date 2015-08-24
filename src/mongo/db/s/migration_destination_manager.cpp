@@ -261,10 +261,10 @@ Status MigrationDestinationManager::start(const string& ns,
         _migrateThreadHandle.join();
     }
 
-    _migrateThreadHandle = std::move(
+    _migrateThreadHandle =
         stdx::thread([this, ns, min, max, shardKeyPattern, fromShard, epoch, writeConcern]() {
             _migrateThread(ns, min, max, shardKeyPattern, fromShard, epoch, writeConcern);
-        }));
+        });
 
     return Status::OK();
 }

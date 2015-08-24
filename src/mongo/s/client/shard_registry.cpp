@@ -139,8 +139,7 @@ shared_ptr<Shard> ShardRegistry::getShard(const ShardId& shardId) {
 }
 
 unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& connStr) const {
-    return stdx::make_unique<Shard>(
-        "<unnamed>", connStr, std::move(_targeterFactory->create(connStr)));
+    return stdx::make_unique<Shard>("<unnamed>", connStr, _targeterFactory->create(connStr));
 }
 
 shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) const {
@@ -310,7 +309,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFind(
         }
 
         for (const BSONObj& doc : data.documents) {
-            response.docs.push_back(std::move(doc.getOwned()));
+            response.docs.push_back(doc.getOwned());
         }
 
         status = Status::OK();

@@ -480,7 +480,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     pq->_awaitData = isAwaitData;
     pq->_partial = isPartial;
 
-    return std::move(pq);
+    return pq;
 }
 
 BSONObj LiteParsedQuery::asFindCommand() const {
