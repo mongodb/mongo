@@ -97,8 +97,11 @@ DB.prototype.commandHelp = function( name ){
                                              this.getMongo().getReadPref());
 
      var options = 0;
-     // We automatically set slaveOk if readPreference is anything but primary.
-     if (this.getMongo().getReadPrefMode() !== "primary") {
+     var readPrefMode = this.getMongo().getReadPrefMode();
+
+     // Set slaveOk if readPrefMode has been explicitly set with a readPreference other than
+     // primary.
+     if (!!readPrefMode && readPrefMode !== "primary") {
          options |= 4;
      }
 
