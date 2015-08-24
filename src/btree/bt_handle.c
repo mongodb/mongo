@@ -404,10 +404,12 @@ __wt_btree_tree_open(
 	 * decrypt, we read the object successfully but we can't decrypt it, and
 	 * we want to fail gracefully.
 	 */
+	F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
 	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
 	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 	WT_ERR(bm->addr_string(bm, session, tmp, addr, addr_size));
 	WT_ERR(__wt_verify_dsk(session, tmp->data, &dsk));
+	F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
 
 	/*
 	 * Build the in-memory version of the page. Clear our local reference to

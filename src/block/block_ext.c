@@ -283,7 +283,7 @@ __wt_block_misplaced(WT_SESSION_IMPL *session,
 	 * Don't check during the salvage read phase, we might be reading an
 	 * already freed overflow page.
 	 */
-	if (F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK))
+	if (F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
 		return (0);
 
 	/*

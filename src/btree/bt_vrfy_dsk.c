@@ -26,13 +26,13 @@ static int __verify_dsk_row(
 	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *);
 
 #define	WT_ERR_VRFY(session, ...) do {					\
-	if (!(F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK)))		\
+	if (!(F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE)))		\
 		__wt_errx(session, __VA_ARGS__);			\
 	goto err;							\
 } while (0)
 
 #define	WT_RET_VRFY(session, ...) do {					\
-	if (!(F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK)))		\
+	if (!(F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE)))		\
 		__wt_errx(session, __VA_ARGS__);			\
 	return (WT_ERROR);						\
 } while (0)

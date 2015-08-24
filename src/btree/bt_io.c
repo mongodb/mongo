@@ -148,7 +148,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 
 	if (0) {
 corrupt:	if (F_ISSET(btree, WT_BTREE_VERIFY) ||
-		    F_ISSET(session, WT_SESSION_SALVAGE_CORRUPT_OK))
+		    F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
 			ret = WT_ERROR;
 		else {
 			__wt_err(session, ret == 0 ? WT_ERROR : ret, fail_msg);
