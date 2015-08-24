@@ -93,8 +93,6 @@ typedef std::shared_ptr<ShardedClientCursor> ShardedClientCursorPtr;
 
 class CursorCache {
 public:
-    static long long TIMEOUT;
-
     typedef std::map<long long, ShardedClientCursorPtr> MapSharded;
     typedef std::map<long long, int> MapShardedInt;
     typedef std::map<long long, std::string> MapNormal;

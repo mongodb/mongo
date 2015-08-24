@@ -63,6 +63,7 @@
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/mongos_options.h"
+#include "mongo/s/query/cluster_cursor_cleanup_job.h"
 #include "mongo/s/request.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/version_mongos.h"
@@ -170,6 +171,7 @@ public:
 void start(const MessageServer::Options& opts) {
     balancer.go();
     cursorCache.startTimeoutThread();
+    clusterCursorCleanupJob.go();
 
     UserCacheInvalidator cacheInvalidatorThread(getGlobalAuthorizationManager());
     {

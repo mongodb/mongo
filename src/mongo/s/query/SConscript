@@ -11,6 +11,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_common',
         "$BUILD_DIR/mongo/s/coreshard",
         "cluster_client_cursor",
+        "cluster_cursor_cleanup_job",
     ],
 )
 
@@ -100,6 +101,21 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "cluster_client_cursor_mock",
         "cluster_cursor_manager",
+    ],
+)
+
+env.Library(
+    target="cluster_cursor_cleanup_job",
+    source=[
+        "cluster_cursor_cleanup_job.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/s/coreshard",
+        "$BUILD_DIR/mongo/util/background_job",
+    ],
+    LIBDEPS_TAGS=[
+        # Needs mongo::inShutDown()
+        'incomplete',
     ],
 )
 

@@ -47,7 +47,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/max_time.h"
-#include "mongo/db/server_parameters.h"
+#include "mongo/s/query/cluster_cursor_cleanup_job.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
@@ -215,10 +215,6 @@ bool ShardedClientCursor::sendNextBatch(int batchSize, BufBuilder& buffer, int& 
 }
 
 // ---- CursorCache -----
-
-long long CursorCache::TIMEOUT = 10 * 60 * 1000 /* 10 minutes */;
-ExportedServerParameter<long long> cursorCacheTimeoutConfig(
-    ServerParameterSet::getGlobal(), "cursorTimeoutMillis", &CursorCache::TIMEOUT, true, true);
 
 unsigned getCCRandomSeed() {
     unique_ptr<SecureRandom> sr(SecureRandom::create());
@@ -452,7 +448,7 @@ void CursorCache::doTimeouts() {
     for (MapSharded::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
         // Note: cursors with no timeout will always have an idleTime of 0
         long long idleFor = i->second->idleTime(now);
-        if (idleFor < TIMEOUT) {
+        if (idleFor < ClusterCursorCleanupJob::cursorTimeoutMillis) {
             continue;
         }
         log() << "killing old cursor " << i->second->getId() << " idle for: " << idleFor << "ms"
