@@ -21,7 +21,7 @@ struct __wt_lsm_worker_cookie {
  *	State for an LSM worker thread.
  */
 struct __wt_lsm_worker_args {
-	WT_SESSION_IMPL	*session;	/* Session */
+	WT_SESSION_IMPL	*session;	A Session */
 	WT_CONDVAR	*work_cond;	/* Owned by the manager */
 	wt_thread_t	tid;		/* Thread id */
 	u_int		id;		/* My manager slot id */
@@ -74,7 +74,7 @@ struct __wt_cursor_lsm {
  * WT_LSM_CHUNK --
  *	A single chunk (file) in an LSM tree.
  */
-struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_lsm_chunk {
+struct __wt_lsm_chunk {
 	const char *uri;		/* Data source for this chunk */
 	const char *bloom_uri;		/* URI of Bloom filter, if any */
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
