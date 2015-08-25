@@ -245,7 +245,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
         }
         auto status = std::move(cursorId.getStatus());
 
-        if (status != ErrorCodes::RecvStaleConfig) {
+        if (status != ErrorCodes::SendStaleConfig && status != ErrorCodes::RecvStaleConfig) {
             // Errors other than receiving a stale config message from mongoD are fatal to the
             // operation.
             return status;
