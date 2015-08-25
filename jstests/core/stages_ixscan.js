@@ -52,8 +52,8 @@ assert.eq(res.results.length, 1);
 // 20 <= foo <= 30
 // baz == 25 (in index so we can match against it.)
 ixscan1 = {ixscan: {args:{keyPattern:{foo:1, baz: 1},
-                          startKey: {"": 20, "":MinKey},
-                          endKey: {"" : 30, "":MaxKey}, endKeyInclusive: true,
+                          startKey: {foo: 20, baz: MinKey},
+                          endKey: {foo: 30, baz: MaxKey}, endKeyInclusive: true,
                           direction: 1},
                     filter: {baz: 25}}};
 res = db.runCommand({stageDebug: {collection: collname, plan: ixscan1}});
@@ -63,8 +63,8 @@ assert.eq(res.results.length, 1);
 // 20 <= foo <= 30
 // bar == 25 (not covered, should error.)
 ixscan1 = {ixscan: {args:{keyPattern:{foo:1, baz: 1},
-                          startKey: {"": 20, "":MinKey},
-                          endKey: {"" : 30, "":MaxKey}, endKeyInclusive: true,
+                          startKey: {foo: 20, baz: MinKey},
+                          endKey: {foo: 30, baz: MaxKey}, endKeyInclusive: true,
                           direction: 1},
                     filter: {bar: 25}}};
 res = db.runCommand({stageDebug: {collection: collname, plan: ixscan1}});
