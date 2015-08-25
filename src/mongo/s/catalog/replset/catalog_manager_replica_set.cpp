@@ -113,7 +113,7 @@ CatalogManagerReplicaSet::CatalogManagerReplicaSet(std::unique_ptr<DistLockManag
 
 CatalogManagerReplicaSet::~CatalogManagerReplicaSet() = default;
 
-Status CatalogManagerReplicaSet::startup(OperationContext* txn) {
+Status CatalogManagerReplicaSet::startup(OperationContext* txn, bool allowNetworking) {
     return Status::OK();
 }
 

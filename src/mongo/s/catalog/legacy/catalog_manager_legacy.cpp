@@ -214,7 +214,13 @@ Status CatalogManagerLegacy::init(const ConnectionString& configDBCS) {
     return Status::OK();
 }
 
-Status CatalogManagerLegacy::startup(OperationContext* txn) {
+Status CatalogManagerLegacy::startup(OperationContext* txn, bool allowNetworking) {
+    if (!allowNetworking) {
+        // Config servers shouldn't call dbHash on themselves and shards don't need to
+        // run the checker.
+        return Status::OK();
+    }
+
     Status status = _startConfigServerChecker();
     if (!status.isOK()) {
         return status;

@@ -52,7 +52,7 @@ public:
         return ConfigServerMode::CSRS;
     }
 
-    Status startup(OperationContext* txn) override;
+    Status startup(OperationContext* txn, bool allowNetworking) override;
 
     void shutDown(OperationContext* txn, bool allowNetworking) override;
 

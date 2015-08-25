@@ -210,7 +210,7 @@ static Status initializeSharding(OperationContext* txn) {
         return status;
     }
 
-    status = catalogManager->startup(txn);
+    status = catalogManager->startup(txn, true);
     if (!status.isOK()) {
         return status;
     }

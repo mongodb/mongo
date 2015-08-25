@@ -96,7 +96,7 @@ public:
      * Performs implementation-specific startup tasks. Must be run after the catalog manager
      * has been installed into the global 'grid' object.
      */
-    virtual Status startup(OperationContext* txn) = 0;
+    virtual Status startup(OperationContext* txn, bool allowNetworking) = 0;
 
     /**
      * Performs necessary cleanup when shutting down cleanly.

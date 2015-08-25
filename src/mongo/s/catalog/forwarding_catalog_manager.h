@@ -78,7 +78,7 @@ public:
 
     ConfigServerMode getMode() override;
 
-    Status startup(OperationContext* txn) override;
+    Status startup(OperationContext* txn, bool allowNetworking) override;
 
     void shutDown(OperationContext* txn, bool allowNetworking = true) override;
 

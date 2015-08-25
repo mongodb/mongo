@@ -170,8 +170,8 @@ CatalogManager::ConfigServerMode ForwardingCatalogManager::getMode() {
     return _actual->getMode();
 }
 
-Status ForwardingCatalogManager::startup(OperationContext* txn) {
-    return retry([this, txn] { return _actual->startup(txn); });
+Status ForwardingCatalogManager::startup(OperationContext* txn, bool allowNetworking) {
+    return retry([this, txn, allowNetworking] { return _actual->startup(txn, allowNetworking); });
 }
 
 void ForwardingCatalogManager::shutDown(OperationContext* txn, bool allowNetworking) {
@@ -513,7 +513,9 @@ void ForwardingCatalogManager::_replaceCatalogManager(const TaskExecutor::Callba
     _actual->shutDown(txn.get(), /* allowNetworking */ false);
     _actual = makeCatalogManager(_service, _nextConfigConnectionString, _shardRegistry, _thisHost);
     _shardRegistry->updateConfigServerConnectionString(_nextConfigConnectionString);
-    fassert(28790, _actual->startup(txn.get()));
+    // Note: this assumes that downgrade is not supported, as this will not start the config
+    // server consistency checker for the legacy catalog manager.
+    fassert(28790, _actual->startup(txn.get(), false /* allowNetworking */));
     args.executor->signalEvent(_nextConfigChangeComplete);
 }
 
