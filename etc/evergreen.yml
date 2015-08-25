@@ -208,6 +208,17 @@ functions:
   - *get_buildnumber
   - *setup_credentials
 
+  "set up virtualenv" :
+    command: shell.exec
+    type: test
+    params:
+        working_dir: src
+        script: |
+          # exit immediately if virtualenv is not found
+          set -o errexit
+          set -o verbose
+          virtualenv --system-site-packages ./venv
+
   "run tests" :
     command: shell.exec
     type: test
@@ -216,6 +227,15 @@ functions:
       script: |
         set -o errexit
         set -o verbose
+
+        # check if virtualenv is set up
+        if [ -d "venv" ]; then
+          if [ "Windows_NT" = "$OS" ]; then
+            . ./venv/Scripts/activate
+          else
+            . ./venv/bin/activate
+          fi
+        fi
 
         cp mongodb*/bin/* .
         if [ ${run_multiple_jobs|false} = true ]; then
@@ -555,6 +575,21 @@ tasks:
   name: ese_WT
   commands:
   - func: "do setup"
+  - func: "set up virtualenv"
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        if [ "Windows_NT" = "$OS" ]; then
+          . ./venv/Scripts/activate
+        else
+          . ./venv/bin/activate
+        fi
+        pip install -r src/mongo/db/modules/enterprise/jstests/encryptdb/libs/requirements.txt
   - func: "run tests"
     vars:
       resmoke_args: --suites=ese --storageEngine=wiredTiger
