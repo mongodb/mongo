@@ -69,6 +69,7 @@ WT_ATOMIC_FUNC(64, uint64_t, uint64_t, 64, __int64)
 WT_ATOMIC_FUNC(v64, uint64_t, volatile uint64_t, 64, __int64)
 WT_ATOMIC_FUNC(i64, int64_t, int64_t, 64, __int64)
 WT_ATOMIC_FUNC(iv64, int64_t, volatile int64_t, 64, __int64)
+WT_ATOMIC_FUNC(size, size_t, size_t, 64, __int64)
 
 /*
  * __wt_atomic_cas_ptr --

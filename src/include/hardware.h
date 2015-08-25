@@ -69,3 +69,7 @@
 } while (0)
 
 #define	WT_CACHE_LINE_ALIGNMENT	64	/* Cache line alignment */
+#define	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, a)			\
+	WT_ASSERT(session,						\
+	    WT_PTRDIFF(&(a)[1], &(a)[0]) >= WT_CACHE_LINE_ALIGNMENT &&	\
+	    WT_PTRDIFF(&(a)[1], &(a)[0]) % WT_CACHE_LINE_ALIGNMENT == 0)

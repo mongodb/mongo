@@ -12,7 +12,6 @@ flags = {
         'SYNC_CHECKPOINT',
         'SYNC_CLOSE',
         'SYNC_DISCARD',
-        'SYNC_DISCARD_FORCE',
         'SYNC_WRITE_LEAVES',
     ],
     'file_types' : [
