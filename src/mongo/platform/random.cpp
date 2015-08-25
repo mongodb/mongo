@@ -48,8 +48,8 @@ namespace mongo {
 
 // ---- PseudoRandom  -----
 
-int32_t PseudoRandom::nextInt32() {
-    int32_t t = _x ^ (_x << 11);
+uint32_t PseudoRandom::nextUInt32() {
+    uint32_t t = _x ^ (_x << 11);
     _x = _y;
     _y = _z;
     _z = _w;
@@ -57,40 +57,30 @@ int32_t PseudoRandom::nextInt32() {
 }
 
 namespace {
-const int32_t default_y = 362436069;
-const int32_t default_z = 521288629;
-const int32_t default_w = 88675123;
-}
+const uint32_t default_y = 362436069;
+const uint32_t default_z = 521288629;
+const uint32_t default_w = 88675123;
+}  // namespace
 
-PseudoRandom::PseudoRandom(int32_t seed) {
+PseudoRandom::PseudoRandom(uint32_t seed) {
     _x = seed;
     _y = default_y;
     _z = default_z;
     _w = default_w;
 }
 
+PseudoRandom::PseudoRandom(int32_t seed) : PseudoRandom(static_cast<uint32_t>(seed)) {}
 
-PseudoRandom::PseudoRandom(uint32_t seed) {
-    _x = static_cast<int32_t>(seed);
-    _y = default_y;
-    _z = default_z;
-    _w = default_w;
-}
+PseudoRandom::PseudoRandom(int64_t seed)
+    : PseudoRandom(static_cast<uint32_t>(seed >> 32) ^ static_cast<uint32_t>(seed)) {}
 
-
-PseudoRandom::PseudoRandom(int64_t seed) {
-    int32_t high = seed >> 32;
-    int32_t low = seed & 0xFFFFFFFF;
-
-    _x = high ^ low;
-    _y = default_y;
-    _z = default_z;
-    _w = default_w;
+int32_t PseudoRandom::nextInt32() {
+    return nextUInt32();
 }
 
 int64_t PseudoRandom::nextInt64() {
-    int64_t a = nextInt32();
-    int64_t b = nextInt32();
+    uint64_t a = nextUInt32();
+    uint64_t b = nextUInt32();
     return (a << 32) | b;
 }
 
@@ -179,4 +169,4 @@ SecureRandom* SecureRandom::create() {
 #error Must implement SecureRandom for platform
 
 #endif
-}
+}  // namespace mongo

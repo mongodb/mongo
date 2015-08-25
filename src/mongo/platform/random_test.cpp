@@ -29,6 +29,7 @@
  */
 
 #include <set>
+#include <vector>
 
 #include "mongo/platform/random.h"
 
@@ -142,6 +143,72 @@ TEST(RandomTest, NextCanonicalWithinRange) {
         double next = prng.nextCanonicalDouble();
         ASSERT_LTE(0.0, next);
         ASSERT_LT(next, 1.0);
+    }
+}
+
+TEST(RandomTest, NextInt32SanityCheck) {
+    // Generate 1000 int32s and assert that each bit is set between 40% and 60% of the time. This is
+    // a bare minimum sanity check, not an attempt to ensure quality random numbers.
+
+    PseudoRandom a(11);
+    std::vector<int32_t> nums;
+    for (int i = 0; i < 1000; i++) {
+        nums.push_back(a.nextInt32());
+    }
+
+    for (int bit = 0; bit < 32; bit++) {
+        int onesCount = 0;
+        for (auto&& num : nums) {
+            bool isSet = (num >> bit) & 1;
+            if (isSet)
+                onesCount++;
+        }
+
+        if (onesCount < 400 || onesCount > 600)
+            FAIL(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
+                               << "% of the time.");
+    }
+}
+
+TEST(RandomTest, NextInt64SanityCheck) {
+    // Generate 1000 int64s and assert that each bit is set between 40% and 60% of the time. This is
+    // a bare minimum sanity check, not an attempt to ensure quality random numbers.
+
+    PseudoRandom a(11);
+    std::vector<int64_t> nums;
+    for (int i = 0; i < 1000; i++) {
+        nums.push_back(a.nextInt64());
+    }
+
+    for (int bit = 0; bit < 64; bit++) {
+        int onesCount = 0;
+        for (auto&& num : nums) {
+            bool isSet = (num >> bit) & 1;
+            if (isSet)
+                onesCount++;
+        }
+
+        if (onesCount < 400 || onesCount > 600)
+            FAIL(str::stream() << "bit " << bit << " was set " << (onesCount / 10.)
+                               << "% of the time.");
+    }
+}
+
+TEST(RandomTest, NextInt32InRange) {
+    PseudoRandom a(11);
+    for (int i = 0; i < 1000; i++) {
+        auto res = a.nextInt32(10);
+        ASSERT_GTE(res, 0);
+        ASSERT_LT(res, 10);
+    }
+}
+
+TEST(RandomTest, NextInt64InRange) {
+    PseudoRandom a(11);
+    for (int i = 0; i < 1000; i++) {
+        auto res = a.nextInt64(10);
+        ASSERT_GTE(res, 0);
+        ASSERT_LT(res, 10);
     }
 }
 

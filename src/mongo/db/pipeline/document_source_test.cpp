@@ -1315,10 +1315,7 @@ TEST_F(SampleFromRandomCursorBasics, MissingIdField) {
 /**
  * The $sampleFromRandomCursor stage should set the random meta value in a way that mimics the
  * non-optimized case.
- *
- * This fails currently, but should be re-enabled once SERVER-20121 is resolved.
  */
-#if 0
 TEST_F(SampleFromRandomCursorBasics, MimicNonOptimized) {
     // Compute the average random meta value on the each doc returned.
     double firstTotal = 0.0;
@@ -1350,7 +1347,6 @@ TEST_F(SampleFromRandomCursorBasics, MimicNonOptimized) {
     ASSERT_GTE(secondTotal / nTrials, 0.49);
     ASSERT_LTE(secondTotal / nTrials, 0.51);
 }
-#endif
 }  // namespace DocumentSourceSampleFromRandomCursor
 
 }  // namespace DocumentSourceSample

@@ -57,20 +57,20 @@ public:
      * @return a number between 0 and max
      */
     int32_t nextInt32(int32_t max) {
-        return nextInt32() % max;
+        return static_cast<uint32_t>(nextInt32()) % static_cast<uint32_t>(max);
     }
 
     /**
      * @return a number between 0 and max
      */
     int64_t nextInt64(int64_t max) {
-        return nextInt64() % max;
+        return static_cast<uint64_t>(nextInt64()) % static_cast<uint64_t>(max);
     }
 
     /**
      * @return a number between 0 and max
      *
-     * This makes PsuedoRandom instances passable as the third argument to std::random_shuffle
+     * This makes PseudoRandom instances passable as the third argument to std::random_shuffle
      */
     intptr_t operator()(intptr_t max) {
         if (sizeof(intptr_t) == 4)
@@ -79,10 +79,12 @@ public:
     }
 
 private:
-    int32_t _x;
-    int32_t _y;
-    int32_t _z;
-    int32_t _w;
+    uint32_t nextUInt32();
+
+    uint32_t _x;
+    uint32_t _y;
+    uint32_t _z;
+    uint32_t _w;
 };
 
 /**
@@ -98,4 +100,4 @@ public:
 
     static SecureRandom* create();
 };
-}
+}  // namespace mongo

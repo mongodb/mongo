@@ -315,7 +315,7 @@ TEST(FailPoint, RandomActivationP5) {
     ASSERT_APPROX_EQUAL(500000,
                         runParallelFailPointTest(
                             FailPoint::random, std::numeric_limits<int32_t>::max() / 2, 10, 100000),
-                        500);
+                        1000);
 }
 
 TEST(FailPoint, RandomActivationP01) {
