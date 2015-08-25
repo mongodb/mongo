@@ -261,13 +261,14 @@ public:
     /**
      * Not allowed to modify indexes.
      * Illegal to call if updateWithDamagesSupported() returns false.
+     * @return the contents of the updated record.
      */
-    Status updateDocumentWithDamages(OperationContext* txn,
-                                     const RecordId& loc,
-                                     const Snapshotted<RecordData>& oldRec,
-                                     const char* damageSource,
-                                     const mutablebson::DamageVector& damages,
-                                     oplogUpdateEntryArgs& args);
+    StatusWith<RecordData> updateDocumentWithDamages(OperationContext* txn,
+                                                     const RecordId& loc,
+                                                     const Snapshotted<RecordData>& oldRec,
+                                                     const char* damageSource,
+                                                     const mutablebson::DamageVector& damages,
+                                                     oplogUpdateEntryArgs& args);
 
     // -----------
 

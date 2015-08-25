@@ -73,6 +73,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     }
 
+    string modifiedData = "11101000";
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
@@ -88,17 +89,18 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
             dv[2].size = 3;
 
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv));
+            auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv);
+            ASSERT_OK(newRecStatus.getStatus());
+            ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
             uow.commit();
         }
     }
 
-    data = "11101000";
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
-            ASSERT_EQUALS(data, record.data());
+            ASSERT_EQUALS(modifiedData, record.data());
         }
     }
 }
@@ -136,6 +138,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     }
 
+    string modifiedData = "10100010";
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
@@ -148,17 +151,18 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
             dv[1].size = 5;
 
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv));
+            auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv);
+            ASSERT_OK(newRecStatus.getStatus());
+            ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
             uow.commit();
         }
     }
 
-    data = "10100010";
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
-            ASSERT_EQUALS(data, record.data());
+            ASSERT_EQUALS(modifiedData, record.data());
         }
     }
 }
@@ -197,6 +201,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
     }
 
+    string modifiedData = "10111010";
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
@@ -209,17 +214,18 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
             dv[1].size = 5;
 
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv));
+            auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, data.c_str(), dv);
+            ASSERT_OK(newRecStatus.getStatus());
+            ASSERT_EQUALS(modifiedData, newRecStatus.getValue().data());
             uow.commit();
         }
     }
 
-    data = "10111010";
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
-            ASSERT_EQUALS(data, record.data());
+            ASSERT_EQUALS(modifiedData, record.data());
         }
     }
 }
@@ -262,7 +268,9 @@ TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
             mutablebson::DamageVector dv;
 
             WriteUnitOfWork uow(opCtx.get());
-            ASSERT_OK(rs->updateWithDamages(opCtx.get(), loc, rec, "", dv));
+            auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, "", dv);
+            ASSERT_OK(newRecStatus.getStatus());
+            ASSERT_EQUALS(data, newRecStatus.getValue().data());
             uow.commit();
         }
     }

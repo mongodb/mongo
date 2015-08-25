@@ -530,13 +530,14 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 args.update = logObj;
                 args.criteria = idQuery;
                 args.fromMigrate = request->isFromMigration();
-                _collection->updateDocumentWithDamages(
+                StatusWith<RecordData> newRecStatus = _collection->updateDocumentWithDamages(
                     getOpCtx(),
                     loc,
                     Snapshotted<RecordData>(oldObj.snapshotId(), oldRec),
                     source,
                     _damages,
                     args);
+                newObj = uassertStatusOK(std::move(newRecStatus)).releaseToBson();
             }
 
             _specificStats.fastmod = true;

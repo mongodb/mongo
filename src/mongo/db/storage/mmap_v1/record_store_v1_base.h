@@ -208,11 +208,11 @@ public:
 
     virtual bool updateWithDamagesSupported() const;
 
-    virtual Status updateWithDamages(OperationContext* txn,
-                                     const RecordId& loc,
-                                     const RecordData& oldRec,
-                                     const char* damageSource,
-                                     const mutablebson::DamageVector& damages);
+    virtual StatusWith<RecordData> updateWithDamages(OperationContext* txn,
+                                                     const RecordId& loc,
+                                                     const RecordData& oldRec,
+                                                     const char* damageSource,
+                                                     const mutablebson::DamageVector& damages);
 
     virtual std::unique_ptr<RecordCursor> getCursorForRepair(OperationContext* txn) const;
 

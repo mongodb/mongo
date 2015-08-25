@@ -597,12 +597,13 @@ bool Collection::updateWithDamagesSupported() const {
     return _recordStore->updateWithDamagesSupported();
 }
 
-Status Collection::updateDocumentWithDamages(OperationContext* txn,
-                                             const RecordId& loc,
-                                             const Snapshotted<RecordData>& oldRec,
-                                             const char* damageSource,
-                                             const mutablebson::DamageVector& damages,
-                                             oplogUpdateEntryArgs& args) {
+StatusWith<RecordData> Collection::updateDocumentWithDamages(
+    OperationContext* txn,
+    const RecordId& loc,
+    const Snapshotted<RecordData>& oldRec,
+    const char* damageSource,
+    const mutablebson::DamageVector& damages,
+    oplogUpdateEntryArgs& args) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
     invariant(oldRec.snapshotId() == txn->recoveryUnit()->getSnapshotId());
     invariant(updateWithDamagesSupported());
@@ -610,14 +611,14 @@ Status Collection::updateDocumentWithDamages(OperationContext* txn,
     // Broadcast the mutation so that query results stay correct.
     _cursorManager.invalidateDocument(txn, loc, INVALIDATION_MUTATION);
 
-    Status status =
+    auto newRecStatus =
         _recordStore->updateWithDamages(txn, loc, oldRec.value(), damageSource, damages);
 
-    if (status.isOK()) {
+    if (newRecStatus.isOK()) {
         args.ns = ns().ns();
         getGlobalServiceContext()->getOpObserver()->onUpdate(txn, args);
     }
-    return status;
+    return newRecStatus;
 }
 
 bool Collection::_enforceQuota(bool userEnforeQuota) const {

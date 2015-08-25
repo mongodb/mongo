@@ -311,8 +311,10 @@ TEST(RecordStoreTestHarness, UpdateInPlace1) {
             dv[0].sourceOffset = 0;
             dv[0].targetOffset = 3;
             dv[0].size = 3;
-            Status res = rs->updateWithDamages(opCtx.get(), loc, s1Rec, damageSource, dv);
-            ASSERT_OK(res);
+
+            auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, s1Rec, damageSource, dv);
+            ASSERT_OK(newRecStatus.getStatus());
+            ASSERT_EQUALS(s2, newRecStatus.getValue().data());
             uow.commit();
         }
     }

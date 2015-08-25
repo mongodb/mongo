@@ -928,11 +928,12 @@ bool WiredTigerRecordStore::updateWithDamagesSupported() const {
     return false;
 }
 
-Status WiredTigerRecordStore::updateWithDamages(OperationContext* txn,
-                                                const RecordId& loc,
-                                                const RecordData& oldRec,
-                                                const char* damageSource,
-                                                const mutablebson::DamageVector& damages) {
+StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
+    OperationContext* txn,
+    const RecordId& loc,
+    const RecordData& oldRec,
+    const char* damageSource,
+    const mutablebson::DamageVector& damages) {
     invariant(false);
 }
 

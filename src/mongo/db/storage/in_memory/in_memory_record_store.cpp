@@ -463,21 +463,15 @@ StatusWith<RecordId> InMemoryRecordStore::updateRecord(OperationContext* txn,
 }
 
 bool InMemoryRecordStore::updateWithDamagesSupported() const {
-    // TODO: Currently the UpdateStage assumes that updateWithDamages will apply the
-    // damages directly to the unowned BSONObj containing the record to be modified.
-    // The implementation of updateWithDamages() below copies the old record to a
-    // a new one and then applies the damages.
-    //
-    // We should be able to enable updateWithDamages() here once this assumption is
-    // relaxed.
-    return false;
+    return true;
 }
 
-Status InMemoryRecordStore::updateWithDamages(OperationContext* txn,
-                                              const RecordId& loc,
-                                              const RecordData& oldRec,
-                                              const char* damageSource,
-                                              const mutablebson::DamageVector& damages) {
+StatusWith<RecordData> InMemoryRecordStore::updateWithDamages(
+    OperationContext* txn,
+    const RecordId& loc,
+    const RecordData& oldRec,
+    const char* damageSource,
+    const mutablebson::DamageVector& damages) {
     InMemoryRecord* oldRecord = recordFor(loc);
     const int len = oldRecord->size;
 
@@ -500,7 +494,7 @@ Status InMemoryRecordStore::updateWithDamages(OperationContext* txn,
 
     *oldRecord = newRecord;
 
-    return Status::OK();
+    return newRecord.toRecordData();
 }
 
 std::unique_ptr<RecordCursor> InMemoryRecordStore::getCursor(OperationContext* txn,
