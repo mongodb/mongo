@@ -576,7 +576,7 @@ __log_wrlsn_server(void *arg)
 	 */
 	WT_ERR(__wt_writelock(session, log->log_direct_lock));
 	direct_lock = 1;
-	WT_ERR(__wt_log_force_write(session, 0, 0));
+	WT_ERR(__wt_log_force_write(session, 0));
 	F_CLR(log, WT_LOG_FORCE_CONSOLIDATE);
 	direct_lock = 0;
 	WT_ERR(__wt_writeunlock(session, log->log_direct_lock));
@@ -627,7 +627,7 @@ __log_server(void *arg)
 		 */
 		WT_ERR(__wt_readlock(session, log->log_direct_lock));
 		direct_lock = 1;
-		WT_ERR(__wt_log_force_write(session, 1, 0));
+		WT_ERR(__wt_log_force_write(session, 1));
 		direct_lock = 0;
 		WT_ERR(__wt_readunlock(session, log->log_direct_lock));
 		/*

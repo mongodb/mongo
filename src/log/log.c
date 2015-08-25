@@ -45,7 +45,7 @@ __wt_log_ckpt_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 
 	conn = S2C(session);
 	log = conn->log;
-	WT_RET(__wt_log_force_write(session, 1, 0));
+	WT_RET(__wt_log_force_write(session, 1));
 	WT_RET(__wt_log_wrlsn(session));
 	*ckp_lsn = log->write_start_lsn;
 	return (0);
@@ -263,7 +263,7 @@ __wt_log_get_all_files(WT_SESSION_IMPL *session,
 	 * These may be files needed by backup.  Force the current slot
 	 * to get written to the file.
 	 */
-	WT_RET(__wt_log_force_write(session, 1, 0));
+	WT_RET(__wt_log_force_write(session, 1));
 	WT_RET(__log_get_files(session, WT_LOG_FILENAME, &files, &count));
 
 	/* Filter out any files that are below the checkpoint LSN. */
@@ -548,7 +548,7 @@ __log_file_header(
 	/*
 	 * We may recursively call __wt_log_acquire to allocate log space for
 	 * the log descriptor record.  Call __log_fill to write it, but we
-	 * do not need to call __wt_log_release because we're not waiting for
+	 * do not need to call __log_release because we're not waiting for
 	 * any earlier operations to complete.
 	 */
 	if (prealloc) {
@@ -1169,11 +1169,11 @@ err:
 }
 
 /*
- * __wt_log_release --
+ * __log_release --
  *	Release a log slot.
  */
-int
-__wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
+static int
+__log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -1624,6 +1624,32 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 }
 
 /*
+ * __log_force_write_internal --
+ *	Force a switch and release and write of the current slot.
+ *	Must be called with the slot lock held.
+ */
+static int
+__log_force_write_internal(WT_SESSION_IMPL *session, int new_slot)
+{
+	WT_LOG *log;
+	WT_LOGSLOT *slot;
+	int free_slot, release;
+
+	log = S2C(session)->log;
+	slot = log->active_slot;
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+	WT_RET(__wt_log_slot_close(session, slot, &release));
+	if (release) {
+		WT_RET(__log_release(session, slot, &free_slot));
+		if (free_slot)
+			WT_RET(__wt_log_slot_free(session, slot));
+	}
+	if (new_slot)
+		WT_RET(__wt_log_slot_new(session));
+	return (0);
+}
+
+/*
  * __log_direct_write --
  *	Write a log record without using the consolidation slots.  We
  *	must hold the direct lock for writing.
@@ -1651,10 +1677,11 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(&tmp, WT_SLOT_SYNC);
 	/*
-	 * Join the existing slot to force it out.
+	 * Force out existing slot.  Call the internal version because we
+	 * are already locked.
 	 */
 	if (F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE))
-		WT_RET(__wt_log_force_write(session, 0, 1));
+		WT_RET(__log_force_write_internal(session, 0));
 	/*
 	 * Set up the temporary slot with the correct LSN information.
 	 * Set our size in the slot for release.
@@ -1666,7 +1693,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	tmp.slot_end_lsn.offset += record->size;
 	tmp.slot_direct_size = record->size;
 	WT_RET(__log_fill(session, &myslot, 1, record, lsnp));
-	WT_RET(__wt_log_release(session, myslot.slot, NULL));
+	WT_RET(__log_release(session, myslot.slot, NULL));
 	log->alloc_lsn = tmp.slot_end_lsn;
 	/*
 	 * Now that we have written our buffer, we can set up a new slot.
@@ -1679,44 +1706,17 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 }
 
 /*
- * __log_force_write_internal --
- *	Force a switch and release and write of the current slot.
- *	Must be called with the slot lock held.
- */
-static int
-__log_force_write_internal(WT_SESSION_IMPL *session, int new_slot)
-{
-	WT_MYSLOT myslot;
-	int free_slot, release;
-
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
-	WT_RET(__wt_log_slot_join(session, 0, 0, &myslot));
-	WT_RET(__wt_log_slot_close(session, &release));
-	if (release) {
-		WT_RET(__wt_log_release(session, myslot.slot, &free_slot));
-		if (free_slot)
-			WT_RET(__wt_log_slot_free(session, myslot.slot));
-	}
-	if (new_slot)
-		WT_RET(__wt_log_slot_new(session));
-	return (0);
-}
-
-/*
  * __wt_log_force_write --
  *	Force a switch and release and write of the current slot.
  *	Wrapper function that takes the lock.
  */
 int
-__wt_log_force_write(WT_SESSION_IMPL *session, int new_slot, int locked)
+__wt_log_force_write(WT_SESSION_IMPL *session, int new_slot)
 {
 	WT_DECL_RET;
 
-	if (locked)
-		ret = __log_force_write_internal(session, new_slot);
-	else
-		WT_WITH_SLOT_LOCK(session, S2C(session)->log,
-		    ret = __log_force_write_internal(session, new_slot));
+	WT_WITH_SLOT_LOCK(session, S2C(session)->log,
+	    ret = __log_force_write_internal(session, new_slot));
 	return (ret);
 }
 
@@ -1978,7 +1978,7 @@ use_slots:
 	ret = 0;
 	if (myslot.end_offset >= WT_LOG_SLOT_BUF_MAX || force)
 		WT_WITH_SLOT_LOCK(session, log,
-		    ret = __wt_log_slot_switch(session, NULL));
+		    ret = __wt_log_slot_switch(session, myslot.slot));
 	if (ret == 0)
 		ret = __log_fill(session, &myslot, 0, record, &lsn);
 	release_size = __wt_log_slot_release(&myslot, (int64_t)rdup_len);
@@ -1991,7 +1991,7 @@ use_slots:
 		myslot.slot->slot_error = ret;
 	WT_ASSERT(session, ret == 0);
 	if (WT_LOG_SLOT_DONE(release_size)) {
-		WT_ERR(__wt_log_release(session, myslot.slot, &free_slot));
+		WT_ERR(__log_release(session, myslot.slot, &free_slot));
 		if (free_slot)
 			WT_ERR(__wt_log_slot_free(session, myslot.slot));
 	} else if (force) {
@@ -2005,7 +2005,7 @@ use_slots:
 			WT_ERR(__wt_cond_signal(session, conn->log_cond));
 			__wt_yield();
 		} else
-			WT_ERR(__wt_log_force_write(session, 1, 0));
+			WT_ERR(__wt_log_force_write(session, 1));
 	}
 	WT_ERR(__wt_readunlock(session, log->log_direct_lock));
 	locked = WT_NOT_LOCKED;

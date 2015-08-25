@@ -28,22 +28,19 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	slot->slot_fh = log->log_fh;
 	slot->slot_error = 0;
 	slot->slot_unbuffered = 0;
-	slot->slot_force_old = 0;
-	slot->slot_force_new = 0;
-	slot->slot_lastrel = 0;
 	return;
 }
 
 /*
  * __wt_log_slot_close --
- *	Close out the current active slot.
+ *	Close out the slot the caller is using.  The slot may already be
+ *	closed or freed by another thread.
  */
 int
-__wt_log_slot_close(WT_SESSION_IMPL *session, int *releasep)
+__wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *releasep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
-	WT_LOGSLOT *current;
 	int64_t end_offset, new_state, old_state;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
@@ -51,43 +48,43 @@ __wt_log_slot_close(WT_SESSION_IMPL *session, int *releasep)
 	log = conn->log;
 	if (releasep != NULL)
 		*releasep = 0;
-retry:
-	current = log->active_slot;
-	if (current == NULL)
+	if (slot == NULL)
 		return (0);
-	old_state = current->slot_state;
+retry:
+	old_state = slot->slot_state;
 	/*
 	 * If someone else is switching out this slot we lost.  Nothing to
 	 * do but return.
 	 */
 	if (WT_LOG_SLOT_CLOSED(old_state))
 		return (0);
+	/*
+	 * If someone completely processed this slot, we're done.
+	 */
+	if (FLD64_ISSET(slot->slot_state, WT_LOG_SLOT_RESERVED))
+		return (0);
 	new_state = (old_state | WT_LOG_SLOT_CLOSE);
 	/*
 	 * Close this slot.  If we lose the race retry.
 	 */
-	__wt_epoch(session, &current->slot_fstart);
-	if (!__wt_atomic_casiv64(&current->slot_state, old_state, new_state))
+	if (!__wt_atomic_casiv64(&slot->slot_state, old_state, new_state))
 		goto retry;
-	__wt_epoch(session, &current->slot_fend);
 	/*
 	 * We own the slot now.  No one else can join.
 	 * Set the end LSN.
 	 */
-	current->slot_force_old = old_state;
-	current->slot_force_new = new_state;
 	WT_STAT_FAST_CONN_INCR(session, log_slot_closes);
 	if (WT_LOG_SLOT_DONE(new_state) && releasep != NULL)
 		*releasep = 1;
-	current->slot_end_lsn = current->slot_start_lsn;
+	slot->slot_end_lsn = slot->slot_start_lsn;
 	end_offset = WT_LOG_SLOT_JOINED(old_state);
-	current->slot_end_lsn.offset += (wt_off_t)end_offset;
+	slot->slot_end_lsn.offset += (wt_off_t)end_offset;
 	WT_STAT_FAST_CONN_INCRV(session,
 	    log_slot_consolidated, end_offset);
 	/*
 	 * XXX Would like to change so one piece of code advances the LSN.
 	 */
-	log->alloc_lsn = current->slot_end_lsn;
+	log->alloc_lsn = slot->slot_end_lsn;
 	WT_ASSERT(session, log->alloc_lsn.file >= log->write_lsn.file);
 	return (0);
 }
@@ -97,10 +94,32 @@ retry:
  *	Switch out the current slot and set up a new one.
  */
 int
-__wt_log_slot_switch(WT_SESSION_IMPL *session, int *releasep)
+__wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
+	WT_LOG *log;
+	int dummy;
+	int64_t state;
+	int32_t j, r;
+
+	log = S2C(session)->log;
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
-	WT_RET(__wt_log_slot_close(session, releasep));
+	/*
+	 * If someone else raced us to closing this specific slot, we're
+	 * done here.
+	 */
+	if (slot != log->active_slot)
+		return (0);
+	WT_RET(__wt_log_slot_close(session, slot, &dummy));
+	/*
+	 * Only mainline callers use switch.  Our size should be in join
+	 * and we have not yet released, so we should never think release
+	 * should be done now.
+	 */
+	WT_ASSERT(session, dummy == 0);
+	state = slot->slot_state;
+	j = WT_LOG_SLOT_JOINED(state);
+	r = WT_LOG_SLOT_RELEASED(state);
+	WT_ASSERT(session, j > r);
 	WT_RET(__wt_log_slot_new(session));
 	return (0);
 }
@@ -294,6 +313,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	 * writes.
 	 */
 	WT_ASSERT(session, mysize < WT_LOG_SLOT_MAXIMUM);
+	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 
 	/*
 	 * The worker thread is constantly trying to join and write out
@@ -388,10 +408,7 @@ __wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
 	 * Add my size into the state and return the new size.
 	 */
 	my_size = WT_LOG_SLOT_JOIN_REL((uint64_t)0, size, 0);
-	__wt_epoch(NULL, &slot->slot_rstart);
 	newsize = __wt_atomic_addiv64(&slot->slot_state, my_size);
-	__wt_epoch(NULL, &slot->slot_rend);
-	slot->slot_lastrel = newsize;
 	return (newsize);
 }
 

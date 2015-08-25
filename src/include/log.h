@@ -118,13 +118,6 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_logslot {
 	WT_LSN	 slot_end_lsn;		/* Slot ending LSN */
 	WT_FH	*slot_fh;		/* File handle for this group */
 	WT_ITEM  slot_buf;		/* Buffer for grouped writes */
-	volatile int64_t slot_force_old;	/* Slot state */
-	volatile int64_t slot_force_new;	/* Slot state */
-	struct timespec slot_fstart;
-	struct timespec slot_fend;
-	volatile int64_t slot_lastrel;	/* Slot state */
-	struct timespec slot_rstart;
-	struct timespec slot_rend;
 
 #define	WT_SLOT_BUFFERED	0x01		/* Buffer writes */
 #define	WT_SLOT_CLOSEFH		0x02		/* Close old fh on release */
