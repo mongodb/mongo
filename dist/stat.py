@@ -165,7 +165,9 @@ __wt_stat_''' + name + '''_aggregate_single(
                 o = '\tif (from->' + l.name + ' > to->' + l.name + ')\n' +\
                     '\t\tto->' + l.name + ' = from->' + l.name + ';\n'
             else:
-                o = '\tto->' + l.name + ' +=\n\t    from->' + l.name + ';\n'
+                o = '\tto->' + l.name + ' += from->' + l.name + ';\n'
+                if len(o) > 72:         # Account for the leading tab.
+                    o = o.replace(' += ', ' +=\n\t    ')
             f.write(o)
         f.write('}\n')
 
@@ -190,8 +192,9 @@ __wt_stat_''' + name + '''_aggregate(
                 '\t    to->' + l.name + ')\n' +\
                 '\t\tto->' + l.name + ' = v;\n'
         else:
-            o = '\tto->' + l.name +\
-                ' +=\n\t    WT_STAT_READ(from, ' + l.name + ');\n'
+            o = '\tto->' + l.name + ' += WT_STAT_READ(from, ' + l.name + ');\n'
+            if len(o) > 72:             # Account for the leading tab.
+                o = o.replace(' += ', ' +=\n\t    ')
         f.write(o)
     f.write('}\n')
 
