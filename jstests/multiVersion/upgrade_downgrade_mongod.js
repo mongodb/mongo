@@ -4,7 +4,8 @@
  * New features/changes tested in 3.2:
  *  - Partial index
  *      This sets partialFilterExpression attribute for an index.
- *      After downgrade, mongod should fail to start (SERVER-17658).
+ *      After downgrade, mongod should start up, but may miss documents when using the partial index
+ *      to answer queries.
  *  - Document validation
  *      This sets the validator attribute for a collection.
  *      After downgrade, this should be ignored.
@@ -147,9 +148,6 @@
         this.data.numIndex = coll.getIndexes().length;
     }
 
-    // In 3.1.8? downgrade with partial index, mongod should fail to start, due to index
-    // incompatibility
-    // Note - this behavior is still not confirmed (see SERVER-17658)
     function verify_ttl_partial(conn) {
         var testDB = conn.getDB('test');
         var coll = testDB.ttl;
@@ -161,10 +159,12 @@
                         return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 1;
                     },
                     testName + " TTL monitor didn't run before timing out.");
-        // All docs should be expired, except 2
-        // Current behavior is all expired partial index docs are removed
-        // Leaving 50 (non_partial) + 1 unexpired partial
-        // assert.eq(coll.count(), 2, testName + ' ttl_partial count2');
+
+        // All documents except for 2 have expired because their 'date' field is more than an hour
+        // old. However, the partial index does not contain index entries for documents where the
+        // 'z' field does not exist. Since the TTL monitor deletes documents from the collection by
+        // doing an index scan, this leaves 50 documents that weren't indexed by the partial index
+        // (49 of which are technically expired), and 1 that was indexed but hasn't expired yet.
         assert.eq(coll.count(), this.data.numColl + 1, testName + ' ttl_partial count');
     }
 
@@ -192,11 +192,6 @@
         this.data.indexNames[indexName] = 1;
         this.data.numIndex = coll.getIndexes().length;
     }
-
-    // In 3.1.8? downgrade with partial index, mongod should fail to start, due to index
-    // incompatibility
-    // Note - this behavior is still not confirmed (see SERVER-17658)
-    // On upgrades, existing documents will be indexed. New documents will apply to filter.
 
     function verify_partial_index(conn) {
         var testDB = conn.getDB('test');
@@ -377,21 +372,20 @@
             ]
         },
         // Downgrade with mmapv1 - ttl w/partial index
-        // Enable this test when implemented (SERVER-17658)
-        // {
-        //     name: "Downgrade - mmapv1: ttl with partial index filter",
-        //     fromBinVersion: "latest",
-        //     toBinVersion: "last-stable",
-        //     storageEngine: "mmapv1",
-        //     options: {setParameter: "ttlMonitorSleepSecs=3"},
-        //     data: {
-        //         indexNames: {_id_: 1},
-        //         numColl: 50,
-        //         partial: 5
-        //     },
-        //     init: [init_ttl_partial],
-        //     verify: [verify_ttl_partial]
-        // },
+        {
+            name: "Downgrade - mmapv1: ttl with partial index filter",
+            fromBinVersion: "latest",
+            toBinVersion: "last-stable",
+            storageEngine: "mmapv1",
+            options: {setParameter: "ttlMonitorSleepSecs=3"},
+            data: {
+                indexNames: {_id_: 1},
+                numColl: 50,
+                partial: 5
+            },
+            init: [init_ttl_partial],
+            verify: [verify_ttl_partial]
+        },
         // Downgrade with mmapv1 - fullTextSearch index
         {
             name: "Downgrade - mmapv1: fullTextSearch index",
@@ -508,23 +502,21 @@
             ]
         },
         // Downgrade with wiredTiger - ttl w/partial index
-        // Enable this test when implemented (SERVER-17658)
-        // {
-        //     name: "Downgrade - wiredTiger: ttl with partial index filter",
-        //     fromBinVersion: "latest",
-        //     toBinVersion: "last-stable",
-        //     storageEngine: "wiredTiger",
-        //     options: {setParameter: "ttlMonitorSleepSecs=3"},
-        //     data: {
-        //         indexNames: {_id_: 1},
-        //         numCapped: 10,
-        //         numColl: 50,
-        //         partial: 5,
-        //         failedConn: true
-        //     },
-        //     init: [init_ttl_partial],
-        //     verify: [verify_ttl_partial]
-        // },
+        {
+            name: "Downgrade - wiredTiger: ttl with partial index filter",
+            fromBinVersion: "latest",
+            toBinVersion: "last-stable",
+            storageEngine: "wiredTiger",
+            options: {setParameter: "ttlMonitorSleepSecs=3"},
+            data: {
+                indexNames: {_id_: 1},
+                numCapped: 10,
+                numColl: 50,
+                partial: 5,
+            },
+            init: [init_ttl_partial],
+            verify: [verify_ttl_partial]
+        },
 
         // Downgrade with wiredTiger - fullTextSearch index
         {
