@@ -1910,7 +1910,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * will turn on consolidation automatically so this code could
 	 * be simplified some for that case.
 	 */
-#ifdef	HAVE_DIAGNOSTIC
+#ifdef HAVE_DIAGNOSTIC
 	/*
 	 * XXX Test out an intermittent direct write call.  We expect this
 	 * to be rare but need to verify the code path.

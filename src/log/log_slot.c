@@ -99,7 +99,9 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_LOG *log;
 	int dummy;
 	int64_t state;
+#ifdef HAVE_DIAGNOSTIC
 	int32_t j, r;
+#endif
 
 	log = S2C(session)->log;
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
@@ -117,9 +119,11 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 */
 	WT_ASSERT(session, dummy == 0);
 	state = slot->slot_state;
+#ifdef HAVE_DIAGNOSTIC
 	j = WT_LOG_SLOT_JOINED(state);
 	r = WT_LOG_SLOT_RELEASED(state);
 	WT_ASSERT(session, j > r);
+#endif
 	WT_RET(__wt_log_slot_new(session));
 	return (0);
 }
