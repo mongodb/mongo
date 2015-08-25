@@ -174,7 +174,7 @@ private:
     AtomicUInt32 _shuttingDown;
     static const uint32_t kShuttingDownMask = 1 << 31;
 
-    SpinLock _cacheLock;
+    stdx::mutex _cacheLock;
     typedef std::vector<WiredTigerSession*> SessionCache;
     SessionCache _sessions;
 
