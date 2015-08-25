@@ -6271,7 +6271,7 @@ TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStartElection) {
         election);
     ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(5500), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(5900), action.getNextHeartbeatStartDate());
 }
 
 TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStepDownRemotePrimary) {
@@ -6334,7 +6334,7 @@ TEST_F(HeartbeatResponseTestOneRetryV1, DecideToReconfig) {
         OpTime(Timestamp(0, 0), 0));  // We've never applied anything.
     ASSERT_EQUALS(HeartbeatResponseAction::Reconfig, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(5500), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(5900), action.getNextHeartbeatStartDate());
 }
 
 class HeartbeatResponseTestTwoRetriesV1 : public HeartbeatResponseTestOneRetryV1 {
@@ -6406,13 +6406,13 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStartElection) {
     startElectionResponse.setConfigVersion(5);
     action = getTopoCoord().processHeartbeatResponse(
         firstRequestDate() + Milliseconds(5000),  // Time is left.
-        Milliseconds(400),                        // Spent 0.4 of the 0.5 second in the network.
+        Milliseconds(300),                        // Spent 0.3 of the 0.5 second in the network.
         target(),
         StatusWith<ReplSetHeartbeatResponse>(startElectionResponse),
         election);
     ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(6000), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(6300), action.getNextHeartbeatStartDate());
 }
 
 TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStepDownSelf) {
@@ -6538,7 +6538,7 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatThreeNonconsecutiveFailures) 
     ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     // Because the heartbeat succeeded, we'll retry in 1 second (half of the election timeout).
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(5500), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(5900), action.getNextHeartbeatStartDate());
 
     // request next heartbeat
     getTopoCoord().prepareHeartbeatRequest(

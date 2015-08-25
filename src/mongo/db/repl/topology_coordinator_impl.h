@@ -233,6 +233,7 @@ public:
     virtual HeartbeatResponseAction setMemberAsDown(Date_t now,
                                                     const int memberIndex,
                                                     const OpTime& myLastOpApplied);
+    virtual Milliseconds getTimeoutDelayForMember(int memberId);
 
     ////////////////////////////////////////////////////////////
     //
@@ -279,6 +280,9 @@ private:
 
     // Returns the number of heartbeat pings which have occurred.
     int _getTotalPings();
+
+    // Returns this node's rsConfig position relative to all voting nodes.
+    int _selfVoterPosition();
 
     // Returns the current "ping" value for the given member by their address
     Milliseconds _getPing(const HostAndPort& host);

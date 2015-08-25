@@ -471,8 +471,10 @@ private:
      * Returns an action to be performed after unlocking _mutex, via
      * _performPostMemberStateUpdateAction.
      */
-    PostMemberStateUpdateAction _setCurrentRSConfig_inlock(const ReplicaSetConfig& newConfig,
-                                                           int myIndex);
+    PostMemberStateUpdateAction _setCurrentRSConfig_inlock(
+        const ReplicationExecutor::CallbackArgs& cbData,
+        const ReplicaSetConfig& newConfig,
+        int myIndex);
 
     /**
      * Updates the last committed OpTime to be "committedOpTime" if it is more recent than the
@@ -697,7 +699,7 @@ private:
      * Starts a heartbeat for each member in the current config.  Called within the executor
      * context.
      */
-    void _startHeartbeats();
+    void _startHeartbeats(const ReplicationExecutor::CallbackArgs& cbData);
 
     /**
      * Cancels all heartbeats.  Called within executor context.
@@ -1011,12 +1013,13 @@ private:
      * Callback which schedules "_handleLivenessTimeout" to be run whenever the liveness timeout
      * for the node who was least recently reported to be alive occurs.
      */
-    void _scheduleNextLivenessUpdate();
+    void _scheduleNextLivenessUpdate(const ReplicationExecutor::CallbackArgs& cbData);
 
     /**
      * Bottom half of _scheduleNextLivenessUpdate.
+     * Must be called from within a callback.
      */
-    void _scheduleNextLivenessUpdate_inlock();
+    void _scheduleNextLivenessUpdate_inlock(const ReplicationExecutor::CallbackArgs& cbData);
 
     /**
      * Callback which marks downed nodes as down, triggers a stepdown if a majority of nodes are no

@@ -364,7 +364,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigStartingUp);
     const PostMemberStateUpdateAction action =
-        _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
+        _setCurrentRSConfig_inlock(cbData, localConfig, myIndex.getValue());
     _setMyLastOptime_inlock(&lk, lastOpTime, false);
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
     _updateTerm_incallback(term);
@@ -1983,7 +1983,8 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigReconfiguring);
     invariant(_rsConfig.isInitialized());
-    const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
+    const PostMemberStateUpdateAction action =
+        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(newConfig);
     _performPostMemberStateUpdateAction(action);
@@ -2109,7 +2110,8 @@ void ReplicationCoordinatorImpl::_finishReplSetInitiate(
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigInitiating);
     invariant(!_rsConfig.isInitialized());
-    const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
+    const PostMemberStateUpdateAction action =
+        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(newConfig);
     _performPostMemberStateUpdateAction(action);
@@ -2327,8 +2329,10 @@ void ReplicationCoordinatorImpl::_processReplSetElect_finish(
 }
 
 ReplicationCoordinatorImpl::PostMemberStateUpdateAction
-ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& newConfig,
-                                                       int myIndex) {
+ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
+    const ReplicationExecutor::CallbackArgs& cbData,
+    const ReplicaSetConfig& newConfig,
+    int myIndex) {
     invariant(_settings.usingReplSets());
     _cancelHeartbeats();
     _setConfigState_inlock(kConfigSteady);
@@ -2353,7 +2357,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& n
     if (_selfIndex >= 0) {
         // Don't send heartbeats if we're not in the config, if we get re-added one of the
         // nodes in the set will contact us.
-        _startHeartbeats();
+        _startHeartbeats(cbData);
     }
     _updateLastCommittedOpTime_inlock();
     _wakeReadyWaiters_inlock();
@@ -2537,7 +2541,7 @@ void ReplicationCoordinatorImpl::_chooseNewSyncSource(
     if (newSyncSource->empty() && _justLostSyncSource && _selfIndex >= 0 &&
         !_getMemberState_inlock().primary()) {
         _cancelHeartbeats();
-        _startHeartbeats();
+        _startHeartbeats(cbData);
         _justLostSyncSource = false;
     } else {
         _justLostSyncSource = true;

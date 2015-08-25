@@ -478,7 +478,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         myIndex = StatusWith<int>(-1);
     }
     const PostMemberStateUpdateAction action =
-        _setCurrentRSConfig_inlock(newConfig, myIndex.getValue());
+        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex.getValue());
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(newConfig);
     _performPostMemberStateUpdateAction(action);
@@ -507,7 +507,7 @@ void ReplicationCoordinatorImpl::_cancelHeartbeats() {
     // CallbackCanceled status, so it's better to leave the handles in the list, for now.
 }
 
-void ReplicationCoordinatorImpl::_startHeartbeats() {
+void ReplicationCoordinatorImpl::_startHeartbeats(const ReplicationExecutor::CallbackArgs& cbData) {
     const Date_t now = _replExecutor.now();
     _seedList.clear();
     for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {
@@ -517,7 +517,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats() {
         _scheduleHeartbeatToTarget(_rsConfig.getMemberAt(i).getHostAndPort(), i, now);
     }
     if (isV1ElectionProtocol()) {
-        _scheduleNextLivenessUpdate_inlock();
+        _scheduleNextLivenessUpdate_inlock(cbData);
     }
 }
 
@@ -559,15 +559,20 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
             }
         }
     }
-    _scheduleNextLivenessUpdate_inlock();
+    _scheduleNextLivenessUpdate_inlock(cbData);
 }
 
-void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate() {
+void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate(
+    const ReplicationExecutor::CallbackArgs& cbData) {
+    if (cbData.status == ErrorCodes::CallbackCanceled)
+        return;
+
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _scheduleNextLivenessUpdate_inlock();
+    _scheduleNextLivenessUpdate_inlock(cbData);
 }
 
-void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
+void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock(
+    const ReplicationExecutor::CallbackArgs& cbData) {
     if (!isV1ElectionProtocol()) {
         return;
     }
@@ -595,7 +600,8 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock() {
         return;
     }
 
-    auto nextTimeout = earliestDate + _rsConfig.getElectionTimeoutPeriod();
+    auto nextTimeout = earliestDate + _rsConfig.getElectionTimeoutPeriod() +
+        _topCoord->getTimeoutDelayForMember(earliestMemberId);
     if (nextTimeout > _replExecutor.now()) {
         LOG(3) << "scheduling next check at " << nextTimeout;
         auto cbh = _replExecutor.scheduleWorkAt(
@@ -618,7 +624,8 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleLivenessUpdate_inlock(int u
     if (_handleLivenessTimeoutCbh.isValid()) {
         _replExecutor.cancel(_handleLivenessTimeoutCbh);
     }
-    _scheduleNextLivenessUpdate_inlock();
+    _replExecutor.scheduleWork(stdx::bind(
+        &ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate, this, stdx::placeholders::_1));
 }
 
 }  // namespace repl

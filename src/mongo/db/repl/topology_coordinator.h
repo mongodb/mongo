@@ -436,6 +436,14 @@ public:
      */
     virtual void setPrimaryIndex(long long primaryIndex) = 0;
 
+    /**
+     * Returns the additional delay to be added to election related timeouts pertaining to the
+     * member with the id "memberId".
+     * If the additional delay could not be calculated (for example, because the  member is absent
+     * from the config or the ping table), Milliseconds() is returned.
+     */
+    virtual Milliseconds getTimeoutDelayForMember(int memberId) = 0;
+
 protected:
     TopologyCoordinator() {}
 };
