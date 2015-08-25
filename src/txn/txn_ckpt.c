@@ -1171,9 +1171,13 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 	/*
 	 * If the handle is already dead or the file isn't durable, force the
 	 * discard.
+	 *
+	 * If the file isn't durable, mark the handle dead, there are asserts
+	 * later on that only dead handles can have modified pages.
 	 */
-	if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT) ||
-	    F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
+	if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
+		F_SET(session->dhandle, WT_DHANDLE_DEAD);
+	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
 		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
 
 	/*
