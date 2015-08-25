@@ -549,6 +549,10 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
         GetMoreRequest getMoreRequest(NamespaceString(ns), id, batchSize, boost::none);
 
         auto getMoreResponse = ClusterFind::runGetMore(txn, getMoreRequest);
+        if (getMoreResponse == ErrorCodes::CursorNotFound) {
+            replyToQuery(ResultFlag_CursorNotFound, request.p(), request.m(), 0, 0, 0);
+            return;
+        }
         uassertStatusOK(getMoreResponse.getStatus());
 
         // Build the response document.
