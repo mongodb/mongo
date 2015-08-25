@@ -413,8 +413,8 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	 * cannot be discarded while reconciliation is in progress;
 	 *    The compaction process reads page modification information, which
 	 * reconciliation modifies;
-	 *    There's a deadlock when performing an in-memory split during a
-	 * checkpoint.
+	 *    In-memory splits: reconciliation of an internal page cannot handle
+	 * a child page splitting during the reconciliation.
 	 */
 	F_CAS_ATOMIC_WAIT(page, WT_PAGE_RECONCILIATION);
 
