@@ -1261,7 +1261,7 @@ fast:		/* If the page can't be evicted, give up. */
 		if (__wt_ref_is_root(ref))
 			WT_RET(__evict_clear_walk(session));
 		else if (ref->page->read_gen == WT_READGEN_OLDEST)
-			WT_RET(__wt_tree_walk(session,
+			WT_RET_NOTFOUND_OK(__wt_tree_walk(session,
 			    &btree->evict_ref, &pages_walked, walk_flags));
 	}
 
