@@ -236,14 +236,14 @@ __wt_stat_dsrc_aggregate_single(
 	    from->block_free;
 	to->block_checkpoint_size +=
 	    from->block_checkpoint_size;
-		/* not aggregating allocation_size */
+	to->allocation_size = from->allocation_size;
 	to->block_reuse_bytes +=
 	    from->block_reuse_bytes;
-		/* not aggregating block_magic */
-		/* not aggregating block_major */
+	to->block_magic = from->block_magic;
+	to->block_major = from->block_major;
 	to->block_size +=
 	    from->block_size;
-		/* not aggregating block_minor */
+	to->block_minor = from->block_minor;
 	to->btree_checkpoint_generation +=
 	    from->btree_checkpoint_generation;
 	to->btree_column_fix +=
@@ -254,7 +254,7 @@ __wt_stat_dsrc_aggregate_single(
 	    from->btree_column_deleted;
 	to->btree_column_variable +=
 	    from->btree_column_variable;
-		/* not aggregating btree_fixed_len */
+	to->btree_fixed_len = from->btree_fixed_len;
 	if (from->btree_maxintlkey > to->btree_maxintlkey)
 		to->btree_maxintlkey = from->btree_maxintlkey;
 	if (from->btree_maxintlpage > to->btree_maxintlpage)
@@ -421,14 +421,14 @@ __wt_stat_dsrc_aggregate(
 	    (int64_t)WT_STAT_READ(from, block_free);
 	to->block_checkpoint_size +=
 	    (int64_t)WT_STAT_READ(from, block_checkpoint_size);
-		/* not aggregating allocation_size */
+	to->allocation_size = from[0]->allocation_size;
 	to->block_reuse_bytes +=
 	    (int64_t)WT_STAT_READ(from, block_reuse_bytes);
-		/* not aggregating block_magic */
-		/* not aggregating block_major */
+	to->block_magic = from[0]->block_magic;
+	to->block_major = from[0]->block_major;
 	to->block_size +=
 	    (int64_t)WT_STAT_READ(from, block_size);
-		/* not aggregating block_minor */
+	to->block_minor = from[0]->block_minor;
 	to->btree_checkpoint_generation +=
 	    (int64_t)WT_STAT_READ(from, btree_checkpoint_generation);
 	to->btree_column_fix +=
@@ -439,7 +439,7 @@ __wt_stat_dsrc_aggregate(
 	    (int64_t)WT_STAT_READ(from, btree_column_deleted);
 	to->btree_column_variable +=
 	    (int64_t)WT_STAT_READ(from, btree_column_variable);
-		/* not aggregating btree_fixed_len */
+	to->btree_fixed_len = from[0]->btree_fixed_len;
 	if ((v = WT_STAT_READ(from, btree_maxintlkey)) >
 	    (uint64_t)to->btree_maxintlkey)
 		to->btree_maxintlkey = (int64_t)v;
