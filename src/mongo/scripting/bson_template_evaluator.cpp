@@ -167,7 +167,7 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandInt(BsonTemplateEva
     if (max <= min)
         return StatusOpEvaluationError;
     // range of max-min
-    int randomNum = min + (btl->rng.nextInt32() % (max - min));
+    int randomNum = min + (btl->rng.nextInt32(max - min));
     if (range.nFields() == 3) {
         if (!range[2].isNumber())
             return StatusOpEvaluationError;
@@ -189,7 +189,7 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandPlusThread(BsonTemp
     const int max = range["1"].numberInt();
     if (max <= min)
         return StatusOpEvaluationError;
-    int randomNum = min + (btl->rng.nextInt32() % (max - min));
+    int randomNum = min + (btl->rng.nextInt32(max - min));
     randomNum += ((max - min) * btl->_id);
     out.append(fieldName, randomNum);
     return StatusSuccess;
