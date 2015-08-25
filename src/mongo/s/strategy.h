@@ -41,11 +41,11 @@ class OperationContext;
  */
 class Strategy {
 public:
-    static void queryOp(OperationContext* txn, Request& r);
+    static void queryOp(OperationContext* txn, Request& request);
 
-    static void getMore(OperationContext* txn, Request& r);
+    static void getMore(OperationContext* txn, Request& request);
 
-    static void writeOp(OperationContext* txn, int op, Request& r);
+    static void writeOp(OperationContext* txn, int op, Request& request);
 
     struct CommandResult {
         ShardId shardTargetId;
@@ -91,10 +91,10 @@ public:
      *
      * DEPRECATED: should not be used by new code.
      */
-    static void clientCommandOp(OperationContext* txn, Request& r);
+    static void clientCommandOp(OperationContext* txn, Request& request);
 
 protected:
-    static bool handleSpecialNamespaces(OperationContext* txn, Request& r, QueryMessage& q);
+    static bool handleSpecialNamespaces(OperationContext* txn, Request& request, QueryMessage& q);
 };
 
 }  // namespace mongo
