@@ -180,18 +180,18 @@ __wt_stat_''' + name + '''_aggregate(
     # a temporary variable until it's needed.
     for l in sorted(list):
         if 'max_aggregate' in l.flags:
-            f.write('\tuint64_t v;\n\n')
+            f.write('\tint64_t v;\n\n')
             break;
     for l in sorted(list):
         if 'no_aggregate' in l.flags:
             o = '\tto->' + l.name + ' = from[0]->' + l.name + ';\n'
         elif 'max_aggregate' in l.flags:
             o = '\tif ((v = WT_STAT_READ(from, ' + l.name + ')) >\n' +\
-                '\t    (uint64_t)to->' + l.name + ')\n' +\
-                '\t\tto->' + l.name + ' = (int64_t)v;\n'
+                '\t    to->' + l.name + ')\n' +\
+                '\t\tto->' + l.name + ' = v;\n'
         else:
             o = '\tto->' + l.name +\
-                ' +=\n\t    (int64_t)WT_STAT_READ(from, ' + l.name + ');\n'
+                ' +=\n\t    WT_STAT_READ(from, ' + l.name + ');\n'
         f.write(o)
     f.write('}\n')
 
