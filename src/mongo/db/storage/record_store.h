@@ -384,6 +384,14 @@ public:
      */
     virtual bool updateWithDamagesSupported() const = 0;
 
+    /**
+     * Updates the record positioned at 'loc' in-place using the deltas described by 'damages'. The
+     * 'damages' vector describes contiguous ranges of 'damageSource' from which to copy and apply
+     * byte-level changes to the data.
+     *
+     * @return the updated version of the record. If unowned data is returned, then it is valid
+     * until the next modification of this Record or the lock on the collection has been released.
+     */
     virtual StatusWith<RecordData> updateWithDamages(OperationContext* txn,
                                                      const RecordId& loc,
                                                      const RecordData& oldRec,

@@ -928,7 +928,7 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
     const RecordData& oldRec,
     const char* damageSource,
     const mutablebson::DamageVector& damages) {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 void WiredTigerRecordStore::_oplogSetStartHack(WiredTigerRecoveryUnit* wru) const {
