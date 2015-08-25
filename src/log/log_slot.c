@@ -98,8 +98,8 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
 	WT_LOG *log;
 	int dummy;
-	int64_t state;
 #ifdef HAVE_DIAGNOSTIC
+	int64_t state;
 	int32_t j, r;
 #endif
 
@@ -118,8 +118,8 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * should be done now.
 	 */
 	WT_ASSERT(session, dummy == 0);
-	state = slot->slot_state;
 #ifdef HAVE_DIAGNOSTIC
+	state = slot->slot_state;
 	j = WT_LOG_SLOT_JOINED(state);
 	r = WT_LOG_SLOT_RELEASED(state);
 	WT_ASSERT(session, j > r);
