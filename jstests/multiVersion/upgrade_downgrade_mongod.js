@@ -534,6 +534,7 @@
             storageEngine: "wiredTiger",
             data: {
                 indexNames: {_id_: 1},
+                failedConn: true
             },
             init: [init_fullTextSearch],
             verify: [verify_fullTextSearch]
@@ -546,6 +547,7 @@
             storageEngine: "wiredTiger",
             data: {
                 indexNames: {_id_: 1},
+                failedConn: true
             },
             init: [init_geo],
             verify: [verify_geo]
