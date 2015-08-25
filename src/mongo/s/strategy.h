@@ -45,6 +45,8 @@ public:
 
     static void getMore(OperationContext* txn, Request& request);
 
+    static void killCursors(OperationContext* txn, Request& request);
+
     static void writeOp(OperationContext* txn, int op, Request& request);
 
     struct CommandResult {

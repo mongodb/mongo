@@ -95,7 +95,7 @@ void Request::process(OperationContext* txn, int attempt) {
 
     bool iscmd = false;
     if (op == dbKillCursors) {
-        cursorCache.gotKillCursors(_m);
+        Strategy::killCursors(txn, *this);
         globalOpCounters.gotOp(op, iscmd);
     } else if (op == dbQuery) {
         NamespaceString nss(getns());

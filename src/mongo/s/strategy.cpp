@@ -32,8 +32,9 @@
 
 #include "mongo/s/strategy.h"
 
-#include "mongo/base/status.h"
+#include "mongo/base/data_cursor.h"
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
@@ -663,6 +664,57 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
 
         replyToQuery(ResultFlag_CursorNotFound, request.p(), request.m(), 0, 0, 0);
         return;
+    }
+}
+
+void Strategy::killCursors(OperationContext* txn, Request& request) {
+    if (!useClusterClientCursor) {
+        cursorCache.gotKillCursors(request.m());
+        return;
+    }
+
+    DbMessage& dbMessage = request.d();
+    const int numCursors = dbMessage.pullInt();
+    massert(28793,
+            str::stream() << "Invalid killCursors message. numCursors: " << numCursors
+                          << ", message size: " << dbMessage.msg().dataSize() << ".",
+            dbMessage.msg().dataSize() == 8 + (8 * numCursors));
+    uassert(28794,
+            str::stream() << "numCursors must be between 1 and 29999.  numCursors: " << numCursors
+                          << ".",
+            numCursors >= 1 && numCursors < 30000);
+    ConstDataCursor cursors(dbMessage.getArray(numCursors));
+    Client* client = txn->getClient();
+    AuthorizationSession* authSession = AuthorizationSession::get(client);
+    ClusterCursorManager* manager = grid.getCursorManager();
+
+    for (int i = 0; i < numCursors; ++i) {
+        CursorId cursorId = cursors.readAndAdvance<LittleEndian<int64_t>>();
+        boost::optional<NamespaceString> nss = manager->getNamespaceForCursorId(cursorId);
+        if (!nss) {
+            LOG(3) << "Can't find cursor to kill.  Cursor id: " << cursorId << ".";
+            continue;
+        }
+
+        Status authorizationStatus = authSession->checkAuthForKillCursors(*nss, cursorId);
+        audit::logKillCursorsAuthzCheck(client,
+                                        *nss,
+                                        cursorId,
+                                        authorizationStatus.isOK() ? ErrorCodes::OK
+                                                                   : ErrorCodes::Unauthorized);
+        if (!authorizationStatus.isOK()) {
+            LOG(3) << "Not authorized to kill cursor.  Namespace: '" << *nss
+                   << "', cursor id: " << cursorId << ".";
+            continue;
+        }
+
+        Status killCursorStatus = manager->killCursor(*nss, cursorId);
+        if (!killCursorStatus.isOK()) {
+            LOG(3) << "Can't find cursor to kill.  Namespace: '" << *nss
+                   << "', cursor id: " << cursorId << ".";
+            continue;
+        }
+        LOG(3) << "Killed cursor.  Namespace: '" << *nss << "', cursor id: " << cursorId << ".";
     }
 }
 
