@@ -279,8 +279,15 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() 
     if (!eventStatus.isOK()) {
         return eventStatus;
     }
-    _currentEvent = eventStatus.getValue();
-    return _currentEvent;
+    auto eventToReturn = eventStatus.getValue();
+    _currentEvent = eventToReturn;
+
+    // It's possible that after we told the caller we had no ready results but before the call to
+    // this method, new results became available. In this case we have to signal the event right
+    // away so that the caller will not block.
+    signalCurrentEventIfReady_inlock();
+
+    return eventToReturn;
 }
 
 void AsyncResultsMerger::handleBatchResponse(
@@ -298,7 +305,7 @@ void AsyncResultsMerger::handleBatchResponse(
         invariant(_lifecycleState == kKillStarted);
 
         // Make sure to wake up anyone waiting on '_currentEvent' if we're shutting down.
-        signalCurrentEvent_inlock();
+        signalCurrentEventIfReady_inlock();
 
         // If we're killed and we're not waiting on any more batches to come back, then we are ready
         // to kill the cursors on the remote hosts and clean up this cursor. Schedule the
@@ -319,7 +326,7 @@ void AsyncResultsMerger::handleBatchResponse(
     }
 
     // Early return from this point on signal anyone waiting on an event, if ready() is true.
-    ScopeGuard signaller = MakeGuard(&AsyncResultsMerger::signalCurrentEvent_inlock, this);
+    ScopeGuard signaller = MakeGuard(&AsyncResultsMerger::signalCurrentEventIfReady_inlock, this);
 
     if (!cbData.response.isOK()) {
         remote.status = cbData.response.getStatus();
@@ -382,10 +389,10 @@ void AsyncResultsMerger::handleBatchResponse(
     // ScopeGuard requires dismiss on success, but we want waiter to be signalled on success as
     // well as failure.
     signaller.Dismiss();
-    signalCurrentEvent_inlock();
+    signalCurrentEventIfReady_inlock();
 }
 
-void AsyncResultsMerger::signalCurrentEvent_inlock() {
+void AsyncResultsMerger::signalCurrentEventIfReady_inlock() {
     if (ready_inlock() && _currentEvent.isValid()) {
         // To prevent ourselves from signalling the event twice, we set '_currentEvent' as
         // invalid after signalling it.

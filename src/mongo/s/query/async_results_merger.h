@@ -239,10 +239,13 @@ private:
                              size_t remoteIndex);
 
     /**
-     * If there is a valid unsignaled event that has been requested via nextReady(), signals that
-     * event.
+     * If there is a valid unsignaled event that has been requested via nextReady() and there are
+     * buffered results that are ready to return, signals that event.
+     *
+     * Invalidates the current event, as we must signal the event exactly once and we only keep a
+     * handle to a valid event if it is unsignaled.
      */
-    void signalCurrentEvent_inlock();
+    void signalCurrentEventIfReady_inlock();
 
     /**
      * Returns true if this async cursor is waiting to receive another batch from a remote.
