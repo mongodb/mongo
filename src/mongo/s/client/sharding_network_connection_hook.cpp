@@ -33,7 +33,11 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/set_shard_version_request.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -66,11 +70,31 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
 
 StatusWith<boost::optional<executor::RemoteCommandRequest>>
 ShardingNetworkConnectionHook::makeRequest(const HostAndPort& remoteHost) {
-    return {boost::none};
+    auto shard = grid.shardRegistry()->getShardNoReload(remoteHost.toString());
+    if (!shard) {
+        return Status(ErrorCodes::ShardNotFound,
+                      str::stream() << "No shard found for host: " << remoteHost.toString());
+    }
+    if (shard->isConfig()) {
+        // No need to initialize sharding metadata if talking to a config server
+        return {boost::none};
+    }
+
+    SetShardVersionRequest ssv = SetShardVersionRequest::makeForInitNoPersist(
+        grid.shardRegistry()->getConfigServerConnectionString(),
+        shard->getId(),
+        shard->getConnString());
+    executor::RemoteCommandRequest request;
+    request.dbname = "admin";
+    request.target = remoteHost;
+    request.timeout = stdx::chrono::seconds{30};
+    request.cmdObj = ssv.toBSON();
+
+    return {request};
 }
 
 Status ShardingNetworkConnectionHook::handleReply(const HostAndPort& remoteHost,
                                                   executor::RemoteCommandResponse&& response) {
-    return Status::OK();
+    return getStatusFromCommandResult(response.data);
 }
 }  // namespace mongo

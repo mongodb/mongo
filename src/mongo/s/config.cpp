@@ -792,7 +792,8 @@ void ConfigServer::reloadSettings(OperationContext* txn) {
     }
 }
 
-void ConfigServer::replicaSetChange(const string& setName, const string& newConnectionString) {
+void ConfigServer::configOrShardReplicaSetChange(const string& setName,
+                                                 const string& newConnectionString) {
     // This is run in it's own thread. Exceptions escaping would result in a call to terminate.
     Client::initThread("replSetChange");
     auto txn = cc().makeOperationContext();
@@ -822,9 +823,38 @@ void ConfigServer::replicaSetChange(const string& setName, const string& newConn
             }
         }
     } catch (const std::exception& e) {
-        log() << "caught exception while updating config servers: " << e.what();
+        warning() << "caught exception while updating config servers: " << e.what();
     } catch (...) {
-        log() << "caught unknown exception while updating config servers";
+        warning() << "caught unknown exception while updating config servers";
+    }
+}
+
+void ConfigServer::configReplicaSetChange(const string& setName,
+                                          const string& newConnectionString) {
+    // This is run in it's own thread. Exceptions escaping would result in a call to terminate.
+    Client::initThread("replSetChange");
+    auto txn = cc().makeOperationContext();
+
+    try {
+        std::shared_ptr<Shard> s = grid.shardRegistry()->lookupRSName(setName);
+        if (!s) {
+            LOG(1) << "shard not found for set: " << newConnectionString;
+            return;
+        }
+
+        if (!s->isConfig()) {
+            return;
+        }
+
+        grid.shardRegistry()->updateConfigServerConnectionString(
+            fassertStatusOK(28801, ConnectionString::parse(newConnectionString)));
+
+    } catch (const std::exception& e) {
+        warning() << "caught exception while updating shard registry with new address for config "
+                     "servers: " << e.what();
+    } catch (...) {
+        warning() << "caught unknown exception while updating shard registry with new address for "
+                     "config servers";
     }
 }
 

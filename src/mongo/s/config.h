@@ -212,8 +212,20 @@ class ConfigServer {
 public:
     static void reloadSettings(OperationContext* txn);
 
-    static void replicaSetChange(const std::string& setName,
-                                 const std::string& newConnectionString);
+    /**
+     * For use in mongod which only needs notifications about the config server replset membership
+     * changes, to update the ShardRegistry.
+     */
+    static void configReplicaSetChange(const std::string& setName,
+                                       const std::string& newConnectionString);
+
+    /**
+     * For use in mongos which needs notifications about changes to both the config server replset
+     * membership (to update the ShardRegistry, same as in mongod) and for changes to regular shard
+     * replset membership changes to update the config.shards collection.
+     */
+    static void configOrShardReplicaSetChange(const std::string& setName,
+                                              const std::string& newConnectionString);
 };
 
 }  // namespace mongo

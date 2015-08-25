@@ -66,4 +66,9 @@ const ChunkVersion& OperationShardVersion::getShardVersion() const {
     return _shardVersion;
 }
 
+void OperationShardVersion::setShardVersion(const ChunkVersion& version) {
+    _shardVersion = version;
+    _hasVersion = true;
+}
+
 }  // namespace mongo

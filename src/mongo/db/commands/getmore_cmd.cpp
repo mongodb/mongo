@@ -50,8 +50,10 @@
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -149,6 +151,9 @@ public:
             return appendCommandStatus(result, parseStatus.getStatus());
         }
         const GetMoreRequest& request = parseStatus.getValue();
+
+        // Disable shard version checking - getmore commands are always unversioned
+        OperationShardVersion::get(txn).setShardVersion(ChunkVersion::IGNORED());
 
         // Depending on the type of cursor being operated on, we hold locks for the whole
         // getMore, or none of the getMore, or part of the getMore.  The three cases in detail:

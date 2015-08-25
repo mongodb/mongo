@@ -74,7 +74,7 @@ protected:
      * a standalone host.
      */
     void expectNewShardCheckStandalone() {
-        onCommand([](const RemoteCommandRequest& request) {
+        onCommandForAddShard([](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_EQ(request.cmdObj, BSON("isdbgrid" << 1));
@@ -88,7 +88,7 @@ protected:
             return responseBuilder.obj();
         });
 
-        onCommand([](const RemoteCommandRequest& request) {
+        onCommandForAddShard([](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_EQ(request.cmdObj, BSON("isMaster" << 1));
@@ -98,7 +98,7 @@ protected:
             return BSON("ismaster" << true);
         });
 
-        onCommand([](const RemoteCommandRequest& request) {
+        onCommandForAddShard([](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_EQ(request.cmdObj, BSON("replSetGetStatus" << 1));
@@ -188,7 +188,7 @@ TEST_F(AddShardTest, AddShardStandalone) {
     expectNewShardCheckStandalone();
 
     // Get databases list from new shard
-    onCommand(
+    onCommandForAddShard(
         [](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
             ASSERT_EQ(request.dbname, "admin");
@@ -302,7 +302,7 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
     expectNewShardCheckStandalone();
 
     // Get databases list from new shard
-    onCommand(
+    onCommandForAddShard(
         [](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, HostAndPort("StandaloneHost:12345"));
             ASSERT_EQ(request.dbname, "admin");

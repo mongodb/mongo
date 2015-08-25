@@ -81,6 +81,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
         stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
                                          makeTaskExecutor(std::move(network)),
                                          networkPtr,
+                                         makeTaskExecutor(executor::makeNetworkInterface()),
                                          configCS));
 
     std::unique_ptr<ForwardingCatalogManager> catalogManager;

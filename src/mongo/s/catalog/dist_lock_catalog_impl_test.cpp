@@ -108,6 +108,8 @@ private:
         auto networkUniquePtr = stdx::make_unique<executor::NetworkInterfaceMock>();
         executor::NetworkInterfaceMock* network = networkUniquePtr.get();
         auto executor = executor::makeThreadPoolTestExecutor(std::move(networkUniquePtr));
+        auto addShardExecutor = executor::makeThreadPoolTestExecutor(
+            stdx::make_unique<executor::NetworkInterfaceMock>());
 
         _networkTestEnv = stdx::make_unique<NetworkTestEnv>(executor.get(), network);
 
@@ -116,6 +118,7 @@ private:
             stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
                                              std::move(executor),
                                              network,
+                                             std::move(addShardExecutor),
                                              configCS);
         _shardRegistry->startup();
 

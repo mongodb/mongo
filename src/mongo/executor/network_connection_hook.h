@@ -74,7 +74,7 @@ public:
      *
      * The command will be run after socket setup, SSL handshake, authentication, and wire
      * protocol detection, but before any commands submitted to the NetworkInterface via
-     * startCommand are run. In the case that it isn't neccessary to run a command, makeRequest
+     * startCommand are run. In the case that it isn't necessary to run a command, makeRequest
      * may return boost::none.
      *
      * This method may be called on a different thread from the caller of startCommand that caused

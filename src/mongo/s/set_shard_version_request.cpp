@@ -82,6 +82,15 @@ SetShardVersionRequest SetShardVersionRequest::makeForInit(
     return SetShardVersionRequest(configServer, shardName, shardConnectionString);
 }
 
+SetShardVersionRequest SetShardVersionRequest::makeForInitNoPersist(
+    const ConnectionString& configServer,
+    const std::string& shardName,
+    const ConnectionString& shardConnectionString) {
+    auto ssv = SetShardVersionRequest(configServer, shardName, shardConnectionString);
+    ssv._noConnectionVersioning = true;
+    return ssv;
+}
+
 SetShardVersionRequest SetShardVersionRequest::makeForVersioning(
     const ConnectionString& configServer,
     const std::string& shardName,

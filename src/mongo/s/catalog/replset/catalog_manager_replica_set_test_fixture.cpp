@@ -86,13 +86,19 @@ void CatalogManagerReplSetTestFixture::setUp() {
     auto targeterFactory(stdx::make_unique<RemoteCommandTargeterFactoryMock>());
     _targeterFactory = targeterFactory.get();
 
+    // Set up first executor used for most operations
     auto network(stdx::make_unique<executor::NetworkInterfaceMock>());
     _mockNetwork = network.get();
-
     auto executor = makeThreadPoolTestExecutor(std::move(network));
-
     _networkTestEnv = stdx::make_unique<NetworkTestEnv>(executor.get(), _mockNetwork);
     _executor = executor.get();
+
+    // Set up second executor used for a few special operations during addShard
+    auto network2(stdx::make_unique<executor::NetworkInterfaceMock>());
+    auto mockNetwork2 = network2.get();
+    auto executor2 = makeThreadPoolTestExecutor(std::move(network2));
+    _addShardNetworkTestEnv = stdx::make_unique<NetworkTestEnv>(executor2.get(), mockNetwork2);
+    _executorForAddShard = executor2.get();
 
     auto uniqueDistLockManager = stdx::make_unique<DistLockManagerMock>();
     _distLockManager = uniqueDistLockManager.get();
@@ -106,8 +112,11 @@ void CatalogManagerReplSetTestFixture::setUp() {
     _configTargeter = configTargeter.get();
     _targeterFactory->addTargeterToReturn(configCS, std::move(configTargeter));
 
-    auto shardRegistry(stdx::make_unique<ShardRegistry>(
-        std::move(targeterFactory), std::move(executor), _mockNetwork, configCS));
+    auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(targeterFactory),
+                                                        std::move(executor),
+                                                        _mockNetwork,
+                                                        std::move(executor2),
+                                                        configCS));
     shardRegistry->startup();
 
     // For now initialize the global grid object. All sharding objects will be accessible
@@ -132,6 +141,7 @@ void CatalogManagerReplSetTestFixture::tearDown() {
 void CatalogManagerReplSetTestFixture::shutdownExecutor() {
     if (_executor) {
         _executor->shutdown();
+        _executorForAddShard->shutdown();
     }
 }
 
@@ -180,6 +190,11 @@ OperationContext* CatalogManagerReplSetTestFixture::operationContext() const {
 
 void CatalogManagerReplSetTestFixture::onCommand(NetworkTestEnv::OnCommandFunction func) {
     _networkTestEnv->onCommand(func);
+}
+
+void CatalogManagerReplSetTestFixture::onCommandForAddShard(
+    NetworkTestEnv::OnCommandFunction func) {
+    _addShardNetworkTestEnv->onCommand(func);
 }
 
 void CatalogManagerReplSetTestFixture::onCommandWithMetadata(

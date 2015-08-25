@@ -111,7 +111,8 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
     StatusWith<BSONObj> cmdStatus{ErrorCodes::InternalError, "uninitialized value"};
 
     // Is it mongos?
-    cmdStatus = shardRegistry->runCommand(txn, shardHost, "admin", BSON("isdbgrid" << 1));
+    cmdStatus =
+        shardRegistry->runCommandForAddShard(txn, shardHost, "admin", BSON("isdbgrid" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -122,7 +123,8 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
     }
 
     // Is it a replica set?
-    cmdStatus = shardRegistry->runCommand(txn, shardHost, "admin", BSON("isMaster" << 1));
+    cmdStatus =
+        shardRegistry->runCommandForAddShard(txn, shardHost, "admin", BSON("isMaster" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -155,7 +157,8 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
     }
 
     // Is it a mongos config server?
-    cmdStatus = shardRegistry->runCommand(txn, shardHost, "admin", BSON("replSetGetStatus" << 1));
+    cmdStatus = shardRegistry->runCommandForAddShard(
+        txn, shardHost, "admin", BSON("replSetGetStatus" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -264,7 +267,8 @@ StatusWith<std::vector<std::string>> getDBNamesListFromShard(
 
     const HostAndPort& shardHost = shardHostStatus.getValue();
 
-    auto cmdStatus = shardRegistry->runCommand(txn, shardHost, "admin", BSON("listDatabases" << 1));
+    auto cmdStatus =
+        shardRegistry->runCommandForAddShard(txn, shardHost, "admin", BSON("listDatabases" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }

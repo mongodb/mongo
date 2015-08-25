@@ -69,16 +69,19 @@ const Milliseconds kNotMasterRetryInterval{500};
 ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
                              std::unique_ptr<executor::TaskExecutor> executor,
                              executor::NetworkInterface* network,
+                             std::unique_ptr<executor::TaskExecutor> addShardExecutor,
                              ConnectionString configServerCS)
     : _targeterFactory(std::move(targeterFactory)),
       _executor(std::move(executor)),
-      _network(network) {
+      _network(network),
+      _executorForAddShard(std::move(addShardExecutor)) {
     updateConfigServerConnectionString(configServerCS);
 }
 
 ShardRegistry::~ShardRegistry() = default;
 
 void ShardRegistry::updateConfigServerConnectionString(ConnectionString configServerCS) {
+    log() << "Updating config server connection string to: " << configServerCS.toString();
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _configServerCS = std::move(configServerCS);
 
@@ -86,12 +89,15 @@ void ShardRegistry::updateConfigServerConnectionString(ConnectionString configSe
 }
 
 void ShardRegistry::startup() {
+    _executorForAddShard->startup();
     _executor->startup();
 }
 
 void ShardRegistry::shutdown() {
     _executor->shutdown();
+    _executorForAddShard->shutdown();
     _executor->join();
+    _executorForAddShard->join();
 }
 
 void ShardRegistry::reload(OperationContext* txn) {
@@ -135,6 +141,10 @@ shared_ptr<Shard> ShardRegistry::getShard(OperationContext* txn, const ShardId& 
     // If we can't find the shard, we might just need to reload the cache
     reload(txn);
 
+    return _findUsingLookUp(shardId);
+}
+
+shared_ptr<Shard> ShardRegistry::getShardNoReload(const ShardId& shardId) {
     return _findUsingLookUp(shardId);
 }
 
@@ -251,12 +261,6 @@ void ShardRegistry::_addShard_inlock(const ShardType& shardType) {
         _rsLookup[shardHost.getSetName()] = shard;
     }
 
-    // Config servers never go through the set shard version mechanism, so there is no need to have
-    // them in the reverse-lookup map.
-    if (shard->isConfig()) {
-        return;
-    }
-
     // TODO: The only reason to have the shard host names in the lookup table is for the
     // setShardVersion call, which resolves the shard id from the shard address. This is
     // error-prone and will go away eventually when we switch all communications to go through
@@ -358,9 +362,26 @@ StatusWith<BSONObj> ShardRegistry::runCommand(OperationContext* txn,
                                               const HostAndPort& host,
                                               const std::string& dbName,
                                               const BSONObj& cmdObj) {
-    auto status = _runCommandWithMetadata(host, dbName, cmdObj, rpc::makeEmptyMetadata());
-    // TODO(spencer): Reload registry if status is ShardNotFound
+    auto status =
+        _runCommandWithMetadata(_executor.get(), host, dbName, cmdObj, rpc::makeEmptyMetadata());
+    if (status.getStatus() == ErrorCodes::ShardNotFound) {  // One retry if the shard isn't found.
+        reload(txn);
+        status = _runCommandWithMetadata(
+            _executor.get(), host, dbName, cmdObj, rpc::makeEmptyMetadata());
+    }
+    if (!status.isOK()) {
+        return status.getStatus();
+    }
 
+    return status.getValue().response;
+}
+
+StatusWith<BSONObj> ShardRegistry::runCommandForAddShard(OperationContext* txn,
+                                                         const HostAndPort& host,
+                                                         const std::string& dbName,
+                                                         const BSONObj& cmdObj) {
+    auto status = _runCommandWithMetadata(
+        _executorForAddShard.get(), host, dbName, cmdObj, rpc::makeEmptyMetadata());
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -373,7 +394,7 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandOnConfig(
     const std::string& dbName,
     const BSONObj& cmdObj,
     const BSONObj& metadata) {
-    return _runCommandWithMetadata(host, dbName, cmdObj, metadata);
+    return _runCommandWithMetadata(_executor.get(), host, dbName, cmdObj, metadata);
 }
 
 StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
@@ -390,36 +411,30 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(const 
 StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandOnConfigWithNotMasterRetries(
     const std::string& dbname, const BSONObj& cmdObj, const BSONObj& metadata) {
     auto configShard = getConfigShard();
-    return _runCommandWithNotMasterRetries(configShard->getTargeter(), dbname, cmdObj, metadata);
+    return _runCommandWithNotMasterRetries(
+        _executor.get(), configShard->getTargeter(), dbname, cmdObj, metadata);
 }
 
 StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationContext* txn,
                                                                   const ShardId& shardId,
                                                                   const std::string& dbname,
                                                                   const BSONObj& cmdObj) {
-    auto status =
-        runCommandWithNotMasterRetries(txn, shardId, dbname, cmdObj, rpc::makeEmptyMetadata());
-
-    if (!status.isOK()) {
-        return status.getStatus();
-    }
-
-    return status.getValue().response;
-}
-
-StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithNotMasterRetries(
-    OperationContext* txn,
-    const ShardId& shardId,
-    const std::string& dbname,
-    const BSONObj& cmdObj,
-    const BSONObj& metadata) {
     auto shard = getShard(txn, shardId);
-    auto response = _runCommandWithNotMasterRetries(shard->getTargeter(), dbname, cmdObj, metadata);
-    // TODO(spencer): Reload registry if status is ShardNotFound
-    return response;
+    auto response = _runCommandWithNotMasterRetries(
+        _executor.get(), shard->getTargeter(), dbname, cmdObj, rpc::makeEmptyMetadata());
+    if (response.getStatus() == ErrorCodes::ShardNotFound) {  // One retry if the shard isn't found.
+        reload(txn);
+        response = _runCommandWithNotMasterRetries(
+            _executor.get(), shard->getTargeter(), dbname, cmdObj, rpc::makeEmptyMetadata());
+    }
+    if (!response.isOK()) {
+        return response.getStatus();
+    }
+    return response.getValue().response;
 }
 
 StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMasterRetries(
+    TaskExecutor* executor,
     RemoteCommandTargeter* targeter,
     const std::string& dbname,
     const BSONObj& cmdObj,
@@ -440,7 +455,8 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMast
             return target.getStatus();
         }
 
-        auto response = _runCommandWithMetadata(target.getValue(), dbname, cmdObj, metadata);
+        auto response =
+            _runCommandWithMetadata(executor, target.getValue(), dbname, cmdObj, metadata);
         if (!response.isOK()) {
             return response.getStatus();
         }
@@ -464,6 +480,7 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMast
 }
 
 StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadata(
+    TaskExecutor* executor,
     const HostAndPort& host,
     const std::string& dbName,
     const BSONObj& cmdObj,
@@ -473,16 +490,16 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
 
     executor::RemoteCommandRequest request(host, dbName, cmdObj, metadata, kConfigCommandTimeout);
     auto callStatus =
-        _executor->scheduleRemoteCommand(request,
-                                         [&responseStatus](const RemoteCommandCallbackArgs& args) {
-                                             responseStatus = args.response;
-                                         });
+        executor->scheduleRemoteCommand(request,
+                                        [&responseStatus](const RemoteCommandCallbackArgs& args) {
+                                            responseStatus = args.response;
+                                        });
     if (!callStatus.isOK()) {
         return callStatus.getStatus();
     }
 
     // Block until the command is carried out
-    _executor->wait(callStatus.getValue());
+    executor->wait(callStatus.getValue());
 
     if (!responseStatus.isOK()) {
         return responseStatus.getStatus();

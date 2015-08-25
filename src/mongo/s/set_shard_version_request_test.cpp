@@ -79,6 +79,24 @@ TEST(SetShardVersionRequest, ParseInitWithAuthoritative) {
     ASSERT_EQ(request.getShardConnectionString().toString(), shardCS.toString());
 }
 
+TEST(SetShardVersionRequest, ParseInitNoConnectionVersioning) {
+    SetShardVersionRequest request =
+        assertGet(SetShardVersionRequest::parseFromBSON(
+            BSON("setShardVersion"
+                 << ""
+                 << "init" << true << "authoritative" << true << "configdb" << configCS.toString()
+                 << "shard"
+                 << "TestShard"
+                 << "shardHost" << shardCS.toString() << "noConnectionVersioning" << true)));
+
+    ASSERT(request.isInit());
+    ASSERT(request.isAuthoritative());
+    ASSERT(request.getNoConnectionVersioning());
+    ASSERT_EQ(request.getConfigServer().toString(), configCS.toString());
+    ASSERT_EQ(request.getShardName(), "TestShard");
+    ASSERT_EQ(request.getShardConnectionString().toString(), shardCS.toString());
+}
+
 TEST(SetShardVersionRequest, ParseFull) {
     const ChunkVersion chunkVersion(1, 2, OID::gen());
 
@@ -212,6 +230,26 @@ TEST(SetShardVersionRequest, ToSSVCommandInit) {
                    << "shard"
                    << "TestShard"
                    << "shardHost" << shardCS.toString()));
+}
+
+TEST(SetShardVersionRequest, ToSSVCommandInitNoConnectionVersioning) {
+    SetShardVersionRequest ssv =
+        SetShardVersionRequest::makeForInitNoPersist(configCS, "TestShard", shardCS);
+
+    ASSERT(ssv.isInit());
+    ASSERT(ssv.isAuthoritative());
+    ASSERT(ssv.getNoConnectionVersioning());
+    ASSERT_EQ(ssv.getConfigServer().toString(), configCS.toString());
+    ASSERT_EQ(ssv.getShardName(), "TestShard");
+    ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
+
+    ASSERT_EQ(ssv.toBSON(),
+              BSON("setShardVersion"
+                   << ""
+                   << "init" << true << "authoritative" << true << "configdb" << configCS.toString()
+                   << "shard"
+                   << "TestShard"
+                   << "shardHost" << shardCS.toString() << "noConnectionVersioning" << true));
 }
 
 TEST(SetShardVersionRequest, ToSSVCommandFull) {

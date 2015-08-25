@@ -69,6 +69,11 @@ public:
      */
     const ChunkVersion& getShardVersion() const;
 
+    /**
+     * Stores the given chunk version into this object.
+     */
+    void setShardVersion(const ChunkVersion& version);
+
 private:
     bool _hasVersion = false;
     ChunkVersion _shardVersion;

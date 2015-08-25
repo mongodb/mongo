@@ -33,6 +33,7 @@
 #include "mongo/db/s/sharding_state.h"
 
 #include "mongo/client/remote_command_targeter_factory_impl.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
@@ -44,6 +45,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/util/log.h"
@@ -155,6 +157,7 @@ void ShardingState::initialize(OperationContext* txn, const string& server) {
     }
 
     ShardedConnectionInfo::addHook();
+    ReplicaSetMonitor::setConfigChangeHook(&ConfigServer::configReplicaSetChange);
 
     ConnectionString configServerCS = uassertStatusOK(ConnectionString::parse(server));
     uassertStatusOK(initializeGlobalShardingState(txn, configServerCS, false));
