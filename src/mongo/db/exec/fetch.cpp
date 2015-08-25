@@ -128,6 +128,9 @@ PlanStage::StageState FetchStage::work(WorkingSetID* out) {
                     return NEED_TIME;
                 }
             } catch (const WriteConflictException& wce) {
+                // Ensure that the BSONObj underlying the WorkingSetMember is owned because it may
+                // be freed when we yield.
+                member->makeObjOwned();
                 _idRetrying = id;
                 *out = WorkingSet::INVALID_ID;
                 _commonStats.needYield++;

@@ -98,11 +98,10 @@ static bool handleCursorCommand(OperationContext* txn,
             break;
         }
 
+        // If adding this object will cause us to exceed the BSON size limit, then we stash it for
+        // later.
         if (resultsArray.len() + next.objsize() > byteLimit) {
-            // Get the pipeline proxy stage wrapped by this PlanExecutor.
-            PipelineProxyStage* proxy = static_cast<PipelineProxyStage*>(exec->getRootStage());
-            // too big. next will be the first doc in the second batch
-            proxy->pushBack(next);
+            exec->enqueue(next);
             break;
         }
 

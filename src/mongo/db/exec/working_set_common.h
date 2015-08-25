@@ -54,12 +54,10 @@ public:
      * state.
      *
      * Iterates over WorkingSetIDs in 'workingSet' which are "sensitive to yield". These are ids
-     * that have transitioned into the LOC_AND_IDX or LOC_AND_OBJ state since the previous yield.
+     * that have transitioned into the LOC_AND_IDX state since the previous yield.
      *
      * The LOC_AND_IDX members are tagged as suspicious so that they can be handled properly in case
-     * the document keyed by the index key is deleted or updated during the yield. LOC_AND_OBJ
-     * working set members with unowned BSON documents have their 'obj' field made owned in order to
-     * ensure that they don't point into storage which may be modified during yield.
+     * the document keyed by the index key is deleted or updated during the yield.
      */
     static void prepareForSnapshotChange(WorkingSet* workingSet);
 

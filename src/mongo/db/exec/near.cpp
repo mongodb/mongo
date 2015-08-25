@@ -216,6 +216,8 @@ PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* erro
     // results.
     double memberDistance = distanceStatus.getValue();
 
+    // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+    nextMember->makeObjOwned();
     _resultBuffer.push(SearchResult(nextMemberID, memberDistance));
 
     // Store the member's RecordId, if available, for quick invalidation

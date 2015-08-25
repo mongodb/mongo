@@ -853,22 +853,20 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 }
             }
 
+            // Ensure that the BSONObj underlying the WorkingSetMember is owned because saveState()
+            // is allowed to free the memory.
+            member->makeObjOwned();
+
             // Save state before making changes
             try {
-                child()->saveState();
                 if (supportsDocLocking()) {
-                    // Doc-locking engines require this after saveState() since they don't use
+                    // Doc-locking engines require this before saveState() since they don't use
                     // invalidations.
                     WorkingSetCommon::prepareForSnapshotChange(_ws);
                 }
+                child()->saveState();
             } catch (const WriteConflictException& wce) {
                 std::terminate();
-            }
-
-            // If we care about the pre-updated version of the doc, save it out here.
-            BSONObj oldObj;
-            if (_params.request->shouldReturnOldDocs()) {
-                oldObj = member->obj.value().getOwned();
             }
 
             // Do the update, get us the new version of the doc.
@@ -879,14 +877,14 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 if (_params.request->shouldReturnNewDocs()) {
                     member->obj = Snapshotted<BSONObj>(getOpCtx()->recoveryUnit()->getSnapshotId(),
                                                        newObj.getOwned());
-                } else {
-                    invariant(_params.request->shouldReturnOldDocs());
-                    member->obj.setValue(oldObj);
                 }
                 member->loc = RecordId();
                 member->transitionToOwnedObj();
             }
         } catch (const WriteConflictException& wce) {
+            // Ensure that the BSONObj underlying the WorkingSetMember is owned because it may be
+            // freed when we yield.
+            member->makeObjOwned();
             _idRetrying = id;
             memberFreer.Dismiss();  // Keep this member around so we can retry updating it.
             *out = WorkingSet::INVALID_ID;

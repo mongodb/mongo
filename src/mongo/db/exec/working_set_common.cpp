@@ -74,10 +74,6 @@ void WorkingSetCommon::prepareForSnapshotChange(WorkingSet* workingSet) {
         WorkingSetMember* member = workingSet->get(id);
         if (member->getState() == WorkingSetMember::LOC_AND_IDX) {
             member->isSuspicious = true;
-        } else if (member->getState() == WorkingSetMember::LOC_AND_OBJ) {
-            // Need to make sure that the data is owned, as underlying storage can change during a
-            // yield.
-            member->makeObjOwned();
         }
     }
 }

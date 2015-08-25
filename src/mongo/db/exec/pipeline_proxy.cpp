@@ -116,10 +116,6 @@ void PipelineProxyStage::doReattachToOperationContext() {
     }
 }
 
-void PipelineProxyStage::pushBack(const BSONObj& obj) {
-    _stash.push_back(obj);
-}
-
 unique_ptr<PlanStageStats> PipelineProxyStage::getStats() {
     unique_ptr<PlanStageStats> ret =
         make_unique<PlanStageStats>(CommonStats(kStageType), STAGE_PIPELINE_PROXY);

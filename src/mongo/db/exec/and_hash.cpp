@@ -136,6 +136,7 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
         for (size_t i = 0; i < _children.size(); ++i) {
             auto& child = _children[i];
             for (size_t j = 0; j < kLookAheadWorks; ++j) {
+                // Cache the result in _lookAheadResults[i].
                 StageState childStatus = child->work(&_lookAheadResults[i]);
 
                 if (PlanStage::IS_EOF == childStatus) {
@@ -144,9 +145,10 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
                     _dataMap.clear();
                     return PlanStage::IS_EOF;
                 } else if (PlanStage::ADVANCED == childStatus) {
-                    // We have a result cached in _lookAheadResults[i].  Stop looking at this
-                    // child.
-                    break;
+                    // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we
+                    // yield.
+                    _ws->get(_lookAheadResults[i])->makeObjOwned();
+                    break;  // Stop looking at this child.
                 } else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
                     // Propage error to parent.
                     *out = _lookAheadResults[i];
@@ -282,6 +284,9 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }
+
+        // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+        member->makeObjOwned();
 
         // Update memory stats.
         _memUsage += member->getMemUsage();

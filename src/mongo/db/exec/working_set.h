@@ -291,8 +291,8 @@ public:
     bool hasOwnedObj() const;
 
     /**
-     * Ensures that 'obj' is owned BSON. Only valid to call on a working set member in LOC_AND_OBJ
-     * state. No-op if 'obj' is already owned.
+     * Ensures that 'obj' of a WSM in the LOC_AND_OBJ state is owned BSON. It is a no-op if the WSM
+     * is in a different state or if 'obj' is already owned.
      */
     void makeObjOwned();
 

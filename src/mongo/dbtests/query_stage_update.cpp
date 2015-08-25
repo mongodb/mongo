@@ -124,7 +124,7 @@ public:
             if (PlanStage::ADVANCED == state) {
                 WorkingSetMember* member = ws.get(id);
                 verify(member->hasObj());
-                out->push_back(member->obj.value());
+                out->push_back(member->obj.value().getOwned());
             }
         }
     }

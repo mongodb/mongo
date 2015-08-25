@@ -364,7 +364,6 @@ long long Helpers::removeRange(OperationContext* txn,
             PlanExecutor::ExecState state;
             // This may yield so we cannot touch nsd after this.
             state = exec->getNext(&obj, &rloc);
-            exec.reset();
             if (PlanExecutor::IS_EOF == state) {
                 break;
             }

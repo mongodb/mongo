@@ -114,11 +114,6 @@ void WorkingSet::transitionToLocAndIdx(WorkingSetID id) {
 void WorkingSet::transitionToLocAndObj(WorkingSetID id) {
     WorkingSetMember* member = get(id);
     member->_state = WorkingSetMember::LOC_AND_OBJ;
-
-    // If 'obj' is owned, then it doesn't need to made owned in preparation for yield.
-    if (!member->obj.value().isOwned()) {
-        _yieldSensitiveIds.push_back(id);
-    }
 }
 
 void WorkingSet::transitionToOwnedObj(WorkingSetID id) {
@@ -174,8 +169,7 @@ bool WorkingSetMember::hasOwnedObj() const {
 }
 
 void WorkingSetMember::makeObjOwned() {
-    invariant(_state == LOC_AND_OBJ);
-    if (!obj.value().isOwned()) {
+    if (_state == LOC_AND_OBJ && !obj.value().isOwned()) {
         obj.setValue(obj.value().getOwned());
     }
 }

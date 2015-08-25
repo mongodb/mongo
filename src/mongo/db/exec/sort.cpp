@@ -271,13 +271,17 @@ void SortStage::addToBuffer(const SortableDataItem& item) {
     // Holds ID of working set member to be freed at end of this function.
     WorkingSetID wsidToFree = WorkingSet::INVALID_ID;
 
+    WorkingSetMember* member = _ws->get(item.wsid);
     if (_limit == 0) {
+        // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
+        member->makeObjOwned();
         _data.push_back(item);
-        _memUsage += _ws->get(item.wsid)->getMemUsage();
+        _memUsage += member->getMemUsage();
     } else if (_limit == 1) {
         if (_data.empty()) {
+            member->makeObjOwned();
             _data.push_back(item);
-            _memUsage = _ws->get(item.wsid)->getMemUsage();
+            _memUsage = member->getMemUsage();
             return;
         }
         wsidToFree = item.wsid;
@@ -285,16 +289,18 @@ void SortStage::addToBuffer(const SortableDataItem& item) {
         // Compare new item with existing item in vector.
         if (cmp(item, _data[0])) {
             wsidToFree = _data[0].wsid;
+            member->makeObjOwned();
             _data[0] = item;
-            _memUsage = _ws->get(item.wsid)->getMemUsage();
+            _memUsage = member->getMemUsage();
         }
     } else {
         // Update data item set instead of vector
         // Limit not reached - insert and return
         vector<SortableDataItem>::size_type limit(_limit);
         if (_dataSet->size() < limit) {
+            member->makeObjOwned();
             _dataSet->insert(item);
-            _memUsage += _ws->get(item.wsid)->getMemUsage();
+            _memUsage += member->getMemUsage();
             return;
         }
         // Limit will be exceeded - compare with item with lowest key
@@ -306,13 +312,14 @@ void SortStage::addToBuffer(const SortableDataItem& item) {
         const WorkingSetComparator& cmp = *_sortKeyComparator;
         if (cmp(item, lastItem)) {
             _memUsage -= _ws->get(lastItem.wsid)->getMemUsage();
-            _memUsage += _ws->get(item.wsid)->getMemUsage();
+            _memUsage += member->getMemUsage();
             wsidToFree = lastItem.wsid;
             // According to std::set iterator validity rules,
             // it does not matter which of erase()/insert() happens first.
             // Here, we choose to erase first to release potential resources
             // used by the last item and to keep the scope of the iterator to a minimum.
             _dataSet->erase(lastItemIt);
+            member->makeObjOwned();
             _dataSet->insert(item);
         }
     }

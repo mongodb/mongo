@@ -167,6 +167,7 @@ public:
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+            first = first.getOwned();
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
             ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
             ASSERT_EQUALS(i, first["c"].numberInt());
@@ -236,6 +237,7 @@ public:
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+            first = first.getOwned();
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
             ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
             ASSERT_EQUALS(i, first["c"].numberInt());
@@ -306,6 +308,7 @@ public:
             BSONObj first, second;
             // We inserted N objects but we get 2 * N from the runner because of dups.
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+            first = first.getOwned();
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
             ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
             ASSERT_EQUALS(i, first["c"].numberInt());
@@ -377,6 +380,7 @@ public:
         for (int i = 0; i < N; ++i) {
             BSONObj first, second;
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+            first = first.getOwned();
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
             ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
             ASSERT_EQUALS(N - i - 1, first["c"].numberInt());

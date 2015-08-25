@@ -92,7 +92,7 @@ void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int le
             BSONObj obj;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
-                src.push_back(obj);
+                src.push_back(obj.getOwned());
             }
         }
 

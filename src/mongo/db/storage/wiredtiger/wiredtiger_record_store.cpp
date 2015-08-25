@@ -154,11 +154,9 @@ public:
 
         WT_ITEM value;
         invariantWTOK(c->get_value(c, &value));
-        auto data = RecordData(static_cast<const char*>(value.data), value.size);
-        data.makeOwned();  // TODO delete this line once safe.
 
         _lastReturnedId = id;
-        return {{id, std::move(data)}};
+        return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
     }
 
     boost::optional<Record> seekExact(const RecordId& id) final {
@@ -174,12 +172,10 @@ public:
 
         WT_ITEM value;
         invariantWTOK(c->get_value(c, &value));
-        auto data = RecordData(static_cast<const char*>(value.data), value.size);
-        data.makeOwned();  // TODO delete this line once safe.
 
         _lastReturnedId = id;
         _eof = false;
-        return {{id, std::move(data)}};
+        return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
     }
 
     void savePositioned() final {
@@ -328,10 +324,8 @@ public:
 
         WT_ITEM value;
         invariantWTOK(_cursor->get_value(_cursor, &value));
-        auto data = RecordData(static_cast<const char*>(value.data), value.size);
-        data.makeOwned();  // TODO delete this line once safe.
 
-        return {{id, std::move(data)}};
+        return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
     }
 
     boost::optional<Record> seekExact(const RecordId& id) final {
