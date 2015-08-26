@@ -680,7 +680,7 @@ err:	__wt_scr_free(session, &from_path);
  *	Create the next log file and write the file header record into it.
  */
 static int
-__log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
+__log_newfile(WT_SESSION_IMPL *session, int conn_open, int *created)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -751,7 +751,7 @@ __log_newfile(WT_SESSION_IMPL *session, int conn_create, int *created)
 	 * If we're called from connection creation code, we need to update
 	 * the LSNs since we're the only write in progress.
 	 */
-	if (conn_create) {
+	if (conn_open) {
 		WT_RET(__wt_fsync(session, log->log_fh));
 		log->sync_lsn = end_lsn;
 		log->write_lsn = end_lsn;
@@ -1245,23 +1245,13 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 * be holes in the log file.
 	 */
 	WT_STAT_FAST_CONN_INCR(session, log_release_write_lsn);
-	while (__wt_log_cmp(&log->write_lsn, &slot->slot_release_lsn) != 0) {
-#if 0
-		/*
-		 * If it is not equal, it better not be larger than our
-		 * release LSN.  Check <= because it could have changed
-		 * to now be equal.
-		 */
-		WT_ASSERT(session,
-		    __wt_log_cmp(&log->write_lsn,
-		    &slot->slot_release_lsn) <= 0);
-#endif
+	while (__wt_log_cmp(&log->write_lsn, &slot->slot_release_lsn) != 0)
 		if (++yield_count < 1000)
 			__wt_yield();
 		else
 			WT_ERR(__wt_cond_wait(
 			    session, log->log_write_cond, 200));
-	}
+
 	log->write_start_lsn = slot->slot_start_lsn;
 	log->write_lsn = slot->slot_end_lsn;
 

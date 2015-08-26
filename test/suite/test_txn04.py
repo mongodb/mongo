@@ -113,7 +113,6 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         # If we are backing up a target, assume the directory exists.
         # We just use the wt backup command.
         # A future test extension could also use a cursor.
-        self.runWt(['-h', self.home, 'printlog'], outfilename='printlog.out')
         cmd = '-h ' + self.home + ' backup '
         if backup_uri != None:
             cmd += '-t ' + backup_uri + ' '

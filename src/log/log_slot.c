@@ -392,7 +392,7 @@ __wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
 {
 	WT_LOGSLOT *slot;
 	wt_off_t cur_offset, my_start;
-	int64_t my_size, newsize;
+	int64_t my_size;
 
 	slot = myslot->slot;
 	my_start = slot->slot_start_offset + myslot->offset;
@@ -412,8 +412,7 @@ __wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
 	 * Add my size into the state and return the new size.
 	 */
 	my_size = WT_LOG_SLOT_JOIN_REL((uint64_t)0, size, 0);
-	newsize = __wt_atomic_addiv64(&slot->slot_state, my_size);
-	return (newsize);
+	return (__wt_atomic_addiv64(&slot->slot_state, my_size));
 }
 
 /*

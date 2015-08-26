@@ -49,6 +49,7 @@
 /*
  * Possible values for the consolidation array slot states:
  *
+ * WT_LOG_SLOT_CLOSE - slot is in use but closed to new joins.
  * WT_LOG_SLOT_FREE - slot is available for allocation.
  * WT_LOG_SLOT_WRITTEN - slot is written and should be processed by worker.
  *
@@ -57,13 +58,23 @@
  *
  * The slot state is divided into two 32 bit sizes.  One half is the
  * amount joined and the other is the amount released.  Since we use
- * a few special states, reserve the top few bits for state.
+ * a few special states, reserve the top few bits for state.  That makes
+ * the maximum size less than 32 bits for both joined and released.
+ */
+
+/*
+ * We allocate the buffer size, but trigger a slot switch when we cross
+ * the maximum size of half the buffer.  If a record is more than the buffer
+ * maximum then we trigger a slot switch and write that record unbuffered.
+ * We use a larger buffer to provide overflow space so that we can switch
+ * once we cross the threshold.
  */
 #define	WT_LOG_SLOT_BUF_SIZE		(256 * 1024)
 #define	WT_LOG_SLOT_BUF_MAX		((uint32_t)log->slot_buf_size / 2)
 
 /*
- * The high bit is reserved for the special states.
+ * The high bit is reserved for the special states.  If the high bit is
+ * set (WT_LOG_SLOT_RESERVED) then we are guaranteed to be in a special state.
  */
 #define	WT_LOG_SLOT_FREE	-1	/* Not in use */
 #define	WT_LOG_SLOT_WRITTEN	-2	/* Slot data written, not processed */
@@ -71,19 +82,29 @@
 /*
  * If new slot states are added, adjust WT_LOG_SLOT_BITS and
  * WT_LOG_SLOT_MASK_OFF accordingly for how much of the top 32
- * bits we are using.
+ * bits we are using.  More slot states here will reduce the maximum
+ * size that a slot can hold unbuffered by half.  If a record is
+ * larger than the maximum we can account for in the slot state we fall
+ * back to direct writes.
  */
 #define	WT_LOG_SLOT_BITS	2
 #define	WT_LOG_SLOT_MAXBITS	(32 - WT_LOG_SLOT_BITS)
-#define	WT_LOG_SLOT_CLOSE	0x4000000000000000	/* Force slot close */
-#define	WT_LOG_SLOT_RESERVED	0x8000000000000000	/* Reserved states */
+#define	WT_LOG_SLOT_CLOSE	0x4000000000000000LL	/* Force slot close */
+#define	WT_LOG_SLOT_RESERVED	0x8000000000000000LL	/* Reserved states */
 
-#define	WT_LOG_SLOT_MASK_OFF	0x3fffffffffffffff
+#define	WT_LOG_SLOT_MASK_OFF	0x3fffffffffffffffLL
 #define	WT_LOG_SLOT_MASK_ON	~(WT_LOG_SLOT_MASK_OFF)
 
+/*
+ * This is the maximum size we can account for in the slot state.  If
+ * there is a record larger than this we fall back to a direct write.
+ */
 #define	WT_LOG_SLOT_MAXIMUM		(uint32_t)			\
-    ((2 ^ WT_LOG_SLOT_MAXBITS) - WT_LOG_SLOT_BUF_SIZE)
+    ((1 << (WT_LOG_SLOT_MAXBITS - 1)) - WT_LOG_SLOT_BUF_SIZE)
 
+/*
+ * These macros manipulate the slot state and its component parts.
+ */
 #define	WT_LOG_SLOT_FLAGS(state)	((state) & WT_LOG_SLOT_MASK_ON)
 #define	WT_LOG_SLOT_JOINED(state)	(((state) & WT_LOG_SLOT_MASK_OFF) >> 32)
 #define	WT_LOG_SLOT_JOIN_REL(j, r, s)	(((j) << 32) + (r) + (s))
@@ -91,7 +112,7 @@
 
 /* Slot is in use */
 #define	WT_LOG_SLOT_ACTIVE(state)	(WT_LOG_SLOT_JOINED(state) >= 0)
-/* Slot is in use, no longer able to be joined */
+/* Slot is in use, but closed to new joins */
 #define	WT_LOG_SLOT_CLOSED(state)					\
     (WT_LOG_SLOT_ACTIVE(state) &&					\
     (FLD64_ISSET(state, WT_LOG_SLOT_CLOSE) &&				\
