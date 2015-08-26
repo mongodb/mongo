@@ -385,31 +385,29 @@ TEST_F(AsyncResultsMergerTest, ClusterFindInitialBatchSizeIsZero) {
     // command is one.
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 0}");
     const long long getMoreBatchSize = 1LL;
-    makeCursorFromFindCmd(findCmd, _remotes, getMoreBatchSize);
+    makeCursorFromFindCmd(findCmd, {_remotes[0], _remotes[1]}, getMoreBatchSize);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
-    // All three shards give back empty responses. Second shard doesn't have any results so it
-    // seconds back a cursor id of zero.
+    // Both shards give back empty responses. Second shard doesn't have any results so it
+    // sends back a cursor id of zero.
     std::vector<GetMoreResponse> responses;
     responses.emplace_back(_nss, CursorId(1), std::vector<BSONObj>());
     responses.emplace_back(_nss, CursorId(0), std::vector<BSONObj>());
-    responses.emplace_back(_nss, CursorId(2), std::vector<BSONObj>());
     scheduleNetworkResponses(responses);
 
-    // In handling the responses from the first and third shards, the ARM should have already asked
-    // for responses from the first and third shards. It won't have anything to return until at
-    // least one of these shards responds.
+    // In handling the responses from the first shard, the ARM should have already asked
+    // for an additional batch from that shard. It won't have anything to return until it
+    // gets a non-empty response.
     ASSERT_FALSE(arm->ready());
     responses.clear();
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}")};
-    responses.emplace_back(_nss, CursorId(0), batch1);
+    responses.emplace_back(_nss, CursorId(1), batch1);
     scheduleNetworkResponses(responses);
     executor->waitForEvent(readyEvent);
 
-    // We can return the results from the first shard before we ever hear from the third.
     ASSERT_TRUE(arm->ready());
     ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
 
@@ -417,13 +415,13 @@ TEST_F(AsyncResultsMergerTest, ClusterFindInitialBatchSizeIsZero) {
     readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
-    // The third shard responds with another empty batch but leaves the cursor open. The shard
-    // probably shouldn't do this, but there's no reason the ARM can handle this by asking for more.
+    // The shard responds with another empty batch but leaves the cursor open. It probably shouldn't
+    // do this, but there's no reason the ARM can't handle this by asking for more.
     responses.clear();
-    responses.emplace_back(_nss, CursorId(2), std::vector<BSONObj>());
+    responses.emplace_back(_nss, CursorId(1), std::vector<BSONObj>());
     scheduleNetworkResponses(responses);
 
-    // Now the third shard responds with a batch and closes the cursor.
+    // The shard responds with another batch and closes the cursor.
     ASSERT_FALSE(arm->ready());
     responses.clear();
     std::vector<BSONObj> batch2 = {fromjson("{_id: 2}")};
