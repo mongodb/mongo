@@ -182,10 +182,10 @@ struct __wt_ovfl_txnc {
  * the original order, and the key (either a byte-string or a record number).
  * The value is simpler: the WT_UPDATE structures transaction ID and value.
  *
- * K: '1', file ID, address-len, address, on-page txn ID, counter, key/recno
+ * K: 'U', file ID, address-len, address, on-page txn ID, counter, key/recno
  * V: transaction ID, value
  */
-#define	WT_LAS_RECONCILE_UPDATE	'1'
+#define	WT_LAS_RECONCILE_UPDATE	'U'
 
 /*
  * WT_PAGE_MODIFY --
@@ -262,7 +262,6 @@ struct __wt_page_modify {
 		 * page entry; in the case of creating lookaside records, there
 		 * is an additional value, the committed item's transaction ID.
 		 */
-#define	WT_LAS_RECONCILE_UPDATE	'1'
 		struct __wt_upd_skipped {
 			WT_INSERT *ins;
 			WT_ROW	  *rip;
