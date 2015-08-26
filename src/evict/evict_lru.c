@@ -175,7 +175,9 @@ __evict_server(void *arg)
 		 * otherwise we can block applications evicting large pages.
 		 */
 		if (!F_ISSET(cache, WT_CACHE_STUCK)) {
-			WT_ERR(__evict_clear_all_walks(session));
+			WT_WITH_DHANDLE_LOCK(session,
+			    ret = __evict_clear_all_walks(session));
+			WT_ERR(ret);
 
 			/* Next time we wake up, reverse the sweep direction. */
 			cache->flags ^= WT_CACHE_WALK_REVERSE;
