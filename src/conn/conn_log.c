@@ -289,6 +289,7 @@ __log_file_server(void *arg)
 	WT_LOG *log;
 	WT_LSN close_end_lsn, min_lsn;
 	WT_SESSION_IMPL *session;
+	uint32_t filenum;
 	int locked;
 
 	session = arg;
@@ -300,34 +301,54 @@ __log_file_server(void *arg)
 		 * If there is a log file to close, make sure any outstanding
 		 * write operations have completed, then fsync and close it.
 		 */
-		if ((close_fh = log->log_close_fh) != NULL &&
-		    __wt_log_cmp(&log->write_lsn, &log->log_close_lsn) >= 0) {
+		if ((close_fh = log->log_close_fh) != NULL) {
+			WT_ERR(__wt_log_extract_lognum(session, close_fh->name,
+			    &filenum));
 			/*
-			 * We've copied the file handle, clear out the one in
-			 * log structure to allow it to be set again.
+			 * We update the close file handle before updating the
+			 * close LSN when changing files.  It is possible we
+			 * could see mismatched settings.  If we do, yield
+			 * until it is set.  This should rarely happen.
 			 */
-			log->log_close_fh = NULL;
-			/*
-			 * Set the close_end_lsn to the LSN immediately after
-			 * ours.  That is, the beginning of the next log file.
-			 * We need to know the LSN file number of our own close
-			 * in case earlier calls are still in progress and the
-			 * next one to move the sync_lsn into the next file for
-			 * later syncs.
-			 */
-			close_end_lsn = log->log_close_lsn;
-			close_end_lsn.file++;
-			close_end_lsn.offset = 0;
-			WT_ERR(__wt_fsync(session, close_fh));
-			__wt_spin_lock(session, &log->log_sync_lock);
-			locked = 1;
-			WT_ERR(__wt_close(session, &close_fh));
-			WT_ASSERT(session,
-			    __wt_log_cmp(&close_end_lsn, &log->sync_lsn) >= 0);
-			log->sync_lsn = close_end_lsn;
-			WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
-			locked = 0;
-			__wt_spin_unlock(session, &log->log_sync_lock);
+			while (log->log_close_lsn.file < filenum)
+				__wt_yield();
+
+			if (__wt_log_cmp(
+			    &log->write_lsn, &log->log_close_lsn) >= 0) {
+				/*
+				 * We've copied the file handle, clear out the
+				 * one in the log structure to allow it to be
+				 * set again.  Copy the LSN before clearing
+				 * the file handle.
+				 * Use a barrier to make sure the compiler does
+				 * not reorder the following two statements.
+				 */
+				close_end_lsn = log->log_close_lsn;
+				WT_READ_BARRIER();
+				log->log_close_fh = NULL;
+				/*
+				 * Set the close_end_lsn to the LSN immediately
+				 * after ours.  That is, the beginning of the
+				 * next log file.   We need to know the LSN
+				 * file number of our own close in case earlier
+				 * calls are still in progress and the next one
+				 * to move the sync_lsn into the next file for
+				 * later syncs.
+				 */
+				close_end_lsn.file++;
+				close_end_lsn.offset = 0;
+				WT_ERR(__wt_fsync(session, close_fh));
+				__wt_spin_lock(session, &log->log_sync_lock);
+				locked = 1;
+				WT_ERR(__wt_close(session, &close_fh));
+				WT_ASSERT(session, __wt_log_cmp(
+				    &close_end_lsn, &log->sync_lsn) >= 0);
+				log->sync_lsn = close_end_lsn;
+				WT_ERR(__wt_cond_signal(
+				    session, log->log_sync_cond));
+				locked = 0;
+				__wt_spin_unlock(session, &log->log_sync_lock);
+			}
 		}
 		/*
 		 * If a later thread asked for a background sync, do it now.

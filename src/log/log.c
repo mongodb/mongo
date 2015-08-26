@@ -709,6 +709,10 @@ __log_newfile(WT_SESSION_IMPL *session, int conn_open, int *created)
 		log->log_close_lsn = log->alloc_lsn;
 	log->fileid++;
 	/*
+	 * Make sure everything we set above is visible.
+	 */
+	WT_FULL_BARRIER();
+	/*
 	 * If we're pre-allocating log files, look for one.  If there aren't any
 	 * or we're not pre-allocating, then create one.
 	 */
