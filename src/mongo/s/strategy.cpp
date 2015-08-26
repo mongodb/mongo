@@ -726,27 +726,28 @@ void Strategy::writeOp(OperationContext* txn, int op, Request& request) {
     // make sure we have a last error
     dassert(&LastError::get(cc()));
 
-    OwnedPointerVector<BatchedCommandRequest> requestsOwned;
-    vector<BatchedCommandRequest*>& requests = requestsOwned.mutableVector();
+    OwnedPointerVector<BatchedCommandRequest> commandRequestsOwned;
+    vector<BatchedCommandRequest*>& commandRequests = commandRequestsOwned.mutableVector();
 
-    msgToBatchRequests(request.m(), &requests);
+    msgToBatchRequests(request.m(), &commandRequests);
 
-    for (vector<BatchedCommandRequest*>::iterator it = requests.begin(); it != requests.end();
+    for (vector<BatchedCommandRequest*>::iterator it = commandRequests.begin();
+         it != commandRequests.end();
          ++it) {
         // Multiple commands registered to last error as multiple requests
-        if (it != requests.begin())
+        if (it != commandRequests.begin())
             LastError::get(cc()).startRequest();
 
-        BatchedCommandRequest* request = *it;
+        BatchedCommandRequest* commandRequest = *it;
 
         // Adjust namespaces for command
-        NamespaceString fullNS(request->getNS());
+        NamespaceString fullNS(commandRequest->getNS());
         string cmdNS = fullNS.getCommandNS();
         // We only pass in collection name to command
-        request->setNS(fullNS);
+        commandRequest->setNS(fullNS);
 
         BSONObjBuilder builder;
-        BSONObj requestBSON = request->toBSON();
+        BSONObj requestBSON = commandRequest->toBSON();
 
         {
             // Disable the last error object for the duration of the write cmd
@@ -754,17 +755,18 @@ void Strategy::writeOp(OperationContext* txn, int op, Request& request) {
             Command::runAgainstRegistered(txn, cmdNS.c_str(), requestBSON, builder, 0);
         }
 
-        BatchedCommandResponse response;
-        bool parsed = response.parseBSON(builder.done(), NULL);
+        BatchedCommandResponse commandResponse;
+        bool parsed = commandResponse.parseBSON(builder.done(), NULL);
         (void)parsed;  // for compile
-        dassert(parsed && response.isValid(NULL));
+        dassert(parsed && commandResponse.isValid(NULL));
 
         // Populate the lastError object based on the write response
         LastError::get(cc()).reset();
-        bool hadError = batchErrorToLastError(*request, response, &LastError::get(cc()));
+        bool hadError =
+            batchErrorToLastError(*commandRequest, commandResponse, &LastError::get(cc()));
 
         // Check if this is an ordered batch and we had an error which should stop processing
-        if (request->getOrdered() && hadError)
+        if (commandRequest->getOrdered() && hadError)
             break;
     }
 }
