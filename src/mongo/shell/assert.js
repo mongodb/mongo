@@ -1,4 +1,4 @@
-doassert = function(msg) {
+doassert = function(msg, obj) {
     // eval if msg is a function
     if (typeof(msg) == "function")
         msg = msg();
@@ -8,7 +8,12 @@ doassert = function(msg) {
     else
         print("assert: " + msg);
 
-    var ex = Error(msg);
+    var ex;
+    if (obj) {
+        ex = _getErrorWithCode(obj, msg);
+    } else {
+        ex = Error(msg);
+    }
     print(ex.stack);
     throw ex;
 }
@@ -251,7 +256,7 @@ assert.commandWorked = function(res, msg){
 
     if (res.ok == 1)
         return res;
-    doassert("command failed: " + tojson(res) + " : " + msg);
+    doassert("command failed: " + tojson(res) + " : " + msg, res);
 }
 
 assert.commandFailed = function(res, msg){
@@ -397,7 +402,7 @@ assert.writeOK = function(res, msg) {
     if (errMsg) {
         if (msg)
             errMsg = errMsg + ": " + msg;
-        doassert(errMsg);
+        doassert(errMsg, res);
     }
     
     return res;
@@ -454,7 +459,7 @@ assert.gleOK = function(res, msg) {
     if (errMsg) {
         if (msg)
             errMsg = errMsg + ": " + msg;
-        doassert(errMsg);
+        doassert(errMsg, res);
     }
     
     return res;
@@ -465,7 +470,7 @@ assert.gleSuccess = function(dbOrGLEDoc, msg) {
     if (gle.err) {
         if (typeof(msg) == "function") 
             msg = msg(gle);
-        doassert("getLastError not null:" + tojson(gle) + " :" + msg);
+        doassert("getLastError not null:" + tojson(gle) + " :" + msg, gle);
     }
     return gle;
 }
