@@ -12,7 +12,6 @@ flags = {
         'SYNC_CHECKPOINT',
         'SYNC_CLOSE',
         'SYNC_DISCARD',
-        'SYNC_DISCARD_FORCE',
         'SYNC_WRITE_LEAVES',
     ],
     'file_types' : [
@@ -107,7 +106,6 @@ flags = {
     'session' : [
         'SESSION_CAN_WAIT',
         'SESSION_CLEAR_EVICT_WALK',
-        'SESSION_DISCARD_FORCE',
         'SESSION_LOCKED_CHECKPOINT',
         'SESSION_LOCKED_HANDLE_LIST',
         'SESSION_LOCKED_SCHEMA',

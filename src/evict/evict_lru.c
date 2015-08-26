@@ -176,7 +176,9 @@ __evict_server(void *arg)
 		 * otherwise we can block applications evicting large pages.
 		 */
 		if (!F_ISSET(cache, WT_CACHE_STUCK)) {
-			WT_ERR(__evict_clear_walks(session));
+			WT_WITH_HANDLE_LIST_LOCK(session,
+			    ret = __evict_clear_all_walks(session));
+			WT_ERR(ret);
 
 			/* Next time we wake up, reverse the sweep direction. */
 			cache->flags ^= WT_CACHE_WALK_REVERSE;
@@ -1254,14 +1256,15 @@ fast:		/* If the page can't be evicted, give up. */
 	 * If we happen to end up on the root page, clear it.  We have to track
 	 * hazard pointers, and the root page complicates that calculation.
 	 *
-	 * Also clear the walk if we land on a page requiring forced eviction.
-	 * The eviction server may go to sleep, and we want this page evicted
-	 * as quickly as possible.
+	 * If we land on a page requiring forced eviction, move on to the next
+	 * page: we want this page evicted as quickly as possible.
 	 */
-	if ((ref = btree->evict_ref) != NULL && (__wt_ref_is_root(ref) ||
-	    ref->page->read_gen == WT_READGEN_OLDEST)) {
-		btree->evict_ref = NULL;
-		WT_RET(__wt_page_release(session, ref, WT_READ_NO_EVICT));
+	if ((ref = btree->evict_ref) != NULL) {
+		if (__wt_ref_is_root(ref))
+			WT_RET(__evict_clear_walk(session));
+		else if (ref->page->read_gen == WT_READGEN_OLDEST)
+			WT_RET_NOTFOUND_OK(__wt_tree_walk(session,
+			    &btree->evict_ref, &pages_walked, walk_flags));
 	}
 
 	WT_STAT_FAST_CONN_INCRV(session, cache_eviction_walk, pages_walked);
