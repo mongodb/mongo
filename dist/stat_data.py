@@ -168,7 +168,7 @@ connection_stats = [
         'maximum bytes configured', 'no_clear,no_scale'),
     CacheStat('cache_bytes_overflow',
         'tracked bytes belonging to overflow pages in the cache',
-            'no_clear,no_scale'),
+        'no_clear,no_scale'),
     CacheStat('cache_bytes_read', 'bytes read into cache'),
     CacheStat('cache_bytes_write', 'bytes written from cache'),
     CacheStat('cache_eviction_app', 'pages evicted by application threads'),
