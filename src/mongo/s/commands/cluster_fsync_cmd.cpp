@@ -95,7 +95,7 @@ public:
                 s->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
 
             BSONObj x = uassertStatusOK(
-                grid.shardRegistry()->runCommand(shardHost, "admin", BSON("fsync" << 1)));
+                grid.shardRegistry()->runCommand(txn, shardHost, "admin", BSON("fsync" << 1)));
 
             sub.append(s->getId(), x);
 

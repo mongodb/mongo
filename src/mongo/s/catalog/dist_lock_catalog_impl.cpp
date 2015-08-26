@@ -41,6 +41,7 @@
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/catalog/type_lockpings.h"
@@ -347,14 +348,14 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
         return targetStatus.getStatus();
     }
 
-    auto resultStatus =
-        _client->runCommand(targetStatus.getValue(), "admin", BSON("serverStatus" << 1));
+    auto resultStatus = _client->runCommandOnConfig(
+        targetStatus.getValue(), "admin", BSON("serverStatus" << 1), rpc::makeEmptyMetadata());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
 
-    BSONObj responseObj(resultStatus.getValue());
+    BSONObj responseObj(resultStatus.getValue().response);
 
     auto cmdStatus = getStatusFromCommandResult(responseObj);
 
@@ -467,8 +468,8 @@ StatusWith<vector<BSONObj>> DistLockCatalogImpl::_findOnConfig(const HostAndPort
                                                                const BSONObj& sort,
                                                                boost::optional<long long> limit) {
     repl::ReadConcernArgs readConcern(boost::none, repl::ReadConcernLevel::kMajorityReadConcern);
-    auto result =
-        _client->exhaustiveFind(host, nss, query, sort, limit, readConcern, kReplMetadata);
+    auto result = _client->exhaustiveFindOnConfigNode(
+        host, nss, query, sort, limit, readConcern, kReplMetadata);
 
     if (!result.isOK()) {
         return result.getStatus();

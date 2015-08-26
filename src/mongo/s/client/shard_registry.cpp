@@ -278,7 +278,7 @@ shared_ptr<Shard> ShardRegistry::_findUsingLookUp(const ShardId& shardId) {
     return nullptr;
 }
 
-StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFind(
+StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfigNode(
     const HostAndPort& host,
     const NamespaceString& nss,
     const BSONObj& query,
@@ -354,10 +354,12 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFind(
     return response;
 }
 
-StatusWith<BSONObj> ShardRegistry::runCommand(const HostAndPort& host,
+StatusWith<BSONObj> ShardRegistry::runCommand(OperationContext* txn,
+                                              const HostAndPort& host,
                                               const std::string& dbName,
                                               const BSONObj& cmdObj) {
-    auto status = runCommandWithMetadata(host, dbName, cmdObj, rpc::makeEmptyMetadata());
+    auto status = _runCommandWithMetadata(host, dbName, cmdObj, rpc::makeEmptyMetadata());
+    // TODO(spencer): Reload registry if status is ShardNotFound
 
     if (!status.isOK()) {
         return status.getStatus();
@@ -366,7 +368,102 @@ StatusWith<BSONObj> ShardRegistry::runCommand(const HostAndPort& host,
     return status.getValue().response;
 }
 
-StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithMetadata(
+StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandOnConfig(
+    const HostAndPort& host,
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    const BSONObj& metadata) {
+    return _runCommandWithMetadata(host, dbName, cmdObj, metadata);
+}
+
+StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
+                                                                          const BSONObj& cmdObj) {
+    auto status = runCommandOnConfigWithNotMasterRetries(dbname, cmdObj, rpc::makeEmptyMetadata());
+
+    if (!status.isOK()) {
+        return status.getStatus();
+    }
+
+    return status.getValue().response;
+}
+
+StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandOnConfigWithNotMasterRetries(
+    const std::string& dbname, const BSONObj& cmdObj, const BSONObj& metadata) {
+    auto configShard = getConfigShard();
+    return _runCommandWithNotMasterRetries(configShard->getTargeter(), dbname, cmdObj, metadata);
+}
+
+StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationContext* txn,
+                                                                  const ShardId& shardId,
+                                                                  const std::string& dbname,
+                                                                  const BSONObj& cmdObj) {
+    auto status =
+        runCommandWithNotMasterRetries(txn, shardId, dbname, cmdObj, rpc::makeEmptyMetadata());
+
+    if (!status.isOK()) {
+        return status.getStatus();
+    }
+
+    return status.getValue().response;
+}
+
+StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithNotMasterRetries(
+    OperationContext* txn,
+    const ShardId& shardId,
+    const std::string& dbname,
+    const BSONObj& cmdObj,
+    const BSONObj& metadata) {
+    auto shard = getShard(txn, shardId);
+    auto response = _runCommandWithNotMasterRetries(shard->getTargeter(), dbname, cmdObj, metadata);
+    // TODO(spencer): Reload registry if status is ShardNotFound
+    return response;
+}
+
+StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMasterRetries(
+    RemoteCommandTargeter* targeter,
+    const std::string& dbname,
+    const BSONObj& cmdObj,
+    const BSONObj& metadata) {
+    const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet{});
+
+    for (int i = 0; i < kNotMasterNumRetries; ++i) {
+        auto target = targeter->findHost(readPref);
+        if (!target.isOK()) {
+            if (ErrorCodes::NotMaster == target.getStatus()) {
+                if (i == kNotMasterNumRetries - 1) {
+                    // If we're out of retries don't bother sleeping, just return.
+                    return target.getStatus();
+                }
+                sleepmillis(durationCount<Milliseconds>(kNotMasterRetryInterval));
+                continue;
+            }
+            return target.getStatus();
+        }
+
+        auto response = _runCommandWithMetadata(target.getValue(), dbname, cmdObj, metadata);
+        if (!response.isOK()) {
+            return response.getStatus();
+        }
+
+        Status commandStatus = getStatusFromCommandResult(response.getValue().response);
+        if (ErrorCodes::NotMaster == commandStatus ||
+            ErrorCodes::NotMasterNoSlaveOkCode == commandStatus) {
+            targeter->markHostNotMaster(target.getValue());
+            if (i == kNotMasterNumRetries - 1) {
+                // If we're out of retries don't bother sleeping, just return.
+                return commandStatus;
+            }
+            sleepmillis(durationCount<Milliseconds>(kNotMasterRetryInterval));
+            continue;
+        }
+
+        return response.getValue();
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadata(
     const HostAndPort& host,
     const std::string& dbName,
     const BSONObj& cmdObj,
@@ -408,91 +505,6 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithMetadata
     }
 
     return cmdResponse;
-}
-
-StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
-                                                                          const BSONObj& cmdObj) {
-    auto status = runCommandOnConfigWithNotMasterRetries(dbname, cmdObj, rpc::makeEmptyMetadata());
-
-    if (!status.isOK()) {
-        return status.getStatus();
-    }
-
-    return status.getValue().response;
-}
-
-StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandOnConfigWithNotMasterRetries(
-    const std::string& dbname, const BSONObj& cmdObj, const BSONObj& metadata) {
-    auto configShard = getConfigShard();
-    return _runCommandWithNotMasterRetries(configShard->getTargeter(), dbname, cmdObj, metadata);
-}
-
-StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationContext* txn,
-                                                                  const ShardId& shardId,
-                                                                  const std::string& dbname,
-                                                                  const BSONObj& cmdObj) {
-    auto status =
-        runCommandWithNotMasterRetries(txn, shardId, dbname, cmdObj, rpc::makeEmptyMetadata());
-
-    if (!status.isOK()) {
-        return status.getStatus();
-    }
-
-    return status.getValue().response;
-}
-
-StatusWith<ShardRegistry::CommandResponse> ShardRegistry::runCommandWithNotMasterRetries(
-    OperationContext* txn,
-    const ShardId& shardId,
-    const std::string& dbname,
-    const BSONObj& cmdObj,
-    const BSONObj& metadata) {
-    auto shard = getShard(txn, shardId);
-    return _runCommandWithNotMasterRetries(shard->getTargeter(), dbname, cmdObj, metadata);
-}
-
-StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMasterRetries(
-    RemoteCommandTargeter* targeter,
-    const std::string& dbname,
-    const BSONObj& cmdObj,
-    const BSONObj& metadata) {
-    const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet{});
-
-    for (int i = 0; i < kNotMasterNumRetries; ++i) {
-        auto target = targeter->findHost(readPref);
-        if (!target.isOK()) {
-            if (ErrorCodes::NotMaster == target.getStatus()) {
-                if (i == kNotMasterNumRetries - 1) {
-                    // If we're out of retries don't bother sleeping, just return.
-                    return target.getStatus();
-                }
-                sleepmillis(durationCount<Milliseconds>(kNotMasterRetryInterval));
-                continue;
-            }
-            return target.getStatus();
-        }
-
-        auto response = runCommandWithMetadata(target.getValue(), dbname, cmdObj, metadata);
-        if (!response.isOK()) {
-            return response.getStatus();
-        }
-
-        Status commandStatus = getStatusFromCommandResult(response.getValue().response);
-        if (ErrorCodes::NotMaster == commandStatus ||
-            ErrorCodes::NotMasterNoSlaveOkCode == commandStatus) {
-            targeter->markHostNotMaster(target.getValue());
-            if (i == kNotMasterNumRetries - 1) {
-                // If we're out of retries don't bother sleeping, just return.
-                return commandStatus;
-            }
-            sleepmillis(durationCount<Milliseconds>(kNotMasterRetryInterval));
-            continue;
-        }
-
-        return response.getValue();
-    }
-
-    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo

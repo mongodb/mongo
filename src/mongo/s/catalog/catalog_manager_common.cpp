@@ -83,7 +83,8 @@ namespace {
  * shard's name should be checked and if empty, one should be generated using some uniform
  * algorithm.
  */
-StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
+StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
+                                          ShardRegistry* shardRegistry,
                                           const ConnectionString& connectionString,
                                           const std::string* shardProposedName) {
     if (connectionString.type() == ConnectionString::SYNC) {
@@ -110,7 +111,7 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
     StatusWith<BSONObj> cmdStatus{ErrorCodes::InternalError, "uninitialized value"};
 
     // Is it mongos?
-    cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("isdbgrid" << 1));
+    cmdStatus = shardRegistry->runCommand(txn, shardHost, "admin", BSON("isdbgrid" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -121,7 +122,7 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
     }
 
     // Is it a replica set?
-    cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("isMaster" << 1));
+    cmdStatus = shardRegistry->runCommand(txn, shardHost, "admin", BSON("isMaster" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -154,7 +155,7 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
     }
 
     // Is it a mongos config server?
-    cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("replSetGetStatus" << 1));
+    cmdStatus = shardRegistry->runCommand(txn, shardHost, "admin", BSON("replSetGetStatus" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -251,7 +252,7 @@ StatusWith<ShardType> validateHostAsShard(ShardRegistry* shardRegistry,
  * it returns excluding those named local and admin, since they serve administrative purpose.
  */
 StatusWith<std::vector<std::string>> getDBNamesListFromShard(
-    ShardRegistry* shardRegistry, const ConnectionString& connectionString) {
+    OperationContext* txn, ShardRegistry* shardRegistry, const ConnectionString& connectionString) {
     auto shardConn = shardRegistry->createConnection(connectionString);
     invariant(shardConn);
 
@@ -263,7 +264,7 @@ StatusWith<std::vector<std::string>> getDBNamesListFromShard(
 
     const HostAndPort& shardHost = shardHostStatus.getValue();
 
-    auto cmdStatus = shardRegistry->runCommand(shardHost, "admin", BSON("listDatabases" << 1));
+    auto cmdStatus = shardRegistry->runCommand(txn, shardHost, "admin", BSON("listDatabases" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -296,7 +297,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
                                                   const long long maxSize) {
     // Validate the specified connection string may serve as shard at all
     auto shardStatus =
-        validateHostAsShard(grid.shardRegistry(), shardConnectionString, shardProposedName);
+        validateHostAsShard(txn, grid.shardRegistry(), shardConnectionString, shardProposedName);
     if (!shardStatus.isOK()) {
         // TODO: This is a workaround for the case were we could have some bad shard being
         // requested to be added and we put that bad connection string on the global replica set
@@ -308,7 +309,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
 
     ShardType& shardType = shardStatus.getValue();
 
-    auto dbNamesStatus = getDBNamesListFromShard(grid.shardRegistry(), shardConnectionString);
+    auto dbNamesStatus = getDBNamesListFromShard(txn, grid.shardRegistry(), shardConnectionString);
     if (!dbNamesStatus.isOK()) {
         return dbNamesStatus.getStatus();
     }

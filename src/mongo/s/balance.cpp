@@ -230,7 +230,7 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
             s->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
 
         BSONObj f = uassertStatusOK(
-            grid.shardRegistry()->runCommand(shardHost, "admin", BSON("features" << 1)));
+            grid.shardRegistry()->runCommand(txn, shardHost, "admin", BSON("features" << 1)));
         if (f["oidMachine"].isNumber()) {
             int x = f["oidMachine"].numberInt();
             if (oids.count(x) == 0) {
@@ -240,7 +240,7 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
                       << " and " << oids[x];
 
                 uassertStatusOK(grid.shardRegistry()->runCommand(
-                    shardHost, "admin", BSON("features" << 1 << "oidReset" << 1)));
+                    txn, shardHost, "admin", BSON("features" << 1 << "oidReset" << 1)));
 
                 const auto otherShard = grid.shardRegistry()->getShard(txn, oids[x]);
                 if (otherShard) {
@@ -248,7 +248,7 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
                         {ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
 
                     uassertStatusOK(grid.shardRegistry()->runCommand(
-                        otherShardHost, "admin", BSON("features" << 1 << "oidReset" << 1)));
+                        txn, otherShardHost, "admin", BSON("features" << 1 << "oidReset" << 1)));
                 }
 
                 return false;

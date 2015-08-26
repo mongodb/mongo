@@ -53,8 +53,8 @@ StatusWith<long long> retrieveTotalShardSize(OperationContext* txn,
         return shardHostStatus.getStatus();
     }
 
-    auto listDatabasesStatus =
-        shardRegistry->runCommand(shardHostStatus.getValue(), "admin", BSON("listDatabases" << 1));
+    auto listDatabasesStatus = shardRegistry->runCommand(
+        txn, shardHostStatus.getValue(), "admin", BSON("listDatabases" << 1));
     if (!listDatabasesStatus.isOK()) {
         return listDatabasesStatus.getStatus();
     }

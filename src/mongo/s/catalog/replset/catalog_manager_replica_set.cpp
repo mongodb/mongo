@@ -1213,8 +1213,7 @@ StatusWith<VersionType> CatalogManagerReplicaSet::_getConfigVersion(OperationCon
 StatusWith<BSONObj> CatalogManagerReplicaSet::_runCommandOnConfig(const HostAndPort& target,
                                                                   const string& dbName,
                                                                   BSONObj cmdObj) {
-    auto result =
-        grid.shardRegistry()->runCommandWithMetadata(target, dbName, cmdObj, kReplMetadata);
+    auto result = grid.shardRegistry()->runCommandOnConfig(target, dbName, cmdObj, kReplMetadata);
 
     if (!result.isOK()) {
         return result.getStatus();
@@ -1252,7 +1251,7 @@ StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFin
     repl::ReadConcernArgs readConcern(_getConfigOpTime(),
                                       repl::ReadConcernLevel::kMajorityReadConcern);
 
-    auto result = grid.shardRegistry()->exhaustiveFind(
+    auto result = grid.shardRegistry()->exhaustiveFindOnConfigNode(
         host, nss, query, sort, limit, readConcern, kReplMetadata);
 
     if (!result.isOK()) {

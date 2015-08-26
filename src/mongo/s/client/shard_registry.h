@@ -162,34 +162,40 @@ public:
     /**
      * Executes 'find' command against the specified host and fetches *all* the results that
      * the host will return until there are no more or until an error is returned.
+     * "host" must refer to a config server.
      *
      * Returns either the complete set of results or an error, never partial results.
      *
      * Note: should never be used outside of CatalogManagerReplicaSet or DistLockCatalogImpl.
      */
-    StatusWith<QueryResponse> exhaustiveFind(const HostAndPort& host,
-                                             const NamespaceString& nss,
-                                             const BSONObj& query,
-                                             const BSONObj& sort,
-                                             boost::optional<long long> limit,
-                                             boost::optional<repl::ReadConcernArgs> readConcern,
-                                             const BSONObj& metadata);
+    StatusWith<QueryResponse> exhaustiveFindOnConfigNode(
+        const HostAndPort& host,
+        const NamespaceString& nss,
+        const BSONObj& query,
+        const BSONObj& sort,
+        boost::optional<long long> limit,
+        boost::optional<repl::ReadConcernArgs> readConcern,
+        const BSONObj& metadata);
 
     /**
      * Runs a command against the specified host and returns the result.  It is the responsibility
      * of the caller to check the returned BSON for command-specific failures.
      */
-    StatusWith<CommandResponse> runCommandWithMetadata(const HostAndPort& host,
-                                                       const std::string& dbName,
-                                                       const BSONObj& cmdObj,
-                                                       const BSONObj& metadata);
-
-    /**
-     * Runs a command against the specified host and returns the result.
-     */
-    StatusWith<BSONObj> runCommand(const HostAndPort& host,
+    StatusWith<BSONObj> runCommand(OperationContext* txn,
+                                   const HostAndPort& host,
                                    const std::string& dbName,
                                    const BSONObj& cmdObj);
+
+    /**
+     * Runs a command against the specified host and returns the result.  It is the responsibility
+     * of the caller to check the returned BSON for command-specific failures.
+     *
+     * "host" must refer to a config server node.
+     */
+    StatusWith<CommandResponse> runCommandOnConfig(const HostAndPort& host,
+                                                   const std::string& dbname,
+                                                   const BSONObj& cmdObj,
+                                                   const BSONObj& metadata);
 
     /**
      * Helper for running commands against a given shard with logic for retargeting and
@@ -234,6 +240,11 @@ private:
     void _addConfigShard_inlock();
 
     std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
+
+    StatusWith<CommandResponse> _runCommandWithMetadata(const HostAndPort& host,
+                                                        const std::string& dbName,
+                                                        const BSONObj& cmdObj,
+                                                        const BSONObj& metadata);
 
     StatusWith<CommandResponse> _runCommandWithNotMasterRetries(RemoteCommandTargeter* targeter,
                                                                 const std::string& dbname,

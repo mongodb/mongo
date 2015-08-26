@@ -77,8 +77,8 @@ std::string retrieveShardMongoDVersion(OperationContext* txn,
     auto shardHost = uassertStatusOK(
         shard->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
 
-    BSONObj serverStatus =
-        uassertStatusOK(shardRegistry->runCommand(shardHost, "admin", BSON("serverStatus" << 1)));
+    BSONObj serverStatus = uassertStatusOK(
+        shardRegistry->runCommand(txn, shardHost, "admin", BSON("serverStatus" << 1)));
     BSONElement versionElement = serverStatus["version"];
     if (versionElement.type() != String) {
         uassertStatusOK({ErrorCodes::NoSuchKey, "version field not found in serverStatus"});

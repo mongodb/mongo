@@ -362,7 +362,7 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
 
         NamespaceString nss(getns());
         auto result = grid.shardRegistry()->runCommand(
-            targetStatus.getValue(), nss.db().toString(), BSON("count" << nss.coll()));
+            txn, targetStatus.getValue(), nss.db().toString(), BSON("count" << nss.coll()));
 
         long long numObjects = 0;
         uassertStatusOK(result.getStatus());
