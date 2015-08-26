@@ -63,7 +63,7 @@ public:
         autoSplitInternal
     };
 
-    Chunk(OperationContext* txn, const ChunkManager* info, ChunkType from);
+    Chunk(OperationContext* txn, const ChunkManager* info, const ChunkType& from);
     Chunk(const ChunkManager* info,
           const BSONObj& min,
           const BSONObj& max,

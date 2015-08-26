@@ -159,7 +159,7 @@ int Chunk::MaxObjectPerChunk = 250000;
 // Can be overridden from command line
 bool Chunk::ShouldAutoSplit = true;
 
-Chunk::Chunk(OperationContext* txn, const ChunkManager* manager, ChunkType from)
+Chunk::Chunk(OperationContext* txn, const ChunkManager* manager, const ChunkType& from)
     : _manager(manager), _lastmod(0, 0, OID()), _dataWritten(mkDataWritten()) {
     string ns = from.getNS();
     _shardId = from.getShard();
