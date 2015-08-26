@@ -520,7 +520,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: eviction worker thread evicting pages",
 	"cache: in-memory page splits",
 	"cache: lookaside table insert calls",
-	"cache: lookaside table cursor-insert key and value bytes inserted",
+	"cache: lookaside table insert key and value bytes inserted",
 	"cache: lookaside table remove calls",
 	"cache: percentage overhead",
 	"cache: tracked dirty pages in the cache",
@@ -683,9 +683,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_hazard = 0;
 	stats->cache_inmem_split = 0;
 	stats->cache_eviction_internal = 0;
-	stats->cache_lookaside_cursor_insert_bytes = 0;
-	stats->cache_lookaside_cursor_insert = 0;
-	stats->cache_lookaside_cursor_remove = 0;
+	stats->cache_lookaside_insert = 0;
+	stats->cache_lookaside_insert_bytes = 0;
+	stats->cache_lookaside_remove = 0;
 		/* not clearing cache_bytes_max */
 		/* not clearing cache_eviction_maximum_page_size */
 	stats->cache_eviction_dirty = 0;
@@ -858,12 +858,12 @@ __wt_stat_connection_aggregate(
 	to->cache_inmem_split += WT_STAT_READ(from, cache_inmem_split);
 	to->cache_eviction_internal +=
 	    WT_STAT_READ(from, cache_eviction_internal);
-	to->cache_lookaside_cursor_insert_bytes +=
-	    WT_STAT_READ(from, cache_lookaside_cursor_insert_bytes);
-	to->cache_lookaside_cursor_insert +=
-	    WT_STAT_READ(from, cache_lookaside_cursor_insert);
-	to->cache_lookaside_cursor_remove +=
-	    WT_STAT_READ(from, cache_lookaside_cursor_remove);
+	to->cache_lookaside_insert +=
+	    WT_STAT_READ(from, cache_lookaside_insert);
+	to->cache_lookaside_insert_bytes +=
+	    WT_STAT_READ(from, cache_lookaside_insert_bytes);
+	to->cache_lookaside_remove +=
+	    WT_STAT_READ(from, cache_lookaside_remove);
 	to->cache_bytes_max += WT_STAT_READ(from, cache_bytes_max);
 	to->cache_eviction_maximum_page_size +=
 	    WT_STAT_READ(from, cache_eviction_maximum_page_size);

@@ -3643,11 +3643,11 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! cache: in-memory page splits */
 #define	WT_STAT_CONN_CACHE_INMEM_SPLIT			1048
 /*! cache: lookaside table insert calls */
-#define	WT_STAT_CONN_CACHE_LOOKASIDE_CURSOR_INSERT	1049
-/*! cache: lookaside table cursor-insert key and value bytes inserted */
-#define	WT_STAT_CONN_CACHE_LOOKASIDE_CURSOR_INSERT_BYTES	1050
+#define	WT_STAT_CONN_CACHE_LOOKASIDE_INSERT		1049
+/*! cache: lookaside table insert key and value bytes inserted */
+#define	WT_STAT_CONN_CACHE_LOOKASIDE_INSERT_BYTES	1050
 /*! cache: lookaside table remove calls */
-#define	WT_STAT_CONN_CACHE_LOOKASIDE_CURSOR_REMOVE	1051
+#define	WT_STAT_CONN_CACHE_LOOKASIDE_REMOVE		1051
 /*! cache: percentage overhead */
 #define	WT_STAT_CONN_CACHE_OVERHEAD			1052
 /*! cache: tracked dirty pages in the cache */
