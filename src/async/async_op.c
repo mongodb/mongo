@@ -237,7 +237,7 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 	asyncop->c.set_key = __wt_cursor_set_key;
 	asyncop->c.get_value = __wt_cursor_get_value;
 	asyncop->c.set_value = __wt_cursor_set_value;
-	asyncop->c.recno = 0;
+	asyncop->c.recno = WT_RECNO_OOB;
 	memset(asyncop->c.raw_recno_buf, 0, sizeof(asyncop->c.raw_recno_buf));
 	memset(&asyncop->c.key, 0, sizeof(asyncop->c.key));
 	memset(&asyncop->c.value, 0, sizeof(asyncop->c.value));
