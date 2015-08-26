@@ -61,7 +61,7 @@ retry:
 	/*
 	 * If someone completely processed this slot, we're done.
 	 */
-	if (FLD64_ISSET(slot->slot_state, WT_LOG_SLOT_RESERVED))
+	if (FLD64_ISSET((uint64_t)slot->slot_state, WT_LOG_SLOT_RESERVED))
 		return (0);
 	new_state = (old_state | WT_LOG_SLOT_CLOSE);
 	/*
@@ -280,9 +280,10 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 	 */
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		slot = &log->slot_pool[i];
-		if (!FLD64_ISSET(slot->slot_state, WT_LOG_SLOT_RESERVED)) {
+		if (!FLD64_ISSET(
+		    (uint64_t)slot->slot_state, WT_LOG_SLOT_RESERVED)) {
 			rel = WT_LOG_SLOT_RELEASED(slot->slot_state);
-			write_size = (size_t)rel - slot->slot_unbuffered;
+			write_size = (size_t)(rel - slot->slot_unbuffered);
 			if (write_size != 0)
 				WT_RET(__wt_write(session, slot->slot_fh,
 				    slot->slot_start_offset, write_size,
@@ -345,8 +346,8 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		released = WT_LOG_SLOT_RELEASED(old_state);
 		join_offset = WT_LOG_SLOT_JOINED(old_state);
 		new_join = join_offset + (int32_t)mysize;
-		new_state = WT_LOG_SLOT_JOIN_REL(
-		    (uint64_t)new_join, released, flag_state);
+		new_state = (int64_t)WT_LOG_SLOT_JOIN_REL(
+		    (int64_t)new_join, (int64_t)released, (int64_t)flag_state);
 
 		/*
 		 * Check if the slot is open for joining and we are able to
@@ -377,7 +378,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		F_SET(slot, WT_SLOT_SYNC);
 	myslotp->slot = slot;
 	myslotp->offset = join_offset;
-	myslotp->end_offset = join_offset + mysize;
+	myslotp->end_offset = (wt_off_t)((uint64_t)join_offset + mysize);
 	return (0);
 }
 
@@ -411,7 +412,7 @@ __wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
 	/*
 	 * Add my size into the state and return the new size.
 	 */
-	my_size = WT_LOG_SLOT_JOIN_REL((uint64_t)0, size, 0);
+	my_size = (int64_t)WT_LOG_SLOT_JOIN_REL((int64_t)0, size, 0);
 	return (__wt_atomic_addiv64(&slot->slot_state, my_size));
 }
 

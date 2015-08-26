@@ -1208,7 +1208,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	}
 
 	if (F_ISSET(slot, WT_SLOT_BUFFERED)) {
-		write_size = (size_t)release_bytes - slot->slot_unbuffered;
+		write_size = (size_t)(release_bytes - slot->slot_unbuffered);
 		if (write_size != 0)
 			WT_ERR(__wt_write(session,
 			    slot->slot_fh, slot->slot_start_offset,
@@ -1680,8 +1680,8 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_RET(__wt_log_acquire(session, record->size, &tmp));
 	WT_ASSERT(session,
 	    __wt_log_cmp(&log->write_lsn, &tmp.slot_release_lsn) <= 0);
-	tmp.slot_end_lsn.offset += record->size;
-	tmp.slot_direct_size = record->size;
+	tmp.slot_end_lsn.offset += (wt_off_t)record->size;
+	tmp.slot_direct_size = (int64_t)record->size;
 	WT_RET(__log_fill(session, &myslot, 1, record, lsnp));
 	WT_RET(__log_release(session, myslot.slot, NULL));
 	log->alloc_lsn = tmp.slot_end_lsn;

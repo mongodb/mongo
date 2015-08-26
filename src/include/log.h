@@ -115,8 +115,8 @@
 /* Slot is in use, but closed to new joins */
 #define	WT_LOG_SLOT_CLOSED(state)					\
     (WT_LOG_SLOT_ACTIVE(state) &&					\
-    (FLD64_ISSET(state, WT_LOG_SLOT_CLOSE) &&				\
-    !FLD64_ISSET(state, WT_LOG_SLOT_RESERVED)))
+    (FLD64_ISSET((uint64_t)state, WT_LOG_SLOT_CLOSE) &&			\
+    !FLD64_ISSET((uint64_t)state, WT_LOG_SLOT_RESERVED)))
 /* Slot is in use, all data copied into buffer */
 #define	WT_LOG_SLOT_DONE(state)						\
     (WT_LOG_SLOT_CLOSED(state) &&					\
@@ -124,7 +124,7 @@
 /* Slot is in use, more threads may join this slot */
 #define	WT_LOG_SLOT_OPEN(state)						\
     (WT_LOG_SLOT_ACTIVE(state) &&					\
-    !FLD64_ISSET((state), WT_LOG_SLOT_CLOSE) &&				\
+    !FLD64_ISSET((uint64_t)(state), WT_LOG_SLOT_CLOSE) &&		\
      WT_LOG_SLOT_JOINED(state) < WT_LOG_SLOT_BUF_MAX)
 
 struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_logslot {
