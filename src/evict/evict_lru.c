@@ -1402,11 +1402,8 @@ __evict_page(WT_SESSION_IMPL *session, int is_server)
 	 * page-discard function assert that no dirty pages are ever
 	 * discarded.
 	 */
-	if (F_ISSET(btree->dhandle, WT_DHANDLE_DEAD) &&
-	    __wt_page_is_modified(page)) {
-		page->modify->write_gen = 0;
-		__wt_cache_dirty_decr(session, page);
-	}
+	if (F_ISSET(btree->dhandle, WT_DHANDLE_DEAD))
+		__wt_page_modify_clear(session, page);
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, 0));
 

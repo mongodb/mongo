@@ -234,10 +234,7 @@ __wt_free_ref(
 	 * it clean explicitly.)
 	 */
 	if (free_pages && ref->page != NULL) {
-		if (ref->page->modify != NULL) {
-			ref->page->modify->write_gen = 0;
-			__wt_cache_dirty_decr(session, ref->page);
-		}
+		__wt_page_modify_clear(session, ref->page);
 		__wt_page_out(session, &ref->page);
 	}
 

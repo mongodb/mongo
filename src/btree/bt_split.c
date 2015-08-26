@@ -1398,8 +1398,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		 * We marked the new page dirty; we're going to discard it, but
 		 * first mark it clean and fix up the cache statistics.
 		 */
-		 right->modify->write_gen = 0;
-		 __wt_cache_dirty_decr(session, right);
+		__wt_page_modify_clear(session, right);
 
 		WT_ERR(ret);
 	}
@@ -1456,8 +1455,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Pages with unresolved changes are not marked clean during
 	 * reconciliation, do it now.
 	 */
-	mod->write_gen = 0;
-	__wt_cache_dirty_decr(session, page);
+	__wt_page_modify_clear(session, page);
 	__wt_ref_out(session, ref);
 
 	/* Swap the new page into place. */
@@ -1514,10 +1512,7 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 	 * Pages with unresolved changes are not marked clean during
 	 * reconciliation, do it now.
 	 */
-	if (__wt_page_is_modified(page)) {
-		 mod->write_gen = 0;
-		 __wt_cache_dirty_decr(session, page);
-	}
+	__wt_page_modify_clear(session, page);
 	__wt_page_out(session, &page);
 
 	return (0);

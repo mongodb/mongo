@@ -304,16 +304,26 @@ __las_page_instantiate(
 		__wt_cache_page_inmem_incr(session, page, total_incr);
 
 		/*
-		 * We modified the page above, which will have set the first
-		 * dirty transaction to the last transaction currently running.
-		 * However, the updates we installed may be older than that.
 		 * Set the first dirty transaction to an impossibly old value
 		 * so this page is never skipped in a checkpoint.
 		 *
 		 * KEITH: is this correct? We don't care about checkpoints, we
-		 * care about older readers in the system.
+		 * care about older readers in the system, but, if the page is
+		 * dirtied again, and we're writing it, does it matter if the
+		 * first-dirty-txn value isn't correct?
 		 */
 		page->modify->first_dirty_txn = WT_TXN_FIRST;
+
+		/*
+		 * We've modified/dirtied the page, but that's not necessary and
+		 * if we keep the page clean, it's easier to evict. We leave the
+		 * lookaside table updates in place, so if we evict this page
+		 * without dirtying it, any future instantiation of it will find
+		 * the records it needs. If the page is dirtied before eviction,
+		 * then we'll write any needed lookaside table records for the
+		 * new location of the page.
+		 */
+		__wt_page_modify_clear(session, page);
 	}
 
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
