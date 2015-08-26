@@ -834,7 +834,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
         }
 
         try {
-            std::unique_ptr<RecordCursor> cursor;
+            std::unique_ptr<SeekableRecordCursor> cursor;
             if (getOpCtx()->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
                 cursor = _collection->getCursor(getOpCtx());
                 // our snapshot has changed, refetch

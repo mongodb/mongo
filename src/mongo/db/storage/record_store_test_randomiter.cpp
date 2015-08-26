@@ -163,7 +163,7 @@ TEST(RecordStoreTestHarness, GetRandomIteratorSingleton) {
         // We should be pointing at the only record in the store.
 
         // Check deattaching / reattaching
-        cursor->savePositioned();
+        cursor->save();
         cursor->detachFromOperationContext();
         opCtx = harnessHelper->newOperationContext();
         cursor->reattachToOperationContext(opCtx.get());

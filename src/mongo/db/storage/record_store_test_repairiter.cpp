@@ -156,7 +156,7 @@ TEST(RecordStoreTestHarness, GetIteratorForRepairInvalidateSingleton) {
         // We should be pointing at the only record in the store.
 
         // Invalidate the record we're pointing at.
-        cursor->savePositioned();
+        cursor->save();
         cursor->invalidate(idToInvalidate);
         cursor->restore();
 

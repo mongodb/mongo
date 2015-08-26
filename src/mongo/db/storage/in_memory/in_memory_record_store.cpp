@@ -109,7 +109,7 @@ private:
     Records _records;
 };
 
-class InMemoryRecordStore::Cursor final : public RecordCursor {
+class InMemoryRecordStore::Cursor final : public SeekableRecordCursor {
 public:
     Cursor(OperationContext* txn, const InMemoryRecordStore& rs)
         : _records(rs._data->records), _isCapped(rs.isCapped()) {}
@@ -137,7 +137,7 @@ public:
         return {{_it->first, _it->second.toRecordData()}};
     }
 
-    void savePositioned() final {
+    void save() final {
         if (!_needFirstSeek && !_lastMoveWasRestore)
             _savedId = _it == _records.end() ? RecordId() : _it->first;
     }
@@ -172,7 +172,7 @@ private:
     const bool _isCapped;
 };
 
-class InMemoryRecordStore::ReverseCursor final : public RecordCursor {
+class InMemoryRecordStore::ReverseCursor final : public SeekableRecordCursor {
 public:
     ReverseCursor(OperationContext* txn, const InMemoryRecordStore& rs)
         : _records(rs._data->records), _isCapped(rs.isCapped()) {}
@@ -210,7 +210,7 @@ public:
         return {{_it->first, _it->second.toRecordData()}};
     }
 
-    void savePositioned() final {
+    void save() final {
         if (!_needFirstSeek && !_lastMoveWasRestore)
             _savedId = _it == _records.rend() ? RecordId() : _it->first;
     }
@@ -497,8 +497,8 @@ StatusWith<RecordData> InMemoryRecordStore::updateWithDamages(
     return newRecord.toRecordData();
 }
 
-std::unique_ptr<RecordCursor> InMemoryRecordStore::getCursor(OperationContext* txn,
-                                                             bool forward) const {
+std::unique_ptr<SeekableRecordCursor> InMemoryRecordStore::getCursor(OperationContext* txn,
+                                                                     bool forward) const {
     if (forward)
         return stdx::make_unique<Cursor>(txn, *this);
     return stdx::make_unique<ReverseCursor>(txn, *this);

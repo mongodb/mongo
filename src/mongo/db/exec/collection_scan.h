@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-class RecordCursor;
+class SeekableRecordCursor;
 class WorkingSet;
 class OperationContext;
 
@@ -86,7 +86,7 @@ private:
     // The filter is not owned by us.
     const MatchExpression* _filter;
 
-    std::unique_ptr<RecordCursor> _cursor;
+    std::unique_ptr<SeekableRecordCursor> _cursor;
 
     CollectionScanParams _params;
 

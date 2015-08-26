@@ -107,7 +107,7 @@ void MultiIteratorStage::kill() {
 
 void MultiIteratorStage::doSaveState() {
     for (auto&& iterator : _iterators) {
-        iterator->savePositioned();
+        iterator->save();
     }
 }
 

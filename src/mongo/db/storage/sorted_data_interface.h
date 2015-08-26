@@ -300,10 +300,10 @@ public:
          * Prepares for state changes in underlying data in a way that allows the cursor's
          * current position to be restored.
          *
-         * It is safe to call savePositioned multiple times in a row.
+         * It is safe to call save multiple times in a row.
          * No other method (excluding destructor) may be called until successfully restored.
          */
-        virtual void savePositioned() = 0;
+        virtual void save() = 0;
 
         /**
          * Prepares for state changes in underlying data without necessarily saving the current
@@ -316,7 +316,7 @@ public:
          * No other method (excluding destructor) may be called until successfully restored.
          */
         virtual void saveUnpositioned() {
-            savePositioned();
+            save();
         }
 
         /**
@@ -325,7 +325,7 @@ public:
          * If the former position no longer exists, a following call to next() will return the
          * next closest position in the direction of the scan, if any.
          *
-         * This handles restoring after either savePositioned() or saveUnpositioned().
+         * This handles restoring after either save() or saveUnpositioned().
          */
         virtual void restore() = 0;
 

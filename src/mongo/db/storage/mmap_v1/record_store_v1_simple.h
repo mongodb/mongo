@@ -53,7 +53,8 @@ public:
         return "SimpleRecordStoreV1";
     }
 
-    std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+                                                    bool forward) const final;
 
     std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const final;
 

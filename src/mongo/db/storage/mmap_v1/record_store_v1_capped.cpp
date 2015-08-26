@@ -583,8 +583,8 @@ void CappedRecordStoreV1::addDeletedRec(OperationContext* txn, const DiskLoc& dl
     }
 }
 
-std::unique_ptr<RecordCursor> CappedRecordStoreV1::getCursor(OperationContext* txn,
-                                                             bool forward) const {
+std::unique_ptr<SeekableRecordCursor> CappedRecordStoreV1::getCursor(OperationContext* txn,
+                                                                     bool forward) const {
     return stdx::make_unique<CappedRecordStoreV1Iterator>(txn, this, forward);
 }
 

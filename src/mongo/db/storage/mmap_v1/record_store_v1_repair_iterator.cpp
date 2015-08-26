@@ -56,10 +56,6 @@ boost::optional<Record> RecordStoreV1RepairCursor::next() {
     return {{out, _recordStore->dataFor(_txn, out)}};
 }
 
-boost::optional<Record> RecordStoreV1RepairCursor::seekExact(const RecordId& id) {
-    invariant(!"seekExact not supported");
-}
-
 void RecordStoreV1RepairCursor::advance() {
     const ExtentManager* em = _recordStore->_extentManager;
 

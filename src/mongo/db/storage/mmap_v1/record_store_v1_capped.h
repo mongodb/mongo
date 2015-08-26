@@ -64,7 +64,8 @@ public:
      */
     void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) final;
 
-    std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+                                                    bool forward) const final;
 
     std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const final;
 

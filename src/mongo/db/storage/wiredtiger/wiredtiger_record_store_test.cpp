@@ -721,7 +721,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorRollover) {
     unique_ptr<OperationContext> cursorCtx(harnessHelper->newOperationContext());
     auto cursor = rs->getCursor(cursorCtx.get());
     ASSERT(cursor->next());
-    cursor->savePositioned();
+    cursor->save();
     cursorCtx->recoveryUnit()->abandonSnapshot();
 
     {  // insert 100 documents which causes rollover
@@ -868,8 +868,8 @@ TEST(WiredTigerRecordStoreTest, CappedCursorYieldFirst) {
     unique_ptr<OperationContext> cursorCtx(harnessHelper->newOperationContext());
     auto cursor = rs->getCursor(cursorCtx.get());
 
-    // See that things work if you yield before you first call getNext().
-    cursor->savePositioned();
+    // See that things work if you yield before you first call next().
+    cursor->save();
     cursorCtx->recoveryUnit()->abandonSnapshot();
     ASSERT_TRUE(cursor->restore());
     auto record = cursor->next();

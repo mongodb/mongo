@@ -215,7 +215,7 @@ void CollectionScan::doInvalidate(OperationContext* txn,
 
 void CollectionScan::doSaveState() {
     if (_cursor) {
-        _cursor->savePositioned();
+        _cursor->save();
     }
 }
 

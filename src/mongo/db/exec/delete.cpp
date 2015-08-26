@@ -136,7 +136,7 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
         try {
             // If the snapshot changed, then we have to make sure we have the latest copy of the
             // doc and that it still matches.
-            std::unique_ptr<RecordCursor> cursor;
+            std::unique_ptr<SeekableRecordCursor> cursor;
             if (getOpCtx()->recoveryUnit()->getSnapshotId() != member->obj.snapshotId()) {
                 cursor = _collection->getCursor(getOpCtx());
                 if (!WorkingSetCommon::fetch(getOpCtx(), _ws, id, cursor)) {

@@ -281,7 +281,7 @@ public:
                           const BSONObj& key,
                           WorkingSet* ws,
                           WorkingSetID id,
-                          unowned_ptr<RecordCursor> recordCursor)
+                          unowned_ptr<SeekableRecordCursor> recordCursor)
         : _txn(txn),
           _recordCursor(recordCursor),
           _keyPattern(keyPattern),
@@ -339,7 +339,7 @@ private:
     }
 
     OperationContext* _txn;
-    unowned_ptr<RecordCursor> _recordCursor;
+    unowned_ptr<SeekableRecordCursor> _recordCursor;
     BSONObj _keyPattern;
     BSONObj _key;
     WorkingSet* _ws;

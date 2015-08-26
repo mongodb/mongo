@@ -196,7 +196,7 @@ public:
             return curr(parts);
         }
 
-        void savePositioned() override {
+        void save() override {
             if (!_lastMoveWasRestore)
                 _savedEOF = isEOF();
 
@@ -213,7 +213,7 @@ public:
         }
 
         void saveUnpositioned() override {
-            // Don't leak our registration if savePositioned() was previously called.
+            // Don't leak our registration if save() was previously called.
             if (!_saved.bucket.isNull())
                 _btree->savedCursors()->unregisterCursor(&_saved);
 

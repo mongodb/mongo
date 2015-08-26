@@ -911,10 +911,6 @@ boost::optional<Record> RecordStoreV1Base::IntraExtentIterator::next() {
     return {{out, _rs->dataFor(_txn, out)}};
 }
 
-boost::optional<Record> RecordStoreV1Base::IntraExtentIterator::seekExact(const RecordId& id) {
-    invariant(!"seekExact not supported");
-}
-
 void RecordStoreV1Base::IntraExtentIterator::advance() {
     if (_curr.isNull())
         return;

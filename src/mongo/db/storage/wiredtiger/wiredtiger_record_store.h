@@ -137,7 +137,8 @@ public:
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages);
 
-    std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+                                                    bool forward) const final;
     std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* txn) const final;
 
     std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const final;

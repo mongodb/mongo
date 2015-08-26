@@ -95,7 +95,8 @@ public:
         invariant(false);
     }
 
-    std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final {
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+                                                    bool forward) const final {
         invariant(false);
     }
 

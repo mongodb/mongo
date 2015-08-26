@@ -45,9 +45,8 @@ public:
     RecordStoreV1RepairCursor(OperationContext* txn, const RecordStoreV1Base* recordStore);
 
     boost::optional<Record> next() final;
-    boost::optional<Record> seekExact(const RecordId& id) final;
     void invalidate(const RecordId& dl);
-    void savePositioned() final {}
+    void save() final {}
     bool restore() final {
         return true;
     }

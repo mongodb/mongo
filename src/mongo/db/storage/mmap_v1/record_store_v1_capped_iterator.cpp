@@ -99,7 +99,7 @@ void CappedRecordStoreV1Iterator::invalidate(const RecordId& id) {
     }
 }
 
-void CappedRecordStoreV1Iterator::savePositioned() {}
+void CappedRecordStoreV1Iterator::save() {}
 
 bool CappedRecordStoreV1Iterator::restore() {
     return !_killedByInvalidate;

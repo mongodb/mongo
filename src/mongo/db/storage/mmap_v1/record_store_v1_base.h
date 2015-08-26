@@ -333,9 +333,8 @@ public:
         : _txn(txn), _curr(start), _rs(rs), _forward(forward) {}
 
     boost::optional<Record> next() final;
-    boost::optional<Record> seekExact(const RecordId& id) final;
     void invalidate(const RecordId& dl) final;
-    void savePositioned() final {}
+    void save() final {}
     bool restore() final {
         return true;
     }

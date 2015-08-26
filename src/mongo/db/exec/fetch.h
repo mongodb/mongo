@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-class RecordCursor;
+class SeekableRecordCursor;
 
 /**
  * This stage turns a RecordId into a BSONObj.
@@ -87,7 +87,7 @@ private:
     // stages. The lifetime of the collection must supersede that of the stage.
     const Collection* _collection;
     // Used to fetch Records from _collection.
-    std::unique_ptr<RecordCursor> _cursor;
+    std::unique_ptr<SeekableRecordCursor> _cursor;
 
     // _ws is not owned by us.
     WorkingSet* _ws;

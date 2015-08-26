@@ -84,7 +84,8 @@ public:
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages);
 
-    std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward) const final;
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+                                                    bool forward) const final;
 
     virtual Status truncate(OperationContext* txn);
 

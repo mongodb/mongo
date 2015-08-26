@@ -203,7 +203,8 @@ public:
      */
     bool findDoc(OperationContext* txn, const RecordId& loc, Snapshotted<BSONObj>* out) const;
 
-    std::unique_ptr<RecordCursor> getCursor(OperationContext* txn, bool forward = true) const;
+    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
+                                                    bool forward = true) const;
 
     /**
      * Returns many cursors that partition the Collection into many disjoint sets. Iterating

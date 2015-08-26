@@ -198,7 +198,8 @@ bool Collection::requiresIdIndex() const {
     return true;
 }
 
-std::unique_ptr<RecordCursor> Collection::getCursor(OperationContext* txn, bool forward) const {
+std::unique_ptr<SeekableRecordCursor> Collection::getCursor(OperationContext* txn,
+                                                            bool forward) const {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IS));
     invariant(ok());
 

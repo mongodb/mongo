@@ -41,7 +41,7 @@ class SimpleRecordStoreV1;
  *
  * If start is not DiskLoc(), the iteration begins at that DiskLoc.
  */
-class SimpleRecordStoreV1Iterator final : public RecordCursor {
+class SimpleRecordStoreV1Iterator final : public SeekableRecordCursor {
 public:
     SimpleRecordStoreV1Iterator(OperationContext* txn,
                                 const SimpleRecordStoreV1* records,
@@ -49,7 +49,7 @@ public:
 
     boost::optional<Record> next() final;
     boost::optional<Record> seekExact(const RecordId& id) final;
-    void savePositioned() final;
+    void save() final;
     bool restore() final;
     void detachFromOperationContext() final {
         _txn = nullptr;

@@ -91,7 +91,7 @@ MONGO_FP_DECLARE(WTWriteConflictException);
 
 const std::string kWiredTigerEngineName = "wiredTiger";
 
-class WiredTigerRecordStore::Cursor final : public RecordCursor {
+class WiredTigerRecordStore::Cursor final : public SeekableRecordCursor {
 public:
     Cursor(OperationContext* txn, const WiredTigerRecordStore& rs, bool forward = true)
         : _rs(rs),
@@ -178,7 +178,7 @@ public:
         return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
     }
 
-    void savePositioned() final {
+    void save() final {
         try {
             if (_cursor)
                 _cursor->reset();
@@ -189,7 +189,7 @@ public:
     }
 
     void saveUnpositioned() final {
-        savePositioned();
+        save();
         _lastReturnedId = RecordId();
     }
 
@@ -329,11 +329,7 @@ public:
         return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
     }
 
-    boost::optional<Record> seekExact(const RecordId& id) final {
-        return {};
-    }
-
-    void savePositioned() final {
+    void save() final {
         if (_cursor && !wt_keeptxnopen()) {
             try {
                 _cursor->reset(_cursor);
@@ -941,8 +937,8 @@ void WiredTigerRecordStore::_oplogSetStartHack(WiredTigerRecoveryUnit* wru) cons
     }
 }
 
-std::unique_ptr<RecordCursor> WiredTigerRecordStore::getCursor(OperationContext* txn,
-                                                               bool forward) const {
+std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::getCursor(OperationContext* txn,
+                                                                       bool forward) const {
     if (_isOplog && forward) {
         WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(txn);
         if (!wru->inActiveTxn() || wru->getOplogReadTill().isNull()) {

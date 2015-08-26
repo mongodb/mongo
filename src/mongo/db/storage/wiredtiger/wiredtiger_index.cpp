@@ -656,7 +656,7 @@ public:
         return curr(parts);
     }
 
-    void savePositioned() override {
+    void save() override {
         try {
             if (_cursor)
                 _cursor->reset();
@@ -670,7 +670,7 @@ public:
     }
 
     void saveUnpositioned() override {
-        savePositioned();
+        save();
         _eof = true;
     }
 

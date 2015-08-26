@@ -235,8 +235,8 @@ void SimpleRecordStoreV1::addDeletedRec(OperationContext* txn, const DiskLoc& dl
     _details->setDeletedListEntry(txn, b, dloc);
 }
 
-std::unique_ptr<RecordCursor> SimpleRecordStoreV1::getCursor(OperationContext* txn,
-                                                             bool forward) const {
+std::unique_ptr<SeekableRecordCursor> SimpleRecordStoreV1::getCursor(OperationContext* txn,
+                                                                     bool forward) const {
     return stdx::make_unique<SimpleRecordStoreV1Iterator>(txn, this, forward);
 }
 

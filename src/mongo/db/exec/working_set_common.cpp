@@ -82,7 +82,7 @@ void WorkingSetCommon::prepareForSnapshotChange(WorkingSet* workingSet) {
 bool WorkingSetCommon::fetch(OperationContext* txn,
                              WorkingSet* workingSet,
                              WorkingSetID id,
-                             unowned_ptr<RecordCursor> cursor) {
+                             unowned_ptr<SeekableRecordCursor> cursor) {
     WorkingSetMember* member = workingSet->get(id);
 
     // The RecordFetcher should already have been transferred out of the WSM and used.

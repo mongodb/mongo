@@ -90,7 +90,7 @@ private:
     // Not owned here.
     const Collection* _collection;
 
-    std::unique_ptr<RecordCursor> _recordCursor;
+    std::unique_ptr<SeekableRecordCursor> _recordCursor;
 
     // The WorkingSet we annotate with results.  Not owned by us.
     WorkingSet* _workingSet;

@@ -137,7 +137,7 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
         Status status = validateBSON(data.data(), data.size());
         if (!status.isOK()) {
             log() << "Invalid BSON detected at " << id << ": " << status << ". Deleting.";
-            cursor->savePositioned();  // 'data' is no longer valid.
+            cursor->save();  // 'data' is no longer valid.
             {
                 WriteUnitOfWork wunit(txn);
                 rs->deleteRecord(txn, id);

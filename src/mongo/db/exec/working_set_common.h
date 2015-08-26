@@ -36,7 +36,7 @@ namespace mongo {
 class CanonicalQuery;
 class Collection;
 class OperationContext;
-class RecordCursor;
+class SeekableRecordCursor;
 
 class WorkingSetCommon {
 public:
@@ -63,7 +63,7 @@ public:
 
     /**
      * Transitions the WorkingSetMember with WorkingSetID 'id' from the LOC_AND_IDX state to the
-     * LOC_AND_OBJ state by fetching a document. Does the fetch using RecordCursor 'cursor'.
+     * LOC_AND_OBJ state by fetching a document. Does the fetch using   'cursor'.
      *
      * If false is returned, the document should not be considered for the result set. It is the
      * caller's responsibility to free 'id' in this case.
@@ -73,12 +73,12 @@ public:
     static bool fetch(OperationContext* txn,
                       WorkingSet* workingSet,
                       WorkingSetID id,
-                      unowned_ptr<RecordCursor> cursor);
+                      unowned_ptr<SeekableRecordCursor> cursor);
 
     static bool fetchIfUnfetched(OperationContext* txn,
                                  WorkingSet* workingSet,
                                  WorkingSetID id,
-                                 unowned_ptr<RecordCursor> cursor) {
+                                 unowned_ptr<SeekableRecordCursor> cursor) {
         WorkingSetMember* member = workingSet->get(id);
         if (member->hasObj())
             return true;

@@ -241,7 +241,7 @@ void IndexScan::doSaveState() {
         return;
     }
 
-    _indexCursor->savePositioned();
+    _indexCursor->save();
 }
 
 void IndexScan::doRestoreState() {

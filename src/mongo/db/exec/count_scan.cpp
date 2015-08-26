@@ -121,7 +121,7 @@ bool CountScan::isEOF() {
 
 void CountScan::doSaveState() {
     if (_cursor)
-        _cursor->savePositioned();
+        _cursor->save();
 }
 
 void CountScan::doRestoreState() {

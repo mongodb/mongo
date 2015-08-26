@@ -281,7 +281,7 @@ public:
             return *_it;
         }
 
-        void savePositioned() override {
+        void save() override {
             // Keep original position if we haven't moved since the last restore.
             _txn = nullptr;
             if (_lastMoveWasRestore)

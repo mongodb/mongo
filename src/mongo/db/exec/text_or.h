@@ -158,7 +158,7 @@ private:
     // Members needed only for using the TextMatchableDocument.
     const MatchExpression* _filter;
     WorkingSetID _idRetrying;
-    std::unique_ptr<RecordCursor> _recordCursor;
+    std::unique_ptr<SeekableRecordCursor> _recordCursor;
     IndexDescriptor* _index;
 };
 }
