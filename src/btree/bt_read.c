@@ -34,7 +34,7 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 	las_addr->size = addr_size;
 	las_key->size = 0;
 	cursor->set_key(
-	    cursor, btree_id, &las_addr, (uint64_t)0, (uint32_t)0, las_key);
+	    cursor, btree_id, las_addr, (uint64_t)0, (uint32_t)0, las_key);
 	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
 		ret = cursor->next(cursor);
 	for (; ret == 0; ret = cursor->next(cursor)) {
