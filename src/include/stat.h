@@ -87,7 +87,7 @@
 /*
  * Sum the values from all structures in the array.
  */
-static inline uint64_t
+static inline int64_t
 __wt_stats_aggregate(void *stats_arg, int slot)
 {
 	int64_t **stats, aggr_v;
@@ -109,13 +109,13 @@ __wt_stats_aggregate(void *stats_arg, int slot)
 	 * second thread decrementing a value before aggregation has reached
 	 * its slot).
 	 *
-	 * For historic API compatibility, the type is a uint64_t; limit to
-	 * positive values, negative numbers would just look really, really
-	 * large.
+	 * For historic API compatibility, the external type is a uint64_t;
+	 * limit our return to positive values, negative numbers would just
+	 * look really, really large.
 	 */
 	if (aggr_v < 0)
 		aggr_v = 0;
-	return ((uint64_t)aggr_v);
+	return (aggr_v);
 }
 
 /*
@@ -134,9 +134,8 @@ __wt_stats_clear(void *stats_arg, int slot)
 
 /*
  * Read/write statistics without any test for statistics configuration. Reading
- * and writing the field requires different actions: reading aggregates the
- * values across the array of structures, writing updates a single structure's
- * value.
+ * and writing the field requires different actions: reading sums the values
+ * across the array of structures, writing updates a single structure's value.
  */
 #define	WT_STAT_READ(stats, fld)					\
 	__wt_stats_aggregate(stats, WT_STATS_FIELD_TO_SLOT(stats, fld))
