@@ -33,8 +33,16 @@ __txn_op_log(WT_SESSION_IMPL *session,
 	 * 3) row store remove; or
 	 * 4) row store insert/update.
 	 */
-	if (cbt->btree->type != BTREE_ROW) {
-		WT_ASSERT(session, cbt->ins != NULL);
+	if (cbt->btree->type == BTREE_ROW) {
+		WT_ERR(__wt_cursor_row_leaf_key(cbt, &key));
+
+		if (WT_UPDATE_DELETED_ISSET(upd))
+			WT_ERR(__wt_logop_row_remove_pack(session, logrec,
+			    op->fileid, &key));
+		else
+			WT_ERR(__wt_logop_row_put_pack(session, logrec,
+			    op->fileid, &key, &value));
+	} else {
 		recno = WT_INSERT_RECNO(cbt->ins);
 		WT_ASSERT(session, recno != WT_RECNO_OOB);
 
@@ -44,15 +52,6 @@ __txn_op_log(WT_SESSION_IMPL *session,
 		else
 			WT_ERR(__wt_logop_col_put_pack(session, logrec,
 			    op->fileid, recno, &value));
-	} else {
-		WT_ERR(__wt_cursor_row_leaf_key(cbt, &key));
-
-		if (WT_UPDATE_DELETED_ISSET(upd))
-			WT_ERR(__wt_logop_row_remove_pack(session, logrec,
-			    op->fileid, &key));
-		else
-			WT_ERR(__wt_logop_row_put_pack(session, logrec,
-			    op->fileid, &key, &value));
 	}
 
 err:	__wt_buf_free(session, &key);
