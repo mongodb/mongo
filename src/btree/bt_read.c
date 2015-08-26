@@ -47,18 +47,14 @@ __las_build_prefix(WT_SESSION_IMPL *session, uint32_t btree_id,
  *	Remove all records matching a key prefix from the lookaside store.
  */
 int
-__wt_las_remove_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor_arg,
-    uint32_t btree_id, const uint8_t *addr, size_t addr_size)
+__wt_las_remove_block(WT_SESSION_IMPL *session,
+    WT_CURSOR *cursor, uint32_t btree_id, const uint8_t *addr, size_t addr_size)
 {
-	WT_CURSOR *cursor;
 	WT_DECL_ITEM(klas);
 	WT_DECL_RET;
 	size_t prefix_len;
-	int exact, reset_evict;
+	int exact;
 	uint8_t prefix[WT_MAX_PREFIX_SIZE];
-
-	cursor = NULL;
-	reset_evict = 0;		/* [-Werror=maybe-uninitialized] */
 
 	/* Build the unique file/address prefix. */
 	__las_build_prefix(
@@ -70,11 +66,9 @@ __wt_las_remove_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor_arg,
 	klas->size = prefix_len;
 
 	/*
-	 * If not provided a lookaside table cursor, open one. Search for the
-	 * matching prefix and step through all matching records, removing them.
+	 * Search for the matching prefix and step through all matching records,
+	 * removing them.
 	 */
-	if ((cursor = cursor_arg) == NULL)
-		WT_ERR(__wt_las_cursor(session, &cursor, &reset_evict));
 	cursor->set_key(cursor, klas);
 	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
 		ret = cursor->next(cursor);
@@ -98,10 +92,7 @@ __wt_las_remove_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor_arg,
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	if (cursor_arg == NULL)
-		WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
-
-	__wt_scr_free(session, &klas);
+err:	__wt_scr_free(session, &klas);
 	return (ret);
 }
 
@@ -138,9 +129,8 @@ __row_instantiate(WT_SESSION_IMPL *session,
  *	Instantiate lookaside update records in a recently read page.
  */
 static int
-__las_page_instantiate(
-    WT_SESSION_IMPL *session, WT_REF *ref, uint32_t read_id,
-    const uint8_t *addr, size_t addr_size, int *need_las_removep)
+__las_page_instantiate(WT_SESSION_IMPL *session,
+    WT_REF *ref, uint32_t read_id, const uint8_t *addr, size_t addr_size)
 {
 	WT_CURSOR *cursor;
 	WT_CURSOR_BTREE cbt;
@@ -156,8 +146,6 @@ __las_page_instantiate(
 	uint8_t prefix[WT_MAX_PREFIX_SIZE];
 	int exact, reset_evict;
 	void *p;
-
-	*need_las_removep = 0;
 
 	cursor = NULL;
 	page = ref->page;
@@ -205,12 +193,6 @@ __las_page_instantiate(
 		if (klas->size <= prefix_len ||
 		    memcmp(klas->data, prefix, prefix_len) != 0)
 			break;
-
-		/*
-		 * If we find/instantiate records, we'll want to remove them
-		 * once this page instantiation is successful.
-		 */
-		*need_las_removep = 1;
 
 		/*
 		 * Skip to the on-page transaction ID stored in the key; if it's
@@ -348,12 +330,10 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PAGE *page;
 	size_t addr_size;
 	uint32_t previous_state;
-	int need_las_remove;
 	const uint8_t *addr;
 
 	btree = S2BT(session);
 	page = NULL;
-	need_las_remove = 0;
 
 	/*
 	 * Don't pass an allocated buffer to the underlying block read function,
@@ -413,21 +393,13 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 			WT_STAT_FAST_CONN_INCR(session, cache_read_lookaside);
 			WT_STAT_FAST_DATA_INCR(session, cache_read_lookaside);
 
-			WT_ERR(__las_page_instantiate(session, ref,
-			    btree->id, addr, addr_size, &need_las_remove));
+			WT_ERR(__las_page_instantiate(
+			    session, ref, btree->id, addr, addr_size));
 		}
 	}
 
 	WT_ERR(__wt_verbose(session, WT_VERB_READ,
 	    "page %p: %s", page, __wt_page_type_string(page->type)));
-
-	/*
-	 * We successfully instantiated the page, remove any update entries from
-	 * the lookaside table.
-	 */
-	if (need_las_remove)
-		WT_ERR(__wt_las_remove_block(
-		    session, NULL, btree->id, addr, addr_size));
 
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 
