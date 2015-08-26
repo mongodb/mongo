@@ -209,12 +209,10 @@ walk_log(WT_SESSION *session)
 		 * connection.
 		 *
 		 * !!!
-		 * We cheat by only looking for fileid 2 in this example; the
-		 * metadata is fileid 0, the lookaside file is fileid 1, making
-		 * the file we created fileid 2.
+		 * Minor cheat: the metadata is fileid 0, skip its records.
 		 */
-		if (fileid == 2 && rectype == WT_LOGREC_COMMIT &&
-		    optype == WT_LOGOP_ROW_PUT) {
+		if (fileid != 0 &&
+		    rectype == WT_LOGREC_COMMIT && optype == WT_LOGOP_ROW_PUT) {
 			if (!in_txn) {
 				ret = session2->begin_transaction(session2,
 				    NULL);
