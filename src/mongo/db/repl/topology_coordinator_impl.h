@@ -52,7 +52,7 @@ class ReplSetMetadata;
 
 namespace repl {
 
-const static Milliseconds UninitializedPing{};
+static const Milliseconds UninitializedPing{};
 
 /**
  * Represents a latency measurement for each replica set member based on heartbeat requests.
