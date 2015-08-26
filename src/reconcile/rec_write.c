@@ -3250,23 +3250,20 @@ __rec_update_las(WT_SESSION_IMPL *session,
 {
 	WT_CURSOR *cursor;
 	WT_DECL_ITEM(key);
-	WT_DECL_ITEM(klas);
 	WT_DECL_RET;
-	WT_ITEM vlas;
+	WT_ITEM las_addr, las_value;
 	WT_PAGE *page;
 	WT_UPDATE *upd;
 	WT_UPD_SKIPPED *list;
-	size_t len;
-	uint64_t recno;
-	uint32_t counter, i, keylen, slot;
-	uint8_t *counterp;
-	void *p;
+	uint64_t las_counter;
+	uint32_t i, slot;
 	int reset_evict;
+	void *p;
 
 	cursor = NULL;
+	WT_CLEAR(las_addr);
+	WT_CLEAR(las_value);
 	page = r->page;
-	counter = 0;
-	counterp = NULL;		/* [-Werror=maybe-uninitialized] */
 
 	/*
 	 * We're writing lookaside records: start instantiating them on pages
@@ -3276,12 +3273,10 @@ __rec_update_las(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_las_cursor(session, &cursor, &reset_evict));
 
-	WT_ERR(__wt_scr_alloc(session, 0, &key));
-	WT_ERR(__wt_scr_alloc(session, 0, &klas));
+	/* Ensure enough room for a column-store key without checking. */
+	WT_ERR(__wt_scr_alloc(session, WT_INTPACK64_MAXSIZE, &key));
 
-	/*
-	 * Enter each update in the boundary list into the lookaside store.
-	 */
+	/* Enter each update in the boundary list into the lookaside store. */
 	for (i = 0, list = bnd->skip; i < bnd->skip_next; ++i, ++list) {
 		/*
 		 * Each key in the lookaside table is associated with a block,
@@ -3305,40 +3300,20 @@ __rec_update_las(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_las_remove_block(
 		    session, cursor, btree_id, bnd->addr.addr, bnd->addr.size));
 
+		/* Lookaside table key component: block address. */
+		las_addr.data = bnd->addr.addr;
+		las_addr.size = bnd->addr.size;
+
+		/* Lookaside table key component: source key. */
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			/* Build the key. */
-			len = sizeof(char) + sizeof(uint32_t) +
-			    sizeof(uint8_t) + bnd->addr.size +
-			    sizeof(uint64_t) + sizeof(uint32_t) +
-			    sizeof(uint64_t);
-			WT_ERR(__wt_buf_init(session, klas, len));
-			p = klas->mem;
-
-			*(char *)p = WT_LAS_RECONCILE_UPDATE;
-			p = (uint8_t *)p + sizeof(char);
-			memcpy(p, &btree_id, sizeof(uint32_t));
-			p = (uint8_t *)p + sizeof(uint32_t);
-			*(uint8_t *)p = bnd->addr.size;
-			p = (uint8_t *)p + sizeof(uint8_t);
-			memcpy(p, bnd->addr.addr, bnd->addr.size);
-			p = (uint8_t *)p + bnd->addr.size;
-			memcpy(p, &list->onpage_txn, sizeof(uint64_t));
-			counterp = p = (uint8_t *)p + sizeof(uint64_t);
-			memcpy(p, &counter, sizeof(uint32_t));
-			p = (uint8_t *)p + sizeof(uint32_t);
-			recno = WT_INSERT_RECNO(list->ins);
-			memcpy(p, &recno, sizeof(uint64_t));
-			p = (uint8_t *)p + sizeof(uint64_t);
-			klas->size = len;
-			WT_ASSERT(session, WT_PTRDIFF(p, klas->mem) == len);
-
-			/* Set the update reference. */
-			upd = list->ins->upd;
+			p = key->mem;
+			WT_ERR(
+			    __wt_vpack_uint(&p, 0, WT_INSERT_RECNO(list->ins)));
+			key->size = WT_PTRDIFF(p, key->data);
 			break;
 		case WT_PAGE_ROW_LEAF:
-			/* Build the key. */
 			if (list->ins == NULL)
 				WT_ERR(__wt_row_leaf_key(
 				    session, page, list->rip, key, 0));
@@ -3346,34 +3321,17 @@ __rec_update_las(WT_SESSION_IMPL *session,
 				key->data = WT_INSERT_KEY(list->ins);
 				key->size = WT_INSERT_KEY_SIZE(list->ins);
 			}
-			len = sizeof(char) + sizeof(uint32_t) +
-			    sizeof(uint8_t) + bnd->addr.size +
-			    sizeof(uint64_t) + sizeof(uint32_t) +
-			    sizeof(uint32_t) + key->size;
-			WT_ERR(__wt_buf_init(session, klas, len));
-			p = klas->mem;
+			break;
+		WT_ILLEGAL_VALUE_ERR(session);
+		}
 
-			*(char *)p = WT_LAS_RECONCILE_UPDATE;
-			p = (uint8_t *)p + sizeof(char);
-			memcpy(p, &btree_id, sizeof(uint32_t));
-			p = (uint8_t *)p + sizeof(uint32_t);
-			*(uint8_t *)p = bnd->addr.size;
-			p = (uint8_t *)p + sizeof(uint8_t);
-			memcpy(p, bnd->addr.addr, bnd->addr.size);
-			p = (uint8_t *)p + bnd->addr.size;
-			memcpy(p, &list->onpage_txn, sizeof(uint64_t));
-			counterp = p = (uint8_t *)p + sizeof(uint64_t);
-			memcpy(p, &counter, sizeof(uint32_t));
-			p = (uint8_t *)p + sizeof(uint32_t);
-			keylen = WT_STORE_SIZE(key->size);
-			memcpy(p, &keylen, sizeof(uint32_t));
-			p = (uint8_t *)p + sizeof(uint32_t);
-			memcpy(p, key->data, key->size);
-			p = (uint8_t *)p + key->size;
-			klas->size = len;
-			WT_ASSERT(session, WT_PTRDIFF(p, klas->mem) == len);
-
-			/* Set the update reference. */
+		/* Lookaside table value component: update reference. */
+		switch (page->type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_VAR:
+			upd = list->ins->upd;
+			break;
+		case WT_PAGE_ROW_LEAF:
 			if (list->ins == NULL) {
 				slot = WT_ROW_SLOT(page, list->rip);
 				upd = page->pg_row_upd[slot];
@@ -3387,42 +3345,27 @@ __rec_update_las(WT_SESSION_IMPL *session,
 		 * Walk the list of updates, storing each key/value pair into
 		 * the lookaside table.
 		 */
-		do {
-			/*
-			 * Update the counter for a unique, in-order key, doing
-			 * the necessary byte-swap for little-endian systems.
-			 */
-			++counter;
-#ifdef WORDS_BIGENDIAN
-			counterp[0] = ((uint8_t *)&counter)[0];
-			counterp[1] = ((uint8_t *)&counter)[1];
-			counterp[2] = ((uint8_t *)&counter)[2];
-			counterp[3] = ((uint8_t *)&counter)[3];
-#else
-			counterp[0] = ((uint8_t *)&counter)[3];
-			counterp[1] = ((uint8_t *)&counter)[2];
-			counterp[2] = ((uint8_t *)&counter)[1];
-			counterp[3] = ((uint8_t *)&counter)[0];
-#endif
-			if (WT_UPDATE_DELETED_ISSET(upd))
-				vlas.size = 0;
-			else {
-				vlas.data = WT_UPDATE_DATA(upd);
-				vlas.size = upd->size;
-			}
+		for (las_counter = 1;
+		    upd != NULL; ++las_counter, upd = upd->next) {
+			cursor->set_key(cursor, btree_id,
+			    &las_addr, list->onpage_txn, las_counter, key);
 
-			/* Insert into the lookaside store. */
-			cursor->set_key(cursor, klas);
-			cursor->set_value(cursor, upd->txnid, upd->size, &vlas);
+			if (WT_UPDATE_DELETED_ISSET(upd))
+				las_value.size = 0;
+			else {
+				las_value.data = WT_UPDATE_DATA(upd);
+				las_value.size = upd->size;
+			}
+			cursor->set_value(
+			    cursor, upd->txnid, upd->size, &las_value);
+
 			WT_ERR(cursor->insert(cursor));
-		} while ((upd = upd->next) != NULL);
+		}
 	}
 
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
 
 	__wt_scr_free(session, &key);
-	__wt_scr_free(session, &klas);
-
 	return (ret);
 }
 

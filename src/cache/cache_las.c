@@ -112,8 +112,7 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	WT_RET(__wt_session_drop(session, WT_LAS_URI, drop_cfg));
 
 	/* Re-create the file. */
-	WT_RET(__wt_session_create(session, WT_LAS_URI,
-	    "key_format=u,value_format=" WT_UNCHECKED_STRING(QIu)));
+	WT_RET(__wt_session_create(session, WT_LAS_URI, WT_LAS_FORMAT));
 
 	/* Open the shared cursor. */
 	WT_WITHOUT_DHANDLE(session,
@@ -157,8 +156,15 @@ __wt_las_set_written(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
-	if (conn->las_written == 0)
+	if (conn->las_written == 0) {
 		conn->las_written = 1;
+
+		/*
+		 * Push the flag: unnecessary, but from now page reads must deal
+		 * with lookaside table records, and we only do the write once.
+		 */
+		WT_FULL_BARRIER();
+	}
 }
 
 /*
@@ -254,33 +260,6 @@ __wt_las_cursor_close(
 }
 
 /*
- * __las_sweep_reconcile --
- *	Return if reconciliation records in the lookaside table can be deleted.
- */
-static int
-__las_sweep_reconcile(WT_SESSION_IMPL *session, WT_ITEM *key)
-{
-	uint64_t txnid;
-	uint8_t addr_size;
-	void *p;
-
-	/*
-	 * Skip to the on-page transaction ID stored in the key; if it's
-	 * globally visible, we no longer need this record, the on-page
-	 * record is just as good.
-	 */
-	p = (uint8_t *)key->data;
-	p = (uint8_t *)p + sizeof(char);		/* '1' */
-	p = (uint8_t *)p + sizeof(uint32_t);		/* file ID */
-	addr_size = *(uint8_t *)p;
-	p = (uint8_t *)p + sizeof(uint8_t);		/* addr_size */
-	p = (uint8_t *)p + addr_size;			/* addr */
-	memcpy(&txnid, p, sizeof(uint64_t));
-
-	return (__wt_txn_visible_all(session, txnid));
-}
-
-/*
  * __wt_las_sweep --
  *	Sweep the lookaside table.
  */
@@ -289,15 +268,23 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
+	WT_DECL_ITEM(las_addr);
+	WT_DECL_ITEM(las_key);
 	WT_DECL_RET;
 	WT_ITEM *key;
-	uint64_t cnt;
+	uint64_t cnt, las_counter, las_txnid;
+	uint32_t las_id;
 	int notused, reset_evict;
 
 	conn = S2C(session);
+	cursor = NULL;
 	key = &conn->las_sweep_key;
+	reset_evict = 0;		/* [-Werror=maybe-uninitialized] */
 
-	WT_RET(__wt_las_cursor(session, &cursor, &reset_evict));
+	WT_ERR(__wt_scr_alloc(session, 0, &las_addr));
+	WT_ERR(__wt_scr_alloc(session, 0, &las_key));
+
+	WT_ERR(__wt_las_cursor(session, &cursor, &reset_evict));
 
 	/*
 	 * If we're not starting a new sweep, position the cursor using the key
@@ -305,7 +292,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 * just roughly in the same spot is fine).
 	 */
 	if (conn->las_sweep_call != 0 && key->data != NULL) {
-		cursor->set_key(cursor, key);
+		__wt_cursor_set_raw_key(cursor, key);
 		if ((ret =
 		    cursor->search_near(cursor, &notused)) == WT_NOTFOUND) {
 			WT_ERR(cursor->reset(cursor));
@@ -343,8 +330,6 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 
 	/* Walk the file. */
 	for (; cnt > 0 && (ret = cursor->next(cursor)) == 0; --cnt) {
-		WT_ERR(cursor->get_key(cursor, key));
-
 		/*
 		 * If the loop terminates after completing a work unit, we will
 		 * continue the table sweep next time. Get a local copy of the
@@ -352,24 +337,22 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * calling cursor.remove, cursor.remove can discard our hazard
 		 * pointer and the page could be evicted from underneath us.
 		 */
-		if (cnt == 1 && !WT_DATA_IN_ITEM(key))
-			WT_ERR(__wt_buf_set(
-			    session, key, key->data, key->size));
+		if (cnt == 1)
+			WT_ERR(__wt_cursor_get_raw_key(cursor, key));
 
-		switch (((uint8_t *)key->data)[0]) {
-		case WT_LAS_RECONCILE_UPDATE:
-			if (__las_sweep_reconcile(session, key)) {
-				/*
-				 * Cursor opened overwrite=true: it won't return
-				 * WT_NOTFOUND if another thread removes the
-				 * record before we do, and the cursor remains
-				 * positioned in that case.
-				 */
-				WT_ERR(cursor->remove(cursor));
-			}
-			break;
-		WT_ILLEGAL_VALUE_ERR(session);
-		}
+		WT_ERR(cursor->get_key(cursor,
+		    &las_id, las_addr, &las_txnid, &las_counter, las_key));
+
+		/*
+		 * If the on-page record transaction ID associated with the
+		 * record is globally visible, the record can be discarded.
+		 *
+		 * Cursor opened overwrite=true: won't return WT_NOTFOUND should
+		 * another thread remove the record before we do, and the cursor
+		 * remains positioned in that case.
+		 */
+		if (__wt_txn_visible_all(session, las_txnid))
+			WT_ERR(cursor->remove(cursor));
 	}
 
 	/*
@@ -395,6 +378,9 @@ err:		__wt_buf_free(session, key);
 	}
 
 	WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
+
+	__wt_scr_free(session, &las_addr);
+	__wt_scr_free(session, &las_key);
 
 	return (ret);
 }

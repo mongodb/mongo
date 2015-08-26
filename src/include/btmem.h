@@ -174,18 +174,24 @@ struct __wt_ovfl_txnc {
  * Lookaside table support: when a page is being reconciled for eviction and has
  * updates that might be required by earlier readers in the system, the updates
  * are written into a lookaside table, and restored as necessary if the page is
- * read. The key is relatively complex: a flag byte (so we can use the lookaside
- * table for other purposes in the future) a unique marker for the page (a file
- * ID plus an address), the on-page item's transaction ID (so we can discard any
- * update records from the lookaside table once the on-page item's transaction
- * is globally visible), a counter (used to ensure the update records remain in
- * the original order, and the key (either a byte-string or a record number).
- * The value is simpler: the WT_UPDATE structures transaction ID and value.
+ * read. The key is a unique marker for the page (a file ID plus an address),
+ * the on-page item's transaction ID (so we can discard any update records from
+ * the lookaside table once the on-page item's transaction is globally visible),
+ * a counter (used to ensure the update records remain in the original order),
+ * and the page key (byte-string for row-store, record number for column-store).
+ * The value is the WT_UPDATE structure's transaction ID, update size and value.
  *
- * K: 'U', file ID, address-len, address, on-page txn ID, counter, key/recno
- * V: transaction ID, value
+ * As the key for the lookaside table is different for row- and column-store, we
+ * store both key types in a WT_ITEM, building/parsing them in the code, because
+ * otherwise we'd need two lookaside files with different key formats. We could
+ * make the lookaside table's key standard by moving the source key into the
+ * lookaside table value, but that doesn't make the coding any simpler, and it
+ * makes the lookaside table's value more likely to overflow the page size when
+ * the row-store key is relatively large.
  */
-#define	WT_LAS_RECONCILE_UPDATE	'U'
+#define	WT_LAS_FORMAT							\
+    "key_format=" WT_UNCHECKED_STRING(IuQQu)				\
+    ",value_format=" WT_UNCHECKED_STRING(QIu)
 
 /*
  * WT_PAGE_MODIFY --

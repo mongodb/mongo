@@ -8,40 +8,6 @@
 
 #include "wt_internal.h"
 
-#define	WT_MAX_PREFIX_SIZE						\
-    (sizeof(char) +							\
-    sizeof(uint32_t) + sizeof(uint8_t) + WT_BTREE_MAX_ADDR_COOKIE)
-
-/*
- * __las_build_prefix --
- *	Build the unique file/address prefix.
- */
-static void
-__las_build_prefix(WT_SESSION_IMPL *session, uint32_t btree_id,
-    const uint8_t *addr, size_t addr_size, uint8_t *prefix, size_t *prefix_lenp)
-{
-	size_t len;
-	void *p;
-
-	/*
-	 * Build the page's unique key prefix we'll search for in the lookaside
-	 * table, based on the file's ID and the page's block address.
-	 */
-	p = prefix;
-	*(char *)p = WT_LAS_RECONCILE_UPDATE;
-	p = (uint8_t *)p + sizeof(char);
-	memcpy(p, &btree_id, sizeof(uint32_t));
-	p = (uint8_t *)p + sizeof(uint32_t);
-	*(uint8_t *)p = (uint8_t)addr_size;
-	p = (uint8_t *)p + sizeof(uint8_t);
-	memcpy(p, addr, addr_size);
-	p = (uint8_t *)p + addr_size;
-	len = sizeof(char) + sizeof(uint32_t) + sizeof(uint8_t) + addr_size;
-	WT_ASSERT(session, WT_PTRDIFF(p, prefix) == len);
-
-	*prefix_lenp = len;
-}
-
 /*
  * __wt_las_remove_block --
  *	Remove all records matching a key prefix from the lookaside store.
@@ -50,49 +16,51 @@ int
 __wt_las_remove_block(WT_SESSION_IMPL *session,
     WT_CURSOR *cursor, uint32_t btree_id, const uint8_t *addr, size_t addr_size)
 {
-	WT_DECL_ITEM(klas);
+	WT_DECL_ITEM(las_addr);
+	WT_DECL_ITEM(las_key);
 	WT_DECL_RET;
-	size_t prefix_len;
+	uint64_t las_counter, las_txnid;
+	uint32_t las_id;
 	int exact;
-	uint8_t prefix[WT_MAX_PREFIX_SIZE];
 
-	/* Build the unique file/address prefix. */
-	__las_build_prefix(
-	    session, btree_id, addr, addr_size, prefix, &prefix_len);
-
-	/* Copy the unique prefix into the key. */
-	WT_RET(__wt_scr_alloc(session, WT_MAX_PREFIX_SIZE, &klas));
-	memcpy(klas->mem, prefix, prefix_len);
-	klas->size = prefix_len;
+	WT_ERR(__wt_scr_alloc(session, 0, &las_addr));
+	WT_ERR(__wt_scr_alloc(session, 0, &las_key));
 
 	/*
-	 * Search for the matching prefix and step through all matching records,
-	 * removing them.
+	 * Search for the block's unique prefix and step through all matching
+	 * records, removing them.
 	 */
-	cursor->set_key(cursor, klas);
+	las_addr->data = addr;
+	las_addr->size = addr_size;
+	las_key->size = 0;
+	cursor->set_key(
+	    cursor, btree_id, &las_addr, (uint64_t)0, (uint32_t)0, las_key);
 	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
 		ret = cursor->next(cursor);
 	for (; ret == 0; ret = cursor->next(cursor)) {
-		WT_ERR(cursor->get_key(cursor, klas));
+		WT_ERR(cursor->get_key(cursor,
+		    &las_id, las_addr, &las_txnid, &las_counter, las_key));
 
 		/*
 		 * Confirm the search using the unique prefix; if not a match,
 		 * we're done searching for records for this page.
 		 */
-		if (klas->size <= prefix_len ||
-		    memcmp(klas->data, prefix, prefix_len) != 0)
+		 if (las_id != btree_id ||
+		     las_addr->size != addr_size ||
+		     memcmp(las_addr->data, addr, addr_size) != 0)
 			break;
 
 		/*
-		 * Cursor opened overwrite=true: it won't return WT_NOTFOUND
-		 * if another thread removes the record before we do, and the
-		 * cursor remains positioned in that case.
+		 * Cursor opened overwrite=true: won't return WT_NOTFOUND should
+		 * another thread remove the record before we do, and the cursor
+		 * remains positioned in that case.
 		 */
 		WT_ERR(cursor->remove(cursor));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-err:	__wt_scr_free(session, &klas);
+err:	__wt_scr_free(session, &las_addr);
+	__wt_scr_free(session, &las_key);
 	return (ret);
 }
 
@@ -135,17 +103,17 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_CURSOR_BTREE cbt;
 	WT_DECL_ITEM(current_key);
-	WT_DECL_ITEM(klas);
-	WT_DECL_ITEM(vlas);
+	WT_DECL_ITEM(las_addr);
+	WT_DECL_ITEM(las_key);
+	WT_DECL_ITEM(las_value);
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_UPDATE *first_upd, *last_upd, *upd;
-	size_t incr, prefix_len, total_incr;
-	uint32_t key_len, upd_size;
-	uint64_t current_recno, recno, txnid;
-	uint8_t prefix[WT_MAX_PREFIX_SIZE];
+	size_t incr, total_incr;
+	uint64_t current_recno, las_counter, las_txnid, recno, upd_txnid;
+	uint32_t las_id, upd_size;
 	int exact, reset_evict;
-	void *p;
+	const void *p;
 
 	cursor = NULL;
 	page = ref->page;
@@ -158,72 +126,64 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	__wt_btcur_open(&cbt);
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current_key));
-	WT_ERR(__wt_scr_alloc(session, WT_MAX_PREFIX_SIZE, &klas));
-	WT_ERR(__wt_scr_alloc(session, 0, &vlas));
+	WT_ERR(__wt_scr_alloc(session, 0, &las_addr));
+	WT_ERR(__wt_scr_alloc(session, 0, &las_key));
+	WT_ERR(__wt_scr_alloc(session, 0, &las_value));
 
-	/* Build the unique file/address prefix. */
-	__las_build_prefix(
-	    session, read_id, addr, addr_size, prefix, &prefix_len);
-
-	/* Copy the unique prefix into the key. */
-	memcpy(klas->mem, prefix, prefix_len);
-	klas->size = prefix_len;
+	/* Open a lookaside table cursor. */
+	WT_ERR(__wt_las_cursor(session, &cursor, &reset_evict));
 
 	/*
-	 * Open a lookaside table cursor and search for the matching prefix,
-	 * stepping through any matching records.
-	 *
 	 * The lookaside records are in key and update order, that is, there
 	 * will be a set of in-order updates for a key, then another set of
 	 * in-order updates for a subsequent key. We process all of the updates
 	 * for a key and then insert those updates into the page, then all the
 	 * updates for the next key, and so on.
+	 *
+	 * Search for the block's unique prefix, stepping through any matching
+	 * records.
 	 */
-	WT_ERR(__wt_las_cursor(session, &cursor, &reset_evict));
-	cursor->set_key(cursor, klas);
+	las_addr->data = addr;
+	las_addr->size = addr_size;
+	las_key->size = 0;
+	cursor->set_key(
+	    cursor, read_id, las_addr, (uint64_t)0, (uint32_t)0, las_key);
 	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
 		ret = cursor->next(cursor);
 	for (; ret == 0; ret = cursor->next(cursor)) {
-		WT_ERR(cursor->get_key(cursor, klas));
+		WT_ERR(cursor->get_key(cursor,
+		    &las_id, las_addr, &las_txnid, &las_counter, las_key));
 
 		/*
 		 * Confirm the search using the unique prefix; if not a match,
 		 * we're done searching for records for this page.
 		 */
-		if (klas->size <= prefix_len ||
-		    memcmp(klas->data, prefix, prefix_len) != 0)
+		if (las_id != read_id ||
+		    las_addr->size != addr_size ||
+		    memcmp(las_addr->data, addr, addr_size) != 0)
 			break;
 
 		/*
-		 * Skip to the on-page transaction ID stored in the key; if it's
-		 * globally visible, we no longer need this record, the on-page
-		 * record is just as good.
+		 * If the on-page value has become globally visible, this record
+		 * is no longer needed.
 		 */
-		p = (uint8_t *)klas->data + prefix_len;
-		memcpy(&txnid, p, sizeof(uint64_t));
-		p = (uint8_t *)p + sizeof(uint64_t);
-		if (__wt_txn_visible_all(session, txnid))
+		if (__wt_txn_visible_all(session, las_txnid))
 			continue;
 
-		/*
-		 * Skip past the counter (it's only needed to ensure records are
-		 * read in their original, listed order), leaving p referencing
-		 * the first byte of the key.
-		 */
-		p = (uint8_t *)p + sizeof(uint32_t);
-
 		/* Allocate the WT_UPDATE structure. */
-		WT_ERR(cursor->get_value(cursor, &txnid, &upd_size, vlas));
+		WT_ERR(cursor->get_value(
+		    cursor, &upd_txnid, &upd_size, las_value));
 		WT_ERR(__wt_update_alloc(session,
-		    (upd_size == WT_UPDATE_DELETED_VALUE) ? NULL : vlas,
+		    (upd_size == WT_UPDATE_DELETED_VALUE) ? NULL : las_value,
 		    &upd, &incr));
 		total_incr += incr;
-		upd->txnid = txnid;
+		upd->txnid = upd_txnid;
 
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			memcpy(&recno, p, sizeof(uint64_t));
+			p = las_key->data;
+			WT_ERR(__wt_vunpack_uint(&p, 0, &recno));
 			if (current_recno == recno)
 				break;
 
@@ -235,10 +195,9 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 			current_recno = recno;
 			break;
 		case WT_PAGE_ROW_LEAF:
-			memcpy(&key_len, p, sizeof(uint32_t));
-			p = (uint8_t *)p + sizeof(uint32_t);
-			if (current_key->size == key_len && memcmp(
-			    current_key->data, p, current_key->size) == 0)
+			if (current_key->size == las_key->size &&
+			    memcmp(current_key->data,
+			    las_key->data, las_key->size) == 0)
 				break;
 
 			if (first_upd != NULL) {
@@ -246,7 +205,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 				    current_key, ref, &cbt, first_upd));
 				first_upd = NULL;
 			}
-			WT_ERR(__wt_buf_set(session, current_key, p, key_len));
+			WT_ERR(__wt_buf_set(session,
+			    current_key, las_key->data, las_key->size));
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
@@ -310,8 +270,9 @@ err:	WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
 		__wt_free_update_list(session, first_upd);
 
 	__wt_scr_free(session, &current_key);
-	__wt_scr_free(session, &klas);
-	__wt_scr_free(session, &vlas);
+	__wt_scr_free(session, &las_addr);
+	__wt_scr_free(session, &las_key);
+	__wt_scr_free(session, &las_value);
 
 	return (ret);
 }
