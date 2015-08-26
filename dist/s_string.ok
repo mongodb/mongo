@@ -213,6 +213,7 @@ NetBSD
 NoAddr
 Noll
 Nul
+OOB
 OPTYPE
 OUTBUFF
 OVFL
@@ -235,6 +236,7 @@ Prepend
 QIu
 Qsort
 RCS
+RECNO
 REF's
 REFs
 RET

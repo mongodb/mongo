@@ -1794,7 +1794,7 @@ static void
 __rec_split_bnd_init(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd)
 {
 	bnd->offset = 0;
-	bnd->recno = 0;
+	bnd->recno = WT_RECNO_OOB;
 	bnd->entries = 0;
 
 	__wt_free(session, bnd->addr.addr);
@@ -2465,7 +2465,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	 * We track the record number at each column-store split point, set an
 	 * initial value.
 	 */
-	recno = 0;
+	recno = WT_RECNO_OOB;
 	if (dsk->type == WT_PAGE_COL_VAR)
 		recno = last->recno;
 
@@ -2714,7 +2714,7 @@ no_slots:
 			break;
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
-			next->recno = 0;
+			next->recno = WT_RECNO_OOB;
 			if (!last_block) {
 				/*
 				 * Confirm there was uncompressed data remaining
@@ -3466,7 +3466,7 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 		recno = 1;
 		break;
 	case BTREE_ROW:
-		recno = 0;
+		recno = WT_RECNO_OOB;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -4666,7 +4666,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			vtype = state == WT_CHILD_PROXY ?
 			    WT_CELL_ADDR_DEL : (u_int)vpack->raw;
 		}
-		__rec_cell_build_addr(r, p, size, vtype, 0);
+		__rec_cell_build_addr(r, p, size, vtype, WT_RECNO_OOB);
 		CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/*
@@ -4753,7 +4753,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		addr = &multi->addr;
 		__rec_cell_build_addr(
-		    r, addr->addr, addr->size, __rec_vtype(addr), 0);
+		    r, addr->addr, addr->size, __rec_vtype(addr), WT_RECNO_OOB);
 
 		/* Boundary: split or write the page. */
 		if (key->len + val->len > r->space_avail)

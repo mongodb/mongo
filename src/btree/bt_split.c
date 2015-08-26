@@ -343,7 +343,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		recno = 0;
+		recno = 0;		/* Less than any valid record number. */
 		WT_INTL_FOREACH_BEGIN(session, page, ref) {
 			WT_ASSERT(session, ref->key.recno > recno);
 			recno = ref->key.recno;
@@ -1206,7 +1206,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * The key-instantiation code checks for races, clear the key fields so
 	 * we don't trigger them.
 	 */
-	child->key.recno = 0;
+	child->key.recno = WT_RECNO_OOB;
 	child->key.ikey = NULL;
 	child->state = WT_REF_MEM;
 

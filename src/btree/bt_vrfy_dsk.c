@@ -71,19 +71,20 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session,
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
-		if (dsk->recno != 0)
+		if (dsk->recno != WT_RECNO_OOB)
 			break;
 		WT_RET_VRFY(session,
-		    "%s page at %s has a record number of zero",
-		    __wt_page_type_string(dsk->type), tag);
+		    "%s page at %s has an invalid record number of %d",
+		    __wt_page_type_string(dsk->type), tag, WT_RECNO_OOB);
 	case WT_PAGE_BLOCK_MANAGER:
 	case WT_PAGE_OVFL:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		if (dsk->recno == 0)
+		if (dsk->recno == WT_RECNO_OOB)
 			break;
 		WT_RET_VRFY(session,
-		    "%s page at %s has a non-zero record number",
+		    "%s page at %s has a record number, which is illegal for "
+		    "this page type",
 		    __wt_page_type_string(dsk->type), tag);
 	}
 

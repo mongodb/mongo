@@ -123,7 +123,7 @@ __col_append_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 	 * If the application didn't specify a record number, allocate a new one
 	 * and set up for an append.
 	 */
-	if ((recno = WT_INSERT_RECNO(new_ins)) == 0) {
+	if ((recno = WT_INSERT_RECNO(new_ins)) == WT_RECNO_OOB) {
 		recno = WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
 		WT_ASSERT(session, WT_SKIP_LAST(ins_head) == NULL ||
 		    recno > WT_INSERT_RECNO(WT_SKIP_LAST(ins_head)));

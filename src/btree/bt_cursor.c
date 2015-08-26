@@ -517,7 +517,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		WT_ERR(__cursor_col_search(session, cbt, NULL));
 
 		if (F_ISSET(cursor, WT_CURSTD_APPEND))
-			cbt->iface.recno = 0;
+			cbt->iface.recno = WT_RECNO_OOB;
 
 		/*
 		 * If not overwriting, fail if the key exists.  Creating a

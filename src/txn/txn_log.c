@@ -36,7 +36,7 @@ __txn_op_log(WT_SESSION_IMPL *session,
 	if (cbt->btree->type != BTREE_ROW) {
 		WT_ASSERT(session, cbt->ins != NULL);
 		recno = WT_INSERT_RECNO(cbt->ins);
-		WT_ASSERT(session, recno != 0);
+		WT_ASSERT(session, recno != WT_RECNO_OOB);
 
 		if (WT_UPDATE_DELETED_ISSET(upd))
 			WT_ERR(__wt_logop_col_remove_pack(session, logrec,
@@ -419,9 +419,9 @@ __wt_txn_truncate_log(
 	} else {
 		op->type = WT_TXN_OP_TRUNCATE_COL;
 		op->u.truncate_col.start =
-		    (start == NULL) ? 0 : start->recno;
+		    (start == NULL) ? WT_RECNO_OOB : start->recno;
 		op->u.truncate_col.stop =
-		    (stop == NULL) ? 0 : stop->recno;
+		    (stop == NULL) ? WT_RECNO_OOB : stop->recno;
 	}
 
 	/* Write that operation into the in-memory log. */

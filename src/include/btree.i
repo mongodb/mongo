@@ -531,7 +531,12 @@ __wt_ref_key_instantiated(WT_REF *ref)
 static inline void
 __wt_ref_key_clear(WT_REF *ref)
 {
-	/* The key union has 2 fields, both of which are 8B. */
+	/*
+	 * The key union has 2 8B fields; this is equivalent to:
+	 *
+	 *	ref->key.recno = WT_RECNO_OOB;
+	 *	ref->key.ikey = NULL;
+	 */
 	ref->key.recno = 0;
 }
 
