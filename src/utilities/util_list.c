@@ -105,7 +105,7 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 		 */
 		if (cflag || vflag ||
 		    (strcmp(key, WT_METADATA_URI) != 0 &&
-		    strcmp(key, WT_LASFILE_URI) != 0))
+		    strcmp(key, WT_LAS_URI) != 0))
 			printf("%s\n", key);
 
 		if (!cflag && !vflag)

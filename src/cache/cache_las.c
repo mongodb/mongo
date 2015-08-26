@@ -57,7 +57,7 @@ __las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
 
 	WT_RET(__wt_open_cursor(
-	    session, WT_LASFILE_URI, NULL, open_cursor_cfg, cursorp));
+	    session, WT_LAS_URI, NULL, open_cursor_cfg, cursorp));
 
 	/*
 	 * Set special flags for the lookaside table: the lookaside flag (used,
@@ -109,10 +109,10 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	F_SET(session, WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION);
 
 	/* Discard any previous incarnation of the file. */
-	WT_RET(__wt_session_drop(session, WT_LASFILE_URI, drop_cfg));
+	WT_RET(__wt_session_drop(session, WT_LAS_URI, drop_cfg));
 
 	/* Re-create the file. */
-	WT_RET(__wt_session_create(session, WT_LASFILE_URI,
+	WT_RET(__wt_session_create(session, WT_LAS_URI,
 	    "key_format=u,value_format=" WT_UNCHECKED_STRING(QIu)));
 
 	/* Open the shared cursor. */

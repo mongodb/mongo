@@ -526,7 +526,7 @@ __backup_list_all_append(WT_SESSION_IMPL *session, const char *cfg[])
 		return (0);
 
 	/* Ignore the lookaside table. */
-	if (strcmp(name, WT_LASFILE_URI) == 0)
+	if (strcmp(name, WT_LAS_URI) == 0)
 		return (0);
 
 	/* Add the file to the list of files to be copied. */
