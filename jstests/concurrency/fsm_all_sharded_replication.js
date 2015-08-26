@@ -6,7 +6,6 @@ var dir = 'jstests/concurrency/fsm_workloads';
 
 var blacklist = [
     // Disabled due to known bugs
-    'agg_base.js', // SERVER-19418 Mongod termination while executing aggregation pipeline
     'distinct.js', // SERVER-13116 distinct isn't sharding aware
     'distinct_noindex.js', // SERVER-13116 distinct isn't sharding aware
     'distinct_projection.js', // SERVER-13116 distinct isn't sharding aware
