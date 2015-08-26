@@ -37,11 +37,11 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	cstats = conn->stats;
 	dstats = ((WT_CURSOR_BTREE *)conn->las_cursor)->btree->dhandle->stats;
 
-	WT_STAT_SET(session, cstats, lookaside_cursor_insert,
+	WT_STAT_SET(session, cstats, cache_lookaside_cursor_insert,
 	    WT_STAT_READ(dstats, cursor_insert));
-	WT_STAT_SET(session, cstats, lookaside_cursor_insert_bytes,
+	WT_STAT_SET(session, cstats, cache_lookaside_cursor_insert_bytes,
 	    WT_STAT_READ(dstats, cursor_insert_bytes));
-	WT_STAT_SET(session, cstats, lookaside_cursor_remove,
+	WT_STAT_SET(session, cstats, cache_lookaside_cursor_remove,
 	    WT_STAT_READ(dstats, cursor_remove));
 }
 

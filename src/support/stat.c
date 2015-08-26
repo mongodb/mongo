@@ -519,6 +519,9 @@ static const char * const __stats_connection_desc[] = {
 	"cache: pages walked for eviction",
 	"cache: eviction worker thread evicting pages",
 	"cache: in-memory page splits",
+	"cache: lookaside table insert calls",
+	"cache: lookaside table cursor-insert key and value bytes inserted",
+	"cache: lookaside table remove calls",
 	"cache: percentage overhead",
 	"cache: tracked dirty pages in the cache",
 	"cache: pages currently held in the cache",
@@ -574,9 +577,6 @@ static const char * const __stats_connection_desc[] = {
 	"log: log sync_dir operations",
 	"log: log server thread advances write LSN",
 	"log: log write operations",
-	"lookaside: lookaside table insert calls",
-	"lookaside: lookaside table cursor-insert key and value bytes inserted",
-	"lookaside: lookaside table remove calls",
 	"LSM: sleep for LSM checkpoint throttle",
 	"LSM: sleep for LSM merge throttle",
 	"LSM: rows merged in an LSM tree",
@@ -683,6 +683,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_hazard = 0;
 	stats->cache_inmem_split = 0;
 	stats->cache_eviction_internal = 0;
+	stats->cache_lookaside_cursor_insert_bytes = 0;
+	stats->cache_lookaside_cursor_insert = 0;
+	stats->cache_lookaside_cursor_remove = 0;
 		/* not clearing cache_bytes_max */
 		/* not clearing cache_eviction_maximum_page_size */
 	stats->cache_eviction_dirty = 0;
@@ -760,9 +763,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->log_compress_len = 0;
 	stats->log_slot_coalesced = 0;
 	stats->log_close_yields = 0;
-	stats->lookaside_cursor_insert_bytes = 0;
-	stats->lookaside_cursor_insert = 0;
-	stats->lookaside_cursor_remove = 0;
 		/* not clearing lsm_work_queue_app */
 		/* not clearing lsm_work_queue_manager */
 	stats->lsm_rows_merged = 0;
@@ -858,6 +858,12 @@ __wt_stat_connection_aggregate(
 	to->cache_inmem_split += WT_STAT_READ(from, cache_inmem_split);
 	to->cache_eviction_internal +=
 	    WT_STAT_READ(from, cache_eviction_internal);
+	to->cache_lookaside_cursor_insert_bytes +=
+	    WT_STAT_READ(from, cache_lookaside_cursor_insert_bytes);
+	to->cache_lookaside_cursor_insert +=
+	    WT_STAT_READ(from, cache_lookaside_cursor_insert);
+	to->cache_lookaside_cursor_remove +=
+	    WT_STAT_READ(from, cache_lookaside_cursor_remove);
 	to->cache_bytes_max += WT_STAT_READ(from, cache_bytes_max);
 	to->cache_eviction_maximum_page_size +=
 	    WT_STAT_READ(from, cache_eviction_maximum_page_size);
@@ -941,12 +947,6 @@ __wt_stat_connection_aggregate(
 	to->log_compress_len += WT_STAT_READ(from, log_compress_len);
 	to->log_slot_coalesced += WT_STAT_READ(from, log_slot_coalesced);
 	to->log_close_yields += WT_STAT_READ(from, log_close_yields);
-	to->lookaside_cursor_insert_bytes +=
-	    WT_STAT_READ(from, lookaside_cursor_insert_bytes);
-	to->lookaside_cursor_insert +=
-	    WT_STAT_READ(from, lookaside_cursor_insert);
-	to->lookaside_cursor_remove +=
-	    WT_STAT_READ(from, lookaside_cursor_remove);
 	to->lsm_work_queue_app += WT_STAT_READ(from, lsm_work_queue_app);
 	to->lsm_work_queue_manager +=
 	    WT_STAT_READ(from, lsm_work_queue_manager);

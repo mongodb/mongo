@@ -276,6 +276,9 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_walk;
 	int64_t cache_eviction_worker_evicting;
 	int64_t cache_inmem_split;
+	int64_t cache_lookaside_cursor_insert;
+	int64_t cache_lookaside_cursor_insert_bytes;
+	int64_t cache_lookaside_cursor_remove;
 	int64_t cache_overhead;
 	int64_t cache_pages_dirty;
 	int64_t cache_pages_inuse;
@@ -331,9 +334,6 @@ struct __wt_connection_stats {
 	int64_t log_sync_dir;
 	int64_t log_write_lsn;
 	int64_t log_writes;
-	int64_t lookaside_cursor_insert;
-	int64_t lookaside_cursor_insert_bytes;
-	int64_t lookaside_cursor_remove;
 	int64_t lsm_checkpoint_throttle;
 	int64_t lsm_merge_throttle;
 	int64_t lsm_rows_merged;

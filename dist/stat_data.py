@@ -67,10 +67,6 @@ class DhandleStat(Stat):
     prefix = 'data-handle'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, DhandleStat.prefix, desc, flags)
-class LookasideStat(Stat):
-    prefix = 'lookaside'
-    def __init__(self, name, desc, flags=''):
-        Stat.__init__(self, name, LookasideStat.prefix, desc, flags)
 class LogStat(Stat):
     prefix = 'log'
     def __init__(self, name, desc, flags=''):
@@ -208,6 +204,10 @@ connection_stats = [
     CacheStat('cache_eviction_worker_evicting',
         'eviction worker thread evicting pages'),
     CacheStat('cache_inmem_split', 'in-memory page splits'),
+    CacheStat('cache_lookaside_cursor_insert', 'lookaside table insert calls'),
+    CacheStat('cache_lookaside_cursor_insert_bytes',
+        'lookaside table cursor-insert key and value bytes inserted'),
+    CacheStat('cache_lookaside_cursor_remove', 'lookaside table remove calls'),
     CacheStat('cache_overhead', 'percentage overhead', 'no_clear,no_scale'),
     CacheStat('cache_pages_dirty',
         'tracked dirty pages in the cache', 'no_clear,no_scale'),
@@ -217,14 +217,6 @@ connection_stats = [
     CacheStat('cache_read_lookaside',
         'pages read into cache requiring lookaside entries'),
     CacheStat('cache_write', 'pages written from cache'),
-
-    ##########################################
-    # Lookaside table statistics
-    ##########################################
-    LookasideStat('lookaside_cursor_insert', 'lookaside table insert calls'),
-    LookasideStat('lookaside_cursor_insert_bytes',
-        'lookaside table cursor-insert key and value bytes inserted'),
-    LookasideStat('lookaside_cursor_remove', 'lookaside table remove calls'),
 
     ##########################################
     # Dhandle statistics

@@ -111,7 +111,6 @@ prefix_list = [
     'thread-yield',
     'async',
     'btree',
-    'lookaside',
     'compression',
 ]
 groups = {'cursor': ['cursor', 'session'], 'lsm': ['LSM', 'transaction'], 'system': ['connection', 'data-handle', 'session'], 'evict': ['cache', 'connection', 'block-manager'], 'memory': ['cache', 'connection', 'reconciliation']}
