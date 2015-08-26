@@ -876,24 +876,35 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * memory inside of the lock and may want to invest effort in making the
 	 * locked period shorter.
 	 *
-	 * We could race with another thread deepening our parent.  To deal
-	 * with that, read the parent pointer each time we try to lock it, and
-	 * check that it's still correct after it is locked.
+	 * We could race with another thread deepening our parent.  To deal with
+	 * that, read the parent pointer each time we try to lock it, and check
+	 * that it's still correct after it is locked.
+	 *
+	 * We use the reconciliation lock here because not only do we have to
+	 * single-thread the split, we have to lock out reconciliation of the
+	 * parent because reconciliation of the parent can't deal with finding
+	 * a split child during internal page traversal. Basically, there's no
+	 * reason to use a different lock if we have to block reconciliation
+	 * anyway.
 	 */
 	for (;;) {
 		parent = ref->home;
-		F_CAS_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED, ret);
+		F_CAS_ATOMIC(parent, WT_PAGE_RECONCILIATION, ret);
 		if (ret == 0) {
 			if (parent == ref->home)
 				break;
-			F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
+			F_CLR_ATOMIC(parent, WT_PAGE_RECONCILIATION);
 			continue;
 		}
+
 		/*
-		 * If we're attempting an in-memory split and we can't lock the
-		 * parent, give up.  This avoids an infinite loop where we are
-		 * trying to split a page while its parent is being
-		 * checkpointed.
+		 * A checkpoint reconciling this parent page can deadlock with
+		 * our in-memory split. We have an exclusive page lock on the
+		 * child before we acquire the page's reconciliation lock, and
+		 * reconciliation acquires the page's reconciliation lock before
+		 * it will encounter the child's exclusive lock (which causes
+		 * reconciliation to loop until the exclusive lock is resolved).
+		 * If we can't lock the parent, give up to avoid that deadlock.
 		 */
 		if (LF_ISSET(WT_SPLIT_INMEM))
 			return (EBUSY);
@@ -1128,7 +1139,7 @@ err:	if (!complete)
 			if (next_ref->state == WT_REF_SPLIT)
 				next_ref->state = WT_REF_DELETED;
 		}
-	F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
+	F_CLR_ATOMIC(parent, WT_PAGE_RECONCILIATION);
 
 	if (hazard)
 		WT_TRET(__wt_hazard_clear(session, parent));

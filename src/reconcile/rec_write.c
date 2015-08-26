@@ -368,11 +368,9 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
-	int split_lock;
 
 	page = ref->page;
 	mod = page->modify;
-	split_lock = 0;
 
 	/* We're shouldn't get called with a clean page, that's an error. */
 	if (!__wt_page_is_modified(page))
@@ -410,21 +408,15 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	r = session->reconcile;
 
 	/*
-	 * Reconciliation locks the page for two reasons: reconciliation reads
-	 * the lists of page updates, so obsolete updates cannot be discarded
-	 * while reconciliation is in progress. Second, the compaction process
-	 * reads page modification information, which reconciliation modifies.
+	 * Reconciliation locks the page for three reasons:
+	 *    Reconciliation reads the lists of page updates, obsolete updates
+	 * cannot be discarded while reconciliation is in progress;
+	 *    The compaction process reads page modification information, which
+	 * reconciliation modifies;
+	 *    In-memory splits: reconciliation of an internal page cannot handle
+	 * a child page splitting during the reconciliation.
 	 */
 	F_CAS_ATOMIC_WAIT(page, WT_PAGE_RECONCILIATION);
-
-	/*
-	 * Mark internal pages as splitting to ensure we don't deadlock when
-	 * performing an in-memory split during a checkpoint.
-	 */
-	if (WT_PAGE_IS_INTERNAL(page)) {
-		F_CAS_ATOMIC_WAIT(page, WT_PAGE_SPLIT_LOCKED);
-		split_lock = 1;
-	}
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -461,9 +453,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	else
 		WT_TRET(__rec_write_wrapup_err(session, r, page));
 
-	/* Release the locks we're holding. */
-	if (split_lock)
-		F_CLR_ATOMIC(page, WT_PAGE_SPLIT_LOCKED);
+	/* Release the reconciliation lock. */
 	F_CLR_ATOMIC(page, WT_PAGE_RECONCILIATION);
 
 	/*

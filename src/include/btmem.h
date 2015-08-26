@@ -581,7 +581,6 @@ struct __wt_page {
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
 #define	WT_PAGE_RECONCILIATION	0x10	/* Page reconciliation lock */
 #define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
-#define	WT_PAGE_SPLIT_LOCKED	0x40	/* An internal page is growing */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	/*
