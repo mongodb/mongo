@@ -448,7 +448,9 @@ bool Balancer::_init(OperationContext* txn) {
         // these checks are redundant in that they're redone at every new round but we want to do
         // them initially here so to catch any problem soon
         grid.shardRegistry()->reload(txn);
-        _checkOIDs(txn);
+        if (!_checkOIDs(txn)) {
+            return false;
+        }
 
         log() << "config servers and shards contacted successfully";
 
