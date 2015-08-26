@@ -119,7 +119,7 @@ flags = {
         'SESSION_NO_EVICTION',
         'SESSION_NO_LOGGING',
         'SESSION_NO_SCHEMA_LOCK',
-        'SESSION_SALVAGE_CORRUPT_OK',
+        'SESSION_QUIET_CORRUPT_FILE',
         'SESSION_SERVER_ASYNC',
     ],
 }

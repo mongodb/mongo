@@ -197,9 +197,9 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 * Turn off read checksum and verification error messages while we're
 	 * reading the file, we expect to see corrupted blocks.
 	 */
-	F_SET(session, WT_SESSION_SALVAGE_CORRUPT_OK);
+	F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
 	ret = __slvg_read(session, ss);
-	F_CLR(session, WT_SESSION_SALVAGE_CORRUPT_OK);
+	F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
 	WT_ERR(ret);
 
 	/*

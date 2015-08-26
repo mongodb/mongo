@@ -391,13 +391,36 @@ __wt_btree_tree_open(
 
 	/*
 	 * Read and verify the page (verify to catch encrypted objects we can't
-	 * decrypt, we read the object successfully but we can't decrypt it, and
-	 * we want to fail gracefully.
+	 * decrypt, where we read the object successfully but we can't decrypt
+	 * it, and we want to fail gracefully).
+	 *
+	 * Create a printable version of the address to pass to verify.
 	 */
-	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
 	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 	WT_ERR(bm->addr_string(bm, session, tmp, addr, addr_size));
-	WT_ERR(__wt_verify_dsk(session, tmp->data, &dsk));
+
+	F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
+	if ((ret = __wt_bt_read(session, &dsk, addr, addr_size)) == 0)
+		ret = __wt_verify_dsk(session, tmp->data, &dsk);
+	F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
+	if (ret != 0)
+		__wt_err(session, ret,
+		    "unable to read root page from %s", session->dhandle->name);
+	/*
+	 * Failure to open metadata means that the database is unavailable.
+	 * Try to provide a helpful failure message.
+	 */
+	if (ret != 0 && WT_IS_METADATA(session->dhandle)) {
+		__wt_errx(session,
+		    "WiredTiger has failed to open its metadata");
+		__wt_errx(session, "This may be due to the database"
+		    " files being encrypted, being from an older"
+		    " version or due to corruption on disk");
+		__wt_errx(session, "You should confirm that you have"
+		    " opened the database with the correct options including"
+		    " all encryption and compression options");
+	}
+	WT_ERR(ret);
 
 	/*
 	 * Build the in-memory version of the page. Clear our local reference to
