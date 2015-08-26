@@ -113,7 +113,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	uint64_t current_recno, las_counter, las_txnid, recno, upd_txnid;
 	uint32_t las_id, upd_size;
 	int exact, reset_evict;
-	const void *p;
+	const uint8_t *p;
 
 	cursor = NULL;
 	page = ref->page;
