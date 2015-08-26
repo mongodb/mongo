@@ -112,8 +112,8 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	WT_RET(__wt_session_drop(session, WT_LASFILE_URI, drop_cfg));
 
 	/* Re-create the file. */
-	WT_RET(__wt_session_create(
-	    session, WT_LASFILE_URI, "key_format=u,value_format=QIu"));
+	WT_RET(__wt_session_create(session, WT_LASFILE_URI,
+	    "key_format=u,value_format=" WT_UNCHECKED_STRING(QIu)));
 
 	/* Open the shared cursor. */
 	WT_WITHOUT_DHANDLE(session,
