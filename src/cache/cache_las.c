@@ -337,8 +337,12 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * calling cursor.remove, cursor.remove can discard our hazard
 		 * pointer and the page could be evicted from underneath us.
 		 */
-		if (cnt == 1)
+		if (cnt == 1) {
 			WT_ERR(__wt_cursor_get_raw_key(cursor, key));
+			if (!WT_DATA_IN_ITEM(key))
+				WT_ERR(__wt_buf_set(
+				    session, key, key->data, key->size));
+		}
 
 		WT_ERR(cursor->get_key(cursor,
 		    &las_id, las_addr, &las_txnid, &las_counter, las_key));
