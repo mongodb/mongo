@@ -95,8 +95,8 @@ rotn_error(ROTN_ENCRYPTOR *encryptor, WT_SESSION *session, int err,
 	WT_EXTENSION_API *wtext;
 
 	wtext = encryptor->wtext;
-	wtext->err_printf(wtext, session, "rotn encryption: %s: %s",
-	    msg, wtext->strerror(wtext, NULL, err));
+	(void)wtext->err_printf(wtext, session,
+	    "rotn encryption: %s: %s", msg, wtext->strerror(wtext, NULL, err));
 	return (err);
 }
 
@@ -418,6 +418,10 @@ rotn_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 }
 /*! [WT_ENCRYPTOR terminate] */
 
+/*
+ * rotn_configure --
+ *	WiredTiger no-op encryption configuration.
+ */
 static int
 rotn_configure(ROTN_ENCRYPTOR *rotn_encryptor, WT_CONFIG_ARG *config)
 {

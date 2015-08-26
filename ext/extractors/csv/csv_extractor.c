@@ -128,7 +128,7 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session,
 		return (errno);
 
 	*csv_extractor = *orig;
-	csv_extractor->field_num = field_num;
+	csv_extractor->field_num = (int)field_num;
 	*customp = (WT_EXTRACTOR *)csv_extractor;
 	return (0);
 }
