@@ -725,6 +725,7 @@ int _main(int argc, char* argv[], char** envp) {
     if (shellGlobalParams.files.size() == 0 && shellGlobalParams.script.empty())
         shellGlobalParams.runShell = true;
 
+    bool lastLineSuccessful = true;
     if (shellGlobalParams.runShell) {
         mongo::shell_utils::MongoProgramScope s;
         // If they specify norc, assume it's not their first time
@@ -847,39 +848,46 @@ int _main(int argc, char* argv[], char** envp) {
             bool wascmd = false;
             {
                 string cmd = linePtr;
-                if (cmd.find(" ") > 0)
-                    cmd = cmd.substr(0, cmd.find(" "));
+                string::size_type firstSpace;
+                if ((firstSpace = cmd.find(" ")) != string::npos)
+                    cmd = cmd.substr(0, firstSpace);
 
                 if (cmd.find("\"") == string::npos) {
                     try {
-                        scope->exec((string) "__iscmd__ = shellHelper[\"" + cmd + "\"];",
-                                    "(shellhelp1)",
-                                    false,
-                                    true,
-                                    true);
-                        if (scope->getBoolean("__iscmd__")) {
-                            scope->exec((string) "shellHelper( \"" + cmd + "\" , \"" +
-                                            code.substr(cmd.size()) + "\");",
-                                        "(shellhelp2)",
+                        lastLineSuccessful =
+                            scope->exec((string) "__iscmd__ = shellHelper[\"" + cmd + "\"];",
+                                        "(shellhelp1)",
                                         false,
                                         true,
-                                        false);
+                                        true);
+                        if (scope->getBoolean("__iscmd__")) {
+                            lastLineSuccessful =
+                                scope->exec((string) "shellHelper( \"" + cmd + "\" , \"" +
+                                                code.substr(cmd.size()) + "\");",
+                                            "(shellhelp2)",
+                                            false,
+                                            true,
+                                            false);
                             wascmd = true;
                         }
                     } catch (std::exception& e) {
                         cout << "error2:" << e.what() << endl;
                         wascmd = true;
+                        lastLineSuccessful = false;
                     }
                 }
             }
 
             if (!wascmd) {
                 try {
-                    if (scope->exec(code.c_str(), "(shell)", false, true, false))
+                    lastLineSuccessful = scope->exec(code.c_str(), "(shell)", false, true, false);
+                    if (lastLineSuccessful) {
                         scope->exec(
                             "shellPrintHelper( __lastres__ );", "(shell2)", true, true, false);
+                    }
                 } catch (std::exception& e) {
                     cout << "error:" << e.what() << endl;
+                    lastLineSuccessful = false;
                 }
             }
 
@@ -894,7 +902,7 @@ int _main(int argc, char* argv[], char** envp) {
         stdx::lock_guard<stdx::mutex> lk(mongo::shell_utils::mongoProgramOutputMutex);
         mongo::dbexitCalled = true;
     }
-    return 0;
+    return (lastLineSuccessful ? 0 : 1);
 }
 
 #ifdef _WIN32
