@@ -3258,7 +3258,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	uint64_t las_counter;
 	uint32_t i, slot;
 	int reset_evict;
-	void *p;
+	uint8_t *p;
 
 	cursor = NULL;
 	WT_CLEAR(las_addr);
