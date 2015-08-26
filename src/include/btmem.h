@@ -891,9 +891,9 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 	 * store 4GB objects; I'd rather do that than increase the size of this
 	 * structure for a flag bit.
 	 */
-#define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
-#define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)
 #define	WT_UPDATE_DELETED_VALUE		UINT32_MAX
+#define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = WT_UPDATE_DELETED_VALUE)
+#define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == WT_UPDATE_DELETED_VALUE)
 	uint32_t size;			/* update length */
 
 	/* The untyped value immediately follows the WT_UPDATE structure. */
