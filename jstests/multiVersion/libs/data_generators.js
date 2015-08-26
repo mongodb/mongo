@@ -277,8 +277,8 @@ function DataGenerator() {
             // BSON Type: 10
             "jstNULL" : null,
             // BSON Type: 11
-            "RegEx" : RegExp("a"),
-            "RegEx" : /a/,
+            "RegExp" : RegExp("a"),
+            "RegExpLiteral" : /a/,
             // BSON Type: 12
             // The DBPointer type in the shell equals the DBRef BSON type
             "DBPointer" : DBPointer("foo", ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")),
