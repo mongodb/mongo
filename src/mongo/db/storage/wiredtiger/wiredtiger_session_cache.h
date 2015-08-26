@@ -143,7 +143,7 @@ private:
     boost::shared_mutex _shutdownLock;
     AtomicUInt32 _shuttingDown;  // Used as boolean - 0 = false, 1 = true
 
-    SpinLock _cacheLock;
+    boost::mutex _cacheLock;
     typedef std::list<WiredTigerSession*> SessionCache;
     SessionCache _sessions;
 

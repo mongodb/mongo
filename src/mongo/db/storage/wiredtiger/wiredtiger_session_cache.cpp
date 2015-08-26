@@ -147,7 +147,7 @@ void WiredTigerSessionCache::closeAll() {
     SessionCache swap;
 
     {
-        boost::lock_guard<SpinLock> lock(_cacheLock);
+        boost::lock_guard<boost::mutex> lock(_cacheLock);
         _epoch.fetchAndAdd(1);
         _sessions.swap(swap);
     }
@@ -165,7 +165,7 @@ WiredTigerSession* WiredTigerSessionCache::getSession() {
     invariant(!_shuttingDown.loadRelaxed());
 
     {
-        boost::lock_guard<SpinLock> lock(_cacheLock);
+        boost::lock_guard<boost::mutex> lock(_cacheLock);
         if (!_sessions.empty()) {
             // Get the most recently used session so that if we discard sessions, we're
             // discarding older ones
@@ -205,7 +205,7 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     uint64_t currentEpoch = _epoch.load();
 
     if (session->_getEpoch() == currentEpoch) {  // check outside of lock to reduce contention
-        boost::lock_guard<SpinLock> lock(_cacheLock);
+        boost::lock_guard<boost::mutex> lock(_cacheLock);
         if (session->_getEpoch() == _epoch.load()) {  // recheck inside the lock for correctness
             returnedToCache = true;
             _sessions.push_back(session);
