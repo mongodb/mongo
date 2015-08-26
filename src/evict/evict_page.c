@@ -383,7 +383,7 @@ __evict_review(
 
 	/*
 	 * Otherwise, if eviction is getting pressed, configure reconciliation
-	 * to write not-yet-globally-visible updates to the lookaside file,
+	 * to write not-yet-globally-visible updates to the lookaside table,
 	 * that allows us to evict pages we'd otherwise have to keep in cache
 	 * to support older transactions.
 	 */
@@ -395,7 +395,7 @@ __evict_review(
 	/*
 	 * Success: assert the page is clean or reconciliation was configured
 	 * for an update/restore split, and if the page is clean, reconciliation
-	 * was configured for a lookaside file or all updates on the page are
+	 * was configured for a lookaside table or all updates on the page are
 	 * globally visible.
 	 */
 	WT_ASSERT(session,

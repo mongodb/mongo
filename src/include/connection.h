@@ -373,10 +373,10 @@ struct __wt_connection_impl {
 	 * the lookaside table (other than eviction server and worker threads
 	 * and the sweep thread, all of which have their own lookaside cursors).
 	 */
-	WT_SPINLOCK	 las_lock;	/* Lookaside file spinlock */
-	WT_SESSION_IMPL *las_session;	/* Lookaside file session */
-	WT_CURSOR	*las_cursor;	/* Lookaside file cursor */
-	int		 las_written;	/* Lookaside file has been written */
+	WT_SPINLOCK	 las_lock;	/* Lookaside table spinlock */
+	WT_SESSION_IMPL *las_session;	/* Lookaside table session */
+	WT_CURSOR	*las_cursor;	/* Lookaside table cursor */
+	int		 las_written;	/* Lookaside table has been written */
 
 	WT_ITEM		 las_sweep_key;	/* Sweep server's saved key */
 	int		 las_sweep_call;/* Sweep server's call count */

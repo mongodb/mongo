@@ -232,7 +232,7 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 		workers[i].id = i;
 
 		/*
-		 * Eviction worker threads get their own lookaside file cursor.
+		 * Eviction worker threads get their own lookaside table cursor.
 		 * Eviction worker threads may be called upon to perform slow
 		 * operations for the block manager.
 		 */
@@ -284,7 +284,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 	else
 		F_SET(session, WT_SESSION_CAN_WAIT);
 
-	/* The eviction server gets its own lookaside file cursor. */
+	/* The eviction server gets its own lookaside table cursor. */
 	F_SET(session, WT_SESSION_LOOKASIDE_CURSOR);
 
 	/*
@@ -1205,7 +1205,7 @@ fast:		/* If the page can't be evicted, give up. */
 		 * try anyway: maybe a transaction that was running last time
 		 * we wrote the page has since rolled back, or we can help the
 		 * checkpoint complete sooner. Additionally, being stuck will
-		 * configure lookaside file writes in reconciliation, allowing
+		 * configure lookaside table writes in reconciliation, allowing
 		 * us to evict pages we can't usually evict.
 		 */
 		if (!FLD_ISSET(cache->state,

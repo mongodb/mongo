@@ -1189,7 +1189,7 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt, int lowlevel)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/*
-	 * The in-memory split and lookaside file code creates low-level btree
+	 * The in-memory split and lookaside table code creates low-level btree
 	 * cursors to search/modify leaf pages. Those cursors don't hold hazard
 	 * pointers, nor are they counted in the session handle's cursor count.
 	 * Skip the usual cursor tear-down in that case.

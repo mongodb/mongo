@@ -47,7 +47,7 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 
 /*
  * __las_cursor_create --
- *	Open a new lookaside file cursor.
+ *	Open a new lookaside table cursor.
  */
 static int
 __las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
@@ -60,7 +60,7 @@ __las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 	    session, WT_LASFILE_URI, NULL, open_cursor_cfg, cursorp));
 
 	/*
-	 * Set special flags for the lookaside file: the lookaside flag (used,
+	 * Set special flags for the lookaside table: the lookaside flag (used,
 	 * for example, to avoid writing records during reconciliation), also
 	 * turn off checkpoints and logging.
 	 *
@@ -104,7 +104,7 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	 * for eviction.
 	 */
 	WT_RET(__wt_open_internal_session(
-	    conn, "lookaside file", 1, 1, &conn->las_session));
+	    conn, "lookaside table", 1, 1, &conn->las_session));
 	session = conn->las_session;
 	F_SET(session, WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION);
 
@@ -149,7 +149,7 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
 
 /*
  * __wt_las_set_written --
- *	Flag that the lookaside file has been written.
+ *	Flag that the lookaside table has been written.
  */
 void
 __wt_las_set_written(WT_SESSION_IMPL *session)
@@ -163,7 +163,7 @@ __wt_las_set_written(WT_SESSION_IMPL *session)
 
 /*
  * __wt_las_is_written --
- *	Return if the lookaside file has been written.
+ *	Return if the lookaside table has been written.
  */
 int
 __wt_las_is_written(WT_SESSION_IMPL *session)
@@ -192,7 +192,7 @@ __wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *reset_evict)
 
 	conn = S2C(session);
 
-	/* Eviction and sweep threads have their own lookaside file cursors. */
+	/* Eviction and sweep threads have their own lookaside table cursors. */
 	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR)) {
 		if (session->las_cursor == NULL) {
 			WT_WITHOUT_DHANDLE(session, ret =
@@ -244,7 +244,7 @@ __wt_las_cursor_close(
 		F_CLR(session, WT_SESSION_NO_EVICTION);
 
 	/*
-	 * Eviction and sweep threads have their own lookaside file cursors;
+	 * Eviction and sweep threads have their own lookaside table cursors;
 	 * else, unlock the shared lookaside cursor.
 	 */
 	if (!F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR))
@@ -255,7 +255,7 @@ __wt_las_cursor_close(
 
 /*
  * __las_sweep_reconcile --
- *	Return if reconciliation records in the lookaside file can be deleted.
+ *	Return if reconciliation records in the lookaside table can be deleted.
  */
 static int
 __las_sweep_reconcile(WT_SESSION_IMPL *session, WT_ITEM *key)
@@ -282,7 +282,7 @@ __las_sweep_reconcile(WT_SESSION_IMPL *session, WT_ITEM *key)
 
 /*
  * __wt_las_sweep --
- *	Sweep the lookaside file.
+ *	Sweep the lookaside table.
  */
 int
 __wt_las_sweep(WT_SESSION_IMPL *session)
@@ -316,10 +316,10 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 
 	/*
 	 * The sweep server wakes up every 10 seconds (by default), it's a slow
-	 * moving thread. Try to review the entire lookaside file once every 5
+	 * moving thread. Try to review the entire lookaside table once every 5
 	 * minutes, or every 30 calls.
 	 *
-	 * The reason is because the lookaside file exists because we're seeing
+	 * The reason is because the lookaside table exists because we're seeing
 	 * cache/eviction pressure (it allows us to trade performance and disk
 	 * space for cache space), and it's likely lookaside blocks are being
 	 * evicted, and reading them back in doesn't help things. A trickier,
@@ -327,7 +327,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 * blocks in the cache in order to get rid of them, and slowly review
 	 * lookaside blocks that have already been evicted.
 	 *
-	 * We can't know for sure how many records are in the lookaside file,
+	 * We can't know for sure how many records are in the lookaside table,
 	 * the cursor insert and remove statistics aren't updated atomically.
 	 * Start with reviewing 100 rows, and if it takes more than the target
 	 * number of calls to finish, increase the number of rows checked on
@@ -373,7 +373,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	}
 
 	/*
-	 * When reaching the lookaside file end or the target number of calls,
+	 * When reaching the lookaside table end or the target number of calls,
 	 * adjust the row count. Decrease/increase the row count depending on
 	 * if the number of calls is less/more than the target.
 	 */

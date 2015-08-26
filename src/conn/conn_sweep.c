@@ -283,8 +283,8 @@ __sweep_server(void *arg)
 		WT_STAT_FAST_CONN_INCR(session, dh_sweeps);
 
 		/*
-		 * Sweep the lookaside file. If the lookaside hasn't yet been
-		 * written, there's no work to do.
+		 * Sweep the lookaside table. If the lookaside table hasn't yet
+		 * been written, there's no work to do.
 		 */
 		if (__wt_las_is_written(session))
 			WT_ERR(__wt_las_sweep(session));

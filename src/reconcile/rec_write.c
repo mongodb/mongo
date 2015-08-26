@@ -728,12 +728,12 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	r->page = page;
 
 	/*
-	 * Lookaside file eviction is configured when eviction gets aggressive,
+	 * Lookaside table eviction is configured when eviction gets aggressive,
 	 * adjust the flags for cases we don't support.
 	 */
 	if (LF_ISSET(WT_EVICT_LOOKASIDE)) {
 		/*
-		 * Saving lookaside file updates into the lookaside file won't
+		 * Saving lookaside table updates into the lookaside table won't
 		 * work.
 		 */
 		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
@@ -741,10 +741,10 @@ __rec_write_init(WT_SESSION_IMPL *session,
 
 		/*
 		 * We don't yet support fixed-length column-store combined with
-		 * the lookaside file. It's not hard to do, but the underlying
+		 * the lookaside table. It's not hard to do, but the underlying
 		 * function that reviews which updates can be written to the
 		 * evicted page and which updates need to be written to the
-		 * lookaside file needs access to the original value from the
+		 * lookaside table needs access to the original value from the
 		 * page being evicted, and there's no code path for that in the
 		 * case of fixed-length column-store objects. (Row-store and
 		 * variable-width column-store objects provide a reference to
@@ -1095,8 +1095,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * we were scanning the update list, so it is possible to find a skipped
 	 * update, but then find all updates are stable at the end of the scan.
 	 *
-	 * Skip the visibility check for the lookaside file as a special-case,
-	 * we know there are no older readers of that file.
+	 * Skip the visibility check for the lookaside table as a special-case,
+	 * we know there are no older readers of that table.
 	 */
 	if (!skipped &&
 	    (F_ISSET(btree, WT_BTREE_LAS_FILE) ||
@@ -1201,9 +1201,9 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 */
 	if (!skipped) {
 		/*
-		 * Lookaside file eviction is only configured when eviction is
-		 * getting aggressive. If not configured for the lookaside file,
-		 * fail eviction.
+		 * Lookaside table eviction is only configured when eviction is
+		 * getting aggressive. If not configured to write the lookaside
+		 * table, fail eviction.
 		 */
 		if (!F_ISSET(r, WT_EVICT_LOOKASIDE))
 			return (EBUSY);
@@ -1265,7 +1265,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * the lookaside table, and associated with each update record is the
 	 * transaction ID of the update we wrote in the reconciled page; once
 	 * that transaction ID is globally visible, we know we no longer need
-	 * the lookaside file records, allowing them to be discarded.
+	 * the lookaside table records, allowing them to be discarded.
 	 */
 	return (__rec_skip_update_save(
 	    session, r, ins, rip, skipped ? WT_TXN_NONE : (*updp)->txnid));
@@ -3284,20 +3284,20 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	 */
 	for (i = 0, list = bnd->skip; i < bnd->skip_next; ++i, ++list) {
 		/*
-		 * Each key in the lookaside file is associated with a block,
+		 * Each key in the lookaside table is associated with a block,
 		 * and those blocks are freed and reallocated to other pages
 		 * as pages in the tree are modified and reconciled. We want
-		 * to be sure we don't add records to the lookaside file, then
+		 * to be sure we don't add records to the lookaside table, then
 		 * discard the block to which they apply, then write a new
 		 * block to the same address, and then apply the old records
 		 * to the new block when it's read. We don't want to clean old
-		 * records out of the lookaside file every time we free a block
+		 * records out of the lookaside table every time we free a block
 		 * because that happens a lot and would be costly; instead, we
 		 * clean out the old records when adding new records into the
-		 * lookaside file. This works because we only read from the
-		 * lookaside file for pages marked with the WT_PAGE_LAS_UPDATE
+		 * lookaside table. This works because we only read from the
+		 * lookaside table for pages marked with the WT_PAGE_LAS_UPDATE
 		 * flag. If we rewrite a block that has no lookaside records,
-		 * the block won't have that flag set and so the lookaside file
+		 * the block won't have that flag set and so the lookaside table
 		 * won't be checked when the block is read. If we rewrite a
 		 * block that has lookaside records, we'll run this code which
 		 * cleans out any old records.
@@ -3385,7 +3385,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 
 		/*
 		 * Walk the list of updates, storing each key/value pair into
-		 * the lookaside file.
+		 * the lookaside table.
 		 */
 		do {
 			/*

@@ -70,7 +70,7 @@ __wt_las_remove_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor_arg,
 	klas->size = prefix_len;
 
 	/*
-	 * If not provided a lookaside file cursor, open one. Search for the
+	 * If not provided a lookaside table cursor, open one. Search for the
 	 * matching prefix and step through all matching records, removing them.
 	 */
 	if ((cursor = cursor_arg) == NULL)
@@ -107,7 +107,7 @@ err:	if (cursor_arg == NULL)
 
 /*
  * __col_instantiate --
- *	Update a column-store page entry based on a lookaside file update list.
+ *	Update a column-store page entry based on a lookaside table update list.
  */
 static int
 __col_instantiate(WT_SESSION_IMPL *session,
@@ -121,7 +121,7 @@ __col_instantiate(WT_SESSION_IMPL *session,
 
 /*
  * __row_instantiate --
- *	Update a row-store page entry based on a lookaside file update list.
+ *	Update a row-store page entry based on a lookaside table update list.
  */
 static int
 __row_instantiate(WT_SESSION_IMPL *session,
@@ -402,9 +402,9 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 			WT_ERR(__wt_delete_page_instantiate(session, ref));
 
 		/*
-		 * Instantiate updates from the database's lookaside file. The
+		 * Instantiate updates from the database's lookaside table. The
 		 * flag might have been set a long time ago, and we only care
-		 * if the lookaside file is currently active, check that before
+		 * if the lookaside table is currently active, check that before
 		 * doing any work.
 		 */
 		dsk = tmp.data;
@@ -423,7 +423,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	/*
 	 * We successfully instantiated the page, remove any update entries from
-	 * the lookaside file.
+	 * the lookaside table.
 	 */
 	if (need_las_remove)
 		WT_ERR(__wt_las_remove_block(

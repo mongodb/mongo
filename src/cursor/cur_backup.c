@@ -525,7 +525,7 @@ __backup_list_all_append(WT_SESSION_IMPL *session, const char *cfg[])
 	if (F_ISSET(S2BT(session), WT_BTREE_BULK))
 		return (0);
 
-	/* Ignore the lookaside file. */
+	/* Ignore the lookaside table. */
 	if (strcmp(name, WT_LASFILE_URI) == 0)
 		return (0);
 

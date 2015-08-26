@@ -97,9 +97,9 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 		}
 
 		/*
-		 * XXX
+		 * !!!
 		 * We don't normally say anything about the WiredTiger metadata
-		 * and lookaside files, they're not application/user "objects"
+		 * and lookaside tables, they're not application/user "objects"
 		 * in the database.  I'm making an exception for the checkpoint
 		 * and verbose options.
 		 */
