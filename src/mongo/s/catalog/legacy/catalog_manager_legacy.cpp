@@ -234,9 +234,9 @@ Status CatalogManagerLegacy::initConfigVersion(OperationContext* txn) {
 }
 
 Status CatalogManagerLegacy::_startConfigServerChecker() {
-    if (!_checkConfigServersConsistent()) {
-        return Status(ErrorCodes::ConfigServersInconsistent,
-                      "Data inconsistency detected amongst config servers");
+    const auto status = _checkConfigServersConsistent();
+    if (!status.isOK()) {
+        return status;
     }
 
     stdx::thread t(stdx::bind(&CatalogManagerLegacy::_consistencyChecker, this));
@@ -1202,9 +1202,11 @@ DistLockManager* CatalogManagerLegacy::getDistLockManager() {
     return _distLockManager.get();
 }
 
-bool CatalogManagerLegacy::_checkConfigServersConsistent(const unsigned tries) const {
-    if (tries <= 0)
-        return false;
+Status CatalogManagerLegacy::_checkConfigServersConsistent(const unsigned tries) const {
+    if (tries <= 0) {
+        return {ErrorCodes::ConfigServersInconsistent,
+                "too many retries after unsuccessful checks"};
+    }
 
     unsigned firstGood = 0;
     int up = 0;
@@ -1243,31 +1245,35 @@ bool CatalogManagerLegacy::_checkConfigServersConsistent(const unsigned tries) c
                 up++;
             }
             conn->done();
-        } catch (const DBException& e) {
+        } catch (const DBException& excep) {
             if (conn) {
                 conn->kill();
+            }
+
+            if (excep.getCode() == ErrorCodes::IncompatibleCatalogManager) {
+                return excep.toStatus();
             }
 
             // We need to catch DBExceptions b/c sometimes we throw them
             // instead of socket exceptions when findN fails
 
-            errMsg = e.toString();
+            errMsg = excep.toString();
             warning() << " couldn't check dbhash on config server " << _configServers[i]
-                      << causedBy(e);
+                      << causedBy(excep);
         }
         res.push_back(result);
     }
 
-    if (_configServers.size() == 1)
-        return true;
+    if (_configServers.size() == 1) {
+        return Status::OK();
+    }
 
     if (up == 0) {
-        // Use a ptr to error so if empty we won't add causedby
-        error() << "no config servers successfully contacted" << causedBy(&errMsg);
-        return false;
+        return {ErrorCodes::ConfigServersInconsistent,
+                str::stream() << "no config servers successfully contacted" << causedBy(&errMsg)};
     } else if (up == 1) {
         warning() << "only 1 config server reachable, continuing";
-        return true;
+        return Status::OK();
     }
 
     BSONObj base = res[firstGood];
@@ -1298,25 +1304,29 @@ bool CatalogManagerLegacy::_checkConfigServersConsistent(const unsigned tries) c
 
         warning() << "config servers " << _configServers[firstGood].toString() << " and "
                   << _configServers[i].toString() << " differ";
+
         if (tries <= 1) {
-            error() << ": " << base["collections"].Obj() << " vs " << res[i]["collections"].Obj();
-            return false;
+            return {ErrorCodes::ConfigServersInconsistent,
+                    str::stream() << "hash from " << _configServers[firstGood].toString() << ": "
+                                  << base["collections"].Obj() << " vs hash from "
+                                  << _configServers[i].toString() << ": "
+                                  << res[i]["collections"].Obj()};
         }
 
         return _checkConfigServersConsistent(tries - 1);
     }
 
-    return true;
+    return Status::OK();
 }
 
 void CatalogManagerLegacy::_consistencyChecker() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     while (!_inShutdown) {
         lk.unlock();
-        const bool isConsistent = _checkConfigServersConsistent();
+        const auto status = _checkConfigServersConsistent();
 
         lk.lock();
-        _consistentFromLastCheck = isConsistent;
+        _consistentFromLastCheck = status.isOK();
         if (_inShutdown)
             break;
         _consistencyCheckerCV.wait_for(lk, Seconds(60));

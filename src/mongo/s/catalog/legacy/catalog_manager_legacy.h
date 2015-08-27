@@ -169,10 +169,10 @@ private:
     size_t _getShardCount(const BSONObj& query) const;
 
     /**
-     * Returns true if all config servers have the same state.
+     * Returns OK if all config servers that were contacted have the same state.
      * If inconsistency detected on first attempt, checks at most 3 more times.
      */
-    bool _checkConfigServersConsistent(const unsigned tries = 4) const;
+    Status _checkConfigServersConsistent(const unsigned tries = 4) const;
 
     /**
      * Checks data consistency amongst config servers every 60 seconds.
