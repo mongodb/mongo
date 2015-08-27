@@ -126,7 +126,6 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     ClusterClientCursorParams params(query.nss());
     params.limit = query.getParsed().getLimit();
     params.batchSize = query.getParsed().getEffectiveBatchSize();
-    params.sort = query.getParsed().getSort();
     params.skip = query.getParsed().getSkip();
     params.isTailable = query.getParsed().isTailable();
 
