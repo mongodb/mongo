@@ -1116,7 +1116,7 @@ Status CatalogManagerReplicaSet::initConfigVersion(OperationContext* txn) {
 
     if (versionInfo.getCurrentVersion() == UpgradeHistory_UnreportedVersion) {
         return {ErrorCodes::IncompatibleShardingConfigVersion,
-                "Assuming config data is old since the version document cannot be found in the"
+                "Assuming config data is old since the version document cannot be found in the "
                 "config server and it contains databases aside 'local' and 'admin'. "
                 "Please upgrade if this is the case. Otherwise, make sure that the config "
                 "server is clean."};
