@@ -1639,7 +1639,7 @@ buildvariants:
 ###########################################
 
 - name: linux-64
-  display_name: Linux 64-bit
+  display_name: Linux
   modules: ~
   run_on:
   - rhel55-test
@@ -1741,7 +1741,7 @@ buildvariants:
 
 - name: linux-64-repeated-execution
   stepback: false
-  display_name: z Linux 64-bit Repeated Execution
+  display_name: ~ Linux Repeated Execution
   modules: ~
   run_on:
   - rhel55-test
@@ -1767,7 +1767,7 @@ buildvariants:
   - name: concurrency_sharded_WT
 
 - name: linux-64-debug
-  display_name: Linux 64-bit DEBUG
+  display_name: Linux DEBUG
   modules: ~
   run_on:
   - rhel55-test
@@ -1845,7 +1845,7 @@ buildvariants:
   - name: tool_WT
 
 - name: linux-64-duroff
-  display_name: Linux 64-bit DUR OFF
+  display_name: Linux (No Journal)
   modules: ~
   run_on:
   - rhel55-test
@@ -1903,7 +1903,7 @@ buildvariants:
 
 - name: linux-64-lsm
   stepback: false
-  display_name: Linux 64-bit LSM
+  display_name: Linux LSM
   run_on:
   - rhel55-test
   batchtime: 1440 # 1 day
@@ -1949,7 +1949,7 @@ buildvariants:
   - name: tool_WT
 
 - name: ubuntu1204
-  display_name: SSL Ubuntu 1204 64-bit
+  display_name: SSL Ubuntu 12.04
   modules: ~
   run_on:
   - ubuntu1204-test
@@ -2048,7 +2048,7 @@ buildvariants:
     - rhel55-test
 
 - name: ubuntu1404
-  display_name: SSL Ubuntu 1404 64-bit
+  display_name: SSL Ubuntu 14.04
   modules: ~
   run_on:
   - ubuntu1404-test
@@ -2147,7 +2147,7 @@ buildvariants:
     - rhel55-test
 
 - name: enterprise-linux-64-amazon-ami
-  display_name: Enterprise Linux 64-bit Amazon AMI
+  display_name: Enterprise Amazon Linux
   modules:
   - enterprise
   run_on:
@@ -2210,7 +2210,7 @@ buildvariants:
     - rhel55-test
 
 - name: amazon
-  display_name: SSL Amazon 64-bit
+  display_name: SSL Amazon Linux
   modules: ~
   run_on:
   - linux-64-amzn-test
@@ -2336,7 +2336,7 @@ buildvariants:
     - rhel55-test
 
 - name: linux-64-decimal
-  display_name: Linux 64-bit (Decimal Enabled)
+  display_name: Linux (Decimal Enabled)
   modules: ~
   run_on:
   - rhel55-test
@@ -2371,7 +2371,7 @@ buildvariants:
 ###########################################
 
 - name: windows-64
-  display_name: Windows 64-bit
+  display_name: Windows Vista
   modules: ~
   run_on:
   - windows-64-vs2013-test
@@ -2459,7 +2459,7 @@ buildvariants:
     - rhel55-test
 
 - name: windows-64-2k8
-  display_name: Windows 64-bit 2008R2+
+  display_name: Windows 2008R2
   modules: ~
   run_on:
   - windows-64-vs2013-test
@@ -2547,7 +2547,7 @@ buildvariants:
     - rhel55-test
 
 - name: windows-64-2k8-debug
-  display_name: Windows 64-bit 2008R2+ DEBUG
+  display_name: Windows 2008R2 DEBUG
   modules: ~
   run_on:
   - windows-64-vs2013-test
@@ -2614,7 +2614,7 @@ buildvariants:
   - name: tool_WT
 
 - name: enterprise-windows-64
-  display_name: Enterprise Windows 64-bit
+  display_name: Enterprise Windows
   modules:
   - enterprise
   run_on:
@@ -2660,7 +2660,7 @@ buildvariants:
     - rhel55-test
 
 - name: windows-64-2k8-ssl
-  display_name: SSL Windows 64-bit 2008R2+
+  display_name: SSL Windows 2008R2
   modules: ~
   run_on:
   - windows-64-vs2013-test
@@ -2988,7 +2988,7 @@ buildvariants:
 ###########################################
 
 - name: enterprise-rhel-57-64-bit
-  display_name: Enterprise RHEL 5.7 64-bit
+  display_name: Enterprise RHEL 5.7
   modules:
   - enterprise
   run_on:
@@ -3032,7 +3032,7 @@ buildvariants:
     - rhel55-test
 
 - name: enterprise-rhel-62-64-bit
-  display_name: Enterprise RHEL 6.2 64-bit
+  display_name: Enterprise RHEL 6.2
   modules:
   - enterprise
   run_on:
@@ -3078,7 +3078,7 @@ buildvariants:
     - rhel55-test
 
 - name: enterprise-rhel-70-64-bit
-  display_name: Enterprise RHEL 7.0 64-bit
+  display_name: Enterprise RHEL 7.0
   modules:
   - enterprise
   run_on:
@@ -3119,7 +3119,7 @@ buildvariants:
     - rhel55-test
 
 - name: rhel55
-  display_name: SSL RHEL 5.5 64-bit
+  display_name: SSL RHEL 5.5
   modules: ~
   run_on:
   - rhel55-test
@@ -3220,7 +3220,7 @@ buildvariants:
     - rhel55-test
 
 - name: rhel62
-  display_name: SSL RHEL 6.2 64-bit
+  display_name: SSL RHEL 6.2
   modules: ~
   run_on:
   - rhel62-test
@@ -3320,7 +3320,7 @@ buildvariants:
     - rhel55-test
 
 - name: rhel70
-  display_name: SSL RHEL 7.0 64-bit
+  display_name: SSL RHEL 7.0
   modules: ~
   run_on:
   - rhel70
@@ -3424,7 +3424,7 @@ buildvariants:
 ###########################################
 
 - name: enterprise-ubuntu1204-64
-  display_name: Enterprise Ubuntu 1204 64-bit
+  display_name: Enterprise Ubuntu 12.04
   modules:
   - enterprise
   run_on:
@@ -3467,7 +3467,7 @@ buildvariants:
     - rhel55-test
 
 - name: enterprise-ubuntu1404-64
-  display_name: Enterprise Ubuntu 1404 64-bit
+  display_name: Enterprise Ubuntu 14.04
   modules:
   - enterprise
   run_on:
@@ -3514,7 +3514,7 @@ buildvariants:
 ###########################################
 
 - name: enterprise-suse11-64
-  display_name: Enterprise SUSE 11 64-bit
+  display_name: Enterprise SLES 11
   modules:
   - enterprise
   run_on:
@@ -3557,7 +3557,7 @@ buildvariants:
     - rhel55-test
 
 - name: suse11
-  display_name: SSL SUSE 11 64-bit
+  display_name: SSL SUSE 11
   modules: ~
   run_on:
   - suse11-test
@@ -3661,7 +3661,7 @@ buildvariants:
 ###########################################
 
 - name: solaris-64-bit
-  display_name: Solaris 64-bit
+  display_name: Solaris
   modules: ~
   run_on:
   - solaris
@@ -3734,7 +3734,7 @@ buildvariants:
 ###########################################
 
 - name: enterprise-debian71-64
-  display_name: Enterprise Debian 7.1 64-bit
+  display_name: Enterprise Debian 7.1
   modules:
   - enterprise
   run_on:
@@ -3777,7 +3777,7 @@ buildvariants:
     - rhel55-test
 
 - name: debian71
-  display_name: SSL Debian 7.1 64-bit
+  display_name: SSL Debian 7.1
   modules: ~
   run_on:
   - debian71-test
@@ -3881,7 +3881,7 @@ buildvariants:
 ##############################################
 
 - name: ubuntu1404-rocksdb
-  display_name: Ubuntu 14.04 64-bit (RocksDB)
+  display_name: Ubuntu 14.04 (RocksDB)
   modules:
   - rocksdb
   run_on:
@@ -3942,7 +3942,7 @@ buildvariants:
 ###########################################
 
 - name: ubuntu1410-debug-asan
-  display_name: z ASAN SSL Ubuntu 1410 64-bit DEBUG
+  display_name: ~ ASAN SSL Ubuntu 14.10 DEBUG
   run_on:
   - ubuntu1410-build
   stepback: false
@@ -4029,7 +4029,7 @@ buildvariants:
   - name: tool_WT
 
 - name: ubuntu1410-asan
-  display_name: z ASAN SSL Ubuntu 1410 64-bit
+  display_name: ~ ASAN SSL Ubuntu 14.10
   run_on:
   - ubuntu1410-build
   stepback: false
@@ -4047,7 +4047,7 @@ buildvariants:
   - name: jstestfuzz
 
 - name: ubuntu1410-fast-clang
-  display_name: z Clang/libc++ Ubuntu 1410 64-bit SSL
+  display_name: ~ Clang/libc++ SSL Ubuntu 14.10
   run_on:
   - ubuntu1410-test
   stepback: false
@@ -4143,7 +4143,7 @@ buildvariants:
     - rhel55-test
 
 - name: ubuntu1404-asio
-  display_name: z ASIO SSL Ubuntu 1404 64-bit
+  display_name: ~ ASIO SSL Ubuntu 14.04
   modules: ~
   run_on:
   - ubuntu1404-test
@@ -4185,7 +4185,7 @@ buildvariants:
   - name: tool_WT
 
 - name: windows-64-2k8-ssl-asio
-  display_name: z ASIO SSL Windows 64-bit 2008R2+
+  display_name: ~ ASIO SSL Windows 2008R2
   modules: ~
   run_on:
   - windows-64-vs2013-test
