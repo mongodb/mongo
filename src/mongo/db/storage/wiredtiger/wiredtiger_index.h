@@ -136,7 +136,8 @@ protected:
     class UniqueBulkBuilder;
 
     const Ordering _ordering;
-    std::string _uri;
+    std::string _uri;	// YSD: It has the value like 'table:index-11-8693615829286590222'.
+    					// The string after the ':' is the file name on the disk.
     uint64_t _tableId;
     std::string _collectionNamespace;
     std::string _indexName;

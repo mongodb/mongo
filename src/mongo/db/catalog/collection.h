@@ -397,9 +397,12 @@ private:
     bool _enforceQuota(bool userEnforeQuota) const;
 
     int _magic;
-
+    // YSD: The full name of the collection starts from database name.
+    // For example, for collection cl in database mydb, it will be 'mydb.cl'.
     NamespaceString _ns;
     CollectionCatalogEntry* _details;
+    // YSD: The address of the storage engine record store. As for wiredTiger, it will
+    // be a pointer of mongo::WiredTigerRecordStore.
     RecordStore* _recordStore;
     DatabaseCatalogEntry* _dbce;
     CollectionInfoCache _infoCache;

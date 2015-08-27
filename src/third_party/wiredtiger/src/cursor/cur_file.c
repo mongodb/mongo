@@ -228,6 +228,8 @@ err:	API_END_RET(session, ret);
 /*
  * __curfile_insert --
  *	WT_CURSOR->insert method for the btree cursor type.
+ *	YSD: Why btree cursor type? When I'm inserting into a collection without index, it
+ *	also comes here. Why???
  */
 static int
 __curfile_insert(WT_CURSOR *cursor)

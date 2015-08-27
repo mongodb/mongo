@@ -846,6 +846,9 @@ StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
     c->set_key(c, _makeKey(loc));
     WiredTigerItem value(data, len);
     c->set_value(c, value.Get());
+    // YSD: When inserting into a collection without index, this insert will go to
+    // __curfile_insert. Why??? __curfile_insert says it's only for btree type cursor.
+    // When will cur_table will be used???
     int ret = WT_OP_CHECK(c->insert(c));
     if (ret) {
         return StatusWith<RecordId>(wtRCToStatus(ret, "WiredTigerRecordStore::insertRecord"));
