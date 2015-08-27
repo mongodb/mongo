@@ -114,7 +114,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
     Locker::LockSnapshot lockStateBackup;
     massert(28795,
             str::stream() << "Unable to yield to wait for readConcern=majority "
-                          << "snapshot to be available for " << nss.ns(),
+            << "snapshot to be available for " << nss.ns(),
             locker->saveLockStateAndUnlock(&lockStateBackup));
     ON_BLOCK_EXIT([&]() { locker->restoreLockState(lockStateBackup); });
 
@@ -123,7 +123,9 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
         repl::ReplicationCoordinator::get(_txn)->waitForNewSnapshot(_txn);
 
         Status status = _txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-        uassert(28786, "failed to set read from majority-committed snapshot", status.isOK());
+        uassert(28786,
+                "failed to set read from majority-committed snapshot",
+                status.isOK());
         mySnapshot = _txn->recoveryUnit()->getMajorityCommittedSnapshot();
     }
 
