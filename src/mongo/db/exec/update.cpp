@@ -855,7 +855,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
 
             // Ensure that the BSONObj underlying the WorkingSetMember is owned because saveState()
             // is allowed to free the memory.
-            member->makeObjOwned();
+            member->makeObjOwnedIfNeeded();
 
             // Save state before making changes
             try {
@@ -869,6 +869,12 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 std::terminate();
             }
 
+            // If we care about the pre-updated version of the doc, save it out here.
+            BSONObj oldObj;
+            if (_params.request->shouldReturnOldDocs()) {
+                oldObj = member->obj.value().getOwned();
+            }
+
             // Do the update, get us the new version of the doc.
             BSONObj newObj = transformAndUpdate(member->obj, loc);
 
@@ -877,6 +883,9 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 if (_params.request->shouldReturnNewDocs()) {
                     member->obj = Snapshotted<BSONObj>(getOpCtx()->recoveryUnit()->getSnapshotId(),
                                                        newObj.getOwned());
+                } else {
+                    invariant(_params.request->shouldReturnOldDocs());
+                    member->obj.setValue(oldObj);
                 }
                 member->loc = RecordId();
                 member->transitionToOwnedObj();
@@ -884,7 +893,7 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
         } catch (const WriteConflictException& wce) {
             // Ensure that the BSONObj underlying the WorkingSetMember is owned because it may be
             // freed when we yield.
-            member->makeObjOwned();
+            member->makeObjOwnedIfNeeded();
             _idRetrying = id;
             memberFreer.Dismiss();  // Keep this member around so we can retry updating it.
             *out = WorkingSet::INVALID_ID;

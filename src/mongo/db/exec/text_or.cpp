@@ -334,7 +334,7 @@ private:
         WorkingSetMember* member = _ws->get(_id);
 
         // Make it owned since we are buffering results.
-        member->makeObjOwned();
+        member->makeObjOwnedIfNeeded();
         return member->obj.value();
     }
 
@@ -375,7 +375,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
             } catch (const WriteConflictException& wce) {
                 // Ensure that the BSONObj underlying the WorkingSetMember is owned because it may
                 // be freed when we yield.
-                wsm->makeObjOwned();
+                wsm->makeObjOwnedIfNeeded();
                 _idRetrying = wsid;
                 *out = WorkingSet::INVALID_ID;
                 return NEED_YIELD;

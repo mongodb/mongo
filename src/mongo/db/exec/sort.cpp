@@ -274,12 +274,12 @@ void SortStage::addToBuffer(const SortableDataItem& item) {
     WorkingSetMember* member = _ws->get(item.wsid);
     if (_limit == 0) {
         // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
-        member->makeObjOwned();
+        member->makeObjOwnedIfNeeded();
         _data.push_back(item);
         _memUsage += member->getMemUsage();
     } else if (_limit == 1) {
         if (_data.empty()) {
-            member->makeObjOwned();
+            member->makeObjOwnedIfNeeded();
             _data.push_back(item);
             _memUsage = member->getMemUsage();
             return;
@@ -289,7 +289,7 @@ void SortStage::addToBuffer(const SortableDataItem& item) {
         // Compare new item with existing item in vector.
         if (cmp(item, _data[0])) {
             wsidToFree = _data[0].wsid;
-            member->makeObjOwned();
+            member->makeObjOwnedIfNeeded();
             _data[0] = item;
             _memUsage = member->getMemUsage();
         }
@@ -298,7 +298,7 @@ void SortStage::addToBuffer(const SortableDataItem& item) {
         // Limit not reached - insert and return
         vector<SortableDataItem>::size_type limit(_limit);
         if (_dataSet->size() < limit) {
-            member->makeObjOwned();
+            member->makeObjOwnedIfNeeded();
             _dataSet->insert(item);
             _memUsage += member->getMemUsage();
             return;
@@ -319,7 +319,7 @@ void SortStage::addToBuffer(const SortableDataItem& item) {
             // Here, we choose to erase first to release potential resources
             // used by the last item and to keep the scope of the iterator to a minimum.
             _dataSet->erase(lastItemIt);
-            member->makeObjOwned();
+            member->makeObjOwnedIfNeeded();
             _dataSet->insert(item);
         }
     }

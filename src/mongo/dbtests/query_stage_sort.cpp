@@ -170,7 +170,7 @@ public:
         // totally) correct.
         BSONObj last;
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&last, NULL));
-        ASSERT(last.isOwned());
+        last = last.getOwned();
 
         // Count 'last'.
         int count = 1;
@@ -182,8 +182,7 @@ public:
             // pattern.
             ASSERT(cmp == 0 || cmp == 1);
             ++count;
-            last = current;
-            ASSERT(last.isOwned());
+            last = current.getOwned();
         }
 
         checkCount(count);

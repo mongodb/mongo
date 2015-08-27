@@ -29,6 +29,7 @@
 #include "mongo/db/exec/working_set.h"
 
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
@@ -168,8 +169,8 @@ bool WorkingSetMember::hasOwnedObj() const {
     return _state == OWNED_OBJ || (_state == LOC_AND_OBJ && obj.value().isOwned());
 }
 
-void WorkingSetMember::makeObjOwned() {
-    if (_state == LOC_AND_OBJ && !obj.value().isOwned()) {
+void WorkingSetMember::makeObjOwnedIfNeeded() {
+    if (supportsDocLocking() && _state == LOC_AND_OBJ && !obj.value().isOwned()) {
         obj.setValue(obj.value().getOwned());
     }
 }

@@ -98,7 +98,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             // Save result for later.
             WorkingSetMember* member = _ws->get(id);
             // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
-            member->makeObjOwned();
+            member->makeObjOwnedIfNeeded();
             _results.push_back(id);
 
             if (_results.size() >= numResults) {

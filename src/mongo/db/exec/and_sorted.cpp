@@ -116,7 +116,7 @@ PlanStage::StageState AndSortedStage::getTargetLoc(WorkingSetID* out) {
         _targetLoc = member->loc;
 
         // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
-        member->makeObjOwned();
+        member->makeObjOwnedIfNeeded();
 
         // We have to AND with all other children.
         for (size_t i = 1; i < _children.size(); ++i) {
@@ -215,7 +215,7 @@ PlanStage::StageState AndSortedStage::moveTowardTargetLoc(WorkingSetID* out) {
             _targetId = id;
 
             // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
-            member->makeObjOwned();
+            member->makeObjOwnedIfNeeded();
 
             _workingTowardRep = std::queue<size_t>();
             for (size_t i = 0; i < _children.size(); ++i) {

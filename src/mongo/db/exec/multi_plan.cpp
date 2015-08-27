@@ -382,7 +382,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             WorkingSetMember* member = candidate.ws->get(id);
             // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we choose to
             // return the results from the 'candidate' plan.
-            member->makeObjOwned();
+            member->makeObjOwnedIfNeeded();
             candidate.results.push_back(id);
 
             // Once a plan returns enough results, stop working.

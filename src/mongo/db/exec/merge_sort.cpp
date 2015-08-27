@@ -123,7 +123,7 @@ PlanStage::StageState MergeSortStage::work(WorkingSetID* out) {
             value.id = id;
             value.stage = child;
             // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
-            member->makeObjOwned();
+            member->makeObjOwnedIfNeeded();
             _mergingData.push_front(value);
 
             // Insert the result (indirectly) into our priority queue.

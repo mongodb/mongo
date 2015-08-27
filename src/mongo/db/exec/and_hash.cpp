@@ -147,7 +147,7 @@ PlanStage::StageState AndHashStage::work(WorkingSetID* out) {
                 } else if (PlanStage::ADVANCED == childStatus) {
                     // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we
                     // yield.
-                    _ws->get(_lookAheadResults[i])->makeObjOwned();
+                    _ws->get(_lookAheadResults[i])->makeObjOwnedIfNeeded();
                     break;  // Stop looking at this child.
                 } else if (PlanStage::FAILURE == childStatus || PlanStage::DEAD == childStatus) {
                     // Propage error to parent.
@@ -286,7 +286,7 @@ PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
         }
 
         // Ensure that the BSONObj underlying the WorkingSetMember is owned in case we yield.
-        member->makeObjOwned();
+        member->makeObjOwnedIfNeeded();
 
         // Update memory stats.
         _memUsage += member->getMemUsage();
