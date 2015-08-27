@@ -53,6 +53,8 @@ static const char * const __stats_dsrc_desc[] = {
 	"cache: pages read into cache requiring lookaside entries",
 	"cache: overflow pages read into cache",
 	"cache: pages written from cache",
+	"cache: page written requiring lookaside records",
+	"cache: pages written requiring in-memory restoration",
 	"compression: raw compression call failed, no additional data available",
 	"compression: raw compression call failed, additional data available",
 	"compression: raw compression call succeeded",
@@ -90,7 +92,6 @@ static const char * const __stats_dsrc_desc[] = {
 	"reconciliation: page checksum matches",
 	"reconciliation: page reconciliation calls",
 	"reconciliation: page reconciliation calls for eviction",
-	"reconciliation: page reconciliation block requires lookaside records",
 	"reconciliation: leaf page key bytes discarded using prefix compression",
 	"reconciliation: internal page key bytes discarded using suffix compression",
 	"session: object compaction",
@@ -162,10 +163,12 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cache_read_overflow = 0;
 	stats->cache_overflow_value = 0;
 	stats->cache_eviction_deepen = 0;
+	stats->cache_write_lookaside = 0;
 	stats->cache_read = 0;
 	stats->cache_read_lookaside = 0;
 	stats->cache_eviction_split = 0;
 	stats->cache_write = 0;
+	stats->cache_write_restore = 0;
 	stats->cache_eviction_clean = 0;
 	stats->compress_read = 0;
 	stats->compress_write = 0;
@@ -210,7 +213,6 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->rec_multiblock_max = 0;
 	stats->rec_overflow_value = 0;
 	stats->rec_page_match = 0;
-	stats->rec_pages_lookaside = 0;
 	stats->rec_pages = 0;
 	stats->rec_pages_eviction = 0;
 	stats->rec_page_delete = 0;
@@ -276,10 +278,12 @@ __wt_stat_dsrc_aggregate_single(
 	to->cache_read_overflow += from->cache_read_overflow;
 	to->cache_overflow_value += from->cache_overflow_value;
 	to->cache_eviction_deepen += from->cache_eviction_deepen;
+	to->cache_write_lookaside += from->cache_write_lookaside;
 	to->cache_read += from->cache_read;
 	to->cache_read_lookaside += from->cache_read_lookaside;
 	to->cache_eviction_split += from->cache_eviction_split;
 	to->cache_write += from->cache_write;
+	to->cache_write_restore += from->cache_write_restore;
 	to->cache_eviction_clean += from->cache_eviction_clean;
 	to->compress_read += from->compress_read;
 	to->compress_write += from->compress_write;
@@ -326,7 +330,6 @@ __wt_stat_dsrc_aggregate_single(
 		to->rec_multiblock_max = from->rec_multiblock_max;
 	to->rec_overflow_value += from->rec_overflow_value;
 	to->rec_page_match += from->rec_page_match;
-	to->rec_pages_lookaside += from->rec_pages_lookaside;
 	to->rec_pages += from->rec_pages;
 	to->rec_pages_eviction += from->rec_pages_eviction;
 	to->rec_page_delete += from->rec_page_delete;
@@ -400,10 +403,13 @@ __wt_stat_dsrc_aggregate(
 	to->cache_overflow_value += WT_STAT_READ(from, cache_overflow_value);
 	to->cache_eviction_deepen +=
 	    WT_STAT_READ(from, cache_eviction_deepen);
+	to->cache_write_lookaside +=
+	    WT_STAT_READ(from, cache_write_lookaside);
 	to->cache_read += WT_STAT_READ(from, cache_read);
 	to->cache_read_lookaside += WT_STAT_READ(from, cache_read_lookaside);
 	to->cache_eviction_split += WT_STAT_READ(from, cache_eviction_split);
 	to->cache_write += WT_STAT_READ(from, cache_write);
+	to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);
 	to->cache_eviction_clean += WT_STAT_READ(from, cache_eviction_clean);
 	to->compress_read += WT_STAT_READ(from, compress_read);
 	to->compress_write += WT_STAT_READ(from, compress_write);
@@ -460,7 +466,6 @@ __wt_stat_dsrc_aggregate(
 		to->rec_multiblock_max = v;
 	to->rec_overflow_value += WT_STAT_READ(from, rec_overflow_value);
 	to->rec_page_match += WT_STAT_READ(from, rec_page_match);
-	to->rec_pages_lookaside += WT_STAT_READ(from, rec_pages_lookaside);
 	to->rec_pages += WT_STAT_READ(from, rec_pages);
 	to->rec_pages_eviction += WT_STAT_READ(from, rec_pages_eviction);
 	to->rec_page_delete += WT_STAT_READ(from, rec_page_delete);
@@ -520,7 +525,6 @@ static const char * const __stats_connection_desc[] = {
 	"cache: eviction worker thread evicting pages",
 	"cache: in-memory page splits",
 	"cache: lookaside table insert calls",
-	"cache: lookaside table insert key and value bytes inserted",
 	"cache: lookaside table remove calls",
 	"cache: percentage overhead",
 	"cache: tracked dirty pages in the cache",
@@ -528,6 +532,8 @@ static const char * const __stats_connection_desc[] = {
 	"cache: pages read into cache",
 	"cache: pages read into cache requiring lookaside entries",
 	"cache: pages written from cache",
+	"cache: page written requiring lookaside records",
+	"cache: pages written requiring in-memory restoration",
 	"connection: pthread mutex condition wait calls",
 	"cursor: cursor create calls",
 	"cursor: cursor insert calls",
@@ -598,8 +604,6 @@ static const char * const __stats_connection_desc[] = {
 	"connection: total read I/Os",
 	"reconciliation: page reconciliation calls",
 	"reconciliation: page reconciliation calls for eviction",
-	"reconciliation: page reconciliation block requires lookaside records",
-	"reconciliation: page reconciliation block requires in-memory restoration",
 	"reconciliation: split bytes currently awaiting free",
 	"reconciliation: split objects currently awaiting free",
 	"connection: pthread mutex shared lock read-lock calls",
@@ -684,12 +688,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_inmem_split = 0;
 	stats->cache_eviction_internal = 0;
 	stats->cache_lookaside_insert = 0;
-	stats->cache_lookaside_insert_bytes = 0;
 	stats->cache_lookaside_remove = 0;
 		/* not clearing cache_bytes_max */
 		/* not clearing cache_eviction_maximum_page_size */
 	stats->cache_eviction_dirty = 0;
 	stats->cache_eviction_deepen = 0;
+	stats->cache_write_lookaside = 0;
 		/* not clearing cache_pages_inuse */
 	stats->cache_eviction_force = 0;
 	stats->cache_eviction_force_delete = 0;
@@ -700,6 +704,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_split = 0;
 	stats->cache_eviction_walk = 0;
 	stats->cache_write = 0;
+	stats->cache_write_restore = 0;
 		/* not clearing cache_overhead */
 		/* not clearing cache_bytes_internal */
 		/* not clearing cache_bytes_leaf */
@@ -773,8 +778,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->lsm_work_units_done = 0;
 	stats->lsm_work_units_created = 0;
 	stats->lsm_work_queue_max = 0;
-	stats->rec_pages_restore = 0;
-	stats->rec_pages_lookaside = 0;
 	stats->rec_pages = 0;
 	stats->rec_pages_eviction = 0;
 		/* not clearing rec_split_stashed_bytes */
@@ -860,8 +863,6 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_eviction_internal);
 	to->cache_lookaside_insert +=
 	    WT_STAT_READ(from, cache_lookaside_insert);
-	to->cache_lookaside_insert_bytes +=
-	    WT_STAT_READ(from, cache_lookaside_insert_bytes);
 	to->cache_lookaside_remove +=
 	    WT_STAT_READ(from, cache_lookaside_remove);
 	to->cache_bytes_max += WT_STAT_READ(from, cache_bytes_max);
@@ -870,6 +871,8 @@ __wt_stat_connection_aggregate(
 	to->cache_eviction_dirty += WT_STAT_READ(from, cache_eviction_dirty);
 	to->cache_eviction_deepen +=
 	    WT_STAT_READ(from, cache_eviction_deepen);
+	to->cache_write_lookaside +=
+	    WT_STAT_READ(from, cache_write_lookaside);
 	to->cache_pages_inuse += WT_STAT_READ(from, cache_pages_inuse);
 	to->cache_eviction_force += WT_STAT_READ(from, cache_eviction_force);
 	to->cache_eviction_force_delete +=
@@ -881,6 +884,7 @@ __wt_stat_connection_aggregate(
 	to->cache_eviction_split += WT_STAT_READ(from, cache_eviction_split);
 	to->cache_eviction_walk += WT_STAT_READ(from, cache_eviction_walk);
 	to->cache_write += WT_STAT_READ(from, cache_write);
+	to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);
 	to->cache_overhead += WT_STAT_READ(from, cache_overhead);
 	to->cache_bytes_internal += WT_STAT_READ(from, cache_bytes_internal);
 	to->cache_bytes_leaf += WT_STAT_READ(from, cache_bytes_leaf);
@@ -962,8 +966,6 @@ __wt_stat_connection_aggregate(
 	to->lsm_work_units_created +=
 	    WT_STAT_READ(from, lsm_work_units_created);
 	to->lsm_work_queue_max += WT_STAT_READ(from, lsm_work_queue_max);
-	to->rec_pages_restore += WT_STAT_READ(from, rec_pages_restore);
-	to->rec_pages_lookaside += WT_STAT_READ(from, rec_pages_lookaside);
 	to->rec_pages += WT_STAT_READ(from, rec_pages);
 	to->rec_pages_eviction += WT_STAT_READ(from, rec_pages_eviction);
 	to->rec_split_stashed_bytes +=

@@ -277,7 +277,6 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_worker_evicting;
 	int64_t cache_inmem_split;
 	int64_t cache_lookaside_insert;
-	int64_t cache_lookaside_insert_bytes;
 	int64_t cache_lookaside_remove;
 	int64_t cache_overhead;
 	int64_t cache_pages_dirty;
@@ -285,6 +284,8 @@ struct __wt_connection_stats {
 	int64_t cache_read;
 	int64_t cache_read_lookaside;
 	int64_t cache_write;
+	int64_t cache_write_lookaside;
+	int64_t cache_write_restore;
 	int64_t cond_wait;
 	int64_t cursor_create;
 	int64_t cursor_insert;
@@ -355,8 +356,6 @@ struct __wt_connection_stats {
 	int64_t read_io;
 	int64_t rec_pages;
 	int64_t rec_pages_eviction;
-	int64_t rec_pages_lookaside;
-	int64_t rec_pages_restore;
 	int64_t rec_split_stashed_bytes;
 	int64_t rec_split_stashed_objects;
 	int64_t rwlock_read;
@@ -435,6 +434,8 @@ struct __wt_dsrc_stats {
 	int64_t cache_read_lookaside;
 	int64_t cache_read_overflow;
 	int64_t cache_write;
+	int64_t cache_write_lookaside;
+	int64_t cache_write_restore;
 	int64_t compress_raw_fail;
 	int64_t compress_raw_fail_temporary;
 	int64_t compress_raw_ok;
@@ -472,7 +473,6 @@ struct __wt_dsrc_stats {
 	int64_t rec_page_match;
 	int64_t rec_pages;
 	int64_t rec_pages_eviction;
-	int64_t rec_pages_lookaside;
 	int64_t rec_prefix_compression;
 	int64_t rec_suffix_compression;
 	int64_t session_compact;

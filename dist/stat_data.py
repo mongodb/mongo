@@ -205,8 +205,6 @@ connection_stats = [
         'eviction worker thread evicting pages'),
     CacheStat('cache_inmem_split', 'in-memory page splits'),
     CacheStat('cache_lookaside_insert', 'lookaside table insert calls'),
-    CacheStat('cache_lookaside_insert_bytes',
-        'lookaside table insert key and value bytes inserted'),
     CacheStat('cache_lookaside_remove', 'lookaside table remove calls'),
     CacheStat('cache_overhead', 'percentage overhead', 'no_clear,no_scale'),
     CacheStat('cache_pages_dirty',
@@ -217,6 +215,10 @@ connection_stats = [
     CacheStat('cache_read_lookaside',
         'pages read into cache requiring lookaside entries'),
     CacheStat('cache_write', 'pages written from cache'),
+    CacheStat('cache_write_lookaside',
+        'page written requiring lookaside records'),
+    CacheStat('cache_write_restore',
+        'pages written requiring in-memory restoration'),
 
     ##########################################
     # Dhandle statistics
@@ -271,10 +273,6 @@ connection_stats = [
     ##########################################
     RecStat('rec_pages', 'page reconciliation calls'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
-    RecStat('rec_pages_lookaside',
-        'page reconciliation block requires lookaside records'),
-    RecStat('rec_pages_restore',
-        'page reconciliation block requires in-memory restoration'),
     RecStat('rec_split_stashed_bytes',
         'split bytes currently awaiting free', 'no_clear,no_scale'),
     RecStat('rec_split_stashed_objects',
@@ -479,6 +477,10 @@ dsrc_stats = [
         'pages read into cache requiring lookaside entries'),
     CacheStat('cache_read_overflow', 'overflow pages read into cache'),
     CacheStat('cache_write', 'pages written from cache'),
+    CacheStat('cache_write_lookaside',
+        'page written requiring lookaside records'),
+    CacheStat('cache_write_restore',
+        'pages written requiring in-memory restoration'),
 
     ##########################################
     # Compression statistics
@@ -509,8 +511,6 @@ dsrc_stats = [
     RecStat('rec_page_match', 'page checksum matches'),
     RecStat('rec_pages', 'page reconciliation calls'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
-    RecStat('rec_pages_lookaside',
-        'page reconciliation block requires lookaside records'),
     RecStat('rec_prefix_compression',
         'leaf page key bytes discarded using prefix compression'),
     RecStat('rec_suffix_compression',

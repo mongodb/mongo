@@ -300,6 +300,9 @@ typedef struct {
 
 	WT_SALVAGE_COOKIE *salvage;	/* If it's a salvage operation */
 
+	int cache_write_lookaside;	/* Used the lookaside table */
+	int cache_write_restore;		/* Used update/restoration */
+
 	uint32_t tested_ref_state;	/* Debugging information */
 } WT_RECONCILE;
 
@@ -372,19 +375,11 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	page = ref->page;
 	mod = page->modify;
 
-	/* We're shouldn't get called with a clean page, that's an error. */
-	if (!__wt_page_is_modified(page))
-		WT_RET_MSG(session, WT_ERROR,
-		    "Attempt to reconcile a clean page.");
-
 	WT_RET(__wt_verbose(session,
 	    WT_VERB_RECONCILE, "%s", __wt_page_type_string(page->type)));
-	WT_STAT_FAST_CONN_INCR(session, rec_pages);
-	WT_STAT_FAST_DATA_INCR(session, rec_pages);
-	if (LF_ISSET(WT_EVICTING)) {
-		WT_STAT_FAST_CONN_INCR(session, rec_pages_eviction);
-		WT_STAT_FAST_DATA_INCR(session, rec_pages_eviction);
-	}
+
+	/* We shouldn't get called with a clean page, that's an error. */
+	WT_ASSERT(session, __wt_page_is_modified(page));
 
 #ifdef HAVE_DIAGNOSTIC
 	{
@@ -455,6 +450,22 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 
 	/* Release the reconciliation lock. */
 	F_CLR_ATOMIC(page, WT_PAGE_RECONCILIATION);
+
+	/* Update statistics. */
+	WT_STAT_FAST_CONN_INCR(session, rec_pages);
+	WT_STAT_FAST_DATA_INCR(session, rec_pages);
+	if (LF_ISSET(WT_EVICTING)) {
+		WT_STAT_FAST_CONN_INCR(session, rec_pages_eviction);
+		WT_STAT_FAST_DATA_INCR(session, rec_pages_eviction);
+	}
+	if (r->cache_write_lookaside) {
+		WT_STAT_FAST_CONN_INCR(session, cache_write_lookaside);
+		WT_STAT_FAST_DATA_INCR(session, cache_write_lookaside);
+	}
+	if (r->cache_write_restore) {
+		WT_STAT_FAST_CONN_INCR(session, cache_write_restore);
+		WT_STAT_FAST_DATA_INCR(session, cache_write_restore);
+	}
 
 	/*
 	 * Clean up the boundary structures: some workloads result in millions
@@ -3147,8 +3158,7 @@ skip_check_complete:
 	 */
 	if (!r->evict_skipped_updates && bnd->skip != NULL) {
 		F_SET(dsk, WT_PAGE_LAS_UPDATE);
-		WT_STAT_FAST_CONN_INCR(session, rec_pages_lookaside);
-		WT_STAT_FAST_DATA_INCR(session, rec_pages_lookaside);
+		r->cache_write_lookaside = 1;
 	}
 
 	/*
@@ -3157,7 +3167,7 @@ skip_check_complete:
 	 * disk image and the list of updates we skipped.
 	 */
 	if (r->evict_skipped_updates && bnd->skip != NULL) {
-		WT_STAT_FAST_CONN_INCR(session, rec_pages_restore);
+		r->cache_write_restore = 1;
 
 		/*
 		 * If the buffer is compressed (raw compression was configured),
