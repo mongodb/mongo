@@ -220,7 +220,7 @@ __wt_las_cursor(
 		*cursorp = conn->las_cursor;
 	}
 
-	/* Turn eviction off. */
+	/* Turn caching and eviction off. */
 	F_SET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 
 	return (0);
