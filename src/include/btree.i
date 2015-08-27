@@ -84,6 +84,9 @@ __wt_cache_decr_check_size(
 	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
 	first = 0;
 	}
+#else
+	WT_UNUSED(fld);
+	WT_UNUSED(session);
 #endif
 }
 
@@ -109,6 +112,9 @@ __wt_cache_decr_check_uint64(
 	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
 	first = 0;
 	}
+#else
+	WT_UNUSED(fld);
+	WT_UNUSED(session);
 #endif
 }
 
