@@ -119,8 +119,8 @@ TEST(RecordStoreTestHarness, GetRandomIteratorNonEmpty) {
         ASSERT(cursor->next());
 
         // We should have at least visited a quarter of the items if we're any random at all
-        // This should be enabled once the fix for WT-2032 is integrated:
-        // ASSERT_LT(remain.size(), nToInsert * 3 / 4);
+        // The expected fraction of visited records is 62.3%.
+        ASSERT_LT(remain.size(), nToInsert * 3 / 4);
     }
 }
 
