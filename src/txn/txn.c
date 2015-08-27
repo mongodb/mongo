@@ -399,7 +399,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	int was_oldest;
 
 	txn = &session->txn;
 	WT_ASSERT(session, txn->mod_count == 0);
@@ -407,7 +406,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 
 	txn_global = &S2C(session)->txn_global;
 	txn_state = WT_SESSION_TXN_STATE(session);
-	was_oldest = 0;
 
 	/* Clear the transaction's ID from the global table. */
 	if (WT_SESSION_IS_CHECKPOINT(session)) {
@@ -424,9 +422,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 		    txn->id != WT_TXN_NONE);
 		WT_PUBLISH(txn_state->id, WT_TXN_NONE);
-
-		/* Quick check for the oldest transaction. */
-		was_oldest = (txn->id == txn_global->last_running);
 		txn->id = WT_TXN_NONE;
 	}
 
@@ -445,14 +440,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	txn->isolation = session->isolation;
 	/* Ensure the transaction flags are cleared on exit */
 	txn->flags = 0;
-
-	/*
-	 * When the oldest transaction in the system completes, bump the oldest
-	 * ID.  This is racy and so not guaranteed, but in practice it keeps
-	 * the oldest ID from falling too far behind.
-	 */
-	if (was_oldest)
-		__wt_txn_update_oldest(session, 1);
 }
 
 /*
