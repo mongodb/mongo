@@ -997,7 +997,6 @@ static int
 __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_INSERT *ins, WT_ROW *rip, WT_CELL_UNPACK *vpack, WT_UPDATE **updp)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_DECL_ITEM(tmp);
 	WT_PAGE *page;
@@ -1008,7 +1007,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 	*updp = NULL;
 
-	btree = S2BT(session);
 	page = r->page;
 
 	/*
@@ -1090,13 +1088,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * We have to check both: the oldest transaction ID may have moved while
 	 * we were scanning the update list, so it is possible to find a skipped
 	 * update, but then find all updates are stable at the end of the scan.
-	 *
-	 * Skip the visibility check for the lookaside table as a special-case,
-	 * we know there are no older readers of that table.
 	 */
-	if (!skipped &&
-	    (F_ISSET(btree, WT_BTREE_LOOKASIDE) ||
-	    __wt_txn_visible_all(session, max_txn)))
+	if (!skipped && __wt_txn_visible_all(session, max_txn))
 		return (0);
 
 	/*

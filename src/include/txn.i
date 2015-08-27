@@ -110,6 +110,10 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	txn_global = &S2C(session)->txn_global;
 	btree = S2BT_SAFE(session);
 
+	/* All updates to the lookaside table are immediately visible. */
+	if (btree != NULL && F_ISSET(btree, WT_BTREE_LOOKASIDE))
+		return (WT_TXN_ABORTED);
+
 	/*
 	 * Take a local copy of these IDs in case they are updated while we are
 	 * checking visibility.  Only the generation needs to be carefully
