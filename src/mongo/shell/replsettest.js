@@ -1174,7 +1174,6 @@ ReplSetTest.prototype.bridge = function( opts ) {
         }
     }
 
-    this.awaitReplication();
     this.stopSet( null, true, opts );
     
     // start set
