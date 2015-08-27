@@ -1,18 +1,4 @@
 # -*- mode: python; -*-
-# build file for MongoDB
-# this requires scons
-# you can get from http://www.scons.org
-# then just type scons
-
-# some common tasks
-#   build 64-bit mac and pushing to s3
-#      scons --64 s3dist
-#      scons --distname=0.8 s3dist
-#      all s3 pushes require settings.py and simples3
-
-# This file, SConstruct, configures the build environment, and then delegates to
-# several, subordinate SConscript files, which describe specific build rules.
-
 import copy
 import datetime
 import errno
@@ -28,7 +14,11 @@ import uuid
 from buildscripts import utils
 from buildscripts import moduleconfig
 
-from mongo_scons_utils import default_variant_dir_generator
+from mongo_scons_utils import (
+    default_buildinfo_environment_data,
+    default_variant_dir_generator,
+    get_toolchain_ver,
+)
 
 import libdeps
 
@@ -147,18 +137,6 @@ add_option('mute',
 add_option('prefix',
     default='$BUILD_ROOT/install',
     help='installation prefix',
-)
-
-add_option('distname',
-    help='dist name (0.8.0)',
-)
-
-add_option('distmod',
-    help='additional piece for full dist name',
-)
-
-add_option('distarch',
-    help='override the architecture name in dist output',
 )
 
 add_option('nostrip',
@@ -633,10 +611,28 @@ env_vars.Add('LINKFLAGS',
     help='Sets flags for the linker',
     converter=variable_shlex_converter)
 
+# Note: This is only really meaningful when configured via a variables file. See the
+# default_buildinfo_environment_data() function for examples of how to use this.
+env_vars.Add('MONGO_BUILDINFO_ENVIRONMENT_DATA',
+    help='Sets the info returned from the buildInfo command and --version command-line flag',
+    default=default_buildinfo_environment_data())
+
 env_vars.Add('MONGO_DIST_SRC_PREFIX',
     help='Sets the prefix for files in the source distribution archive',
     converter=variable_distsrc_converter,
     default="mongodb-src-r${MONGO_VERSION}")
+
+env_vars.Add('MONGO_DISTARCH',
+    help='Adds a string representing the target processor architecture to the dist archive',
+    default='$TARGET_ARCH')
+
+env_vars.Add('MONGO_DISTMOD',
+    help='Adds a string that will be embedded in the dist archive naming',
+    default=None)
+
+env_vars.Add('MONGO_DISTNAME',
+    help='Sets the version string to be used in dist archive naming',
+    default='$MONGO_VERSION')
 
 env_vars.Add('MONGO_VERSION',
     help='Sets the version string for MongoDB',
@@ -997,6 +993,9 @@ elif not detectConf.CheckForOS(env['TARGET_OS']):
     env.FatalError("TARGET_OS ({0}) is not supported by compiler", env['TARGET_OS'])
 
 detectConf.Finish()
+
+env['CC_VERSION'] = get_toolchain_ver(env, 'CC')
+env['CXX_VERSION'] = get_toolchain_ver(env, 'CXX')
 
 if not env['HOST_ARCH']:
     env['HOST_ARCH'] = env['TARGET_ARCH']
@@ -2420,8 +2419,7 @@ env.AlwaysBuild( "lint" )
 #  ----  INSTALL -------
 
 def getSystemInstallName():
-    dist_arch = GetOption("distarch")
-    arch_name = env['TARGET_ARCH'] if not dist_arch else dist_arch
+    arch_name = env.subst('$MONGO_DISTARCH')
 
     # We need to make sure the directory names inside dist tarballs are permanently
     # consistent, even if the target OS name used in scons is different. Any differences
@@ -2437,8 +2435,8 @@ def getSystemInstallName():
     if len(mongo_modules):
             n += "-" + "-".join(m.name for m in mongo_modules)
 
-    dn = GetOption("distmod")
-    if dn and len(dn) > 0:
+    dn = env.subst('$MONGO_DISTMOD')
+    if len(dn) > 0:
         n = n + "-" + dn
 
     return n
@@ -2464,12 +2462,7 @@ def add_version_to_distsrc(env, archive):
 
 env.AddDistSrcCallback(add_version_to_distsrc)
 
-if has_option('distname'):
-    distName = GetOption( "distname" )
-else:
-    distName = env['MONGO_VERSION']
-
-env['SERVER_DIST_BASENAME'] = 'mongodb-%s-%s' % (getSystemInstallName(), distName)
+env['SERVER_DIST_BASENAME'] = env.subst('mongodb-%s-$MONGO_DISTNAME' % (getSystemInstallName()))
 
 module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
 

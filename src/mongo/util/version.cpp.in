@@ -54,133 +54,142 @@
 
 namespace mongo {
 
-    using std::string;
-    using std::stringstream;
+using std::string;
+using std::stringstream;
 
-    const char versionString[] = "@mongo_version@";
-    const char * gitVersion() { return "@mongo_git_hash@"; }
-    const char * compiledJSEngine() { return "@buildinfo_js_engine@"; }
-    const char * allocator() { return "@buildinfo_allocator@"; }
+const char versionString[] = "@mongo_version@";
+const char* gitVersion() {
+    return "@mongo_git_hash@";
+}
+const char* compiledJSEngine() {
+    return "@buildinfo_js_engine@";
+}
+const char* allocator() {
+    return "@buildinfo_allocator@";
+}
 
-    const int kMongoVersionMajor = @mongo_version_major@;
-    const int kMongoVersionMinor = @mongo_version_minor@;
-    const int kMongoVersionPatch = @mongo_version_patch@;
-    const int kMongoVersionExtra = @mongo_version_extra@;
-    const char kMongoVersionExtraStr[] = "@mongo_version_extra_str@";
+const int kMongoVersionMajor = @mongo_version_major@;
+const int kMongoVersionMinor = @mongo_version_minor@;
+const int kMongoVersionPatch = @mongo_version_patch@;
+const int kMongoVersionExtra = @mongo_version_extra@;
+const char kMongoVersionExtraStr[] = "@mongo_version_extra_str@";
 
-    std::vector<std::string> compiledModules() {
-        const std::vector<string> modules_list = @buildinfo_modules@;
-        return modules_list;
-    }
+using BuildInfoTuple = std::tuple<std::string, std::string, bool, bool>;
+const std::vector<BuildInfoTuple> kBuildEnvironment = @buildinfo_environment_data@;
 
-    void printCompiledModules() {
-        stringstream ss;
-        ss << "modules: ";
-        auto modules_list = compiledModules();
-        if (modules_list.size() == 0) {
-            ss << "none";
-        } else {
-            for (const auto& m: modules_list) {
-                ss << m << " ";
-            }
-        }
-        log() << ss.str();
-    }
+std::vector<std::string> compiledModules() {
+    const std::vector<string> modules_list = @buildinfo_modules@;
+    return modules_list;
+}
 
-    bool isSameMajorVersion(const char* version) {
-        int major = -1, minor = -1;
-        pcrecpp::RE ver_regex("^(\\d+)\\.(\\d+)\\.");
-        ver_regex.PartialMatch(version, &major, &minor);
+bool isSameMajorVersion(const char* version) {
+    int major = -1, minor = -1;
+    pcrecpp::RE ver_regex("^(\\d+)\\.(\\d+)\\.");
+    ver_regex.PartialMatch(version, &major, &minor);
 
-        if(major == -1 || minor == -1)
-            return false;
-        return (major == kMongoVersionMajor && minor == kMongoVersionMinor);
-    }
+    if (major == -1 || minor == -1)
+        return false;
+    return (major == kMongoVersionMajor && minor == kMongoVersionMinor);
+}
 
-    string mongodVersion() {
-        stringstream ss;
-        ss << "db version v" << versionString;
-        return ss.str();
-    }
+string mongodVersion() {
+    stringstream ss;
+    ss << "db version v" << versionString;
+    return ss.str();
+}
 
-    void printGitVersion() { log() << "git version: " << gitVersion(); }
-
-    const std::string openSSLVersion(const std::string &prefix, const std::string &suffix) {
+const std::string openSSLVersion(const std::string& prefix, const std::string& suffix) {
 #ifndef MONGO_CONFIG_SSL
-        return "";
+    return "";
 #else
-        return prefix + SSLeay_version(SSLEAY_VERSION) + suffix;
+    return prefix + SSLeay_version(SSLEAY_VERSION) + suffix;
 #endif
-    }
-
-    void printOpenSSLVersion() {
-#ifdef MONGO_CONFIG_SSL
-        log() << openSSLVersion("OpenSSL version: ");
-#endif
-    }
+}
 
 #if defined(_WIN32)
-    const char * targetMinOS() {
+const char* targetMinOS() {
 #if (NTDDI_VERSION >= NTDDI_WIN7)
-        return "Windows 7/Windows Server 2008 R2";
-#elif (NTDDI_VERSION >= NTDDI_VISTA)
-        return "Windows Vista/Windows Server 2008";
+    return "Windows 7/Windows Server 2008 R2";
+#elif(NTDDI_VERSION >= NTDDI_VISTA)
+    return "Windows Vista/Windows Server 2008";
 #else
 #error This targeted Windows version is not supported
-#endif // NTDDI_VERSION
-    }
+#endif  // NTDDI_VERSION
+}
 
-    void printTargetMinOS() {
-        log() << "targetMinOS: " << targetMinOS();
-    }
-#endif // _WIN32
+void printTargetMinOS() {
+    log() << "targetMinOS: " << targetMinOS();
+}
+#endif  // _WIN32
 
-    void printAllocator() {
-        log() << "allocator: " << allocator();
-    }
+void printBuildInfo() {
+    log() << "git version: " << gitVersion();
 
-    void appendBuildInfo(BSONObjBuilder& result) {
-        result << "version" << versionString
-               << "gitVersion" << gitVersion()
-#if defined(_WIN32)
-               << "targetMinOS" << targetMinOS()
-#endif
-               << "allocator" << allocator()
-               << "javascriptEngine" << compiledJSEngine()
-               << "sysInfo" << "deprecated";
-
-        BSONArrayBuilder versionArray(result.subarrayStart("versionArray"));
-        versionArray << kMongoVersionMajor
-                     << kMongoVersionMinor
-                     << kMongoVersionPatch
-                     << kMongoVersionExtra;
-        versionArray.done();
-
-        BSONObjBuilder opensslInfo(result.subobjStart("openssl"));
 #ifdef MONGO_CONFIG_SSL
-        opensslInfo << "running" << openSSLVersion()
-                    << "compiled" << OPENSSL_VERSION_TEXT;
-#else
-        opensslInfo << "running" << "disabled"
-                    << "compiled" << "disabled";
+    log() << openSSLVersion("OpenSSL version: ");
 #endif
-        opensslInfo.done();
 
-        BSONObjBuilder buildvarsInfo(result.subobjStart("buildEnvironment"));
-        buildvarsInfo << "build_command" << "@buildinfo_cmdline@"
-                      << "cc" << "@buildinfo_cc_version@"
-                      << "ccflags" << "@buildinfo_ccflags@"
-                      << "cflags" << "@buildinfo_cflags@"
-                      << "cxx" << "@buildinfo_cxx_version@"
-                      << "cxxflags" << "@buildinfo_cxxflags@"
-                      << "linkflags" << "@buildinfo_linkflags@"
-                      << "modules" << compiledModules()
-                      << "target_arch" << "@buildinfo_target_arch@"
-                      << "target_os" << "@buildinfo_target_os@";
-        buildvarsInfo.done();
+    log() << "allocator: " << allocator();
 
-        result << "bits" << (int)sizeof(void*) * 8;
-        result.appendBool( "debug" , kDebugBuild );
-        result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+    stringstream ss;
+    ss << "modules: ";
+    auto modules_list = compiledModules();
+    if (modules_list.size() == 0) {
+        ss << "none";
+    } else {
+        for (const auto& m : modules_list) {
+            ss << m << " ";
+        }
     }
+    log() << ss.str();
+
+    log() << "build environment:";
+    for (auto&& envDataEntry : kBuildEnvironment) {
+        if (std::get<3>(envDataEntry)) {
+            auto val = std::get<1>(envDataEntry);
+            if (val.length() == 0)
+                continue;
+            log() << "    " << std::get<0>(envDataEntry) << ": " << std::get<1>(envDataEntry);
+        }
+    }
+}
+
+void appendBuildInfo(BSONObjBuilder& result) {
+    result << "version" << versionString << "gitVersion" << gitVersion()
+#if defined(_WIN32)
+           << "targetMinOS" << targetMinOS()
+#endif
+           << "allocator" << allocator() << "javascriptEngine" << compiledJSEngine() << "sysInfo"
+           << "deprecated";
+
+    BSONArrayBuilder versionArray(result.subarrayStart("versionArray"));
+    versionArray << kMongoVersionMajor << kMongoVersionMinor << kMongoVersionPatch
+                 << kMongoVersionExtra;
+    versionArray.done();
+
+    BSONObjBuilder opensslInfo(result.subobjStart("openssl"));
+#ifdef MONGO_CONFIG_SSL
+    opensslInfo << "running" << openSSLVersion() << "compiled" << OPENSSL_VERSION_TEXT;
+#else
+    opensslInfo << "running"
+                << "disabled"
+                << "compiled"
+                << "disabled";
+#endif
+    opensslInfo.done();
+
+    BSONObjBuilder buildvarsInfo(result.subobjStart("buildEnvironment"));
+    buildvarsInfo << "modules" << compiledModules();
+
+    for (auto&& envDataEntry : kBuildEnvironment) {
+        if (std::get<2>(envDataEntry)) {
+            buildvarsInfo << std::get<0>(envDataEntry) << std::get<1>(envDataEntry);
+        }
+    }
+    buildvarsInfo.done();
+
+    result << "bits" << (int)sizeof(void*) * 8;
+    result.appendBool("debug", kDebugBuild);
+    result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+}
 }

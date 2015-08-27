@@ -5,11 +5,8 @@
 import itertools
 import os
 import re
-import subprocess
 import sys
 from buildscripts import utils
-
-import SCons.Action
 
 Import("env")
 Import("has_option")
@@ -131,40 +128,6 @@ env.Library(
     LIBDEPS=baseLibDeps,
 )
 
-def get_toolchain_ver(tool):
-    # By default we don't know the version of each tool, and only report what
-    # command gets executed (gcc vs /opt/mongodbtoolchain/bin/gcc).
-    verstr = "version unknown"
-    proc = None
-    if env.ToolchainIs('clang', 'gcc'):
-        proc = SCons.Action._subproc(env,
-            env.subst("${%s} --version" % tool),
-            stdout=subprocess.PIPE,
-            stderr='devnull',
-            stdin='devnull',
-            universal_newlines=True,
-            error='raise',
-            shell=True)
-        verstr = proc.stdout.readline()
-
-    elif env.ToolchainIs('msvc') and env.TargetOSIs('windows'):
-        proc = SCons.Action._subproc(env,
-            env.subst("${%s}" % tool),
-            stdout='devnull',
-            stderr=subprocess.PIPE,
-            stdin='devnull',
-            universal_newlines=True,
-            error='raise',
-            shell=True)
-        verstr = proc.stderr.readline()
-
-    # If we started a process, we should drain its stdout/stderr and wait for
-    # it to end.
-    if proc:
-        proc.communicate()
-
-    return env.subst('${%s}: %s' % (tool, verstr))
-
 js_engine_ver = get_option("js-engine") if get_option("server-js") == "on" else "none"
 
 # On windows, we need to escape the backslashes in the command-line
@@ -203,6 +166,26 @@ else:
     version_parts[3] = 0
 version_parts = [ int(x) for x in version_parts[:4]]
 
+# This turns the MONGO_BUILDINFO_ENVIRONMENT_DATA tuples into a std::vector of
+# std::tuple<string, string, bool, bool>.
+buildInfoInitializer = []
+for tup in env['MONGO_BUILDINFO_ENVIRONMENT_DATA']:
+    def pyToCXXBool(val):
+        return "true" if val else "false"
+    def wrapInQuotes(val):
+        return '"{0}"'.format(val)
+    buildInfoInitializer.append(
+        'std::make_tuple({0})'.format(', '.join(
+            (
+                wrapInQuotes(tup[0]),
+                wrapInQuotes(env.subst(tup[1])),
+                pyToCXXBool(tup[2]),
+                pyToCXXBool(tup[3]),
+            )
+        ))
+    )
+buildInfoInitializer = '{{ {0} }}'.format(', '.join(buildInfoInitializer))
+
 generatedVersionFile = env.Substfile(
     'util/version.cpp.in',
     SUBST_DICT=[
@@ -215,16 +198,8 @@ generatedVersionFile = env.Substfile(
         ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
         ('@buildinfo_js_engine@', js_engine_ver),
         ('@buildinfo_allocator@', GetOption('allocator')),
-        ('@buildinfo_ccflags@', env['CCFLAGS']),
-        ('@buildinfo_cflags@', env['CFLAGS']),
-        ('@buildinfo_cxxflags@', env['CXXFLAGS']),
-        ('@buildinfo_linkflags@', env['LINKFLAGS']),
-        ('@buildinfo_cmdline@', ''),
         ('@buildinfo_modules@', module_list),
-        ('@buildinfo_target_arch@', env['TARGET_ARCH']),
-        ('@buildinfo_target_os@', env.GetTargetOSName()),
-        ('@buildinfo_cc_version@', get_toolchain_ver('CC')),
-        ('@buildinfo_cxx_version@', get_toolchain_ver('CXX')),
+        ('@buildinfo_environment_data@', buildInfoInitializer),
     ])
 env.Alias('generated-sources', generatedVersionFile)
 

@@ -50,9 +50,7 @@ bool is32bit() {
 
 void logProcessDetails() {
     log() << mongodVersion();
-    printGitVersion();
-    printOpenSSLVersion();
-    printAllocator();
+    printBuildInfo();
     printCommandLineOpts();
 }
 

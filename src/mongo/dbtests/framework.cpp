@@ -61,8 +61,7 @@ int runDbTests(int argc, char** argv) {
     Client::initThread("testsuite");
 
     srand((unsigned)frameworkGlobalParams.seed);
-    printGitVersion();
-    printOpenSSLVersion();
+    printBuildInfo();
 
     getGlobalServiceContext()->initializeGlobalStorageEngine();
 
