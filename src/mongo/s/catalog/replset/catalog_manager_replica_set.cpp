@@ -98,6 +98,7 @@ const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
 const int kInitialSSVRetries = 3;
 const int kActionLogCollectionSize = 1024 * 1024 * 2;
 const int kChangeLogCollectionSize = 1024 * 1024 * 10;
+const int kMaxConfigVersionInitRetry = 3;
 
 void _toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
@@ -1086,51 +1087,68 @@ StatusWith<long long> CatalogManagerReplicaSet::_runCountCommandOnConfig(const H
 }
 
 Status CatalogManagerReplicaSet::initConfigVersion(OperationContext* txn) {
-    auto versionStatus = _getConfigVersion(txn);
-    if (!versionStatus.isOK()) {
-        return versionStatus.getStatus();
+    for (int x = 0; x < kMaxConfigVersionInitRetry; x++) {
+        auto versionStatus = _getConfigVersion(txn);
+        if (!versionStatus.isOK()) {
+            return versionStatus.getStatus();
+        }
+
+        auto versionInfo = versionStatus.getValue();
+        if (versionInfo.getMinCompatibleVersion() > CURRENT_CONFIG_VERSION) {
+            return {ErrorCodes::IncompatibleShardingConfigVersion,
+                    str::stream() << "current version v" << CURRENT_CONFIG_VERSION
+                                  << " is older than the cluster min compatible v"
+                                  << versionInfo.getMinCompatibleVersion()};
+        }
+
+        if (versionInfo.getCurrentVersion() == UpgradeHistory_EmptyVersion) {
+            VersionType newVersion;
+            newVersion.setClusterId(OID::gen());
+            newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
+            newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
+
+            BSONObj versionObj(newVersion.toBSON());
+            BatchedCommandResponse response;
+            auto upsertStatus = update(txn,
+                                       VersionType::ConfigNS,
+                                       versionObj,
+                                       versionObj,
+                                       true /* upsert*/,
+                                       false /* multi */,
+                                       &response);
+
+            if ((upsertStatus.isOK() && response.getN() < 1) ||
+                upsertStatus == ErrorCodes::DuplicateKey) {
+                // Do the check again as someone inserted a new config version document
+                // and the upsert neither inserted nor updated a config version document.
+                // Note: you can get duplicate key errors on upsert because of SERVER-14322.
+                continue;
+            }
+
+            return upsertStatus;
+        }
+
+        if (versionInfo.getCurrentVersion() == UpgradeHistory_UnreportedVersion) {
+            return {ErrorCodes::IncompatibleShardingConfigVersion,
+                    "Assuming config data is old since the version document cannot be found in the "
+                    "config server and it contains databases aside 'local' and 'admin'. "
+                    "Please upgrade if this is the case. Otherwise, make sure that the config "
+                    "server is clean."};
+        }
+
+        if (versionInfo.getCurrentVersion() < CURRENT_CONFIG_VERSION) {
+            return {ErrorCodes::IncompatibleShardingConfigVersion,
+                    str::stream() << "need to upgrade current cluster version to v"
+                                  << CURRENT_CONFIG_VERSION << "; currently at v"
+                                  << versionInfo.getCurrentVersion()};
+        }
+
+        return Status::OK();
     }
 
-    auto versionInfo = versionStatus.getValue();
-    if (versionInfo.getMinCompatibleVersion() > CURRENT_CONFIG_VERSION) {
-        return {ErrorCodes::IncompatibleShardingConfigVersion,
-                str::stream() << "current version v" << CURRENT_CONFIG_VERSION
-                              << " is older than the cluster min compatible v"
-                              << versionInfo.getMinCompatibleVersion()};
-    }
-
-    if (versionInfo.getCurrentVersion() == UpgradeHistory_EmptyVersion) {
-        VersionType newVersion;
-        newVersion.setClusterId(OID::gen());
-        newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
-        newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
-
-        BSONObj versionObj(newVersion.toBSON());
-        return update(txn,
-                      VersionType::ConfigNS,
-                      versionObj,
-                      versionObj,
-                      true /* upsert*/,
-                      false /* multi */,
-                      nullptr);
-    }
-
-    if (versionInfo.getCurrentVersion() == UpgradeHistory_UnreportedVersion) {
-        return {ErrorCodes::IncompatibleShardingConfigVersion,
-                "Assuming config data is old since the version document cannot be found in the "
-                "config server and it contains databases aside 'local' and 'admin'. "
-                "Please upgrade if this is the case. Otherwise, make sure that the config "
-                "server is clean."};
-    }
-
-    if (versionInfo.getCurrentVersion() < CURRENT_CONFIG_VERSION) {
-        return {ErrorCodes::IncompatibleShardingConfigVersion,
-                str::stream() << "need to upgrade current cluster version to v"
-                              << CURRENT_CONFIG_VERSION << "; currently at v"
-                              << versionInfo.getCurrentVersion()};
-    }
-
-    return Status::OK();
+    return {ErrorCodes::IncompatibleShardingConfigVersion,
+            str::stream() << "unable to create new config version document after "
+                          << kMaxConfigVersionInitRetry << " retries"};
 }
 
 StatusWith<VersionType> CatalogManagerReplicaSet::_getConfigVersion(OperationContext* txn) {

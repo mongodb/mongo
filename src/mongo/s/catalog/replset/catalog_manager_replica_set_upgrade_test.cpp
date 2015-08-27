@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <string>
 #include <vector>
 
 #include "mongo/bson/json.h"
@@ -45,6 +46,7 @@ namespace {
 
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
+using std::string;
 using std::vector;
 
 using CatalogManagerReplSetTest = CatalogManagerReplSetTestFixture;
@@ -65,12 +67,9 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
         ASSERT_EQ("version", findCmd["find"].str());
         checkReadConcern(findCmd, Timestamp(0, 0), 0);
 
-        BSONObj versionDoc(fromjson(R"({
-                _id: 1,
-                minCompatibleVersion: 6,
-                currentVersion: 7,
-                clusterId: ObjectId("55919cc6dbe86ce7ac056427")
-            })"));
+        BSONObj versionDoc(BSON("_id" << 1 << "minCompatibleVersion"
+                                      << MIN_COMPATIBLE_CONFIG_VERSION << "currentVersion"
+                                      << CURRENT_CONFIG_VERSION << "clusterId" << OID::gen()));
 
         return vector<BSONObj>{versionDoc};
     });
@@ -78,7 +77,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, UpgradeTargetError) {
+TEST_F(CatalogManagerReplSetTestFixture, InitTargetError) {
     configTargeter()->setFindHostReturnValue({ErrorCodes::InternalError, "Bad test network"});
 
     auto future = launchAsync([this] {
@@ -90,7 +89,30 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeTargetError) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, UpgradeClusterMultiVersion) {
+TEST_F(CatalogManagerReplSetTestFixture, InitIncompatibleVersion) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->initConfigVersion(operationContext());
+        ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion, status.code());
+        ASSERT_FALSE(status.reason().empty());
+    });
+
+    onFindCommand([](const RemoteCommandRequest& request) {
+        BSONObj versionDoc(fromjson(R"({
+                _id: 1,
+                minCompatibleVersion: 2,
+                currentVersion: 3,
+                clusterId: ObjectId("55919cc6dbe86ce7ac056427")
+            })"));
+
+        return vector<BSONObj>{versionDoc};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, InitClusterMultiVersion) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
@@ -121,7 +143,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeClusterMultiVersion) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, UpgradeInvalidConfigVersionDoc) {
+TEST_F(CatalogManagerReplSetTestFixture, InitInvalidConfigVersionDoc) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
@@ -144,7 +166,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeInvalidConfigVersionDoc) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
+TEST_F(CatalogManagerReplSetTestFixture, InitNoVersionDocEmptyConfig) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
@@ -186,6 +208,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
 
         BatchedCommandResponse response;
         response.setOk(true);
+        response.setN(1);
         response.setNModified(1);
 
         return response.toBSON();
@@ -194,7 +217,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfig) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfigWithAdmin) {
+TEST_F(CatalogManagerReplSetTestFixture, InitNoVersionDocEmptyConfigWithAdmin) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future =
@@ -217,6 +240,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfigWithAdmin
 
         BatchedCommandResponse response;
         response.setOk(true);
+        response.setN(1);
         response.setNModified(1);
 
         return response.toBSON();
@@ -225,12 +249,12 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocEmptyConfigWithAdmin
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, UpgradeWriteError) {
+TEST_F(CatalogManagerReplSetTestFixture, InitConfigWriteError) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
         auto status = catalogManager()->initConfigVersion(operationContext());
-        ASSERT_EQ(ErrorCodes::DuplicateKey, status.code());
+        ASSERT_EQ(ErrorCodes::ExceededTimeLimit, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
 
@@ -245,8 +269,8 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeWriteError) {
                 n: 0,
                 writeErrors: [{
                     index: 0,
-                    code: 11000,
-                    errmsg: "E11000 duplicate key error index: test.user.$_id_ dup key: { : 1.0 }"
+                    code: 50,
+                    errmsg: "exceeded time limit"
                 }]
             })");
     });
@@ -254,7 +278,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeWriteError) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocNonEmptyConfigServer) {
+TEST_F(CatalogManagerReplSetTestFixture, InitNoVersionDocNonEmptyConfigServer) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
@@ -270,7 +294,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNoVersionDocNonEmptyConfigServer
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(CatalogManagerReplSetTestFixture, UpgradeTooOld) {
+TEST_F(CatalogManagerReplSetTestFixture, InitVersionTooOld) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
     auto future = launchAsync([this] {
@@ -292,6 +316,345 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeTooOld) {
             })"));
 
         return vector<BSONObj>{versionDoc};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoOpAfterRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    auto future =
+        launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
+
+    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
+
+    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
+
+    onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        ASSERT_EQ(string("update"), request.cmdObj.firstElementFieldName());
+
+        return fromjson(R"({
+                ok: 1,
+                nModified: 0,
+                n: 0,
+                writeErrors: [{
+                    index: 0,
+                    code: 11000,
+                    errmsg: "E11000 duplicate key error index: config.v.$_id_ dup key: { : 1.0 }"
+                }]
+            })");
+    });
+
+    // Retry starts here
+
+    onFindCommand([this](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        const auto& findCmd = request.cmdObj;
+        ASSERT_EQ("version", findCmd["find"].str());
+        checkReadConcern(findCmd, Timestamp(0, 0), 0);
+
+        BSONObj versionDoc(fromjson(R"({
+                _id: 1,
+                minCompatibleVersion: 6,
+                currentVersion: 7,
+                clusterId: ObjectId("55919cc6dbe86ce7ac056427")
+            })"));
+
+        return vector<BSONObj>{versionDoc};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoConfigVersionAfterRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    auto future =
+        launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
+
+    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
+
+    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
+
+    onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        ASSERT_EQ(string("update"), request.cmdObj.firstElementFieldName());
+
+        return fromjson(R"({
+                ok: 1,
+                nModified: 0,
+                n: 0,
+                writeErrors: [{
+                    index: 0,
+                    code: 11000,
+                    errmsg: "E11000 duplicate key error index: config.v.$_id_ dup key: { : 1.0 }"
+                }]
+            })");
+    });
+
+    // Retry starts here
+
+    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
+
+    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
+
+    onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+
+        BatchedUpdateRequest actualBatchedUpdate;
+        std::string errmsg;
+        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(VersionType::ConfigNS, actualBatchedUpdate.getNS().ns());
+
+        auto updates = actualBatchedUpdate.getUpdates();
+        ASSERT_EQUALS(1U, updates.size());
+        auto update = updates.front();
+
+        ASSERT_EQUALS(update->getQuery(), update->getUpdateExpr());
+        ASSERT_TRUE(update->getUpsert());
+        ASSERT_FALSE(update->getMulti());
+
+        auto versionDocRes = VersionType::fromBSON(update->getUpdateExpr());
+        ASSERT_OK(versionDocRes.getStatus());
+        const VersionType& versionDoc = versionDocRes.getValue();
+
+        ASSERT_EQ(MIN_COMPATIBLE_CONFIG_VERSION, versionDoc.getMinCompatibleVersion());
+        ASSERT_EQ(CURRENT_CONFIG_VERSION, versionDoc.getCurrentVersion());
+        ASSERT_TRUE(versionDoc.isClusterIdSet());
+        ASSERT_FALSE(versionDoc.isExcludingMongoVersionsSet());
+        ASSERT_FALSE(versionDoc.isUpgradeIdSet());
+        ASSERT_FALSE(versionDoc.isUpgradeStateSet());
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+        response.setN(1);
+        response.setNModified(1);
+
+        return response.toBSON();
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyTooNewAfterRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->initConfigVersion(operationContext());
+        ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion, status.code());
+        ASSERT_FALSE(status.reason().empty());
+    });
+
+    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
+
+    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
+
+    onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        ASSERT_EQ(string("update"), request.cmdObj.firstElementFieldName());
+
+        return fromjson(R"({
+                ok: 1,
+                nModified: 0,
+                n: 0,
+                writeErrors: [{
+                    index: 0,
+                    code: 11000,
+                    errmsg: "E11000 duplicate key error index: config.v.$_id_ dup key: { : 1.0 }"
+                }]
+            })");
+    });
+
+    // Retry starts here
+
+    onFindCommand([this](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        const auto& findCmd = request.cmdObj;
+        ASSERT_EQ("version", findCmd["find"].str());
+        checkReadConcern(findCmd, Timestamp(0, 0), 0);
+
+        BSONObj versionDoc(fromjson(R"({
+                _id: 1,
+                minCompatibleVersion: 2000000000,
+                currentVersion: 2000000000,
+                clusterId: ObjectId("55919cc6dbe86ce7ac056427")
+            })"));
+
+        return vector<BSONObj>{versionDoc};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyMaxRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    auto future = launchAsync([this] {
+        auto status = catalogManager()->initConfigVersion(operationContext());
+        ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion, status.code());
+        ASSERT_FALSE(status.reason().empty());
+    });
+
+    const int maxRetry = 3;
+    for (int x = 0; x < maxRetry; x++) {
+        onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
+
+        expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
+
+        onCommand([](const RemoteCommandRequest& request) {
+            ASSERT_EQ(HostAndPort("config:123"), request.target);
+            ASSERT_EQ("config", request.dbname);
+
+            ASSERT_EQ(string("update"), request.cmdObj.firstElementFieldName());
+
+            return fromjson(R"({
+                    ok: 1,
+                    nModified: 0,
+                    n: 0,
+                    writeErrors: [{
+                        index: 0,
+                        code: 11000,
+                        errmsg: "E11000 duplicate key error index: config.v.$_id_ dup key: { : 1 }"
+                    }]
+                })");
+        });
+    }
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoOpAfterRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    auto future =
+        launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
+
+    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
+
+    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
+
+    onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        ASSERT_EQ(string("update"), request.cmdObj.firstElementFieldName());
+
+        return fromjson(R"({
+                ok: 1,
+                nModified: 0,
+                n: 0
+            })");
+    });
+
+    // Retry starts here
+
+    onFindCommand([this](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        const auto& findCmd = request.cmdObj;
+        ASSERT_EQ("version", findCmd["find"].str());
+        checkReadConcern(findCmd, Timestamp(0, 0), 0);
+
+        BSONObj versionDoc(fromjson(R"({
+                _id: 1,
+                minCompatibleVersion: 6,
+                currentVersion: 7,
+                clusterId: ObjectId("55919cc6dbe86ce7ac056427")
+            })"));
+
+        return vector<BSONObj>{versionDoc};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoConfigVersionAfterRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
+
+    auto future =
+        launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
+
+    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
+
+    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
+
+    onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        ASSERT_EQ(string("update"), request.cmdObj.firstElementFieldName());
+
+        return fromjson(R"({
+                ok: 1,
+                nModified: 0,
+                n: 0
+            })");
+    });
+
+    // Retry starts here
+
+    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
+
+    expectCount(HostAndPort("config:123"), NamespaceString("config.shards"), BSONObj(), 0);
+
+    onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQ(HostAndPort("config:123"), request.target);
+        ASSERT_EQ("config", request.dbname);
+
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+
+        BatchedUpdateRequest actualBatchedUpdate;
+        std::string errmsg;
+        ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
+        ASSERT_EQUALS(VersionType::ConfigNS, actualBatchedUpdate.getNS().ns());
+
+        auto updates = actualBatchedUpdate.getUpdates();
+        ASSERT_EQUALS(1U, updates.size());
+        auto update = updates.front();
+
+        ASSERT_EQUALS(update->getQuery(), update->getUpdateExpr());
+        ASSERT_TRUE(update->getUpsert());
+        ASSERT_FALSE(update->getMulti());
+
+        auto versionDocRes = VersionType::fromBSON(update->getUpdateExpr());
+        ASSERT_OK(versionDocRes.getStatus());
+        const VersionType& versionDoc = versionDocRes.getValue();
+
+        ASSERT_EQ(MIN_COMPATIBLE_CONFIG_VERSION, versionDoc.getMinCompatibleVersion());
+        ASSERT_EQ(CURRENT_CONFIG_VERSION, versionDoc.getCurrentVersion());
+        ASSERT_TRUE(versionDoc.isClusterIdSet());
+        ASSERT_FALSE(versionDoc.isExcludingMongoVersionsSet());
+        ASSERT_FALSE(versionDoc.isUpgradeIdSet());
+        ASSERT_FALSE(versionDoc.isUpgradeStateSet());
+
+        BatchedCommandResponse response;
+        response.setOk(true);
+        response.setN(1);
+        response.setNModified(1);
+
+        return response.toBSON();
     });
 
     future.timed_get(kFutureTimeout);
