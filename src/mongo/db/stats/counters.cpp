@@ -136,33 +136,26 @@ BSONObj OpCounters::getObj() const {
 }
 
 void NetworkCounter::hit(long long bytesIn, long long bytesOut) {
-    const long long MAX = 1ULL << 60;
+    const uint64_t MAX = 1ULL << 60;
 
     // don't care about the race as its just a counter
-    bool overflow = _bytesIn > MAX || _bytesOut > MAX;
+    bool overflow = _bytesIn.loadRelaxed() > MAX || _bytesOut.loadRelaxed() > MAX;
 
     if (overflow) {
-        _lock.lock();
-        _overflows++;
-        _bytesIn = bytesIn;
-        _bytesOut = bytesOut;
-        _requests = 1;
-        _lock.unlock();
+        _bytesIn.store(bytesIn);
+        _bytesOut.store(bytesOut);
+        _requests.store(1);
     } else {
-        _lock.lock();
-        _bytesIn += bytesIn;
-        _bytesOut += bytesOut;
-        _requests++;
-        _lock.unlock();
+        _bytesIn.fetchAndAdd(bytesIn);
+        _bytesOut.fetchAndAdd(bytesOut);
+        _requests.fetchAndAdd(1);
     }
 }
 
 void NetworkCounter::append(BSONObjBuilder& b) {
-    _lock.lock();
-    b.appendNumber("bytesIn", _bytesIn);
-    b.appendNumber("bytesOut", _bytesOut);
-    b.appendNumber("numRequests", _requests);
-    _lock.unlock();
+    b.append("bytesIn", static_cast<long long>(_bytesIn.loadRelaxed()));
+    b.append("bytesOut", static_cast<long long>(_bytesOut.loadRelaxed()));
+    b.append("numRequests", static_cast<long long>(_requests.loadRelaxed()));
 }
 
 
