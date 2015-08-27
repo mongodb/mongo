@@ -891,13 +891,14 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
 			continue;
 		}
+
 		/*
 		 * If we're attempting an in-memory split and we can't lock the
-		 * parent, give up.  This avoids an infinite loop where we are
-		 * trying to split a page while its parent is being
-		 * checkpointed.
+		 * parent while there is a checkpoint in progress, give up.
+		 * This avoids an infinite loop where we are trying to split a
+		 * page while its parent is being checkpointed.
 		 */
-		if (LF_ISSET(WT_SPLIT_INMEM))
+		if (LF_ISSET(WT_SPLIT_INMEM) && S2BT(session)->checkpointing)
 			return (EBUSY);
 		__wt_yield();
 	}
