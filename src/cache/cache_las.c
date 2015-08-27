@@ -31,8 +31,8 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 		return;
 
 	/*
-	 * KEITH: is there a cleaner way to get a reference to the underlying
-	 * data handle?
+	 * We have a cursor, and we need the underlying data handle; we can get
+	 * to it by way of the underlying btree handle, but it's a little ugly.
 	 */
 	cstats = conn->stats;
 	dstats = ((WT_CURSOR_BTREE *)conn->las_cursor)->btree->dhandle->stats;
