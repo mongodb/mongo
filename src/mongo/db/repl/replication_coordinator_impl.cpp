@@ -950,9 +950,6 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
 
 void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    // Wake ops waiting for a new snapshot.
-    _snapshotCreatedCond.notify_all();
-
     for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
          it != _replicationWaiterList.end();
          ++it) {
@@ -978,9 +975,6 @@ void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
 
 void ReplicationCoordinatorImpl::interruptAll() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    // Wake ops waiting for a new snapshot.
-    _snapshotCreatedCond.notify_all();
-
     for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
          it != _replicationWaiterList.end();
          ++it) {
