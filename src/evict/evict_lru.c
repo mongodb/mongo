@@ -159,6 +159,7 @@ __evict_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	u_int spins;
 
 	session = arg;
 	conn = S2C(session);
@@ -176,8 +177,26 @@ __evict_server(void *arg)
 		 * otherwise we can block applications evicting large pages.
 		 */
 		if (!F_ISSET(cache, WT_CACHE_STUCK)) {
-			WT_WITH_HANDLE_LIST_LOCK(session,
-			    ret = __evict_clear_all_walks(session));
+			for (spins = 0; (ret = __wt_spin_trylock(
+			    session, &conn->dhandle_lock)) == EBUSY &&
+			    !F_ISSET(cache, WT_CACHE_CLEAR_WALKS);
+			    spins++) {
+				if (spins < 1000)
+					__wt_yield();
+				else
+					__wt_sleep(0, 1000);
+			}
+			/*
+			 * If we gave up acquiring the lock, that indicates a
+			 * session is waiting for us to clear walks.  Do that
+			 * as part of a normal pass (without the handle list
+			 * lock) to avoid deadlock.
+			 */
+			if (ret == EBUSY)
+				continue;
+			WT_ERR(ret);
+			ret = __evict_clear_all_walks(session);
+			__wt_spin_unlock(session, &conn->dhandle_lock);
 			WT_ERR(ret);
 
 			/* Next time we wake up, reverse the sweep direction. */
