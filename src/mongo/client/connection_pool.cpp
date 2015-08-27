@@ -175,14 +175,26 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
             [this, target](const executor::RemoteCommandResponse& isMasterReply) {
                 return _hook->validateHost(target, isMasterReply);
             }));
+    } else {
+        conn.reset(new DBClientConnection());
+    }
 
-        // setSoTimeout takes a double representing the number of seconds for send and receive
-        // timeouts.  Thus, we must express 'timeout' in milliseconds and divide by 1000.0 to get
-        // the number of seconds with a fractional part.
-        conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
+    // setSoTimeout takes a double representing the number of seconds for send and receive
+    // timeouts.  Thus, we must express 'timeout' in milliseconds and divide by 1000.0 to get
+    // the number of seconds with a fractional part.
+    conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
 
-        uassertStatusOK(conn->connect(target));
+    uassertStatusOK(conn->connect(target));
+    conn->port().tag |= _messagingPortTags;
 
+    if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+        uassert(ErrorCodes::AuthenticationFailed,
+                "Missing credentials for authenticating as internal user",
+                isInternalAuthSet());
+        conn->auth(getInternalUserAuthParamsWithFallback());
+    }
+
+    if (_hook) {
         auto postConnectRequest = uassertStatusOK(_hook->makeRequest(target));
 
         // We might not have a postConnectRequest
@@ -200,22 +212,6 @@ ConnectionPool::ConnectionList::iterator ConnectionPool::acquireConnection(
 
             uassertStatusOK(_hook->handleReply(target, std::move(rcr)));
         }
-    } else {
-        conn.reset(new DBClientConnection());
-        // setSoTimeout takes a double representing the number of seconds for send and receive
-        // timeouts.  Thus, we must express 'timeout' in milliseconds and divide by 1000.0 to get
-        // the number of seconds with a fractional part.
-        conn->setSoTimeout(durationCount<Milliseconds>(timeout) / 1000.0);
-        uassertStatusOK(conn->connect(target));
-    }
-
-    conn->port().tag |= _messagingPortTags;
-
-    if (getGlobalAuthorizationManager()->isAuthEnabled()) {
-        uassert(ErrorCodes::AuthenticationFailed,
-                "Missing credentials for authenticating as internal user",
-                isInternalAuthSet());
-        conn->auth(getInternalUserAuthParamsWithFallback());
     }
 
     lk.lock();
