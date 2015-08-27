@@ -15,14 +15,12 @@
     var coll = db.getCollection("find_getmore_cmd");
 
     coll.drop();
-    assert.writeOK(coll.insert({_id: -9, a: 4, b: "foo foo"}));
-    assert.writeOK(coll.insert({_id: -5, a: 8}));
-    assert.writeOK(coll.insert({_id: -1, a: 10, b: "foo"}));
-    assert.writeOK(coll.insert({_id: 1, a: 5}));
-    assert.writeOK(coll.insert({_id: 5, a: 20, b: "foo foo foo"}));
-    assert.writeOK(coll.insert({_id: 9, a: 3}));
-
-    assert.commandWorked(coll.ensureIndex({b: "text"}));
+    assert.writeOK(coll.insert({_id: -9}));
+    assert.writeOK(coll.insert({_id: -5}));
+    assert.writeOK(coll.insert({_id: -1}));
+    assert.writeOK(coll.insert({_id: 1}));
+    assert.writeOK(coll.insert({_id: 5}));
+    assert.writeOK(coll.insert({_id: 9}));
 
     assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
     st.ensurePrimaryShard(db.getName(), "shard0000");
@@ -79,7 +77,7 @@
     assert.eq(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 1);
-    assert.eq(cmdRes.cursor.firstBatch[0], {_id: -5, a: 8});
+    assert.eq(cmdRes.cursor.firstBatch[0], {_id: -5});
 
     // A predicate with $where.
     cmdRes = db.runCommand({find: coll.getName(), filter: {$where: "this._id == 5"}});
@@ -87,7 +85,7 @@
     assert.eq(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 1);
-    assert.eq(cmdRes.cursor.firstBatch[0], {_id: 5, a: 20, b: "foo foo foo"});
+    assert.eq(cmdRes.cursor.firstBatch[0], {_id: 5});
 
     // Tailable option should result in a failure because the collection is not capped.
     cmdRes = db.runCommand({find: coll.getName(), tailable: true});
@@ -95,66 +93,9 @@
 
     // $natural sort.
     cmdRes = db.runCommand({find: coll.getName(), sort: {$natural: 1}});
-    assert.commandWorked(cmdRes);
     assert.eq(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 6);
-
-    // Should be able to sort despite projecting out the sort key.
-    cmdRes = db.runCommand({find: coll.getName(), sort: {a: 1}, projection: {_id: 1}});
-    assert.commandWorked(cmdRes);
-    assert.eq(cmdRes.cursor.id, NumberLong(0));
-    assert.eq(cmdRes.cursor.ns, coll.getFullName());
-    assert.eq(cmdRes.cursor.firstBatch.length, 6);
-    assert.eq(cmdRes.cursor.firstBatch[0], {_id: 9});
-    assert.eq(cmdRes.cursor.firstBatch[1], {_id: -9});
-    assert.eq(cmdRes.cursor.firstBatch[2], {_id: 1});
-    assert.eq(cmdRes.cursor.firstBatch[3], {_id: -5});
-    assert.eq(cmdRes.cursor.firstBatch[4], {_id: -1});
-    assert.eq(cmdRes.cursor.firstBatch[5], {_id: 5});
-
-    // Ensure textScore meta-sort works in mongos.
-    cmdRes = db.runCommand({
-        find: coll.getName(),
-        filter: {$text: {$search: "foo"}},
-        sort: {score: {$meta: "textScore"}},
-        projection: {score: {$meta: "textScore"}}
-    });
-    assert.commandWorked(cmdRes);
-    assert.eq(cmdRes.cursor.id, NumberLong(0));
-    assert.eq(cmdRes.cursor.ns, coll.getFullName());
-    assert.eq(cmdRes.cursor.firstBatch.length, 3);
-    assert.eq(cmdRes.cursor.firstBatch[0]["_id"], 5);
-    assert.eq(cmdRes.cursor.firstBatch[1]["_id"], -9);
-    assert.eq(cmdRes.cursor.firstBatch[2]["_id"], -1);
-
-    // User projection on $sortKey is illegal.
-    cmdRes = db.runCommand({find: coll.getName(), projection: {$sortKey: 1}, sort: {_id: 1}});
-    assert.commandFailed(cmdRes);
-    cmdRes = db.runCommand({
-        find: coll.getName(),
-        projection: {$sortKey: {$meta: 'sortKey'}},
-        sort: {_id: 1}
-    });
-    assert.commandFailed(cmdRes);
-
-    // User should be able to issue a sortKey meta-projection, as long as it's not on the reserved
-    // $sortKey field.
-    cmdRes = db.runCommand({
-        find: coll.getName(),
-        projection: {_id: 0, a: 0, b: 0, key: {$meta: 'sortKey'}},
-        sort: {_id: 1}
-    });
-    assert.commandWorked(cmdRes);
-    assert.eq(cmdRes.cursor.id, NumberLong(0));
-    assert.eq(cmdRes.cursor.ns, coll.getFullName());
-    assert.eq(cmdRes.cursor.firstBatch.length, 6);
-    assert.eq(cmdRes.cursor.firstBatch[0], {key: {"": -9}});
-    assert.eq(cmdRes.cursor.firstBatch[1], {key: {"": -5}});
-    assert.eq(cmdRes.cursor.firstBatch[2], {key: {"": -1}});
-    assert.eq(cmdRes.cursor.firstBatch[3], {key: {"": 1}});
-    assert.eq(cmdRes.cursor.firstBatch[4], {key: {"": 5}});
-    assert.eq(cmdRes.cursor.firstBatch[5], {key: {"": 9}});
 
     st.stop();
 })();
