@@ -146,7 +146,7 @@ struct __wt_btree {
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
 #define	WT_BTREE_BULK		0x00100	/* Bulk-load handle */
 #define	WT_BTREE_IN_MEMORY	0x00200	/* Cache-resident object */
-#define	WT_BTREE_LAS_FILE	0x00400	/* Look-aside object */
+#define	WT_BTREE_LOOKASIDE	0x00400	/* Look-aside table */
 #define	WT_BTREE_NO_CHECKPOINT	0x00800	/* Disable checkpoints */
 #define	WT_BTREE_NO_EVICTION	0x01000	/* Disable eviction */
 #define	WT_BTREE_NO_LOGGING	0x02000	/* Disable logging */

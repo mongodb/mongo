@@ -69,8 +69,8 @@ __las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 	 * wiredtiger_open).
 	 */
 	btree = S2BT(session);
-	if (!F_ISSET(btree, WT_BTREE_LAS_FILE))
-		F_SET(btree, WT_BTREE_LAS_FILE);
+	if (!F_ISSET(btree, WT_BTREE_LOOKASIDE))
+		F_SET(btree, WT_BTREE_LOOKASIDE);
 	if (!F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
 		F_SET(btree, WT_BTREE_NO_CHECKPOINT);
 	if (!F_ISSET(btree, WT_BTREE_NO_LOGGING))

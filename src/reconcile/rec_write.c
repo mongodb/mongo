@@ -736,7 +736,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 		 * Saving lookaside table updates into the lookaside table won't
 		 * work.
 		 */
-		if (F_ISSET(btree, WT_BTREE_LAS_FILE))
+		if (F_ISSET(btree, WT_BTREE_LOOKASIDE))
 			LF_CLR(WT_EVICT_LOOKASIDE);
 
 		/*
@@ -1095,7 +1095,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * we know there are no older readers of that table.
 	 */
 	if (!skipped &&
-	    (F_ISSET(btree, WT_BTREE_LAS_FILE) ||
+	    (F_ISSET(btree, WT_BTREE_LOOKASIDE) ||
 	    __wt_txn_visible_all(session, max_txn)))
 		return (0);
 
