@@ -114,11 +114,13 @@ std::string CompactOptions::toString() const {
 // CappedInsertNotifier
 //
 
-CappedInsertNotifier::CappedInsertNotifier() : _cappedInsertCount(0) {}
+CappedInsertNotifier::CappedInsertNotifier() : _cappedInsertCount(0), _dead(false) {}
 
 void CappedInsertNotifier::notifyOfInsert() {
     stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
-    _cappedInsertCount++;
+    if (!_dead) {
+        _cappedInsertCount++;
+    }
     _cappedNewDataNotifier.notify_all();
 }
 
@@ -129,12 +131,22 @@ uint64_t CappedInsertNotifier::getCount() const {
 
 void CappedInsertNotifier::waitForInsert(uint64_t referenceCount, Microseconds timeout) const {
     stdx::unique_lock<stdx::mutex> lk(_cappedNewDataMutex);
-
-    while (referenceCount == _cappedInsertCount) {
+    while (!_dead && referenceCount == _cappedInsertCount) {
         if (stdx::cv_status::timeout == _cappedNewDataNotifier.wait_for(lk, timeout)) {
             return;
         }
     }
+}
+
+void CappedInsertNotifier::kill() {
+    stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
+    _dead = true;
+    _cappedNewDataNotifier.notify_all();
+}
+
+bool CappedInsertNotifier::isDead() {
+    stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
+    return _dead;
 }
 
 // ----
@@ -169,6 +181,9 @@ Collection::Collection(OperationContext* txn,
 Collection::~Collection() {
     verify(ok());
     _magic = 0;
+    if (_cappedNotifier) {
+        _cappedNotifier->kill();
+    }
 }
 
 bool Collection::requiresIdIndex() const {

@@ -125,6 +125,16 @@ public:
      */
     void waitForInsert(uint64_t referenceCount, Microseconds timeout) const;
 
+    /**
+     * Cancels the notifier if the collection is dropped/invalidated.
+     */
+    void kill();
+
+    /**
+     * Returns true if no new insert notification will occur.
+     */
+    bool isDead();
+
 private:
     // Signalled when a successful insert is made into a capped collection.
     mutable stdx::condition_variable _cappedNewDataNotifier;
@@ -137,6 +147,9 @@ private:
     // The condition which '_cappedNewDataNotifier' is being notified of is an increment of this
     // counter. Access to this counter is synchronized with '_cappedNewDataMutex'.
     uint64_t _cappedInsertCount;
+
+    // True once the notifier is dead.
+    bool _dead;
 };
 
 /**
