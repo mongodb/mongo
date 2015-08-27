@@ -52,7 +52,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	WT_DECL_RET;
 	char *pool_name;
 	int created, updating;
-	uint64_t chunk, reserve, size, used_cache;
+	uint64_t chunk, quota, reserve, size, used_cache;
 
 	conn = S2C(session);
 	created = updating = 0;
@@ -143,6 +143,11 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 			chunk = (uint64_t)cval.val;
 		else
 			chunk = cp->chunk;
+		if (__wt_config_gets(session, &cfg[1],
+		    "shared_cache.quota", &cval) == 0 && cval.val != 0)
+			quota = (uint64_t)cval.val;
+		else
+			quota = cp->quota;
 	} else {
 		/*
 		 * The only time shared cache configuration uses default
@@ -156,6 +161,9 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		    session, cfg, "shared_cache.chunk", &cval));
 		WT_ASSERT(session, cval.val != 0);
 		chunk = (uint64_t)cval.val;
+		WT_ERR(__wt_config_gets(
+		    session, cfg, "shared_cache.quota", &cval));
+		quota = (uint64_t)cval.val;
 	}
 
 	/*
@@ -198,8 +206,10 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	/* The configuration is verified - it's safe to update the pool. */
 	cp->size = size;
 	cp->chunk = chunk;
+	cp->quota = quota;
 
 	conn->cache->cp_reserved = reserve;
+	conn->cache->cp_quota = quota;
 
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (updating)
@@ -633,6 +643,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 * Conditions for increasing the amount of resources for an
 		 * entry:
 		 *  - there is space available in the pool
+		 *  - the connection isn't over quota
 		 *  - the connection is using enough cache to require eviction
 		 *  - there was some activity across the pool
 		 *  - this entry is using less than the entire cache pool
@@ -640,13 +651,15 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 *  - the pool is less than half distributed
 		 */
 		} else if (!pool_full &&
+		    entry->cache_size < cache->cp_quota &&
 		    __wt_cache_bytes_inuse(cache) >=
 		    (entry->cache_size * cache->eviction_target) / 100 &&
 		    (pressure > bump_threshold ||
 		    cp->currently_used < cp->size * 0.5)) {
 			grow = 1;
-			adjustment =
-			    WT_MIN(cp->chunk, cp->size - cp->currently_used);
+			adjustment = WT_MIN(WT_MIN(cp->chunk,
+			    cp->size - cp->currently_used),
+			    cache->cp_quota - entry->cache_size);
 		}
 		/*
 		 * Bounds checking: don't go over the pool size or under the

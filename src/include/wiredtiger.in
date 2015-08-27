@@ -1750,14 +1750,16 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the name of a cache that
 	 * is shared between databases or \c "none" when no shared cache is
 	 * configured., a string; default \c none.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this
-	 * database is guaranteed to have available from the shared cache.  This
-	 * setting is per database.  Defaults to the chunk size., an integer;
-	 * default \c 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory
-	 * to allocate for the shared cache.  Setting this will update the value
-	 * if one is already set., an integer between 1MB and 10TB; default \c
-	 * 500MB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;quota, maximum amount of cache this
+	 * database is allowed to be allocated.  Defaults to the entire pool.,
+	 * an integer; default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve,
+	 * amount of cache this database is guaranteed to have available from
+	 * the shared cache.  This setting is per database.  Defaults to the
+	 * chunk size., an integer; default \c 0.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for
+	 * the shared cache.  Setting this will update the value if one is
+	 * already set., an integer between 1MB and 10TB; default \c 500MB.}
 	 * @config{ ),,}
 	 * @config{statistics, Maintain database statistics\, which may impact
 	 * performance.  Choosing "all" maintains all statistics regardless of
@@ -2216,14 +2218,18 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the name of a cache that is shared
  * between databases or \c "none" when no shared cache is configured., a string;
  * default \c none.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache
- * this database is guaranteed to have available from the shared cache.  This
- * setting is per database.  Defaults to the chunk size., an integer; default \c
- * 0.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for the
- * shared cache.  Setting this will update the value if one is already set., an
- * integer between 1MB and 10TB; default \c 500MB.}
- * @config{ ),,}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;quota, maximum amount of
+ * cache this database is allowed to be allocated.  Defaults to the entire
+ * pool., an integer; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve,
+ * amount of cache this database is guaranteed to have available from the shared
+ * cache.  This setting is per database.  Defaults to the chunk size., an
+ * integer; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory
+ * to allocate for the shared cache.  Setting this will update the value if one
+ * is already set., an integer between 1MB and 10TB; default \c 500MB.}
+ * @config{
+ * ),,}
  * @config{statistics, Maintain database statistics\, which may impact
  * performance.  Choosing "all" maintains all statistics regardless of cost\,
  * "fast" maintains a subset of statistics that are relatively inexpensive\,
