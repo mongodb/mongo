@@ -144,7 +144,7 @@ public:
         const std::initializer_list<StringData> passthroughFields = {
             "hint",
             "$queryOptions",
-            "$readMajorityTemporaryName",
+            "readConcern",
             LiteParsedQuery::cmdOptionMaxTimeMS,
         };
         for (auto name : passthroughFields) {

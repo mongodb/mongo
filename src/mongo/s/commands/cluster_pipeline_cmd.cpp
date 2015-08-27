@@ -161,7 +161,7 @@ public:
         }
 
         const std::initializer_list<StringData> fieldsToPropagateToShards = {
-            "$queryOptions", "$readMajorityTemporaryName", LiteParsedQuery::cmdOptionMaxTimeMS,
+            "$queryOptions", "readConcern", LiteParsedQuery::cmdOptionMaxTimeMS,
         };
         for (auto&& field : fieldsToPropagateToShards) {
             commandBuilder[field] = Value(cmdObj[field]);
@@ -221,7 +221,7 @@ public:
                 Value(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
         }
 
-        // Not propagating $readMajorityTemporaryName to merger since it doesn't do local reads.
+        // Not propagating readConcern to merger since it doesn't do local reads.
 
         string outputNsOrEmpty;
         if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(pipeline->output())) {

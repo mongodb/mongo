@@ -84,6 +84,11 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
             continue;
         }
 
+        // readConcern is also for the command processor.
+        if (str::equals(pFieldName, "readConcern")) {
+            continue;
+        }
+
         // ignore cursor options since they are handled externally.
         if (str::equals(pFieldName, "cursor")) {
             continue;
