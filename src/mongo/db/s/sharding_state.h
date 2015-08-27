@@ -162,7 +162,7 @@ public:
 
     // querying support
 
-    bool needCollectionMetadata(Client* client, const std::string& ns) const;
+    bool needCollectionMetadata(OperationContext* txn, const std::string& ns) const;
     std::shared_ptr<CollectionMetadata> getCollectionMetadata(const std::string& ns);
 
     // chunk migrate and split support

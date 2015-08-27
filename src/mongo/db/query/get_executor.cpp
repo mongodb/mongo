@@ -603,8 +603,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorFind(OperationContext* txn,
     }
 
     size_t options = QueryPlannerParams::DEFAULT;
-    if (ShardingState::get(getGlobalServiceContext())
-            ->needCollectionMetadata(txn->getClient(), nss.ns())) {
+    if (ShardingState::get(getGlobalServiceContext())->needCollectionMetadata(txn, nss.ns())) {
         options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
     return getExecutor(

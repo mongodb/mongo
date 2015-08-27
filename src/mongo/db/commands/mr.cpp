@@ -1315,7 +1315,7 @@ public:
             // Get metadata before we check our version, to make sure it doesn't increment
             // in the meantime.  Need to do this in the same lock scope as the block.
             if (ShardingState::get(getGlobalServiceContext())
-                    ->needCollectionMetadata(client, config.ns)) {
+                    ->needCollectionMetadata(txn, config.ns)) {
                 collMetadata =
                     ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(config.ns);
             }

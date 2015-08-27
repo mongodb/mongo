@@ -122,8 +122,7 @@ shared_ptr<PlanExecutor> createRandomCursorExecutor(Collection* collection,
     stage->addIterator(std::move(randCursor));
 
     // If we're in a sharded environment, we need to filter out documents we don't own.
-    if (ShardingState::get(getGlobalServiceContext())
-            ->needCollectionMetadata(txn->getClient(), txn->getNS())) {
+    if (ShardingState::get(getGlobalServiceContext())->needCollectionMetadata(txn, txn->getNS())) {
         auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
             txn,
             ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(txn->getNS()),
