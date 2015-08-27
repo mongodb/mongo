@@ -94,6 +94,7 @@
 
 #define	WT_LOG_SLOT_MASK_OFF	0x3fffffffffffffffLL
 #define	WT_LOG_SLOT_MASK_ON	~(WT_LOG_SLOT_MASK_OFF)
+#define	WT_LOG_SLOT_JOIN_MASK	(WT_LOG_SLOT_MASK_OFF >> 32)
 
 /*
  * This is the maximum size we can account for in the slot state.  If
@@ -111,7 +112,9 @@
 #define	WT_LOG_SLOT_RELEASED(state)	((int64_t)(int32_t)(state))
 
 /* Slot is in use */
-#define	WT_LOG_SLOT_ACTIVE(state)	(WT_LOG_SLOT_JOINED(state) >= 0)
+#define	WT_LOG_SLOT_ACTIVE(state)					\
+    (WT_LOG_SLOT_JOINED(state) != WT_LOG_SLOT_JOIN_MASK &&		\
+     WT_LOG_SLOT_JOINED(state) < WT_LOG_SLOT_MAXIMUM)
 /* Slot is in use, but closed to new joins */
 #define	WT_LOG_SLOT_CLOSED(state)					\
     (WT_LOG_SLOT_ACTIVE(state) &&					\

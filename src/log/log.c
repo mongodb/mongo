@@ -1632,11 +1632,11 @@ __log_force_write_internal(WT_SESSION_IMPL *session, int new_slot)
 	log = S2C(session)->log;
 	slot = log->active_slot;
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
-	WT_RET(__wt_log_slot_close(session, slot, &release));
+	__wt_log_slot_close(session, slot, &release);
 	if (release) {
 		WT_RET(__log_release(session, slot, &free_slot));
 		if (free_slot)
-			WT_RET(__wt_log_slot_free(session, slot));
+			__wt_log_slot_free(session, slot);
 	}
 	if (new_slot)
 		WT_RET(__wt_log_slot_new(session));
@@ -1963,7 +1963,7 @@ use_slots:
 	 */
 	WT_ERR(__wt_readlock(session, log->log_direct_lock));
 	locked = WT_READ_LOCKED;
-	WT_ERR(__wt_log_slot_join(session, rdup_len, flags, &myslot));
+	__wt_log_slot_join(session, rdup_len, flags, &myslot);
 	/*
 	 * If the addition of this record crosses the buffer boundary,
 	 * switch in a new slot.
@@ -1987,7 +1987,7 @@ use_slots:
 	if (WT_LOG_SLOT_DONE(release_size)) {
 		WT_ERR(__log_release(session, myslot.slot, &free_slot));
 		if (free_slot)
-			WT_ERR(__wt_log_slot_free(session, myslot.slot));
+			__wt_log_slot_free(session, myslot.slot);
 	} else if (force) {
 		/*
 		 * If we are going to wait for this slot to get written,

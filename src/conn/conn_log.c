@@ -494,7 +494,7 @@ restart:
 			    &slot->slot_release_lsn) == 0 &&
 			    __wt_log_cmp(&slot->slot_start_lsn,
 			    &slot->slot_end_lsn) == 0) {
-				WT_ERR(__wt_log_slot_free(session, slot));
+				__wt_log_slot_free(session, slot);
 				continue;
 			}
 			if (coalescing != NULL) {
@@ -560,7 +560,7 @@ restart:
 					WT_ERR(__wt_cond_signal(
 					    session, conn->log_file_cond));
 			}
-			WT_ERR(__wt_log_slot_free(session, slot));
+			__wt_log_slot_free(session, slot);
 		}
 	}
 err:	__wt_spin_unlock(session, &log->log_writelsn_lock);
