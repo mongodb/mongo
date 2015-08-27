@@ -99,8 +99,8 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_LOG *log;
 	int dummy;
 #ifdef HAVE_DIAGNOSTIC
-	int64_t state;
-	int32_t j, r;
+	int64_t r, state;
+	int32_t j;
 #endif
 
 	log = S2C(session)->log;
@@ -306,8 +306,8 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int64_t flag_state, new_state, old_state;
-	int32_t join_offset, new_join, released;
+	int64_t flag_state, new_state, old_state, released;
+	int32_t join_offset, new_join;
 
 	conn = S2C(session);
 	log = conn->log;
