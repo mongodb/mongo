@@ -324,7 +324,7 @@ __log_file_server(void *arg)
 				 * not reorder the following two statements.
 				 */
 				close_end_lsn = log->log_close_lsn;
-				WT_READ_BARRIER();
+				WT_FULL_BARRIER();
 				log->log_close_fh = NULL;
 				/*
 				 * Set the close_end_lsn to the LSN immediately
