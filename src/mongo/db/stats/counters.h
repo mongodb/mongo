@@ -95,18 +95,14 @@ extern OpCounters replOpCounters;
 
 class NetworkCounter {
 public:
-    NetworkCounter() : _bytesIn(0), _bytesOut(0), _requests(0), _overflows(0) {}
+    NetworkCounter() : _bytesIn(0), _bytesOut(0), _requests(0) {}
     void hit(long long bytesIn, long long bytesOut);
     void append(BSONObjBuilder& b);
 
 private:
-    long long _bytesIn;
-    long long _bytesOut;
-    long long _requests;
-
-    long long _overflows;
-
-    SpinLock _lock;
+    AtomicUInt64 _bytesIn;
+    AtomicUInt64 _bytesOut;
+    AtomicUInt64 _requests;
 };
 
 extern NetworkCounter networkCounter;
