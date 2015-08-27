@@ -548,13 +548,13 @@ __rec_write_status(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * unchanged since reconciliation started, it's clean.
 		 *
 		 * If the write generation changed, the page has been written
-		 * since reconciliation started and remains dirty; if evicting,
-		 * we've failed.
+		 * since reconciliation started and remains dirty (that can't
+		 * happen when evicting, the page is exclusively locked).
 		 */
 		if (__wt_atomic_cas32(&mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
-		else if (F_ISSET(r, WT_EVICTING))
-			return (EBUSY);
+		else
+			WT_ASSERT(session, !F_ISSET(r, WT_EVICTING));
 	}
 
 	return (0);
