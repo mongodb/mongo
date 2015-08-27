@@ -9,6 +9,9 @@ load('jstests/aggregation/extras/utils.js');
     var coll = db.agg_sample;
     coll.drop();
 
+    // Should return no results on a collection that doesn't exist. Should not crash.
+    assert.eq(coll.aggregate([{$sample: {size: 10}}]).toArray(), []);
+
     var nItems = 3;
     for (var i = 0; i < nItems; i++) {
         assert.writeOK(coll.insert({_id: i}));

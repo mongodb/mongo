@@ -193,8 +193,9 @@ shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
             return std::shared_ptr<PlanExecutor>();  // don't need a cursor
         }
 
+        auto sampleStage = dynamic_cast<DocumentSourceSample*>(sources.front().get());
         // Optimize an initial $sample stage if possible.
-        if (auto sampleStage = dynamic_cast<DocumentSourceSample*>(sources.front().get())) {
+        if (collection && sampleStage) {
             const long long sampleSize = sampleStage->getSampleSize();
             const long long numRecords = collection->getRecordStore()->numRecords(txn);
             auto exec = createRandomCursorExecutor(collection, txn, sampleSize, numRecords);
