@@ -16,6 +16,11 @@ sh._adminCommand = function( cmd , skipCheck ) {
     return db.getSisterDB( "admin" ).runCommand( cmd );
 }
 
+sh._getConfigDB = function() {
+    sh._checkMongos();
+    return db.getSiblingDB( "config" );
+}
+
 sh._dataFormat = function( bytes ){
    if( bytes < 1024 ) return Math.floor( bytes ) + "B"
    if( bytes < 1024 * 1024 ) return Math.floor( bytes / 1024 ) + "KiB"
@@ -97,12 +102,12 @@ sh.moveChunk = function( fullName , find , to ) {
 }
 
 sh.setBalancerState = function( onOrNot ) { 
-    db.getSisterDB( "config" ).settings.update({ _id: "balancer" }, { $set : { stopped: onOrNot ? false : true } }, true );
+    sh._getConfigDB().settings.update({ _id: "balancer" }, { $set : { stopped: onOrNot ? false : true } }, true );
 }
 
 sh.getBalancerState = function(configDB) {
     if (configDB === undefined)
-        configDB = db.getSiblingDB('config');
+        configDB = sh._getConfigDB();
     var x = configDB.settings.findOne({ _id: "balancer" } )
     if ( x == null )
         return true;
@@ -111,7 +116,7 @@ sh.getBalancerState = function(configDB) {
 
 sh.isBalancerRunning = function (configDB) {
     if (configDB === undefined)
-        configDB = db.getSiblingDB('config');
+        configDB = sh._getConfigDB();
     var x = configDB.locks.findOne({ _id: "balancer" });
     if (x == null) {
         print("config.locks collection empty or missing. be sure you are connected to a mongos");
@@ -122,7 +127,7 @@ sh.isBalancerRunning = function (configDB) {
 
 sh.getBalancerHost = function(configDB) {
     if (configDB === undefined)
-        configDB = db.getSiblingDB('config');
+        configDB = sh._getConfigDB();
     var x = configDB.locks.findOne({ _id: "balancer" });
     if( x == null ){
         print("config.locks collection does not contain balancer lock. be sure you are connected to a mongos");
@@ -142,19 +147,19 @@ sh.startBalancer = function( timeout, interval ) {
 }
 
 sh.waitForDLock = function( lockId, onOrNot, timeout, interval ){
-    
     // Wait for balancer to be on or off
     // Can also wait for particular balancer state
     var state = onOrNot
+    var configDB = sh._getConfigDB();
     
     var beginTS = undefined
     if( state == undefined ){
-        var currLock = db.getSisterDB( "config" ).locks.findOne({ _id : lockId })
+        var currLock = configDB.locks.findOne({ _id : lockId })
         if( currLock != null ) beginTS = currLock.ts
     }
         
     var lockStateOk = function(){
-        var lock = db.getSisterDB( "config" ).locks.findOne({ _id : lockId })
+        var lock = configDB.locks.findOne({ _id : lockId })
 
         if( state == false ) return ! lock || lock.state == 0
         if( state == true ) return lock && lock.state == 2
@@ -175,7 +180,7 @@ sh.waitForDLock = function( lockId, onOrNot, timeout, interval ){
 sh.waitForPingChange = function( activePings, timeout, interval ){
     
     var isPingChanged = function( activePing ){
-        var newPing = db.getSisterDB( "config" ).mongos.findOne({ _id : activePing._id })
+        var newPing = sh._getConfigDB().mongos.findOne({ _id : activePing._id })
         return ! newPing || newPing.ping + "" != activePing.ping + ""
     }
     
@@ -210,8 +215,7 @@ sh.waitForPingChange = function( activePings, timeout, interval ){
 }
 
 sh.waitForBalancerOff = function( timeout, interval ){
-    
-    var pings = db.getSisterDB( "config" ).mongos.find().toArray()
+    var pings = sh._getConfigDB().mongos.find().toArray()
     var activePings = []
     for( var i = 0; i < pings.length; i++ ){
         if( ! pings[i].waiting ) activePings.push( pings[i] )
@@ -271,7 +275,12 @@ sh.disableBalancing = function( coll ){
         throw Error("Must specify collection");
     }
     var dbase = db
-    if( coll instanceof DBCollection ) dbase = coll.getDB()
+    if( coll instanceof DBCollection ) {
+        dbase = coll.getDB()
+    } else {
+        sh._checkMongos();
+    }
+
     dbase.getSisterDB( "config" ).collections.update({ _id : coll + "" }, { $set : { "noBalance" : true } })
 }
 
@@ -280,7 +289,12 @@ sh.enableBalancing = function( coll ){
         throw Error("Must specify collection");
     }
     var dbase = db
-    if( coll instanceof DBCollection ) dbase = coll.getDB()
+    if( coll instanceof DBCollection ) {
+        dbase = coll.getDB()
+    } else {
+        sh._checkMongos();
+    }
+
     dbase.getSisterDB( "config" ).collections.update({ _id : coll + "" }, { $set : { "noBalance" : false } })
 }
 
@@ -339,7 +353,7 @@ sh._checkLastError = function( mydb ) {
 }
 
 sh.addShardTag = function( shard, tag ) {
-    var config = db.getSisterDB( "config" );
+    var config = sh._getConfigDB();
     if ( config.shards.findOne( { _id : shard } ) == null ) {
         throw Error( "can't find a shard with name: " + shard );
     }
@@ -348,7 +362,7 @@ sh.addShardTag = function( shard, tag ) {
 }
 
 sh.removeShardTag = function( shard, tag ) {
-    var config = db.getSisterDB( "config" );
+    var config = sh._getConfigDB();
     if ( config.shards.findOne( { _id : shard } ) == null ) {
         throw Error( "can't find a shard with name: " + shard );
     }
@@ -361,7 +375,7 @@ sh.addTagRange = function( ns, min, max, tag ) {
         throw new Error("min and max cannot be the same");
     }
 
-    var config = db.getSisterDB( "config" );
+    var config = sh._getConfigDB();
     config.tags.update( {_id: { ns : ns , min : min } } , 
             {_id: { ns : ns , min : min }, ns : ns , min : min , max : max , tag : tag } , 
             true );
@@ -369,7 +383,7 @@ sh.addTagRange = function( ns, min, max, tag ) {
 }
 
 sh.removeTagRange = function( ns, min, max, tag ) {
-    var config = db.getSisterDB( "config" );
+    var config = sh._getConfigDB();
     // warn if the namespace does not exist, even dropped
     if ( config.collections.findOne( { _id : ns } ) == null ) {
         print( "Warning: can't find the namespace: " + ns + " - collection likely never sharded" );
@@ -447,7 +461,7 @@ sh.getRecentFailedRounds = function(configDB) {
  */
 sh.getRecentMigrations = function(configDB) {
     if (configDB === undefined)
-        configDB = db.getSiblingDB('config');
+        configDB = sh._getConfigDB();
     var yesterday = new Date( new Date() - 24 * 60 * 60 * 1000 );
 
     // Successful migrations.
