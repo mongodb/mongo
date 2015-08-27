@@ -143,10 +143,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
 
     // Use read pref to target a particular host from each shard. Also construct the find command
     // that we will forward to each shard.
-    params.remotes.resize(shards.size());
-    for (size_t i = 0; i < shards.size(); ++i) {
-        const auto& shard = shards[i];
-
+    for (const auto& shard : shards) {
         // The find command cannot be used to query config server content with legacy 3-host config
         // servers, because the new targeting logic only works for config server replica sets.
         if (shard->isConfig() && shard->getConnString().type() == ConnectionString::SYNC) {
@@ -159,7 +156,6 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         if (!hostAndPort.isOK()) {
             return hostAndPort.getStatus();
         }
-        params.remotes[i].hostAndPort = std::move(hostAndPort.getValue());
 
         // Build the find command, and attach shard version if necessary.
         BSONObjBuilder cmdBuilder;
@@ -170,7 +166,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
             cmdBuilder.appendArray(LiteParsedQuery::kShardVersionField, shardVersion.toBSON());
         }
 
-        params.remotes[i].cmdObj = cmdBuilder.obj();
+        params.remotes.emplace_back(std::move(hostAndPort.getValue()), cmdBuilder.obj());
     }
 
     auto ccc =
