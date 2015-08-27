@@ -66,6 +66,12 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
         newLimit = *lpq.getLimit() + lpq.getSkip().value_or(0);
     }
 
+    // Similarly, if nToReturn is set, we forward the sum of nToReturn and the skip.
+    boost::optional<long long> newNToReturn;
+    if (lpq.getNToReturn()) {
+        newNToReturn = *lpq.getNToReturn() + lpq.getSkip().value_or(0);
+    }
+
     return LiteParsedQuery::makeAsFindCmd(lpq.nss(),
                                           lpq.getFilter(),
                                           lpq.getProj(),
@@ -74,7 +80,7 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
                                           boost::none,  // Don't forward skip.
                                           newLimit,
                                           lpq.getBatchSize(),
-                                          lpq.getNToReturn(),
+                                          newNToReturn,
                                           lpq.wantMore(),
                                           lpq.isExplain(),
                                           lpq.getComment(),
