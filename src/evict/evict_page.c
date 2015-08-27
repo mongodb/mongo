@@ -336,6 +336,13 @@ __evict_review(
 
 	/* Check if the page can be evicted. */
 	if (!closing) {
+		/*
+		 * Update the oldest ID to avoid wasted effort should it have
+		 * fallen behind current.
+		 */
+		if (__wt_page_is_modified(page))
+			__wt_txn_update_oldest(session, 1);
+
 		if (!__wt_page_can_evict(session, page, 0, inmem_splitp))
 			return (EBUSY);
 
