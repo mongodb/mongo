@@ -651,7 +651,8 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 *  - the pool is less than half distributed
 		 */
 		} else if (!pool_full &&
-		    entry->cache_size < cache->cp_quota &&
+		    (cache->cp_quota == 0 ||
+		    entry->cache_size < cache->cp_quota) &&
 		    __wt_cache_bytes_inuse(cache) >=
 		    (entry->cache_size * cache->eviction_target) / 100 &&
 		    (pressure > bump_threshold ||
