@@ -109,6 +109,7 @@ struct __wt_cache {
 	 * Cache pool information.
 	 */
 	uint64_t cp_pass_pressure;	/* Calculated pressure from this pass */
+	uint64_t cp_quota;		/* Maximum size for this cache */
 	uint64_t cp_reserved;		/* Base size for this cache */
 	WT_SESSION_IMPL *cp_session;	/* May be used for cache management */
 	uint32_t cp_skip_count;		/* Post change stabilization */
@@ -140,6 +141,7 @@ struct __wt_cache_pool {
 	const char *name;
 	uint64_t size;
 	uint64_t chunk;
+	uint64_t quota;
 	uint64_t currently_used;
 	uint32_t refs;		/* Reference count for structure. */
 	/* Locked: List of connections participating in the cache pool. */
