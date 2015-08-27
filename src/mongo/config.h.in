@@ -72,3 +72,6 @@
 
 // Defined if SSL support is enabled
 @mongo_config_ssl@
+
+// Defined if WiredTiger storage engine is enabled
+@mongo_config_wiredtiger_enabled@

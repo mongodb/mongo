@@ -414,9 +414,12 @@ static void _initAndListen(int listenPort) {
     }
 
     getGlobalServiceContext()->initializeGlobalStorageEngine();
+
+#ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
     if (WiredTigerCustomizationHooks::get(getGlobalServiceContext())->restartRequired()) {
         exitCleanly(EXIT_CLEAN);
     }
+#endif
 
     // Warn if we detect configurations for multiple registered storage engines in
     // the same configuration file/environment.

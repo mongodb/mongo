@@ -1427,6 +1427,7 @@ if get_option('wiredtiger') == 'on':
             "Re-run scons with --wiredtiger=off to build on 32-bit platforms")
     else:
         wiredtiger = True
+        env.SetConfigHeaderDefine("MONGO_CONFIG_WIREDTIGER_ENABLED")
 
 if get_option('experimental-decimal-support') == 'on':
     env.SetConfigHeaderDefine("MONGO_CONFIG_EXPERIMENTAL_DECIMAL_SUPPORT")
