@@ -332,12 +332,16 @@ void Balancer::_doBalanceRound(OperationContext* txn,
         }
 
         std::vector<ChunkType> allNsChunks;
-        grid.catalogManager(txn)->getChunks(txn,
-                                            BSON(ChunkType::ns(nss.ns())),
-                                            BSON(ChunkType::min() << 1),
-                                            boost::none,  // all chunks
-                                            &allNsChunks,
-                                            nullptr);
+        Status status = grid.catalogManager(txn)->getChunks(txn,
+                                                            BSON(ChunkType::ns(nss.ns())),
+                                                            BSON(ChunkType::min() << 1),
+                                                            boost::none,  // all chunks
+                                                            &allNsChunks,
+                                                            nullptr);
+        if (!status.isOK()) {
+            warning() << "failed to load chunks for ns " << nss.ns() << causedBy(status);
+            continue;
+        }
 
         set<BSONObj> allChunkMinimums;
         map<string, vector<ChunkType>> shardToChunksMap;
@@ -359,7 +363,7 @@ void Balancer::_doBalanceRound(OperationContext* txn,
             shardToChunksMap[i->first];
         }
 
-        DistributionStatus status(shardInfo, shardToChunksMap);
+        DistributionStatus distStatus(shardInfo, shardToChunksMap);
 
         // TODO: TagRange contains all the information from TagsType except for the namespace,
         //       so maybe the two can be merged at some point in order to avoid the
@@ -375,7 +379,7 @@ void Balancer::_doBalanceRound(OperationContext* txn,
                     TagRange(tt.getMinKey().getOwned(), tt.getMaxKey().getOwned(), tt.getTag()));
                 uassert(16356,
                         str::stream() << "tag ranges not valid for: " << nss.ns(),
-                        status.addTagRange(ranges.back()));
+                        distStatus.addTagRange(ranges.back()));
             }
         }
 
@@ -432,7 +436,8 @@ void Balancer::_doBalanceRound(OperationContext* txn,
             continue;
         }
 
-        shared_ptr<MigrateInfo> migrateInfo(_policy->balance(nss.ns(), status, _balancedLastTime));
+        shared_ptr<MigrateInfo> migrateInfo(
+            _policy->balance(nss.ns(), distStatus, _balancedLastTime));
         if (migrateInfo) {
             candidateChunks->push_back(migrateInfo);
         }

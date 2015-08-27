@@ -102,7 +102,10 @@ public:
         }
 
         vector<string> databases;
-        catalogManager->getDatabasesForShard(txn, s->getId(), &databases);
+        Status status = catalogManager->getDatabasesForShard(txn, s->getId(), &databases);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
+        }
 
         // Get BSONObj containing:
         // 1) note about moving or dropping databases in a shard
