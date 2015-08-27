@@ -111,8 +111,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	WT_UPDATE *first_upd, *last_upd, *upd;
 	size_t incr, total_incr;
 	uint64_t current_recno, las_counter, las_txnid, recno, upd_txnid;
-	uint32_t las_id, upd_size;
-	int exact, reset_evict;
+	uint32_t las_id, upd_size, session_flags;
+	int exact;
 	const uint8_t *p;
 
 	cursor = NULL;
@@ -120,7 +120,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	first_upd = last_upd = upd = NULL;
 	total_incr = 0;
 	current_recno = recno = WT_RECNO_OOB;
-	reset_evict = 0;		/* [-Werror=maybe-uninitialized] */
+	session_flags = 0;		/* [-Werror=maybe-uninitialized] */
 
 	__wt_btcur_init(session, &cbt);
 	__wt_btcur_open(&cbt);
@@ -131,7 +131,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &las_value));
 
 	/* Open a lookaside table cursor. */
-	WT_ERR(__wt_las_cursor(session, &cursor, &reset_evict));
+	WT_ERR(__wt_las_cursor(session, &cursor, &session_flags));
 
 	/*
 	 * The lookaside records are in key and update order, that is, there
@@ -240,7 +240,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		}
 
 	/* Discard the cursor. */
-	WT_ERR(__wt_las_cursor_close(session, &cursor, reset_evict));
+	WT_ERR(__wt_las_cursor_close(session, &cursor, session_flags));
 
 	if (total_incr != 0) {
 		__wt_cache_page_inmem_incr(session, page, total_incr);
@@ -257,7 +257,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		__wt_page_modify_clear(session, page);
 	}
 
-err:	WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
+err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 	WT_TRET(__wt_btcur_close(&cbt, 1));
 
 	/*

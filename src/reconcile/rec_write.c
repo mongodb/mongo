@@ -3245,8 +3245,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	WT_UPDATE *upd;
 	WT_UPD_SKIPPED *list;
 	uint64_t las_counter;
-	uint32_t i, slot;
-	int reset_evict;
+	uint32_t i, session_flags, slot;
 	uint8_t *p;
 
 	cursor = NULL;
@@ -3260,7 +3259,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	 */
 	__wt_las_set_written(session);
 
-	WT_ERR(__wt_las_cursor(session, &cursor, &reset_evict));
+	WT_ERR(__wt_las_cursor(session, &cursor, &session_flags));
 
 	/* Ensure enough room for a column-store key without checking. */
 	WT_ERR(__wt_scr_alloc(session, WT_INTPACK64_MAXSIZE, &key));
@@ -3352,7 +3351,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 		}
 	}
 
-err:	WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
+err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 
 	__wt_scr_free(session, &key);
 	return (ret);

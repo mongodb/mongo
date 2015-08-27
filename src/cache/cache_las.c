@@ -182,7 +182,8 @@ __wt_las_is_written(WT_SESSION_IMPL *session)
  *	Return a lookaside cursor.
  */
 int
-__wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *reset_evict)
+__wt_las_cursor(
+    WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t *session_flags)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -193,8 +194,13 @@ __wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *reset_evict)
 	 * We don't want to get tapped for eviction after we start using the
 	 * lookaside cursor; save a copy of the current eviction state, we'll
 	 * turn eviction off before we return.
+	 *
+	 * Don't cache lookaside table pages, we're here because of eviction
+	 * problems and there's no reason to believe lookaside pages will be
+	 * useful more than once.
 	 */
-	*reset_evict = F_ISSET(session, WT_SESSION_NO_EVICTION) ? 0 : 1;
+	*session_flags =
+	    F_ISSET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 
 	conn = S2C(session);
 
@@ -215,8 +221,7 @@ __wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *reset_evict)
 	}
 
 	/* Turn eviction off. */
-	if (*reset_evict)
-		F_SET(session, WT_SESSION_NO_EVICTION);
+	F_SET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 
 	return (0);
 }
@@ -227,7 +232,7 @@ __wt_las_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int *reset_evict)
  */
 int
 __wt_las_cursor_close(
-	WT_SESSION_IMPL *session, WT_CURSOR **cursorp, int reset_evict)
+	WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t session_flags)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
@@ -243,11 +248,11 @@ __wt_las_cursor_close(
 	ret = cursor->reset(cursor);
 
 	/*
-	 * We turned off eviction while the lookaside cursor was in use, restore
-	 * the session's flags.
+	 * We turned off caching and eviction while the lookaside cursor was in
+	 * use, restore the session's flags.
 	 */
-	if (reset_evict)
-		F_CLR(session, WT_SESSION_NO_EVICTION);
+	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
+	F_SET(session, session_flags);
 
 	/*
 	 * Eviction and sweep threads have their own lookaside table cursors;
@@ -273,18 +278,18 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_ITEM *key;
 	uint64_t cnt, las_counter, las_txnid;
-	uint32_t las_id;
-	int notused, reset_evict;
+	uint32_t las_id, session_flags;
+	int notused;
 
 	conn = S2C(session);
 	cursor = NULL;
 	key = &conn->las_sweep_key;
-	reset_evict = 0;		/* [-Werror=maybe-uninitialized] */
+	session_flags = 0;		/* [-Werror=maybe-uninitialized] */
 
 	WT_ERR(__wt_scr_alloc(session, 0, &las_addr));
 	WT_ERR(__wt_scr_alloc(session, 0, &las_key));
 
-	WT_ERR(__wt_las_cursor(session, &cursor, &reset_evict));
+	WT_ERR(__wt_las_cursor(session, &cursor, &session_flags));
 
 	/*
 	 * If we're not starting a new sweep, position the cursor using the key
@@ -381,7 +386,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 err:		__wt_buf_free(session, key);
 	}
 
-	WT_TRET(__wt_las_cursor_close(session, &cursor, reset_evict));
+	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 
 	__wt_scr_free(session, &las_addr);
 	__wt_scr_free(session, &las_key);
