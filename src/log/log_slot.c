@@ -28,7 +28,6 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	slot->slot_fh = log->log_fh;
 	slot->slot_error = 0;
 	slot->slot_unbuffered = 0;
-	return;
 }
 
 /*
@@ -36,7 +35,7 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
  *	Close out the slot the caller is using.  The slot may already be
  *	closed or freed by another thread.
  */
-int
+void
 __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *releasep)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -49,7 +48,7 @@ __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *releasep)
 	if (releasep != NULL)
 		*releasep = 0;
 	if (slot == NULL)
-		return (0);
+		return;
 retry:
 	old_state = slot->slot_state;
 	/*
@@ -57,12 +56,12 @@ retry:
 	 * do but return.
 	 */
 	if (WT_LOG_SLOT_CLOSED(old_state))
-		return (0);
+		return;
 	/*
 	 * If someone completely processed this slot, we're done.
 	 */
 	if (FLD64_ISSET((uint64_t)slot->slot_state, WT_LOG_SLOT_RESERVED))
-		return (0);
+		return;
 	new_state = (old_state | WT_LOG_SLOT_CLOSE);
 	/*
 	 * Close this slot.  If we lose the race retry.
@@ -86,7 +85,6 @@ retry:
 	 */
 	log->alloc_lsn = slot->slot_end_lsn;
 	WT_ASSERT(session, log->alloc_lsn.file >= log->write_lsn.file);
-	return (0);
 }
 
 /*
@@ -111,7 +109,7 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 */
 	if (slot != log->active_slot)
 		return (0);
-	WT_RET(__wt_log_slot_close(session, slot, &dummy));
+	__wt_log_slot_close(session, slot, &dummy);
 	/*
 	 * Only mainline callers use switch.  Our size should be in join
 	 * and we have not yet released, so we should never think release
@@ -299,7 +297,7 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
  *	Join a consolidated logging slot.  Must be called with
  *	the read lock held.
  */
-int
+void
 __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
     uint32_t flags, WT_MYSLOT *myslotp)
 {
@@ -329,7 +327,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	 */
 	if (log->active_slot == NULL) {
 		WT_ASSERT(session, mysize == 0);
-		return (0);
+		return;
 	}
 	/*
 	 * There should almost always be a slot open.
@@ -379,7 +377,6 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	myslotp->slot = slot;
 	myslotp->offset = join_offset;
 	myslotp->end_offset = (wt_off_t)((uint64_t)join_offset + mysize);
-	return (0);
 }
 
 /*
@@ -420,7 +417,7 @@ __wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
  * __wt_log_slot_free --
  *	Free a slot back into the pool.
  */
-int
+void
 __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
 
@@ -433,5 +430,4 @@ __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	slot->flags = WT_SLOT_INIT_FLAGS;
 	slot->slot_error = 0;
 	slot->slot_state = WT_LOG_SLOT_FREE;
-	return (0);
 }
