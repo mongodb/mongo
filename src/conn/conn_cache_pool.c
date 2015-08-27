@@ -632,6 +632,13 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		    entry->cache_size > reserved &&
 		    pressure < WT_CACHE_POOL_REDUCE_THRESHOLD && highest > 1) {
 			grow = 0;
+			/*
+			 * Don't drop the size down too much - or it can
+			 * trigger aggressive eviction in the connection,
+			 * which is likely to lead to lower throughput and
+			 * potentially a negative feedback loop in the
+			 * balance algorithm.
+			 */
 			smallest = (100 * __wt_cache_bytes_inuse(cache)) /
 			    cache->eviction_trigger;
 			if (entry->cache_size > smallest)

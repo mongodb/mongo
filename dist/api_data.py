@@ -455,7 +455,7 @@ connection_runtime_config = [
         Config('quota', '0', r'''
             maximum size of cache this database can be allocated from the
             shared cache. Defaults to the entire shared cache size''',
-			type='int'),
+            type='int'),
         Config('reserve', '0', r'''
             amount of cache this database is guaranteed to have
             available from the shared cache. This setting is per
