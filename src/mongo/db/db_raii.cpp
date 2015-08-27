@@ -72,41 +72,30 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn, const 
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
                                                    const NamespaceString& nss)
-    : _txn(txn), _transaction(txn, MODE_IS), _autoColl(txn, nss, MODE_IS) {
-    // We have both the DB and collection locked, which the prerequisite to do a stable shard
-    // version check
-    ensureShardVersionOKOrThrow(_txn, nss.ns());
+    : _txn(txn), _transaction(txn, MODE_IS) {
+    {
+        _autoColl.emplace(txn, nss, MODE_IS);
+        auto curOp = CurOp::get(_txn);
+        stdx::lock_guard<Client> lk(*_txn->getClient());
 
-    auto curOp = CurOp::get(_txn);
-    stdx::lock_guard<Client> lk(*_txn->getClient());
-
-    // TODO: OldClientContext legacy, needs to be removed
-    curOp->ensureStarted();
-    curOp->setNS_inlock(nss.ns());
-
-    // At this point, we are locked in shared mode for the database by the DB lock in the
-    // constructor, so it is safe to load the DB pointer.
-    if (_autoColl.getDb()) {
         // TODO: OldClientContext legacy, needs to be removed
-        curOp->enter_inlock(nss.ns().c_str(), _autoColl.getDb()->getProfilingLevel());
-    }
+        curOp->ensureStarted();
+        curOp->setNS_inlock(nss.ns());
 
-    if (getCollection()) {
-        if (auto minSnapshot = getCollection()->getMinimumVisibleSnapshot()) {
-            if (auto mySnapshot = _txn->recoveryUnit()->getMajorityCommittedSnapshot()) {
-                while (mySnapshot < minSnapshot) {
-                    // Wait until a snapshot is available.
-                    repl::ReplicationCoordinator::get(_txn)->waitForNewSnapshot(_txn);
-
-                    Status status = _txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
-                    uassert(28786,
-                            "failed to set read from majority-committed snapshot",
-                            status.isOK());
-                    mySnapshot = _txn->recoveryUnit()->getMajorityCommittedSnapshot();
-                }
-            }
+        // At this point, we are locked in shared mode for the database by the DB lock in the
+        // constructor, so it is safe to load the DB pointer.
+        if (_autoColl->getDb()) {
+            // TODO: OldClientContext legacy, needs to be removed
+            curOp->enter_inlock(nss.ns().c_str(), _autoColl->getDb()->getProfilingLevel());
         }
     }
+
+    // Note: this can yield.
+    _ensureMajorityCommittedSnapshotIsValid(nss);
+
+    // We have both the DB and collection locked, which is the prerequisite to do a stable shard
+    // version check, but we'd like to do the check after we have a satisfactory snapshot.
+    ensureShardVersionOKOrThrow(_txn, nss.ns());
 }
 
 AutoGetCollectionForRead::~AutoGetCollectionForRead() {
@@ -120,6 +109,38 @@ AutoGetCollectionForRead::~AutoGetCollectionForRead() {
                 currentOp->isCommand());
 }
 
+void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss) {
+    while (true) {
+        auto coll = _autoColl->getCollection();
+        if (!coll) {
+            return;
+        }
+        auto minSnapshot = coll->getMinimumVisibleSnapshot();
+        if (!minSnapshot) {
+            return;
+        }
+        auto mySnapshot = _txn->recoveryUnit()->getMajorityCommittedSnapshot();
+        if (!mySnapshot) {
+            return;
+        }
+        if (mySnapshot >= minSnapshot) {
+            return;
+        }
+
+        // Yield locks.
+        _autoColl = {};
+
+        repl::ReplicationCoordinator::get(_txn)->waitForNewSnapshot(_txn);
+
+        uassertStatusOK(_txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
+
+        stdx::lock_guard<Client> lk(*_txn->getClient());
+        CurOp::get(_txn)->yielded();
+
+        // Relock.
+        _autoColl.emplace(_txn, nss, MODE_IS);
+    }
+}
 
 OldClientContext::OldClientContext(OperationContext* txn, const std::string& ns, Database* db)
     : _justCreated(false), _doVersion(true), _ns(ns), _db(db), _txn(txn) {}

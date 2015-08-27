@@ -143,20 +143,21 @@ public:
     ~AutoGetCollectionForRead();
 
     Database* getDb() const {
-        return _autoColl.getDb();
+        return _autoColl->getDb();
     }
 
     Collection* getCollection() const {
-        return _autoColl.getCollection();
+        return _autoColl->getCollection();
     }
 
 private:
     void _init(const std::string& ns, StringData coll);
+    void _ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss);
 
     const Timer _timer;
     OperationContext* const _txn;
     const ScopedTransaction _transaction;
-    const AutoGetCollection _autoColl;
+    boost::optional<AutoGetCollection> _autoColl;
 };
 
 /**
