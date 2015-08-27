@@ -557,6 +557,7 @@ static const char * const __stats_connection_desc[] = {
 	"log: log records too small to compress",
 	"log: log records not compressed",
 	"log: log records compressed",
+	"log: log records written directly",
 	"log: maximum log file size",
 	"log: pre-allocated log files prepared",
 	"log: number of pre-allocated log files to create",
@@ -571,7 +572,6 @@ static const char * const __stats_connection_desc[] = {
 	"log: consolidated slot joins",
 	"log: consolidated slot join races",
 	"log: record size exceeded maximum",
-	"log: failed to find a slot large enough for record",
 	"log: consolidated slot join transitions",
 	"log: log sync operations",
 	"log: log sync_dir operations",
@@ -738,12 +738,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->log_slot_races = 0;
 	stats->log_slot_transitions = 0;
 	stats->log_slot_joins = 0;
-	stats->log_slot_toosmall = 0;
 	stats->log_bytes_payload = 0;
 	stats->log_bytes_written = 0;
 	stats->log_compress_writes = 0;
 	stats->log_compress_write_fails = 0;
 	stats->log_compress_small = 0;
+	stats->log_direct_writes = 0;
 	stats->log_release_write_lsn = 0;
 	stats->log_scans = 0;
 	stats->log_scan_rereads = 0;
@@ -919,13 +919,13 @@ __wt_stat_connection_aggregate(
 	to->log_slot_races += WT_STAT_READ(from, log_slot_races);
 	to->log_slot_transitions += WT_STAT_READ(from, log_slot_transitions);
 	to->log_slot_joins += WT_STAT_READ(from, log_slot_joins);
-	to->log_slot_toosmall += WT_STAT_READ(from, log_slot_toosmall);
 	to->log_bytes_payload += WT_STAT_READ(from, log_bytes_payload);
 	to->log_bytes_written += WT_STAT_READ(from, log_bytes_written);
 	to->log_compress_writes += WT_STAT_READ(from, log_compress_writes);
 	to->log_compress_write_fails +=
 	    WT_STAT_READ(from, log_compress_write_fails);
 	to->log_compress_small += WT_STAT_READ(from, log_compress_small);
+	to->log_direct_writes += WT_STAT_READ(from, log_direct_writes);
 	to->log_release_write_lsn +=
 	    WT_STAT_READ(from, log_release_write_lsn);
 	to->log_scans += WT_STAT_READ(from, log_scans);

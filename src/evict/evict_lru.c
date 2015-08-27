@@ -487,12 +487,24 @@ __evict_pass(WT_SESSION_IMPL *session)
 		}
 
 		/*
-		 * Increment the shared read generation.  We do this
-		 * occasionally even if eviction is not currently required, so
-		 * that pages have some relative read generation when the
-		 * eviction server does need to do some work.
+		 * Increment the shared read generation. Do this occasionally
+		 * even if eviction is not currently required, so that pages
+		 * have some relative read generation when the eviction server
+		 * does need to do some work.
 		 */
 		__wt_cache_read_gen_incr(session);
+
+		/*
+		 * Update the oldest ID: we use it to decide whether pages are
+		 * candidates for eviction.  Without this, if all threads are
+		 * blocked after a long-running transaction (such as a
+		 * checkpoint) completes, we may never start evicting again.
+		 *
+		 * Do this every time the eviction server wakes up, regardless
+		 * of whether the cache is full, to prevent the oldest ID
+		 * falling too far behind.
+		 */
+		__wt_txn_update_oldest(session, 1);
 
 		if (!__evict_update_work(session))
 			break;
@@ -899,14 +911,6 @@ __evict_walk(WT_SESSION_IMPL *session)
 	dhandle = NULL;
 	incr = dhandle_locked = 0;
 	retries = 0;
-
-	/*
-	 * Update the oldest ID: we use it to decide whether pages are
-	 * candidates for eviction.  Without this, if all threads are blocked
-	 * after a long-running transaction (such as a checkpoint) completes,
-	 * we may never start evicting again.
-	 */
-	__wt_txn_update_oldest(session, 1);
 
 	if (cache->evict_current == NULL)
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
@@ -1424,7 +1428,7 @@ __evict_page(WT_SESSION_IMPL *session, int is_server)
  * crosses its boundaries.
  */
 int
-__wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, int pct_full)
+__wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;

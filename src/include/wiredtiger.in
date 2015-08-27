@@ -1750,6 +1750,9 @@ struct __wt_connection {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the name of a cache that
 	 * is shared between databases or \c "none" when no shared cache is
 	 * configured., a string; default \c none.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;quota, maximum size of cache this
+	 * database can be allocated from the shared cache.  Defaults to the
+	 * entire shared cache size., an integer; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this
 	 * database is guaranteed to have available from the shared cache.  This
 	 * setting is per database.  Defaults to the chunk size., an integer;
@@ -2216,10 +2219,12 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the name of a cache that is shared
  * between databases or \c "none" when no shared cache is configured., a string;
  * default \c none.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache
- * this database is guaranteed to have available from the shared cache.  This
- * setting is per database.  Defaults to the chunk size., an integer; default \c
- * 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;quota, maximum size of
+ * cache this database can be allocated from the shared cache.  Defaults to the
+ * entire shared cache size., an integer; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this database is
+ * guaranteed to have available from the shared cache.  This setting is per
+ * database.  Defaults to the chunk size., an integer; default \c 0.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for the
  * shared cache.  Setting this will update the value if one is already set., an
  * integer between 1MB and 10TB; default \c 500MB.}
@@ -3718,36 +3723,36 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_COMPRESS_WRITE_FAILS		1085
 /*! log: log records compressed */
 #define	WT_STAT_CONN_LOG_COMPRESS_WRITES		1086
+/*! log: log records written directly */
+#define	WT_STAT_CONN_LOG_DIRECT_WRITES			1087
 /*! log: maximum log file size */
-#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1087
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1088
 /*! log: pre-allocated log files prepared */
-#define	WT_STAT_CONN_LOG_PREALLOC_FILES			1088
+#define	WT_STAT_CONN_LOG_PREALLOC_FILES			1089
 /*! log: number of pre-allocated log files to create */
-#define	WT_STAT_CONN_LOG_PREALLOC_MAX			1089
+#define	WT_STAT_CONN_LOG_PREALLOC_MAX			1090
 /*! log: pre-allocated log files used */
-#define	WT_STAT_CONN_LOG_PREALLOC_USED			1090
+#define	WT_STAT_CONN_LOG_PREALLOC_USED			1091
 /*! log: log release advances write LSN */
-#define	WT_STAT_CONN_LOG_RELEASE_WRITE_LSN		1091
+#define	WT_STAT_CONN_LOG_RELEASE_WRITE_LSN		1092
 /*! log: records processed by log scan */
-#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1092
+#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1093
 /*! log: log scan records requiring two reads */
-#define	WT_STAT_CONN_LOG_SCAN_REREADS			1093
+#define	WT_STAT_CONN_LOG_SCAN_REREADS			1094
 /*! log: log scan operations */
-#define	WT_STAT_CONN_LOG_SCANS				1094
+#define	WT_STAT_CONN_LOG_SCANS				1095
 /*! log: consolidated slot closures */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1095
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1096
 /*! log: written slots coalesced */
-#define	WT_STAT_CONN_LOG_SLOT_COALESCED			1096
+#define	WT_STAT_CONN_LOG_SLOT_COALESCED			1097
 /*! log: logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1097
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1098
 /*! log: consolidated slot joins */
-#define	WT_STAT_CONN_LOG_SLOT_JOINS			1098
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			1099
 /*! log: consolidated slot join races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			1099
+#define	WT_STAT_CONN_LOG_SLOT_RACES			1100
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1100
-/*! log: failed to find a slot large enough for record */
-#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			1101
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1101
 /*! log: consolidated slot join transitions */
 #define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1102
 /*! log: log sync operations */

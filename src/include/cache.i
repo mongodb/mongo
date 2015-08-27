@@ -159,12 +159,12 @@ __wt_eviction_dirty_target(WT_SESSION_IMPL *session)
  * percentage as a side-effect.
  */
 static inline int
-__wt_eviction_needed(WT_SESSION_IMPL *session, int *pct_fullp)
+__wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CACHE *cache;
 	uint64_t bytes_inuse, bytes_max;
-	int pct_full;
+	u_int pct_full;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -177,21 +177,16 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, int *pct_fullp)
 	bytes_max = conn->cache_size + 1;
 
 	/*
-	 * Return the cache full percentage; anything over 95% means we involve
-	 * the application thread.
+	 * Calculate the cache full percentage; anything over the trigger means
+	 * we involve the application thread.
 	 */
-	pct_full = (int)((100 * bytes_inuse) / bytes_max);
+	pct_full = (u_int)((100 * bytes_inuse) / bytes_max);
 	if (pct_fullp != NULL)
 		*pct_fullp = pct_full;
-	if (pct_full >= 95)
+	if (pct_full > cache->eviction_trigger)
 		return (1);
 
-	/*
-	 * Return if we're over the trigger cache size or there are too many
-	 * dirty pages.
-	 */
-	if (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100)
-		return (1);
+	/* Return if there are too many dirty bytes in cache. */
 	if (__wt_cache_dirty_inuse(cache) >
 	    (cache->eviction_dirty_trigger * bytes_max) / 100)
 		return (1);
@@ -206,7 +201,7 @@ static inline int
 __wt_cache_eviction_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
 {
 	WT_BTREE *btree;
-	int pct_full;
+	u_int pct_full;
 
 	if (didworkp != NULL)
 		*didworkp = 0;

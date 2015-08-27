@@ -906,7 +906,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 		 * reconciliation to loop until the exclusive lock is resolved).
 		 * If we can't lock the parent, give up to avoid that deadlock.
 		 */
-		if (LF_ISSET(WT_SPLIT_INMEM))
+		if (LF_ISSET(WT_SPLIT_INMEM) && S2BT(session)->checkpointing)
 			return (EBUSY);
 		__wt_yield();
 	}

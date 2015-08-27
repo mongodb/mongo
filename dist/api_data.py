@@ -449,13 +449,17 @@ connection_runtime_config = [
         Config('chunk', '10MB', r'''
             the granularity that a shared cache is redistributed''',
             min='1MB', max='10TB'),
+        Config('name', 'none', r'''
+            the name of a cache that is shared between databases or
+            \c "none" when no shared cache is configured'''),
+        Config('quota', '0', r'''
+            maximum size of cache this database can be allocated from the
+            shared cache. Defaults to the entire shared cache size''',
+            type='int'),
         Config('reserve', '0', r'''
             amount of cache this database is guaranteed to have
             available from the shared cache. This setting is per
             database. Defaults to the chunk size''', type='int'),
-        Config('name', 'none', r'''
-            the name of a cache that is shared between databases or
-            \c "none" when no shared cache is configured'''),
         Config('size', '500MB', r'''
             maximum memory to allocate for the shared cache. Setting
             this will update the value if one is already set''',
