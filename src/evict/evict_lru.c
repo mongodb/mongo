@@ -1434,7 +1434,7 @@ __evict_page(WT_SESSION_IMPL *session, int is_server)
  * crosses its boundaries.
  */
 int
-__wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, int pct_full)
+__wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;

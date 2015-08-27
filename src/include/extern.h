@@ -311,7 +311,7 @@ extern int __wt_evict_destroy(WT_SESSION_IMPL *session);
 extern int __wt_evict_page(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, int *evict_resetp);
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
-extern int __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, int pct_full);
+extern int __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full);
 extern void __wt_cache_dump(WT_SESSION_IMPL *session);
 extern int __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int closing);
 extern int __wt_evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, int closing);
