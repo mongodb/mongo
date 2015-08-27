@@ -1063,10 +1063,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			 * When reconciling for a checkpoint, track whether any
 			 * updates were skipped on the way to finding the first
 			 * visible update.
-			 *
-			 * KEITH: I think this may be wrong, we aren't checking
-			 * that we can't write updates committed more recently
-			 * than in-progress checkpoints.
 			 */
 			if (*updp == NULL) {
 				if (__wt_txn_visible(session, txnid))
