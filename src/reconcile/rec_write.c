@@ -2136,36 +2136,37 @@ __rec_split_row_promote(
 	 * the last key and smaller than the current key.
 	 */
 	max = r->last;
-	for (i = r->skip_next; i > 0; --i) {
-		skip = &r->skip[i - 1];
-		if (skip->ins == NULL)
-			WT_ERR(__wt_row_leaf_key(
-			    session, r->page, skip->rip, update, 0));
-		else {
-			update->data = WT_INSERT_KEY(skip->ins);
-			update->size = WT_INSERT_KEY_SIZE(skip->ins);
+	if (r->evict_skipped_updates)
+		for (i = r->skip_next; i > 0; --i) {
+			skip = &r->skip[i - 1];
+			if (skip->ins == NULL)
+				WT_ERR(__wt_row_leaf_key(
+				    session, r->page, skip->rip, update, 0));
+			else {
+				update->data = WT_INSERT_KEY(skip->ins);
+				update->size = WT_INSERT_KEY_SIZE(skip->ins);
+			}
+
+			/* Compare against the current key, it must be less. */
+			WT_ERR(__wt_compare(
+			    session, btree->collator, update, r->cur, &cmp));
+			if (cmp >= 0)
+				continue;
+
+			/* Compare against the last key, it must be greater. */
+			WT_ERR(__wt_compare(
+			    session, btree->collator, update, r->last, &cmp));
+			if (cmp >= 0)
+				max = update;
+
+			/*
+			 * The saved updates are in key-sort order so the entry
+			 * we're looking for is either the last or the next-to-
+			 * last one in the list.  Once we've compared an entry
+			 * against the last key on the page, we're done.
+			 */
+			break;
 		}
-
-		/* Compare against the current key, it must be less. */
-		WT_ERR(__wt_compare(
-		    session, btree->collator, update, r->cur, &cmp));
-		if (cmp >= 0)
-			continue;
-
-		/* Compare against the last key, it must be greater. */
-		WT_ERR(__wt_compare(
-		    session, btree->collator, update, r->last, &cmp));
-		if (cmp >= 0)
-			max = update;
-
-		/*
-		 * The skipped updates are in key-sort order so the entry we're
-		 * looking for is either the last one or the next-to-last one
-		 * in the list.  Once we've compared an entry against the last
-		 * key on the page, we're done.
-		 */
-		break;
-	}
 
 	/*
 	 * The largest key on the last block must sort before the current key,
