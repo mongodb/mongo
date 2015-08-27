@@ -308,7 +308,7 @@ __wt_txn_checkpoint_log(
 	switch (flags) {
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = 1;
-		*ckpt_lsn = S2C(session)->log->write_start_lsn;
+		WT_ERR(__wt_log_ckpt_lsn(session, ckpt_lsn));
 		/*
 		 * We need to make sure that the log records in the checkpoint
 		 * LSN are on disk.  In particular to make sure that the
@@ -337,7 +337,7 @@ __wt_txn_checkpoint_log(
 			txn->ckpt_nsnapshot = 0;
 			WT_CLEAR(empty);
 			ckpt_snapshot = &empty;
-			*ckpt_lsn = S2C(session)->log->write_start_lsn;
+			WT_ERR(__wt_log_ckpt_lsn(session, ckpt_lsn));
 		} else
 			ckpt_snapshot = txn->ckpt_snapshot;
 

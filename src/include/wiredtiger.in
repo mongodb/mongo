@@ -3710,36 +3710,36 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_COMPRESS_WRITE_FAILS		1081
 /*! log: log records compressed */
 #define	WT_STAT_CONN_LOG_COMPRESS_WRITES		1082
+/*! log: log records written directly */
+#define	WT_STAT_CONN_LOG_DIRECT_WRITES			1083
 /*! log: maximum log file size */
-#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1083
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1084
 /*! log: pre-allocated log files prepared */
-#define	WT_STAT_CONN_LOG_PREALLOC_FILES			1084
+#define	WT_STAT_CONN_LOG_PREALLOC_FILES			1085
 /*! log: number of pre-allocated log files to create */
-#define	WT_STAT_CONN_LOG_PREALLOC_MAX			1085
+#define	WT_STAT_CONN_LOG_PREALLOC_MAX			1086
 /*! log: pre-allocated log files used */
-#define	WT_STAT_CONN_LOG_PREALLOC_USED			1086
+#define	WT_STAT_CONN_LOG_PREALLOC_USED			1087
 /*! log: log release advances write LSN */
-#define	WT_STAT_CONN_LOG_RELEASE_WRITE_LSN		1087
+#define	WT_STAT_CONN_LOG_RELEASE_WRITE_LSN		1088
 /*! log: records processed by log scan */
-#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1088
+#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1089
 /*! log: log scan records requiring two reads */
-#define	WT_STAT_CONN_LOG_SCAN_REREADS			1089
+#define	WT_STAT_CONN_LOG_SCAN_REREADS			1090
 /*! log: log scan operations */
-#define	WT_STAT_CONN_LOG_SCANS				1090
+#define	WT_STAT_CONN_LOG_SCANS				1091
 /*! log: consolidated slot closures */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1091
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1092
 /*! log: written slots coalesced */
-#define	WT_STAT_CONN_LOG_SLOT_COALESCED			1092
+#define	WT_STAT_CONN_LOG_SLOT_COALESCED			1093
 /*! log: logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1093
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1094
 /*! log: consolidated slot joins */
-#define	WT_STAT_CONN_LOG_SLOT_JOINS			1094
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			1095
 /*! log: consolidated slot join races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			1095
+#define	WT_STAT_CONN_LOG_SLOT_RACES			1096
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1096
-/*! log: failed to find a slot large enough for record */
-#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			1097
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1097
 /*! log: consolidated slot join transitions */
 #define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1098
 /*! log: log sync operations */

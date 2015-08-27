@@ -915,7 +915,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	 * If our LSN is smaller than the current sync LSN then our
 	 * transaction is stable.  We're done.
 	 */
-	if (WT_LOG_CMP(&session->bg_sync_lsn, &log->sync_lsn) <= 0)
+	if (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) <= 0)
 		goto err;
 
 	/*
@@ -937,7 +937,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	 * Keep checking the LSNs until we find it is stable or we reach
 	 * our timeout.
 	 */
-	while (WT_LOG_CMP(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
+	while (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
 		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
 		WT_ERR(__wt_epoch(session, &now));
 		waited_ms = WT_TIMEDIFF(now, start) / WT_MILLION;

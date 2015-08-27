@@ -32,6 +32,7 @@ BIGENDIAN
 BOOL
 BSR
 BTREE
+BUF
 BZ
 Barack
 Bitfield
@@ -291,6 +292,7 @@ ULINE
 URI
 URIs
 UTF
+Unbuffered
 UnixLib
 Unmap
 UnmapViewOfFile
@@ -940,6 +942,7 @@ uS
 uint
 uintmax
 unbare
+unbuffered
 uncompressing
 uncompresssed
 undef

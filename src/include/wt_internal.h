@@ -335,6 +335,7 @@ union __wt_rand_state;
 #include "cache.i"			/* required by txn.i */
 #include "cell.i"			/* required by btree.i */
 
+#include "log.i"
 #include "mutex.i"			/* required by btree.i */
 #include "txn.i"			/* required by btree.i */
 

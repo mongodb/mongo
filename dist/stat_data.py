@@ -238,6 +238,7 @@ connection_stats = [
     LogStat('log_compress_small', 'log records too small to compress'),
     LogStat('log_compress_writes', 'log records compressed'),
     LogStat('log_compress_write_fails', 'log records not compressed'),
+    LogStat('log_direct_writes', 'log records written directly'),
     LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale'),
     LogStat('log_prealloc_files', 'pre-allocated log files prepared'),
     LogStat('log_prealloc_max',
@@ -258,8 +259,6 @@ connection_stats = [
     LogStat('log_slot_joins', 'consolidated slot joins'),
     LogStat('log_slot_races', 'consolidated slot join races'),
     LogStat('log_slot_toobig', 'record size exceeded maximum'),
-    LogStat('log_slot_toosmall',
-        'failed to find a slot large enough for record'),
     LogStat('log_slot_transitions', 'consolidated slot join transitions'),
 
     ##########################################
