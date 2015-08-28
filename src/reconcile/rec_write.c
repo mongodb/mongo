@@ -3270,34 +3270,33 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	/* Ensure enough room for a column-store key without checking. */
 	WT_ERR(__wt_scr_alloc(session, WT_INTPACK64_MAXSIZE, &key));
 
-	/* Enter each update in the boundary list into the lookaside store. */
+	/*
+	 * Each key in the lookaside table is associated with a block, and those
+	 * blocks are freed and reallocated to other pages as pages in the tree
+	 * are modified and reconciled. We want to be sure we don't add records
+	 * to the lookaside table, then discard the block to which they apply,
+	 * then write a new block to the same address, and then apply the old
+	 * records to the new block when it's read. We don't want to clean old
+	 * records out of the lookaside table every time we free a block because
+	 * that happens a lot and would be costly; instead, we clean out the old
+	 * records when adding new records into the lookaside table. This works
+	 * because we only read from the lookaside table for pages marked with
+	 * the WT_PAGE_LAS_UPDATE flag: that flag won't be set if we rewrite a
+	 * block with no lookaside records, so the lookaside table won't be
+	 * checked when the block is read, even if there are lookaside table
+	 * records matching that block. If we rewrite a block that has lookaside
+	 * records, we'll run this code, discarding any old records that might
+	 * exist.
+	 */
+	WT_ERR(__wt_las_remove_block(
+	    session, cursor, btree_id, bnd->addr.addr, bnd->addr.size));
+
+	/* Lookaside table key component: block address. */
+	las_addr.data = bnd->addr.addr;
+	las_addr.size = bnd->addr.size;
+
+	/* Enter each update in the boundary's list into the lookaside store. */
 	for (i = 0, list = bnd->supd; i < bnd->supd_next; ++i, ++list) {
-		/*
-		 * Each key in the lookaside table is associated with a block,
-		 * and those blocks are freed and reallocated to other pages
-		 * as pages in the tree are modified and reconciled. We want
-		 * to be sure we don't add records to the lookaside table, then
-		 * discard the block to which they apply, then write a new
-		 * block to the same address, and then apply the old records
-		 * to the new block when it's read. We don't want to clean old
-		 * records out of the lookaside table every time we free a block
-		 * because that happens a lot and would be costly; instead, we
-		 * clean out the old records when adding new records into the
-		 * lookaside table. This works because we only read from the
-		 * lookaside table for pages marked with the WT_PAGE_LAS_UPDATE
-		 * flag. If we rewrite a block that has no lookaside records,
-		 * the block won't have that flag set and so the lookaside table
-		 * won't be checked when the block is read. If we rewrite a
-		 * block that has lookaside records, we'll run this code which
-		 * cleans out any old records.
-		 */
-		WT_ERR(__wt_las_remove_block(
-		    session, cursor, btree_id, bnd->addr.addr, bnd->addr.size));
-
-		/* Lookaside table key component: block address. */
-		las_addr.data = bnd->addr.addr;
-		las_addr.size = bnd->addr.size;
-
 		/* Lookaside table key component: source key. */
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
