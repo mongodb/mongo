@@ -134,7 +134,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 		if ((count = txn_global->scan_count) < 0)
 			WT_PAUSE();
 	} while (count < 0 ||
-	    !WT_ATOMIC_CAS4(txn_global->scan_count, count, count + 1));
+	    !__wt_atomic_casiv32(&txn_global->scan_count, count, count + 1));
 
 	current_id = snap_min = txn_global->current;
 	prev_oldest_id = txn_global->oldest_id;
@@ -147,7 +147,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 		/* Check that the oldest ID has not moved in the meantime. */
 		if (prev_oldest_id == txn_global->oldest_id) {
 			WT_ASSERT(session, txn_global->scan_count > 0);
-			(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
+			(void)__wt_atomic_subiv32(&txn_global->scan_count, 1);
 			return;
 		}
 	}
@@ -183,7 +183,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	txn_state->snap_min = snap_min;
 
 	WT_ASSERT(session, txn_global->scan_count > 0);
-	(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
+	(void)__wt_atomic_subiv32(&txn_global->scan_count, 1);
 
 	__txn_sort_snapshot(session, n, current_id);
 }
@@ -237,7 +237,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		if ((count = txn_global->scan_count) < 0)
 			WT_PAUSE();
 	} while (count < 0 ||
-	    !WT_ATOMIC_CAS4(txn_global->scan_count, count, count + 1));
+	    !__wt_atomic_casiv32(&txn_global->scan_count, count, count + 1));
 
 	/* The oldest ID cannot change until the scan count goes to zero. */
 	prev_oldest_id = txn_global->oldest_id;
@@ -288,7 +288,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 
 	/* Update the oldest ID. */
 	if ((WT_TXNID_LT(prev_oldest_id, oldest_id) || last_running_moved) &&
-	    WT_ATOMIC_CAS4(txn_global->scan_count, 1, -1)) {
+	    __wt_atomic_casiv32(&txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 			if ((id = s->id) != WT_TXN_NONE &&
@@ -333,7 +333,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 			    oldest_session->txn.snap_min);
 		}
 		WT_ASSERT(session, txn_global->scan_count > 0);
-		(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
+		(void)__wt_atomic_subiv32(&txn_global->scan_count, 1);
 	}
 }
 
@@ -663,20 +663,29 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 {
 	WT_TXN_GLOBAL *txn_global;
 	WT_CONNECTION_IMPL *conn;
-	WT_CONNECTION_STATS *stats;
+	WT_CONNECTION_STATS **stats;
 	uint64_t checkpoint_pinned;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
-	stats = &conn->stats;
+	stats = conn->stats;
 	checkpoint_pinned = txn_global->checkpoint_pinned;
 
-	WT_STAT_SET(stats, txn_pinned_range,
-	    txn_global->current - txn_global->oldest_id);
+	WT_STAT_SET(session, stats, txn_pinned_range,
+	   txn_global->current - txn_global->oldest_id);
 
-	WT_STAT_SET(stats, txn_pinned_checkpoint_range,
+	WT_STAT_SET(session, stats, txn_pinned_checkpoint_range,
 	    checkpoint_pinned == WT_TXN_NONE ?
 	    0 : txn_global->current - checkpoint_pinned);
+
+	WT_STAT_SET(
+	    session, stats, txn_checkpoint_time_max, conn->ckpt_time_max);
+	WT_STAT_SET(
+	    session, stats, txn_checkpoint_time_min, conn->ckpt_time_min);
+	WT_STAT_SET(
+	    session, stats, txn_checkpoint_time_recent, conn->ckpt_time_recent);
+	WT_STAT_SET(
+	    session, stats, txn_checkpoint_time_total, conn->ckpt_time_total);
 }
 
 /*
@@ -719,6 +728,7 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_calloc_def(
 	    session, conn->session_size, &txn_global->states));
+	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, txn_global->states);
 
 	for (i = 0, s = txn_global->states; i < conn->session_size; i++, s++)
 		s->id = s->snap_min = WT_TXN_NONE;

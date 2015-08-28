@@ -58,7 +58,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
             cursor.set_value(v[0], v[1], v[2], v[3])
         else:
             cursor.set_value(value_populate(cursor, 10))
-            
+
     def test_reconfigure_overwrite(self):
         uri = self.type + self.name
         for open_config in (None, "overwrite=0", "overwrite=1"):
@@ -77,7 +77,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
                 self.set_kv(cursor)
                 cursor.insert()
             cursor.close()
-            
+
     def test_reconfigure_readonly(self):
         uri = self.type + self.name
         for open_config in (None, "readonly=0", "readonly=1"):

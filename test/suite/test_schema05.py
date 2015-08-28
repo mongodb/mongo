@@ -107,7 +107,7 @@ class test_schema05(wttest.WiredTigerTestCase):
             cursor[i] = ','.join([str((i*j)%100) for j in
                                   range(0, self.nindices)])
         cursor.close()
-        
+
     def check_entries(self):
         cursor = self.session.open_cursor('table:schema05', None, None)
         icursor = []

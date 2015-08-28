@@ -46,9 +46,15 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
     # with simply the wrong keyid may appear valid when initially verified,
     # but may result in error on first use. The odds that a real encryptor
     # would leave a lot of its input unchanged is infinitesimally small.
+    #
+    # When both self.forceerror1 and self.forceerror2 occur, we set a config
+    # flag when loading the rotn encryptor, which forces a particular error
+    # return in rotn.decrypt. We look for that return back from
+    # wiredtiger_open.
     encrypt_scen_1 = [
         ('none', dict( name1='none', keyid1='', secretkey1='')),
-        ('rotn17abc', dict( name1='rotn', keyid1='17', secretkey1='ABC')),
+        ('rotn17abc', dict( name1='rotn', keyid1='17',
+                                      secretkey1='ABC', forceerror1=True)),
         ('rotn11abc', dict( name1='rotn', keyid1='11', secretkey1='ABC')),
         ('rotn11xyz', dict( name1='rotn', keyid1='11', secretkey1='XYZ')),
         ('rotn11xyz_and_clear', dict( name1='rotn', keyid1='11',
@@ -58,7 +64,8 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         ('none', dict( name2='none', keyid2='', secretkey2='')),
         ('rotn17abc', dict( name2='rotn', keyid2='17', secretkey2='ABC')),
         ('rotn11abc', dict( name2='rotn', keyid2='11', secretkey2='ABC')),
-        ('rotn11xyz', dict( name2='rotn', keyid2='11', secretkey2='XYZ')),
+        ('rotn11xyz', dict( name2='rotn', keyid2='11',
+                                      secretkey2='XYZ', forceerror2=True)),
         ('rotn11xyz_and_clear', dict( name2='rotn', keyid2='11',
                                       secretkey2='XYZ', fileinclear2=True))
     ]
@@ -73,6 +80,7 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Override WiredTigerTestCase, we have extensions.
     def setUpConnectionOpen(self, dir):
+        forceerror = None
         if self.part == 1:
             self.name = self.name1
             self.keyid = self.keyid1
@@ -85,15 +93,28 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
             self.secretkey = self.secretkey2
             self.fileinclear = self.fileinclear2 if \
                                hasattr(self, 'fileinclear2') else False
+            if hasattr(self, 'forceerror1') and hasattr(self, 'forceerror2'):
+                forceerror = "rotn_force_error=true"
+        self.expect_forceerror = forceerror != None
+        self.got_forceerror = False
 
         encarg = 'encryption=(name={0},keyid={1},secretkey={2}),'.format(
             self.name, self.keyid, self.secretkey)
-        extarg = self.extensionArg([('encryptors', self.name),
-            ('encryptors', self.name)])
+        # If forceerror is set for this test, add a config arg to
+        # the extension string. That signals rotn to return a (-1000)
+        # error code, which we'll detect here.
+        extarg = self.extensionArg([('encryptors', self.name, forceerror)])
         self.pr('encarg = ' + encarg + ' extarg = ' + extarg)
-        conn = wiredtiger.wiredtiger_open(dir,
-            'create,error_prefix="{0}: ",{1}{2}'.format(
-                self.shortid(), encarg, extarg))
+        completed = False
+        try:
+            conn = wiredtiger.wiredtiger_open(dir,
+                'create,error_prefix="{0}: ",{1}{2}'.format(
+                 self.shortid(), encarg, extarg))
+        except (BaseException) as err:
+            # Capture the recognizable error created by rotn
+            if str(-1000) in str(err):
+                self.got_forceerror = True
+            raise
         self.pr(`conn`)
         return conn
 
@@ -119,7 +140,7 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
     def extensionArg(self, exts):
         extfiles = []
         for ext in exts:
-            (dirname, name) = ext
+            (dirname, name, extarg) = ext
             if name != None and name != 'none':
                 testdir = os.path.dirname(__file__)
                 extdir = os.path.join(run.wt_builddir, 'ext', dirname)
@@ -127,12 +148,16 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
                     extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
                 if not os.path.exists(extfile):
                     self.skipTest('extension "' + extfile + '" not built')
+                extfile = '"' + extfile + '"'
                 if not extfile in extfiles:
-                    extfiles.append(extfile)
+                    s = extfile
+                    if extarg != None:
+                        s += "=(config=\"" + extarg + "\")"
+                    extfiles.append(s)
         if len(extfiles) == 0:
             return ''
         else:
-            return ',extensions=["' + '","'.join(extfiles) + '"]'
+            return ',extensions=[' + ','.join(extfiles) + ']'
 
     # Evaluate expression, which either must succeed (if expect_okay)
     # or must fail (if !expect_okay).
@@ -204,7 +229,8 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
                 self.check_records(cursor, r, 0, self.nrecords)
                 self.check_records(cursor, r, self.nrecords, self.nrecords * 2)
             cursor.close()
-        
+        self.assertEqual(self.expect_forceerror, self.got_forceerror)
+
 
 if __name__ == '__main__':
     wttest.run()

@@ -71,7 +71,7 @@ class test_backup05(wttest.WiredTigerTestCase, suite_subprocess):
         session = self.setUpSessionOpen(conn)
         session.verify(self.uri)
         conn.close()
-        
+
     def test_backup(self):
         '''Check manual fsyncLock backup strategy'''
 

@@ -70,7 +70,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         for checkpoint_name, entry in self.checkpoints.iteritems():
             self.add_records(checkpoint_name)
             self.session.checkpoint("name=" + checkpoint_name)
-            
+
     # Create a dictionary of sorted records a checkpoint should include.
     def list_expected(self, name):
         records = {}

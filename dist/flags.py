@@ -12,7 +12,6 @@ flags = {
         'SYNC_CHECKPOINT',
         'SYNC_CLOSE',
         'SYNC_DISCARD',
-        'SYNC_DISCARD_FORCE',
         'SYNC_WRITE_LEAVES',
     ],
     'file_types' : [
@@ -107,7 +106,6 @@ flags = {
     'session' : [
         'SESSION_CAN_WAIT',
         'SESSION_CLEAR_EVICT_WALK',
-        'SESSION_DISCARD_FORCE',
         'SESSION_LOCKED_CHECKPOINT',
         'SESSION_LOCKED_HANDLE_LIST',
         'SESSION_LOCKED_SCHEMA',
@@ -119,7 +117,7 @@ flags = {
         'SESSION_NO_DATA_HANDLES',
         'SESSION_NO_LOGGING',
         'SESSION_NO_SCHEMA_LOCK',
-        'SESSION_SALVAGE_CORRUPT_OK',
+        'SESSION_QUIET_CORRUPT_FILE',
         'SESSION_SERVER_ASYNC',
     ],
 }

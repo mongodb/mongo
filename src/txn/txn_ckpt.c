@@ -285,19 +285,22 @@ static void
 __checkpoint_stats(
     WT_SESSION_IMPL *session, struct timespec *start, struct timespec *stop)
 {
+	WT_CONNECTION_IMPL *conn;
 	uint64_t msec;
+
+	conn = S2C(session);
 
 	/*
 	 * Get time diff in microseconds.
 	 */
 	msec = WT_TIMEDIFF(*stop, *start) / WT_MILLION;
-	if (msec > WT_CONN_STAT(session, txn_checkpoint_time_max))
-		WT_STAT_FAST_CONN_SET(session, txn_checkpoint_time_max, msec);
-	if (WT_CONN_STAT(session, txn_checkpoint_time_min) == 0 ||
-	    msec < WT_CONN_STAT(session, txn_checkpoint_time_min))
-		WT_STAT_FAST_CONN_SET(session, txn_checkpoint_time_min, msec);
-	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_time_recent, msec);
-	WT_STAT_FAST_CONN_INCRV(session, txn_checkpoint_time_total, msec);
+
+	if (msec > conn->ckpt_time_max)
+		conn->ckpt_time_max = msec;
+	if (conn->ckpt_time_min == 0 || msec < conn->ckpt_time_min)
+		conn->ckpt_time_min = msec;
+	conn->ckpt_time_recent = msec;
+	conn->ckpt_time_total += msec;
 }
 
 /*
@@ -1161,9 +1164,9 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 	btree = S2BT(session);
 	bulk = F_ISSET(btree, WT_BTREE_BULK) ? 1 : 0;
 
-	/* If the handle is already dead, force the discard. */
+	/* If the handle is already dead, discard it. */
 	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
-		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD_FORCE));
+		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
 
 	/*
 	 * If closing an unmodified file, check that no update is required

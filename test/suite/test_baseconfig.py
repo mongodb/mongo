@@ -25,31 +25,30 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
 
 import os
-from wiredtiger import wiredtiger_open
+import wiredtiger, wttest
 
-# Connect to the database and open a session
-os.system('rm -rf WT_HOME')
-os.makedirs('WT_HOME')
+# test_baseconfig
+#       test base configuration file being ignored.
+class test_baseconfig(wttest.WiredTigerTestCase):
+    def test_baseconfig(self):
+        # Open up another database and modify the baseconfig
+        os.mkdir("A")
+        conn = wiredtiger.wiredtiger_open("A", 'create')
+        self.assertTrue(os.path.exists("A/WiredTiger.basecfg"))
+        with open("A/WiredTiger.basecfg", "a") as basecfg_file:
+            basecfg_file.write("foo!")
+        conn.close()
 
-conn = wiredtiger_open('WT_HOME', 'create')
-session = conn.open_session()
+        # Open a database, we should assert here as the basecfg is invalid
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError,
+            lambda: wiredtiger.wiredtiger_open("A", ''),
+            '/unknown configuration key/')
 
-# Create a simple table
-session.create('table:T', 'key_format=S,value_format=S')
+        conn = wiredtiger.wiredtiger_open("A", "create,config_base=false")
+        conn.close()
 
-# Open a cursor and insert a record
-cursor = session.open_cursor('table:T', None)
-
-cursor.set_key('key1')
-cursor.set_value('value1')
-cursor.insert()
-
-# Iterate through the records
-cursor.reset()
-for key, value in cursor:
-    print('Got record: %s : %s' % (key, value))
-
-conn.close()
+if __name__ == '__main__':
+    wttest.run()

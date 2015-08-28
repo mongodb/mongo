@@ -151,15 +151,16 @@ retry:
 	 * If we can set the state then the op entry is ours.
 	 * Start the next search at the next entry after this one.
 	 */
-	if (!WT_ATOMIC_CAS4(op->state, WT_ASYNCOP_FREE, WT_ASYNCOP_READY)) {
+	if (!__wt_atomic_cas32(&op->state, WT_ASYNCOP_FREE, WT_ASYNCOP_READY)) {
 		WT_STAT_FAST_CONN_INCR(session, async_alloc_race);
 		goto retry;
 	}
 	WT_STAT_FAST_CONN_INCRV(session, async_alloc_view, view);
 	WT_RET(__async_get_format(conn, uri, config, op));
-	op->unique_id = WT_ATOMIC_ADD8(async->op_id, 1);
+	op->unique_id = __wt_atomic_add64(&async->op_id, 1);
 	op->optype = WT_AOP_NONE;
-	(void)WT_ATOMIC_STORE4(async->ops_index, (i + 1) % conn->async_size);
+	(void)__wt_atomic_store32(
+	    &async->ops_index, (i + 1) % conn->async_size);
 	*opp = op;
 	return (0);
 }
@@ -206,15 +207,15 @@ __wt_async_stats_update(WT_SESSION_IMPL *session)
 {
 	WT_ASYNC *async;
 	WT_CONNECTION_IMPL *conn;
-	WT_CONNECTION_STATS *stats;
+	WT_CONNECTION_STATS **stats;
 
 	conn = S2C(session);
 	async = conn->async;
 	if (async == NULL)
 		return;
-	stats = &conn->stats;
-	WT_STAT_SET(stats, async_cur_queue, async->cur_queue);
-	WT_STAT_SET(stats, async_max_queue, async->max_queue);
+	stats = conn->stats;
+	WT_STAT_SET(session, stats, async_cur_queue, async->cur_queue);
+	WT_STAT_SET(session, stats, async_max_queue, async->max_queue);
 	F_SET(conn, WT_CONN_SERVER_ASYNC);
 }
 
@@ -514,7 +515,7 @@ retry:
 		 */
 		__wt_sleep(0, 100000);
 
-	if (!WT_ATOMIC_CAS4(async->flush_state, WT_ASYNC_FLUSH_NONE,
+	if (!__wt_atomic_cas32(&async->flush_state, WT_ASYNC_FLUSH_NONE,
 	    WT_ASYNC_FLUSH_IN_PROGRESS))
 		goto retry;
 	/*
@@ -524,7 +525,7 @@ retry:
 	 * things off the work queue with the lock.
 	 */
 	async->flush_count = 0;
-	(void)WT_ATOMIC_ADD8(async->flush_gen, 1);
+	(void)__wt_atomic_add64(&async->flush_gen, 1);
 	WT_ASSERT(session, async->flush_op.state == WT_ASYNCOP_FREE);
 	async->flush_op.state = WT_ASYNCOP_READY;
 	WT_ERR(__wt_async_op_enqueue(session, &async->flush_op));

@@ -312,7 +312,7 @@ if __name__ == '__main__':
     else:
         for arg in testargs:
             testsFromArg(tests, loader, arg)
-        
+
     if debug:
         import pdb
         pdb.set_trace()

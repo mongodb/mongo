@@ -6,121 +6,216 @@
  * See the file LICENSE for redistribution information.
  */
 
-struct __wt_stats {
-	const char	*desc;				/* text description */
-	uint64_t	 v;				/* 64-bit value */
-};
+/*
+ * Statistics counters:
+ *
+ * We use an array of statistics structures; threads write different structures
+ * to avoid writing the same cache line and incurring cache coherency overheads,
+ * which can dramatically slow fast and otherwise read-mostly workloads.
+ *
+ * With an 8B statistics value and 64B cache-line alignment, 8 values share the
+ * same cache line. There are collisions when different threads choose the same
+ * statistics structure and update values that live on the cache line. There is
+ * likely some locality however: a thread updating the cursor search statistic
+ * is likely to update other cursor statistics with a chance of hitting already
+ * cached values.
+ *
+ * The actual statistic value must be signed, because one thread might increment
+ * the value in its structure, and then another thread might decrement the same
+ * value in another structure (where the value was initially zero), so the value
+ * in the second thread's slot will go negative.
+ *
+ * When reading a statistics value, the array values are summed and returned to
+ * the caller. The summation is performed without locking, so the value read
+ * may be inconsistent (and might be negative, if increments/decrements race
+ * with the reader).
+ *
+ * Choosing how many structures isn't easy: obviously, a smaller number creates
+ * more conflicts while a larger number uses more memory.
+ *
+ * Ideally, if the application running on the system is CPU-intensive, and using
+ * all CPUs on the system, we want to use the same number of slots as there are
+ * CPUs (because their L1 caches are the units of coherency). However, in
+ * practice we cannot easily determine how many CPUs are actually available to
+ * the application.
+ *
+ * Our next best option is to use the number of threads in the application as a
+ * heuristic for the number of CPUs (presumably, the application architect has
+ * figured out how many CPUs are available). However, inside WiredTiger we don't
+ * know when the application creates its threads.
+ *
+ * For now, we use a fixed number of slots. Ideally, we would approximate the
+ * largest number of cores we expect on any machine where WiredTiger might be
+ * run, however, we don't want to waste that much memory on smaller machines.
+ * As of 2015, machines with more than 24 CPUs are relatively rare.
+ *
+ * Default hash table size; use a prime number of buckets rather than assuming
+ * a good hash (Reference Sedgewick, Algorithms in C, "Hash Functions").
+ */
+#define	WT_COUNTER_SLOTS	23
 
 /*
- * Read/write statistics without any test for statistics configuration.
+ * WT_STATS_SLOT_ID is the thread's slot ID for the array of structures.
+ *
+ * Ideally, we want a slot per CPU, and we want each thread to index the slot
+ * corresponding to the CPU it runs on. Unfortunately, getting the ID of the
+ * current CPU is difficult: some operating systems provide a system call to
+ * acquire a CPU ID, but not all (regardless, making a system call to increment
+ * a statistics value is far too expensive).
+ *
+ * Our second-best option is to use the thread ID. Unfortunately, there is no
+ * portable way to obtain a unique thread ID that's a small-enough number to
+ * be used as an array index (portable thread IDs are usually a pointer or an
+ * opaque chunk, not a simple integer).
+ *
+ * Our solution is to use the session ID; there is normally a session per thread
+ * and the session ID is a small, monotonically increasing number.
  */
-#define	WT_STAT(stats, fld)						\
-	((stats)->fld.v)
-#define	WT_STAT_ATOMIC_DECRV(stats, fld, value) do {			\
-	(void)WT_ATOMIC_SUB8(WT_STAT(stats, fld), (value));		\
-} while (0)
-#define	WT_STAT_ATOMIC_DECR(stats, fld) WT_STAT_ATOMIC_DECRV(stats, fld, 1)
-#define	WT_STAT_ATOMIC_INCRV(stats, fld, value) do {			\
-	(void)WT_ATOMIC_ADD8(WT_STAT(stats, fld), (value));		\
-} while (0)
-#define	WT_STAT_ATOMIC_INCR(stats, fld) WT_STAT_ATOMIC_INCRV(stats, fld, 1)
-#define	WT_STAT_DECRV(stats, fld, value) do {				\
-	(stats)->fld.v -= (value);					\
-} while (0)
-#define	WT_STAT_DECR(stats, fld) WT_STAT_DECRV(stats, fld, 1)
-#define	WT_STAT_INCRV(stats, fld, value) do {				\
-	(stats)->fld.v += (value);					\
-} while (0)
-#define	WT_STAT_INCR(stats, fld) WT_STAT_INCRV(stats, fld, 1)
-#define	WT_STAT_SET(stats, fld, value) do {				\
-	(stats)->fld.v = (uint64_t)(value);				\
+#define	WT_STATS_SLOT_ID(session)					\
+	((session)->id) % WT_COUNTER_SLOTS
+
+/*
+ * Statistic structures are arrays of int64_t's. We have functions to read/write
+ * those structures regardless of the specific statistic structure we're working
+ * with, by translating statistics structure field names to structure offsets.
+ *
+ * Translate a statistic's value name to an offset.
+ */
+#define	WT_STATS_FIELD_TO_SLOT(stats, fld)				\
+	(int)(&(stats)[0]->fld - (int64_t *)(stats)[0])
+
+/*
+ * Sum the values from all structures in the array.
+ */
+static inline int64_t
+__wt_stats_aggregate(void *stats_arg, int slot)
+{
+	int64_t **stats, aggr_v;
+	int i;
+
+	stats = stats_arg;
+	for (aggr_v = 0, i = 0; i < WT_COUNTER_SLOTS; i++)
+		aggr_v += stats[i][slot];
+
+	/*
+	 * This can race. However, any implementation with a single value can
+	 * race as well, different threads could set the same counter value
+	 * simultaneously. While we are making races more likely, we are not
+	 * fundamentally weakening the isolation semantics found in updating a
+	 * single value.
+	 *
+	 * Additionally, the aggregation can go negative (imagine a thread
+	 * incrementing a value after aggregation has passed its slot and a
+	 * second thread decrementing a value before aggregation has reached
+	 * its slot).
+	 *
+	 * For historic API compatibility, the external type is a uint64_t;
+	 * limit our return to positive values, negative numbers would just
+	 * look really, really large.
+	 */
+	if (aggr_v < 0)
+		aggr_v = 0;
+	return (aggr_v);
+}
+
+/*
+ * Clear the values in all structures in the array.
+ */
+static inline void
+__wt_stats_clear(void *stats_arg, int slot)
+{
+	int64_t **stats;
+	int i;
+
+	stats = stats_arg;
+	for (i = 0; i < WT_COUNTER_SLOTS; i++)
+		stats[i][slot] = 0;
+}
+
+/*
+ * Read/write statistics without any test for statistics configuration. Reading
+ * and writing the field requires different actions: reading sums the values
+ * across the array of structures, writing updates a single structure's value.
+ */
+#define	WT_STAT_READ(stats, fld)					\
+	__wt_stats_aggregate(stats, WT_STATS_FIELD_TO_SLOT(stats, fld))
+#define	WT_STAT_WRITE(session, stats, fld)				\
+	((stats)[WT_STATS_SLOT_ID(session)]->fld);
+
+#define	WT_STAT_DECRV(session, stats, fld, value)			\
+	(stats)[WT_STATS_SLOT_ID(session)]->fld -= (int64_t)(value)
+#define	WT_STAT_DECR(session, stats, fld)				\
+	WT_STAT_DECRV(session, stats, fld, 1)
+#define	WT_STAT_INCRV(session, stats, fld, value)			\
+	(stats)[WT_STATS_SLOT_ID(session)]->fld += (int64_t)(value)
+#define	WT_STAT_INCR(session, stats, fld)				\
+	WT_STAT_INCRV(session, stats, fld, 1)
+#define	WT_STAT_SET(session, stats, fld, value) do {			\
+	__wt_stats_clear(stats, WT_STATS_FIELD_TO_SLOT(stats, fld));	\
+	(stats)[0]->fld = (int64_t)(value);				\
 } while (0)
 
 /*
- * Read/write statistics if "fast" statistics are configured.
+ * Update statistics if "fast" statistics are configured.
  */
-#define	WT_STAT_FAST_ATOMIC_DECRV(session, stats, fld, value) do {	\
-	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
-		WT_STAT_ATOMIC_DECRV(stats, fld, value);		\
-} while (0)
-#define	WT_STAT_FAST_ATOMIC_DECR(session, stats, fld)			\
-	WT_STAT_FAST_ATOMIC_DECRV(session, stats, fld, 1)
-#define	WT_STAT_FAST_ATOMIC_INCRV(session, stats, fld, value) do {	\
-	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
-		WT_STAT_ATOMIC_INCRV(stats, fld, value);		\
-} while (0)
-#define	WT_STAT_FAST_ATOMIC_INCR(session, stats, fld)			\
-	WT_STAT_FAST_ATOMIC_INCRV(session, stats, fld, 1)
 #define	WT_STAT_FAST_DECRV(session, stats, fld, value) do {		\
 	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
-		WT_STAT_DECRV(stats, fld, value);			\
+		WT_STAT_DECRV(session, stats, fld, value);		\
 } while (0)
 #define	WT_STAT_FAST_DECR(session, stats, fld)				\
 	WT_STAT_FAST_DECRV(session, stats, fld, 1)
 #define	WT_STAT_FAST_INCRV(session, stats, fld, value) do {		\
 	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
-		WT_STAT_INCRV(stats, fld, value);			\
+		WT_STAT_INCRV(session, stats, fld, value);		\
 } while (0)
 #define	WT_STAT_FAST_INCR(session, stats, fld)				\
 	WT_STAT_FAST_INCRV(session, stats, fld, 1)
 #define	WT_STAT_FAST_SET(session, stats, fld, value) do {		\
 	if (FLD_ISSET(S2C(session)->stat_flags, WT_CONN_STAT_FAST))	\
-		WT_STAT_SET(stats, fld, value);				\
+		WT_STAT_SET(session, stats, fld, value);		\
 } while (0)
 
 /*
- * Read/write connection handle statistics if "fast" statistics are configured.
+ * Update connection handle statistics if "fast" statistics are configured.
  */
-#define	WT_STAT_FAST_CONN_ATOMIC_DECRV(session, fld, value)		\
-	WT_STAT_FAST_ATOMIC_DECRV(session, &S2C(session)->stats, fld, value)
-#define	WT_STAT_FAST_CONN_ATOMIC_DECR(session, fld)			\
-	WT_STAT_FAST_ATOMIC_DECR(session, &S2C(session)->stats, fld)
-#define	WT_STAT_FAST_CONN_ATOMIC_INCRV(session, fld, value)		\
-	WT_STAT_FAST_ATOMIC_INCRV(session, &S2C(session)->stats, fld, value)
-#define	WT_STAT_FAST_CONN_ATOMIC_INCR(session, fld)			\
-	WT_STAT_FAST_ATOMIC_INCR(session, &S2C(session)->stats, fld)
 #define	WT_STAT_FAST_CONN_DECR(session, fld)				\
-	WT_STAT_FAST_DECR(session, &S2C(session)->stats, fld)
+	WT_STAT_FAST_DECR(session, S2C(session)->stats, fld)
 #define	WT_STAT_FAST_CONN_DECRV(session, fld, value)			\
-	WT_STAT_FAST_DECRV(session, &S2C(session)->stats, fld, value)
+	WT_STAT_FAST_DECRV(session, S2C(session)->stats, fld, value)
 #define	WT_STAT_FAST_CONN_INCR(session, fld)				\
-	WT_STAT_FAST_INCR(session, &S2C(session)->stats, fld)
+	WT_STAT_FAST_INCR(session, S2C(session)->stats, fld)
 #define	WT_STAT_FAST_CONN_INCRV(session, fld, value)			\
-	WT_STAT_FAST_INCRV(session, &S2C(session)->stats, fld, value)
+	WT_STAT_FAST_INCRV(session, S2C(session)->stats, fld, value)
 #define	WT_STAT_FAST_CONN_SET(session, fld, value)			\
-	WT_STAT_FAST_SET(session, &S2C(session)->stats, fld, value)
+	WT_STAT_FAST_SET(session, S2C(session)->stats, fld, value)
 
 /*
- * Read/write data-source handle statistics if the data-source handle is set
- * and "fast" statistics are configured.
+ * Update data-source handle statistics if "fast" statistics are configured
+ * and the data-source handle is set.
  *
  * XXX
  * We shouldn't have to check if the data-source handle is NULL, but it's
- * useful until everything is converted to using data-source handles.
+ * necessary until everything is converted to using data-source handles.
  */
 #define	WT_STAT_FAST_DATA_DECRV(session, fld, value) do {		\
 	if ((session)->dhandle != NULL)					\
 		WT_STAT_FAST_DECRV(					\
-		    session, &(session)->dhandle->stats, fld, value);	\
+		    session, (session)->dhandle->stats, fld, value);	\
 } while (0)
 #define	WT_STAT_FAST_DATA_DECR(session, fld)				\
 	WT_STAT_FAST_DATA_DECRV(session, fld, 1)
 #define	WT_STAT_FAST_DATA_INCRV(session, fld, value) do {		\
 	if ((session)->dhandle != NULL)					\
 		WT_STAT_FAST_INCRV(					\
-		    session, &(session)->dhandle->stats, fld, value);	\
+		    session, (session)->dhandle->stats, fld, value);	\
 } while (0)
 #define	WT_STAT_FAST_DATA_INCR(session, fld)				\
 	WT_STAT_FAST_DATA_INCRV(session, fld, 1)
 #define	WT_STAT_FAST_DATA_SET(session, fld, value) do {			\
 	if ((session)->dhandle != NULL)					\
 		WT_STAT_FAST_SET(					\
-		   session, &(session)->dhandle->stats, fld, value);	\
+		    session, (session)->dhandle->stats, fld, value);	\
 } while (0)
-
-/* Connection handle statistics value. */
-#define	WT_CONN_STAT(session, fld)					\
-	WT_STAT(&S2C(session)->stats, fld)
 
 /*
  * DO NOT EDIT: automatically built by dist/stat.py.
@@ -132,150 +227,151 @@ struct __wt_stats {
  */
 #define	WT_CONNECTION_STATS_BASE	1000
 struct __wt_connection_stats {
-	WT_STATS async_alloc_race;
-	WT_STATS async_alloc_view;
-	WT_STATS async_cur_queue;
-	WT_STATS async_flush;
-	WT_STATS async_full;
-	WT_STATS async_max_queue;
-	WT_STATS async_nowork;
-	WT_STATS async_op_alloc;
-	WT_STATS async_op_compact;
-	WT_STATS async_op_insert;
-	WT_STATS async_op_remove;
-	WT_STATS async_op_search;
-	WT_STATS async_op_update;
-	WT_STATS block_byte_map_read;
-	WT_STATS block_byte_read;
-	WT_STATS block_byte_write;
-	WT_STATS block_map_read;
-	WT_STATS block_preload;
-	WT_STATS block_read;
-	WT_STATS block_write;
-	WT_STATS cache_bytes_dirty;
-	WT_STATS cache_bytes_internal;
-	WT_STATS cache_bytes_inuse;
-	WT_STATS cache_bytes_leaf;
-	WT_STATS cache_bytes_max;
-	WT_STATS cache_bytes_overflow;
-	WT_STATS cache_bytes_read;
-	WT_STATS cache_bytes_write;
-	WT_STATS cache_eviction_app;
-	WT_STATS cache_eviction_checkpoint;
-	WT_STATS cache_eviction_clean;
-	WT_STATS cache_eviction_deepen;
-	WT_STATS cache_eviction_dirty;
-	WT_STATS cache_eviction_fail;
-	WT_STATS cache_eviction_force;
-	WT_STATS cache_eviction_force_delete;
-	WT_STATS cache_eviction_force_fail;
-	WT_STATS cache_eviction_hazard;
-	WT_STATS cache_eviction_internal;
-	WT_STATS cache_eviction_maximum_page_size;
-	WT_STATS cache_eviction_queue_empty;
-	WT_STATS cache_eviction_queue_not_empty;
-	WT_STATS cache_eviction_server_evicting;
-	WT_STATS cache_eviction_server_not_evicting;
-	WT_STATS cache_eviction_slow;
-	WT_STATS cache_eviction_split;
-	WT_STATS cache_eviction_walk;
-	WT_STATS cache_eviction_worker_evicting;
-	WT_STATS cache_inmem_split;
-	WT_STATS cache_overhead;
-	WT_STATS cache_pages_dirty;
-	WT_STATS cache_pages_inuse;
-	WT_STATS cache_read;
-	WT_STATS cache_write;
-	WT_STATS cond_wait;
-	WT_STATS cursor_create;
-	WT_STATS cursor_insert;
-	WT_STATS cursor_next;
-	WT_STATS cursor_prev;
-	WT_STATS cursor_remove;
-	WT_STATS cursor_reset;
-	WT_STATS cursor_search;
-	WT_STATS cursor_search_near;
-	WT_STATS cursor_update;
-	WT_STATS dh_conn_handle_count;
-	WT_STATS dh_session_handles;
-	WT_STATS dh_session_sweeps;
-	WT_STATS dh_sweep_close;
-	WT_STATS dh_sweep_ref;
-	WT_STATS dh_sweep_remove;
-	WT_STATS dh_sweep_tod;
-	WT_STATS dh_sweeps;
-	WT_STATS file_open;
-	WT_STATS log_buffer_size;
-	WT_STATS log_bytes_payload;
-	WT_STATS log_bytes_written;
-	WT_STATS log_close_yields;
-	WT_STATS log_compress_len;
-	WT_STATS log_compress_mem;
-	WT_STATS log_compress_small;
-	WT_STATS log_compress_write_fails;
-	WT_STATS log_compress_writes;
-	WT_STATS log_max_filesize;
-	WT_STATS log_prealloc_files;
-	WT_STATS log_prealloc_max;
-	WT_STATS log_prealloc_used;
-	WT_STATS log_release_write_lsn;
-	WT_STATS log_scan_records;
-	WT_STATS log_scan_rereads;
-	WT_STATS log_scans;
-	WT_STATS log_slot_closes;
-	WT_STATS log_slot_coalesced;
-	WT_STATS log_slot_consolidated;
-	WT_STATS log_slot_joins;
-	WT_STATS log_slot_races;
-	WT_STATS log_slot_toobig;
-	WT_STATS log_slot_toosmall;
-	WT_STATS log_slot_transitions;
-	WT_STATS log_sync;
-	WT_STATS log_sync_dir;
-	WT_STATS log_write_lsn;
-	WT_STATS log_writes;
-	WT_STATS lsm_checkpoint_throttle;
-	WT_STATS lsm_merge_throttle;
-	WT_STATS lsm_rows_merged;
-	WT_STATS lsm_work_queue_app;
-	WT_STATS lsm_work_queue_manager;
-	WT_STATS lsm_work_queue_max;
-	WT_STATS lsm_work_queue_switch;
-	WT_STATS lsm_work_units_created;
-	WT_STATS lsm_work_units_discarded;
-	WT_STATS lsm_work_units_done;
-	WT_STATS memory_allocation;
-	WT_STATS memory_free;
-	WT_STATS memory_grow;
-	WT_STATS page_busy_blocked;
-	WT_STATS page_forcible_evict_blocked;
-	WT_STATS page_locked_blocked;
-	WT_STATS page_read_blocked;
-	WT_STATS page_sleep;
-	WT_STATS read_io;
-	WT_STATS rec_pages;
-	WT_STATS rec_pages_eviction;
-	WT_STATS rec_split_stashed_bytes;
-	WT_STATS rec_split_stashed_objects;
-	WT_STATS rwlock_read;
-	WT_STATS rwlock_write;
-	WT_STATS session_cursor_open;
-	WT_STATS session_open;
-	WT_STATS txn_begin;
-	WT_STATS txn_checkpoint;
-	WT_STATS txn_checkpoint_generation;
-	WT_STATS txn_checkpoint_running;
-	WT_STATS txn_checkpoint_time_max;
-	WT_STATS txn_checkpoint_time_min;
-	WT_STATS txn_checkpoint_time_recent;
-	WT_STATS txn_checkpoint_time_total;
-	WT_STATS txn_commit;
-	WT_STATS txn_fail_cache;
-	WT_STATS txn_pinned_checkpoint_range;
-	WT_STATS txn_pinned_range;
-	WT_STATS txn_rollback;
-	WT_STATS txn_sync;
-	WT_STATS write_io;
+	int64_t async_alloc_race;
+	int64_t async_alloc_view;
+	int64_t async_cur_queue;
+	int64_t async_flush;
+	int64_t async_full;
+	int64_t async_max_queue;
+	int64_t async_nowork;
+	int64_t async_op_alloc;
+	int64_t async_op_compact;
+	int64_t async_op_insert;
+	int64_t async_op_remove;
+	int64_t async_op_search;
+	int64_t async_op_update;
+	int64_t block_byte_map_read;
+	int64_t block_byte_read;
+	int64_t block_byte_write;
+	int64_t block_map_read;
+	int64_t block_preload;
+	int64_t block_read;
+	int64_t block_write;
+	int64_t cache_bytes_dirty;
+	int64_t cache_bytes_internal;
+	int64_t cache_bytes_inuse;
+	int64_t cache_bytes_leaf;
+	int64_t cache_bytes_max;
+	int64_t cache_bytes_overflow;
+	int64_t cache_bytes_read;
+	int64_t cache_bytes_write;
+	int64_t cache_eviction_app;
+	int64_t cache_eviction_checkpoint;
+	int64_t cache_eviction_clean;
+	int64_t cache_eviction_deepen;
+	int64_t cache_eviction_dirty;
+	int64_t cache_eviction_fail;
+	int64_t cache_eviction_force;
+	int64_t cache_eviction_force_delete;
+	int64_t cache_eviction_force_fail;
+	int64_t cache_eviction_hazard;
+	int64_t cache_eviction_internal;
+	int64_t cache_eviction_maximum_page_size;
+	int64_t cache_eviction_queue_empty;
+	int64_t cache_eviction_queue_not_empty;
+	int64_t cache_eviction_server_evicting;
+	int64_t cache_eviction_server_not_evicting;
+	int64_t cache_eviction_slow;
+	int64_t cache_eviction_split;
+	int64_t cache_eviction_walk;
+	int64_t cache_eviction_worker_evicting;
+	int64_t cache_inmem_split;
+	int64_t cache_overhead;
+	int64_t cache_pages_dirty;
+	int64_t cache_pages_inuse;
+	int64_t cache_read;
+	int64_t cache_write;
+	int64_t cond_wait;
+	int64_t cursor_create;
+	int64_t cursor_insert;
+	int64_t cursor_next;
+	int64_t cursor_prev;
+	int64_t cursor_remove;
+	int64_t cursor_reset;
+	int64_t cursor_restart;
+	int64_t cursor_search;
+	int64_t cursor_search_near;
+	int64_t cursor_update;
+	int64_t dh_conn_handle_count;
+	int64_t dh_session_handles;
+	int64_t dh_session_sweeps;
+	int64_t dh_sweep_close;
+	int64_t dh_sweep_ref;
+	int64_t dh_sweep_remove;
+	int64_t dh_sweep_tod;
+	int64_t dh_sweeps;
+	int64_t file_open;
+	int64_t log_buffer_size;
+	int64_t log_bytes_payload;
+	int64_t log_bytes_written;
+	int64_t log_close_yields;
+	int64_t log_compress_len;
+	int64_t log_compress_mem;
+	int64_t log_compress_small;
+	int64_t log_compress_write_fails;
+	int64_t log_compress_writes;
+	int64_t log_max_filesize;
+	int64_t log_prealloc_files;
+	int64_t log_prealloc_max;
+	int64_t log_prealloc_used;
+	int64_t log_release_write_lsn;
+	int64_t log_scan_records;
+	int64_t log_scan_rereads;
+	int64_t log_scans;
+	int64_t log_slot_closes;
+	int64_t log_slot_coalesced;
+	int64_t log_slot_consolidated;
+	int64_t log_slot_joins;
+	int64_t log_slot_races;
+	int64_t log_slot_toobig;
+	int64_t log_slot_toosmall;
+	int64_t log_slot_transitions;
+	int64_t log_sync;
+	int64_t log_sync_dir;
+	int64_t log_write_lsn;
+	int64_t log_writes;
+	int64_t lsm_checkpoint_throttle;
+	int64_t lsm_merge_throttle;
+	int64_t lsm_rows_merged;
+	int64_t lsm_work_queue_app;
+	int64_t lsm_work_queue_manager;
+	int64_t lsm_work_queue_max;
+	int64_t lsm_work_queue_switch;
+	int64_t lsm_work_units_created;
+	int64_t lsm_work_units_discarded;
+	int64_t lsm_work_units_done;
+	int64_t memory_allocation;
+	int64_t memory_free;
+	int64_t memory_grow;
+	int64_t page_busy_blocked;
+	int64_t page_forcible_evict_blocked;
+	int64_t page_locked_blocked;
+	int64_t page_read_blocked;
+	int64_t page_sleep;
+	int64_t read_io;
+	int64_t rec_pages;
+	int64_t rec_pages_eviction;
+	int64_t rec_split_stashed_bytes;
+	int64_t rec_split_stashed_objects;
+	int64_t rwlock_read;
+	int64_t rwlock_write;
+	int64_t session_cursor_open;
+	int64_t session_open;
+	int64_t txn_begin;
+	int64_t txn_checkpoint;
+	int64_t txn_checkpoint_generation;
+	int64_t txn_checkpoint_running;
+	int64_t txn_checkpoint_time_max;
+	int64_t txn_checkpoint_time_min;
+	int64_t txn_checkpoint_time_recent;
+	int64_t txn_checkpoint_time_total;
+	int64_t txn_commit;
+	int64_t txn_fail_cache;
+	int64_t txn_pinned_checkpoint_range;
+	int64_t txn_pinned_range;
+	int64_t txn_rollback;
+	int64_t txn_sync;
+	int64_t write_io;
 };
 
 /*
@@ -283,96 +379,97 @@ struct __wt_connection_stats {
  */
 #define	WT_DSRC_STATS_BASE	2000
 struct __wt_dsrc_stats {
-	WT_STATS allocation_size;
-	WT_STATS block_alloc;
-	WT_STATS block_checkpoint_size;
-	WT_STATS block_extension;
-	WT_STATS block_free;
-	WT_STATS block_magic;
-	WT_STATS block_major;
-	WT_STATS block_minor;
-	WT_STATS block_reuse_bytes;
-	WT_STATS block_size;
-	WT_STATS bloom_count;
-	WT_STATS bloom_false_positive;
-	WT_STATS bloom_hit;
-	WT_STATS bloom_miss;
-	WT_STATS bloom_page_evict;
-	WT_STATS bloom_page_read;
-	WT_STATS bloom_size;
-	WT_STATS btree_checkpoint_generation;
-	WT_STATS btree_column_deleted;
-	WT_STATS btree_column_fix;
-	WT_STATS btree_column_internal;
-	WT_STATS btree_column_variable;
-	WT_STATS btree_compact_rewrite;
-	WT_STATS btree_entries;
-	WT_STATS btree_fixed_len;
-	WT_STATS btree_maximum_depth;
-	WT_STATS btree_maxintlkey;
-	WT_STATS btree_maxintlpage;
-	WT_STATS btree_maxleafkey;
-	WT_STATS btree_maxleafpage;
-	WT_STATS btree_maxleafvalue;
-	WT_STATS btree_overflow;
-	WT_STATS btree_row_internal;
-	WT_STATS btree_row_leaf;
-	WT_STATS cache_bytes_read;
-	WT_STATS cache_bytes_write;
-	WT_STATS cache_eviction_checkpoint;
-	WT_STATS cache_eviction_clean;
-	WT_STATS cache_eviction_deepen;
-	WT_STATS cache_eviction_dirty;
-	WT_STATS cache_eviction_fail;
-	WT_STATS cache_eviction_hazard;
-	WT_STATS cache_eviction_internal;
-	WT_STATS cache_eviction_split;
-	WT_STATS cache_inmem_split;
-	WT_STATS cache_overflow_value;
-	WT_STATS cache_read;
-	WT_STATS cache_read_overflow;
-	WT_STATS cache_write;
-	WT_STATS compress_raw_fail;
-	WT_STATS compress_raw_fail_temporary;
-	WT_STATS compress_raw_ok;
-	WT_STATS compress_read;
-	WT_STATS compress_write;
-	WT_STATS compress_write_fail;
-	WT_STATS compress_write_too_small;
-	WT_STATS cursor_create;
-	WT_STATS cursor_insert;
-	WT_STATS cursor_insert_bulk;
-	WT_STATS cursor_insert_bytes;
-	WT_STATS cursor_next;
-	WT_STATS cursor_prev;
-	WT_STATS cursor_remove;
-	WT_STATS cursor_remove_bytes;
-	WT_STATS cursor_reset;
-	WT_STATS cursor_search;
-	WT_STATS cursor_search_near;
-	WT_STATS cursor_update;
-	WT_STATS cursor_update_bytes;
-	WT_STATS lsm_checkpoint_throttle;
-	WT_STATS lsm_chunk_count;
-	WT_STATS lsm_generation_max;
-	WT_STATS lsm_lookup_no_bloom;
-	WT_STATS lsm_merge_throttle;
-	WT_STATS rec_dictionary;
-	WT_STATS rec_multiblock_internal;
-	WT_STATS rec_multiblock_leaf;
-	WT_STATS rec_multiblock_max;
-	WT_STATS rec_overflow_key_internal;
-	WT_STATS rec_overflow_key_leaf;
-	WT_STATS rec_overflow_value;
-	WT_STATS rec_page_delete;
-	WT_STATS rec_page_match;
-	WT_STATS rec_pages;
-	WT_STATS rec_pages_eviction;
-	WT_STATS rec_prefix_compression;
-	WT_STATS rec_suffix_compression;
-	WT_STATS session_compact;
-	WT_STATS session_cursor_open;
-	WT_STATS txn_update_conflict;
+	int64_t allocation_size;
+	int64_t block_alloc;
+	int64_t block_checkpoint_size;
+	int64_t block_extension;
+	int64_t block_free;
+	int64_t block_magic;
+	int64_t block_major;
+	int64_t block_minor;
+	int64_t block_reuse_bytes;
+	int64_t block_size;
+	int64_t bloom_count;
+	int64_t bloom_false_positive;
+	int64_t bloom_hit;
+	int64_t bloom_miss;
+	int64_t bloom_page_evict;
+	int64_t bloom_page_read;
+	int64_t bloom_size;
+	int64_t btree_checkpoint_generation;
+	int64_t btree_column_deleted;
+	int64_t btree_column_fix;
+	int64_t btree_column_internal;
+	int64_t btree_column_variable;
+	int64_t btree_compact_rewrite;
+	int64_t btree_entries;
+	int64_t btree_fixed_len;
+	int64_t btree_maximum_depth;
+	int64_t btree_maxintlkey;
+	int64_t btree_maxintlpage;
+	int64_t btree_maxleafkey;
+	int64_t btree_maxleafpage;
+	int64_t btree_maxleafvalue;
+	int64_t btree_overflow;
+	int64_t btree_row_internal;
+	int64_t btree_row_leaf;
+	int64_t cache_bytes_read;
+	int64_t cache_bytes_write;
+	int64_t cache_eviction_checkpoint;
+	int64_t cache_eviction_clean;
+	int64_t cache_eviction_deepen;
+	int64_t cache_eviction_dirty;
+	int64_t cache_eviction_fail;
+	int64_t cache_eviction_hazard;
+	int64_t cache_eviction_internal;
+	int64_t cache_eviction_split;
+	int64_t cache_inmem_split;
+	int64_t cache_overflow_value;
+	int64_t cache_read;
+	int64_t cache_read_overflow;
+	int64_t cache_write;
+	int64_t compress_raw_fail;
+	int64_t compress_raw_fail_temporary;
+	int64_t compress_raw_ok;
+	int64_t compress_read;
+	int64_t compress_write;
+	int64_t compress_write_fail;
+	int64_t compress_write_too_small;
+	int64_t cursor_create;
+	int64_t cursor_insert;
+	int64_t cursor_insert_bulk;
+	int64_t cursor_insert_bytes;
+	int64_t cursor_next;
+	int64_t cursor_prev;
+	int64_t cursor_remove;
+	int64_t cursor_remove_bytes;
+	int64_t cursor_reset;
+	int64_t cursor_restart;
+	int64_t cursor_search;
+	int64_t cursor_search_near;
+	int64_t cursor_update;
+	int64_t cursor_update_bytes;
+	int64_t lsm_checkpoint_throttle;
+	int64_t lsm_chunk_count;
+	int64_t lsm_generation_max;
+	int64_t lsm_lookup_no_bloom;
+	int64_t lsm_merge_throttle;
+	int64_t rec_dictionary;
+	int64_t rec_multiblock_internal;
+	int64_t rec_multiblock_leaf;
+	int64_t rec_multiblock_max;
+	int64_t rec_overflow_key_internal;
+	int64_t rec_overflow_key_leaf;
+	int64_t rec_overflow_value;
+	int64_t rec_page_delete;
+	int64_t rec_page_match;
+	int64_t rec_pages;
+	int64_t rec_pages_eviction;
+	int64_t rec_prefix_compression;
+	int64_t rec_suffix_compression;
+	int64_t session_compact;
+	int64_t session_cursor_open;
+	int64_t txn_update_conflict;
 };
 
 /* Statistics section: END */

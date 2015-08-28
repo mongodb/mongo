@@ -156,7 +156,7 @@ class test_autoclose(wttest.WiredTigerTestCase):
         self.assertRaisesHavingMessage(exceptions.RuntimeError,
                                        lambda: self.create_table(),
                                        '/wt_session.* is None/')
-        
+
     def test_close_connection1(self):
         """
         Use a connection handle after it is closed.
@@ -166,6 +166,6 @@ class test_autoclose(wttest.WiredTigerTestCase):
         self.assertRaisesHavingMessage(exceptions.RuntimeError,
                                        lambda: conn.open_session(None),
                                        '/wt_connection.* is None/')
-        
+
 if __name__ == '__main__':
     wttest.run()

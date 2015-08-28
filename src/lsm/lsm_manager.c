@@ -258,7 +258,7 @@ __wt_lsm_manager_free_work_unit(
 	if (entry != NULL) {
 		WT_ASSERT(session, entry->lsm_tree->queue_ref > 0);
 
-		(void)WT_ATOMIC_SUB4(entry->lsm_tree->queue_ref, 1);
+		(void)__wt_atomic_sub32(&entry->lsm_tree->queue_ref, 1);
 		__wt_free(session, entry);
 	}
 }
@@ -639,9 +639,9 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	 * on close, the flag is cleared and then the queue reference count
 	 * is checked.
 	 */
-	(void)WT_ATOMIC_ADD4(lsm_tree->queue_ref, 1);
+	(void)__wt_atomic_add32(&lsm_tree->queue_ref, 1);
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
-		(void)WT_ATOMIC_SUB4(lsm_tree->queue_ref, 1);
+		(void)__wt_atomic_sub32(&lsm_tree->queue_ref, 1);
 		return (0);
 	}
 
@@ -668,6 +668,6 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	return (0);
 err:
 	if (!pushed)
-		(void)WT_ATOMIC_SUB4(lsm_tree->queue_ref, 1);
+		(void)__wt_atomic_sub32(&lsm_tree->queue_ref, 1);
 	return (ret);
 }

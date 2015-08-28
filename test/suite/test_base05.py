@@ -154,7 +154,7 @@ class test_base05(wttest.WiredTigerTestCase):
             choice = (n + i) % len(reflist)
             result += reflist[choice]
         return result + ':' + str(n)
-        
+
     def test_table_ss(self):
         """
         Create entries, and read back in a cursor: key=string, value=string
@@ -196,7 +196,7 @@ class test_base05(wttest.WiredTigerTestCase):
 
     def do_test_table_base(self, convert):
         """
-        Base functionality that uses regular strings with 
+        Base functionality that uses regular strings with
         non-ASCII (UTF) chars and optionally converts them to
         Unicode (considered a type separate from string in Python).
         """
