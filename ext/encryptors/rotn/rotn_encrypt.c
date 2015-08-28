@@ -493,9 +493,10 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	rotn_encryptor->encryptor.terminate = rotn_terminate;
 	rotn_encryptor->wtext = connection->get_extension_api(connection);
 
-	if ((ret = rotn_configure(rotn_encryptor, config)) != 0)
+	if ((ret = rotn_configure(rotn_encryptor, config)) != 0) {
+		free(rotn_encryptor);
 		return (ret);
-
+	}
 						/* Load the encryptor */
 	return (connection->add_encryptor(
 	    connection, "rotn", (WT_ENCRYPTOR *)rotn_encryptor, NULL));
