@@ -357,8 +357,6 @@ private:
 
     void _stepDownSelfAndReplaceWith(int newPrimary);
 
-    MemberState _getMyState() const;
-
     /**
      * Looks up the provided member in the blacklist and returns true if the member's blacklist
      * expire time is after 'now'.  If the member is found but the expire time is before 'now',
