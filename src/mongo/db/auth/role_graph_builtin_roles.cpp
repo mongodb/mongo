@@ -291,6 +291,9 @@ void addUserAdminAnyDbPrivileges(PrivilegeVector* privileges) {
         privileges, Privilege(ResourcePattern::forClusterResource(), ActionType::listDatabases));
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
+        Privilege(ResourcePattern::forClusterResource(), ActionType::authSchemaUpgrade));
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
         Privilege(ResourcePattern::forClusterResource(), ActionType::invalidateUserCache));
 
 
