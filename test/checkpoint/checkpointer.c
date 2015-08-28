@@ -134,8 +134,7 @@ done:	if ((ret = session->close(session, NULL)) != 0)
 /*
  * verify_checkpoint --
  *     Open a cursor on each table at the last checkpoint and walk through
- *     the tables in parallel. The key/values should match across all
- *     tables.
+ *     the tables in parallel. The key/values should match across all tables.
  */
 static int
 verify_checkpoint(WT_SESSION *session)
