@@ -1478,25 +1478,22 @@ __rec_child_deleted(
 	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
 	 * a special case during reconciliation.  First, if the deletion was a
 	 * result of a session truncate call, the deletion may not be visible to
-	 * us.  In that case, we proceed as with any change that's not visible
-	 * during reconciliation by setting the skipped flag and ignoring the
-	 * change for the purposes of writing the internal page.
+	 * us. In that case, we proceed as with any change not visible during
+	 * reconciliation by ignoring the change for the purposes of writing the
+	 * internal page.
 	 *
 	 * In this case, there must be an associated page-deleted structure, and
 	 * it holds the transaction ID we care about.
+	 *
+	 * In some cases, there had better not be any updates we can't see.
 	 */
-	if (page_del != NULL && !__wt_txn_visible(session, page_del->txnid)) {
-		/*
-		 * In some cases, there had better not be any updates we can't
-		 * write.
-		 */
-		if (F_ISSET(r, WT_VISIBILITY_ERR))
-			WT_PANIC_RET(session, EINVAL,
-			    "reconciliation illegally skipped an update");
-	}
+	if (F_ISSET(r, WT_VISIBILITY_ERR) &&
+	    page_del != NULL && !__wt_txn_visible(session, page_del->txnid))
+		WT_PANIC_RET(session, EINVAL,
+		    "reconciliation illegally skipped an update");
 
 	/*
-	 * The deletion is visible to us, deal with any underlying disk blocks.
+	 * Deal with any underlying disk blocks.
 	 *
 	 * First, check to see if there is an address associated with this leaf:
 	 * if there isn't, we're done, the underlying page is already gone.  If
