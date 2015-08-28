@@ -35,6 +35,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/s/cursors.h"
+#include "mongo/s/query/cluster_client_cursor_impl.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/util/log.h"
@@ -214,7 +216,8 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
     return Command::appendCommandStatus(result, status);
 }
 
-Status storePossibleCursor(const std::string& server, const BSONObj& cmdResult) {
+namespace {
+Status storePossibleCursorLegacy(const std::string& server, const BSONObj& cmdResult) {
     if (cmdResult["ok"].trueValue() && cmdResult.hasField("cursor")) {
         BSONElement cursorIdElt = cmdResult.getFieldDotted("cursor.id");
 
@@ -241,6 +244,47 @@ Status storePossibleCursor(const std::string& server, const BSONObj& cmdResult) 
     }
 
     return Status::OK();
+}
+}  // namespace
+
+StatusWith<BSONObj> storePossibleCursor(const std::string& server,
+                                        const BSONObj& cmdResult,
+                                        executor::TaskExecutor* executor,
+                                        ClusterCursorManager* cursorManager) {
+    if (!useClusterClientCursor) {
+        Status status = storePossibleCursorLegacy(server, cmdResult);
+        return (status.isOK() ? StatusWith<BSONObj>(cmdResult) : StatusWith<BSONObj>(status));
+    }
+
+    if (!cmdResult["ok"].trueValue() || !cmdResult.hasField("cursor")) {
+        return cmdResult;
+    }
+
+    auto incomingCursorResponse = CursorResponse::parseFromBSON(cmdResult);
+    if (!incomingCursorResponse.isOK()) {
+        return incomingCursorResponse.getStatus();
+    }
+
+    if (incomingCursorResponse.getValue().cursorId == CursorId(0)) {
+        return cmdResult;
+    }
+
+    ClusterClientCursorParams params(incomingCursorResponse.getValue().nss);
+    params.remotes.emplace_back(HostAndPort(server), incomingCursorResponse.getValue().cursorId);
+
+    auto ccc = stdx::make_unique<ClusterClientCursorImpl>(executor, std::move(params));
+    auto pinnedCursor =
+        cursorManager->registerCursor(std::move(ccc),
+                                      incomingCursorResponse.getValue().nss,
+                                      ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                      ClusterCursorManager::CursorLifetime::Mortal);
+    CursorId clusterCursorId = pinnedCursor.getCursorId();
+    pinnedCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+
+    CursorResponse outgoingCursorResponse(incomingCursorResponse.getValue().nss,
+                                          clusterCursorId,
+                                          incomingCursorResponse.getValue().batch);
+    return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 }
 
 }  // namespace mongo
