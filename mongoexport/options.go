@@ -14,16 +14,16 @@ See http://docs.mongodb.org/manual/reference/program/mongoexport/ for more infor
 // OutputFormatOptions defines the set of options to use in formatting exported data.
 type OutputFormatOptions struct {
 	// Fields is an option to directly specify comma-separated fields to export to CSV.
-	Fields string `long:"fields" short:"f" description:"comma separated list of field names (required for exporting CSV) e.g. -f \"name,age\" "`
+	Fields string `long:"fields" value-name:"<field>[,<field>]*" short:"f" description:"comma separated list of field names (required for exporting CSV) e.g. -f \"name,age\" "`
 
 	// FieldFile is a filename that refers to a list of fields to export, 1 per line.
-	FieldFile string `long:"fieldFile" description:"file with field names - 1 per line"`
+	FieldFile string `long:"fieldFile" value-name:"<filename>" description:"file with field names - 1 per line"`
 
 	// Type selects the type of output to export as (json or csv).
-	Type string `long:"type" default:"json" default-mask:"-" description:"the output format, either json or csv (defaults to 'json')"`
+	Type string `long:"type" value-name:"<type>" default:"json" default-mask:"-" description:"the output format, either json or csv (defaults to 'json')"`
 
 	// OutputFile specifies an output file path.
-	OutputFile string `long:"out" short:"o" description:"output file; if not specified, stdout is used"`
+	OutputFile string `long:"out" value-name:"<filename>" short:"o" description:"output file; if not specified, stdout is used"`
 
 	// JSONArray if set will export the documents an array of JSON documents.
 	JSONArray bool `long:"jsonArray" description:"output to a JSON array rather than one object per line"`
@@ -39,13 +39,13 @@ func (*OutputFormatOptions) Name() string {
 
 // InputOptions defines the set of options to use in retrieving data from the server.
 type InputOptions struct {
-	Query          string `long:"query" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
-	QueryFile      string `long:"queryFile" description:"path to a file containing a query filter (JSON)"`
+	Query          string `long:"query" value-name:"<json>" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
+	QueryFile      string `long:"queryFile" value-name:"<filename>" description:"path to a file containing a query filter (JSON)"`
 	SlaveOk        bool   `long:"slaveOk" short:"k" description:"allow secondary reads if available (default true)" default:"true" default-mask:"-"`
 	ForceTableScan bool   `long:"forceTableScan" description:"force a table scan (do not use $snapshot)"`
-	Skip           int    `long:"skip" description:"number of documents to skip"`
-	Limit          int    `long:"limit" description:"limit the number of documents to export"`
-	Sort           string `long:"sort" description:"sort order, as a JSON string, e.g. '{x:1}'"`
+	Skip           int    `long:"skip" value-name:"<count>" description:"number of documents to skip"`
+	Limit          int    `long:"limit" value-name:"<count>" description:"limit the number of documents to export"`
+	Sort           string `long:"sort" value-name:"<json>" description:"sort order, as a JSON string, e.g. '{x:1}'"`
 }
 
 // Name returns a human-readable group name for input options.

@@ -9,13 +9,13 @@ See http://docs.mongodb.org/manual/reference/program/mongoimport/ for more infor
 // InputOptions defines the set of options for reading input data.
 type InputOptions struct {
 	// Fields is an option to directly specify comma-separated fields to import to CSV.
-	Fields *string `long:"fields" short:"f" description:"comma separated list of field names, e.g. -f name,age"`
+	Fields *string `long:"fields" value-name:"<field>[,<field>]*" short:"f" description:"comma separated list of field names, e.g. -f name,age"`
 
 	// FieldFile is a filename that refers to a list of fields to import, 1 per line.
-	FieldFile *string `long:"fieldFile" description:"file with field names - 1 per line"`
+	FieldFile *string `long:"fieldFile" value-name:"<filename>" description:"file with field names - 1 per line"`
 
 	// Specifies the location and name of a file containing the data to import.
-	File string `long:"file" description:"file to import from; if not specified, stdin is used"`
+	File string `long:"file" value-name:"<filename>" description:"file to import from; if not specified, stdin is used"`
 
 	// Treats the input source's first line as field list (csv and tsv only).
 	HeaderLine bool `long:"headerline" description:"use first line in input source as the field list (CSV and TSV only)"`
@@ -24,7 +24,7 @@ type InputOptions struct {
 	JSONArray bool `long:"jsonArray" description:"treat input source as a JSON array"`
 
 	// Specifies the file type to import. The default format is JSON, but it’s possible to import CSV and TSV files.
-	Type string `long:"type" default:"json" default-mask:"-" description:"input format to import: json, csv, or tsv (defaults to 'json')"`
+	Type string `long:"type" value-name:"<type>" default:"json" default-mask:"-" description:"input format to import: json, csv, or tsv (defaults to 'json')"`
 }
 
 // Name returns a description of the InputOptions struct.
@@ -44,7 +44,7 @@ type IngestOptions struct {
 	MaintainInsertionOrder bool `long:"maintainInsertionOrder" description:"insert documents in the order of their appearance in the input source"`
 
 	// Sets the number of insertion routines to use
-	NumInsertionWorkers int `short:"j" long:"numInsertionWorkers" description:"number of insert operations to run concurrently (defaults to 1)" default:"1" default-mask:"-"`
+	NumInsertionWorkers int `short:"j" value-name:"<number>" long:"numInsertionWorkers" description:"number of insert operations to run concurrently (defaults to 1)" default:"1" default-mask:"-"`
 
 	// Forces mongoimport to halt the import operation at the first insert or upsert error.
 	StopOnError bool `long:"stopOnError" description:"stop importing at first insert/upsert error"`
@@ -53,10 +53,10 @@ type IngestOptions struct {
 	Upsert bool `long:"upsert" description:"insert or update objects that already exist"`
 
 	// Specifies a list of fields for the query portion of the upsert; defaults to _id field.
-	UpsertFields string `long:"upsertFields" description:"comma-separated fields for the query part of the upsert"`
+	UpsertFields string `long:"upsertFields" value-name:"<field>[,<field>]*" description:"comma-separated fields for the query part of the upsert"`
 
 	// Sets write concern level for write operations.
-	WriteConcern string `long:"writeConcern" default:"majority" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}' (defaults to 'majority')"`
+	WriteConcern string `long:"writeConcern" default:"majority" value-name:"<write-concern-specifier>" default-mask:"-" description:"write concern options e.g. --writeConcern majority, --writeConcern '{w: 3, wtimeout: 500, fsync: true, j: true}' (defaults to 'majority')"`
 }
 
 // Name returns a description of the IngestOptions struct.

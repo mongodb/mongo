@@ -6,10 +6,9 @@ View and debug .bson files.
 
 See http://docs.mongodb.org/manual/reference/program/bsondump/ for more information.`
 
-
 type BSONDumpOptions struct {
 	// Format to display the BSON data file
-	Type string `long:"type" default:"json" default-mask:"-" description:"type of output: debug, json (default 'json')"`
+	Type string `long:"type" value-name:"<type>" default:"json" default-mask:"-" description:"type of output: debug, json (default 'json')"`
 
 	// Validate each BSON document before displaying
 	ObjCheck bool `long:"objcheck" description:"validate BSON during processing"`

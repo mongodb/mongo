@@ -72,8 +72,8 @@ type HiddenOptions struct {
 
 type Namespace struct {
 	// Specified database and collection
-	DB         string `short:"d" long:"db" description:"database to use"`
-	Collection string `short:"c" long:"collection" description:"collection to use"`
+	DB         string `short:"d" long:"db" value-name:"<database-name>" description:"database to use"`
+	Collection string `short:"c" long:"collection" value-name:"<collection-name>" description:"collection to use"`
 }
 
 // Struct holding generic options
@@ -84,7 +84,7 @@ type General struct {
 
 // Struct holding verbosity-related options
 type Verbosity struct {
-	SetVerbosity func(string) `short:"v" long:"verbose" description:"more detailed log output (include multiple times for more verbosity, e.g. -vvvvv, or specify a numeric value, e.g. --verbose=N)" optional:"true" optional-value:""`
+	SetVerbosity func(string) `short:"v" long:"verbose" value-name:"<level>" description:"more detailed log output (include multiple times for more verbosity, e.g. -vvvvv, or specify a numeric value, e.g. --verbose=N)" optional:"true" optional-value:""`
 	Quiet        bool         `long:"quiet" description:"hide all log output"`
 	VLevel       int          `no-flag:"true"`
 }
@@ -99,17 +99,17 @@ func (v Verbosity) IsQuiet() bool {
 
 // Struct holding connection-related options
 type Connection struct {
-	Host string `short:"h" long:"host" description:"mongodb host to connect to (setname/host1,host2 for replica sets)"`
-	Port string `long:"port" description:"server port (can also use --host hostname:port)"`
+	Host string `short:"h" long:"host" value-name:"<hostname>" description:"mongodb host to connect to (setname/host1,host2 for replica sets)"`
+	Port string `long:"port" value-name:"<port>" description:"server port (can also use --host hostname:port)"`
 }
 
 // Struct holding ssl-related options
 type SSL struct {
 	UseSSL              bool   `long:"ssl" description:"connect to a mongod or mongos that has ssl enabled"`
-	SSLCAFile           string `long:"sslCAFile" description:"the .pem file containing the root certificate chain from the certificate authority"`
-	SSLPEMKeyFile       string `long:"sslPEMKeyFile" description:"the .pem file containing the certificate and key"`
-	SSLPEMKeyPassword   string `long:"sslPEMKeyPassword" description:"the password to decrypt the sslPEMKeyFile, if necessary"`
-	SSLCRLFile          string `long:"sslCRLFile" description:"the .pem file containing the certificate revocation list"`
+	SSLCAFile           string `long:"sslCAFile" value-name:"<filename>" description:"the .pem file containing the root certificate chain from the certificate authority"`
+	SSLPEMKeyFile       string `long:"sslPEMKeyFile" value-name:"<filename>" description:"the .pem file containing the certificate and key"`
+	SSLPEMKeyPassword   string `long:"sslPEMKeyPassword" value-name:"<password>" description:"the password to decrypt the sslPEMKeyFile, if necessary"`
+	SSLCRLFile          string `long:"sslCRLFile" value-name:"<filename>" description:"the .pem file containing the certificate revocation list"`
 	SSLAllowInvalidCert bool   `long:"sslAllowInvalidCertificates" description:"bypass the validation for server certificates"`
 	SSLAllowInvalidHost bool   `long:"sslAllowInvalidHostnames" description:"bypass the validation for server name"`
 	SSLFipsMode         bool   `long:"sslFIPSMode" description:"use FIPS mode of the installed openssl library"`
@@ -117,16 +117,16 @@ type SSL struct {
 
 // Struct holding auth-related options
 type Auth struct {
-	Username  string `short:"u" long:"username" description:"username for authentication"`
-	Password  string `short:"p" long:"password" description:"password for authentication"`
-	Source    string `long:"authenticationDatabase" description:"database that holds the user's credentials"`
-	Mechanism string `long:"authenticationMechanism" description:"authentication mechanism to use"`
+	Username  string `short:"u" value-name:"<username>" long:"username" description:"username for authentication"`
+	Password  string `short:"p" value-name:"<password>" long:"password" description:"password for authentication"`
+	Source    string `long:"authenticationDatabase" value-name:"<database-name>" description:"database that holds the user's credentials"`
+	Mechanism string `long:"authenticationMechanism" value-name:"<mechanism>" description:"authentication mechanism to use"`
 }
 
 // Struct for Kerberos/GSSAPI-specific options
 type Kerberos struct {
-	Service     string `long:"gssapiServiceName" description:"service name to use when authenticating using GSSAPI/Kerberos ('mongodb' by default)"`
-	ServiceHost string `long:"gssapiHostName" description:"hostname to use when authenticating using GSSAPI/Kerberos (remote server's address by default)"`
+	Service     string `long:"gssapiServiceName" value-name:"<service-name>" description:"service name to use when authenticating using GSSAPI/Kerberos ('mongodb' by default)"`
+	ServiceHost string `long:"gssapiHostName" value-name:"<host-name>" description:"hostname to use when authenticating using GSSAPI/Kerberos (remote server's address by default)"`
 }
 
 type OptionRegistrationFunction func(o *ToolOptions) error
@@ -280,13 +280,12 @@ func (o *ToolOptions) GetAuthenticationDatabase() string {
 }
 
 // AddOptions registers an additional options group to this instance
-func (o *ToolOptions) AddOptions(opts ExtraOptions) error {
+func (o *ToolOptions) AddOptions(opts ExtraOptions) {
 	_, err := o.parser.AddGroup(opts.Name()+" options", "", opts)
 	if err != nil {
-		return fmt.Errorf("error setting command line options for"+
-			" %v: %v", opts.Name(), err)
+		panic(fmt.Sprintf("error setting command line options for  %v: %v",
+			opts.Name(), err))
 	}
-	return nil
 }
 
 // Parse the command line args.  Returns any extra args not accounted for by
