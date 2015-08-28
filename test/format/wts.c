@@ -462,8 +462,7 @@ wts_dump(const char *tag, int dump_bdb)
 	track("dump files and compare", 0ULL, NULL);
 
 	len = strlen(g.home) + strlen(BERKELEY_DB_PATH) + strlen(g.uri) + 100;
-	if ((cmd = malloc(len)) == NULL)
-		die(errno, "malloc");
+	cmd = dmalloc(len);
 	(void)snprintf(cmd, len,
 	    "sh s_dumpcmp -h %s %s %s %s %s %s",
 	    g.home,
@@ -564,9 +563,7 @@ wts_stats(void)
 
 	/* Data source statistics. */
 	fprintf(fp, "\n\n====== Data source statistics:\n");
-	if ((stat_name =
-	    malloc(strlen("statistics:") + strlen(g.uri) + 1)) == NULL)
-		die(errno, "malloc");
+	stat_name = dmalloc(strlen("statistics:") + strlen(g.uri) + 1);
 	sprintf(stat_name, "statistics:%s", g.uri);
 	if ((ret = session->open_cursor(
 	    session, stat_name, NULL, NULL, &cursor)) != 0)

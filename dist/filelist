@@ -45,6 +45,7 @@ src/btree/col_srch.c
 src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
+src/cache/cache_las.c
 src/config/config.c
 src/config/config_api.c
 src/config/config_check.c

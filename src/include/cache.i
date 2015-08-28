@@ -104,48 +104,6 @@ __wt_cache_dirty_inuse(WT_CACHE *cache)
 }
 
 /*
- * __wt_cache_status --
- *	Return if the cache usage exceeds the eviction or dirty targets.
- */
-static inline void
-__wt_cache_status(WT_SESSION_IMPL *session, int *evictp, int *dirtyp)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_CACHE *cache;
-	uint64_t bytes_inuse, bytes_max, dirty_inuse;
-
-	conn = S2C(session);
-	cache = conn->cache;
-
-	/*
-	 * There's an assumption "evict" overrides "dirty", that is, if eviction
-	 * is required, we no longer care where we are with respect to the dirty
-	 * target.
-	 *
-	 * Avoid division by zero if the cache size has not yet been set in a
-	 * shared cache.
-	 */
-	bytes_max = conn->cache_size + 1;
-	if (evictp != NULL) {
-		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100) {
-			*evictp = 1;
-			return;
-		}
-		*evictp = 0;
-	}
-	if (dirtyp != NULL) {
-		dirty_inuse = __wt_cache_dirty_inuse(cache);
-		if (dirty_inuse >
-		    (cache->eviction_dirty_target * bytes_max) / 100) {
-			*dirtyp = 1;
-			return;
-		}
-		*dirtyp = 0;
-	}
-}
-
-/*
  * __wt_session_can_wait --
  *	Return if a session available for a potentially slow operation.
  */
@@ -161,15 +119,38 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 		return (0);
 
 	/*
-	 * LSM sets the no-cache-check flag when holding the LSM tree lock,
+	 * LSM sets the no-eviction flag when holding the LSM tree lock,
 	 * in that case, or when holding the schema lock, we don't want to
 	 * highjack the thread for eviction.
 	 */
 	if (F_ISSET(session,
-	    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_LOCKED_SCHEMA))
+	    WT_SESSION_NO_EVICTION | WT_SESSION_LOCKED_SCHEMA))
 		return (0);
 
 	return (1);
+}
+
+/*
+ * __wt_eviction_aggressive --
+ *	Return if the eviction server is running in aggressive mode.
+ */
+static inline int
+__wt_eviction_aggressive(WT_SESSION_IMPL *session)
+{
+	return (FLD_ISSET(
+	    S2C(session)->cache->state, WT_EVICT_PASS_AGGRESSIVE) ? 1 : 0);
+}
+
+/*
+ * __wt_eviction_dirty_target --
+ *	Return if the eviction server is running to reduce the number of dirty
+ * pages (versus running to discard pages from the cache).
+ */
+static inline int
+__wt_eviction_dirty_target(WT_SESSION_IMPL *session)
+{
+	return (FLD_ISSET(
+	    S2C(session)->cache->state, WT_EVICT_PASS_DIRTY) ? 1 : 0);
 }
 
 /*
@@ -230,7 +211,7 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
 	 * that case, or when holding the schema or handle list locks (which
 	 * block eviction), we don't want to highjack the thread for eviction.
 	 */
-	if (F_ISSET(session, WT_SESSION_NO_CACHE_CHECK |
+	if (F_ISSET(session, WT_SESSION_NO_EVICTION |
 	    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_SCHEMA))
 		return (0);
 

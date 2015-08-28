@@ -36,6 +36,7 @@ static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
 static int	   config_is_perm(const char *);
 static void	   config_isolation(void);
+static void	   config_lrt(void);
 static void	   config_map_checksum(const char *, u_int *);
 static void	   config_map_compression(const char *, u_int *);
 static void	   config_map_encryption(const char *, u_int *);
@@ -102,8 +103,7 @@ config_setup(void)
 	 * our configuration, LSM or KVS devices are "tables", but files are
 	 * tested as well.
 	 */
-	if ((g.uri = malloc(256)) == NULL)
-		die(errno, "malloc");
+	g.uri = dmalloc(256);
 	strcpy(g.uri, DATASOURCE("file") ? "file:" : "table:");
 	if (DATASOURCE("helium"))
 		strcat(g.uri, "dev1/");
@@ -135,12 +135,6 @@ config_setup(void)
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		g.c_reverse = 0;
 
-	config_checksum();
-	config_compression("compression");
-	config_compression("logging_compression");
-	config_encryption();
-	config_isolation();
-
 	/*
 	 * Periodically, run single-threaded so we can compare the results to
 	 * a Berkeley DB copy, as long as the thread-count isn't nailed down.
@@ -148,6 +142,13 @@ config_setup(void)
 	 */
 	if (!g.replay && g.run_cnt % 20 == 19 && !config_is_perm("threads"))
 		g.c_threads = 1;
+
+	config_checksum();
+	config_compression("compression");
+	config_compression("logging_compression");
+	config_encryption();
+	config_isolation();
+	config_lrt();
 
 	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
@@ -325,6 +326,26 @@ config_isolation(void)
 			break;
 		}
 		config_single(cstr, 0);
+	}
+}
+
+/*
+ * config_lrt --
+ *	Long-running transaction configuration.
+ */
+static void
+config_lrt(void)
+{
+	/*
+	 * The underlying engine doesn't support a lookaside file for
+	 * fixed-length column stores.
+	 */
+	if (g.type == FIX) {
+		if (config_is_perm("long_running_txn"))
+			die(EINVAL,
+			    "long_running_txn not supported with fixed-length "
+			    "column store");
+		g.c_long_running_txn = 0;
 	}
 }
 

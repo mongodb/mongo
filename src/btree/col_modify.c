@@ -48,10 +48,10 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 * There's some chance the application specified a record past
 		 * the last record on the page.  If that's the case, and we're
 		 * inserting a new WT_INSERT/WT_UPDATE pair, it goes on the
-		 * append list, not the update list. In addition, a recno of 0
+		 * append list, not the update list. Also, an out-of-band recno
 		 * implies an append operation, we're allocating a new row.
 		 */
-		if (recno == 0 ||
+		if (recno == WT_RECNO_OOB ||
 		    recno > (btree->type == BTREE_COL_VAR ?
 		    __col_var_last_recno(page) : __col_fix_last_recno(page)))
 			append = 1;
@@ -160,7 +160,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 * The serial mutex acts as our memory barrier to flush these
 		 * writes before inserting them into the list.
 		 */
-		if (cbt->ins_stack[0] == NULL || recno == 0)
+		if (cbt->ins_stack[0] == NULL || recno == WT_RECNO_OOB)
 			for (i = 0; i < skipdepth; i++) {
 				cbt->ins_stack[i] = &ins_head->head[i];
 				ins->next[i] = cbt->next_stack[i] = NULL;

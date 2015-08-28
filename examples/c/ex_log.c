@@ -214,11 +214,13 @@ walk_log(WT_SESSION *session)
 
 		/*
 		 * If the operation is a put, replay it here on the backup
-		 * connection.  Note, we cheat by looking only for fileid 1
-		 * in this example.  The metadata is fileid 0.
+		 * connection.
+		 *
+		 * !!!
+		 * Minor cheat: the metadata is fileid 0, skip its records.
 		 */
-		if (fileid == 1 && rectype == WT_LOGREC_COMMIT &&
-		    optype == WT_LOGOP_ROW_PUT) {
+		if (fileid != 0 &&
+		    rectype == WT_LOGREC_COMMIT && optype == WT_LOGOP_ROW_PUT) {
 			if (!in_txn) {
 				ret = session2->begin_transaction(session2,
 				    NULL);

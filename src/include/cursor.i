@@ -32,7 +32,7 @@ __cursor_pos_clear(WT_CURSOR_BTREE *cbt)
 	 * and it's a minimal set of things we need to clear. It would be a
 	 * lot simpler to clear everything, but we call this function a lot.
 	 */
-	cbt->recno = 0;
+	cbt->recno = WT_RECNO_OOB;
 
 	cbt->ins = NULL;
 	cbt->ins_head = NULL;

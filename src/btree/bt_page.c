@@ -143,6 +143,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 * done on this file, we're done.
 			 */
 			if (LF_ISSET(WT_READ_NO_EVICT) ||
+			    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 			    F_ISSET(btree, WT_BTREE_NO_EVICTION))
 				goto skip_evict;
 

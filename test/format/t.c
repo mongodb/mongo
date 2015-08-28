@@ -312,6 +312,11 @@ die(int e, const char *fmt, ...)
 	/* Single-thread error handling. */
 	(void)pthread_rwlock_wrlock(&g.death_lock);
 
+	/* Try and turn off tracking so it doesn't obscure the error message. */
+	if (g.track) {
+		g.track = 0;
+		fprintf(stderr, "\n");
+	}
 	if (fmt != NULL) {				/* Death message. */
 		fprintf(stderr, "%s: ", g.progname);
 		va_start(ap, fmt);

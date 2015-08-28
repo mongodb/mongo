@@ -358,9 +358,13 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * have committed in the meantime, and the last_running field
 		 * been updated past it.  That is all very unlikely, but not
 		 * impossible, so we take care to read the global state before
-		 * the atomic increment.  If we raced with reconciliation, just
-		 * leave the previous value here: at worst, we will write a
-		 * page in a checkpoint when not absolutely necessary.
+		 * the atomic increment.
+		 *
+		 * If the page was dirty on entry, then last_running == 0. The
+		 * page could have become clean since then, if reconciliation
+		 * completed. In that case, we leave the previous value for
+		 * first_dirty_txn rather than potentially racing to update it,
+		 * at worst, we'll unnecessarily write a page in a checkpoint.
 		 */
 		if (last_running != 0)
 			page->modify->first_dirty_txn = last_running;
@@ -369,6 +373,25 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Check if this is the largest transaction ID to update the page. */
 	if (WT_TXNID_LT(page->modify->update_txn, session->txn.id))
 		page->modify->update_txn = session->txn.id;
+}
+
+/*
+ * __wt_page_modify_clear --
+ *	Clean a modified page.
+ */
+static inline void
+__wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	/*
+	 * The page must be held exclusive when this call is made, this call
+	 * can only be used when the page is owned by a single thread.
+	 *
+	 * Allow the call to be made on clean pages.
+	 */
+	if (__wt_page_is_modified(page)) {
+		page->modify->write_gen = 0;
+		__wt_cache_dirty_decr(session, page);
+	}
 }
 
 /*
@@ -533,7 +556,12 @@ __wt_ref_key_instantiated(WT_REF *ref)
 static inline void
 __wt_ref_key_clear(WT_REF *ref)
 {
-	/* The key union has 2 fields, both of which are 8B. */
+	/*
+	 * The key union has 2 8B fields; this is equivalent to:
+	 *
+	 *	ref->key.recno = WT_RECNO_OOB;
+	 *	ref->key.ikey = NULL;
+	 */
 	ref->key.recno = 0;
 }
 
@@ -964,9 +992,6 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * let the threads continue before doing eviction.
 	 *
 	 * Ignore anything other than large, dirty row-store leaf pages.
-	 *
-	 * XXX KEITH
-	 * Need a better test for append-only workloads.
 	 */
 	if (page->type != WT_PAGE_ROW_LEAF ||
 	    page->memory_footprint < btree->maxmempage ||
@@ -1106,7 +1131,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
 
 	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
-	if ((ret = __wt_evict_page(session, ref)) == 0) {
+	if ((ret = __wt_evict(session, ref, 0)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else
@@ -1157,12 +1182,13 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * memory_page_max setting, when we see many deleted items, and when we
 	 * are attempting to scan without trashing the cache.
 	 *
-	 * Fast checks if eviction is disabled for this operation or this tree,
-	 * then perform a general check if eviction will be possible.
+	 * Fast checks if eviction is disabled for this handle, operation or
+	 * tree, then perform a general check if eviction will be possible.
 	 */
 	page = ref->page;
 	if (page->read_gen != WT_READGEN_OLDEST ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
+	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    !__wt_page_can_evict(session, page, 1, NULL))
 		return (__wt_hazard_clear(session, page));

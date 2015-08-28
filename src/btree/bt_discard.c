@@ -15,7 +15,6 @@ static void __free_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_skip_array(WT_SESSION_IMPL *, WT_INSERT_HEAD **, uint32_t);
 static void __free_skip_list(WT_SESSION_IMPL *, WT_INSERT *);
 static void __free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t);
-static void __free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
 
 /*
  * __wt_ref_out --
@@ -56,7 +55,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	 */
 	WT_ASSERT(session, !__wt_page_is_modified(page));
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
-	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_LOCKED));
+	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_RECONCILIATION));
 
 #ifdef HAVE_DIAGNOSTIC
 	{
@@ -160,8 +159,8 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 				__wt_free(session, multi->key.ikey);
 				break;
 			}
-			__wt_free(session, multi->skip);
-			__wt_free(session, multi->skip_dsk);
+			__wt_free(session, multi->supd);
+			__wt_free(session, multi->supd_dsk);
 			__wt_free(session, multi->addr.addr);
 		}
 		__wt_free(session, mod->mod_multi);
@@ -235,10 +234,7 @@ __wt_free_ref(
 	 * it clean explicitly.)
 	 */
 	if (free_pages && ref->page != NULL) {
-		if (ref->page->modify != NULL) {
-			ref->page->modify->write_gen = 0;
-			__wt_cache_dirty_decr(session, ref->page);
-		}
+		__wt_page_modify_clear(session, ref->page);
 		__wt_page_out(session, &ref->page);
 	}
 
@@ -373,7 +369,7 @@ __free_skip_list(WT_SESSION_IMPL *session, WT_INSERT *ins)
 	WT_INSERT *next;
 
 	for (; ins != NULL; ins = next) {
-		__free_update_list(session, ins->upd);
+		__wt_free_update_list(session, ins->upd);
 		next = WT_SKIP_NEXT(ins);
 		__wt_free(session, ins);
 	}
@@ -395,29 +391,23 @@ __free_update(
 	 */
 	for (updp = update_head; entries > 0; --entries, ++updp)
 		if (*updp != NULL)
-			__free_update_list(session, *updp);
+			__wt_free_update_list(session, *updp);
 
 	/* Free the update array. */
 	__wt_free(session, update_head);
 }
 
 /*
- * __free_update_list --
+ * __wt_free_update_list --
  *	Walk a WT_UPDATE forward-linked list and free the per-thread combination
  *	of a WT_UPDATE structure and its associated data.
  */
-static void
-__free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+void
+__wt_free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
 	WT_UPDATE *next;
 
 	for (; upd != NULL; upd = next) {
-		/* Everything we free should be visible to everyone. */
-		WT_ASSERT(session,
-		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
-		    upd->txnid == WT_TXN_ABORTED ||
-		    __wt_txn_visible_all(session, upd->txnid));
-
 		next = upd->next;
 		__wt_free(session, upd);
 	}

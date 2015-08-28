@@ -157,11 +157,13 @@ KVS
 Kanowski's
 Kounavis
 LANGID
+LAS
 LF
 LLLLLL
 LLLLLLL
 LOGREC
 LOGSCAN
+LOOKASIDE
 LRU
 LRVv
 LSB
@@ -177,6 +179,7 @@ Levyx
 Llqr
 Llqrt
 LockFile
+Lookaside
 Lookup
 MALLOC
 MEM
@@ -211,6 +214,7 @@ NetBSD
 NoAddr
 Noll
 Nul
+OOB
 OPTYPE
 OUTBUFF
 OVFL
@@ -232,6 +236,7 @@ Preload
 Prepend
 Qsort
 RCS
+RECNO
 REF's
 REFs
 RET
@@ -321,6 +326,7 @@ WiredTiger's
 WiredTigerCheckpoint
 WiredTigerException
 WiredTigerInit
+WiredTigerLAS
 WiredTigerLog
 WiredTigerPreplog
 WiredTigerTmplog
@@ -506,6 +512,7 @@ dlh
 dll
 dlopen
 dlsym
+dmalloc
 dmsg
 doxgen
 doxygen
@@ -515,6 +522,7 @@ dsk
 dsrc
 dst
 dstlen
+dstrdup
 dsync
 dumpcmp
 dumpfile
@@ -651,6 +659,7 @@ kvraw
 kvs
 kvsbdb
 lang
+las
 latencies
 lbrace
 lbracket
@@ -678,6 +687,7 @@ logread
 logrec
 logsize
 logtest
+lookaside
 lookup
 lookups
 lossy
@@ -951,6 +961,7 @@ unesc
 unescaped
 uninstantiated
 unistd
+unlinked
 unmap
 unmarshall
 unmarshalled
