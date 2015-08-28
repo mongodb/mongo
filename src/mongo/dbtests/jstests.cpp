@@ -400,42 +400,11 @@ public:
 
         BSONObj out;
 
-        /**
-         * TODO remove the v8 tests after we switch over
-         *
-         * Note that we've changed behavior so that uncaught js exceptions that
-         * bubble up actually convert into user exceptions, instead of just
-         * logging to stdout and silently failing otherwise.
-         */
-        auto ivs = globalScriptEngine->getInterpreterVersionString();
-        std::string prefix("MozJS");
-        if (ivs.compare(0, prefix.length(), prefix) == 0) {
-            ASSERT_THROWS(s->invoke("blah.y = 'e'", 0, 0), mongo::UserException);
-            ASSERT_THROWS(s->invoke("blah.a = 19;", 0, 0), mongo::UserException);
-            ASSERT_THROWS(s->invoke("blah.zz.a = 19;", 0, 0), mongo::UserException);
-            ASSERT_THROWS(s->invoke("blah.zz = { a : 19 };", 0, 0), mongo::UserException);
-            ASSERT_THROWS(s->invoke("delete blah['x']", 0, 0), mongo::UserException);
-        } else {
-            s->invoke("blah.y = 'e'", 0, 0);
-            out = s->getObject("blah");
-            ASSERT(strlen(out["y"].valuestr()) > 1);
-
-            s->invoke("blah.a = 19;", 0, 0);
-            out = s->getObject("blah");
-            ASSERT(out["a"].eoo());
-
-            s->invoke("blah.zz.a = 19;", 0, 0);
-            out = s->getObject("blah");
-            ASSERT(out["zz"].embeddedObject()["a"].eoo());
-
-            s->setObject("blah.zz", BSON("a" << 19));
-            out = s->getObject("blah");
-            ASSERT(out["zz"].embeddedObject()["a"].eoo());
-
-            s->invoke("delete blah['x']", 0, 0);
-            out = s->getObject("blah");
-            ASSERT(!out["x"].eoo());
-        }
+        ASSERT_THROWS(s->invoke("blah.y = 'e'", 0, 0), mongo::UserException);
+        ASSERT_THROWS(s->invoke("blah.a = 19;", 0, 0), mongo::UserException);
+        ASSERT_THROWS(s->invoke("blah.zz.a = 19;", 0, 0), mongo::UserException);
+        ASSERT_THROWS(s->invoke("blah.zz = { a : 19 };", 0, 0), mongo::UserException);
+        ASSERT_THROWS(s->invoke("delete blah['x']", 0, 0), mongo::UserException);
 
         // read-only object itself can be overwritten
         s->invoke("blah = {}", 0, 0);
