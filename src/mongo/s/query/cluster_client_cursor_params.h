@@ -60,17 +60,17 @@ struct ClusterClientCursorParams {
             : hostAndPort(std::move(hostAndPort)), cursorId(cursorId) {}
 
         // How the networking layer should contact this remote.
-        const HostAndPort hostAndPort;
+        HostAndPort hostAndPort;
 
         // The raw command parameters to send to this remote (e.g. the find command specification).
         //
         // Exactly one of 'cmdObj' or 'cursorId' must be set.
-        const boost::optional<BSONObj> cmdObj;
+        boost::optional<BSONObj> cmdObj;
 
         // The cursorId for the remote node, if one already exists.
         //
         // Exactly one of 'cmdObj' or 'cursorId' must be set.
-        const boost::optional<CursorId> cursorId;
+        boost::optional<CursorId> cursorId;
     };
 
     ClusterClientCursorParams() {}
