@@ -2347,7 +2347,7 @@ buildvariants:
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
-    push_arch: x86_64
+    push_arch: x86_64-decimal
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release --experimental-decimal-support=on
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
@@ -2362,9 +2362,6 @@ buildvariants:
   - name: jsDecimalCore
   - name: jsDecimalCore_WT
   - name: jstestfuzz
-  - name: push
-    distros:
-    - rhel55-test
 
 ###########################################
 #         Windows buildvariants           #
