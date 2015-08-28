@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -40,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -256,6 +258,36 @@ TEST_F(ReplCoordHBV1Test, OnlyUnauthorizedUpCausesRecovering) {
     assertMemberState(MemberState::RS_RECOVERING, "0");
 }
 
+TEST_F(ReplCoordHBV1Test, ArbiterRecordsCommittedOpTimeFromHeartbeat) {
+    // Tests that an arbiter will update its committed optime from the heartbeat metadata
+    assertStartSuccess(fromjson(
+                           "{_id:'mySet', version:1, protocolVersion:1, members:["
+                           "{_id:1, host:'node1:12345', arbiterOnly:true}, "
+                           "{_id:2, host:'node2:12345'}]}"),
+                       HostAndPort("node1", 12345));
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_ARBITER));
+
+    // calls processReplSetMetadata with the "committed" optime and verifies that the arbiter sets
+    // its current optime to 'expected'
+    auto test = [this](OpTime committedOpTime, OpTime expected) {
+        // process heartbeat metadata directly
+        StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
+            rpc::kReplSetMetadataFieldName << BSON(
+                "lastOpCommitted" << BSON("ts" << committedOpTime.getTimestamp() << "term"
+                                               << committedOpTime.getTerm()) << "lastOpVisible"
+                                  << BSON("ts" << committedOpTime.getTimestamp() << "term"
+                                               << committedOpTime.getTerm()) << "configVersion" << 1
+                                  << "primaryIndex" << 1 << "term" << committedOpTime.getTerm())));
+        getReplCoord()->processReplSetMetadata(metadata.getValue());
+
+        ASSERT_EQ(getReplCoord()->getMyLastOptime().getTimestamp(), expected.getTimestamp());
+    };
+
+    OpTime committedOpTime{Timestamp{10, 10}, 10};
+    test(committedOpTime, committedOpTime);
+    OpTime olderOpTime{Timestamp{2, 2}, 9};
+    test(olderOpTime, committedOpTime);
+}
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

@@ -365,7 +365,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     invariant(_rsConfigState == kConfigStartingUp);
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
-    _setMyLastOptime_inlock(&lk, lastOpTime, false);
+    _setMyLastOptimeAndReport_inlock(&lk, lastOpTime, false);
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
     _updateTerm_incallback(term);
     LOG(1) << "Current term is now " << term;
@@ -760,37 +760,28 @@ void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
 void ReplicationCoordinatorImpl::setMyLastOptimeForward(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     if (opTime > _getMyLastOptime_inlock()) {
-        _setMyLastOptime_inlock(&lock, opTime, false);
+        _setMyLastOptimeAndReport_inlock(&lock, opTime, false);
     }
 }
 
 void ReplicationCoordinatorImpl::setMyLastOptime(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _setMyLastOptime_inlock(&lock, opTime, false);
+    _setMyLastOptimeAndReport_inlock(&lock, opTime, false);
 }
 
 void ReplicationCoordinatorImpl::resetMyLastOptime() {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     // Reset to uninitialized OpTime
-    _setMyLastOptime_inlock(&lock, OpTime(), true);
+    _setMyLastOptimeAndReport_inlock(&lock, OpTime(), true);
 }
 
-void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(stdx::unique_lock<stdx::mutex>* lock,
-                                                         const OpTime& opTime,
-                                                         bool isRollbackAllowed) {
+void ReplicationCoordinatorImpl::_setMyLastOptimeAndReport_inlock(
+    stdx::unique_lock<stdx::mutex>* lock, const OpTime& opTime, bool isRollbackAllowed) {
     invariant(lock->owns_lock());
-    SlaveInfo* mySlaveInfo = &_slaveInfo[_getMyIndexInSlaveInfo_inlock()];
-    invariant(isRollbackAllowed || mySlaveInfo->opTime <= opTime);
-    _updateSlaveInfoOptime_inlock(mySlaveInfo, opTime);
+    _setMyLastOptime_inlock(opTime, isRollbackAllowed);
 
     if (getReplicationMode() != modeReplSet) {
         return;
-    }
-
-    for (auto& opTimeWaiter : _opTimeWaiterList) {
-        if (*(opTimeWaiter->opTime) <= opTime) {
-            opTimeWaiter->condVar->notify_all();
-        }
     }
 
     if (_getMemberState_inlock().primary()) {
@@ -800,6 +791,19 @@ void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(stdx::unique_lock<stdx:
     lock->unlock();
 
     _externalState->forwardSlaveProgress();  // Must do this outside _mutex
+}
+
+void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(const OpTime& opTime,
+                                                         bool isRollbackAllowed) {
+    SlaveInfo* mySlaveInfo = &_slaveInfo[_getMyIndexInSlaveInfo_inlock()];
+    invariant(isRollbackAllowed || mySlaveInfo->opTime <= opTime);
+    _updateSlaveInfoOptime_inlock(mySlaveInfo, opTime);
+
+    for (auto& opTimeWaiter : _opTimeWaiterList) {
+        if (*(opTimeWaiter->opTime) <= opTime) {
+            opTimeWaiter->condVar->notify_all();
+        }
+    }
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
@@ -2604,7 +2608,7 @@ void ReplicationCoordinatorImpl::resetLastOpTimeFromOplog(OperationContext* txn)
         lastOpTime = lastOpTimeStatus.getValue();
     }
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _setMyLastOptime_inlock(&lk, lastOpTime, true);
+    _setMyLastOptimeAndReport_inlock(&lk, lastOpTime, true);
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
 }
 
@@ -2678,6 +2682,10 @@ void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& co
         return;
     }
 
+    if (_getMemberState_inlock().arbiter()) {
+        _setMyLastOptime_inlock(committedOpTime, false);
+    }
+
     _lastCommittedOpTime = committedOpTime;
 
     auto maxSnapshotForOpTime = SnapshotInfo{committedOpTime, SnapshotName::max()};
@@ -2719,7 +2727,9 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
         return {ErrorCodes::BadValue, "not using election protocol v1"};
     }
 
-    updateTerm(args.getTerm());
+    auto termStatus = updateTerm(args.getTerm());
+    if (!termStatus.isOK())
+        return termStatus;
 
     Status result{ErrorCodes::InternalError, "didn't set status in processReplSetRequestVotes"};
     CBHStatus cbh = _replExecutor.scheduleWork(
