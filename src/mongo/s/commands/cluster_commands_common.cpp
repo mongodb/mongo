@@ -33,7 +33,7 @@
 #include "mongo/s/commands/cluster_commands_common.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/version_manager.h"

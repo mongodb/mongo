@@ -41,7 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"

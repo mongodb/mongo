@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/getmore_response.h"
+#include "mongo/db/query/cursor_response.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -43,20 +43,42 @@ const char kCursorField[] = "cursor";
 const char kIdField[] = "id";
 const char kNsField[] = "ns";
 const char kBatchField[] = "nextBatch";
-const char kBatchFieldAlt[] = "firstBatch";
+const char kBatchFieldInitial[] = "firstBatch";
 
 }  // namespace
 
-GetMoreResponse::GetMoreResponse(NamespaceString namespaceString,
-                                 CursorId id,
-                                 std::vector<BSONObj> objs,
-                                 boost::optional<long long> nReturnedSoFar)
+void appendCursorResponseObject(long long cursorId,
+                                StringData cursorNamespace,
+                                BSONArray firstBatch,
+                                BSONObjBuilder* builder) {
+    BSONObjBuilder cursorObj(builder->subobjStart(kCursorField));
+    cursorObj.append(kIdField, cursorId);
+    cursorObj.append(kNsField, cursorNamespace);
+    cursorObj.append(kBatchFieldInitial, firstBatch);
+    cursorObj.done();
+}
+
+void appendGetMoreResponseObject(long long cursorId,
+                                 StringData cursorNamespace,
+                                 BSONArray nextBatch,
+                                 BSONObjBuilder* builder) {
+    BSONObjBuilder cursorObj(builder->subobjStart(kCursorField));
+    cursorObj.append(kIdField, cursorId);
+    cursorObj.append(kNsField, cursorNamespace);
+    cursorObj.append(kBatchField, nextBatch);
+    cursorObj.done();
+}
+
+CursorResponse::CursorResponse(NamespaceString namespaceString,
+                               CursorId id,
+                               std::vector<BSONObj> objs,
+                               boost::optional<long long> nReturnedSoFar)
     : nss(std::move(namespaceString)),
       cursorId(id),
       batch(std::move(objs)),
       numReturnedSoFar(nReturnedSoFar) {}
 
-StatusWith<GetMoreResponse> GetMoreResponse::parseFromBSON(const BSONObj& cmdResponse) {
+StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdResponse) {
     Status cmdStatus = getStatusFromCommandResult(cmdResponse);
     if (!cmdStatus.isOK()) {
         return cmdStatus;
@@ -92,12 +114,12 @@ StatusWith<GetMoreResponse> GetMoreResponse::parseFromBSON(const BSONObj& cmdRes
 
     BSONElement batchElt = cursorObj[kBatchField];
     if (batchElt.eoo()) {
-        batchElt = cursorObj[kBatchFieldAlt];
+        batchElt = cursorObj[kBatchFieldInitial];
     }
 
     if (batchElt.type() != BSONType::Array) {
         return {ErrorCodes::TypeMismatch,
-                str::stream() << "Must have array field '" << kBatchFieldAlt << "' or '"
+                str::stream() << "Must have array field '" << kBatchFieldInitial << "' or '"
                               << kBatchField << "' in: " << cmdResponse};
     }
     batchObj = batchElt.Obj();
@@ -116,7 +138,7 @@ StatusWith<GetMoreResponse> GetMoreResponse::parseFromBSON(const BSONObj& cmdRes
     return {{NamespaceString(fullns), cursorId, batch}};
 }
 
-void GetMoreResponse::toBSON(BSONObjBuilder* builder) const {
+void CursorResponse::addToBSON(BSONObjBuilder* builder) const {
     BSONObjBuilder cursorBuilder(builder->subobjStart(kCursorField));
 
     cursorBuilder.append(kIdField, cursorId);
@@ -133,9 +155,9 @@ void GetMoreResponse::toBSON(BSONObjBuilder* builder) const {
     builder->append("ok", 1.0);
 }
 
-BSONObj GetMoreResponse::toBSON() const {
+BSONObj CursorResponse::toBSON() const {
     BSONObjBuilder builder;
-    toBSON(&builder);
+    addToBSON(&builder);
     return builder.obj();
 }
 

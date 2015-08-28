@@ -548,12 +548,12 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
         }
         GetMoreRequest getMoreRequest(NamespaceString(ns), id, batchSize, boost::none);
 
-        auto getMoreResponse = ClusterFind::runGetMore(txn, getMoreRequest);
-        if (getMoreResponse == ErrorCodes::CursorNotFound) {
+        auto cursorResponse = ClusterFind::runGetMore(txn, getMoreRequest);
+        if (cursorResponse == ErrorCodes::CursorNotFound) {
             replyToQuery(ResultFlag_CursorNotFound, request.p(), request.m(), 0, 0, 0);
             return;
         }
-        uassertStatusOK(getMoreResponse.getStatus());
+        uassertStatusOK(cursorResponse.getStatus());
 
         // Build the response document.
         //
@@ -562,7 +562,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
         BufBuilder buffer(ShardedClientCursor::INIT_REPLY_BUFFER_SIZE);
 
         int numResults = 0;
-        for (const auto& obj : getMoreResponse.getValue().batch) {
+        for (const auto& obj : cursorResponse.getValue().batch) {
             buffer.appendBuf((void*)obj.objdata(), obj.objsize());
             ++numResults;
         }
@@ -573,8 +573,8 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
                      buffer.buf(),
                      buffer.len(),
                      numResults,
-                     getMoreResponse.getValue().numReturnedSoFar.value_or(0),
-                     getMoreResponse.getValue().cursorId);
+                     cursorResponse.getValue().numReturnedSoFar.value_or(0),
+                     cursorResponse.getValue().cursorId);
         return;
     }
 

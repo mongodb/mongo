@@ -47,7 +47,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/storage_options.h"

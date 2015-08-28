@@ -36,7 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/multi_iterator.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/base/checked_cast.h"

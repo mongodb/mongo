@@ -113,10 +113,9 @@ env.Library(
     target='command_request_response',
     source=[
         'count_request.cpp',
-        'cursor_responses.cpp',
+        'cursor_response.cpp',
         'find_and_modify_request.cpp',
         'getmore_request.cpp',
-        'getmore_response.cpp',
         'killcursors_request.cpp',
         'killcursors_response.cpp',
     ],
@@ -132,9 +131,9 @@ env.CppUnitTest(
     target='command_request_response_test',
     source=[
         'count_request_test.cpp',
+        'cursor_response_test.cpp',
         'find_and_modify_request_test.cpp',
         'getmore_request_test.cpp',
-        'getmore_response_test.cpp',
         'killcursors_request_test.cpp',
         'killcursors_response_test.cpp',
     ],

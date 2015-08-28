@@ -44,7 +44,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/global_timestamp.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"

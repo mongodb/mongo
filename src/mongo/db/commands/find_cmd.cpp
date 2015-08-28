@@ -43,7 +43,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"

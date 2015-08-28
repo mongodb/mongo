@@ -268,8 +268,8 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                           << " times without establishing shard version."};
 }
 
-StatusWith<GetMoreResponse> ClusterFind::runGetMore(OperationContext* txn,
-                                                    const GetMoreRequest& request) {
+StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
+                                                   const GetMoreRequest& request) {
     auto cursorManager = grid.getCursorManager();
 
     auto pinnedCursor = cursorManager->checkOutCursor(request.nss, request.cursorid);
@@ -308,7 +308,7 @@ StatusWith<GetMoreResponse> ClusterFind::runGetMore(OperationContext* txn,
     CursorId idToReturn = (cursorState == ClusterCursorManager::CursorState::Exhausted)
         ? CursorId(0)
         : request.cursorid;
-    return GetMoreResponse(request.nss, idToReturn, std::move(batch), startingFrom);
+    return CursorResponse(request.nss, idToReturn, std::move(batch), startingFrom);
 }
 
 }  // namespace mongo

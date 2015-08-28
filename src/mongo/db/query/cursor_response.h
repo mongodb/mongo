@@ -28,20 +28,23 @@
 
 #pragma once
 
-namespace mongo {
+#include <vector>
 
-class BSONObjBuilder;
-class StringData;
-struct BSONArray;
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/namespace_string.h"
+
+namespace mongo {
 
 /**
  * Builds a cursor response object from the provided cursor identifiers and "firstBatch",
  * and appends the response object to the provided builder under the field name "cursor".
- * If the node is a member of a replSet, also appends the current term, primary, and
- * lastOp information.
  *
  * The response object has the following format:
  *   { id: <NumberLong>, ns: <String>, firstBatch: <Array> }.
+ *
+ * This function is deprecated.  Prefer CursorResponse::toBSON() instead.
  */
 void appendCursorResponseObject(long long cursorId,
                                 StringData cursorNamespace,
@@ -51,15 +54,41 @@ void appendCursorResponseObject(long long cursorId,
 /**
  * Builds a getMore response object from the provided cursor identifiers and "nextBatch",
  * and appends the response object to the provided builder under the field name "cursor".
- * If the node is a member of a replSet, also appends the current term, primary, and
- * lastOp information.
  *
  * The response object has the following format:
  *   { id: <NumberLong>, ns: <String>, nextBatch: <Array> }.
+ *
+ * This function is deprecated.  Prefer CursorResponse::toBSON() instead.
  */
 void appendGetMoreResponseObject(long long cursorId,
                                  StringData cursorNamespace,
                                  BSONArray nextBatch,
                                  BSONObjBuilder* builder);
+
+struct CursorResponse {
+    /**
+     * Constructs from values for each of the fields.
+     */
+    CursorResponse(NamespaceString namspaceString,
+                   CursorId id,
+                   std::vector<BSONObj> objs,
+                   boost::optional<long long> nReturnedSoFar = boost::none);
+
+    /**
+     * Constructs a CursorResponse from the command BSON response.
+     */
+    static StatusWith<CursorResponse> parseFromBSON(const BSONObj& cmdResponse);
+
+    /**
+     * Converts this response to its raw BSON representation.
+     */
+    BSONObj toBSON() const;
+    void addToBSON(BSONObjBuilder* builder) const;
+
+    const NamespaceString nss;
+    const CursorId cursorId;
+    const std::vector<BSONObj> batch;
+    const boost::optional<long long> numReturnedSoFar;
+};
 
 }  // namespace mongo

@@ -33,7 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/rpc/get_status_from_command_result.h"

@@ -32,8 +32,8 @@
 
 #include "mongo/s/query/async_results_merger.h"
 
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
-#include "mongo/db/query/getmore_response.h"
 #include "mongo/db/query/killcursors_request.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -333,37 +333,37 @@ void AsyncResultsMerger::handleBatchResponse(
         return;
     }
 
-    auto getMoreParseStatus = GetMoreResponse::parseFromBSON(cbData.response.getValue().data);
+    auto getMoreParseStatus = CursorResponse::parseFromBSON(cbData.response.getValue().data);
     if (!getMoreParseStatus.isOK()) {
         remote.status = getMoreParseStatus.getStatus();
         return;
     }
 
-    auto getMoreResponse = getMoreParseStatus.getValue();
+    auto cursorResponse = getMoreParseStatus.getValue();
 
     // If we have a cursor established, and we get a non-zero cursorid that is not equal to the
     // established cursorid, we will fail the operation.
-    if (remote.cursorId && getMoreResponse.cursorId != 0 &&
-        *remote.cursorId != getMoreResponse.cursorId) {
+    if (remote.cursorId && cursorResponse.cursorId != 0 &&
+        *remote.cursorId != cursorResponse.cursorId) {
         remote.status = Status(ErrorCodes::BadValue,
                                str::stream() << "Expected cursorid " << *remote.cursorId
-                                             << " but received " << getMoreResponse.cursorId);
+                                             << " but received " << cursorResponse.cursorId);
         return;
     }
 
     // Mark that we've gotten a valid response back from 'remote' at least once.
     remote.gotFirstResponse = true;
 
-    remote.cursorId = getMoreResponse.cursorId;
+    remote.cursorId = cursorResponse.cursorId;
 
-    for (const auto& obj : getMoreResponse.batch) {
+    for (const auto& obj : cursorResponse.batch) {
         remote.docBuffer.push(obj);
         ++remote.fetchedCount;
     }
 
     // If we're doing a sorted merge, then we have to make sure to put this remote onto the
     // merge queue.
-    if (!_params.sort.isEmpty() && !getMoreResponse.batch.empty()) {
+    if (!_params.sort.isEmpty() && !cursorResponse.batch.empty()) {
         _mergeQueue.push(remoteIndex);
     }
 

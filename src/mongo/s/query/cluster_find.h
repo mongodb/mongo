@@ -32,7 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
-#include "mongo/db/query/getmore_response.h"
+#include "mongo/db/query/cursor_response.h"
 
 namespace mongo {
 
@@ -65,10 +65,10 @@ public:
                                          std::vector<BSONObj>* results);
 
     /**
-     * Executes the getMore request 'request', and on success returns a GetMoreResponse.
+     * Executes the getMore request 'request', and on success returns a CursorResponse.
      */
-    static StatusWith<GetMoreResponse> runGetMore(OperationContext* txn,
-                                                  const GetMoreRequest& request);
+    static StatusWith<CursorResponse> runGetMore(OperationContext* txn,
+                                                 const GetMoreRequest& request);
 };
 
 }  // namespace mongo

@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/getmore_response.h"
+#include "mongo/db/query/cursor_response.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -36,15 +36,15 @@ namespace mongo {
 
 namespace {
 
-TEST(GetMoreResponseTest, parseFromBSONFirstBatch) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(BSON(
+TEST(CursorResponseTest, parseFromBSONFirstBatch) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
         "cursor" << BSON("id" << CursorId(123) << "ns"
                               << "db.coll"
                               << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
                  << "ok" << 1));
     ASSERT_OK(result.getStatus());
 
-    GetMoreResponse response = result.getValue();
+    CursorResponse response = result.getValue();
     ASSERT_EQ(response.cursorId, CursorId(123));
     ASSERT_EQ(response.nss.ns(), "db.coll");
     ASSERT_EQ(response.batch.size(), 2U);
@@ -52,15 +52,15 @@ TEST(GetMoreResponseTest, parseFromBSONFirstBatch) {
     ASSERT_EQ(response.batch[1], BSON("_id" << 2));
 }
 
-TEST(GetMoreResponseTest, parseFromBSONNextBatch) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(BSON(
+TEST(CursorResponseTest, parseFromBSONNextBatch) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
         "cursor" << BSON("id" << CursorId(123) << "ns"
                               << "db.coll"
                               << "nextBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
                  << "ok" << 1));
     ASSERT_OK(result.getStatus());
 
-    GetMoreResponse response = result.getValue();
+    CursorResponse response = result.getValue();
     ASSERT_EQ(response.cursorId, CursorId(123));
     ASSERT_EQ(response.nss.ns(), "db.coll");
     ASSERT_EQ(response.batch.size(), 2U);
@@ -68,15 +68,15 @@ TEST(GetMoreResponseTest, parseFromBSONNextBatch) {
     ASSERT_EQ(response.batch[1], BSON("_id" << 2));
 }
 
-TEST(GetMoreResponseTest, parseFromBSONCursorIdZero) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(BSON(
+TEST(CursorResponseTest, parseFromBSONCursorIdZero) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
         "cursor" << BSON("id" << CursorId(0) << "ns"
                               << "db.coll"
                               << "nextBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
                  << "ok" << 1));
     ASSERT_OK(result.getStatus());
 
-    GetMoreResponse response = result.getValue();
+    CursorResponse response = result.getValue();
     ASSERT_EQ(response.cursorId, CursorId(0));
     ASSERT_EQ(response.nss.ns(), "db.coll");
     ASSERT_EQ(response.batch.size(), 2U);
@@ -84,46 +84,46 @@ TEST(GetMoreResponseTest, parseFromBSONCursorIdZero) {
     ASSERT_EQ(response.batch[1], BSON("_id" << 2));
 }
 
-TEST(GetMoreResponseTest, parseFromBSONEmptyBatch) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(
+TEST(CursorResponseTest, parseFromBSONEmptyBatch) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(
         BSON("cursor" << BSON("id" << CursorId(123) << "ns"
                                    << "db.coll"
                                    << "nextBatch" << BSONArrayBuilder().arr()) << "ok" << 1));
     ASSERT_OK(result.getStatus());
 
-    GetMoreResponse response = result.getValue();
+    CursorResponse response = result.getValue();
     ASSERT_EQ(response.cursorId, CursorId(123));
     ASSERT_EQ(response.nss.ns(), "db.coll");
     ASSERT_EQ(response.batch.size(), 0U);
 }
 
-TEST(GetMoreResponseTest, parseFromBSONMissingCursorField) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(BSON("ok" << 1));
+TEST(CursorResponseTest, parseFromBSONMissingCursorField) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON("ok" << 1));
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(GetMoreResponseTest, parseFromBSONCursorFieldWrongType) {
-    StatusWith<GetMoreResponse> result =
-        GetMoreResponse::parseFromBSON(BSON("cursor" << 3 << "ok" << 1));
+TEST(CursorResponseTest, parseFromBSONCursorFieldWrongType) {
+    StatusWith<CursorResponse> result =
+        CursorResponse::parseFromBSON(BSON("cursor" << 3 << "ok" << 1));
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(GetMoreResponseTest, parseFromBSONNsFieldMissing) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(BSON(
+TEST(CursorResponseTest, parseFromBSONNsFieldMissing) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
         "cursor" << BSON("id" << CursorId(123) << "firstBatch"
                               << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2))) << "ok" << 1));
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(GetMoreResponseTest, parseFromBSONNsFieldWrongType) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(BSON(
+TEST(CursorResponseTest, parseFromBSONNsFieldWrongType) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
         "cursor" << BSON("id" << CursorId(123) << "ns" << 456 << "firstBatch"
                               << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2))) << "ok" << 1));
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(GetMoreResponseTest, parseFromBSONIdFieldMissing) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(
+TEST(CursorResponseTest, parseFromBSONIdFieldMissing) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(
         BSON("cursor" << BSON("ns"
                               << "db.coll"
                               << "nextBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
@@ -131,8 +131,8 @@ TEST(GetMoreResponseTest, parseFromBSONIdFieldMissing) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(GetMoreResponseTest, parseFromBSONIdFieldWrongType) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(
+TEST(CursorResponseTest, parseFromBSONIdFieldWrongType) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(
         BSON("cursor" << BSON("id"
                               << "123"
                               << "ns"
@@ -142,49 +142,49 @@ TEST(GetMoreResponseTest, parseFromBSONIdFieldWrongType) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(GetMoreResponseTest, parseFromBSONBatchFieldMissing) {
-    StatusWith<GetMoreResponse> result =
-        GetMoreResponse::parseFromBSON(BSON("cursor" << BSON("id" << CursorId(123) << "ns"
-                                                                  << "db.coll") << "ok" << 1));
+TEST(CursorResponseTest, parseFromBSONBatchFieldMissing) {
+    StatusWith<CursorResponse> result =
+        CursorResponse::parseFromBSON(BSON("cursor" << BSON("id" << CursorId(123) << "ns"
+                                                                 << "db.coll") << "ok" << 1));
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(GetMoreResponseTest, parseFromBSONFirstBatchFieldWrongType) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(
+TEST(CursorResponseTest, parseFromBSONFirstBatchFieldWrongType) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(
         BSON("cursor" << BSON("id" << CursorId(123) << "ns"
                                    << "db.coll"
                                    << "firstBatch" << BSON("_id" << 1)) << "ok" << 1));
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(GetMoreResponseTest, parseFromBSONNextBatchFieldWrongType) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(
+TEST(CursorResponseTest, parseFromBSONNextBatchFieldWrongType) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(
         BSON("cursor" << BSON("id" << CursorId(123) << "ns"
                                    << "db.coll"
                                    << "nextBatch" << BSON("_id" << 1)) << "ok" << 1));
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(GetMoreResponseTest, parseFromBSONOkFieldMissing) {
-    StatusWith<GetMoreResponse> result = GetMoreResponse::parseFromBSON(BSON(
+TEST(CursorResponseTest, parseFromBSONOkFieldMissing) {
+    StatusWith<CursorResponse> result = CursorResponse::parseFromBSON(BSON(
         "cursor" << BSON("id" << CursorId(123) << "ns"
                               << "db.coll"
                               << "nextBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))));
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(GetMoreResponseTest, parseFromBSONHandleErrorResponse) {
-    StatusWith<GetMoreResponse> result =
-        GetMoreResponse::parseFromBSON(BSON("ok" << 0 << "code" << 123 << "errmsg"
-                                                 << "does not work"));
+TEST(CursorResponseTest, parseFromBSONHandleErrorResponse) {
+    StatusWith<CursorResponse> result =
+        CursorResponse::parseFromBSON(BSON("ok" << 0 << "code" << 123 << "errmsg"
+                                                << "does not work"));
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQ(result.getStatus().code(), 123);
     ASSERT_EQ(result.getStatus().reason(), "does not work");
 }
 
-TEST(GetMoreResponseTest, toBSON) {
+TEST(CursorResponseTest, toBSON) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
-    GetMoreResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
+    CursorResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
     BSONObj responseObj = response.toBSON();
     BSONObj expectedResponse = BSON(
         "cursor" << BSON("id" << CursorId(123) << "ns"
@@ -194,12 +194,12 @@ TEST(GetMoreResponseTest, toBSON) {
     ASSERT_EQ(responseObj, expectedResponse);
 }
 
-TEST(GetMoreResponseTest, toBSONWithBuilder) {
+TEST(CursorResponseTest, addToBSON) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
-    GetMoreResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
+    CursorResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
 
     BSONObjBuilder builder;
-    response.toBSON(&builder);
+    response.addToBSON(&builder);
     BSONObj responseObj = builder.obj();
 
     BSONObj expectedResponse = BSON(

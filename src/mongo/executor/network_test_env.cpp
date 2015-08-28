@@ -32,7 +32,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/cursor_responses.h"
+#include "mongo/db/query/cursor_response.h"
 
 namespace mongo {
 
