@@ -3251,7 +3251,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	WT_SAVE_UPD *list;
 	WT_UPDATE *upd;
 	uint64_t las_counter;
-	uint32_t session_flags, slot;
+	uint32_t i, session_flags, slot;
 	uint8_t *p;
 
 	cursor = NULL;
@@ -3296,8 +3296,8 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	las_addr.size = bnd->addr.size;
 
 	/* Enter each update in the boundary's list into the lookaside store. */
-	for (las_counter = 0, list = bnd->supd;
-	    las_counter < bnd->supd_next; ++las_counter, ++list) {
+	for (las_counter = 0, i = 0,
+	    list = bnd->supd; i < bnd->supd_next; ++i, ++list) {
 		/* Lookaside table key component: source key. */
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
@@ -3340,9 +3340,9 @@ __rec_update_las(WT_SESSION_IMPL *session,
 		 * Walk the list of updates, storing each key/value pair into
 		 * the lookaside table.
 		 */
-		for (; upd != NULL; upd = upd->next) {
+		do {
 			cursor->set_key(cursor, btree_id,
-			    &las_addr, las_counter, list->onpage_txn, key);
+			    &las_addr, ++las_counter, list->onpage_txn, key);
 
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				las_value.size = 0;
@@ -3354,7 +3354,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 			    cursor, upd->txnid, upd->size, &las_value);
 
 			WT_ERR(cursor->insert(cursor));
-		}
+		} while ((upd = upd->next) != NULL);
 	}
 
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
