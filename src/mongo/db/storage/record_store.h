@@ -444,10 +444,6 @@ public:
      *
      * Partition cursors are only required to support forward scanning, so it is illegal to call
      * seekExact() on any of the returned cursors.
-     *
-     * WARNING: the first call to restore() on each cursor may (but is not guaranteed to) be on
-     * a different RecoveryUnit than the initial save. This will be made more sane as part of
-     * SERVER-17364.
      */
     virtual std::vector<std::unique_ptr<RecordCursor>> getManyCursors(OperationContext* txn) const {
         std::vector<std::unique_ptr<RecordCursor>> out(1);
