@@ -480,7 +480,7 @@ func (d *decodeState) array(v reflect.Value) {
 	case reflect.Interface:
 		if v.NumMethod() == 0 {
 			// Decoding into nil interface?  Switch to non-reflect code.
-			v.Set(reflect.ValueOf(d.arrayInterface()))
+			v.Set(reflect.ValueOf(d.arrayInterface(false)))
 			return
 		}
 		// Otherwise it's invalid.
@@ -939,23 +939,32 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 // in an empty interface.  They are not strictly necessary,
 // but they avoid the weight of reflection in this common case.
 
-// valueInterface is like value but returns interface{}
-func (d *decodeState) valueInterface() interface{} {
+// valueInterface is like value but returns interface{}. It takes a boolean
+// parameter denoting whether or not the value is being unmarshalled within
+// a bson.D, so that bson.Ds can be the default object type when
+// they are inside other bson.D documents.
+func (d *decodeState) valueInterface(insideBSOND bool) interface{} {
 	switch d.scanWhile(scanSkipSpace) {
 	default:
 		d.error(errPhase)
 		panic("unreachable")
 	case scanBeginArray:
-		return d.arrayInterface()
+		return d.arrayInterface(insideBSOND)
 	case scanBeginObject:
+		if insideBSOND {
+			return d.bsonDInterface()
+		}
 		return d.objectInterface()
 	case scanBeginLiteral:
 		return d.literalInterface()
 	}
 }
 
-// arrayInterface is like array but returns []interface{}.
-func (d *decodeState) arrayInterface() []interface{} {
+// arrayInterface is like array but returns []interface{}. It takes a boolean
+// parameter denoting whether or not the value is being unmarshalled within
+// a bson.D, so that bson.Ds can be the default object type when
+// they are inside other bson.D documents.
+func (d *decodeState) arrayInterface(insideBSOND bool) []interface{} {
 	var v = make([]interface{}, 0)
 	for {
 		// Look ahead for ] - can only happen on first iteration.
@@ -968,7 +977,7 @@ func (d *decodeState) arrayInterface() []interface{} {
 		d.off--
 		d.scan.undo(op)
 
-		v = append(v, d.valueInterface())
+		v = append(v, d.valueInterface(insideBSOND))
 
 		// Next token must be , or ].
 		op = d.scanWhile(scanSkipSpace)
@@ -1014,7 +1023,7 @@ func (d *decodeState) bsonDInterface() bson.D {
 		}
 
 		// Read value.
-		m = append(m, bson.DocElem{key, d.valueInterface()})
+		m = append(m, bson.DocElem{key, d.valueInterface(true)})
 
 		// Next token must be , or }.
 		op = d.scanWhile(scanSkipSpace)
@@ -1060,7 +1069,7 @@ func (d *decodeState) objectInterface() map[string]interface{} {
 		}
 
 		// Read value.
-		m[key] = d.valueInterface()
+		m[key] = d.valueInterface(false)
 
 		// Next token must be , or }.
 		op = d.scanWhile(scanSkipSpace)

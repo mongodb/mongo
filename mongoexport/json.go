@@ -70,7 +70,7 @@ func (jsonExporter *JSONExportOutput) Flush() error {
 
 // ExportDocument converts the given document to extended JSON, and writes it
 // to the output.
-func (jsonExporter *JSONExportOutput) ExportDocument(document bson.M) error {
+func (jsonExporter *JSONExportOutput) ExportDocument(document bson.D) error {
 	if jsonExporter.ArrayOutput || jsonExporter.PrettyOutput {
 		if jsonExporter.NumExported >= 1 {
 			if jsonExporter.ArrayOutput {

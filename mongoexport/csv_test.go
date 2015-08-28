@@ -3,6 +3,7 @@ package mongoexport
 import (
 	"bytes"
 	"encoding/csv"
+	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
@@ -26,7 +27,7 @@ func TestWriteCSV(t *testing.T) {
 
 		Convey("Exported document with missing fields should print as blank", func() {
 			csvExporter := NewCSVExportOutput(fields, out)
-			csvExporter.ExportDocument(bson.M{"_id": "12345"})
+			csvExporter.ExportDocument(bson.D{{"_id", "12345"}})
 			csvExporter.WriteFooter()
 			csvExporter.Flush()
 			rec, err := csv.NewReader(strings.NewReader(out.String())).Read()
@@ -36,7 +37,7 @@ func TestWriteCSV(t *testing.T) {
 
 		Convey("Exported document with index into nested objects should print correctly", func() {
 			csvExporter := NewCSVExportOutput(fields, out)
-			csvExporter.ExportDocument(bson.M{"z": []interface{}{"x", bson.M{"a": "T", "B": 1}}})
+			csvExporter.ExportDocument(bson.D{{"z", []interface{}{"x", bson.D{{"a", "T"}, {"B", 1}}}}})
 			csvExporter.WriteFooter()
 			csvExporter.Flush()
 			rec, err := csv.NewReader(strings.NewReader(out.String())).Read()
@@ -48,5 +49,53 @@ func TestWriteCSV(t *testing.T) {
 			out.Reset()
 		})
 
+	})
+}
+
+func TestExtractDField(t *testing.T) {
+	Convey("With a test bson.D", t, func() {
+		testD := bsonutil.MarshalD{
+			{"a", "string"},
+			{"b", []interface{}{"inner", bsonutil.MarshalD{{"inner2", 1}}}},
+			{"c", bsonutil.MarshalD{{"x", 5}}},
+		}
+
+		Convey("regular fields should be extracted by name", func() {
+			val := extractFieldByName("a", testD)
+			So(val, ShouldEqual, "string")
+		})
+
+		Convey("array fields should be extracted by name", func() {
+			val := extractFieldByName("b.1", testD)
+			So(val, ShouldResemble, bsonutil.MarshalD{{"inner2", 1}})
+			val = extractFieldByName("b.1.inner2", testD)
+			So(val, ShouldEqual, 1)
+			val = extractFieldByName("b.0", testD)
+			So(val, ShouldEqual, "inner")
+		})
+
+		Convey("subdocument fields should be extracted by name", func() {
+			val := extractFieldByName("c", testD)
+			So(val, ShouldResemble, bsonutil.MarshalD{{"x", 5}})
+			val = extractFieldByName("c.x", testD)
+			So(val, ShouldEqual, 5)
+		})
+
+		Convey(`non-existing fields should return ""`, func() {
+			val := extractFieldByName("f", testD)
+			So(val, ShouldEqual, "")
+			val = extractFieldByName("c.nope", testD)
+			So(val, ShouldEqual, "")
+			val = extractFieldByName("b.1000", testD)
+			So(val, ShouldEqual, "")
+			val = extractFieldByName("b.1.nada", testD)
+			So(val, ShouldEqual, "")
+		})
+
+	})
+
+	Convey(`Extraction of a non-document should return ""`, t, func() {
+		val := extractFieldByName("meh", []interface{}{"meh"})
+		So(val, ShouldEqual, "")
 	})
 }

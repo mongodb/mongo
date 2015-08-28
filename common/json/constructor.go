@@ -88,7 +88,7 @@ func (d *decodeState) ctorInterface() []interface{} {
 		d.off--
 		d.scan.undo(op)
 
-		v = append(v, d.valueInterface())
+		v = append(v, d.valueInterface(false))
 
 		// Next token must be , or ).
 		op = d.scanWhile(scanSkipSpace)

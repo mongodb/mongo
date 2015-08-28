@@ -29,6 +29,15 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 			v[key] = bsonValue
 		}
 		return v, nil
+	case bson.D:
+		for i := range v {
+			var err error
+			v[i].Value, err = ParseJSONValue(v[i].Value)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return v, nil
 
 	case []interface{}: // array
 		for i, jsonValue := range v {
@@ -74,6 +83,11 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 		return bson.Binary{v.Type, data}, nil
 
 	case json.DBRef: // DBRef
+		var err error
+		v.Id, err = ParseJSONValue(v.Id)
+		if err != nil {
+			return nil, err
+		}
 		return mgo.DBRef{v.Collection, v.Id, v.Database}, nil
 
 	case json.DBPointer: // DBPointer, for backwards compatibility
