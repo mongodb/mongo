@@ -684,7 +684,7 @@ __split_multi_inmem(
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_UPDATE *upd;
-	WT_UPD_SKIPPED *skip;
+	WT_SAVE_UPD *supd;
 	uint64_t recno;
 	uint32_t i, slot;
 
@@ -702,22 +702,22 @@ __split_multi_inmem(
 	 * allocated page on error, when discarding the allocated WT_REF.
 	 */
 	WT_RET(__wt_page_inmem(session, ref,
-	    multi->skip_dsk, ((WT_PAGE_HEADER *)multi->skip_dsk)->mem_size,
+	    multi->supd_dsk, ((WT_PAGE_HEADER *)multi->supd_dsk)->mem_size,
 	    WT_PAGE_DISK_ALLOC, &page));
-	multi->skip_dsk = NULL;
+	multi->supd_dsk = NULL;
 
 	if (orig->type == WT_PAGE_ROW_LEAF)
 		WT_RET(__wt_scr_alloc(session, 0, &key));
 
 	/* Re-create each modification we couldn't write. */
-	for (i = 0, skip = multi->skip; i < multi->skip_entries; ++i, ++skip)
+	for (i = 0, supd = multi->supd; i < multi->supd_entries; ++i, ++supd)
 		switch (orig->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
 			/* Build a key. */
-			upd = skip->ins->upd;
-			skip->ins->upd = NULL;
-			recno = WT_INSERT_RECNO(skip->ins);
+			upd = supd->ins->upd;
+			supd->ins->upd = NULL;
+			recno = WT_INSERT_RECNO(supd->ins);
 
 			/* Search the page. */
 			WT_ERR(__wt_col_search(session, recno, ref, &cbt));
@@ -728,19 +728,19 @@ __split_multi_inmem(
 			break;
 		case WT_PAGE_ROW_LEAF:
 			/* Build a key. */
-			if (skip->ins == NULL) {
-				slot = WT_ROW_SLOT(orig, skip->rip);
+			if (supd->ins == NULL) {
+				slot = WT_ROW_SLOT(orig, supd->rip);
 				upd = orig->pg_row_upd[slot];
 				orig->pg_row_upd[slot] = NULL;
 
 				WT_ERR(__wt_row_leaf_key(
-				    session, orig, skip->rip, key, 0));
+				    session, orig, supd->rip, key, 0));
 			} else {
-				upd = skip->ins->upd;
-				skip->ins->upd = NULL;
+				upd = supd->ins->upd;
+				supd->ins->upd = NULL;
 
-				key->data = WT_INSERT_KEY(skip->ins);
-				key->size = WT_INSERT_KEY_SIZE(skip->ins);
+				key->data = WT_INSERT_KEY(supd->ins);
+				key->size = WT_INSERT_KEY_SIZE(supd->ins);
 			}
 
 			/* Search the page. */
@@ -799,7 +799,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	 */
 	ref->home = NULL;
 
-	if (multi->skip == NULL) {
+	if (multi->supd == NULL) {
 		/*
 		 * Copy the address: we could simply take the buffer, but that
 		 * would complicate error handling, freeing the reference array
@@ -828,7 +828,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		break;
 	}
 
-	ref->state = multi->skip == NULL ? WT_REF_DISK : WT_REF_MEM;
+	ref->state = multi->supd == NULL ? WT_REF_DISK : WT_REF_MEM;
 
 	/*
 	 * If our caller wants to track the memory allocations, we have a return

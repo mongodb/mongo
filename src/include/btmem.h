@@ -264,17 +264,17 @@ struct __wt_page_modify {
 		 * Eviction, but block wasn't written: unresolved updates and
 		 * associated disk image.
 		 *
-		 * Skipped updates are either a WT_INSERT, or a row-store leaf
+		 * Saved updates are either a WT_INSERT, or a row-store leaf
 		 * page entry; in the case of creating lookaside records, there
 		 * is an additional value, the committed item's transaction ID.
 		 */
-		struct __wt_upd_skipped {
+		struct __wt_save_upd {
 			WT_INSERT *ins;
 			WT_ROW	  *rip;
 			uint64_t   onpage_txn;
-		} *skip;
-		uint32_t skip_entries;
-		void	*skip_dsk;
+		} *supd;
+		uint32_t supd_entries;
+		void	*supd_dsk;
 
 		/*
 		 * Block was written: address, size and checksum.

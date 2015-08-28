@@ -159,8 +159,8 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 				__wt_free(session, multi->key.ikey);
 				break;
 			}
-			__wt_free(session, multi->skip);
-			__wt_free(session, multi->skip_dsk);
+			__wt_free(session, multi->supd);
+			__wt_free(session, multi->supd_dsk);
 			__wt_free(session, multi->addr.addr);
 		}
 		__wt_free(session, mod->mod_multi);

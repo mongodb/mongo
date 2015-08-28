@@ -51,9 +51,9 @@ typedef struct {
 	 * uncommitted updates can be saved/restored, that is, evict most of the
 	 * page and create a new, smaller page in which we re-instantiate the
 	 * uncommitted updates. If there are no uncommitted updates, but are
-	 * updates not yet visible to all readers in the system, we write those
-	 * updates into a database side store, restoring them on demand if/when
-	 * the page is read back into memory.
+	 * updates not yet visible to all readers in the system, we can write
+	 * those updates into a database side store, restoring them on demand
+	 * if/when the page is read back into memory.
 	 *
 	 * Both are configured from outside of reconciliation: saving/restoring
 	 * updates is the WT_EVICT_UPDATE_RESTORE flag. Writing not-yet-visible
@@ -176,18 +176,12 @@ typedef struct {
 		void    *dsk;		/* Split's disk image */
 
 		/*
-		 * When busy pages get large, we need to be able to evict them
-		 * even when they contain unresolved updates, or updates which
-		 * cannot be evicted because of running transactions.  In such
-		 * cases, break the page into multiple blocks, write the blocks
-		 * that can be evicted, saving lists of updates for blocks that
-		 * cannot be evicted, then re-instantiate the blocks that cannot
-		 * be evicted as new, in-memory pages, restoring the updates on
-		 * those pages.
+		 * Saved update list, supporting the WT_EVICT_UPDATE_RESTORE and
+		 * WT_EVICT_LOOKASIDE configurations.
 		 */
-		WT_UPD_SKIPPED *skip;	/* Skipped updates */
-		uint32_t	skip_next;
-		size_t		skip_allocated;
+		WT_SAVE_UPD *supd;	/* Saved updates */
+		uint32_t     supd_next;
+		size_t	     supd_allocated;
 
 		/*
 		 * The key for a row-store page; no column-store key is needed
@@ -243,12 +237,12 @@ typedef struct {
 	size_t	 space_avail;		/* Remaining space in this chunk */
 
 	/*
-	 * While reviewing updates for each page, we store skipped updates here,
+	 * While reviewing updates for each page, we save WT_UPDATE lists here,
 	 * and then move them to per-block areas as the blocks are defined.
 	 */
-	WT_UPD_SKIPPED *skip;		/* Skipped updates */
-	uint32_t	skip_next;
-	size_t		skip_allocated;
+	WT_SAVE_UPD *supd;		/* Saved updates */
+	uint32_t     supd_next;
+	size_t	     supd_allocated;
 
 	/*
 	 * We don't need to keep the 0th key around on internal pages, the
@@ -786,8 +780,8 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	r->all_empty_value = 1;
 	r->any_empty_value = 0;
 
-	/* The list of cached, skipped updates. */
-	r->skip_next = 0;
+	/* The list of saved updates. */
+	r->supd_next = 0;
 
 	/*
 	 * Dictionary compression only writes repeated values once.  We grow
@@ -866,7 +860,7 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
 
 	__rec_bnd_cleanup(session, r, 1);
 
-	__wt_free(session, r->skip);
+	__wt_free(session, r->supd);
 
 	__wt_buf_free(session, &r->k.buf);
 	__wt_buf_free(session, &r->v.buf);
@@ -920,7 +914,7 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
 			__wt_free(session, bnd->addr.addr);
 			__wt_free(session, bnd->dsk);
-			__wt_free(session, bnd->skip);
+			__wt_free(session, bnd->supd);
 			__wt_buf_free(session, &bnd->key);
 		}
 		__wt_free(session, r->bnd);
@@ -941,7 +935,7 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 		for (bnd = r->bnd, i = 0; i < last_used; ++bnd, ++i) {
 			__wt_free(session, bnd->addr.addr);
 			__wt_free(session, bnd->dsk);
-			__wt_free(session, bnd->skip);
+			__wt_free(session, bnd->supd);
 		}
 	}
 }
@@ -964,38 +958,37 @@ __rec_block_free(
 }
 
 /*
- * __rec_skip_update_save --
- *	Save a skipped WT_UPDATE list for later restoration.
+ * __rec_update_save --
+ *	Save a WT_UPDATE list for later restoration.
  */
 static int
-__rec_skip_update_save(WT_SESSION_IMPL *session,
+__rec_update_save(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip, uint64_t txnid)
 {
 	WT_RET(__wt_realloc_def(
-	    session, &r->skip_allocated, r->skip_next + 1, &r->skip));
-	r->skip[r->skip_next].ins = ins;
-	r->skip[r->skip_next].rip = rip;
-	r->skip[r->skip_next].onpage_txn = txnid;
-	++r->skip_next;
+	    session, &r->supd_allocated, r->supd_next + 1, &r->supd));
+	r->supd[r->supd_next].ins = ins;
+	r->supd[r->supd_next].rip = rip;
+	r->supd[r->supd_next].onpage_txn = txnid;
+	++r->supd_next;
 	return (0);
 }
 
 /*
- * __rec_skip_update_move --
- *	Move a skipped WT_UPDATE list from the per-page cache to a specific
+ * __rec_update_move --
+ *	Move a saved WT_UPDATE list from the per-page cache to a specific
  * block's list.
  */
 static int
-__rec_skip_update_move(
-    WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_UPD_SKIPPED *skip)
+__rec_update_move(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_SAVE_UPD *supd)
 {
 	WT_RET(__wt_realloc_def(
-	    session, &bnd->skip_allocated, bnd->skip_next + 1, &bnd->skip));
-	bnd->skip[bnd->skip_next] = *skip;
-	++bnd->skip_next;
+	    session, &bnd->supd_allocated, bnd->supd_next + 1, &bnd->supd));
+	bnd->supd[bnd->supd_next] = *supd;
+	++bnd->supd_next;
 
-	skip->ins = NULL;
-	skip->rip = NULL;
+	supd->ins = NULL;
+	supd->rip = NULL;
 	return (0);
 }
 
@@ -1274,7 +1267,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * that transaction ID is globally visible, we know we no longer need
 	 * the lookaside table records, allowing them to be discarded.
 	 */
-	return (__rec_skip_update_save(
+	return (__rec_update_save(
 	    session, r, ins, rip, skipped ? WT_TXN_NONE : (*updp)->txnid));
 }
 
@@ -1810,9 +1803,9 @@ __rec_split_bnd_init(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd)
 	bnd->cksum = 0;
 	__wt_free(session, bnd->dsk);
 
-	__wt_free(session, bnd->skip);
-	bnd->skip_next = 0;
-	bnd->skip_allocated = 0;
+	__wt_free(session, bnd->supd);
+	bnd->supd_next = 0;
+	bnd->supd_allocated = 0;
 
 	/*
 	 * Don't touch the key, we re-use that memory in each new
@@ -2085,7 +2078,7 @@ __rec_split_row_promote(
 	WT_DECL_ITEM(update);
 	WT_DECL_RET;
 	WT_ITEM *max;
-	WT_UPD_SKIPPED *skip;
+	WT_SAVE_UPD *supd;
 	size_t cnt, len, size;
 	uint32_t i;
 	const uint8_t *pa, *pb;
@@ -2137,14 +2130,14 @@ __rec_split_row_promote(
 	 */
 	max = r->last;
 	if (r->evict_skipped_updates)
-		for (i = r->skip_next; i > 0; --i) {
-			skip = &r->skip[i - 1];
-			if (skip->ins == NULL)
+		for (i = r->supd_next; i > 0; --i) {
+			supd = &r->supd[i - 1];
+			if (supd->ins == NULL)
 				WT_ERR(__wt_row_leaf_key(
-				    session, r->page, skip->rip, update, 0));
+				    session, r->page, supd->rip, update, 0));
 			else {
-				update->data = WT_INSERT_KEY(skip->ins);
-				update->size = WT_INSERT_KEY_SIZE(skip->ins);
+				update->data = WT_INSERT_KEY(supd->ins);
+				update->size = WT_INSERT_KEY_SIZE(supd->ins);
 			}
 
 			/* Compare against the current key, it must be less. */
@@ -2571,10 +2564,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 		WT_RET(compressor->pre_size(compressor, wt_session,
 		    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 		    (size_t)r->raw_offsets[slots], &result_len));
-	extra_skip = 0;
-	if (btree->kencryptor != NULL)
-		extra_skip = btree->kencryptor->size_const +
-		    WT_ENCRYPT_LEN_SIZE;
+	extra_skip = btree->kencryptor == NULL ? 0 :
+	    btree->kencryptor->size_const + WT_ENCRYPT_LEN_SIZE;
 
 	corrected_page_size = result_len + WT_BLOCK_COMPRESS_SKIP;
 	WT_RET(bm->write_size(bm, session, &corrected_page_size));
@@ -2902,7 +2893,7 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		 * really empty; otherwise, the page is truly empty and we will
 		 * merge it into its parent during the parent's reconciliation.
 		 */
-		if (r->skip_next == 0)
+		if (r->supd_next == 0)
 			return (0);
 
 		/*
@@ -3055,7 +3046,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
 	WT_PAGE_MODIFY *mod;
-	WT_UPD_SKIPPED *skip;
+	WT_SAVE_UPD *supd;
 	size_t addr_size;
 	uint32_t bnd_slot, i, j;
 	int cmp;
@@ -3098,23 +3089,23 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	bnd->cksum = 0;
 
 	/*
-	 * Check if we've skipped updates that belong to this block, and move
-	 * any to the per-block structure.  Quit as soon as we find a skipped
+	 * Check if we've saved updates that belong to this block, and move
+	 * any to the per-block structure.  Quit as soon as we find a saved
 	 * update that doesn't belong to the block, they're in sorted order.
 	 *
 	 * This code requires a key be filled in for the next block (or the
 	 * last block flag be set, if there's no next block).
 	 */
-	for (i = 0, skip = r->skip; i < r->skip_next; ++i, ++skip) {
-		/* The last block gets all remaining skipped updates. */
+	for (i = 0, supd = r->supd; i < r->supd_next; ++i, ++supd) {
+		/* The last block gets all remaining saved updates. */
 		if (last_block) {
-			WT_ERR(__rec_skip_update_move(session, bnd, skip));
+			WT_ERR(__rec_update_move(session, bnd, supd));
 			continue;
 		}
 
 		/*
-		 * Get the skipped update's key and compare it with this block's
-		 * key range.  If the skipped update list belongs with the block
+		 * Get the saved update's key and compare it with this block's
+		 * key range.  If the saved update list belongs with the block
 		 * we're about to write, move it to the per-block memory.  Check
 		 * only to the first update that doesn't go with the block, they
 		 * must be in sorted order.
@@ -3122,42 +3113,42 @@ __rec_split_write(WT_SESSION_IMPL *session,
 		switch (page->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			if (WT_INSERT_RECNO(skip->ins) >= (bnd + 1)->recno)
-				goto skip_check_complete;
+			if (WT_INSERT_RECNO(supd->ins) >= (bnd + 1)->recno)
+				goto supd_check_complete;
 			break;
 		case WT_PAGE_ROW_LEAF:
-			if (skip->ins == NULL)
+			if (supd->ins == NULL)
 				WT_ERR(__wt_row_leaf_key(
-				    session, page, skip->rip, key, 0));
+				    session, page, supd->rip, key, 0));
 			else {
-				key->data = WT_INSERT_KEY(skip->ins);
-				key->size = WT_INSERT_KEY_SIZE(skip->ins);
+				key->data = WT_INSERT_KEY(supd->ins);
+				key->size = WT_INSERT_KEY_SIZE(supd->ins);
 			}
 			WT_ERR(__wt_compare(session,
 			    btree->collator, key, &(bnd + 1)->key, &cmp));
 			if (cmp >= 0)
-				goto skip_check_complete;
+				goto supd_check_complete;
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
-		WT_ERR(__rec_skip_update_move(session, bnd, skip));
+		WT_ERR(__rec_update_move(session, bnd, supd));
 	}
 
-skip_check_complete:
+supd_check_complete:
 	/*
 	 * If there are updates that weren't moved to the block, shuffle them to
-	 * the beginning of the cached list (we maintain the skipped updates in
-	 * sorted order, new skipped updates must be appended to the list).
+	 * the beginning of the cached list (we maintain the saved updates in
+	 * sorted order, new saved updates must be appended to the list).
 	 */
-	for (j = 0; i < r->skip_next; ++j, ++i)
-		r->skip[j] = r->skip[i];
-	r->skip_next = j;
+	for (j = 0; i < r->supd_next; ++j, ++i)
+		r->supd[j] = r->supd[i];
+	r->supd_next = j;
 
 	/*
 	 * If we found updates that weren't globally visible when reconciling
 	 * this page, note that in the page header.
 	 */
-	if (!r->evict_skipped_updates && bnd->skip != NULL) {
+	if (!r->evict_skipped_updates && bnd->supd != NULL) {
 		F_SET(dsk, WT_PAGE_LAS_UPDATE);
 		r->cache_write_lookaside = 1;
 	}
@@ -3167,7 +3158,7 @@ skip_check_complete:
 	 * actually write it. Instead, we will re-instantiate the page using the
 	 * disk image and the list of updates we skipped.
 	 */
-	if (r->evict_skipped_updates && bnd->skip != NULL) {
+	if (r->evict_skipped_updates && bnd->supd != NULL) {
 		r->cache_write_restore = 1;
 
 		/*
@@ -3239,7 +3230,7 @@ skip_check_complete:
 	 * If we found updates that weren't globally visible when reconciling
 	 * this page, copy those updates into the database's lookaside store.
 	 */
-	if (!r->evict_skipped_updates && bnd->skip != NULL)
+	if (!r->evict_skipped_updates && bnd->supd != NULL)
 		ret = __rec_update_las(session, r, btree->id, bnd);
 
 done:
@@ -3260,8 +3251,8 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ITEM las_addr, las_value;
 	WT_PAGE *page;
+	WT_SAVE_UPD *list;
 	WT_UPDATE *upd;
-	WT_UPD_SKIPPED *list;
 	uint64_t las_counter;
 	uint32_t i, session_flags, slot;
 	uint8_t *p;
@@ -3283,7 +3274,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, WT_INTPACK64_MAXSIZE, &key));
 
 	/* Enter each update in the boundary list into the lookaside store. */
-	for (i = 0, list = bnd->skip; i < bnd->skip_next; ++i, ++list) {
+	for (i = 0, list = bnd->supd; i < bnd->supd_next; ++i, ++list) {
 		/*
 		 * Each key in the lookaside table is associated with a block,
 		 * and those blocks are freed and reallocated to other pages
@@ -5205,7 +5196,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_free(session, multi->key.ikey);
 			break;
 		}
-		if (multi->skip == NULL) {
+		if (multi->supd == NULL) {
 			if (multi->addr.reuse)
 				multi->addr.addr = NULL;
 			else {
@@ -5214,8 +5205,8 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 				__wt_free(session, multi->addr.addr);
 			}
 		} else {
-			__wt_free(session, multi->skip);
-			__wt_free(session, multi->skip_dsk);
+			__wt_free(session, multi->supd);
+			__wt_free(session, multi->supd_dsk);
 		}
 	}
 	__wt_free(session, mod->mod_multi);
@@ -5372,10 +5363,10 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			WT_RET(__wt_calloc_def(
 			    session, r->bnd_next, &mod->mod_multi));
 			multi = mod->mod_multi;
-			multi->skip = bnd->skip;
-			multi->skip_entries = bnd->skip_next;
-			bnd->skip = NULL;
-			multi->skip_dsk = bnd->dsk;
+			multi->supd = bnd->supd;
+			multi->supd_entries = bnd->supd_next;
+			bnd->supd = NULL;
+			multi->supd_dsk = bnd->dsk;
 			bnd->dsk = NULL;
 			mod->mod_multi_entries = 1;
 
@@ -5563,11 +5554,11 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_RET(__wt_row_ikey_alloc(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
 
-		if (r->evict_skipped_updates && bnd->skip != NULL) {
-			multi->skip = bnd->skip;
-			multi->skip_entries = bnd->skip_next;
-			bnd->skip = NULL;
-			multi->skip_dsk = bnd->dsk;
+		if (r->evict_skipped_updates && bnd->supd != NULL) {
+			multi->supd = bnd->supd;
+			multi->supd_entries = bnd->supd_next;
+			bnd->supd = NULL;
+			multi->supd_dsk = bnd->dsk;
 			bnd->dsk = NULL;
 		} else {
 			multi->addr = bnd->addr;
@@ -5603,11 +5594,11 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
 		multi->key.recno = bnd->recno;
 
-		if (r->evict_skipped_updates && bnd->skip != NULL) {
-			multi->skip = bnd->skip;
-			multi->skip_entries = bnd->skip_next;
-			bnd->skip = NULL;
-			multi->skip_dsk = bnd->dsk;
+		if (r->evict_skipped_updates && bnd->supd != NULL) {
+			multi->supd = bnd->supd;
+			multi->supd_entries = bnd->supd_next;
+			bnd->supd = NULL;
+			multi->supd_dsk = bnd->dsk;
 			bnd->dsk = NULL;
 		} else {
 			multi->addr = bnd->addr;
