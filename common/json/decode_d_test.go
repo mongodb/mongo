@@ -1,6 +1,7 @@
 package json
 
 import (
+	"fmt"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"testing"
@@ -8,7 +9,7 @@ import (
 
 func TestDecodeBsonD(t *testing.T) {
 	Convey("When unmarshalling JSON into a bson.D", t, func() {
-		Convey("Should be stored as DocElem's with keys in the same order", func() {
+		Convey("a document should be stored with keys in the same order", func() {
 			data := `{"a":1, "b":2, "c":3, "d":4, "e":5, "f":6}`
 			out := bson.D{}
 			err := Unmarshal([]byte(data), &out)
@@ -23,7 +24,7 @@ func TestDecodeBsonD(t *testing.T) {
 
 		})
 
-		Convey("A nested bson.D should be parsed", func() {
+		Convey("a nested bson.D should be parsed", func() {
 			data := `{"a": 17, "b":{"foo":"bar", "baz":"boo"}, c:"wow" }`
 			out := struct {
 				A int    `json:"a"`
@@ -41,7 +42,7 @@ func TestDecodeBsonD(t *testing.T) {
 			So(out.B[1].Value, ShouldEqual, "boo")
 		})
 
-		Convey("Objects nested within DocElems should still be parsed", func() {
+		Convey("objects nested within DocElems should still be parsed", func() {
 			data := `{"a":["x", "y","z"], "b":{"foo":"bar", "baz":"boo"}}`
 			out := bson.D{}
 			err := Unmarshal([]byte(data), &out)
@@ -50,7 +51,45 @@ func TestDecodeBsonD(t *testing.T) {
 			So(out[0].Name, ShouldEqual, "a")
 			So(out[1].Name, ShouldEqual, "b")
 			So(out[0].Value, ShouldResemble, []interface{}{"x", "y", "z"})
-			So(out[1].Value, ShouldResemble, map[string]interface{}{"foo": "bar", "baz": "boo"})
+			So(out[1].Value, ShouldResemble, bson.D{{"foo", "bar"}, {"baz", "boo"}})
+		})
+
+		Convey("only subdocuments inside a bson.D should be parsed into a bson.D", func() {
+			data := `{subA: {a:{b:{c:9}}}, subB:{a:{b:{c:9}}}}`
+			out := struct {
+				A interface{} `json:"subA"`
+				B bson.D      `json:"subB"`
+			}{}
+			err := Unmarshal([]byte(data), &out)
+			So(err, ShouldBeNil)
+			aMap := out.A.(map[string]interface{})
+			So(len(aMap), ShouldEqual, 1)
+			aMapSub := aMap["a"].(map[string]interface{})
+			So(len(aMapSub), ShouldEqual, 1)
+			aMapSubSub := aMapSub["b"].(map[string]interface{})
+			So(aMapSubSub["c"], ShouldEqual, 9)
+			So(len(out.B), ShouldEqual, 1)
+			// using string comparison for simplicity
+			So(fmt.Sprintf("%v", out.B), ShouldEqual,
+				fmt.Sprintf("%v", bson.D{{"a", bson.D{{"b", bson.D{{"c", 9}}}}}}))
+		})
+
+		Convey("subdocuments inside arrays inside bson.D should be parsed into a bson.D", func() {
+			data := `{"a":[1,2,{b:"inner"}]}`
+			out := bson.D{}
+			err := Unmarshal([]byte(data), &out)
+			So(err, ShouldBeNil)
+			So(len(out), ShouldEqual, 1)
+			So(out[0].Value, ShouldHaveSameTypeAs, []interface{}{})
+			innerArray := out[0].Value.([]interface{})
+			So(len(innerArray), ShouldEqual, 3)
+			So(innerArray[0], ShouldEqual, 1)
+			So(innerArray[1], ShouldEqual, 2)
+			So(innerArray[2], ShouldHaveSameTypeAs, bson.D{})
+			innerD := innerArray[2].(bson.D)
+			So(len(innerD), ShouldEqual, 1)
+			So(innerD[0].Name, ShouldEqual, "b")
+			So(innerD[0].Value, ShouldEqual, "inner")
 		})
 
 		Convey("null should be a valid value", func() {

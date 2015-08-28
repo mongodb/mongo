@@ -474,7 +474,7 @@ readLoop:
 func (imp *MongoImport) handleUpsert(documents []bson.Raw, collection *mgo.Collection) (numInserted int, err error) {
 	stopOnError := imp.IngestOptions.StopOnError
 	for _, rawBsonDocument := range documents {
-		document := bson.M{}
+		document := bson.D{}
 		err = bson.Unmarshal(rawBsonDocument.Data, &document)
 		if err != nil {
 			return numInserted, fmt.Errorf("error unmarshaling document: %v", err)

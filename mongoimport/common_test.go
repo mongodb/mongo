@@ -127,29 +127,26 @@ func TestGetUpsertValue(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UnitTestType)
 
 	Convey("Given a field and a BSON document, on calling getUpsertValue", t, func() {
-		Convey("the value of the key should be correct for unnested "+
-			"documents", func() {
-			bsonDocument := bson.M{"a": 3}
+		Convey("the value of the key should be correct for unnested documents", func() {
+			bsonDocument := bson.D{{"a", 3}}
 			So(getUpsertValue("a", bsonDocument), ShouldEqual, 3)
 		})
-		Convey("the value of the key should be correct for nested "+
-			"document fields", func() {
-			bsonDocument := bson.M{"a": bson.M{"b": 4}}
+		Convey("the value of the key should be correct for nested document fields", func() {
+			bsonDocument := bson.D{{"a", bson.D{{"b", 4}}}}
 			So(getUpsertValue("a.b", bsonDocument), ShouldEqual, 4)
 		})
 		Convey("the value of the key should be nil for unnested document "+
 			"fields that do not exist", func() {
-			bsonDocument := bson.M{"a": 4}
+			bsonDocument := bson.D{{"a", 4}}
 			So(getUpsertValue("c", bsonDocument), ShouldBeNil)
 		})
 		Convey("the value of the key should be nil for nested document "+
 			"fields that do not exist", func() {
-			bsonDocument := bson.M{"a": bson.M{"b": 4}}
+			bsonDocument := bson.D{{"a", bson.D{{"b", 4}}}}
 			So(getUpsertValue("a.c", bsonDocument), ShouldBeNil)
 		})
-		Convey("the value of the key should be nil for nil document"+
-			"values", func() {
-			So(getUpsertValue("a", bson.M{"a": nil}), ShouldBeNil)
+		Convey("the value of the key should be nil for nil document values", func() {
+			So(getUpsertValue("a", bson.D{{"a", nil}}), ShouldBeNil)
 		})
 	})
 }
@@ -161,7 +158,7 @@ func TestConstructUpsertDocument(t *testing.T) {
 		"constructUpsertDocument", t, func() {
 		Convey("the key/value combination in the upsert document should be "+
 			"correct for unnested documents with single fields", func() {
-			bsonDocument := bson.M{"a": 3}
+			bsonDocument := bson.D{{"a", 3}}
 			upsertFields := []string{"a"}
 			upsertDocument := constructUpsertDocument(upsertFields,
 				bsonDocument)
@@ -169,28 +166,27 @@ func TestConstructUpsertDocument(t *testing.T) {
 		})
 		Convey("the key/value combination in the upsert document should be "+
 			"correct for unnested documents with several fields", func() {
-			bsonDocument := bson.M{"a": 3, "b": "string value"}
+			bsonDocument := bson.D{{"a", 3}, {"b", "string value"}}
 			upsertFields := []string{"a"}
-			expectedDocument := bson.M{"a": 3}
+			expectedDocument := bson.D{{"a", 3}}
 			upsertDocument := constructUpsertDocument(upsertFields,
 				bsonDocument)
 			So(upsertDocument, ShouldResemble, expectedDocument)
 		})
 		Convey("the key/value combination in the upsert document should be "+
 			"correct for nested documents with several fields", func() {
-			bsonDocument := bson.M{"a": bson.M{testCollection: 4}, "b": "string value"}
+			bsonDocument := bson.D{{"a", bson.D{{testCollection, 4}}}, {"b", "string value"}}
 			upsertFields := []string{"a.c"}
-			expectedDocument := bson.M{"a.c": 4}
+			expectedDocument := bson.D{{"a.c", 4}}
 			upsertDocument := constructUpsertDocument(upsertFields,
 				bsonDocument)
 			So(upsertDocument, ShouldResemble, expectedDocument)
 		})
 		Convey("the upsert document should be nil if the key does not exist "+
 			"in the BSON document", func() {
-			bsonDocument := bson.M{"a": 3, "b": "string value"}
+			bsonDocument := bson.D{{"a", 3}, {"b", "string value"}}
 			upsertFields := []string{testCollection}
-			upsertDocument := constructUpsertDocument(upsertFields,
-				bsonDocument)
+			upsertDocument := constructUpsertDocument(upsertFields, bsonDocument)
 			So(upsertDocument, ShouldBeNil)
 		})
 	})

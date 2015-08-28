@@ -86,14 +86,15 @@ func channelQuorumError(ch <-chan error, quorum int) (err error) {
 }
 
 // constructUpsertDocument constructs a BSON document to use for upserts
-func constructUpsertDocument(upsertFields []string, document bson.M) bson.M {
-	upsertDocument := bson.M{}
+func constructUpsertDocument(upsertFields []string, document bson.D) bson.D {
+	upsertDocument := bson.D{}
 	var hasDocumentKey bool
 	for _, key := range upsertFields {
-		upsertDocument[key] = getUpsertValue(key, document)
-		if upsertDocument[key] != nil {
+		val := getUpsertValue(key, document)
+		if val != nil {
 			hasDocumentKey = true
 		}
+		upsertDocument = append(upsertDocument, bson.DocElem{key, val})
 	}
 	if !hasDocumentKey {
 		return nil
@@ -162,20 +163,24 @@ func getParsedValue(token string) interface{} {
 // notation for nested fields. e.g. "person.age" would return 34 would return
 // 34 in the document: bson.M{"person": bson.M{"age": 34}} whereas,
 // "person.name" would return nil
-func getUpsertValue(field string, document bson.M) interface{} {
+func getUpsertValue(field string, document bson.D) interface{} {
 	index := strings.Index(field, ".")
 	if index == -1 {
-		return document[field]
+		// grab the value (ignoring errors because we are okay with nil)
+		val, _ := bsonutil.FindValueByKey(field, &document)
+		return val
 	}
+	// recurse into subdocuments
 	left := field[0:index]
-	if document[left] == nil {
+	subDoc, _ := bsonutil.FindValueByKey(left, &document)
+	if subDoc == nil {
 		return nil
 	}
-	subDoc, ok := document[left].(bson.M)
+	subDocD, ok := subDoc.(bson.D)
 	if !ok {
 		return nil
 	}
-	return getUpsertValue(field[index+1:], subDoc)
+	return getUpsertValue(field[index+1:], subDocD)
 }
 
 // filterIngestError accepts a boolean indicating if a non-nil error should be,

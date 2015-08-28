@@ -53,7 +53,7 @@ type ExportOutput interface {
 
 	// WriteRecord writes the given document to the given io.Writer according to
 	// the format supported by the underlying ExportOutput implementation.
-	ExportDocument(bson.M) error
+	ExportDocument(bson.D) error
 
 	// WriteFooter outputs any post-record headers that are written once per
 	// output file.
@@ -313,7 +313,7 @@ func (exp *MongoExport) exportInternal(out io.Writer) (int64, error) {
 		return 0, err
 	}
 
-	var result bson.M
+	var result bson.D
 
 	docsCount := int64(0)
 
