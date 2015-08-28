@@ -17,7 +17,7 @@ static int __col_insert_alloc(
  */
 int
 __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
-    uint64_t recno, WT_ITEM *value, WT_UPDATE *upd, int is_remove)
+    uint64_t recno, WT_ITEM *value, WT_UPDATE *upd_arg, int is_remove)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -25,7 +25,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	WT_INSERT_HEAD *ins_head, **ins_headp;
 	WT_ITEM _value;
 	WT_PAGE *page;
-	WT_UPDATE *old_upd;
+	WT_UPDATE *old_upd, *upd;
 	size_t ins_size, upd_size;
 	u_int i, skipdepth;
 	int append, logged;
@@ -33,6 +33,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	btree = cbt->btree;
 	ins = NULL;
 	page = cbt->ref->page;
+	upd = upd_arg;
 	append = logged = 0;
 
 	/* This code expects a remove to have a NULL value. */
@@ -76,7 +77,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 * If we are restoring updates that couldn't be evicted, the
 		 * key must not exist on the new page.
 		 */
-		WT_ASSERT(session, upd == NULL);
+		WT_ASSERT(session, upd_arg == NULL);
 
 		/* Make sure the update can proceed. */
 		WT_ERR(__wt_txn_update_check(
@@ -134,7 +135,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		cbt->ins_head = ins_head;
 		cbt->ins = ins;
 
-		if (upd == NULL) {
+		if (upd_arg == NULL) {
 			WT_ERR(
 			    __wt_update_alloc(session, value, &upd, &upd_size));
 			WT_ERR(__wt_txn_modify(session, upd));
@@ -192,7 +193,8 @@ err:		/*
 		if (logged)
 			__wt_txn_unmodify(session);
 		__wt_free(session, ins);
-		__wt_free(session, upd);
+		if (upd_arg == NULL)
+			__wt_free(session, upd);
 	}
 
 	return (ret);
