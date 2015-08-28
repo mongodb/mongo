@@ -1,7 +1,5 @@
 (function() {
 
-    load("jstests/configs/standard_dump_targets.config.js");
-
     jsTest.log('Testing that the order of fields is preserved in the oplog');
 
     var toolTest = new ToolTest('ordered_oplog');
