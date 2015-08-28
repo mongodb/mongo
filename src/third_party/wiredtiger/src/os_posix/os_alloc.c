@@ -58,7 +58,9 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 		WT_STAT_FAST_CONN_INCR(session, memory_allocation);
 
 	if ((p = calloc(number, size)) == NULL)
-		WT_RET_MSG(session, __wt_errno(), "memory allocation");
+		WT_RET_MSG(session, __wt_errno(),
+		    "memory allocation of %" WT_SIZET_FMT " bytes failed",
+		    size * number);
 
 	*(void **)retp = p;
 	return (0);
@@ -100,7 +102,9 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	}
 
 	if ((p = realloc(p, bytes_to_allocate)) == NULL)
-		WT_RET_MSG(session, __wt_errno(), "memory allocation");
+		WT_RET_MSG(session, __wt_errno(),
+		    "memory allocation of %" WT_SIZET_FMT " bytes failed",
+		    bytes_to_allocate);
 
 	/*
 	 * Clear the allocated memory -- an application might: allocate memory,
@@ -171,7 +175,9 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 		if ((ret = posix_memalign(&newp,
 		    S2C(session)->buffer_alignment,
 		    bytes_to_allocate)) != 0)
-			WT_RET_MSG(session, ret, "memory allocation");
+			WT_RET_MSG(session, ret,
+			     "memory allocation of %" WT_SIZET_FMT
+			     " bytes failed", bytes_to_allocate);
 
 		if (p != NULL)
 			memcpy(newp, p, bytes_allocated);

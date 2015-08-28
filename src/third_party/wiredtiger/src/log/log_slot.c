@@ -35,6 +35,8 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	log = conn->log;
+
+	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, log->slot_pool);
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		log->slot_pool[i].slot_state = WT_LOG_SLOT_FREE;
 		log->slot_pool[i].slot_index = WT_SLOT_INVALID_INDEX;
@@ -168,7 +170,7 @@ join_slot:
 	 * We lost a race to add our size into this slot.  Check the state
 	 * and try again.
 	 */
-	if (!WT_ATOMIC_CAS8(slot->slot_state, old_state, new_state)) {
+	if (!__wt_atomic_casiv64(&slot->slot_state, old_state, new_state)) {
 		WT_STAT_FAST_CONN_INCR(session, log_slot_races);
 		goto join_slot;
 	}
@@ -247,7 +249,8 @@ __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	newslot->slot_state = WT_LOG_SLOT_READY;
 	newslot->slot_index = slot->slot_index;
 	log->slot_array[newslot->slot_index] = newslot;
-	old_state = WT_ATOMIC_STORE8(slot->slot_state, WT_LOG_SLOT_PENDING);
+	old_state =
+	    __wt_atomic_storeiv64(&slot->slot_state, WT_LOG_SLOT_PENDING);
 	slot->slot_group_size = (uint64_t)(old_state - WT_LOG_SLOT_READY);
 	/*
 	 * Note that this statistic may be much bigger than in reality,
@@ -303,14 +306,11 @@ __wt_log_slot_wait(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 int64_t
 __wt_log_slot_release(WT_LOGSLOT *slot, uint64_t size)
 {
-	int64_t newsize;
-
 	/*
 	 * Add my size into the state.  When it reaches WT_LOG_SLOT_DONE
 	 * all participatory threads have completed copying their piece.
 	 */
-	newsize = WT_ATOMIC_ADD8(slot->slot_state, (int64_t)size);
-	return (newsize);
+	return (__wt_atomic_addiv64(&slot->slot_state, (int64_t)size));
 }
 
 /*

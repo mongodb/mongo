@@ -16,7 +16,7 @@ l="$l `echo ../src/include/*.i`"
 (
 # Get the list of statistics fields.
 search=`sed \
-    -e 's/^	WT_STATS \([a-z_*]*\);$/\1/p' \
+    -e 's/^	int64_t \([a-z_*]*\);$/\1/p' \
     -e d ../src/include/stat.h |
     sort`
 

@@ -45,7 +45,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_conn_config_init(session));
 
 	/* Statistics. */
-	__wt_stat_init_connection_stats(&conn->stats);
+	__wt_stat_connection_init(conn);
 
 	/* Locks. */
 	WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
@@ -58,8 +58,10 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
 	WT_RET(__wt_spin_init(session, &conn->schema_lock, "schema"));
 	WT_RET(__wt_spin_init(session, &conn->table_lock, "table creation"));
-	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS(conn), &conn->page_lock));
-	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i)
+
+	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS, &conn->page_lock));
+	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, conn->page_lock);
+	for (i = 0; i < WT_PAGE_LOCKS; ++i)
 		WT_RET(
 		    __wt_spin_init(session, &conn->page_lock[i], "btree page"));
 
@@ -141,7 +143,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->reconfig_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_spin_destroy(session, &conn->table_lock);
-	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i)
+	for (i = 0; i < WT_PAGE_LOCKS; ++i)
 		__wt_spin_destroy(session, &conn->page_lock[i]);
 	__wt_free(session, conn->page_lock);
 

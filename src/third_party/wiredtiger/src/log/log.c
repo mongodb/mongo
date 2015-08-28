@@ -791,7 +791,7 @@ __wt_log_allocfile(
 	 */
 	WT_RET(__wt_scr_alloc(session, 0, &from_path));
 	WT_ERR(__wt_scr_alloc(session, 0, &to_path));
-	tmp_id = WT_ATOMIC_ADD4(log->tmp_fileid, 1);
+	tmp_id = __wt_atomic_add32(&log->tmp_fileid, 1);
 	WT_ERR(__log_filename(session, tmp_id, WT_LOG_TMPNAME, from_path));
 	WT_ERR(__log_filename(session, lognum, dest, to_path));
 	/*

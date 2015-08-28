@@ -26,7 +26,7 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Select a spinlock for the page; let the barrier immediately below
 	 * keep things from racing too badly.
 	 */
-	modify->page_lock = ++conn->page_lock_cnt % WT_PAGE_LOCKS(conn);
+	modify->page_lock = ++conn->page_lock_cnt % WT_PAGE_LOCKS;
 
 	/*
 	 * Multiple threads of control may be searching and deciding to modify
@@ -34,7 +34,7 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * footprint, else discard the modify structure, another thread did the
 	 * work.
 	 */
-	if (WT_ATOMIC_CAS8(page->modify, NULL, modify))
+	if (__wt_atomic_cas_ptr(&page->modify, NULL, modify))
 		__wt_cache_page_inmem_incr(session, page, sizeof(*modify));
 	else
 		__wt_free(session, modify);
@@ -316,7 +316,7 @@ __wt_update_obsolete_check(
 	 */
 	if (first != NULL &&
 	    (next = first->next) != NULL &&
-	    WT_ATOMIC_CAS8(first->next, next, NULL))
+	    __wt_atomic_cas_ptr(&first->next, next, NULL))
 		return (next);
 
 	/*

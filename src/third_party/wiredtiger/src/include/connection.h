@@ -180,13 +180,17 @@ struct __wt_connection_impl {
 	WT_SPINLOCK table_lock;		/* Table creation spinlock */
 
 	/*
-	 * We distribute the btree page locks across a set of spin locks; it
-	 * can't be an array, we impose cache-line alignment and gcc doesn't
-	 * support that for arrays.  Don't use too many: they are only held for
-	 * very short operations, each one is 64 bytes, so 256 will fill the L1
-	 * cache on most CPUs.
+	 * We distribute the btree page locks across a set of spin locks. Don't
+	 * use too many: they are only held for very short operations, each one
+	 * is 64 bytes, so 256 will fill the L1 cache on most CPUs.
+	 *
+	 * Use a prime number of buckets rather than assuming a good hash
+	 * (Reference Sedgewick, Algorithms in C, "Hash Functions").
+	 *
+	 * Note: this can't be an array, we impose cache-line alignment and gcc
+	 * doesn't support that for arrays smaller than the alignment.
 	 */
-#define	WT_PAGE_LOCKS(conn)	16
+#define	WT_PAGE_LOCKS		17
 	WT_SPINLOCK *page_lock;	        /* Btree page spinlocks */
 	u_int	     page_lock_cnt;	/* Next spinlock to use */
 
@@ -211,6 +215,8 @@ struct __wt_connection_impl {
 	WT_FH *lock_fh;			/* Lock file handle */
 
 	volatile uint64_t  split_gen;	/* Generation number for splits */
+	uint64_t split_stashed_bytes;	/* Atomic: split statistics */
+	uint64_t split_stashed_objects;
 
 	/*
 	 * The connection keeps a cache of data handles. The set of handles
@@ -238,6 +244,7 @@ struct __wt_connection_impl {
 	u_int open_btree_count;		/* Locked: open writable btree count */
 	uint32_t next_file_id;		/* Locked: file ID counter */
 	uint32_t open_file_count;	/* Atomic: open file handle count */
+	uint32_t open_cursor_count;	/* Atomic: open cursor handle count */
 
 	/*
 	 * WiredTiger allocates space for 50 simultaneous sessions (threads of
@@ -278,7 +285,12 @@ struct __wt_connection_impl {
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
 	wt_off_t	 ckpt_logsize;	/* Checkpoint log size period */
 	uint32_t	 ckpt_signalled;/* Checkpoint signalled */
-	uint64_t	 ckpt_usecs;	/* Checkpoint period */
+
+	uint64_t  ckpt_usecs;		/* Checkpoint timer */
+	uint64_t  ckpt_time_max;	/* Checkpoint time min/max */
+	uint64_t  ckpt_time_min;
+	uint64_t  ckpt_time_recent;	/* Checkpoint time recent/total */
+	uint64_t  ckpt_time_total;
 
 	int compact_in_memory_pass;	/* Compaction serialization */
 
@@ -290,7 +302,9 @@ struct __wt_connection_impl {
 #define	WT_CONN_STAT_SIZE	0x20	/* "size" statistics configured */
 	uint32_t stat_flags;
 
-	WT_CONNECTION_STATS stats;	/* Connection statistics */
+					/* Connection statistics */
+	WT_CONNECTION_STATS *stats[WT_COUNTER_SLOTS];
+	WT_CONNECTION_STATS  stat_array[WT_COUNTER_SLOTS];
 
 	WT_ASYNC	*async;		/* Async structure */
 	int		 async_cfg;	/* Global async configuration */

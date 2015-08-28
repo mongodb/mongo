@@ -74,6 +74,13 @@ else
 		cat $t
 	}
 
+	# Alignment directive before "struct".
+	egrep 'WT_COMPILER_TYPE_ALIGN.*struct' $f > $t
+	test -s $t && {
+		echo "$f: compiler alignment direction must precede \"struct\""
+		cat $t
+	}
+
 	# Direct calls to functions we're not supposed to use in the library.
 	# We don't check for all of them, just a few of the common ones.
 	if ! expr "$f" : 'bench/.*' > /dev/null &&

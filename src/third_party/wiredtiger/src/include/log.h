@@ -77,7 +77,7 @@
 #define	WT_LOG_SLOT_PENDING	2
 #define	WT_LOG_SLOT_WRITTEN	3
 #define	WT_LOG_SLOT_READY	4
-typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
+struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_logslot {
 	volatile int64_t slot_state;	/* Slot state */
 	uint64_t slot_group_size;	/* Group size */
 	int32_t	 slot_error;		/* Error value */
@@ -96,19 +96,18 @@ typedef WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) struct {
 #define	WT_SLOT_SYNC		0x04		/* Needs sync on release */
 #define	WT_SLOT_SYNC_DIR	0x08		/* Directory sync on release */
 	uint32_t flags;			/* Flags */
-} WT_LOGSLOT;
+};
 
 #define	WT_SLOT_INIT_FLAGS	(WT_SLOT_BUFFERED)
 
-typedef struct {
+struct __wt_myslot {
 	WT_LOGSLOT	*slot;
 	wt_off_t	 offset;
-} WT_MYSLOT;
-
+};
 					/* Offset of first record */
 #define	WT_LOG_FIRST_RECORD	log->allocsize
 
-typedef struct {
+struct __wt_log {
 	uint32_t	allocsize;	/* Allocation alignment size */
 	wt_off_t	log_written;	/* Amount of log written this period */
 	/*
@@ -155,18 +154,21 @@ typedef struct {
 	 * Our testing shows that the more consolidation we generate the
 	 * better the performance we see which equates to an active slot
 	 * slot count of one.
+	 *
+	 * Note: this can't be an array, we impose cache-line alignment and
+	 * gcc doesn't support that for arrays.
 	 */
 #define	WT_SLOT_ACTIVE	1
 #define	WT_SLOT_POOL	128
-	WT_LOGSLOT	*slot_array[WT_SLOT_ACTIVE];	/* Active slots */
-	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
-	size_t		 slot_buf_size;		/* Buffer size for slots */
+	WT_LOGSLOT *slot_array[WT_SLOT_ACTIVE];	/* Active slots */
+	WT_LOGSLOT  slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
+	size_t	    slot_buf_size;		/* Buffer size for slots */
 
 #define	WT_LOG_FORCE_CONSOLIDATE	0x01	/* Disable direct writes */
 	uint32_t	 flags;
-} WT_LOG;
+};
 
-typedef struct {
+struct __wt_log_record {
 	uint32_t	len;		/* 00-03: Record length including hdr */
 	uint32_t	checksum;	/* 04-07: Checksum of the record */
 
@@ -176,7 +178,7 @@ typedef struct {
 	uint8_t		unused[2];	/* 10-11: Padding */
 	uint32_t	mem_len;	/* 12-15: Uncompressed len if needed */
 	uint8_t		record[0];	/* Beginning of actual data */
-} WT_LOG_RECORD;
+};
 
 /*
  * WT_LOG_DESC --
