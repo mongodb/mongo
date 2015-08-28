@@ -72,6 +72,16 @@ public:
     /// Create a new Document deep-converted from the given BSONObj.
     explicit Document(const BSONObj& bson);
 
+#if defined(_MSC_VER) && _MSC_VER < 1900  // MVSC++ <= 2013 can't generate default move operations
+    Document(const Document& other) = default;
+    Document& operator=(const Document& other) = default;
+    Document(Document&& other) : _storage(std::move(other._storage)) {}
+    Document& operator=(Document&& other) {
+        _storage = std::move(other._storage);
+        return *this;
+    }
+#endif
+
     void swap(Document& rhs) {
         _storage.swap(rhs._storage);
     }
@@ -268,6 +278,10 @@ public:
         _val = v;
     }
 
+    void operator=(Value&& v) {
+        _val = std::move(v);
+    }
+
     /** These are designed to allow things like mutDoc["a"]["b"]["c"] = Value(10);
      *  It is safe to use even on nonexistent fields.
      */
@@ -334,9 +348,9 @@ public:
     MutableDocument() : _storageHolder(NULL), _storage(_storageHolder) {}
     explicit MutableDocument(size_t expectedFields);
 
-    /// No copy yet. Copy-on-write. See storage()
-    explicit MutableDocument(const Document& d) : _storageHolder(NULL), _storage(_storageHolder) {
-        reset(d);
+    /// No copy of data yet. Copy-on-write. See storage()
+    explicit MutableDocument(Document d) : _storageHolder(NULL), _storage(_storageHolder) {
+        reset(std::move(d));
     }
 
     ~MutableDocument() {
@@ -349,8 +363,8 @@ public:
      *  All Positions from the passed in Document are valid and refer to the
      *  same field in this MutableDocument.
      */
-    void reset(const Document& d = Document()) {
-        reset(d._storage.get());
+    void reset(Document d = Document()) {
+        reset(std::move(d._storage));
     }
 
     /** Add the given field to the Document.
@@ -468,12 +482,10 @@ private:
     friend class MutableValue;  // for access to next constructor
     explicit MutableDocument(MutableValue mv) : _storageHolder(NULL), _storage(mv.getDocPtr()) {}
 
-    void reset(const DocumentStorage* ds) {
+    void reset(boost::intrusive_ptr<const DocumentStorage> ds) {
         if (_storage)
             intrusive_ptr_release(_storage);
-        _storage = ds;
-        if (_storage)
-            intrusive_ptr_add_ref(_storage);
+        _storage = ds.detach();
     }
 
     // This is split into 3 functions to speed up the fast-path
@@ -492,7 +504,7 @@ private:
         return const_cast<DocumentStorage&>(*storagePtr());
     }
     DocumentStorage& clonedStorage() {
-        reset(storagePtr()->clone().get());
+        reset(storagePtr()->clone());
         return const_cast<DocumentStorage&>(*storagePtr());
     }
 

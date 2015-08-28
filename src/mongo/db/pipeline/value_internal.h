@@ -29,6 +29,7 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/config.hpp>
 #include <boost/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonobj.h"
@@ -167,6 +168,11 @@ public:
         memcpyed();
     }
 
+    ValueStorage(ValueStorage&& rhs) BOOST_NOEXCEPT {
+        memcpy(this, &rhs, sizeof(*this));
+        rhs.zero();  // Reset rhs to the missing state. TODO consider only doing this if refCounter.
+    }
+
     ~ValueStorage() {
         DEV verifyRefCountingIfShould();
         if (refCounter)
@@ -174,8 +180,34 @@ public:
         DEV memset(this, 0xee, sizeof(*this));
     }
 
-    ValueStorage& operator=(ValueStorage rhsCopy) {
-        this->swap(rhsCopy);
+    ValueStorage& operator=(const ValueStorage& rhs) {
+        // This is designed to be effectively a no-op on self-assign, without needing an explicit
+        // check. This requires that rhs's refcount is incremented before ours is released, and that
+        // we use memmove rather than memcpy.
+        DEV rhs.verifyRefCountingIfShould();
+        if (rhs.refCounter)
+            intrusive_ptr_add_ref(rhs.genericRCPtr);
+
+        DEV verifyRefCountingIfShould();
+        if (refCounter)
+            intrusive_ptr_release(genericRCPtr);
+
+        memmove(this, &rhs, sizeof(*this));
+        return *this;
+    }
+
+    ValueStorage& operator=(ValueStorage&& rhs) BOOST_NOEXCEPT {
+#if defined(_MSC_VER) && _MSC_VER < 1900  // MSVC 2013 STL can emit self-move-assign.
+        if (&rhs == this)
+            return *this;
+#endif
+
+        DEV verifyRefCountingIfShould();
+        if (refCounter)
+            intrusive_ptr_release(genericRCPtr);
+
+        memmove(this, &rhs, sizeof(*this));
+        rhs.zero();  // Reset rhs to the missing state. TODO consider only doing this if refCounter.
         return *this;
     }
 
