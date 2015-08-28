@@ -55,7 +55,7 @@ endTime = new Date();
 
 duration = Math.floor((endTime.valueOf() - startTime.valueOf()) / 1000);
 
-assert.eq(duration, 9, "sleep time affects the total time to produce a number or results");
+assert.gte(duration, 9, "sleep time affects the total time to produce a number or results");
 
 clearRawMongoProgramOutput();
 pid = startMongoProgramNoConnect("mongostat", "--host", rs.liveNodes.slaves[1].host, "--discover");
