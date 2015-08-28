@@ -175,9 +175,9 @@ struct __wt_ovfl_txnc {
  * updates that might be required by earlier readers in the system, the updates
  * are written into a lookaside table, and restored as necessary if the page is
  * read. The key is a unique marker for the page (a file ID plus an address),
+ * a counter (used to ensure the update records remain in the original order),
  * the on-page item's transaction ID (so we can discard any update records from
  * the lookaside table once the on-page item's transaction is globally visible),
- * a counter (used to ensure the update records remain in the original order),
  * and the page key (byte-string for row-store, record number for column-store).
  * The value is the WT_UPDATE structure's transaction ID, update size and value.
  *

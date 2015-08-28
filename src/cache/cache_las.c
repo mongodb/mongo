@@ -348,7 +348,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		}
 
 		WT_ERR(cursor->get_key(cursor,
-		    &las_id, las_addr, &las_txnid, &las_counter, las_key));
+		    &las_id, las_addr, &las_counter, &las_txnid, las_key));
 
 		/*
 		 * If the on-page record transaction ID associated with the

@@ -39,7 +39,7 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 		ret = cursor->next(cursor);
 	for (; ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor,
-		    &las_id, las_addr, &las_txnid, &las_counter, las_key));
+		    &las_id, las_addr, &las_counter, &las_txnid, las_key));
 
 		/*
 		 * Confirm the search using the unique prefix; if not a match,
@@ -152,7 +152,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 		ret = cursor->next(cursor);
 	for (; ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor,
-		    &las_id, las_addr, &las_txnid, &las_counter, las_key));
+		    &las_id, las_addr, &las_counter, &las_txnid, las_key));
 
 		/*
 		 * Confirm the search using the unique prefix; if not a match,
@@ -186,6 +186,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 			WT_ERR(__wt_vunpack_uint(&p, 0, &recno));
 			if (current_recno == recno)
 				break;
+			WT_ASSERT(session, current_recno < recno);
 
 			if (first_upd != NULL) {
 				WT_ERR(__col_instantiate(session,
