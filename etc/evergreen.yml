@@ -3014,6 +3014,7 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
   - name: jsCore_auth
   - name: jstestfuzz
   - name: mmap
@@ -3058,6 +3059,7 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
   - name: jstestfuzz
   - name: mmap
   - name: jsCore_auth
@@ -3101,6 +3103,7 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
   - name: jsCore_auth
   - name: jstestfuzz
   - name: mmap
@@ -3449,6 +3452,7 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
   - name: jsCore_auth
   - name: jstestfuzz
   - name: mmap
@@ -3492,6 +3496,7 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
   - name: jsCore_auth
   - name: jstestfuzz
   - name: mmap
@@ -3539,6 +3544,7 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
   - name: jsCore_auth
   - name: jstestfuzz
   - name: replicasets_auth
@@ -3759,6 +3765,7 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
   - name: jsCore_auth
   - name: jstestfuzz
   - name: mmap
