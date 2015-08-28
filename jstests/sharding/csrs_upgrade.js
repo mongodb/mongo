@@ -125,10 +125,7 @@ var st;
         _id: csrsName,
         version: 1,
         configsvr: true,
-        members: [ { _id: 0, host: st.c0.name }],
-        settings: {
-            protocolVersion :1
-        }
+        members: [ { _id: 0, host: st.c0.name }]
     };
     assert.commandWorked(st.c0.adminCommand({replSetInitiate: csrsConfig}));
     var csrs = [];
