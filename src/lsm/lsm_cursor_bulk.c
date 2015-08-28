@@ -92,6 +92,7 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor, *bulk_cursor;
+	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	int ordered;
@@ -118,17 +119,16 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
 	cursor->insert = __clsm_insert_bulk;
 	cursor->close = __clsm_close_bulk;
 
-	/* Setup the first chunk in the tree. */
-	WT_RET(__wt_clsm_request_switch(clsm));
-	WT_RET(__wt_clsm_await_switch(clsm));
-
 	/*
-	 * Grab and release the LSM tree lock to ensure that the first chunk
-	 * has been fully created before proceeding. We have the LSM tree
-	 * open exclusive, so that saves us from needing the lock generally.
+	 * Setup the first chunk in the tree. This is the only time we switch
+	 * without using the LSM worker threads, it's safe to do here since
+	 * we have an exclusive lock on the LSM tree. We need to do this
+	 * switch inline, since switch needs a schema lock and online index
+	 * creation opens a bulk cursor while holding the schema lock.
 	 */
-	WT_RET(__wt_lsm_tree_readlock(session, lsm_tree));
-	WT_RET(__wt_lsm_tree_readunlock(session, lsm_tree));
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __wt_lsm_tree_switch(session, lsm_tree));
+	WT_RET(ret);
 
 	/*
 	 * Open a bulk cursor on the first chunk, it's not a regular LSM chunk
