@@ -610,14 +610,20 @@ Status userCreateNS(OperationContext* txn,
     if (!status.isOK())
         return status;
 
-    status = validateStorageOptions(collectionOptions.storageEngine,
-                                    &StorageEngine::Factory::validateCollectionStorageOptions);
+    status =
+        validateStorageOptions(collectionOptions.storageEngine,
+                               stdx::bind(&StorageEngine::Factory::validateCollectionStorageOptions,
+                                          stdx::placeholders::_1,
+                                          stdx::placeholders::_2));
     if (!status.isOK())
         return status;
 
     if (auto indexOptions = collectionOptions.indexOptionDefaults["storageEngine"]) {
-        status = validateStorageOptions(indexOptions.Obj(),
-                                        &StorageEngine::Factory::validateIndexStorageOptions);
+        status =
+            validateStorageOptions(indexOptions.Obj(),
+                                   stdx::bind(&StorageEngine::Factory::validateIndexStorageOptions,
+                                              stdx::placeholders::_1,
+                                              stdx::placeholders::_2));
         if (!status.isOK()) {
             return status;
         }

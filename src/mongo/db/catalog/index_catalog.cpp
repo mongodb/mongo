@@ -621,8 +621,11 @@ Status IndexCatalog::_isSpecOk(const BSONObj& spec) const {
                       "Empty \"storageEngine\" options are invalid. "
                       "Please remove the field or include valid options.");
     }
-    Status storageEngineStatus = validateStorageOptions(
-        storageEngineOptions, &StorageEngine::Factory::validateIndexStorageOptions);
+    Status storageEngineStatus =
+        validateStorageOptions(storageEngineOptions,
+                               stdx::bind(&StorageEngine::Factory::validateIndexStorageOptions,
+                                          stdx::placeholders::_1,
+                                          stdx::placeholders::_2));
     if (!storageEngineStatus.isOK()) {
         return storageEngineStatus;
     }
