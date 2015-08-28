@@ -319,17 +319,6 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 
 	/*
-	 * The worker thread is constantly trying to join and write out
-	 * the current buffered slot, even when direct writes are in
-	 * use.  If we're doing direct writes, there may not be a slot active.
-	 * Verify we're from the worker thread (passed in a size of 0).
-	 * There is nothing to do so just return.
-	 */
-	if (log->active_slot == NULL) {
-		WT_ASSERT(session, mysize == 0);
-		return;
-	}
-	/*
 	 * There should almost always be a slot open.
 	 */
 	for (;;) {
