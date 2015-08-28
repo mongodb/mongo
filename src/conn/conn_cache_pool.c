@@ -526,7 +526,8 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 		    (reads * WT_CACHE_POOL_READ_MULTIPLIER);
 
 		/* Weight smaller caches higher. */
-		tmp *= (double)balanced_size / entry->cache_size;
+		tmp = (uint64_t)(tmp *
+		    ((double)balanced_size / entry->cache_size));
 
 		/* Smooth over history. */
 		cache->cp_pass_pressure =
