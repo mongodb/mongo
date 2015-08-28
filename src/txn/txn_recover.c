@@ -144,10 +144,10 @@ __txn_op_apply(
 		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
 
 		/* Set up the cursors. */
-		if (start_recno == 0) {
+		if (start_recno == WT_RECNO_OOB) {
 			start = NULL;
 			stop = cursor;
-		} else if (stop_recno == 0) {
+		} else if (stop_recno == WT_RECNO_OOB) {
 			start = cursor;
 			stop = NULL;
 		} else {

@@ -512,7 +512,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	 * Don't block if the cache is full: our next unit of work may be to
 	 * discard some trees to free space.
 	 */
-	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
+	F_SET(session, WT_SESSION_NO_EVICTION);
 
 	if (create_bloom) {
 		if (ret == 0)
@@ -632,6 +632,6 @@ err:	if (locked)
 			    "Merge failed with %s",
 			   __wt_strerror(session, ret, NULL, 0)));
 	}
-	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
+	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 	return (ret);
 }

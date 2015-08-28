@@ -33,7 +33,6 @@ static int   col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
 static int   col_update(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   nextprev(WT_CURSOR *, int, int *);
 static void *ops(void *);
-static int   read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
 static int   row_insert(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
 static int   row_update(TINFO *, WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
@@ -240,12 +239,12 @@ ops(void *arg)
 
 	tinfo = arg;
 
-	/* Initialize the per-thread random number generator. */
-	__wt_random_init(&tinfo->rnd);
-
 	conn = g.wts_conn;
 	keybuf = valbuf = NULL;
 	readonly = 0;			/* -Wconditional-uninitialized */
+
+	/* Initialize the per-thread random number generator. */
+	__wt_random_init(&tinfo->rnd);
 
 	/* Set up the default key and value buffers. */
 	key_gen_setup(&keybuf);
@@ -476,7 +475,7 @@ skip_insert:			if (col_update(tinfo,
 			}
 		} else {
 			++tinfo->search;
-			if (read_row(cursor, &key, keyno))
+			if (read_row(cursor, &key, keyno, 0))
 				if (intxn)
 					goto deadlock;
 			continue;
@@ -499,7 +498,7 @@ skip_insert:			if (col_update(tinfo,
 
 		/* Read to confirm the operation. */
 		++tinfo->search;
-		if (read_row(cursor, &key, keyno))
+		if (read_row(cursor, &key, keyno, 0))
 			goto deadlock;
 
 		/* Reset the cursor: there is no reason to keep pages pinned. */
@@ -584,7 +583,7 @@ wts_read_scan(void)
 		}
 
 		key.data = keybuf;
-		if ((ret = read_row(cursor, &key, cnt)) != 0)
+		if ((ret = read_row(cursor, &key, cnt, 0)) != 0)
 			die(ret, "read_scan");
 	}
 
@@ -598,8 +597,8 @@ wts_read_scan(void)
  * read_row --
  *	Read and verify a single element in a row- or column-store file.
  */
-static int
-read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
+int
+read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int notfound_err)
 {
 	static int sn = 0;
 	WT_ITEM value;
@@ -635,19 +634,24 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		ret = cursor->search(cursor);
 		sn = 1;
 	}
-	if (ret == 0) {
+	switch (ret) {
+	case 0:
 		if (g.type == FIX) {
 			ret = cursor->get_value(cursor, &bitfield);
 			value.data = &bitfield;
 			value.size = 1;
-		} else {
+		} else
 			ret = cursor->get_value(cursor, &value);
-		}
-	}
-	if (ret == WT_ROLLBACK)
+		break;
+	case WT_ROLLBACK:
 		return (WT_ROLLBACK);
-	if (ret != 0 && ret != WT_NOTFOUND)
+	case WT_NOTFOUND:
+		if (notfound_err)
+			return (WT_NOTFOUND);
+		break;
+	default:
 		die(ret, "read_row: read row %" PRIu64, keyno);
+	}
 
 #ifdef HAVE_BERKELEY_DB
 	if (!SINGLETHREADED)

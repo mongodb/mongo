@@ -65,8 +65,7 @@ copy_file(const char *name)
 	int ret;
 
 	len = strlen(g.home) + strlen(g.home_backup) + strlen(name) * 2 + 20;
-	if ((cmd = malloc(len)) == NULL)
-		die(errno, "malloc");
+	cmd = dmalloc(len);
 	(void)snprintf(cmd, len,
 	    "cp %s/%s %s/%s", g.home, name, g.home_backup, name);
 	if ((ret = system(cmd)) != 0)

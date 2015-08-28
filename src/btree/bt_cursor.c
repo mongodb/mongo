@@ -517,7 +517,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		WT_ERR(__cursor_col_search(session, cbt, NULL));
 
 		if (F_ISSET(cursor, WT_CURSTD_APPEND))
-			cbt->iface.recno = 0;
+			cbt->iface.recno = WT_RECNO_OOB;
 
 		/*
 		 * If not overwriting, fail if the key exists.  Creating a
@@ -1153,6 +1153,19 @@ err:	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
 }
 
 /*
+ * __wt_btcur_init --
+ *	Initialize an cursor used for internal purposes.
+ */
+void
+__wt_btcur_init(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+{
+	memset(cbt, 0, sizeof(WT_CURSOR_BTREE));
+
+	cbt->iface.session = &session->iface;
+	cbt->btree = S2BT(session);
+}
+
+/*
  * __wt_btcur_open --
  *	Open a btree cursor.
  */
@@ -1168,14 +1181,22 @@ __wt_btcur_open(WT_CURSOR_BTREE *cbt)
  *	Close a btree cursor.
  */
 int
-__wt_btcur_close(WT_CURSOR_BTREE *cbt)
+__wt_btcur_close(WT_CURSOR_BTREE *cbt, int lowlevel)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	ret = __curfile_leave(cbt);
+	/*
+	 * The in-memory split and lookaside table code creates low-level btree
+	 * cursors to search/modify leaf pages. Those cursors don't hold hazard
+	 * pointers, nor are they counted in the session handle's cursor count.
+	 * Skip the usual cursor tear-down in that case.
+	 */
+	if (!lowlevel)
+		ret = __curfile_leave(cbt);
+
 	__wt_buf_free(session, &cbt->_row_key);
 	__wt_buf_free(session, &cbt->_tmp);
 

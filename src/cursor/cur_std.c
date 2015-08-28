@@ -258,9 +258,9 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			    item->data, item->size, "q", &cursor->recno));
 		} else
 			cursor->recno = va_arg(ap, uint64_t);
-		if (cursor->recno == 0)
+		if (cursor->recno == WT_RECNO_OOB)
 			WT_ERR_MSG(session, EINVAL,
-			    "Record numbers must be greater than zero");
+			    "%d is an invalid record number", WT_RECNO_OOB);
 		buf->data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else {

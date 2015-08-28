@@ -80,16 +80,13 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			break;
 		case WT_SYNC_DISCARD:
 			/*
-			 * If we see a dirty page in a dead handle, clean the
+			 * Dead handles may reference dirty pages; clean the
 			 * page, both to keep statistics correct, and to let
 			 * the page-discard function assert no dirty page is
 			 * ever discarded.
 			 */
-			if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD) &&
-			    __wt_page_is_modified(page)) {
-				page->modify->write_gen = 0;
-				__wt_cache_dirty_decr(session, page);
-			}
+			if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
+				__wt_page_modify_clear(session, page);
 
 			WT_ASSERT(session,
 			    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||

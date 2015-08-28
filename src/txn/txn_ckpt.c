@@ -246,6 +246,10 @@ __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 	WT_ASSERT(session, WT_PREFIX_MATCH(session->dhandle->name, "file:"));
 
+	/* Skip files that are never involved in a checkpoint. */
+	if (F_ISSET(S2BT(session), WT_BTREE_NO_CHECKPOINT))
+		return (0);
+
 	/* Make sure there is space for the next entry. */
 	WT_RET(__wt_realloc_def(session, &session->ckpt_handle_allocated,
 	    session->ckpt_handle_next + 1, &session->ckpt_handle));
@@ -1164,7 +1168,15 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 	btree = S2BT(session);
 	bulk = F_ISSET(btree, WT_BTREE_BULK) ? 1 : 0;
 
-	/* If the handle is already dead, discard it. */
+	/*
+	 * If the handle is already dead or the file isn't durable, force the
+	 * discard.
+	 *
+	 * If the file isn't durable, mark the handle dead, there are asserts
+	 * later on that only dead handles can have modified pages.
+	 */
+	if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
+		F_SET(session->dhandle, WT_DHANDLE_DEAD);
 	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
 		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
 

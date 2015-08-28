@@ -340,6 +340,8 @@ __wt_debug_disk(
 		__dmsg(ds, ", empty-all");
 	if (F_ISSET(dsk, WT_PAGE_EMPTY_V_NONE))
 		__dmsg(ds, ", empty-none");
+	if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE))
+		__dmsg(ds, ", LAS-update");
 
 	__dmsg(ds, ", generation %" PRIu64 "\n", dsk->write_gen);
 
@@ -643,12 +645,10 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", disk-mapped");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 		__dmsg(ds, ", evict-lru");
-	if (F_ISSET_ATOMIC(page, WT_PAGE_SCANNING))
-		__dmsg(ds, ", scanning");
+	if (F_ISSET_ATOMIC(page, WT_PAGE_RECONCILIATION))
+		__dmsg(ds, ", reconciliation");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
 		__dmsg(ds, ", split-insert");
-	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_LOCKED))
-		__dmsg(ds, ", split-locked");
 
 	if (mod != NULL)
 		switch (F_ISSET(mod, WT_PM_REC_MASK)) {

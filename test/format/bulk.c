@@ -39,6 +39,7 @@ wts_load(void)
 	int is_bulk, ret;
 
 	conn = g.wts_conn;
+	keybuf = valbuf = NULL;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
