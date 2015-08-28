@@ -1426,6 +1426,29 @@ TEST_F(TopoCoordTest, PrepareFreshResponse) {
     ASSERT_TRUE(responseBuilder12.obj().isEmpty());
 }
 
+TEST_F(TopoCoordTest, ArbiterHeartbeatFrequency) {
+    // This tests that arbiters issue heartbeats at electionTimeout/2 frequencies
+    TopoCoordTest::setUp();
+    updateConfig(fromjson(
+                     "{_id:'mySet', version:1, protocolVersion:1, members:["
+                     "{_id:1, host:'node1:12345', arbiterOnly:true}, "
+                     "{_id:2, host:'node2:12345'}], "
+                     "settings:{heartbeatIntervalMillis:10, electionTimeoutMillis:5000}}"),
+                 0);
+    HostAndPort target("host2", 27017);
+    Date_t requestDate = now();
+    std::pair<ReplSetHeartbeatArgs, Milliseconds> uppingRequest =
+        getTopoCoord().prepareHeartbeatRequest(requestDate, "myset", target);
+    auto action =
+        getTopoCoord().processHeartbeatResponse(requestDate,
+                                                Milliseconds(0),
+                                                target,
+                                                makeStatusWith<ReplSetHeartbeatResponse>(),
+                                                OpTime(Timestamp(0, 0), 0));
+    Date_t expected(now() + Milliseconds(2500));
+    ASSERT_EQUALS(expected, action.getNextHeartbeatStartDate());
+}
+
 class HeartbeatResponseTest : public TopoCoordTest {
 public:
     virtual void setUp() {

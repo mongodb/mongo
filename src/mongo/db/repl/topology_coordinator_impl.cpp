@@ -900,11 +900,16 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
         }
     }
 
-    // If a node is not PRIMARY and has no sync source, we increase the heartbeat rate in order
-    // to help it find a sync source more quickly, which helps ensure the PRIMARY will continue to
+    // If a node is not PRIMARY and has no sync source,
+    // we increase the heartbeat rate in order
+    // to help it find a sync source more quickly,
+    // which helps ensure the PRIMARY will continue to
     // see the majority of the cluster.
+    //
+    // Arbiters also use half the election timeout period for their heartbeat frequency
     Milliseconds heartbeatInterval;
-    if (_rsConfig.getProtocolVersion() == 1 && getSyncSourceAddress().empty() && !_iAmPrimary()) {
+    if (_rsConfig.getProtocolVersion() == 1 &&
+        (getMemberState().arbiter() || (getSyncSourceAddress().empty() && !_iAmPrimary()))) {
         heartbeatInterval = _rsConfig.getElectionTimeoutPeriod() / 2;
     } else {
         heartbeatInterval = _rsConfig.getHeartbeatInterval();
