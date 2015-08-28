@@ -92,7 +92,8 @@
 		return (__wt_illegal_value(session, NULL))
 #define	WT_ILLEGAL_VALUE_ERR(session)					\
 	default:							\
-		WT_ERR(__wt_illegal_value(session, NULL))
+		ret = __wt_illegal_value(session, NULL);		\
+		goto err
 #define	WT_ILLEGAL_VALUE_SET(session)					\
 	default:							\
 		ret = __wt_illegal_value(session, NULL);		\
