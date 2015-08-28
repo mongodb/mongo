@@ -66,6 +66,11 @@ void appendGetMoreResponseObject(long long cursorId,
                                  BSONObjBuilder* builder);
 
 struct CursorResponse {
+    enum class ResponseType {
+        InitialResponse,
+        SubsequentResponse,
+    };
+
     /**
      * Constructs from values for each of the fields.
      */
@@ -82,8 +87,8 @@ struct CursorResponse {
     /**
      * Converts this response to its raw BSON representation.
      */
-    BSONObj toBSON() const;
-    void addToBSON(BSONObjBuilder* builder) const;
+    BSONObj toBSON(ResponseType responseType) const;
+    void addToBSON(ResponseType responseType, BSONObjBuilder* builder) const;
 
     const NamespaceString nss;
     const CursorId cursorId;

@@ -182,10 +182,22 @@ TEST(CursorResponseTest, parseFromBSONHandleErrorResponse) {
     ASSERT_EQ(result.getStatus().reason(), "does not work");
 }
 
-TEST(CursorResponseTest, toBSON) {
+TEST(CursorResponseTest, toBSONInitialResponse) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
     CursorResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
-    BSONObj responseObj = response.toBSON();
+    BSONObj responseObj = response.toBSON(CursorResponse::ResponseType::InitialResponse);
+    BSONObj expectedResponse = BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "testdb.testcoll"
+                              << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+                 << "ok" << 1.0);
+    ASSERT_EQ(responseObj, expectedResponse);
+}
+
+TEST(CursorResponseTest, toBSONSubsequentResponse) {
+    std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
+    CursorResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
+    BSONObj responseObj = response.toBSON(CursorResponse::ResponseType::SubsequentResponse);
     BSONObj expectedResponse = BSON(
         "cursor" << BSON("id" << CursorId(123) << "ns"
                               << "testdb.testcoll"
@@ -194,12 +206,28 @@ TEST(CursorResponseTest, toBSON) {
     ASSERT_EQ(responseObj, expectedResponse);
 }
 
-TEST(CursorResponseTest, addToBSON) {
+TEST(CursorResponseTest, addToBSONInitialResponse) {
     std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
     CursorResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
 
     BSONObjBuilder builder;
-    response.addToBSON(&builder);
+    response.addToBSON(CursorResponse::ResponseType::InitialResponse, &builder);
+    BSONObj responseObj = builder.obj();
+
+    BSONObj expectedResponse = BSON(
+        "cursor" << BSON("id" << CursorId(123) << "ns"
+                              << "testdb.testcoll"
+                              << "firstBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+                 << "ok" << 1.0);
+    ASSERT_EQ(responseObj, expectedResponse);
+}
+
+TEST(CursorResponseTest, addToBSONSubsequentResponse) {
+    std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
+    CursorResponse response(NamespaceString("testdb.testcoll"), CursorId(123), batch);
+
+    BSONObjBuilder builder;
+    response.addToBSON(CursorResponse::ResponseType::SubsequentResponse, &builder);
     BSONObj responseObj = builder.obj();
 
     BSONObj expectedResponse = BSON(

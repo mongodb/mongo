@@ -138,13 +138,16 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
     return {{NamespaceString(fullns), cursorId, batch}};
 }
 
-void CursorResponse::addToBSON(BSONObjBuilder* builder) const {
+void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
+                               BSONObjBuilder* builder) const {
     BSONObjBuilder cursorBuilder(builder->subobjStart(kCursorField));
 
     cursorBuilder.append(kIdField, cursorId);
     cursorBuilder.append(kNsField, nss.ns());
 
-    BSONArrayBuilder batchBuilder(cursorBuilder.subarrayStart(kBatchField));
+    const char* batchFieldName =
+        (responseType == ResponseType::InitialResponse) ? kBatchFieldInitial : kBatchField;
+    BSONArrayBuilder batchBuilder(cursorBuilder.subarrayStart(batchFieldName));
     for (const BSONObj& obj : batch) {
         batchBuilder.append(obj);
     }
@@ -155,9 +158,9 @@ void CursorResponse::addToBSON(BSONObjBuilder* builder) const {
     builder->append("ok", 1.0);
 }
 
-BSONObj CursorResponse::toBSON() const {
+BSONObj CursorResponse::toBSON(CursorResponse::ResponseType responseType) const {
     BSONObjBuilder builder;
-    addToBSON(&builder);
+    addToBSON(responseType, &builder);
     return builder.obj();
 }
 

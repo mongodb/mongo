@@ -114,7 +114,7 @@ public:
             return appendCommandStatus(result, response.getStatus());
         }
 
-        response.getValue().addToBSON(&result);
+        response.getValue().addToBSON(CursorResponse::ResponseType::SubsequentResponse, &result);
         return true;
     }
 
