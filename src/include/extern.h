@@ -140,16 +140,15 @@ extern const char *__wt_addr_string(WT_SESSION_IMPL *session, const uint8_t *add
 extern int __wt_ovfl_read(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *store);
 extern int __wt_ovfl_cache(WT_SESSION_IMPL *session, WT_PAGE *page, void *cookie, WT_CELL_UNPACK *vpack);
 extern int __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell);
+extern int __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint64_t recno, uint32_t alloc_entries, int alloc_refs, WT_PAGE **pagep);
+extern int __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, size_t memsize, uint32_t flags, WT_PAGE **pagep);
+extern int __wt_las_remove_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t btree_id, const uint8_t *addr, size_t addr_size);
 extern int
 __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
  , const char *file, int line
 #endif
  );
-extern int __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type, uint64_t recno, uint32_t alloc_entries, int alloc_refs, WT_PAGE **pagep);
-extern int __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, size_t memsize, uint32_t flags, WT_PAGE **pagep);
-extern int __wt_las_remove_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t btree_id, const uint8_t *addr, size_t addr_size);
-extern int __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd);
 extern int __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[]);
 extern void __wt_split_stash_discard(WT_SESSION_IMPL *session);
