@@ -838,6 +838,8 @@ StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
         loc = _nextId();
     }
 
+    // YSD: Get a cursor on the table specifed by _tableId(data source). With this cursor
+    // the operations like insert can be done.
     WiredTigerCursor curwrap(_uri, _tableId, true, txn);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();

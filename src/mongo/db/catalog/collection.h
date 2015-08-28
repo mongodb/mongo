@@ -222,6 +222,7 @@ public:
      * i.e. will not add an _id field for documents that are missing it
      *
      * If enforceQuota is false, quotas will be ignored.
+     * YSD: Then when the _id field is added???
      */
     StatusWith<RecordId> insertDocument(OperationContext* txn,
                                         const BSONObj& doc,

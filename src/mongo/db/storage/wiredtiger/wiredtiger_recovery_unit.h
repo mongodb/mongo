@@ -185,6 +185,7 @@ private:
     uint64_t _tableID;
     WiredTigerRecoveryUnit* _ru;  // not owned
     WiredTigerSession* _session;
+    // YSD: Initialized with cursor on the datasource in the constructure of this class.
     WT_CURSOR* _cursor;  // owned, but pulled
 };
 }

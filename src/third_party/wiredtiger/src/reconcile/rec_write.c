@@ -4758,6 +4758,11 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 			r->any_empty_value = 1;
 		else {
 			r->all_empty_value = 0;
+			// YSD: If a dictionary is used, try to find tye current value in the dictionary.
+			// If it's found, the value in val will be replaced with the information of the
+			// dictionary item.
+			// If the value can't be found in the dictionary, it will be added into the
+			// dictionary if there is free slot. Otherwise nothing will be done.
 			if (btree->dictionary)
 				WT_RET(__rec_dict_replace(session, r, 0, val));
 			__rec_copy_incr(session, r, val);

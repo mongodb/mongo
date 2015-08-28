@@ -391,6 +391,8 @@ StatusWith<RecordId> Collection::_insertDocument(OperationContext* txn,
     //       under the RecordStore, this feels broken since that should be a
     //       collection access method probably
 
+    // YSD: When inserting a document into a collection, this will call 
+    // WiredTigerRecordStore::insertRecord for WiredTiger storage engine.
     StatusWith<RecordId> loc = _recordStore->insertRecord(
         txn, docToInsert.objdata(), docToInsert.objsize(), _enforceQuota(enforceQuota));
     if (!loc.isOK())

@@ -81,6 +81,8 @@ public:
         return _session;
     }
 
+    // YSD: Get a cursor on the data source specified by id. It may open a new one or duplicate
+    // a recently used one.
     WT_CURSOR* getCursor(const std::string& uri, uint64_t id, bool forRecordStore);
 
     void releaseCursor(uint64_t id, WT_CURSOR* cursor);

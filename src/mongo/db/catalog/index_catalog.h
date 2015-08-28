@@ -263,6 +263,7 @@ public:
     // ----- data modifiers ------
 
     // this throws for now
+    // YSD: Create the index fro a record after inserting it into a collection.
     Status indexRecord(OperationContext* txn, const BSONObj& obj, const RecordId& loc);
 
     void unindexRecord(OperationContext* txn, const BSONObj& obj, const RecordId& loc, bool noWarn);
@@ -334,9 +335,11 @@ private:
     Status _doesSpecConflictWithExisting(OperationContext* txn, const BSONObj& spec) const;
 
     int _magic;
-    Collection* const _collection;
+    Collection* const _collection;  // YSD: The collection which this index catalog attached to.
     const int _maxNumIndexesAllowed;
 
+    // YSD: All the index entries of this collection. They are maintained in a vector. When
+    // indexing a record, it should be done on all the indies.
     IndexCatalogEntryContainer _entries;
 
     // These are the index specs of indexes that were "leftover".
