@@ -75,7 +75,7 @@
     // Test basic usage of "cursor.batchSize" option.
     //
 
-    // TODO: When SERVER-19569 is done, we should be able to run this test regardless of whether we
+    // TODO: When SERVER-20194 is done, we should be able to run this test regardless of whether we
     // are using the find/getMore commands, both against a standalone server and passed through
     // mongos.
     if (!coll.getDB().getMongo().useReadCommands()) {
@@ -120,7 +120,7 @@
     // Test more than 2 batches of results.
     //
 
-    // TODO: When SERVER-19569 is done, we should be able to run this test regardless of whether we
+    // TODO: When SERVER-20194 is done, we should be able to run this test regardless of whether we
     // are using the find/getMore commands, both against a standalone server and passed through
     // mongos.
     if (!coll.getDB().getMongo().useReadCommands()) {

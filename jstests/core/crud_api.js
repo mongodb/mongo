@@ -722,7 +722,7 @@
         // Insert all of them
         coll.insertMany([{a:0, b:0}, {a:1, b:1}]);
 
-        // TODO: When SERVER-19569 is done, we should be able to run this test regardless of whether
+        // TODO: When SERVER-20194 is done, we should be able to run this test regardless of whether
         // we are using the find/getMore commands, both against a standalone server and passed
         // through mongos.
         if (!db.getMongo().useReadCommands()) {
