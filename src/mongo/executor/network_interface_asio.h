@@ -88,6 +88,8 @@ private:
 
     enum class State { kReady, kRunning, kShutdown };
 
+    friend class AsyncOp;
+
     /**
      * AsyncConnection encapsulates the per-connection state we maintain.
      */
@@ -122,7 +124,27 @@ private:
      */
     class AsyncCommand {
     public:
-        AsyncCommand(AsyncConnection* conn, Message&& command, Date_t now);
+        /**
+         * Describes the variant of AsyncCommand this object represents.
+         */
+        enum class CommandType {
+            /**
+             * An ordinary command of an unspecified Protocol.
+             */
+            kRPC,
+
+            /**
+             * A 'find' command that has been downconverted to an OP_QUERY.
+             */
+            kDownConvertedFind,
+
+            /**
+             * A 'getMore' command that has been downconverted to an OP_GET_MORE.
+             */
+            kDownConvertedGetMore,
+        };
+
+        AsyncCommand(AsyncConnection* conn, CommandType type, Message&& command, Date_t now);
 
         NetworkInterfaceASIO::AsyncConnection& conn();
 
@@ -134,6 +156,8 @@ private:
 
     private:
         NetworkInterfaceASIO::AsyncConnection* const _conn;
+
+        const CommandType _type;
 
         Message _toSend;
         Message _toRecv;
@@ -149,7 +173,8 @@ private:
      */
     class AsyncOp {
     public:
-        AsyncOp(const TaskExecutor::CallbackHandle& cbHandle,
+        AsyncOp(NetworkInterfaceASIO* net,
+                const TaskExecutor::CallbackHandle& cbHandle,
                 const RemoteCommandRequest& request,
                 const RemoteCommandCompletionFn& onFinish,
                 Date_t now);
@@ -166,11 +191,11 @@ private:
         // AsyncOp may run multiple commands over its lifetime (for example, an ismaster
         // command, the command provided to the NetworkInterface via startCommand(), etc.)
         // Calling beginCommand() resets internal state to prepare to run newCommand.
-        AsyncCommand& beginCommand(const RemoteCommandRequest& request,
-                                   rpc::Protocol protocol,
-                                   Date_t now);
-        AsyncCommand& beginCommand(Message&& newCommand, Date_t now);
-        AsyncCommand& command();
+        Status beginCommand(const RemoteCommandRequest& request);
+        Status beginCommand(Message&& newCommand,
+                            AsyncCommand::CommandType = AsyncCommand::CommandType::kRPC);
+
+        AsyncCommand* command();
 
         void finish(const TaskExecutor::ResponseStatus& status);
 
@@ -183,6 +208,7 @@ private:
         void setOperationProtocol(rpc::Protocol proto);
 
     private:
+        NetworkInterfaceASIO* const _owner;
         // Information describing a task enqueued on the NetworkInterface
         // via a call to startCommand().
         TaskExecutor::CallbackHandle _cbHandle;

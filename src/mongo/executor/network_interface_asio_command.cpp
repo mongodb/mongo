@@ -38,6 +38,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/executor/async_stream_interface.h"
+#include "mongo/executor/downconvert_find_and_getmore_commands.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
@@ -123,12 +124,37 @@ void asyncRecvMessageBody(AsyncStreamInterface& stream,
     stream.read(asio::buffer(mdView.data(), bodyLength), std::forward<Handler>(handler));
 }
 
+ResponseStatus decodeRPC(Message* received, rpc::Protocol protocol, Milliseconds elapsed) {
+    try {
+        // makeReply will throw if the reply is invalid
+        auto reply = rpc::makeReply(received);
+        if (reply->getProtocol() != protocol) {
+            auto requestProtocol = rpc::toString(static_cast<rpc::ProtocolSet>(protocol));
+            if (!requestProtocol.isOK())
+                return requestProtocol.getStatus();
+
+            return Status(ErrorCodes::RPCProtocolNegotiationFailed,
+                          str::stream() << "Mismatched RPC protocols - request was '"
+                                        << requestProtocol.getValue().toString() << "' '"
+                                        << " but reply was '" << opToString(received->operation())
+                                        << "'");
+        }
+        auto ownedCommandReply = reply->getCommandReply().getOwned();
+        auto ownedReplyMetadata = reply->getMetadata().getOwned();
+        return {RemoteCommandResponse(
+            std::move(ownedCommandReply), std::move(ownedReplyMetadata), elapsed)};
+    } catch (...) {
+        return exceptionToStatus();
+    }
+}
+
 }  // namespace
 
 NetworkInterfaceASIO::AsyncCommand::AsyncCommand(AsyncConnection* conn,
+                                                 CommandType type,
                                                  Message&& command,
                                                  Date_t now)
-    : _conn(conn), _toSend(std::move(command)), _start(now) {
+    : _conn(conn), _type(type), _toSend(std::move(command)), _start(now) {
     _toSend.header().setResponseTo(0);
 }
 
@@ -150,30 +176,20 @@ MSGHEADER::Value& NetworkInterfaceASIO::AsyncCommand::header() {
 
 ResponseStatus NetworkInterfaceASIO::AsyncCommand::response(rpc::Protocol protocol, Date_t now) {
     auto& received = _toRecv;
-    try {
-        auto reply = rpc::makeReply(&received);
-
-        if (reply->getProtocol() != protocol) {
-            auto requestProtocol = rpc::toString(static_cast<rpc::ProtocolSet>(protocol));
-            if (!requestProtocol.isOK())
-                return requestProtocol.getStatus();
-
-            return Status(ErrorCodes::RPCProtocolNegotiationFailed,
-                          str::stream() << "Mismatched RPC protocols - request was '"
-                                        << requestProtocol.getValue().toString() << "' '"
-                                        << " but reply was '" << opToString(received.operation())
-                                        << "'");
+    switch (_type) {
+        case CommandType::kRPC: {
+            return decodeRPC(&received, protocol, now - _start);
         }
-
-        // unavoidable copy
-        auto ownedCommandReply = reply->getCommandReply().getOwned();
-        auto ownedReplyMetadata = reply->getMetadata().getOwned();
-        return ResponseStatus(RemoteCommandResponse(
-            std::move(ownedCommandReply), std::move(ownedReplyMetadata), now - _start));
-    } catch (...) {
-        // makeReply can throw if the reply was invalid.
-        return exceptionToStatus();
+        case CommandType::kDownConvertedFind: {
+            auto ns = DbMessage(_toSend).getns();
+            return upconvertLegacyQueryResponse(_toSend.header().getId(), ns, received);
+        }
+        case CommandType::kDownConvertedGetMore: {
+            auto ns = DbMessage(_toSend).getns();
+            return upconvertLegacyGetMoreResponse(_toSend.header().getId(), ns, received);
+        }
     }
+    MONGO_UNREACHABLE;
 }
 
 void NetworkInterfaceASIO::_startCommand(AsyncOp* op) {
@@ -188,9 +204,12 @@ void NetworkInterfaceASIO::_startCommand(AsyncOp* op) {
 }
 
 void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
-    auto& cmd = op->beginCommand(op->request(), op->operationProtocol(), now());
+    auto beginStatus = op->beginCommand(op->request());
+    if (!beginStatus.isOK()) {
+        return _completeOperation(op, beginStatus);
+    }
 
-    _asyncRunCommand(&cmd,
+    _asyncRunCommand(op->command(),
                      [this, op](std::error_code ec, size_t bytes) {
                          _validateAndRun(op, ec, [this, op]() { _completedOpCallback(op); });
                      });
@@ -198,7 +217,7 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
 
 void NetworkInterfaceASIO::_completedOpCallback(AsyncOp* op) {
     // TODO: handle metadata readers.
-    auto response = op->command().response(op->operationProtocol(), now());
+    auto response = op->command()->response(op->operationProtocol(), now());
     _completeOperation(op, response);
 }
 
@@ -290,10 +309,13 @@ void NetworkInterfaceASIO::_runConnectionHook(AsyncOp* op) {
         return _beginCommunication(op);
     }
 
-    auto& cmd = op->beginCommand(*optionalRequest, op->operationProtocol(), now());
+    auto beginStatus = op->beginCommand(*optionalRequest);
+    if (!beginStatus.isOK()) {
+        return _completeOperation(op, beginStatus);
+    }
 
     auto finishHook = [this, op]() {
-        auto response = op->command().response(op->operationProtocol(), now());
+        auto response = op->command()->response(op->operationProtocol(), now());
 
         if (!response.isOK()) {
             return _completeOperation(op, response.getStatus());
@@ -311,7 +333,7 @@ void NetworkInterfaceASIO::_runConnectionHook(AsyncOp* op) {
         return _beginCommunication(op);
     };
 
-    return _asyncRunCommand(&cmd,
+    return _asyncRunCommand(op->command(),
                             [this, op, finishHook](std::error_code ec, std::size_t bytes) {
                                 _validateAndRun(op, ec, finishHook);
                             });

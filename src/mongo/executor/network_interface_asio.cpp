@@ -126,7 +126,7 @@ Date_t NetworkInterfaceASIO::now() {
 void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                         const RemoteCommandRequest& request,
                                         const RemoteCommandCompletionFn& onFinish) {
-    auto ownedOp = stdx::make_unique<AsyncOp>(cbHandle, request, onFinish, now());
+    auto ownedOp = stdx::make_unique<AsyncOp>(this, cbHandle, request, onFinish, now());
 
     AsyncOp* op = ownedOp.get();
 

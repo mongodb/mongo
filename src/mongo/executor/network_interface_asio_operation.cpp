@@ -30,10 +30,14 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/executor/network_interface_asio.h"
+#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/async_stream_interface.h"
+#include "mongo/executor/downconvert_find_and_getmore_commands.h"
+#include "mongo/executor/network_interface_asio.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/request_builder_interface.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace executor {
@@ -61,11 +65,17 @@ std::unique_ptr<Message> messageFromRequest(const RemoteCommandRequest& request,
 
 }  // namespace
 
-NetworkInterfaceASIO::AsyncOp::AsyncOp(const TaskExecutor::CallbackHandle& cbHandle,
+NetworkInterfaceASIO::AsyncOp::AsyncOp(NetworkInterfaceASIO* const owner,
+                                       const TaskExecutor::CallbackHandle& cbHandle,
                                        const RemoteCommandRequest& request,
                                        const RemoteCommandCompletionFn& onFinish,
                                        Date_t now)
-    : _cbHandle(cbHandle), _request(request), _onFinish(onFinish), _start(now), _canceled(0) {}
+    : _owner(owner),
+      _cbHandle(cbHandle),
+      _request(request),
+      _onFinish(onFinish),
+      _start(now),
+      _canceled(0) {}
 
 void NetworkInterfaceASIO::AsyncOp::cancel() {
     // An operation may be in mid-flight when it is canceled, so we
@@ -91,26 +101,50 @@ void NetworkInterfaceASIO::AsyncOp::setConnection(AsyncConnection&& conn) {
     _connection = std::move(conn);
 }
 
-NetworkInterfaceASIO::AsyncCommand& NetworkInterfaceASIO::AsyncOp::beginCommand(
-    Message&& newCommand, Date_t now) {
+Status NetworkInterfaceASIO::AsyncOp::beginCommand(Message&& newCommand,
+                                                   AsyncCommand::CommandType type) {
     // NOTE: We operate based on the assumption that AsyncOp's
     // AsyncConnection does not change over its lifetime.
     invariant(_connection.is_initialized());
 
     // Construct a new AsyncCommand object for each command.
-    _command.emplace(_connection.get_ptr(), std::move(newCommand), now);
-    return _command.get();
+    _command.emplace(_connection.get_ptr(), type, std::move(newCommand), _owner->now());
+    return Status::OK();
 }
 
-NetworkInterfaceASIO::AsyncCommand& NetworkInterfaceASIO::AsyncOp::beginCommand(
-    const RemoteCommandRequest& request, rpc::Protocol protocol, Date_t now) {
-    auto newCommand = messageFromRequest(request, protocol);
-    return beginCommand(std::move(*newCommand), now);
+Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& request) {
+    // Check if we need to downconvert find or getMore commands.
+    StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
+    const auto isFindCmd = commandName == LiteParsedQuery::kFindCommandName;
+    const auto isGetMoreCmd = commandName == GetMoreRequest::kGetMoreCommandName;
+    const auto isFindOrGetMoreCmd = isFindCmd || isGetMoreCmd;
+
+    // If we aren't sending a find or getMore, or the server supports OP_COMMAND we don't have
+    // to worry about downconversion.
+    if (!isFindOrGetMoreCmd || connection().serverProtocols() == rpc::supports::kAll) {
+        auto newCommand = messageFromRequest(request, operationProtocol());
+        return beginCommand(std::move(*newCommand), AsyncCommand::CommandType::kRPC);
+    } else if (isFindCmd) {
+        auto downconvertedFind = downconvertFindCommandRequest(request);
+        if (!downconvertedFind.isOK()) {
+            return downconvertedFind.getStatus();
+        }
+        return beginCommand(std::move(downconvertedFind.getValue()),
+                            AsyncCommand::CommandType::kDownConvertedFind);
+    } else {
+        invariant(isGetMoreCmd);
+        auto downconvertedGetMore = downconvertGetMoreCommandRequest(request);
+        if (!downconvertedGetMore.isOK()) {
+            return downconvertedGetMore.getStatus();
+        }
+        return beginCommand(std::move(downconvertedGetMore.getValue()),
+                            AsyncCommand::CommandType::kDownConvertedGetMore);
+    }
 }
 
-NetworkInterfaceASIO::AsyncCommand& NetworkInterfaceASIO::AsyncOp::command() {
+NetworkInterfaceASIO::AsyncCommand* NetworkInterfaceASIO::AsyncOp::command() {
     invariant(_command.is_initialized());
-    return _command.get();
+    return _command.get_ptr();
 }
 
 void NetworkInterfaceASIO::AsyncOp::finish(const ResponseStatus& status) {

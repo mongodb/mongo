@@ -62,6 +62,10 @@ public:
         return _end - _begin;
     }
 
+    bool empty() const {
+        return length() == 0;
+    }
+
     template <typename T>
     Status read(T* t, size_t offset = 0) const {
         if (offset > length()) {

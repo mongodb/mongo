@@ -58,12 +58,15 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
     requestBuilder.setCommandArgs(BSON("isMaster" << 1));
 
     // Set current command to ismaster request and run
-    auto& cmd = op->beginCommand(std::move(*(requestBuilder.done())), now());
+    auto beginStatus = op->beginCommand(std::move(*(requestBuilder.done())));
+    if (!beginStatus.isOK()) {
+        return _completeOperation(op, beginStatus);
+    }
 
     // Callback to parse protocol information out of received ismaster response
     auto parseIsMaster = [this, op]() {
 
-        auto swCommandReply = op->command().response(rpc::Protocol::kOpQuery, now());
+        auto swCommandReply = op->command()->response(rpc::Protocol::kOpQuery, now());
         if (!swCommandReply.isOK()) {
             return _completeOperation(op, swCommandReply.getStatus());
         }
@@ -99,7 +102,7 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
 
     };
 
-    _asyncRunCommand(&cmd,
+    _asyncRunCommand(op->command(),
                      [this, op, parseIsMaster](std::error_code ec, size_t bytes) {
                          _validateAndRun(op, ec, std::move(parseIsMaster));
                      });
@@ -127,14 +130,18 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
     // authenticateClient will use this to run auth-related commands over our connection.
     auto runCommandHook = [this, op](executor::RemoteCommandRequest request,
                                      auth::AuthCompletionHandler handler) {
-        auto& cmd = op->beginCommand(request, op->operationProtocol(), now());
+
+        auto beginStatus = op->beginCommand(request);
+        if (!beginStatus.isOK()) {
+            return handler(beginStatus);
+        }
 
         auto callAuthCompletionHandler = [this, op, handler]() {
-            auto authResponse = op->command().response(op->operationProtocol(), now());
+            auto authResponse = op->command()->response(op->operationProtocol(), now());
             handler(authResponse);
         };
 
-        _asyncRunCommand(&cmd,
+        _asyncRunCommand(op->command(),
                          [this, op, callAuthCompletionHandler](std::error_code ec, size_t bytes) {
                              _validateAndRun(op, ec, callAuthCompletionHandler);
                          });

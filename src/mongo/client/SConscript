@@ -166,12 +166,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/query/lite_parsed_query',
+        '$BUILD_DIR/mongo/executor/downconvert_find_and_getmore_commands',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/rpc/metadata',
-        '$BUILD_DIR/mongo/rpc/protocol',
         '$BUILD_DIR/mongo/util/net/hostandport',
         'connection_pool',
     ],
