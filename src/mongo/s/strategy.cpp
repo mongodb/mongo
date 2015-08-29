@@ -76,11 +76,7 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-
-namespace {
-// A spigot to enable the ClusterClientCursor codepath
 MONGO_EXPORT_SERVER_PARAMETER(useClusterClientCursor, bool, false);
-}  // namespace
 
 static bool _isSystemIndexes(const char* ns) {
     return nsToCollectionSubstring(ns) == "system.indexes";

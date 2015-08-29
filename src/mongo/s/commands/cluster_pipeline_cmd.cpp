@@ -200,8 +200,11 @@ public:
 
         if (!needSplit) {
             invariant(shardResults.size() == 1);
-            const auto& reply = shardResults[0].result;
-            storePossibleCursor(shardResults[0].target.toString(), reply);
+            const BSONObj reply =
+                uassertStatusOK(storePossibleCursor(shardResults[0].target.toString(),
+                                                    shardResults[0].result,
+                                                    grid.shardRegistry()->getExecutor(),
+                                                    grid.getCursorManager()));
             result.appendElements(reply);
             return reply["ok"].trueValue();
         }
@@ -258,7 +261,7 @@ private:
     // host the command was run on which is necessary for cursor support. The exact host
     // could be different from conn->getServerAddress() for connections that map to
     // multiple servers such as for replica sets. These also take care of registering
-    // returned cursors with mongos's cursorCache.
+    // returned cursors.
     BSONObj aggRunCommand(DBClientBase* conn, const string& db, BSONObj cmd, int queryOptions);
 
     bool aggPassthrough(OperationContext* txn,
@@ -395,7 +398,10 @@ BSONObj PipelineCommand::aggRunCommand(DBClientBase* conn,
         throw RecvStaleConfigException("command failed because of stale config", result);
     }
 
-    uassertStatusOK(storePossibleCursor(cursor->originalHost(), result));
+    result = uassertStatusOK(storePossibleCursor(cursor->originalHost(),
+                                                 result,
+                                                 grid.shardRegistry()->getExecutor(),
+                                                 grid.getCursorManager()));
     return result;
 }
 

@@ -1383,21 +1383,25 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        auto status = grid.catalogCache()->getDatabase(txn, dbName);
-        if (!status.isOK()) {
-            return appendEmptyResultSet(
-                result, status.getStatus(), dbName + ".$cmd.listCollections");
+        auto conf = grid.catalogCache()->getDatabase(txn, dbName);
+        if (!conf.isOK()) {
+            return appendEmptyResultSet(result, conf.getStatus(), dbName + ".$cmd.listCollections");
         }
 
-        shared_ptr<DBConfig> conf = status.getValue();
-        bool retval = passthrough(txn, conf, cmdObj, result);
+        BSONObjBuilder shardResponseBuilder;
+        bool retval = passthrough(txn, conf.getValue(), cmdObj, shardResponseBuilder);
+        BSONObj shardResponse = shardResponseBuilder.obj();
 
-        const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
-        Status storeCursorStatus =
-            storePossibleCursor(shard->getConnString().toString(), result.asTempObj());
-        if (!storeCursorStatus.isOK()) {
-            return appendCommandStatus(result, storeCursorStatus);
+        const auto shard = grid.shardRegistry()->getShard(txn, conf.getValue()->getPrimaryId());
+        StatusWith<BSONObj> transformedResponse =
+            storePossibleCursor(shard->getConnString().toString(),
+                                shardResponse,
+                                grid.shardRegistry()->getExecutor(),
+                                grid.getCursorManager());
+        if (!transformedResponse.isOK()) {
+            return appendCommandStatus(result, transformedResponse.getStatus());
         }
+        result.appendElements(transformedResponse.getValue());
 
         return retval;
     }
@@ -1421,15 +1425,25 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        auto conf = uassertStatusOK(grid.catalogCache()->getDatabase(txn, dbName));
-        bool retval = passthrough(txn, conf, cmdObj, result);
-
-        const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
-        Status storeCursorStatus =
-            storePossibleCursor(shard->getConnString().toString(), result.asTempObj());
-        if (!storeCursorStatus.isOK()) {
-            return appendCommandStatus(result, storeCursorStatus);
+        auto conf = grid.catalogCache()->getDatabase(txn, dbName);
+        if (!conf.isOK()) {
+            return appendCommandStatus(result, conf.getStatus());
         }
+
+        BSONObjBuilder shardResponseBuilder;
+        bool retval = passthrough(txn, conf.getValue(), cmdObj, shardResponseBuilder);
+        BSONObj shardResponse = shardResponseBuilder.obj();
+
+        const auto shard = grid.shardRegistry()->getShard(txn, conf.getValue()->getPrimaryId());
+        StatusWith<BSONObj> transformedResponse =
+            storePossibleCursor(shard->getConnString().toString(),
+                                shardResponse,
+                                grid.shardRegistry()->getExecutor(),
+                                grid.getCursorManager());
+        if (!transformedResponse.isOK()) {
+            return appendCommandStatus(result, transformedResponse.getStatus());
+        }
+        result.appendElements(transformedResponse.getValue());
 
         return retval;
     }
