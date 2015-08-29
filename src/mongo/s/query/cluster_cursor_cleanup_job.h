@@ -46,7 +46,7 @@ public:
      * Period of time after which mortal cursors are killed for inactivity. Configurable with
      * server parameter "cursorTimeoutMillis".
      *
-     * TODO: Move declaration to cpp file once CursorCache class is deleted. See SERVER-20194 for
+     * TODO: Move declaration to cpp file once CursorCache class is deleted. See SERVER-19569 for
      * more details.
      */
     static long long cursorTimeoutMillis;
