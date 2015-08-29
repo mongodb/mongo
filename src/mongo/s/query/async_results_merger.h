@@ -167,21 +167,14 @@ private:
         bool exhausted() const;
 
         HostAndPort hostAndPort;
-
-        // The command object for sending to the remote to establish the cursor. If a remote cursor
-        // has not been established yet, this member will be set to a valid command object. If a
-        // remote cursor has already been established, this member will be unset.
-        boost::optional<BSONObj> cmdObj;
-
-        // The cursor id for the remote cursor. If a remote cursor has not been established yet,
-        // this member will be unset. If a remote cursor has been established and is not yet
-        // exhausted, this member will be set to a valid non-zero cursor id. If a remote cursor was
-        // established but is now exhausted, this member will be set to zero.
+        BSONObj cmdObj;
         boost::optional<CursorId> cursorId;
-
         std::queue<BSONObj> docBuffer;
         executor::TaskExecutor::CallbackHandle cbHandle;
         Status status = Status::OK();
+
+        // Set to true once we have heard from the remote node at least once.
+        bool gotFirstResponse = false;
 
         // Count of fetched docs during ARM processing of the current batch. Used to reduce the
         // batchSize in getMore when mongod returned less docs than the requested batchSize.

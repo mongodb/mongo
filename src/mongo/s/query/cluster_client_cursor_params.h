@@ -32,7 +32,6 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
@@ -42,35 +41,11 @@ struct ClusterClientCursorParams {
      * Contains any CCC parameters that are specified per-remote node.
      */
     struct Remote {
-        /**
-         * Use when a new cursor should be created on the remote.
-         */
-        Remote(HostAndPort hostAndPort, BSONObj cmdObj)
-            : hostAndPort(std::move(hostAndPort)), cmdObj(std::move(cmdObj)) {}
-
-        /**
-         * Use when an a cursor already exists on the remote.  The resulting CCC will take ownership
-         * of the existing remote cursor, generating results based on its current state.
-         *
-         * Note that any results already generated from this cursor will not be returned by the
-         * resulting CCC.  The caller is responsible for ensuring that results previously generated
-         * by this cursor have been processed.
-         */
-        Remote(HostAndPort hostAndPort, CursorId cursorId)
-            : hostAndPort(std::move(hostAndPort)), cursorId(cursorId) {}
-
         // How the networking layer should contact this remote.
-        const HostAndPort hostAndPort;
+        HostAndPort hostAndPort;
 
         // The raw command parameters to send to this remote (e.g. the find command specification).
-        //
-        // Exactly one of 'cmdObj' or 'cursorId' must be set.
-        const boost::optional<BSONObj> cmdObj;
-
-        // The cursorId for the remote node, if one already exists.
-        //
-        // Exactly one of 'cmdObj' or 'cursorId' must be set.
-        const boost::optional<CursorId> cursorId;
+        BSONObj cmdObj;
     };
 
     ClusterClientCursorParams() {}

@@ -76,8 +76,7 @@ protected:
                                const std::vector<HostAndPort>& remotes,
                                boost::optional<long long> getMoreBatchSize = boost::none) {
         const bool isExplain = true;
-        const auto lpq =
-            unittest::assertGet(LiteParsedQuery::makeFromFindCommand(_nss, findCmd, isExplain));
+        lpq = unittest::assertGet(LiteParsedQuery::makeFromFindCommand(_nss, findCmd, isExplain));
 
         params = ClusterClientCursorParams(_nss);
         params.sort = lpq->getSort();
@@ -87,22 +86,10 @@ protected:
         params.isTailable = lpq->isTailable();
 
         for (const auto& hostAndPort : remotes) {
-            params.remotes.emplace_back(hostAndPort, findCmd);
-        }
-
-        arm = stdx::make_unique<AsyncResultsMerger>(executor, params);
-    }
-
-    /**
-     * Given a vector of (HostAndPort, CursorIds) representing a set of existing cursors, constructs
-     * the appropriate ARM.  The default CCC parameters are used.
-     */
-    void makeCursorFromExistingCursors(
-        const std::vector<std::pair<HostAndPort, CursorId>>& remotes) {
-        params = ClusterClientCursorParams(_nss);
-
-        for (const auto& hostIdPair : remotes) {
-            params.remotes.emplace_back(hostIdPair.first, hostIdPair.second);
+            ClusterClientCursorParams::Remote remoteParams;
+            remoteParams.hostAndPort = hostAndPort;
+            remoteParams.cmdObj = findCmd;
+            params.remotes.push_back(remoteParams);
         }
 
         arm = stdx::make_unique<AsyncResultsMerger>(executor, params);
@@ -176,6 +163,7 @@ protected:
     const std::vector<HostAndPort> _remotes;
 
     executor::TaskExecutor* executor;
+    std::unique_ptr<LiteParsedQuery> lpq;
 
     ClusterClientCursorParams params;
     std::unique_ptr<AsyncResultsMerger> arm;
@@ -447,35 +435,6 @@ TEST_F(AsyncResultsMergerTest, ClusterFindInitialBatchSizeIsZero) {
     ASSERT_TRUE(arm->ready());
     ASSERT(!unittest::assertGet(arm->nextReady()));
 }
-
-TEST_F(AsyncResultsMergerTest, ExistingCursors) {
-    makeCursorFromExistingCursors({{_remotes[0], 5}, {_remotes[1], 6}});
-
-    ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent());
-    ASSERT_FALSE(arm->ready());
-
-    std::vector<CursorResponse> responses;
-    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
-    responses.emplace_back(_nss, CursorId(0), batch1);
-    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
-    responses.emplace_back(_nss, CursorId(0), batch2);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
-
-    executor->waitForEvent(readyEvent);
-
-    ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
-    ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()));
-    ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()));
-    ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()));
-    ASSERT_TRUE(arm->ready());
-    ASSERT(!unittest::assertGet(arm->nextReady()));
-}
-
 
 TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");

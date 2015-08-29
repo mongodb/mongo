@@ -91,7 +91,7 @@ bool AsyncResultsMerger::ready_inlock() {
         // We don't return any results until we have received at least one response from each remote
         // node. This is necessary for versioned commands: we have to ensure that we've properly
         // established the shard version on each node before we can start returning results.
-        if (!remote.cursorId) {
+        if (!remote.gotFirstResponse) {
             return false;
         }
     }
@@ -224,7 +224,7 @@ Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
     BSONObj cmdObj = remote.cursorId
         ? GetMoreRequest(_params.nsString, *remote.cursorId, adjustedBatchSize, boost::none)
               .toBSON()
-        : *remote.cmdObj;
+        : remote.cmdObj;
 
     executor::RemoteCommandRequest request(
         remote.hostAndPort, _params.nsString.db().toString(), cmdObj);
@@ -351,8 +351,10 @@ void AsyncResultsMerger::handleBatchResponse(
         return;
     }
 
+    // Mark that we've gotten a valid response back from 'remote' at least once.
+    remote.gotFirstResponse = true;
+
     remote.cursorId = cursorResponse.cursorId;
-    remote.cmdObj = boost::none;
 
     for (const auto& obj : cursorResponse.batch) {
         remote.docBuffer.push(obj);
@@ -481,10 +483,7 @@ executor::TaskExecutor::EventHandle AsyncResultsMerger::kill() {
 
 AsyncResultsMerger::RemoteCursorData::RemoteCursorData(
     const ClusterClientCursorParams::Remote& params)
-    : hostAndPort(params.hostAndPort), cmdObj(params.cmdObj), cursorId(params.cursorId) {
-    // Either cmdObj or cursorId can be provided, but not both.
-    invariant(static_cast<bool>(cmdObj) != static_cast<bool>(cursorId));
-}
+    : hostAndPort(params.hostAndPort), cmdObj(params.cmdObj) {}
 
 bool AsyncResultsMerger::RemoteCursorData::hasNext() const {
     return !docBuffer.empty();
