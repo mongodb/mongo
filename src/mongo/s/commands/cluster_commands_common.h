@@ -41,13 +41,8 @@ namespace mongo {
 class BSONObj;
 
 class AScopedConnection;
-class ClusterCursorManager;
 class DBClientBase;
 class DBClientCursor;
-
-namespace executor {
-class TaskExecutor;
-}  // namespace executor
 
 /**
  * DEPRECATED - do not use in any new code. All new code must use the TaskExecutor interface
@@ -137,19 +132,11 @@ int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& 
 bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns);
 
 /**
- * Utility function to create a cursor based on existing cursor on a remote instance.  'cmdResult'
- * must be the response object generated upon creation of the cursor. The cursor is created using
- * 'executor', and the cursor is stored with 'cursorManager' (unless 'useClusterClientCursor' is
- * set to false, in which case the cursor is stored with the 'cursorCache' singleton).
- *
- * If 'cmdResult' does not describe a command cursor response document or no cursor is specified,
- * returns 'cmdResult'. If a parsing error occurs, returns an error Status. Otherwise, returns a
- * BSONObj response document describing the newly-created cursor, which is suitable for returning to
- * the client.
+ * Utility function to parse a cursor command response and save the cursor in the CursorCache
+ * "refs" container. Returns Status::OK() if the cursor was successfully saved or no cursor
+ * was specified in the command response, and returns an error Status if a parsing error was
+ * encountered.
  */
-StatusWith<BSONObj> storePossibleCursor(const std::string& server,
-                                        const BSONObj& cmdResult,
-                                        executor::TaskExecutor* executor,
-                                        ClusterCursorManager* cursorManager);
+Status storePossibleCursor(const std::string& server, const BSONObj& cmdResult);
 
 }  // namespace mongo

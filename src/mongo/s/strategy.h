@@ -36,9 +36,6 @@ namespace mongo {
 
 class OperationContext;
 
-// A spigot to enable the ClusterClientCursor codepath.
-extern bool useClusterClientCursor;
-
 /**
  * Legacy interface for processing client read/write/cmd requests.
  */
