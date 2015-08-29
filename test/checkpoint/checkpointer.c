@@ -348,10 +348,10 @@ diagnose_key_error(
 		return (1);
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("1st cursor didn't find 1st key\n", ret, 0);
+		(void)log_print_err("1st cursor didn't find 1st key", ret, 0);
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("1st cursor didn't find 2nd key\n", ret, 0);
+		(void)log_print_err("1st cursor didn't find 2nd key", ret, 0);
 	if (c->close(c) != 0)
 		return (1);
 
@@ -360,10 +360,10 @@ diagnose_key_error(
 		return (1);
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("2nd cursor didn't find 1st key\n", ret, 0);
+		(void)log_print_err("2nd cursor didn't find 1st key", ret, 0);
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
+		(void)log_print_err("2nd cursor didn't find 2nd key", ret, 0);
 	if (c->close(c) != 0)
 		return (1);
 
@@ -377,7 +377,7 @@ live_check:
 		return (1);
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("1st cursor didn't find 1st key\n", ret, 0);
+		(void)log_print_err("1st cursor didn't find 1st key", ret, 0);
 	if (c->close(c) != 0)
 		return (1);
 
@@ -386,7 +386,7 @@ live_check:
 		return (1);
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
+		(void)log_print_err("2nd cursor didn't find 2nd key", ret, 0);
 	if (c->close(c) != 0)
 		return (1);
 
