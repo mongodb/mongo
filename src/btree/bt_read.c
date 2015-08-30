@@ -354,8 +354,6 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	/*
 	 * Get the address: if there is no address, the page was deleted, but a
 	 * subsequent search or insert is forcing re-creation of the name space.
-	 * Otherwise, there's an address, read the backing disk page and build
-	 * an in-memory version of the page.
 	 */
 	WT_ERR(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 	if (addr == NULL) {
@@ -363,44 +361,51 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref)
 
 		WT_ERR(__wt_btree_new_leaf_page(session, &page));
 		ref->page = page;
-	} else {
-		/*
-		 * Read the page, then build the in-memory version of the page.
-		 * Clear any local reference to an allocated copy of the disk
-		 * image on return, the page steals it.
-		 */
-		WT_ERR(__wt_bt_read(session, &tmp, addr, addr_size));
-		WT_ERR(__wt_page_inmem(session, ref, tmp.data, tmp.memsize,
-		    WT_DATA_IN_ITEM(&tmp) ?
-		    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
-		tmp.mem = NULL;
-
-		/* If the page was deleted, instantiate that information. */
-		if (previous_state == WT_REF_DELETED)
-			WT_ERR(__wt_delete_page_instantiate(session, ref));
-
-		/*
-		 * Instantiate updates from the database's lookaside table. The
-		 * flag might have been set a long time ago, and we only care
-		 * if the lookaside table is currently active, check that before
-		 * doing any work.
-		 */
-		dsk = tmp.data;
-		if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE) &&
-		    __wt_las_is_written(session)) {
-			WT_STAT_FAST_CONN_INCR(session, cache_read_lookaside);
-			WT_STAT_FAST_DATA_INCR(session, cache_read_lookaside);
-
-			WT_ERR(__las_page_instantiate(
-			    session, ref, btree->id, addr, addr_size));
-		}
+		goto done;
 	}
 
-	WT_ERR(__wt_verbose(session, WT_VERB_READ,
-	    "page %p: %s", page, __wt_page_type_string(page->type)));
+	/*
+	 * There's an address, read or map the backing disk page and build an
+	 * in-memory version of the page.
+	 */
+	WT_ERR(__wt_bt_read(session, &tmp, addr, addr_size));
+	WT_ERR(__wt_page_inmem(session, ref, tmp.data, tmp.memsize,
+	    WT_DATA_IN_ITEM(&tmp) ?
+	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
 
-	WT_PUBLISH(ref->state, WT_REF_MEM);
+	/*
+	 * Clear the local reference to an allocated copy of the disk image on
+	 * return; the page steals it, errors in this code should not free it.
+	 */
+	tmp.mem = NULL;
 
+	/*
+	 * If reading for a checkpoint, there's no additional work to do, the
+	 * page on disk is correct as written.
+	 */
+	if (session->dhandle->checkpoint != NULL)
+		goto done;
+
+	/* If the page was deleted, instantiate that information. */
+	if (previous_state == WT_REF_DELETED)
+		WT_ERR(__wt_delete_page_instantiate(session, ref));
+
+	/*
+	 * Instantiate updates from the database's lookaside table. The page
+	 * flag was set when the page was written, potentially a long time ago.
+	 * We only care if the lookaside table is currently active, check that
+	 * before doing any work.
+	 */
+	dsk = tmp.data;
+	if (F_ISSET(dsk, WT_PAGE_LAS_UPDATE) && __wt_las_is_written(session)) {
+		WT_STAT_FAST_CONN_INCR(session, cache_read_lookaside);
+		WT_STAT_FAST_DATA_INCR(session, cache_read_lookaside);
+
+		WT_ERR(__las_page_instantiate(
+		    session, ref, btree->id, addr, addr_size));
+	}
+
+done:	WT_PUBLISH(ref->state, WT_REF_MEM);
 	return (0);
 
 err:	/*
