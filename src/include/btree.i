@@ -414,6 +414,9 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * shouldn't cause problems; regardless, let's play it safe.)
 	 */
 	if (S2BT(session)->modified == 0) {
+		/* Assert we never dirty a checkpoint handle. */
+		WT_ASSERT(session, session->dhandle->checkpoint == NULL);
+
 		S2BT(session)->modified = 1;
 		WT_FULL_BARRIER();
 	}
