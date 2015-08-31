@@ -694,9 +694,9 @@
 
         // Simple tailable cursor
         var cursor = coll.find({}).sort({a:1}).tailable();
-        assert.eq(34, cursor._options);
+        assert.eq(34, (cursor._options & ~DBQuery.Option.slaveOk));
         var cursor = coll.find({}).sort({a:1}).tailable(false);
-        assert.eq(2, cursor._options);
+        assert.eq(2, (cursor._options & ~DBQuery.Option.slaveOk));
 
         // Check modifiers
         var cursor = coll.find({}).modifiers({$hint:'a_1'});
@@ -704,15 +704,15 @@
 
         // allowPartialResults
         var cursor = coll.find({}).allowPartialResults();
-        assert.eq(128, cursor._options);
+        assert.eq(128, (cursor._options & ~DBQuery.Option.slaveOk));
 
         // noCursorTimeout
         var cursor = coll.find({}).noCursorTimeout();
-        assert.eq(16, cursor._options);
+        assert.eq(16, (cursor._options & ~DBQuery.Option.slaveOk));
 
         // oplogReplay
         var cursor = coll.find({}).oplogReplay();
-        assert.eq(8, cursor._options);
+        assert.eq(8, (cursor._options & ~DBQuery.Option.slaveOk));
 
         //
         // Aggregation
