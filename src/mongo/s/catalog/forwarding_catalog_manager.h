@@ -48,9 +48,16 @@ struct ReadPreferenceSetting;
 /**
  * The ForwardingCatalogManager is an indirection layer that allows for dynamic switching of
  * catalog manager implementations at runtime, to facilitate upgrade.
+ * Inheriting privately from CatalogManager is intentional.  All callers of CatalogManager methods
+ * on a ForwardingCatalogManager will get access to the FCM pointer by calling
+ * FCM::getCatalogManagerToUse, which can return a CatalogManager* because it is a member of FCM
+ * and thus knows that FCM inherits from CatalogManager.  This makes it obvious if we try to call
+ * CatalogManager methods directly on a ForwardingCatalogManager pointer.
  */
-class ForwardingCatalogManager final : public CatalogManager {
+class ForwardingCatalogManager final : private CatalogManager {
 public:
+    class ScopedDistLock;
+
     ForwardingCatalogManager(ServiceContext* service,
                              const ConnectionString& configCS,
                              ShardRegistry* shardRegistry,
@@ -59,13 +66,21 @@ public:
     /**
      * Constructor for use in tests.
      */
-    explicit ForwardingCatalogManager(ServiceContext* service,
-                                      std::unique_ptr<CatalogManager> actual,
-                                      ShardRegistry* shardRegistry,
-                                      const HostAndPort& thisHost);
+    ForwardingCatalogManager(ServiceContext* service,
+                             std::unique_ptr<CatalogManager> actual,
+                             ShardRegistry* shardRegistry,
+                             const HostAndPort& thisHost);
 
     virtual ~ForwardingCatalogManager();
 
+    // Only public because of unit tests
+    DistLockManager* getDistLockManager() override;
+
+    /**
+     * If desiredMode doesn't equal _actual->getMode(), schedules work to swap the actual catalog
+     * manager to one of the type specified by desiredMode.
+     * Currently only supports going to CSRS mode from SCCC mode.
+     */
     Status scheduleReplaceCatalogManagerIfNeeded(ConfigServerMode desiredMode,
                                                  StringData replSetName,
                                                  const HostAndPort& knownServer);
@@ -76,6 +91,28 @@ public:
      */
     void waitForCatalogManagerChange();
 
+    /**
+     * Returns a ScopedDistLock which is the RAII type for holding a distributed lock.
+     * ScopedDistLock prevents the underlying CatalogManager from being swapped as long as it is
+     * in scope.
+     */
+    StatusWith<ScopedDistLock> distLock(
+        OperationContext* txn,
+        StringData name,
+        StringData whyMessage,
+        stdx::chrono::milliseconds waitFor = DistLockManager::kDefaultSingleLockAttemptTimeout,
+        stdx::chrono::milliseconds lockTryInterval = DistLockManager::kDefaultLockRetryInterval);
+
+    /**
+     * Returns a pointer to the CatalogManager that should be used for general CatalogManager
+     * operation.  Most of the time it will return 'this' - the ForwardingCatalogManager.  If there
+     * is a distributed lock held as part of this operation, however, it will return the underlying
+     * CatalogManager to prevent deadlock from occurring by trying to swap the catalog manager while
+     * a distlock is held.
+     */
+    CatalogManager* getCatalogManagerToUse(OperationContext* txn);
+
+private:
     ConfigServerMode getMode() override;
 
     Status startup(OperationContext* txn, bool allowNetworking) override;
@@ -178,37 +215,8 @@ public:
 
     Status createDatabase(OperationContext* txn, const std::string& dbName) override;
 
-    DistLockManager* getDistLockManager() override;
-
     Status initConfigVersion(OperationContext* txn) override;
 
-    class ScopedDistLock {
-        MONGO_DISALLOW_COPYING(ScopedDistLock);
-
-    public:
-        ScopedDistLock(ForwardingCatalogManager* fcm, DistLockManager::ScopedDistLock theLock);
-        ScopedDistLock(ScopedDistLock&& other);
-        ~ScopedDistLock();
-
-        ScopedDistLock& operator=(ScopedDistLock&& other);
-
-        Status checkStatus() {
-            return _lock.checkStatus();
-        }
-
-    private:
-        ForwardingCatalogManager* _fcm;
-        DistLockManager::ScopedDistLock _lock;
-    };
-
-    StatusWith<ScopedDistLock> distLock(
-        OperationContext* txn,
-        StringData name,
-        StringData whyMessage,
-        stdx::chrono::milliseconds waitFor = DistLockManager::kDefaultSingleLockAttemptTimeout,
-        stdx::chrono::milliseconds lockTryInterval = DistLockManager::kDefaultLockRetryInterval);
-
-private:
     template <typename Callable>
     auto retry(Callable&& c) -> decltype(std::forward<Callable>(c)());
 
@@ -230,6 +238,28 @@ private:
 
     ConnectionString _nextConfigConnectionString;                   // Guarded by _observerMutex.
     executor::TaskExecutor::EventHandle _nextConfigChangeComplete;  // Guarded by _observerMutex.
+};
+
+class ForwardingCatalogManager::ScopedDistLock {
+    MONGO_DISALLOW_COPYING(ScopedDistLock);
+
+public:
+    ScopedDistLock(OperationContext* txn,
+                   ForwardingCatalogManager* fcm,
+                   DistLockManager::ScopedDistLock theLock);
+    ScopedDistLock(ScopedDistLock&& other);
+    ~ScopedDistLock();
+
+    ScopedDistLock& operator=(ScopedDistLock&& other);
+
+    Status checkStatus() {
+        return _lock.checkStatus();
+    }
+
+private:
+    OperationContext* _txn;
+    ForwardingCatalogManager* _fcm;
+    DistLockManager::ScopedDistLock _lock;
 };
 
 }  // namespace mongo

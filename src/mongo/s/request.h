@@ -79,7 +79,7 @@ public:
 
     void process(OperationContext* txn, int attempt = 0);
 
-    void init();
+    void init(OperationContext* txn);
 
 private:
     Client* const _clientInfo;

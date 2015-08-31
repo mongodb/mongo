@@ -121,6 +121,85 @@ ForwardingCatalogManager::ForwardingCatalogManager(ServiceContext* service,
 
 ForwardingCatalogManager::~ForwardingCatalogManager() = default;
 
+
+StatusWith<ForwardingCatalogManager::ScopedDistLock> ForwardingCatalogManager::distLock(
+    OperationContext* txn,
+    StringData name,
+    StringData whyMessage,
+    stdx::chrono::milliseconds waitFor,
+    stdx::chrono::milliseconds lockTryInterval) {
+    for (int i = 0; i < 2; ++i) {
+        try {
+            _operationLock.lock_shared();
+            auto guard = MakeGuard([this] { _operationLock.unlock_shared(); });
+            auto dlmLock =
+                _actual->getDistLockManager()->lock(name, whyMessage, waitFor, lockTryInterval);
+            if (dlmLock.isOK()) {
+                guard.Dismiss();  // Don't unlock _operationLock; hold it until the returned
+                                  // ScopedDistLock goes out of scope!
+                try {
+                    return ScopedDistLock(txn, this, std::move(dlmLock.getValue()));
+                } catch (...) {
+                    // Once the guard that unlocks _operationLock is dismissed, any exception before
+                    // this method returns is fatal.
+                    std::terminate();
+                }
+            } else if (dlmLock.getStatus() != ErrorCodes::IncompatibleCatalogManager) {
+                return dlmLock.getStatus();
+            }
+        } catch (const DBException& ex) {
+            if (ex.getCode() != ErrorCodes::IncompatibleCatalogManager) {
+                throw;
+            }
+        }
+
+        waitForCatalogManagerChange(txn);
+    }
+    MONGO_UNREACHABLE;
+}
+
+namespace {
+const auto scopedDistLockHeld = OperationContext::declareDecoration<bool>();
+}
+
+CatalogManager* ForwardingCatalogManager::getCatalogManagerToUse(OperationContext* txn) {
+    if (scopedDistLockHeld(txn)) {
+        return _actual.get();
+    } else {
+        return this;
+    }
+}
+
+ForwardingCatalogManager::ScopedDistLock::ScopedDistLock(OperationContext* txn,
+                                                         ForwardingCatalogManager* fcm,
+                                                         DistLockManager::ScopedDistLock theLock)
+    : _txn(txn), _fcm(fcm), _lock(std::move(theLock)) {
+    scopedDistLockHeld(txn) = true;
+}
+
+ForwardingCatalogManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other)
+    : _txn(other._txn), _fcm(other._fcm), _lock(std::move(other._lock)) {
+    other._txn = nullptr;
+    other._fcm = nullptr;
+}
+
+ForwardingCatalogManager::ScopedDistLock::~ScopedDistLock() {
+    if (_fcm) {  // This ScopedDistLock was not moved from
+        auto guard = MakeGuard([this] { _fcm->_operationLock.unlock_shared(); });
+        DistLockManager::ScopedDistLock dlmLock = std::move(_lock);
+        scopedDistLockHeld(_txn) = false;
+    }
+}
+
+ForwardingCatalogManager::ScopedDistLock& ForwardingCatalogManager::ScopedDistLock::operator=(
+    ScopedDistLock&& other) {
+    invariant(!_fcm);
+    _fcm = other._fcm;
+    other._fcm = nullptr;
+    _lock = std::move(other._lock);
+    return *this;
+}
+
 Status ForwardingCatalogManager::scheduleReplaceCatalogManagerIfNeeded(
     ConfigServerMode desiredMode, StringData replSetName, const HostAndPort& knownServer) {
     stdx::lock_guard<stdx::mutex> lk(_observerMutex);
@@ -163,6 +242,77 @@ void ForwardingCatalogManager::waitForCatalogManagerChange() {
     auto configChangeComplete = _nextConfigChangeComplete;
     oblk.unlock();
     _shardRegistry->getExecutor()->waitForEvent(configChangeComplete);
+}
+
+namespace {
+
+template <typename T>
+struct CheckForIncompatibleCatalogManager {
+    T operator()(T&& v) {
+        return std::forward<T>(v);
+    }
+};
+
+template <typename T>
+struct CheckForIncompatibleCatalogManager<StatusWith<T>> {
+    StatusWith<T> operator()(StatusWith<T>&& v) {
+        if (!v.isOK() && v.getStatus().code() == ErrorCodes::IncompatibleCatalogManager) {
+            uassertStatusOK(v);
+        }
+        return std::forward<StatusWith<T>>(v);
+    }
+};
+
+template <>
+struct CheckForIncompatibleCatalogManager<Status> {
+    Status operator()(Status&& v) {
+        if (v.code() == ErrorCodes::IncompatibleCatalogManager) {
+            uassertStatusOK(v);
+        }
+        return std::move(v);
+    }
+};
+
+template <typename T>
+T checkForIncompatibleCatalogManager(T&& v) {
+    return CheckForIncompatibleCatalogManager<T>()(std::forward<T>(v));
+}
+
+}  // namespace
+
+template <typename Callable>
+auto ForwardingCatalogManager::retry(Callable&& c) -> decltype(std::forward<Callable>(c)()) {
+    for (int i = 0; i < 2; ++i) {
+        try {
+            rwlock_shared oplk(_operationLock);
+            return checkForIncompatibleCatalogManager(std::forward<Callable>(c)());
+        } catch (const DBException& ex) {
+            if (ex.getCode() != ErrorCodes::IncompatibleCatalogManager) {
+                throw;
+            }
+        }
+
+        waitForCatalogManagerChange();
+    }
+    MONGO_UNREACHABLE;
+}
+
+void ForwardingCatalogManager::_replaceCatalogManager(const TaskExecutor::CallbackArgs& args) {
+    if (!args.status.isOK()) {
+        return;
+    }
+    Client::initThreadIfNotAlready();
+    auto txn = cc().makeOperationContext();
+
+    stdx::lock_guard<RWLock> oplk(_operationLock);
+    stdx::lock_guard<stdx::mutex> oblk(_observerMutex);
+    _actual->shutDown(txn.get(), /* allowNetworking */ false);
+    _actual = makeCatalogManager(_service, _nextConfigConnectionString, _shardRegistry, _thisHost);
+    _shardRegistry->updateConfigServerConnectionString(_nextConfigConnectionString);
+    // Note: this assumes that downgrade is not supported, as this will not start the config
+    // server consistency checker for the legacy catalog manager.
+    fassert(28790, _actual->startup(txn.get(), false /* allowNetworking */));
+    args.executor->signalEvent(_nextConfigChangeComplete);
 }
 
 CatalogManager::ConfigServerMode ForwardingCatalogManager::getMode() {
@@ -386,138 +536,6 @@ DistLockManager* ForwardingCatalogManager::getDistLockManager() {
 
 Status ForwardingCatalogManager::initConfigVersion(OperationContext* txn) {
     return retry([&] { return _actual->initConfigVersion(txn); });
-}
-
-StatusWith<ForwardingCatalogManager::ScopedDistLock> ForwardingCatalogManager::distLock(
-    OperationContext* txn,
-    StringData name,
-    StringData whyMessage,
-    stdx::chrono::milliseconds waitFor,
-    stdx::chrono::milliseconds lockTryInterval) {
-    for (int i = 0; i < 2; ++i) {
-        try {
-            _operationLock.lock_shared();
-            auto guard = MakeGuard([this] { _operationLock.unlock_shared(); });
-            auto dlmLock =
-                _actual->getDistLockManager()->lock(name, whyMessage, waitFor, lockTryInterval);
-            if (dlmLock.isOK()) {
-                guard.Dismiss();  // Don't unlock _operationLock; hold it until the returned
-                                  // ScopedDistLock goes out of scope!
-                try {
-                    return ScopedDistLock(this, std::move(dlmLock.getValue()));
-                } catch (...) {
-                    // Once the guard that unlocks _operationLock is dismissed, any exception before
-                    // this method returns is fatal.
-                    std::terminate();
-                }
-            } else if (dlmLock.getStatus() != ErrorCodes::IncompatibleCatalogManager) {
-                return dlmLock.getStatus();
-            }
-        } catch (const DBException& ex) {
-            if (ex.getCode() != ErrorCodes::IncompatibleCatalogManager) {
-                throw;
-            }
-        }
-
-        waitForCatalogManagerChange();
-    }
-    MONGO_UNREACHABLE;
-}
-
-ForwardingCatalogManager::ScopedDistLock::ScopedDistLock(ForwardingCatalogManager* fcm,
-                                                         DistLockManager::ScopedDistLock theLock)
-    : _fcm(fcm), _lock(std::move(theLock)) {}
-
-ForwardingCatalogManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other)
-    : _fcm(other._fcm), _lock(std::move(other._lock)) {
-    other._fcm = nullptr;
-}
-
-ForwardingCatalogManager::ScopedDistLock::~ScopedDistLock() {
-    if (_fcm) {
-        auto guard = MakeGuard([this] { _fcm->_operationLock.unlock_shared(); });
-        DistLockManager::ScopedDistLock dlmLock = std::move(_lock);
-    }
-}
-
-ForwardingCatalogManager::ScopedDistLock& ForwardingCatalogManager::ScopedDistLock::operator=(
-    ScopedDistLock&& other) {
-    invariant(!_fcm);
-    _fcm = other._fcm;
-    other._fcm = nullptr;
-    _lock = std::move(other._lock);
-    return *this;
-}
-
-namespace {
-
-template <typename T>
-struct CheckForIncompatibleCatalogManager {
-    T operator()(T&& v) {
-        return std::forward<T>(v);
-    }
-};
-
-template <typename T>
-struct CheckForIncompatibleCatalogManager<StatusWith<T>> {
-    StatusWith<T> operator()(StatusWith<T>&& v) {
-        if (!v.isOK() && v.getStatus().code() == ErrorCodes::IncompatibleCatalogManager) {
-            uassertStatusOK(v);
-        }
-        return std::forward<StatusWith<T>>(v);
-    }
-};
-
-template <>
-struct CheckForIncompatibleCatalogManager<Status> {
-    Status operator()(Status&& v) {
-        if (v.code() == ErrorCodes::IncompatibleCatalogManager) {
-            uassertStatusOK(v);
-        }
-        return std::move(v);
-    }
-};
-
-template <typename T>
-T checkForIncompatibleCatalogManager(T&& v) {
-    return CheckForIncompatibleCatalogManager<T>()(std::forward<T>(v));
-}
-
-}  // namespace
-
-template <typename Callable>
-auto ForwardingCatalogManager::retry(Callable&& c) -> decltype(std::forward<Callable>(c)()) {
-    for (int i = 0; i < 2; ++i) {
-        try {
-            rwlock_shared oplk(_operationLock);
-            return checkForIncompatibleCatalogManager(std::forward<Callable>(c)());
-        } catch (const DBException& ex) {
-            if (ex.getCode() != ErrorCodes::IncompatibleCatalogManager) {
-                throw;
-            }
-        }
-
-        waitForCatalogManagerChange();
-    }
-    MONGO_UNREACHABLE;
-}
-
-void ForwardingCatalogManager::_replaceCatalogManager(const TaskExecutor::CallbackArgs& args) {
-    if (!args.status.isOK()) {
-        return;
-    }
-    Client::initThreadIfNotAlready();
-    auto txn = cc().makeOperationContext();
-
-    stdx::lock_guard<RWLock> oplk(_operationLock);
-    stdx::lock_guard<stdx::mutex> oblk(_observerMutex);
-    _actual->shutDown(txn.get(), /* allowNetworking */ false);
-    _actual = makeCatalogManager(_service, _nextConfigConnectionString, _shardRegistry, _thisHost);
-    _shardRegistry->updateConfigServerConnectionString(_nextConfigConnectionString);
-    // Note: this assumes that downgrade is not supported, as this will not start the config
-    // server consistency checker for the legacy catalog manager.
-    fassert(28790, _actual->startup(txn.get(), false /* allowNetworking */));
-    args.executor->signalEvent(_nextConfigChangeComplete);
 }
 
 }  // namespace mongo

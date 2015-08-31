@@ -136,7 +136,7 @@ ForwardingCatalogManager* Grid::forwardingCatalogManager() {
 }
 
 CatalogManager* Grid::catalogManager(OperationContext* txn) {
-    return _catalogManager.get();
+    return _catalogManager->getCatalogManagerToUse(txn);
 }
 
 }  // namespace mongo

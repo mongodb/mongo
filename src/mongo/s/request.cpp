@@ -55,7 +55,7 @@ Request::Request(Message& m, AbstractMessagingPort* p)
     ClusterLastErrorInfo::get(_clientInfo).newRequest();
 }
 
-void Request::init() {
+void Request::init(OperationContext* txn) {
     if (_didInit) {
         return;
     }
@@ -76,12 +76,12 @@ void Request::init() {
                 nss.isValid());
     }
 
-    AuthorizationSession::get(_clientInfo)->startRequest(NULL);
+    AuthorizationSession::get(_clientInfo)->startRequest(txn);
     _didInit = true;
 }
 
 void Request::process(OperationContext* txn, int attempt) {
-    init();
+    init(txn);
     int op = _m.operation();
     verify(op > dbMsg);
 

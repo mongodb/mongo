@@ -134,7 +134,7 @@ public:
         auto txn = cc().makeOperationContext();
 
         try {
-            r.init();
+            r.init(txn.get());
             r.process(txn.get());
         } catch (const AssertionException& ex) {
             LOG(ex.isUserAssertion() ? 1 : 0) << "Assertion failed"
