@@ -8,6 +8,14 @@
 
 #include "wt_internal.h"
 
+ /* YSD:
+  * Note that 'rec' does not mean 'record' in this place.
+  * Here 'rec' means reconciliation. As it explained below, reconciliation is to re-format
+  * a memory page according to the format on a disk, and then flush it to disk.
+  * So the functions here is mostly called by checkpoint, who is working with write ahead
+  * transaction log to ensure data persistance.
+  */
+
 struct __rec_boundary;		typedef struct __rec_boundary WT_BOUNDARY;
 struct __rec_dictionary;	typedef struct __rec_dictionary WT_DICTIONARY;
 struct __rec_kv;		typedef struct __rec_kv WT_KV;
