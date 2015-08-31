@@ -306,27 +306,30 @@ TEST_F(AsyncResultsMergerTest, ClusterFindSorted) {
     ASSERT_FALSE(arm->ready());
 
     std::vector<CursorResponse> responses;
-    std::vector<BSONObj> batch1 = {fromjson("{_id: 5}"), fromjson("{_id: 6}")};
+    std::vector<BSONObj> batch1 = {fromjson("{_id: 5, $sortKey: {'': 5}}"),
+                                   fromjson("{_id: 6, $sortKey: {'': 6}}")};
     responses.emplace_back(_nss, CursorId(0), batch1);
-    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 9}")};
+    std::vector<BSONObj> batch2 = {fromjson("{_id: 3, $sortKey: {'': 3}}"),
+                                   fromjson("{_id: 9, $sortKey: {'': 9}}")};
     responses.emplace_back(_nss, CursorId(0), batch2);
-    std::vector<BSONObj> batch3 = {fromjson("{_id: 4}"), fromjson("{_id: 8}")};
+    std::vector<BSONObj> batch3 = {fromjson("{_id: 4, $sortKey: {'': 4}}"),
+                                   fromjson("{_id: 8, $sortKey: {'': 8}}")};
     responses.emplace_back(_nss, CursorId(0), batch3);
     scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{_id: 3, $sortKey: {'': 3}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{_id: 4, $sortKey: {'': 4}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 5}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{_id: 5, $sortKey: {'': 5}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 6}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{_id: 6, $sortKey: {'': 6}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 8}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{_id: 8, $sortKey: {'': 8}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 9}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{_id: 9, $sortKey: {'': 9}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
     ASSERT(!unittest::assertGet(arm->nextReady()));
 }
@@ -340,60 +343,128 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMoreSorted) {
     ASSERT_FALSE(arm->ready());
 
     std::vector<CursorResponse> responses;
-    std::vector<BSONObj> batch1 = {fromjson("{_id: 5}"), fromjson("{_id: 6}")};
+    std::vector<BSONObj> batch1 = {fromjson("{$sortKey: {'': 5}}"),
+                                   fromjson("{$sortKey: {'': 6}}")};
     responses.emplace_back(_nss, CursorId(1), batch1);
-    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
+    std::vector<BSONObj> batch2 = {fromjson("{$sortKey: {'': 3}}"),
+                                   fromjson("{$sortKey: {'': 4}}")};
     responses.emplace_back(_nss, CursorId(0), batch2);
-    std::vector<BSONObj> batch3 = {fromjson("{_id: 7}"), fromjson("{_id: 8}")};
+    std::vector<BSONObj> batch3 = {fromjson("{$sortKey: {'': 7}}"),
+                                   fromjson("{$sortKey: {'': 8}}")};
     responses.emplace_back(_nss, CursorId(2), batch3);
     scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{$sortKey: {'': 3}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 4}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{$sortKey: {'': 4}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 5}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{$sortKey: {'': 5}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 6}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{$sortKey: {'': 6}}"), *unittest::assertGet(arm->nextReady()));
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     responses.clear();
-    std::vector<BSONObj> batch4 = {fromjson("{_id: 7}"), fromjson("{_id: 10}")};
+    std::vector<BSONObj> batch4 = {fromjson("{$sortKey: {'': 7}}"),
+                                   fromjson("{$sortKey: {'': 10}}")};
     responses.emplace_back(_nss, CursorId(0), batch4);
     scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 7}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{$sortKey: {'': 7}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 7}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{$sortKey: {'': 7}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 8}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{$sortKey: {'': 8}}"), *unittest::assertGet(arm->nextReady()));
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
     responses.clear();
-    std::vector<BSONObj> batch5 = {fromjson("{_id: 9}"), fromjson("{_id: 10}")};
+    std::vector<BSONObj> batch5 = {fromjson("{$sortKey: {'': 9}}"),
+                                   fromjson("{$sortKey: {'': 10}}")};
     responses.emplace_back(_nss, CursorId(0), batch5);
     scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 9}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{$sortKey: {'': 9}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 10}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{$sortKey: {'': 10}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
-    ASSERT_EQ(fromjson("{_id: 10}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_EQ(fromjson("{$sortKey: {'': 10}}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
     ASSERT(!unittest::assertGet(arm->nextReady()));
 }
+
+TEST_F(AsyncResultsMergerTest, ClusterFindCompoundSortKey) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', sort: {a: -1, b: 1}, batchSize: 2}");
+    makeCursorFromFindCmd(findCmd, _remotes);
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{$sortKey: {'': 5, '': 9}}"),
+                                   fromjson("{$sortKey: {'': 4, '': 20}}")};
+    responses.emplace_back(_nss, CursorId(0), batch1);
+    std::vector<BSONObj> batch2 = {fromjson("{$sortKey: {'': 10, '': 11}}"),
+                                   fromjson("{$sortKey: {'': 4, '': 4}}")};
+    responses.emplace_back(_nss, CursorId(0), batch2);
+    std::vector<BSONObj> batch3 = {fromjson("{$sortKey: {'': 10, '': 12}}"),
+                                   fromjson("{$sortKey: {'': 5, '': 9}}")};
+    responses.emplace_back(_nss, CursorId(0), batch3);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{$sortKey: {'': 10, '': 11}}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{$sortKey: {'': 10, '': 12}}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{$sortKey: {'': 5, '': 9}}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{$sortKey: {'': 5, '': 9}}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{$sortKey: {'': 4, '': 4}}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{$sortKey: {'': 4, '': 20}}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT(!unittest::assertGet(arm->nextReady()));
+}
+
+TEST_F(AsyncResultsMergerTest, ClusterFindSortedButNoSortKey) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', sort: {a: -1, b: 1}, batchSize: 2}");
+    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Parsing the batch results in an error because the sort key is missing.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{a: 2, b: 1}"), fromjson("{a: 1, b: 2}")};
+    responses.emplace_back(_nss, CursorId(1), batch1);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    auto statusWithNext = arm->nextReady();
+    ASSERT(!statusWithNext.isOK());
+    ASSERT_EQ(statusWithNext.getStatus().code(), ErrorCodes::InternalError);
+
+    // Required to kill the 'arm' on error before destruction.
+    auto killEvent = arm->kill();
+    executor->waitForEvent(killEvent);
+}
+
 
 TEST_F(AsyncResultsMergerTest, ClusterFindInitialBatchSizeIsZero) {
     // Initial batchSize sent with the find command is zero; batchSize sent with each getMore

@@ -34,10 +34,15 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
 struct ClusterClientCursorParams {
+    // When mongos has to do a merge in order to return results to the client in the correct sort
+    // order, it requests a sortKey meta-projection using this field name.
+    static const char kSortKeyField[];
+
     /**
      * Contains any CCC parameters that are specified per-remote node.
      */
