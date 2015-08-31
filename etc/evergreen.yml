@@ -1097,6 +1097,14 @@ tasks:
       resmoke_args: --suites=rlp --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: read_concern_majority_passthrough_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=read_concern_majority_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
   name: replicasets
   commands:
   - func: "do setup"
@@ -1833,6 +1841,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded
   - name: concurrency_sharded_WT
+  - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -1941,6 +1950,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded
   - name: concurrency_sharded_WT
+  - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
@@ -2641,6 +2651,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded
   - name: concurrency_sharded_WT
+  - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication
@@ -2717,6 +2728,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded
   - name: concurrency_sharded_WT
+  - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication
@@ -3036,6 +3048,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded
   - name: concurrency_sharded_WT
+  - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication

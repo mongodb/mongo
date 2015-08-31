@@ -1,0 +1,54 @@
+selector:
+  js_test:
+    roots:
+    - jstests/core/*.js
+    exclude_files:
+    # Tests that won't work with an injected 'majority' readConcern
+    # and/or an injected 'majority' writeConcern
+    - jstests/core/array_match4.js # checks commands with various write concerns
+    - jstests/core/batch_write_command*.js # these tests use various write concerns
+    - jstests/core/crud_api.js # has specific w:0 tests
+    - jstests/core/evalb.js # system.profile not replicated
+    - jstests/core/mr_merge.js # mr temp tables aren't replicated
+    - jstests/core/mr_merge2.js # mr temp tables aren't replicated
+    - jstests/core/mr_outreduce.js # mr temp tables aren't replicated
+    - jstests/core/mr_outreduce2.js # mr temp tables aren't replicated
+    - jstests/core/opcounters_active.js  # off by n problem with opcounters
+    - jstests/core/opcounters_write_cmd.js # off by n problem with opcounters
+    - jstests/core/profile1.js # system.profile not replicated
+    - jstests/core/profile2.js # system.profile not replicated
+    - jstests/core/profile3.js # system.profile not replicated
+    - jstests/core/profile4.js # system.profile not replicated
+    - jstests/core/profile5.js # system.profile not replicated
+    - jstests/core/read_after_optime.js # verifies read after optime fails on standalone
+    - jstests/core/shell1.js # tests setSlaveOk() variations on standalone mongod
+    - jstests/core/shell_writeconcern.js # checks write concern shell helpers
+    # Timing / excessive run time with sleep workaround in place for SERVER-20260
+    - jstests/core/index_create_too_many.js
+    - jstests/core/index_many2.js
+    - jstests/core/index_many.js
+    # Tests that are flaky with the level of sleep we've set
+    - jstests/core/apply_ops1.js
+    - jstests/core/eval6.js
+    - jstests/core/geo_s2cursorlimitskip.js
+    - jstests/core/plan_cache_clear.js
+    - jstests/core/stages_delete.js
+    - jstests/core/updatej.js
+    # Tests that need triaging & remediation | blacklist decision
+    - jstests/core/capped6.js # might be autoIndexId
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        eval: "var testingReplication = true;load('jstests/slow2/readmajority_jscore_passthrough.js');"
+        readMode: commands
+    fixture:
+      class: ReplicaSetFixture
+      mongod_options:
+        nopreallocj: ''
+        set_parameters:
+          enableTestCommands: 1
+      # Running with one node until SERVER-20260 in place. Allows us to use a much smaller sleep.
+      # Bring up to two or three once fixed.
+      num_nodes: 1

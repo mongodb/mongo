@@ -109,6 +109,11 @@ DB.prototype.commandHelp = function( name ){
      return this.runCommand(cmdObjWithReadPref, null, options);
  };
 
+ // runCommand uses this impl to actually execute the command
+ DB.prototype._runCommandImpl = function(name, obj, options){
+     return this.getMongo().runCommand(name, obj, options);
+ }
+
  DB.prototype.runCommand = function( obj, extra, queryOptions ){
      var mergedObj = (typeof(obj) === "string") ? this._mergeCommandOptions(obj, extra) : obj;
      // if options were passed (i.e. because they were overridden on a collection), use them.
@@ -116,7 +121,7 @@ DB.prototype.commandHelp = function( name ){
      var options = (typeof(queryOptions) !== "undefined") ? queryOptions : this.getQueryOptions();
      var res;
      try {
-         res = this.getMongo().runCommand(this._name, mergedObj, options);
+         res = this._runCommandImpl(this._name, mergedObj, options);
      }
      catch (ex) {
          // When runCommand flowed through query, a connection error resulted in the message
