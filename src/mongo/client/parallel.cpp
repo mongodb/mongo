@@ -835,7 +835,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
                 fassert(28792, !_cmChangeAttempted);
                 _cmChangeAttempted = true;
 
-                grid.forwardingCatalogManager()->waitForCatalogManagerChange();
+                grid.forwardingCatalogManager()->waitForCatalogManagerChange(txn);
                 startInit(txn);
                 return;
             }

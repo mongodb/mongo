@@ -89,7 +89,7 @@ public:
      * Blocking method, which will waits for a previously scheduled catalog manager change to
      * complete. It is illegal to call unless scheduleReplaceCatalogManagerIfNeeded has been called.
      */
-    void waitForCatalogManagerChange();
+    void waitForCatalogManagerChange(OperationContext* txn);
 
     /**
      * Returns a ScopedDistLock which is the RAII type for holding a distributed lock.
@@ -218,7 +218,7 @@ private:
     Status initConfigVersion(OperationContext* txn) override;
 
     template <typename Callable>
-    auto retry(Callable&& c) -> decltype(std::forward<Callable>(c)());
+    auto retry(OperationContext* txn, Callable&& c) -> decltype(std::forward<Callable>(c)());
 
     void _replaceCatalogManager(const executor::TaskExecutor::CallbackArgs& args);
 
