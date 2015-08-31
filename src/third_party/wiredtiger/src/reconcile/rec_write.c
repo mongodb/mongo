@@ -630,6 +630,8 @@ __rec_raw_compression_config(
 /*
  * __rec_write_init --
  *	Initialize the reconciliation structure.
+ * YSD: The compressors(raw compressor, dictionary compressor and prefix compressor)
+ * are initialized in this function.
  */
 static int
 __rec_write_init(WT_SESSION_IMPL *session,
