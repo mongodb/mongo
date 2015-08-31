@@ -1078,6 +1078,16 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	}
 
 	/*
+	 * If all of the updates were aborted, quit. This test is not strictly
+	 * necessary because the above loop exits with skipped not set and the
+	 * maximum transaction left at its initial value of WT_TXN_NONE, so
+	 * the test below will be branch true and return, but it's cheap and a
+	 * little more explicit, and makes Coverity happy.
+	 */
+	if (max_txn == WT_TXN_NONE)
+		return (0);
+
+	/*
 	 * Track the maximum transaction ID in the page.  We store this in the
 	 * tree at the end of reconciliation in the service of checkpoints, it
 	 * is used to avoid discarding trees from memory when they have changes
