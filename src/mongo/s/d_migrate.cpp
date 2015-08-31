@@ -442,7 +442,7 @@ public:
 
         string whyMessage(str::stream() << "migrating chunk [" << minKey << ", " << maxKey
                                         << ") in " << ns);
-        auto scopedDistLock = grid.catalogManager(txn)->distLock(txn, ns, whyMessage);
+        auto scopedDistLock = grid.forwardingCatalogManager()->distLock(txn, ns, whyMessage);
 
         if (!scopedDistLock.isOK()) {
             errmsg = stream() << "could not acquire collection lock for " << ns

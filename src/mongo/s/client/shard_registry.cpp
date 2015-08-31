@@ -102,7 +102,7 @@ void ShardRegistry::shutdown() {
 
 void ShardRegistry::reload(OperationContext* txn) {
     vector<ShardType> shards;
-    Status status = grid.catalogManager()->getAllShards(txn, &shards);
+    Status status = grid.catalogManager(txn)->getAllShards(txn, &shards);
     uassert(13632,
             str::stream() << "could not get updated shard list from config server due to "
                           << status.toString(),

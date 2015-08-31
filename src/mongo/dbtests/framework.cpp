@@ -76,7 +76,7 @@ int runDbTests(int argc, char** argv) {
     {
         auto txn = cc().makeOperationContext();
         auto distLockMgr = dynamic_cast<LegacyDistLockManager*>(
-            grid.catalogManager(txn.get())->getDistLockManager());
+            grid.forwardingCatalogManager()->getDistLockManager());
         if (distLockMgr) {
             distLockMgr->enablePinger(false);
         }

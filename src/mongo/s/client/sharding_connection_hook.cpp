@@ -115,7 +115,7 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
                 configServerModeNumber == 0 || configServerModeNumber == 1);
 
         BSONElement setName = isMasterResponse["setName"];
-        status = grid.catalogManager()->scheduleReplaceCatalogManagerIfNeeded(
+        status = grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
             configServerModeNumber == 0 ? CatalogManager::ConfigServerMode::SCCC
                                         : CatalogManager::ConfigServerMode::CSRS,
             setName.type() == String ? setName.valueStringData() : StringData(),

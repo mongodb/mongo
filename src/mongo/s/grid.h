@@ -93,8 +93,19 @@ public:
      */
     bool getConfigShouldBalance(OperationContext* txn) const;
 
-    ForwardingCatalogManager* catalogManager(OperationContext* txn);  // TODO(spencer): remove
-    ForwardingCatalogManager* catalogManager();
+    /**
+     * Returns a pointer to a CatalogManager to use for accessing catalog data stored on the config
+     * servers.
+     */
+    CatalogManager* catalogManager(OperationContext* txn);
+
+    /**
+     * Returns a direct pointer to the ForwardingCatalogManager.  This should only be used for
+     * calling methods that are specific to the ForwardingCatalogManager and not part of the generic
+     * CatalogManager interface, such as for taking the distributed lock and scheduling replacement
+     * of the underlying CatalogManager that the ForwardingCatalogManager is delegating to.
+     */
+    ForwardingCatalogManager* forwardingCatalogManager();
 
     CatalogCache* catalogCache() {
         return _catalogCache.get();

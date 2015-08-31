@@ -389,7 +389,7 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
                 fassert(28791, !cmChangeAttempted);
                 cmChangeAttempted = true;
 
-                grid.catalogManager()->waitForCatalogManagerChange();
+                grid.forwardingCatalogManager()->waitForCatalogManagerChange();
             } else {
                 Command::appendCommandStatus(builder, e.toStatus());
                 BSONObj x = builder.done();

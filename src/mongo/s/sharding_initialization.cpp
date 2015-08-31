@@ -100,7 +100,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
               std::move(shardRegistry),
               stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getClockSource()));
 
-    auto status = grid.catalogManager()->startup(txn, allowNetworking);
+    auto status = grid.catalogManager(txn)->startup(txn, allowNetworking);
     if (!status.isOK()) {
         return status;
     }

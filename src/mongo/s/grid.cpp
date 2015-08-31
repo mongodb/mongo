@@ -131,11 +131,11 @@ void Grid::clearForUnitTests() {
     _cursorManager.reset();
 }
 
-ForwardingCatalogManager* Grid::catalogManager() {
+ForwardingCatalogManager* Grid::forwardingCatalogManager() {
     return _catalogManager.get();
 }
 
-ForwardingCatalogManager* Grid::catalogManager(OperationContext* txn) {
+CatalogManager* Grid::catalogManager(OperationContext* txn) {
     return _catalogManager.get();
 }
 

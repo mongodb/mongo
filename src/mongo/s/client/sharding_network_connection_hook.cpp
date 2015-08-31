@@ -61,7 +61,7 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
     }
 
     BSONElement setName = isMasterReply.data["setName"];
-    return grid.catalogManager()->scheduleReplaceCatalogManagerIfNeeded(
+    return grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
         configServerModeNumber == 0 ? CatalogManager::ConfigServerMode::SCCC
                                     : CatalogManager::ConfigServerMode::CSRS,
         setName.type() == String ? setName.valueStringData() : StringData(),

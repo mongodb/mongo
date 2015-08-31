@@ -628,7 +628,7 @@ public:
 
         const string whyMessage(str::stream() << "splitting chunk [" << minKey << ", " << maxKey
                                               << ") in " << nss.toString());
-        auto scopedDistLock = grid.catalogManager(txn)->distLock(txn, nss.ns(), whyMessage);
+        auto scopedDistLock = grid.forwardingCatalogManager()->distLock(txn, nss.ns(), whyMessage);
         if (!scopedDistLock.isOK()) {
             errmsg = str::stream() << "could not acquire collection lock for " << nss.toString()
                                    << " to split chunk [" << minKey << "," << maxKey << ")"

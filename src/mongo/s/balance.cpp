@@ -540,8 +540,8 @@ void Balancer::run() {
             uassert(13258, "oids broken after resetting!", _checkOIDs(txn.get()));
 
             {
-                auto scopedDistLock = grid.catalogManager(txn.get())
-                                          ->distLock(txn.get(), "balancer", "doing balance round");
+                auto scopedDistLock = grid.forwardingCatalogManager()->distLock(
+                    txn.get(), "balancer", "doing balance round");
 
                 if (!scopedDistLock.isOK()) {
                     LOG(1) << "skipping balancing round" << causedBy(scopedDistLock.getStatus());

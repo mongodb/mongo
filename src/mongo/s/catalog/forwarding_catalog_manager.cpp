@@ -378,7 +378,8 @@ Status ForwardingCatalogManager::createDatabase(OperationContext* txn, const std
 }
 
 DistLockManager* ForwardingCatalogManager::getDistLockManager() {
-    warning() << "getDistLockManager called on ForwardingCatalogManager which should never happen!";
+    warning() << "getDistLockManager called on ForwardingCatalogManager which should never happen "
+                 "outside of unit tests!";
     stdx::lock_guard<stdx::mutex> lk(_observerMutex);
     return _actual->getDistLockManager();
 }
