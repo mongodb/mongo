@@ -417,9 +417,14 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     if (shouldReset) {
         const auto cmOpTime = tempChunkManager->getConfigOpTime();
         invariant(cmOpTime >= _configOpTime);
-        invariant(cmOpTime >= ci.getCM()->getConfigOpTime());
 
-        ci.resetCM(tempChunkManager.release());
+        // The existing ChunkManager could have been updated since we last checked, so
+        // replace the existing chunk manager only if it is strictly newer.
+        // The condition should be (>) than instead of (>=), but use (>=) since legacy non-repl
+        // config servers will always have an opTime of zero.
+        if (cmOpTime >= ci.getCM()->getConfigOpTime()) {
+            ci.resetCM(tempChunkManager.release());
+        }
     }
 
     uassert(
