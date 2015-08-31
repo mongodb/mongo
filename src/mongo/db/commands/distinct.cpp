@@ -106,12 +106,17 @@ public:
 
         // Extract the query field. If the query field is nonexistent, an empty query is used.
         BSONObj query;
-        BSONElement queryElt;
-        auto statusQuery = bsonExtractTypedField(cmdObj, kQueryField, BSONType::Object, &queryElt);
-        if (statusQuery.isOK()) {
-            query = queryElt.embeddedObject();
-        } else if (statusQuery != ErrorCodes::NoSuchKey) {
-            return {statusQuery};
+        if (BSONElement queryElt = cmdObj[kQueryField]) {
+            if (queryElt.type() == BSONType::Object) {
+                query = queryElt.embeddedObject();
+            } else if (queryElt.type() != BSONType::jstNULL) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << "\"" << kQueryField
+                                            << "\" had the wrong type. Expected "
+                                            << typeName(BSONType::Object) << " or "
+                                            << typeName(BSONType::jstNULL) << ", found "
+                                            << typeName(queryElt.type()));
+            }
         }
 
         auto executor = getExecutorDistinct(
