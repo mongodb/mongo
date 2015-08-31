@@ -136,7 +136,7 @@ BSONObj OpCounters::getObj() const {
 }
 
 void NetworkCounter::hit(long long bytesIn, long long bytesOut) {
-    const uint64_t MAX = 1ULL << 60;
+    const int64_t MAX = 1ULL << 60;
 
     // don't care about the race as its just a counter
     bool overflow = _bytesIn.loadRelaxed() > MAX || _bytesOut.loadRelaxed() > MAX;
