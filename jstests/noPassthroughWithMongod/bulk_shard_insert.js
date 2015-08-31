@@ -43,7 +43,7 @@ while( docsInserted < numDocs ){
     
     var bulk = []
     for( var i = 0; i < currBulkSize; i++ ){
-        bulk.push({ hi : "there", at : docsInserted, i : i, x : x })
+        bulk.push({hi: "there", at: docsInserted, i: i, x: data});
     }
     
     assert.writeOK(coll.insert( bulk ));
