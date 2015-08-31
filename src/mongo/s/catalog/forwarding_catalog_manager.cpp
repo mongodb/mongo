@@ -193,6 +193,11 @@ ForwardingCatalogManager::ScopedDistLock::~ScopedDistLock() {
 
 ForwardingCatalogManager::ScopedDistLock& ForwardingCatalogManager::ScopedDistLock::operator=(
     ScopedDistLock&& other) {
+#if defined(_MSC_VER) && _MSC_VER < 1900  // MSVC 2013 STL can emit self-move-assign.
+    if (&other == this)
+        return *this;
+#endif
+
     invariant(!_fcm);
     _fcm = other._fcm;
     other._fcm = nullptr;

@@ -412,9 +412,14 @@ public:
         _setData(buf, true);
     }
 
-    // vector swap() so this is fast
     Message& operator=(Message&& r) {
-        verify(empty());
+        // This implementation was originally written using an auto_ptr-style fake move. When
+        // converting to a real move assignment, checking for self-assignment was the simplest way
+        // to ensure correctness.
+        if (&r == this)
+            return *this;
+
+        verify(empty());  // This means that our _data must be empty() when we swap below.
         verify(r._freeIt);
         _buf = r._buf;
         r._buf = 0;

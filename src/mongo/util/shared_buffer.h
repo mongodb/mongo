@@ -43,18 +43,15 @@ public:
         _holder.swap(other._holder);
     }
 
+#if defined(_MSC_VER) && _MSC_VER < 1900
     SharedBuffer(const SharedBuffer&) = default;
     SharedBuffer& operator=(const SharedBuffer&) = default;
-
-    SharedBuffer(SharedBuffer&& other) : _holder() {
-        swap(other);
-    }
-
+    SharedBuffer(SharedBuffer&& other) : _holder(std::move(other._holder)) {}
     SharedBuffer& operator=(SharedBuffer&& other) {
-        swap(other);
-        other._holder.reset();
+        _holder = std::move(other._holder);
         return *this;
     }
+#endif
 
     static SharedBuffer allocate(size_t bytes) {
         return takeOwnership(static_cast<char*>(mongoMalloc(sizeof(Holder) + bytes)));
