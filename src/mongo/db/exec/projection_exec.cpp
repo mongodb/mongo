@@ -39,6 +39,29 @@ namespace mongo {
 using std::max;
 using std::string;
 
+namespace {
+
+/**
+ * Adds sort key metadata inside 'member' to 'builder' with field name 'fieldName'.
+ *
+ * Returns a non-OK status if sort key metadata is missing from 'member'.
+ */
+Status addSortKeyMetaProj(StringData fieldName,
+                          const WorkingSetMember& member,
+                          BSONObjBuilder* builder) {
+    if (!member.hasComputed(WSM_SORT_KEY)) {
+        return Status(ErrorCodes::InternalError,
+                      "sortKey meta-projection requested but no data available");
+    }
+
+    const SortKeyComputedData* sortKeyData =
+        static_cast<const SortKeyComputedData*>(member.getComputed(WSM_SORT_KEY));
+    builder->append(fieldName, sortKeyData->getSortKey());
+    return Status::OK();
+}
+
+}  // namespace
+
 ProjectionExec::ProjectionExec()
     : _include(true),
       _special(false),
@@ -50,7 +73,6 @@ ProjectionExec::ProjectionExec()
       _hasDottedField(false),
       _queryExpression(NULL),
       _hasReturnKey(false) {}
-
 
 ProjectionExec::ProjectionExec(const BSONObj& spec,
                                const MatchExpression* queryExpression,
@@ -126,7 +148,8 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
                 if (e2.valuestr() == LiteParsedQuery::metaTextScore) {
                     _meta[e.fieldName()] = META_TEXT_SCORE;
                 } else if (e2.valuestr() == LiteParsedQuery::metaSortKey) {
-                    _meta[e.fieldName()] = META_SORT_KEY;
+                    _sortKeyMetaFields.push_back(e.fieldName());
+                    _meta[_sortKeyMetaFields.back()] = META_SORT_KEY;
                 } else if (e2.valuestr() == LiteParsedQuery::metaRecordId) {
                     _meta[e.fieldName()] = META_RECORDID;
                 } else if (e2.valuestr() == LiteParsedQuery::metaGeoNearPoint) {
@@ -135,8 +158,6 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
                     _meta[e.fieldName()] = META_GEONEAR_DIST;
                 } else if (e2.valuestr() == LiteParsedQuery::metaIndexKey) {
                     _hasReturnKey = true;
-                    // The index key clobbers everything so just stop parsing here.
-                    return;
                 } else {
                     // This shouldn't happen, should be caught by parsing.
                     verify(0);
@@ -226,15 +247,24 @@ void ProjectionExec::add(const string& field, int skip, int limit) {
 
 Status ProjectionExec::transform(WorkingSetMember* member) const {
     if (_hasReturnKey) {
-        BSONObj keyObj;
+        BSONObjBuilder builder;
 
         if (member->hasComputed(WSM_INDEX_KEY)) {
             const IndexKeyComputedData* key =
                 static_cast<const IndexKeyComputedData*>(member->getComputed(WSM_INDEX_KEY));
-            keyObj = key->getKey();
+            builder.appendElements(key->getKey());
         }
 
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), keyObj.getOwned());
+        // Must be possible to do both returnKey meta-projection and sortKey meta-projection so that
+        // mongos can support returnKey.
+        for (auto fieldName : _sortKeyMetaFields) {
+            auto sortKeyMetaStatus = addSortKeyMetaProj(fieldName, *member, &builder);
+            if (!sortKeyMetaStatus.isOK()) {
+                return sortKeyMetaStatus;
+            }
+        }
+
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), builder.obj());
         member->keyData.clear();
         member->loc = RecordId();
         member->transitionToOwnedObj();
@@ -316,13 +346,10 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
                 bob.append(it->first, 0.0);
             }
         } else if (META_SORT_KEY == it->second) {
-            if (!member->hasComputed(WSM_SORT_KEY)) {
-                return Status(ErrorCodes::InternalError,
-                              "sortKey meta-projection requested but no data available");
+            auto sortKeyMetaStatus = addSortKeyMetaProj(it->first, *member, &bob);
+            if (!sortKeyMetaStatus.isOK()) {
+                return sortKeyMetaStatus;
             }
-            const SortKeyComputedData* sortKeyData =
-                static_cast<const SortKeyComputedData*>(member->getComputed(WSM_SORT_KEY));
-            bob.append(it->first, sortKeyData->getSortKey());
         } else if (META_RECORDID == it->second) {
             bob.append(it->first, static_cast<long long>(member->loc.repr()));
         }

@@ -273,8 +273,8 @@ Status ParsedProjection::make(const BSONObj& spec,
         }
     }
 
-    // returnKey clobbers everything.
-    if (hasIndexKeyProjection) {
+    // returnKey clobbers everything except for sortKey meta-projection.
+    if (hasIndexKeyProjection && !wantSortKey) {
         pp->_requiresDocument = false;
     }
 

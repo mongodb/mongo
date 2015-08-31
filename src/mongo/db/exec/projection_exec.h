@@ -190,9 +190,13 @@ private:
     // Projections that aren't sourced from the document or index keys.
     MetaMap _meta;
 
-    // Do we have a returnKey projection?  If so we *only* output the index key metadata.  If
-    // it's not found we output nothing.
+    // Do we have a returnKey projection?  If so we *only* output the index key metadata, and
+    // possibly the sort key for mongos to use.  If it's not found we output nothing.
     bool _hasReturnKey;
+
+    // The field names associated with any sortKey meta-projection(s). Empty if there is no sortKey
+    // meta-projection.
+    std::vector<StringData> _sortKeyMetaFields;
 };
 
 }  // namespace mongo
