@@ -1623,16 +1623,30 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
  *	Must be called with the slot lock held.
  */
 static int
-__log_force_write_internal(WT_SESSION_IMPL *session, int new_slot)
+__log_force_write_internal(WT_SESSION_IMPL *session, int new_slot, int direct)
 {
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
 	int free_slot, release;
 
 	log = S2C(session)->log;
+retry:
 	slot = log->active_slot;
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+	/*
+	 * Direct writes need to have ownership of the slot.  There can be
+	 * no outstanding threads on the slot when a direct write happens.
+	 * If there are, yield and try again.  We need to release and retake
+	 * the slot lock in case the outstanding thread is also trying to
+	 * close the slot.
+	 */
 	__wt_log_slot_close(session, slot, &release);
+	if (direct && !release) {
+		__wt_spin_unlock(session, &log->log_slot_lock);
+		__wt_yield();
+		__wt_spin_lock(session, &log->log_slot_lock);
+		goto retry;
+	}
 	if (release) {
 		WT_RET(__log_release(session, slot, &free_slot));
 		if (free_slot)
@@ -1674,8 +1688,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * Force out existing slot.  Call the internal version because we
 	 * are already locked.
 	 */
-	if (F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE))
-		WT_RET(__log_force_write_internal(session, 0));
+	WT_RET(__log_force_write_internal(session, 0, 1));
 	/*
 	 * Set up the temporary slot with the correct LSN information.
 	 * Set our size in the slot for release.
@@ -1694,8 +1707,7 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * This is split out from the forced write call so that the LSN
 	 * values reflect our write.
 	 */
-	if (F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE))
-		WT_RET(__wt_log_slot_new(session));
+	WT_RET(__wt_log_slot_new(session));
 	return (0);
 }
 
@@ -1710,7 +1722,7 @@ __wt_log_force_write(WT_SESSION_IMPL *session, int new_slot)
 	WT_DECL_RET;
 
 	WT_WITH_SLOT_LOCK(session, S2C(session)->log,
-	    ret = __log_force_write_internal(session, new_slot));
+	    ret = __log_force_write_internal(session, new_slot, 0));
 	return (ret);
 }
 
@@ -1859,7 +1871,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_MYSLOT myslot;
 	int64_t release_size;
 	uint32_t force, rdup_len;
-	int free_slot, locked;
+	int free_slot;
 #ifdef HAVE_DIAGNOSTIC
 	int direct_force;
 #endif
@@ -1867,7 +1879,6 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	conn = S2C(session);
 	log = conn->log;
 	free_slot = 0;
-	locked = WT_NOT_LOCKED;
 	WT_INIT_LSN(&lsn);
 	myslot.slot = NULL;
 	/*
@@ -1911,35 +1922,14 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 */
 	direct_force = ((++log->write_calls % 1000) == 0);
 
-	if (direct_force || !F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE) ||
-	    rdup_len >= WT_LOG_SLOT_MAXIMUM) {
-		if (direct_force || rdup_len >= WT_LOG_SLOT_MAXIMUM) {
+	if (direct_force || rdup_len >= WT_LOG_SLOT_MAXIMUM) {
 #else
-	if (!F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE) ||
-	    rdup_len >= WT_LOG_SLOT_MAXIMUM) {
-		/*
-		 * Large records must use direct write.
-		 */
-		if (rdup_len >= WT_LOG_SLOT_MAXIMUM) {
+	if (rdup_len >= WT_LOG_SLOT_MAXIMUM) {
 #endif
-			WT_STAT_FAST_CONN_INCR(session, log_slot_toobig);
-			WT_ERR(__wt_writelock(session, log->log_direct_lock));
-		} else {
-			ret = __wt_try_writelock(session, log->log_direct_lock);
-			if (ret != 0) {
-				F_SET(log, WT_LOG_FORCE_CONSOLIDATE);
-				WT_WITH_SLOT_LOCK(session, log,
-				    ret = __wt_log_slot_new(session));
-				WT_ERR(ret);
-				goto use_slots;
-			}
-		}
-		locked = WT_WRITE_LOCKED;
+		WT_STAT_FAST_CONN_INCR(session, log_slot_toobig);
 		WT_WITH_SLOT_LOCK(session, log,
 		    ret = __log_direct_write(session, record, &lsn, flags));
 		WT_ERR(ret);
-		WT_ERR(__wt_writeunlock(session, log->log_direct_lock));
-		locked = WT_NOT_LOCKED;
 		if (ret == 0 && lsnp != NULL)
 			*lsnp = lsn;
 		/*
@@ -1954,15 +1944,12 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		}
 	}
 
-use_slots:
 	/*
 	 * As soon as we see contention for the log slot, disable direct
 	 * log writes. We get better performance by forcing writes through
 	 * the consolidation code. This is because individual writes flood
 	 * the I/O system faster than they contend on the log slot lock.
 	 */
-	WT_ERR(__wt_readlock(session, log->log_direct_lock));
-	locked = WT_READ_LOCKED;
 	__wt_log_slot_join(session, rdup_len, flags, &myslot);
 	/*
 	 * If the addition of this record crosses the buffer boundary,
@@ -2001,8 +1988,6 @@ use_slots:
 		} else
 			WT_ERR(__wt_log_force_write(session, 1));
 	}
-	WT_ERR(__wt_readunlock(session, log->log_direct_lock));
-	locked = WT_NOT_LOCKED;
 	if (LF_ISSET(WT_LOG_FLUSH)) {
 		/* Wait for our writes to reach the OS */
 		while (__wt_log_cmp(&log->write_lsn, &lsn) <= 0 &&
@@ -2024,12 +2009,7 @@ bg:	if (LF_ISSET(WT_LOG_BACKGROUND) &&
 	    __wt_log_cmp(&session->bg_sync_lsn, &lsn) <= 0)
 		WT_ERR(__wt_log_background(session, &lsn));
 
-err:	if (locked != WT_NOT_LOCKED) {
-		if (locked == WT_READ_LOCKED)
-			WT_RET(__wt_readunlock(session, log->log_direct_lock));
-		else
-			WT_RET(__wt_writeunlock(session, log->log_direct_lock));
-	}
+err:
 	if (ret == 0 && lsnp != NULL)
 		*lsnp = lsn;
 	/*

@@ -576,14 +576,10 @@ __log_wrlsn_server(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	int direct_lock;
 
 	session = arg;
 	conn = S2C(session);
-	log = conn->log;
-	direct_lock = 0;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Write out any log record buffers.
@@ -595,18 +591,11 @@ __log_wrlsn_server(void *arg)
 	 * On close we need to do this one more time because there could
 	 * be straggling log writes that need to be written.
 	 */
-	WT_ERR(__wt_writelock(session, log->log_direct_lock));
-	direct_lock = 1;
 	WT_ERR(__wt_log_force_write(session, 0));
-	F_CLR(log, WT_LOG_FORCE_CONSOLIDATE);
-	direct_lock = 0;
-	WT_ERR(__wt_writeunlock(session, log->log_direct_lock));
 	WT_ERR(__wt_log_wrlsn(session));
 	if (0) {
 err:		__wt_err(session, ret, "log wrlsn server error");
 	}
-	if (direct_lock)
-		(void)__wt_writeunlock(session, log->log_direct_lock);
 	return (WT_THREAD_RET_VALUE);
 }
 
@@ -621,12 +610,12 @@ __log_server(void *arg)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	u_int arch_lock, direct_lock;
+	u_int arch_lock;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	arch_lock = direct_lock = 0;
+	arch_lock = 0;
 	/*
 	 * The log server thread does a variety of work.  It forces out any
 	 * buffered log writes.  It pre-allocates log files and it performs
@@ -646,11 +635,7 @@ __log_server(void *arg)
 		 * and a buffer may need to wait for the write_lsn to advance
 		 * in the case of a synchronous buffer.  We end up with a hang.
 		 */
-		WT_ERR(__wt_readlock(session, log->log_direct_lock));
-		direct_lock = 1;
 		WT_ERR(__wt_log_force_write(session, 1));
-		direct_lock = 0;
-		WT_ERR(__wt_readunlock(session, log->log_direct_lock));
 		/*
 		 * Perform log pre-allocation.
 		 */
@@ -680,8 +665,6 @@ __log_server(void *arg)
 	if (0) {
 err:		__wt_err(session, ret, "log server error");
 	}
-	if (direct_lock)
-		(void)__wt_readunlock(session, log->log_direct_lock);
 	if (arch_lock)
 		(void)__wt_writeunlock(session, log->log_archive_lock);
 	return (WT_THREAD_RET_VALUE);
@@ -720,8 +703,6 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	    "log write LSN"));
 	WT_RET(__wt_rwlock_alloc(session,
 	    &log->log_archive_lock, "log archive lock"));
-	WT_RET(__wt_rwlock_alloc(session,
-	    &log->log_direct_lock, "log direct write lock"));
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize =
 		    WT_MAX((uint32_t)conn->buffer_alignment, WT_LOG_ALIGN);
@@ -888,7 +869,6 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_write_cond));
 	WT_TRET(__wt_rwlock_destroy(session, &conn->log->log_archive_lock));
-	WT_TRET(__wt_rwlock_destroy(session, &conn->log->log_direct_lock));
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);

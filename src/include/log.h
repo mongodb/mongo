@@ -203,7 +203,6 @@ struct __wt_log {
 	WT_SPINLOCK      log_writelsn_lock; /* Locked: write LSN */
 
 	WT_RWLOCK	 *log_archive_lock;	/* Archive and log cursors */
-	WT_RWLOCK	 *log_direct_lock;	/* Direct and buffered writes */
 
 	/* Notify any waiting threads when sync_lsn is updated. */
 	WT_CONDVAR	*log_sync_cond;
@@ -227,7 +226,6 @@ struct __wt_log {
 	uint64_t	 write_calls;		/* Calls to log_write */
 #endif
 
-#define	WT_LOG_FORCE_CONSOLIDATE	0x01	/* Disable direct writes */
 	uint32_t	 flags;
 };
 

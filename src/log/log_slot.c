@@ -142,8 +142,6 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	conn = S2C(session);
 	log = conn->log;
-	if (!F_ISSET(log,  WT_LOG_FORCE_CONSOLIDATE))
-		return (0);
 	/*
 	 * Although this function is single threaded, multiple threads could
 	 * be trying to set a new active slot sequentially.  If we find an
@@ -236,7 +234,6 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
 	    log_buffer_size, log->slot_buf_size * WT_SLOT_POOL);
-	F_SET(log, WT_LOG_FORCE_CONSOLIDATE);
 	/*
 	 * Set up the available slot from the pool the first time.
 	 */

@@ -51,10 +51,6 @@ struct __wt_rwlock {
 	wt_rwlock_t rwlock;		/* Read/write lock */
 };
 
-#define	WT_NOT_LOCKED	0
-#define	WT_READ_LOCKED	1
-#define	WT_WRITE_LOCKED	2
-
 /*
  * Spin locks:
  *
