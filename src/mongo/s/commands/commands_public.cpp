@@ -998,12 +998,16 @@ public:
 
         // Extract the targeting query.
         BSONObj targetingQuery;
-        BSONElement queryElt;
-        auto statusQuery = bsonExtractTypedField(cmdObj, "query", BSONType::Object, &queryElt);
-        if (statusQuery.isOK()) {
-            targetingQuery = queryElt.embeddedObject();
-        } else if (statusQuery != ErrorCodes::NoSuchKey) {
-            return {statusQuery};
+        if (BSONElement queryElt = cmdObj["query"]) {
+            if (queryElt.type() == BSONType::Object) {
+                targetingQuery = queryElt.embeddedObject();
+            } else if (queryElt.type() != BSONType::jstNULL) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << "\"query\" had the wrong type. Expected "
+                                            << typeName(BSONType::Object) << " or "
+                                            << typeName(BSONType::jstNULL) << ", found "
+                                            << typeName(queryElt.type()));
+            }
         }
 
         BSONObjBuilder explainCmdBob;
