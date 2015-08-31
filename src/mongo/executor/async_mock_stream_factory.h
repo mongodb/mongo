@@ -92,7 +92,7 @@ public:
             const stdx::function<RemoteCommandResponse(RemoteCommandRequest)> replyFunc);
 
     private:
-        void _unblock_inlock(stdx::unique_lock<stdx::mutex>* lk);
+        void _unblock_inlock();
         void _block_inlock(StreamState state, stdx::unique_lock<stdx::mutex>* lk);
 
         asio::io_service* _io_service;

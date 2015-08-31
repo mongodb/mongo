@@ -156,23 +156,19 @@ void AsyncMockStreamFactory::MockStream::_block_inlock(StreamState state,
                                                        stdx::unique_lock<stdx::mutex>* lk) {
     invariant(_state == kRunning);
     _state = state;
-    lk->unlock();
     _cv.notify_one();
-    lk->lock();
     _cv.wait(*lk, [this]() { return _state == kRunning; });
 }
 
 void AsyncMockStreamFactory::MockStream::unblock() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _unblock_inlock(&lk);
+    _unblock_inlock();
 }
 
-void AsyncMockStreamFactory::MockStream::_unblock_inlock(stdx::unique_lock<stdx::mutex>* lk) {
+void AsyncMockStreamFactory::MockStream::_unblock_inlock() {
     invariant(_state != kRunning);
     _state = kRunning;
-    lk->unlock();
     _cv.notify_one();
-    lk->lock();
 }
 
 auto AsyncMockStreamFactory::MockStream::waitUntilBlocked() -> StreamState {
