@@ -659,13 +659,10 @@ private:
      *
      * This function has the same rules for "opTime" as setMyLastOptime(), unless
      * "isRollbackAllowed" is true.
-     *
-     * This function will also report our position externally (like upstream) if necessary.
      */
-    void _setMyLastOptimeAndReport_inlock(stdx::unique_lock<stdx::mutex>* lock,
-                                          const OpTime& opTime,
-                                          bool isRollbackAllowed);
-    void _setMyLastOptime_inlock(const OpTime& opTime, bool isRollbackAllowed);
+    void _setMyLastOptime_inlock(stdx::unique_lock<stdx::mutex>* lock,
+                                 const OpTime& opTime,
+                                 bool isRollbackAllowed);
 
     /**
      * Schedules a heartbeat to be sent to "target" at "when". "targetIndex" is the index
