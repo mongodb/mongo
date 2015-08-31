@@ -264,7 +264,19 @@ func (dump *MongoDump) Dump() (err error) {
 	}
 
 	if dump.OutputOptions.Archive != "" {
-		dump.archive.Prelude, err = archive.NewPrelude(dump.manager, dump.ToolOptions.HiddenOptions.MaxProcs)
+		session, err := dump.sessionProvider.GetSession()
+		if err != nil {
+			return err
+		}
+		buildInfo, err := session.BuildInfo()
+		var serverVersion string
+		if err != nil {
+			log.Logf(log.Always, "warning, couldn't get version information from server: %v", err)
+			serverVersion = "unknown"
+		} else {
+			serverVersion = buildInfo.Version
+		}
+		dump.archive.Prelude, err = archive.NewPrelude(dump.manager, dump.ToolOptions.HiddenOptions.MaxProcs, serverVersion)
 		if err != nil {
 			return fmt.Errorf("creating archive prelude: %v", err)
 		}

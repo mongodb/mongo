@@ -26,8 +26,10 @@ type CollectionMetadata struct {
 // Header is a data structure that, as BSON, is found immediately after the magic
 // number in the archive, before any CollectionMetadatas. It is the home of any archive level information
 type Header struct {
-	ConcurrentCollections int32  `BSON:"concurrent_collections",omitempty`
-	FormatVersion         string `BSON:"version"`
+	ConcurrentCollections int32  `bson:"concurrent_collections",omitempty`
+	FormatVersion         string `bson:"version"`
+	ServerVersion         string `bson:"server_version"`
+	ToolVersion           string `bson:"tool_version"`
 }
 
 const minBSONSize = 4 + 1 // an empty BSON document should be exactly five bytes long
