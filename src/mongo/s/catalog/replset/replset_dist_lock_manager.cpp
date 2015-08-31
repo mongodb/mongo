@@ -152,17 +152,21 @@ void ReplSetDistLockManager::doTask() {
 StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc) {
     const auto& processID = lockDoc.getProcess();
     auto pingStatus = _catalog->getPing(processID);
-    if (!pingStatus.isOK()) {
-        return pingStatus.getStatus();
-    }
 
-    const auto& pingDoc = pingStatus.getValue();
-    Status pingDocValidationStatus = pingDoc.validate();
-    if (!pingDocValidationStatus.isOK()) {
-        return {ErrorCodes::UnsupportedFormat,
-                str::stream() << "invalid ping document for " << processID << ": "
-                              << pingDocValidationStatus.toString()};
-    }
+    Date_t pingValue;
+    if (pingStatus.isOK()) {
+        const auto& pingDoc = pingStatus.getValue();
+        Status pingDocValidationStatus = pingDoc.validate();
+        if (!pingDocValidationStatus.isOK()) {
+            return {ErrorCodes::UnsupportedFormat,
+                    str::stream() << "invalid ping document for " << processID << ": "
+                                  << pingDocValidationStatus.toString()};
+        }
+
+        pingValue = pingDoc.getPing();
+    } else if (pingStatus.getStatus() != ErrorCodes::NoMatchingDocument) {
+        return pingStatus.getStatus();
+    } // else use default pingValue if ping document does not exist.
 
     Timer timer(_serviceContext->getTickSource());
     auto serverInfoStatus = _catalog->getServerInfo();
@@ -175,7 +179,6 @@ StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc) {
     // time from the config server.
     milliseconds delay(timer.millis() / 2);  // Assuming symmetrical delay.
 
-    Date_t pingValue = pingDoc.getPing();
     const auto& serverInfo = serverInfoStatus.getValue();
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);

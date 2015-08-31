@@ -115,7 +115,6 @@ protected:
         _mgr.shutDown(true);
     }
 
-    TickSourceMock _tickSource;
     std::unique_ptr<DistLockCatalogMock> _dummyDoNotUse;  // dummy placeholder
     DistLockCatalogMock* _mockCatalog;
     string _processID;
@@ -1744,6 +1743,90 @@ TEST_F(ReplSetDistLockManagerFixture, CannotOvertakeIfConfigServerClockGoesBackw
         ASSERT_NOT_OK(status);
         ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
     }
+}
+
+/**
+ * Test scenario:
+ * 1. Attempt to grab lock fails because lock is already owned.
+ * 2. Try to get ping data (does not exist) and config server clock.
+ * 3. Since we don't have previous ping data to compare with, we cannot
+ *    decide whether it's ok to overtake, so we can't.
+ * 4. Lock expiration has elapsed and the ping still does not exist.
+ * 5. 2nd attempt to grab lock still fails for the same reason.
+ * 6. But since the ping has not been updated, dist lock manager should overtake lock.
+ */
+TEST_F(RSDistLockMgrWithMockTickSource, CanOvertakeIfNoPingDocument) {
+    getMockCatalog()->expectGrabLock(
+        [](StringData, const OID&, StringData, StringData, Date_t, StringData) {
+            // Don't care
+        },
+        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
+
+    LocksType currentLockDoc;
+    currentLockDoc.setName("bar");
+    currentLockDoc.setState(LocksType::LOCKED);
+    currentLockDoc.setProcess("otherProcess");
+    currentLockDoc.setLockID(OID("5572007fda9e476582bf3716"));
+    currentLockDoc.setWho("me");
+    currentLockDoc.setWhy("why");
+
+    getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("bar", name); },
+                                          currentLockDoc);
+
+    getMockCatalog()->expectGetPing([](StringData process) {
+        ASSERT_EQUALS("otherProcess", process);
+    }, {ErrorCodes::NoMatchingDocument, "no ping"});
+
+    getMockCatalog()->expectGetServerInfo([]() {}, DistLockCatalog::ServerInfo(Date_t(), OID()));
+
+    // First attempt will record the ping data.
+    {
+        auto status = getMgr()->lock("bar", "", Milliseconds(0), Milliseconds(0)).getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::LockBusy, status.code());
+    }
+
+    OID lastTS;
+    getMockCatalog()->expectGrabLock(
+        [&lastTS](StringData, const OID& newTS, StringData, StringData, Date_t, StringData) {
+            lastTS = newTS;
+        },
+        {ErrorCodes::LockStateChangeFailed, "nMod 0"});
+
+    getMockCatalog()->expectGetLockByName([](StringData name) { ASSERT_EQUALS("bar", name); },
+                                          currentLockDoc);
+
+    getMockCatalog()->expectGetPing([](StringData process) {
+        ASSERT_EQUALS("otherProcess", process);
+    }, {ErrorCodes::NoMatchingDocument, "no ping"});
+
+    getMockCatalog()->expectGetServerInfo(
+        []() {}, DistLockCatalog::ServerInfo(Date_t() + kLockExpiration + Milliseconds(1), OID()));
+
+    getMockCatalog()->expectOvertakeLock(
+        [this, &lastTS, &currentLockDoc](StringData lockID,
+                                         const OID& lockSessionID,
+                                         const OID& currentHolderTS,
+                                         StringData who,
+                                         StringData processId,
+                                         Date_t time,
+                                         StringData why) {
+            ASSERT_EQUALS("bar", lockID);
+            ASSERT_EQUALS(lastTS, lockSessionID);
+            ASSERT_EQUALS(currentLockDoc.getLockID(), currentHolderTS);
+            ASSERT_EQUALS(getProcessID(), processId);
+            ASSERT_EQUALS("foo", why);
+        },
+        currentLockDoc);  // return arbitrary valid lock document, for testing purposes only.
+
+    getMockCatalog()->expectUnLock(
+        [](const OID&) {
+            // Don't care
+        },
+        Status::OK());
+
+    // Second attempt should overtake lock.
+    { ASSERT_OK(getMgr()->lock("bar", "foo", Milliseconds(0), Milliseconds(0)).getStatus()); }
 }
 
 }  // unnamed namespace
