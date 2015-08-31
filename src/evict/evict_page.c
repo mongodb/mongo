@@ -298,9 +298,12 @@ static int
 __evict_review(
     WT_SESSION_IMPL *session, WT_REF *ref, int *inmem_splitp, int closing)
 {
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t flags;
+
+	btree = S2BT(session);
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -389,12 +392,21 @@ __evict_review(
 		LF_SET(WT_EVICT_UPDATE_RESTORE);
 
 	/*
-	 * Otherwise, if eviction is getting pressed, configure reconciliation
-	 * to write not-yet-globally-visible updates to the lookaside table,
-	 * that allows us to evict pages we'd otherwise have to keep in cache
-	 * to support older transactions.
+	 * Otherwise, if eviction is getting pressed and checkpoint allows it,
+	 * configure reconciliation to write not-yet-globally-visible updates
+	 * to the lookaside table, allowing the eviction of pages we'd otherwise
+	 * have to retain in cache to support older readers.
+	 *
+	 * Running checkpoints can prevent this solution because reconciliation
+	 * using the lookaside table writes a key's last committed value, which
+	 * might not be the value checkpoint would write. It's sufficient to
+	 * know a checkpoint isn't running at this instant (or is running but
+	 * has finished with this file), any future checkpoint must include all
+	 * committed modifications from this page, which is what reconciliation
+	 * will write.
 	 */
-	if (!closing && __wt_eviction_aggressive(session))
+	if (!closing && __wt_eviction_aggressive(session) &&
+	    btree->checkpoint_gen == S2C(session)->txn_global.checkpoint_gen)
 		LF_SET(WT_EVICT_LOOKASIDE);
 
 	WT_RET(__wt_reconcile(session, ref, NULL, flags));
