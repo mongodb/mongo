@@ -55,8 +55,8 @@ public:
     }
 
 private:
-    AtomicUInt64 _num;
-    AtomicUInt64 _totalMillis;
+    AtomicInt64 _num;
+    AtomicInt64 _totalMillis;
 };
 
 /**

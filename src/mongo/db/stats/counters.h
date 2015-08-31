@@ -100,9 +100,9 @@ public:
     void append(BSONObjBuilder& b);
 
 private:
-    AtomicUInt64 _bytesIn;
-    AtomicUInt64 _bytesOut;
-    AtomicUInt64 _requests;
+    AtomicInt64 _bytesIn;
+    AtomicInt64 _bytesOut;
+    AtomicInt64 _requests;
 };
 
 extern NetworkCounter networkCounter;
