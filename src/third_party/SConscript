@@ -72,10 +72,10 @@ if not use_system_version_of_library('intel_decimal128'):
         ('intel_decimal128', '#/src/third_party/IntelRDFPMathLib20U1/LIBRARY'))
 
 def injectAllThirdPartyIncludePaths(thisEnv):
-    thisEnv.AppendUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
+    thisEnv.PrependUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
 
 def injectThirdPartyIncludePaths(thisEnv, libraries):
-    thisEnv.AppendUnique(CPPPATH=[
+    thisEnv.PrependUnique(CPPPATH=[
         entry[1] for entry in thirdPartyIncludePathList if entry[0] in libraries])
 
 env.AddMethod(injectAllThirdPartyIncludePaths, 'InjectAllThirdPartyIncludePaths')
