@@ -166,7 +166,7 @@ StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc) {
         pingValue = pingDoc.getPing();
     } else if (pingStatus.getStatus() != ErrorCodes::NoMatchingDocument) {
         return pingStatus.getStatus();
-    } // else use default pingValue if ping document does not exist.
+    }  // else use default pingValue if ping document does not exist.
 
     Timer timer(_serviceContext->getTickSource());
     auto serverInfoStatus = _catalog->getServerInfo();
