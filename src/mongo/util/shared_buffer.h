@@ -31,6 +31,7 @@
 #include <boost/intrusive_ptr.hpp>
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/allocator.h"
 
 namespace mongo {
 
@@ -56,7 +57,7 @@ public:
     }
 
     static SharedBuffer allocate(size_t bytes) {
-        return takeOwnership(static_cast<char*>(malloc(sizeof(Holder) + bytes)));
+        return takeOwnership(static_cast<char*>(mongoMalloc(sizeof(Holder) + bytes)));
     }
 
     /**
