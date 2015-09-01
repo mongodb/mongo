@@ -64,5 +64,9 @@ std::string TopologyCoordinator::Role::toString() const {
 
 TopologyCoordinator::~TopologyCoordinator() {}
 
+std::ostream& operator<<(std::ostream& os, TopologyCoordinator::Role role) {
+    return os << role.toString();
+}
+
 }  // namespace repl
 }  // namespace mongo

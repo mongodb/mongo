@@ -29,6 +29,7 @@
 #pragma once
 
 #include <string>
+#include <iosfwd>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -490,6 +491,12 @@ private:
 
     int _value;
 };
+
+//
+// Convenience method for unittest code. Please use accessors otherwise.
+//
+
+std::ostream& operator<<(std::ostream& os, TopologyCoordinator::Role role);
 
 }  // namespace repl
 }  // namespace mongo
