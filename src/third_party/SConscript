@@ -51,10 +51,10 @@ if not use_system_version_of_library('yaml'):
         ('yaml', '#/src/third_party/yaml-cpp-0.5.1/include'))
 
 def injectAllThirdPartyIncludePaths(thisEnv):
-    thisEnv.AppendUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
+    thisEnv.PrependUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
 
 def injectThirdPartyIncludePaths(thisEnv, libraries):
-    thisEnv.AppendUnique(CPPPATH=[
+    thisEnv.PrependUnique(CPPPATH=[
         entry[1] for entry in thirdPartyIncludePathList if entry[0] in libraries])
 
 env.AddMethod(injectAllThirdPartyIncludePaths, 'InjectAllThirdPartyIncludePaths')
