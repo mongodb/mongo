@@ -101,7 +101,6 @@ MongoRunner = function(){}
     
 MongoRunner.dataDir = "/data/db"
 MongoRunner.dataPath = "/data/db/"
-MongoRunner.usedPortMap = {}
 
 MongoRunner.VersionSub = function(regex, version) {
     this.regex = regex;
@@ -217,16 +216,6 @@ MongoRunner.toRealDir = function( path, pathOpts ){
 }
 
 MongoRunner.toRealFile = MongoRunner.toRealDir
-
-MongoRunner.nextOpenPort = function(){
-
-    var i = 0;
-    while( MongoRunner.usedPortMap[ "" + ( 27000 + i ) ] ) i++;
-    MongoRunner.usedPortMap[ "" + ( 27000 + i ) ] = true
-    
-    return 27000 + i
-
-}
 
 /**
  * Returns an iterator object which yields successive versions on toString(), starting from a
@@ -363,8 +352,7 @@ MongoRunner.arrToOpts = function( arr ){
 
 MongoRunner.savedOptions = {}
 
-MongoRunner.mongoOptions = function( opts ){
-   
+MongoRunner.mongoOptions = function(opts) {
     // Don't remember waitForConnect
     var waitForConnect = opts.waitForConnect;
     delete opts.waitForConnect;
@@ -403,32 +391,35 @@ MongoRunner.mongoOptions = function( opts ){
     // If we passed in restart : <conn> or runId : <conn>
     if( isObject( opts.runId ) && opts.runId.runId ) opts.runId = opts.runId.runId
     
-    if( opts.restart && opts.remember ) opts = Object.merge( MongoRunner.savedOptions[ opts.runId ], opts )
+    if (opts.restart && opts.remember) {
+        opts = Object.merge(MongoRunner.savedOptions[ opts.runId ], opts);
+    }
 
     // Create a new runId
     opts.runId = opts.runId || ObjectId()
-    
-    // Save the port if required
-    if( ! opts.forgetPort ) opts.port = opts.port || MongoRunner.nextOpenPort()
-    
-    var shouldRemember = ( ! opts.restart && ! opts.noRemember ) || ( opts.restart && opts.appendOptions )
-    
+
+    if (opts.forgetPort) {
+        delete opts.port;
+    }
+
     // Normalize and get the binary version to use
     opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
-        
-    if ( shouldRemember ){
-        MongoRunner.savedOptions[ opts.runId ] = Object.merge( opts, {} )
-    }
-    
-    // Default for waitForConnect is true
-    opts.waitForConnect = (waitForConnect == undefined || waitForConnect == null) ?
-        true : waitForConnect;
 
-    opts.port = opts.port || MongoRunner.nextOpenPort()
-    MongoRunner.usedPortMap[ "" + parseInt( opts.port ) ] = true
-    
-    opts.pathOpts = Object.merge( opts.pathOpts || {}, { port : "" + opts.port, runId : "" + opts.runId } )    
-   
+    var shouldRemember =
+        (!opts.restart && !opts.noRemember ) || (opts.restart && opts.appendOptions);
+    if (shouldRemember) {
+        MongoRunner.savedOptions[opts.runId] = Object.merge(opts, {});
+    }
+
+    // Default for waitForConnect is true
+    opts.waitForConnect =
+        (waitForConnect == undefined || waitForConnect == null) ? true : waitForConnect;
+
+    opts.port = opts.port || allocatePort();
+
+    opts.pathOpts = Object.merge(opts.pathOpts || {},
+                                 { port : "" + opts.port, runId : "" + opts.runId });
+
     return opts
 }
 
@@ -509,9 +500,8 @@ MongoRunner.mongodOptions = function( opts ){
     return opts
 }
 
-MongoRunner.mongosOptions = function( opts ){
-
-    opts = MongoRunner.mongoOptions( opts )
+MongoRunner.mongosOptions = function( opts ) {
+    opts = MongoRunner.mongoOptions(opts);
     
     // Normalize configdb option to be host string if currently a host
     if( opts.configdb && opts.configdb.getDB ){
@@ -611,24 +601,23 @@ MongoRunner.runMongod = function( opts ){
     return mongod
 }
 
-MongoRunner.runMongos = function( opts ){
-    
+MongoRunner.runMongos = function(opts) {
     opts = opts || {}
+
     var useHostName = false;
     var runId = null;
     var waitForConnect = true;
     var fullOptions = opts;
     
-    if( isObject( opts ) ) {
-        
+    if (isObject(opts)) {
         opts = MongoRunner.mongosOptions( opts );
         fullOptions = opts;
-        
+
         useHostName = opts.useHostName || opts.useHostname;
         runId = opts.runId;
         waitForConnect = opts.waitForConnect;
-        
-        opts = MongoRunner.arrOptions( "mongos", opts )
+
+        opts = MongoRunner.arrOptions("mongos", opts);
     }
     
     var mongos = MongoRunner.startWithArgs(opts, waitForConnect);
@@ -678,33 +667,11 @@ MongoRunner.stopMongod = function( port, signal, opts ){
         var opts = MongoRunner.savedOptions( port )
         if( opts ) port = parseInt( opts.port )
     }
-    
-    var exitCode = _stopMongoProgram( parseInt( port ), parseInt( signal ), opts )
-    
-    delete MongoRunner.usedPortMap[ "" + parseInt( port ) ]
 
-    return exitCode
+    return _stopMongoProgram(parseInt(port), parseInt(signal), opts);
 }
 
-MongoRunner.stopMongos = MongoRunner.stopMongod
-
-MongoRunner.isStopped = function( port ){
-    
-    if( ! port ) {
-        print( "Cannot detect if process " + port + " is stopped." )
-        return
-    }
-    
-    if( port.port )
-        port = parseInt( port.port )
-    
-    if( port instanceof ObjectId ){
-        var opts = MongoRunner.savedOptions( port )
-        if( opts ) port = parseInt( opts.port )
-    }
-    
-    return MongoRunner.usedPortMap[ "" + parseInt( port ) ] ? false : true
-}
+MongoRunner.stopMongos = MongoRunner.stopMongod;
 
 /**
  * Starts an instance of the specified mongo tool
@@ -749,17 +716,15 @@ _startMongodEmpty = function () {
 
     return startMongoProgram.apply(null, args);
 }
+
 _startMongod = function () {
     print("startMongod WARNING DELETES DATA DIRECTORY THIS IS FOR TESTING ONLY");
     return _startMongodEmpty.apply(null, arguments);
 }
+
 _startMongodNoReset = function(){
     var args = createMongoArgs( "mongod" , arguments );
     return startMongoProgram.apply( null, args );
-}
-
-startMongos = function(args){
-    return MongoRunner.runMongos(args);
 }
 
 /**

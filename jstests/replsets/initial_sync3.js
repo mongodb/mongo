@@ -7,18 +7,18 @@
 load("jstests/replsets/rslib.js");
 var name = "initialsync3";
 var host = getHostName();
-var port = allocatePorts(7);
 
 print("Start set with three nodes");
 var replTest = new ReplSetTest( {name: name, nodes: 3} );
 var nodes = replTest.startSet();
 replTest.initiate({
-    _id : name,
-    members : [
-        {_id:0, host : host+":"+port[0], priority: 10},
-        {_id:1, host : host+":"+port[1], priority: 0},
-        {_id:2, host : host+":"+port[2], priority : 0, buildIndexes : false},
-               ]});
+    _id: name,
+    members: [
+        {_id: 0, host: host + ":" + nodes[0].port, priority: 10},
+        {_id: 1, host: host + ":" + nodes[1].port, priority: 0},
+        {_id: 2, host: host + ":" + nodes[2].port, priority: 0, buildIndexes: false},
+    ]
+});
 
 var master = replTest.getMaster();
 

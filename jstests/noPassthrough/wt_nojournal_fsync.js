@@ -23,6 +23,7 @@ function writeDataAndRestart(doFsync) {
 
     jsTestLog("restart node");
     conn = MongoRunner.runMongod({restart: true,
+                                  port: conn.port,
                                   cleanData: false,
                                   storageEngine: "wiredTiger",
                                   nojournal: ""});

@@ -13,7 +13,7 @@ s._configServers[1].getDB( "admin" ).runCommand( { _skewClockCommand : 1, skew :
 
 // We need to start another mongos after skewing the clock, since the first mongos will have already
 // tested the config servers (via the balancer) before we manually skewed them
-otherMongos = startMongos( { port : 30020, v : 2, configdb : s._configDB } );
+var otherMongos = MongoRunner.runMongos({v: 2, configdb: s._configDB});
 
 // Initialize DB data
 initDB = function(name) {

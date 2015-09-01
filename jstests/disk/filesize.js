@@ -1,9 +1,8 @@
-// test for SERVER-7430: Warning about smallfiles should include filename
-var port = allocatePorts( 1 )[ 0 ];
+// Test for SERVER-7430: Warning about smallfiles should include filename
 var baseName = "filesize";
 
 // Start mongod with --smallfiles
-var m = MongoRunner.runMongod({bind_ip: "127.0.0.1", nojournal: "", smallfiles: ""});
+var m = MongoRunner.runMongod({nojournal: "", smallfiles: ""});
 
 var db = m.getDB( baseName );
 
@@ -14,7 +13,12 @@ if (db.serverBuildInfo().bits == 32) {
     // Restart mongod without --smallFiles
     MongoRunner.stopMongod(m);
     m = MongoRunner.runMongod({
-        restart: true, cleanData: false, dbpath: m.dbpath, bind_ip: "127.0.0.1", nojournal: ""});
+        restart: true,
+        cleanData: false,
+        dbpath: m.dbpath,
+        port: m.port,
+        nojournal: "",
+    });
 
     db = m.getDB( baseName );
     var log = db.adminCommand( { getLog : "global" } ).log

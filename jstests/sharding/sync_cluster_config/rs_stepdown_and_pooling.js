@@ -37,9 +37,7 @@ else {
         conns.push(new Mongo(mongos.host));
         conns[i].getCollection(coll + "").findOne();
     }
-    
-    assert.eq(primary.port, 31100);
-    
+
     jsTest.log("Returning the connections back to the pool.");
     
     for ( var i = 0; i < conns.length; i++ ) {

@@ -143,7 +143,7 @@ conn = MongoRunner.runMongod({restart: true,
 log("verify after recovery");
 verify();
 
-log("stop mongod 30002");
+log("stop mongod");
 MongoRunner.stopMongod(conn);
 sleep(5000);
 

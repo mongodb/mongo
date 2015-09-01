@@ -1,11 +1,10 @@
 // SERVER-9137 test that the httpinterface parameter enables the web interface
-port = allocatePorts(1)[0];
-httpPort = port + 1000;
-var conn = MongoRunner.runMongod({port: port, smallfiles: ""});
+var conn = MongoRunner.runMongod({smallfiles: ""});
+var httpPort = conn.port + 1000;
 
 tryHttp = function() {
     try {
-        var mongo = new Mongo('localhost:'+httpPort) ;
+        var mongo = new Mongo('localhost:' + httpPort) ;
     }
     catch (e) {
         return false;
@@ -18,7 +17,7 @@ assert.throws(function() {assert.soon(tryHttp, "tryHttp failed, like we expected
 
 MongoRunner.stopMongod(conn);
 
-conn = MongoRunner.runMongod({ port:port, smallfiles: "", httpinterface: ""});
+conn = MongoRunner.runMongod({port: conn.port, smallfiles: "", httpinterface: ""});
 assert.soon(tryHttp,
             "the web interface should be running on " + httpPort);
 

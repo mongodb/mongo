@@ -36,14 +36,11 @@ function SSLTest(serverOpts, clientOpts) {
         return canonical;
     };
 
-    this.port = allocatePorts(1)[0];
     this.serverOpts = MongoRunner.mongodOptions(canonicalServerOpts(serverOpts));
+    this.port = this.serverOpts.port;
     resetDbpath(this.serverOpts.dbpath);
 
     this.clientOpts = Object.extend({}, clientOpts || this.defaultSSLClientOptions);
-
-    // Add our allocated port to the options objects.
-    this.serverOpts.port = this.port;
     this.clientOpts.port = this.port;
 }
 

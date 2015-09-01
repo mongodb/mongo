@@ -1,6 +1,4 @@
-
-
-s = new ShardingTest( "diffservers1" , 2 );
+var s = new ShardingTest( "diffservers1" , 2 );
 
 assert.eq( 2 , s.config.shards.count() , "server count wrong" );
 assert.eq( 2 , s._configServers[0].getDB( "config" ).shards.count() , "where are servers!" );
@@ -14,8 +12,10 @@ test1.save( { a : 3 } );
 assert( 3 , test1.count() );
 
 assert( ! s.admin.runCommand( { addshard: "sdd$%" } ).ok , "bad hostname" );
-assert( ! s.admin.runCommand( { addshard: "127.0.0.1:43415" } ).ok , "host not up" );
-assert( ! s.admin.runCommand( { addshard: "10.0.0.1:43415" } ).ok , "allowed shard in IP when config is localhost" );
+var portWithoutHostRunning = allocatePort();
+assert(!s.admin.runCommand({addshard: "127.0.0.1:" + portWithoutHostRunning}).ok, "host not up");
+assert(!s.admin.runCommand({ addshard: "10.0.0.1:" + portWithoutHostRunning}).ok,
+       "allowed shard in IP when config is localhost" );
 
 s.stop();
 

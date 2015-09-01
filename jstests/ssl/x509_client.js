@@ -20,8 +20,6 @@ var CA_CERT = "jstests/libs/ca.pem"
 var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client"
 var INVALID_CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=invalid"
 
-port = allocatePorts(1)[0];
-
 function authAndTest(mongo) {
     external = mongo.getDB("$external")
     test = mongo.getDB("test");
@@ -53,10 +51,10 @@ var x509_options = {sslMode : "requireSSL",
                     sslPEMKeyFile : SERVER_CERT,
                     sslCAFile : CA_CERT};
 
-var mongo = MongoRunner.runMongod(Object.merge(x509_options, {port: port, auth: ""}));
+var mongo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
 
 authAndTest(mongo);
-MongoRunner.stopMongod(port);
+MongoRunner.stopMongod(mongo.port);
 
 print("2. Testing x.509 auth to mongos");
 

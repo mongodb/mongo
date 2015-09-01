@@ -85,13 +85,12 @@ assert.eq(gle.wtimeout, null);
 
 replTest.stopSet();
 
-// Next check that it still works on a lone mongod
+// Next check that it still works on a standalone mongod.
 // Need to start a single server manually to keep this test in the jstests/replsets test suite
-var port = allocatePorts(1)[0];
 var baseName = "SERVER-9005";
 
-var mongod = MongoRunner.runMongod({port: port});
-var sdb = new Mongo("localhost:"+port).getDB("test");
+var mongod = MongoRunner.runMongod({});
+var sdb = mongod.getDB("test");
 
 sdb.foo.drop();
 sdb.foo.insert({ _id: "1" });

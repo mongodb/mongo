@@ -59,7 +59,7 @@ var runTest = function(adminDB) {
     expectedFPState(adminDB.runCommand({ configureFailPoint: 'dummy' }), 1, { x: 1 });
 };
 
-var conn = MongoRunner.runMongod({ port: 29000 });
+var conn = MongoRunner.runMongod();
 runTest(conn.getDB('admin'));
 MongoRunner.stopMongod(conn.port);
 

@@ -1,13 +1,10 @@
-
 if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger") {
 
     var baseDir = "jstests_per_db_and_split_c_and_i";
-    port = allocatePorts( 1 )[ 0 ];
-    dbpath = MongoRunner.dataPath + baseDir + "/";
+    var dbpath = MongoRunner.dataPath + baseDir + "/";
 
     var m = MongoRunner.runMongod({
         dbpath: dbpath,
-        port: port,
         wiredTigerDirectoryForIndexes: '',
         directoryperdb: ''});
     db = m.getDB( "foo" );
@@ -19,22 +16,22 @@ if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wired
     assert( listFiles( dbpath + "/foo/index" ).length > 0 );
     assert( listFiles( dbpath + "/foo/collection" ).length > 0 );
 
-    MongoRunner.stopMongod(port);
+    MongoRunner.stopMongod(m.port);
 
     // Subsequent attempts to start server using same dbpath but different
     // wiredTigerDirectoryForIndexes and directoryperdb options should fail.
     assert.isnull(MongoRunner.runMongod({
         dbpath: dbpath,
-        port: port,
+        port: m.port,
         restart: true}));
     assert.isnull(MongoRunner.runMongod({
         dbpath: dbpath,
-        port: port,
+        port: m.port,
         restart: true,
         directoryperdb: ''}));
     assert.isnull(MongoRunner.runMongod({
         dbpath: dbpath,
-        port: port,
+        port: m.port,
         restart: true,
         wiredTigerDirectoryForIndexes: ''}));
 }

@@ -6,9 +6,6 @@ seedString = function(replTest) {
 };
 
 removeShard = function(st, replTest) {
-
-
-
     print( "Removing shard with name: " + replTest.name );
     res = st.admin.runCommand( { removeshard: replTest.name } )
     printjson(res);
@@ -192,7 +189,7 @@ print( "Sleeping for 20 seconds to let the other shard's ReplicaSetMonitor time 
 sleep( 20000 );
 
 
-var rst2 = new ReplSetTest({name : rst1.name, nodes : 2, startPort : rst1.startPort + 1500, useHostName : true});
+var rst2 = new ReplSetTest({name : rst1.name, nodes : 2, useHostName : true});
 rst2.startSet();
 rst2.initiate();
 rst2.awaitReplication();

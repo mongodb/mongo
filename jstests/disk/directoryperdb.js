@@ -1,9 +1,6 @@
 var baseDir = "jstests_disk_directoryper";
 var baseName = "directoryperdb"
-port = allocatePorts( 1 )[ 0 ];
-dbpath = MongoRunner.dataPath + baseDir + "/";
-
-
+var dbpath = MongoRunner.dataPath + baseDir + "/";
 var storageEngine = db.serverStatus().storageEngine.name;
 
 // The pattern which matches the names of database files

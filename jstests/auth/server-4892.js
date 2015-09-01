@@ -7,24 +7,25 @@
 
 var baseName = 'jstests_auth_server4892';
 var dbpath = MongoRunner.dataPath + baseName;
-var port = allocatePorts( 1 )[ 0 ];
-var mongod_common_args = [
-    '--port', port, '--dbpath', dbpath, '--bind_ip', '127.0.0.1', '--nohttpinterface' ];
+resetDbpath(dbpath);
+var mongodCommonArgs = {
+    dbpath: dbpath,
+    noCleanData: true,
+};
 
 /*
  * Start an instance of mongod, pass it as a parameter to operation(), then stop the instance of
  * mongod before unwinding or returning out of with_mongod().
  *
- * extra_mongod_args are extra arguments to pass on the mongod command line, in an Array.
+ * 'extraMongodArgs' are extra arguments to pass on the mongod command line, as an object.
  */
-function with_mongod( extra_mongod_args, operation ) {
-    var mongod = startMongoProgram.apply(
-        null, ['mongod'].concat( mongod_common_args, extra_mongod_args ) );
+function withMongod(extraMongodArgs, operation) {
+    var mongod = MongoRunner.runMongod(Object.merge(mongodCommonArgs, extraMongodArgs));
 
     try {
         operation( mongod );
     } finally {
-        MongoRunner.stopMongod( port );
+        MongoRunner.stopMongod( mongod.port );
     }
 }
 
@@ -42,9 +43,7 @@ function expectNumLiveCursors(mongod, expectedNumLiveCursors) {
           + expectedNumLiveCursors + ")");
 }
 
-resetDbpath( dbpath );
-
-with_mongod( ['--noauth'], function setupTest( mongod ) {
+withMongod({noauth: ""}, function setupTest(mongod) {
     var admin, somedb, conn;
     conn = new Mongo( mongod.host );
     admin = conn.getDB( 'admin' );
@@ -59,7 +58,7 @@ with_mongod( ['--noauth'], function setupTest( mongod ) {
     admin.logout();
 } );
 
-with_mongod( ['--auth'], function runTest( mongod ) {
+withMongod({auth: ""}, function runTest(mongod) {
     var conn = new Mongo( mongod.host );
     var somedb = conn.getDB( 'somedb' );
     somedb.auth('frim', 'fram');

@@ -6,13 +6,12 @@
  */
 (function() {
     "use strict";
+
     var baseDir = "jstests_ttl_capped";
-    var port = allocatePorts( 1 )[ 0 ];
     var dbpath = MongoRunner.dataPath + baseDir + "/";
     
     var m = MongoRunner.runMongod({
                                     dbpath: dbpath,
-                                    port: port,
                                     setParameter:"ttlMonitorSleepSecs=1"});
     var db = m.getDB( "test" );
     
@@ -49,5 +48,5 @@
     assert.eq(t.count(), 1);
     assert.eq(ac.count(), 0);
     
-    MongoRunner.stopMongod(port);
+    MongoRunner.stopMongod(m.port);
 })();

@@ -6,15 +6,17 @@
 // Verify that the copyDatabase command works appropriately when the
 // target mongo instance has authentication enabled.
 
+(function() {
 
 // Setup fromDb with no auth
-var fromDb = MongoRunner.runMongod({ port: 29000 });
- 
+var fromDb = MongoRunner.runMongod();
+
 // Setup toDb with auth
-var toDb = MongoRunner.runMongod({auth : "", port : 31001});
+var toDb = MongoRunner.runMongod({auth: ""});
 var admin = toDb.getDB("admin");
 admin.createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
 admin.auth("foo","bar");
-  
+
 admin.copyDatabase('test', 'test', fromDb.host)
 
+})();

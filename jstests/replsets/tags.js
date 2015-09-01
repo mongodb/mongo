@@ -6,7 +6,7 @@ var num = 5;
 var host = getHostName();
 var name = "tags";
 
-var replTest = new ReplSetTest( {name: name, nodes: num, startPort:31000} );
+var replTest = new ReplSetTest( {name: name, nodes: num} );
 var nodes = replTest.startSet();
 var port = replTest.ports;
 replTest.initiate({_id : name, members :

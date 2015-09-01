@@ -207,9 +207,11 @@ var st;
     var sconfig = Object.extend({}, st.s0.fullOptions, /* deep */ true);
     delete sconfig.port;
     sconfig.configdb = csrsName + "/" + csrs[0].name;
-    assertCanSplit(startMongos(sconfig), "when mongos started with --configdb=" + sconfig.configdb);
+    assertCanSplit(MongoRunner.runMongos(sconfig),
+                   "when mongos started with --configdb=" + sconfig.configdb);
     sconfig.configdb = st.s0.fullOptions.configdb;
-    assertCanSplit(startMongos(sconfig), "when mongos started with --configdb=" + sconfig.configdb);
+    assertCanSplit(MongoRunner.runMongos(sconfig),
+                   "when mongos started with --configdb=" + sconfig.configdb);
     assertCanSplit(st.s0, "on mongos that drove the upgrade");
     assertCanSplit(st.s1, "on mongos that was previously unaware of the upgrade");
 }());

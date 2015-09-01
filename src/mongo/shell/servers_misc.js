@@ -1,7 +1,7 @@
 ToolTest = function( name, extraOptions ){
     this.name = name;
     this.options = extraOptions;
-    this.port = allocatePorts(1)[0];
+    this.port = allocatePort();
     this.baseName = "jstests_tool_" + name;
     this.root = MongoRunner.dataPath + this.baseName;
     this.dbpath = this.root + "/";
@@ -62,7 +62,7 @@ ToolTest.prototype.runTool = function(){
 
 ReplTest = function( name, ports ){
     this.name = name;
-    this.ports = ports || allocatePorts( 2 );
+    this.ports = ports || allocatePorts(2);
 }
 
 ReplTest.prototype.getPort = function( master ){
@@ -162,14 +162,35 @@ ReplTest.prototype.stop = function( master , signal ){
     return _stopMongoProgram( this.getPort( master ) , signal || 15 );
 }
 
-allocatePorts = function( n , startPort ) {
-    var ret = [];
-    var start = startPort || 31000;
-    for( var i = start; i < start + n; ++i )
-        ret.push( i );
-    return ret;
-}
+/**
+ * Returns a port number that has not been given out to any other caller from the same mongo shell.
+ */
+allocatePort = (function() {
+    var maxPort = Math.pow(2, 16) - 1;
+    // Chosen in an attempt to have a large number of unassigned ports that are also outside the
+    // ephemeral port range.
+    var nextPort = 20000;
 
+    return function() {
+        if (nextPort === maxPort) {
+            throw new Error("Exceeded maximum port range in allocatePort()");
+        }
+        return nextPort++;
+    };
+})();
+
+/**
+ * Returns a list of 'numPorts' port numbers that have not been given out to any other caller from
+ * the same mongo shell.
+ */
+allocatePorts = function(numPorts) {
+    var ports = [];
+    for (var i = 0; i < numPorts; i++) {
+        ports.push(allocatePort());
+    }
+
+    return ports;
+};
 
 SyncCCTest = function( testName , extraMongodOptions ){
     this._testName = testName;

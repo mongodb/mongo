@@ -1,5 +1,5 @@
 var name = "sharding_rs_arb1"
-var replTest = new ReplSetTest( { name : name , nodes : 3 , startPort : 31000 } );
+var replTest = new ReplSetTest( { name : name , nodes : 3 } );
 replTest.startSet();
 var port = replTest.ports;
 replTest.initiate({_id : name, members :
@@ -25,4 +25,3 @@ assert( res.ok , tojson(res) )
 
 st.stop();
 replTest.stopSet();
-

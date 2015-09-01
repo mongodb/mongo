@@ -1,31 +1,36 @@
-adminUser = {
+(function() {
+
+'use strict';
+
+var adminUser = {
     db : "admin",
     username : "foo",
     password : "bar"
 };
 
-testUser = {
+var testUser = {
     db : "test",
     username : "bar",
     password : "baz"
 };
 
-testUserReadOnly = {
+var testUserReadOnly = {
     db : "test",
     username : "sad",
     password : "bat"
 };
 
 
-function login(userObj , thingToUse ) {
-    if ( ! thingToUse )
+function login(userObj, thingToUse) {
+    if (!thingToUse) {
         thingToUse = s;
+    }
 
     thingToUse.getDB(userObj.db).auth(userObj.username, userObj.password);
 }
 
-function logout(userObj, thingToUse ) {
-    if ( ! thingToUse )
+function logout(userObj, thingToUse) {
+    if (!thingToUse)
         thingToUse = s;
 
     s.getDB(userObj.db).runCommand({logout:1});
@@ -36,17 +41,6 @@ function getShardName(rsTest) {
     var config = master.getDB("local").system.replset.findOne();
     var members = config.members.map(function(elem) { return elem.host; });
     return config._id+"/"+members.join(",");
-}
-
-function setupTest() {
-    var s = new ShardingTest( "auth1", 0 , 0 , 1 ,
-      {
-        rs: true,
-        extraOptions : {"keyFile" : "jstests/libs/key1"},
-        noChunkSize : true,
-        enableBalancer:true
-      } );
-    return s;
 }
 
 function runTest(s) {
@@ -60,15 +54,16 @@ function runTest(s) {
                                                        { $set: { value : 1 }}, true ));
     printjson(s.getDB("config").settings.find().toArray());
 
-    print("restart mongos");
-    MongoRunner.stopMongos(31000);
-    var opts = { port : 31000, v : 2, configdb : s._configDB, keyFile : "jstests/libs/key1", chunkSize : 1 };
-    var conn = startMongos( opts );
-    s.s = s._mongos[0] = s["s0"] = conn;
+    print("restart mongos with different auth options");
 
+    s.restartMongos(0, { port: s.port,
+                         v: 2,
+                         configdb: s._configDB,
+                         keyFile: "jstests/libs/key1",
+                         chunkSize: 1 });
     login(adminUser);
 
-    d1 = new ReplSetTest({name : "d1", nodes : 3, startPort : 31100, useHostName : true });
+    var d1 = new ReplSetTest({name : "d1", nodes : 3, useHostName : true });
     d1.startSet({keyFile : "jstests/libs/key2", verbose : 0});
     d1.initiate();
 
@@ -99,12 +94,14 @@ function runTest(s) {
     assert(thrown);
 
     print("start rs w/correct key");
+
     d1.stopSet();
     d1.startSet({keyFile : "jstests/libs/key1", verbose : 0});
     d1.initiate();
+
     var master = d1.getMaster();
 
-    print("adding shard w/auth "+shardName);
+    print("adding shard w/auth " + shardName);
 
     result = s.getDB("admin").runCommand({addShard : shardName});
     assert.eq(result.ok, 1, tojson(result));
@@ -125,12 +122,12 @@ function runTest(s) {
 
     print("query try");
     var e = assert.throws(function() {
-        conn.getDB("foo").bar.findOne();
+        s.s.getDB("foo").bar.findOne();
     });
     printjson(e);
 
     print("cmd try");
-    assert.eq( 0, conn.getDB("foo").runCommand({listDatabases:1}).ok );
+    assert.eq(0, s.s.getDB("foo").runCommand({listDatabases:1}).ok);
 
     print("insert try 1");
     s.getDB("test").foo.insert({x:1});
@@ -144,7 +141,7 @@ function runTest(s) {
 
     logout(testUser);
 
-    d2 = new ReplSetTest({name : "d2", nodes : 3, startPort : 31200, useHostName : true });
+    var d2 = new ReplSetTest({name : "d2", nodes : 3, useHostName : true });
     d2.startSet({keyFile : "jstests/libs/key1", verbose : 0});
     d2.initiate();
     d2.awaitSecondaryNodes();
@@ -218,7 +215,6 @@ function runTest(s) {
         assert(false, "Number of docs found does not equal the number inserted. Missing docs: " + missingDocNumbers);
     }
 
-
     // We're only sure we aren't duplicating documents iff there's no balancing going on here
     // This call also waits for any ongoing balancing to stop
     s.stopBalancer(60000);
@@ -253,9 +249,10 @@ function runTest(s) {
 
     login(testUser);
     print( "testing map reduce" );
-    /* sharded map reduce can be tricky since all components talk to each other.
-       for example SERVER-4114 is triggered when 1 mongod connects to another for final reduce
-       it's not properly tested here since addresses are localhost, which is more permissive */
+
+    // Sharded map reduce can be tricky since all components talk to each other. For example
+    // SERVER-4114 is triggered when 1 mongod connects to another for final reduce it's not
+    // properly tested here since addresses are localhost, which is more permissive.
     var res = s.getDB("test").runCommand(
         {mapreduce : "foo",
          map : function() { emit(this.x, 1); },
@@ -265,18 +262,20 @@ function runTest(s) {
     printjson(res);
     assert.commandWorked(res);
 
-    // check that dump doesn't get stuck with auth
-    var x = runMongoProgram( "mongodump", "--host", "127.0.0.1:31000", "-d", testUser.db, "-u",
-                             testUser.username, "-p", testUser.password, "--authenticationMechanism",
-                             "SCRAM-SHA-1");
-    print("result: "+x);
+    // Check that dump doesn't get stuck with auth
+    var x = runMongoProgram("mongodump",
+                            "--host", s.s.host,
+                            "-d", testUser.db,
+                            "-u", testUser.username,
+                            "-p", testUser.password,
+                            "--authenticationMechanism", "SCRAM-SHA-1");
+    print("result: " + x);
 
-    // test read only users
-
+    // Test read only users
     print( "starting read only tests" );
 
-    readOnlyS = new Mongo( s.getDB( "test" ).getMongo().host )
-    readOnlyDB = readOnlyS.getDB( "test" );
+    var readOnlyS = new Mongo( s.getDB( "test" ).getMongo().host )
+    var readOnlyDB = readOnlyS.getDB( "test" );
 
     print( "   testing find that should fail" );
     assert.throws( function(){ readOnlyDB.foo.findOne(); } )
@@ -296,6 +295,7 @@ function runTest(s) {
     print("make sure currentOp/killOp fail");
     assert.commandFailed(readOnlyDB.currentOp());
     assert.commandFailed(readOnlyDB.killOp(123));
+
     // fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
     /*
     broken because of SERVER-4156
@@ -307,20 +307,30 @@ function runTest(s) {
          out:"blarg"
         }));
     */
+
     print( "   testing logout (should succeed)" );
     assert.commandWorked(readOnlyDB.runCommand({logout : 1}));
 
     print("make sure currentOp/killOp fail again");
     assert.commandFailed(readOnlyDB.currentOp());
     assert.commandFailed(readOnlyDB.killOp(123));
-    // fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
 }
 
-var s = setupTest();
-if (s.getDB( "admin" ).runCommand( "buildInfo" ).bits < 64) {
-    print("Skipping test on 32-bit platforms");
+var s = new ShardingTest("auth1", 0, 0, 1,
+                         {
+                            rs: true,
+                            extraOptions: { "keyFile": "jstests/libs/key1" },
+                            noChunkSize: true,
+                            enableBalancer: true
+                         });
+
+if (s.getDB('admin').runCommand('buildInfo').bits < 64) {
+    print('Skipping test on 32-bit platforms');
 }
 else {
     runTest(s);
 }
+
 s.stop();
+
+})();

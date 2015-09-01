@@ -32,7 +32,7 @@ assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
                        version: new Timestamp(2, 0),
                        authoritative: true,
                        shard: "shard0000",
-                       shardHost: "localhost:30000" }),
+                       shardHost: s.s.host }),
         "should have failed because version is config is 1|0" );
 
 var epoch = s.getDB('config').chunks.findOne().lastmodEpoch;
@@ -42,7 +42,7 @@ assert.commandWorked( a.runCommand({ setShardVersion: "alleyinsider.foo",
                                      versionEpoch: epoch,
                                      authoritative: true,
                                      shard: "shard0000",
-                                     shardHost: "localhost:30000" }),
+                                     shardHost: s.s.host }),
                      "should have worked" );
 
 assert( a.runCommand({ setShardVersion: "alleyinsider.foo",

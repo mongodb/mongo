@@ -1,11 +1,10 @@
 
 SlowWeeklyMongod = function( name ) {
     this.name = name;
-    this.port = 30201;
-    
     this.start = new Date();
 
-    this.conn = MongoRunner.runMongod({port: this.port, smallfiles: "", nojournal: ""});
+    this.conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
+    this.port = this.conn.port;
 };
 
 SlowWeeklyMongod.prototype.getDB = function( name ) {

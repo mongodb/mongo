@@ -7,31 +7,34 @@ var SAN_CERT = "jstests/libs/localhostnameSAN.pem";
 var CLIENT_CERT = "jstests/libs/client.pem"
 var BAD_SAN_CERT = "jstests/libs/badSAN.pem";
 
-port = allocatePorts(1)[0];
-
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
-    MongoRunner.runMongod({port: port,
-                           sslMode: "requireSSL", 
-                           sslPEMKeyFile: certPath,
-                           sslCAFile: CA_CERT});
+    var mongod = MongoRunner.runMongod({sslMode: "requireSSL",
+                                        sslPEMKeyFile: certPath,
+                                        sslCAFile: CA_CERT});
 
     var mongo;
     if (allowInvalidCert) {
-        mongo = runMongoProgram("mongo", "--port", port, "--ssl", 
-                                "--sslCAFile", CA_CERT, 
+        mongo = runMongoProgram("mongo",
+                                "--port", mongod.port,
+                                "--ssl",
+                                "--sslCAFile", CA_CERT,
                                 "--sslPEMKeyFile", CLIENT_CERT,
                                 "--sslAllowInvalidCertificates",
                                 "--eval", ";");
     }
     else if (allowInvalidHost) {
-        mongo = runMongoProgram("mongo", "--port", port, "--ssl",
+        mongo = runMongoProgram("mongo",
+                                "--port", mongod.port,
+                                "--ssl",
                                 "--sslCAFile", CA_CERT,
                                 "--sslPEMKeyFile", CLIENT_CERT,
                                 "--sslAllowInvalidHostnames",
                                 "--eval", ";");
     } else {
-        mongo = runMongoProgram("mongo", "--port", port, "--ssl", 
-                                "--sslCAFile", CA_CERT, 
+        mongo = runMongoProgram("mongo",
+                                "--port", mongod.port,
+                                "--ssl",
+                                "--sslCAFile", CA_CERT,
                                 "--sslPEMKeyFile", CLIENT_CERT,
                                 "--eval", ";");
     }
@@ -46,7 +49,7 @@ function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSuc
         assert.eq(1, mongo, "Connection attempt succeeded when it should fail certPath: " + 
                   certPath);
     }
-    MongoRunner.stopMongod(port);
+    MongoRunner.stopMongod(mongod.port);
 }
 
 // 1. Test client connections with different server certificates

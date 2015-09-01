@@ -1,4 +1,8 @@
-var conn = MongoRunner.runMongod({auth : "", port : 31001});
+(function() {
+
+'use strict'
+
+var conn = MongoRunner.runMongod({ auth: "" });
 
 var admin = conn.getDB("admin");
 var errorCodeUnauthorized = 13;
@@ -24,3 +28,5 @@ conn.getDB("admin").auth("foo","bar");
 assert("inprog" in admin.currentOp());
 assert("info" in admin.killOp(123));
 assert.eq(admin.fsyncUnlock().errmsg, "not locked");
+
+})();

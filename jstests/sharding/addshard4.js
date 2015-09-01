@@ -2,7 +2,7 @@
 
 s = new ShardingTest( "addshard4", 2 , 0 , 1 , {useHostname : true});
 
-r = new ReplSetTest({name : "addshard4", nodes : 3, startPort : 31100});
+var r = new ReplSetTest({name: "addshard4", nodes: 3});
 r.startSet();
 
 var config = r.getReplSetConfig();
@@ -31,7 +31,7 @@ var result = s.adminCommand({"addshard" : shardName});
 printjson(result);
 assert.eq(result, true);
 
-r = new ReplSetTest({name : "addshard42", nodes : 3, startPort : 31200});
+r = new ReplSetTest({name : "addshard42", nodes : 3});
 r.startSet();
 
 config = r.getReplSetConfig();

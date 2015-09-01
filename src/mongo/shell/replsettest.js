@@ -40,55 +40,58 @@
  *     useSeedList {boolean}: Use the connection string format of this set
  *        as the replica set name (overrides the name property). Default: false
  *     keyFile {string}
- *     shardSvr {boolean}: Default: false
- *     startPort {number}: port offset to be used for each replica. Default: 31000
+ *     shardSvr {boolean}: Whether this replica set serves as a shard in a cluster. Default: false.
  *   }
  * 
  * Member variables:
  * numNodes {number} - number of nodes
  * nodes {Array.<Mongo>} - connection to replica set members
  */
-ReplSetTest = function( opts ){
+ReplSetTest = function(opts) {
     this.name  = opts.name || "testReplSet";
     this.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
     this.host  = this.useHostName ? (opts.host || getHostName()) : 'localhost';
     this.oplogSize = opts.oplogSize || 40;
     this.useSeedList = opts.useSeedList || false;
-    this.ports = [];
-    this.keyFile = opts.keyFile
+    this.keyFile = opts.keyFile;
     this.shardSvr = opts.shardSvr || false;
 
-    this.startPort = opts.startPort || 31000;
+    this.nodeOptions = {};
 
-    this.nodeOptions = {}    
-    if( isObject( opts.nodes ) ){
-        var len = 0
-        for( var i in opts.nodes ){
+    if (isObject(opts.nodes )) {
+        var len = 0;
+
+        for(var i in opts.nodes) {
             var options = this.nodeOptions[ "n" + len ] = Object.merge(opts.nodeOptions, 
                                                                        opts.nodes[i]);
             if( i.startsWith( "a" ) ) options.arbiter = true;
             len++
         }
+
         this.numNodes = len
     }
-    else if( Array.isArray( opts.nodes ) ){
-        for( var i = 0; i < opts.nodes.length; i++ )
+    else if (Array.isArray(opts.nodes)) {
+        for(var i = 0; i < opts.nodes.length; i++) {
             this.nodeOptions[ "n" + i ] = Object.merge(opts.nodeOptions, opts.nodes[i]);
+        }
+
         this.numNodes = opts.nodes.length
     }
     else {
-        for ( var i =0; i < opts.nodes; i++ )
+        for (var i = 0; i < opts.nodes; i++) {
             this.nodeOptions[ "n" + i ] = opts.nodeOptions;
+        }
+
         this.numNodes = opts.nodes;
     }
-    
-    this.ports = allocatePorts( this.numNodes , this.startPort );
-    this.nodes = []
+
+    this.ports = allocatePorts(this.numNodes);
+    this.nodes = [];
+
     this.initLiveNodes()
-    
+
     Object.extend( this, ReplSetTest.Health )
     Object.extend( this, ReplSetTest.State )
-    
 }
 
 // List of nodes as host:port strings.
@@ -259,7 +262,6 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
 }
 
 ReplSetTest.prototype.startSet = function( options ) {
-    
     var nodes = [];
     print( "ReplSetTest Starting Set" );
 
@@ -417,23 +419,18 @@ ReplSetTest.prototype.status = function( timeout ){
 }
 
 // Add a node to the test set
-ReplSetTest.prototype.add = function( config ) {
-  if(this.ports.length == 0) {
-    var nextPort = allocatePorts( 1, this.startPort )[0];
-  }
-  else {
-    var nextPort = this.ports[this.ports.length-1] + 1;
-  }
-  print("ReplSetTest Next port: " + nextPort);
-  this.ports.push(nextPort);
-  printjson(this.ports);
+ReplSetTest.prototype.add = function(config) {
+    var nextPort = allocatePort();
+    print("ReplSetTest Next port: " + nextPort);
 
-  var nextId = this.nodes.length;
-  printjson(this.nodes);
-  print("ReplSetTest nextId:" + nextId);
-  var newNode = this.start( nextId, config );
-  
-  return newNode;
+    this.ports.push(nextPort);
+    printjson(this.ports);
+
+    var nextId = this.nodes.length;
+    printjson(this.nodes);
+
+    print("ReplSetTest nextId: " + nextId);
+    return this.start(nextId, config);
 }
 
 ReplSetTest.prototype.remove = function( nodeId ) {
@@ -634,10 +631,8 @@ ReplSetTest.prototype.getHashes = function( db ){
  *   before the server starts.  Default: false.
  * 
  */
-ReplSetTest.prototype.start = function( n , options , restart , wait ){
-    
-    if( n.length ){
-        
+ReplSetTest.prototype.start = function( n , options , restart , wait ) {
+    if( n.length ) {
         var nodes = n
         var started = []
         
@@ -648,7 +643,6 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
         }
         
         return started
-        
     }
     
     print( "ReplSetTest n is : " + n )
@@ -659,7 +653,6 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
                  port : this.getPort( n ),
                  noprealloc : "",
                  smallfiles : "",
-                 rest : "",
                  replSet : this.useSeedList ? this.getURL() : this.name,
                  dbpath : "$set-$node" }
     
@@ -696,8 +689,8 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
     print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
     
     var rval = this.nodes[n] = MongoRunner.runMongod( options )
-    
-    if( ! rval ) return rval
+
+    if(!rval) return rval;
     
     // Add replica set specific attributes
     this.nodes[n].nodeId = n
@@ -709,14 +702,13 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
         if( wait ) wait = 0
         else wait = -1
     }
-    
-    if( wait < 0 ) return rval
-    
+
+    if( wait < 0 ) return rval;
+
     // Wait for startup
     this.waitForHealth( rval, this.UP, wait )
-    
-    return rval
-    
+
+    return rval;
 }
 
 
