@@ -573,12 +573,6 @@ void PlanCache::encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuild
  * This handles all the special projection types ($meta, $elemMatch, etc.)
  */
 void PlanCache::encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuilder) const {
-    if (projObj.isEmpty()) {
-        return;
-    }
-
-    *keyBuilder << kEncodeProjectionSection;
-
     // Sorts the BSON elements by field name using a map.
     std::map<StringData, BSONElement> elements;
 
@@ -586,7 +580,18 @@ void PlanCache::encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuild
     while (it.more()) {
         BSONElement elt = it.next();
         StringData fieldName = elt.fieldNameStringData();
+
+        // Internal callers may add $-prefixed fields to the projection. These are not part of a
+        // user query, and therefore are not considered part of the cache key.
+        if (fieldName[0] == '$') {
+            continue;
+        }
+
         elements[fieldName] = elt;
+    }
+
+    if (!elements.empty()) {
+        *keyBuilder << kEncodeProjectionSection;
     }
 
     // Read elements in order of field name
@@ -635,7 +640,17 @@ Status PlanCache::add(const CanonicalQuery& query,
     const LiteParsedQuery& pq = query.getParsed();
     entry->query = pq.getFilter().getOwned();
     entry->sort = pq.getSort().getOwned();
-    entry->projection = pq.getProj().getOwned();
+
+    // Strip projections on $-prefixed fields, as these are added by internal callers of the query
+    // system and are not considered part of the user projection.
+    BSONObjBuilder projBuilder;
+    for (auto elem : pq.getProj()) {
+        if (elem.fieldName()[0] == '$') {
+            continue;
+        }
+        projBuilder.append(elem);
+    }
+    entry->projection = projBuilder.obj();
 
     stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
     std::unique_ptr<PlanCacheEntry> evictedEntry = _cache.add(computeKey(query), entry);
