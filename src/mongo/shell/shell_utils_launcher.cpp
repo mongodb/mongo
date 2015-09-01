@@ -471,11 +471,16 @@ void ProgramRunner::launchProcess(int child_stdout) {
     verify(nativePid != -1);
     if (nativePid == 0) {
         // DON'T ASSERT IN THIS BLOCK - very bad things will happen
+        //
+        // Also, deliberately call _exit instead of quickExit. We intended to
+        // fork() and exec() here, so we never want to run any form of cleanup.
+        // This includes things that quickExit calls, such as atexit leak
+        // checks.
 
         if (dup2(child_stdout, STDOUT_FILENO) == -1 || dup2(child_stdout, STDERR_FILENO) == -1) {
             // Async signal unsafe code reporting a terminal error condition.
             cout << "Unable to dup2 child output: " << errnoWithDescription() << endl;
-            quickExit(-1);  // do not pass go, do not call atexit handlers
+            _exit(-1);  // do not pass go, do not call atexit handlers
         }
 
         // NOTE execve is async signal safe, but it is not clear that execvp is async
@@ -484,7 +489,8 @@ void ProgramRunner::launchProcess(int child_stdout) {
 
         // Async signal unsafe code reporting a terminal error condition.
         cout << "Unable to start program " << argv[0] << ' ' << errnoWithDescription() << endl;
-        quickExit(-1);
+
+        _exit(-1);
     }
 
 #endif
