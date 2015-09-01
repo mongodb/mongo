@@ -30,8 +30,8 @@
  * Constants that control how much influence different metrics have on
  * the pressure calculation.
  */
-#define	WT_CACHE_POOL_APP_EVICT_MULTIPLIER	10
-#define	WT_CACHE_POOL_APP_WAIT_MULTIPLIER	50
+#define	WT_CACHE_POOL_APP_EVICT_MULTIPLIER	3
+#define	WT_CACHE_POOL_APP_WAIT_MULTIPLIER	6
 #define	WT_CACHE_POOL_READ_MULTIPLIER	1
 
 static int __cache_pool_adjust(
