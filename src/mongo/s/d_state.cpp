@@ -248,7 +248,7 @@ bool shardVersionOk(OperationContext* txn,
     // If there is a version attached to the OperationContext, use it as the received version.
     // Otherwise, get the received version from the ShardedConnectionInfo.
     if (OperationShardVersion::get(txn).hasShardVersion()) {
-        received = OperationShardVersion::get(txn).getShardVersion();
+        received = OperationShardVersion::get(txn).getShardVersion(NamespaceString(ns));
     } else {
         ShardedConnectionInfo* info = ShardedConnectionInfo::get(client, false);
         if (!info) {

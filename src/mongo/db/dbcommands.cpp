@@ -1252,7 +1252,9 @@ void Command::execCommand(OperationContext* txn,
         CurOp::get(txn)->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS) * 1000);
 
         // Handle shard version that may have been sent along with the command.
-        OperationShardVersion::get(txn).initializeFromCommand(request.getCommandArgs());
+        OperationShardVersion::get(txn).initializeFromCommand(
+            NamespaceString(command->parseNs(dbname, request.getCommandArgs())),
+            request.getCommandArgs());
 
         // Can throw
         txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.

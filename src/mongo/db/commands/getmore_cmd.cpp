@@ -153,7 +153,7 @@ public:
         const GetMoreRequest& request = parseStatus.getValue();
 
         // Disable shard version checking - getmore commands are always unversioned
-        OperationShardVersion::get(txn).setShardVersion(ChunkVersion::IGNORED());
+        OperationShardVersion::get(txn).setShardVersion(request.nss, ChunkVersion::IGNORED());
 
         // Depending on the type of cursor being operated on, we hold locks for the whole
         // getMore, or none of the getMore, or part of the getMore.  The three cases in detail:

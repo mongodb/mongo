@@ -65,6 +65,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/stats/counters.h"
@@ -780,13 +781,12 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
     ExecInsertsState state(_txn, &request);
     normalizeInserts(request, &state.normalizedInserts);
 
-    ShardedConnectionInfo* info = ShardedConnectionInfo::get(_txn->getClient(), false);
-    if (info) {
-        if (request.isMetadataSet() && request.getMetadata()->isShardVersionSet()) {
-            info->setVersion(request.getTargetingNS(), request.getMetadata()->getShardVersion());
-        } else {
-            info->setVersion(request.getTargetingNS(), ChunkVersion::IGNORED());
-        }
+    auto& operationShardVersion = OperationShardVersion::get(_txn);
+    if (request.isMetadataSet() && request.getMetadata()->isShardVersionSet()) {
+        operationShardVersion.setShardVersion(request.getTargetingNSS(),
+                                              request.getMetadata()->getShardVersion());
+    } else {
+        operationShardVersion.setShardVersion(request.getTargetingNSS(), ChunkVersion::IGNORED());
     }
 
     // Yield frequency is based on the same constants used by PlanYieldPolicy.
@@ -833,20 +833,18 @@ void WriteBatchExecutor::execUpdate(const BatchItemRef& updateItem,
     beginCurrentOp(_txn, updateItem);
     incOpStats(updateItem);
 
-    ShardedConnectionInfo* info = ShardedConnectionInfo::get(_txn->getClient(), false);
-    if (info) {
-        auto rootRequest = updateItem.getRequest();
-        if (!updateItem.getUpdate()->getMulti() && rootRequest->isMetadataSet() &&
-            rootRequest->getMetadata()->isShardVersionSet()) {
-            info->setVersion(rootRequest->getTargetingNS(),
-                             rootRequest->getMetadata()->getShardVersion());
-        } else {
-            info->setVersion(rootRequest->getTargetingNS(), ChunkVersion::IGNORED());
-        }
+    auto& operationShardVersion = OperationShardVersion::get(_txn);
+    auto rootRequest = updateItem.getRequest();
+    if (!updateItem.getUpdate()->getMulti() && rootRequest->isMetadataSet() &&
+        rootRequest->getMetadata()->isShardVersionSet()) {
+        operationShardVersion.setShardVersion(rootRequest->getTargetingNSS(),
+                                              rootRequest->getMetadata()->getShardVersion());
+    } else {
+        operationShardVersion.setShardVersion(rootRequest->getTargetingNSS(),
+                                              ChunkVersion::IGNORED());
     }
 
     WriteOpResult result;
-
     multiUpdate(_txn, updateItem, &result);
 
     if (!result.getStats().upsertedID.isEmpty()) {
@@ -873,20 +871,18 @@ void WriteBatchExecutor::execRemove(const BatchItemRef& removeItem, WriteErrorDe
     beginCurrentOp(_txn, removeItem);
     incOpStats(removeItem);
 
-    ShardedConnectionInfo* info = ShardedConnectionInfo::get(_txn->getClient(), false);
-    if (info) {
-        auto rootRequest = removeItem.getRequest();
-        if (removeItem.getDelete()->getLimit() == 1 && rootRequest->isMetadataSet() &&
-            rootRequest->getMetadata()->isShardVersionSet()) {
-            info->setVersion(rootRequest->getTargetingNS(),
-                             rootRequest->getMetadata()->getShardVersion());
-        } else {
-            info->setVersion(rootRequest->getTargetingNS(), ChunkVersion::IGNORED());
-        }
+    auto& operationShardVersion = OperationShardVersion::get(_txn);
+    auto rootRequest = removeItem.getRequest();
+    if (removeItem.getDelete()->getLimit() == 1 && rootRequest->isMetadataSet() &&
+        rootRequest->getMetadata()->isShardVersionSet()) {
+        operationShardVersion.setShardVersion(rootRequest->getTargetingNSS(),
+                                              rootRequest->getMetadata()->getShardVersion());
+    } else {
+        operationShardVersion.setShardVersion(rootRequest->getTargetingNSS(),
+                                              ChunkVersion::IGNORED());
     }
 
     WriteOpResult result;
-
     multiRemove(_txn, removeItem, &result);
 
     // END CURRENT OP

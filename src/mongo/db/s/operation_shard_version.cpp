@@ -40,14 +40,17 @@ const OperationContext::Decoration<OperationShardVersion> shardingMetadataDecora
     OperationContext::declareDecoration<OperationShardVersion>();
 
 const char* kShardVersionField = "shardVersion";
+const ChunkVersion kUnshardedVersion(ChunkVersion::UNSHARDED());
 
 }  // namespace mongo
+
+OperationShardVersion::OperationShardVersion() = default;
 
 OperationShardVersion& OperationShardVersion::get(OperationContext* txn) {
     return shardingMetadataDecoration(txn);
 }
 
-void OperationShardVersion::initializeFromCommand(const BSONObj& cmdObj) {
+void OperationShardVersion::initializeFromCommand(NamespaceString ns, const BSONObj& cmdObj) {
     BSONElement versionElt;
     Status status = bsonExtractTypedField(cmdObj, kShardVersionField, BSONType::Array, &versionElt);
     if (!status.isOK()) {
@@ -55,19 +58,39 @@ void OperationShardVersion::initializeFromCommand(const BSONObj& cmdObj) {
     }
 
     const BSONArray versionArr(versionElt.Obj());
-    _shardVersion = ChunkVersion::fromBSON(versionArr, &_hasVersion);
+    bool hasVersion = false;
+    ChunkVersion newVersion = ChunkVersion::fromBSON(versionArr, &hasVersion);
+
+    if (!hasVersion) {
+        return;
+    }
+
+    // This currently supports only setting the shard version for one namespace.
+    invariant(!_hasVersion || _ns == ns);
+
+    _hasVersion = true;
+    _ns = std::move(ns);
+    _shardVersion = std::move(newVersion);
 }
 
 bool OperationShardVersion::hasShardVersion() const {
     return _hasVersion;
 }
 
-const ChunkVersion& OperationShardVersion::getShardVersion() const {
+const ChunkVersion& OperationShardVersion::getShardVersion(const NamespaceString& ns) const {
+    if (_ns != ns) {
+        return kUnshardedVersion;
+    }
+
     return _shardVersion;
 }
 
-void OperationShardVersion::setShardVersion(const ChunkVersion& version) {
-    _shardVersion = version;
+void OperationShardVersion::setShardVersion(NamespaceString ns, ChunkVersion newVersion) {
+    // This currently supports only setting the shard version for one namespace.
+    invariant(!_hasVersion || _ns == ns);
+
+    _ns = std::move(ns);
+    _shardVersion = std::move(newVersion);
     _hasVersion = true;
 }
 

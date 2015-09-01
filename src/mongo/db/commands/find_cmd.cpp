@@ -234,7 +234,7 @@ public:
         // that we don't hold locks while waiting on the network.
         ShardingState* const shardingState = ShardingState::get(txn);
         if (OperationShardVersion::get(txn).hasShardVersion() && shardingState->enabled()) {
-            ChunkVersion receivedVersion = OperationShardVersion::get(txn).getShardVersion();
+            ChunkVersion receivedVersion = OperationShardVersion::get(txn).getShardVersion(nss);
             ChunkVersion latestVersion;
             uassertStatusOK(shardingState->refreshMetadataIfNeeded(
                 txn, nss.ns(), receivedVersion, &latestVersion));

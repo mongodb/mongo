@@ -30,6 +30,8 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/chunk_version.h"
 
@@ -40,9 +42,15 @@ namespace mongo {
  * from mongos as a command parameter.
  *
  * The metadata for a particular operation can be retrieved using the get() method.
+ *
+ * Note: This only supports storing the version for a single namespace.
  */
 class OperationShardVersion {
+    MONGO_DISALLOW_COPYING(OperationShardVersion);
+
 public:
+    OperationShardVersion();
+
     /**
      * Retrieves a reference to the shard version decorating the OperationContext, 'txn'.
      */
@@ -50,11 +58,12 @@ public:
 
     /**
      * Parses shard version from the command parameters 'cmdObj' and stores the results in this
-     * object. If no shard version is attached to the command, does nothing.
+     * object along with the give namespace that is associated with the version. Does nothing
+     * if no shard version is attached to the command.
      *
      * Expects the format { ..., shardVersion: [<version>, <epoch>] }.
      */
-    void initializeFromCommand(const BSONObj& cmdObj);
+    void initializeFromCommand(NamespaceString ns, const BSONObj& cmdObj);
 
     /**
      * Returns whether or not there is a shard version associated with this operation.
@@ -62,21 +71,24 @@ public:
     bool hasShardVersion() const;
 
     /**
-     * Returns the shard version (i.e. maximum chunk version) being used by the operation. Documents
-     * in chunks which did not belong on this shard at this shard version will be filtered out.
+     * Returns the shard version (i.e. maximum chunk version) of a namespace being used by the
+     * operation. Documents in chunks which did not belong on this shard at this shard version
+     * will be filtered out.
      *
-     * Only valid if hasShardVersion() returns true.
+     * Returns ChunkVersion::UNSHARDED() if this operation has no shard version information
+     * for the requested namespace.
      */
-    const ChunkVersion& getShardVersion() const;
+    const ChunkVersion& getShardVersion(const NamespaceString& ns) const;
 
     /**
-     * Stores the given chunk version into this object.
+     * Stores the given chunk version of a namespace into this object.
      */
-    void setShardVersion(const ChunkVersion& version);
+    void setShardVersion(NamespaceString ns, ChunkVersion newVersion);
 
 private:
     bool _hasVersion = false;
     ChunkVersion _shardVersion;
+    NamespaceString _ns;
 };
 
 }  // namespace mongo
