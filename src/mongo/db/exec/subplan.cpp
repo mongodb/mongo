@@ -120,16 +120,9 @@ bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
         return false;
     }
 
-    // If it's a rooted $or and has none of the disqualifications above, then subplanning is
-    // allowed.
-    if (MatchExpression::OR == expr->matchType()) {
-        return true;
-    }
-
-    // We also allow subplanning if it's a contained OR that does not have a TEXT or GEO_NEAR node.
-    const bool hasTextOrGeoNear = QueryPlannerCommon::hasNode(expr, MatchExpression::TEXT) ||
-        QueryPlannerCommon::hasNode(expr, MatchExpression::GEO_NEAR);
-    return isContainedOr(expr) && !hasTextOrGeoNear;
+    // TODO: For now we only allow rooted OR. We should consider also allowing contained OR that
+    // does not have a TEXT or GEO_NEAR node.
+    return MatchExpression::OR == expr->matchType();
 }
 
 std::unique_ptr<MatchExpression> SubplanStage::rewriteToRootedOr(

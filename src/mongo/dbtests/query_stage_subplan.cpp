@@ -385,23 +385,27 @@ public:
             ASSERT_TRUE(SubplanStage::canUseSubplanning(*cq2));
         }
 
-        // Can use subplanning for a single contained $or.
+        // Can't use subplanning for a single contained $or.
+        //
+        // TODO: Consider allowing this to use subplanning (see SERVER-13732).
         {
             std::string findCmd =
                 "{find: 'testns',"
                 "filter: {e: 1, $or: [{a:1, b:1}, {c:1, d:1}]}}";
             std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-            ASSERT_TRUE(SubplanStage::canUseSubplanning(*cq));
+            ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
         }
 
-        // Can use subplanning if the contained $or query has a geo predicate.
+        // Can't use subplanning if the contained $or query has a geo predicate.
+        //
+        // TODO: Consider allowing this to use subplanning (see SERVER-13732).
         {
             std::string findCmd =
                 "{find: 'testns',"
                 "filter: {loc: {$geoWithin: {$centerSphere: [[0,0], 1]}},"
                 "e: 1, $or: [{a:1, b:1}, {c:1, d:1}]}}";
             std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-            ASSERT_TRUE(SubplanStage::canUseSubplanning(*cq));
+            ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
         }
 
         // Can't use subplanning if the contained $or query also has a $text predicate.
