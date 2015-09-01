@@ -990,9 +990,8 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Check for pages with append-only workloads. A common application
 	 * pattern is to have multiple threads frantically appending to the
 	 * tree. We want to reconcile and evict this page, but we'd like to
-	 * do it without making the appending threads wait. If we're not
-	 * discarding the tree, check and see if it's worth doing a split to
-	 * let the threads continue before doing eviction.
+	 * do it without making the appending threads wait. See if it's worth
+	 * doing a split to let the threads continue before doing eviction.
 	 *
 	 * Ignore anything other than large, dirty row-store leaf pages.
 	 */
@@ -1011,9 +1010,6 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * level means there will be a new 6th level for roughly each 4KB of
 	 * entries in the list. If we have at least two 6th level entries, the
 	 * list is at least large enough to work with.)
-	 *
-	 * The following code requires at least two items on the insert list,
-	 * this test serves the additional purpose of confirming that.
 	 */
 #define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(6, WT_SKIP_MAXDEPTH - 1)
 	ins_head = page->pg_row_entries == 0 ?
