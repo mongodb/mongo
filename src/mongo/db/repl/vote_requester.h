@@ -37,6 +37,7 @@
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -78,6 +79,11 @@ public:
          */
         VoteRequestResult getResult() const;
 
+        /**
+         * Returns the list of nodes that responded to the VoteRequest command.
+         */
+        unordered_set<HostAndPort> getResponders() const;
+
     private:
         const ReplicaSetConfig _rsConfig;
         const long long _candidateId;
@@ -85,6 +91,7 @@ public:
         bool _dryRun = false;  // this bool indicates this is a mock election when true
         const OpTime _lastOplogEntry;
         std::vector<HostAndPort> _targets;
+        unordered_set<HostAndPort> _responders;
         bool _staleTerm = false;
         long long _responsesProcessed = 0;
         long long _votes = 1;
@@ -120,6 +127,7 @@ public:
     void cancel(ReplicationExecutor* executor);
 
     VoteRequestResult getResult() const;
+    unordered_set<HostAndPort> getResponders() const;
 
 private:
     std::unique_ptr<Algorithm> _algorithm;

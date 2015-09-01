@@ -105,6 +105,10 @@ protected:
         _requester->processResponse(request, response);
     }
 
+    int getNumResponders() {
+        return _requester->getResponders().size();
+    }
+
     VoteRequester::VoteRequestResult getResult() {
         return _requester->getResult();
     }
@@ -220,6 +224,7 @@ TEST_F(VoteRequesterTest, ImmediateGoodResponseWinElection) {
     processResponse(requestFrom("host1"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(1, getNumResponders());
 }
 
 TEST_F(VoteRequesterTest, BadConfigVersionWinElection) {
@@ -231,6 +236,7 @@ TEST_F(VoteRequesterTest, BadConfigVersionWinElection) {
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(2, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -243,6 +249,7 @@ TEST_F(VoteRequesterTest, SetNameDiffersWinElection) {
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(2, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -255,6 +262,7 @@ TEST_F(VoteRequesterTest, LastOpTimeIsGreaterWinElection) {
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(2, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -267,6 +275,7 @@ TEST_F(VoteRequesterTest, FailedToContactWinElection) {
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(1, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -279,6 +288,7 @@ TEST_F(VoteRequesterTest, AlreadyVotedWinElection) {
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(2, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -289,6 +299,7 @@ TEST_F(VoteRequesterTest, StaleTermLoseElection) {
     ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::StaleTerm, getResult());
+    ASSERT_EQUALS(1, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -302,6 +313,7 @@ TEST_F(VoteRequesterTest, NotEnoughVotesLoseElection) {
     ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host2"));
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::InsufficientVotes, getResult());
+    ASSERT_EQUALS(1, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -310,6 +322,7 @@ TEST_F(VoteRequesterDryRunTest, ImmediateGoodResponseWinElection) {
     processResponse(requestFrom("host1"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(1, getNumResponders());
 }
 
 TEST_F(VoteRequesterDryRunTest, BadConfigVersionWinElection) {
@@ -321,6 +334,7 @@ TEST_F(VoteRequesterDryRunTest, BadConfigVersionWinElection) {
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(2, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -333,6 +347,7 @@ TEST_F(VoteRequesterDryRunTest, SetNameDiffersWinElection) {
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(2, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -345,6 +360,7 @@ TEST_F(VoteRequesterDryRunTest, LastOpTimeIsGreaterWinElection) {
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(2, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -357,6 +373,7 @@ TEST_F(VoteRequesterDryRunTest, FailedToContactWinElection) {
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(1, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -369,6 +386,7 @@ TEST_F(VoteRequesterDryRunTest, AlreadyVotedWinElection) {
     processResponse(requestFrom("host2"), votedYes());
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::SuccessfullyElected, getResult());
+    ASSERT_EQUALS(2, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -379,6 +397,7 @@ TEST_F(VoteRequesterDryRunTest, StaleTermLoseElection) {
     ASSERT_EQUALS(1, countLogLinesContaining("Got no vote from host1"));
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::StaleTerm, getResult());
+    ASSERT_EQUALS(1, getNumResponders());
     stopCapturingLogMessages();
 }
 
@@ -392,6 +411,7 @@ TEST_F(VoteRequesterDryRunTest, NotEnoughVotesLoseElection) {
     ASSERT_EQUALS(1, countLogLinesContaining("Got failed response from host2"));
     ASSERT_TRUE(hasReceivedSufficientResponses());
     ASSERT_EQUALS(VoteRequester::InsufficientVotes, getResult());
+    ASSERT_EQUALS(1, getNumResponders());
     stopCapturingLogMessages();
 }
 

@@ -99,6 +99,7 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
         log() << "VoteRequester: Got failed response from " << request.target << ": "
               << response.getStatus();
     } else {
+        _responders.insert(request.target);
         ReplSetRequestVotesResponse voteResponse;
         voteResponse.initialize(response.getValue().data);
         if (voteResponse.getVoteGranted()) {
@@ -129,6 +130,10 @@ VoteRequester::VoteRequestResult VoteRequester::Algorithm::getResult() const {
     }
 }
 
+unordered_set<HostAndPort> VoteRequester::Algorithm::getResponders() const {
+    return _responders;
+}
+
 VoteRequester::VoteRequester() : _isCanceled(false) {}
 VoteRequester::~VoteRequester() {}
 
@@ -152,6 +157,10 @@ void VoteRequester::cancel(ReplicationExecutor* executor) {
 
 VoteRequester::VoteRequestResult VoteRequester::getResult() const {
     return _algorithm->getResult();
+}
+
+unordered_set<HostAndPort> VoteRequester::getResponders() const {
+    return _algorithm->getResponders();
 }
 
 }  // namespace repl
