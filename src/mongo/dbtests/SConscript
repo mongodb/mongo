@@ -111,6 +111,7 @@ dbtest = env.Program(
         'socktests.cpp',
         'threadedtests.cpp',
         'updatetests.cpp',
+        'validate_tests.cpp',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/coredb",

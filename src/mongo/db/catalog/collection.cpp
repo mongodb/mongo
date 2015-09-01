@@ -906,7 +906,39 @@ public:
         return Status::OK();
     }
 };
+
+void validateIndexKeyCount(OperationContext* txn,
+                           const IndexDescriptor& idx,
+                           int64_t numIdxKeys,
+                           int64_t numRecs,
+                           ValidateResults* results) {
+    if (idx.isIdIndex() && numIdxKeys != numRecs) {
+        string err = str::stream() << "number of _id index entries (" << numIdxKeys
+                                   << ") does not match the number of documents (" << numRecs
+                                   << ")";
+        results->errors.push_back(err);
+        results->valid = false;
+        return;  // Avoid failing the next two checks, they just add redundant/confusing messages
+    }
+    if (!idx.isMultikey(txn) && numIdxKeys > numRecs) {
+        string err = str::stream() << "index " << idx.indexName()
+                                   << " is not multi-key, but has more entries (" << numIdxKeys
+                                   << ") than documents (" << numRecs << ")";
+        results->errors.push_back(err);
+        results->valid = false;
+    }
+    //  If an access method name is given, the index may be a full text, geo or special
+    //  index plugin with different semantics.
+    if (!idx.isSparse() && !idx.isPartial() && idx.getAccessMethodName() == "" &&
+        numIdxKeys < numRecs) {
+        string err = str::stream() << "index " << idx.indexName()
+                                   << " is not sparse or partial, but has fewer entries ("
+                                   << numIdxKeys << ") than documents (" << numRecs << ")";
+        results->errors.push_back(err);
+        results->valid = false;
+    }
 }
+}  // namespace
 
 Status Collection::validate(OperationContext* txn,
                             bool full,
@@ -944,6 +976,9 @@ Status Collection::validate(OperationContext* txn,
                 int64_t keys;
                 iam->validate(txn, full, &keys, bob.get());
                 indexes.appendNumber(descriptor->indexNamespace(), static_cast<long long>(keys));
+
+                validateIndexKeyCount(
+                    txn, *descriptor, keys, _recordStore->numRecords(txn), results);
 
                 if (bob) {
                     BSONObj obj = bob->done();
