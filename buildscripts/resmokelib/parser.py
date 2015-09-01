@@ -17,6 +17,7 @@ from .. import resmokeconfig
 # Mapping of the attribute of the parsed arguments (dest) to its key as it appears in the options
 # YAML configuration file. Most should only be converting from snake_case to camelCase.
 DEST_TO_CONFIG = {
+    "base_port": "basePort",
     "buildlogger_url": "buildloggerUrl",
     "continue_on_failure": "continueOnFailure",
     "dbpath_prefix": "dbpathPrefix",
@@ -70,6 +71,11 @@ def parse_command_line():
 
     parser.add_option("--options", dest="options_file", metavar="OPTIONS",
                       help="A YAML file that specifies global options to resmoke.py.")
+
+    parser.add_option("--basePort", dest="base_port", metavar="PORT",
+                      help=("The starting port number to use for mongod and mongos processes"
+                            " spawned by resmoke.py or the tests themselves. Each fixture and Job"
+                            " allocates a contiguous range of ports."))
 
     parser.add_option("--buildloggerUrl", action="store", dest="buildlogger_url", metavar="URL",
                       help="The root url of the buildlogger server.")
@@ -186,6 +192,7 @@ def update_config_vars(values):
         if values[dest] is not None:
             config[config_var] = values[dest]
 
+    _config.BASE_PORT = int(config.pop("basePort"))
     _config.BUILDLOGGER_URL = config.pop("buildloggerUrl")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpathPrefix"))
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest"))

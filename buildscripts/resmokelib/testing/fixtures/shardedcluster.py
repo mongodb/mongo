@@ -266,8 +266,7 @@ class _MongoSFixture(interface.Fixture):
             self.mongos_options["chunkSize"] = 50
 
         if "port" not in self.mongos_options:
-            with core.network.UnusedPort() as port:
-                self.mongos_options["port"] = port.num
+            self.mongos_options["port"] = core.network.PortAllocator.next_fixture_port(self.job_num)
         self.port = self.mongos_options["port"]
 
         mongos = core.programs.mongos_program(self.logger,

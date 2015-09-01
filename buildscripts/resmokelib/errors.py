@@ -33,3 +33,12 @@ class ServerFailure(TestFailure):
     as a failure.
     """
     pass
+
+
+class PortAllocationError(ResmokeError):
+    """
+    Exception that is raised by the PortAllocator if a port is requested
+    outside of the range of valid ports, or if a fixture requests more
+    ports than were reserved for that job.
+    """
+    pass

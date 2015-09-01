@@ -69,8 +69,7 @@ class MongoDFixture(interface.Fixture):
             pass
 
         if "port" not in self.mongod_options:
-            with core.network.UnusedPort() as port:
-                self.mongod_options["port"] = port.num
+            self.mongod_options["port"] = core.network.PortAllocator.next_fixture_port(self.job_num)
         self.port = self.mongod_options["port"]
 
         mongod = core.programs.mongod_program(self.logger,

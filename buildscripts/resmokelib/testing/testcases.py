@@ -307,6 +307,12 @@ class JSTestCase(TestCase):
 
         global_vars["MongoRunner.dataDir"] = data_dir
         global_vars["MongoRunner.dataPath"] = data_path
+
+        min_port = core.network.PortAllocator.min_test_port(fixture.job_num)
+        max_port = core.network.PortAllocator.max_test_port(fixture.job_num)
+        global_vars["MongoRunner.minPort"] = min_port
+        global_vars["MongoRunner.maxPort"] = max_port
+
         self.shell_options["global_vars"] = global_vars
 
         shutil.rmtree(data_dir, ignore_errors=True)

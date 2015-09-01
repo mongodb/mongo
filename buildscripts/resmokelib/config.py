@@ -33,6 +33,7 @@ MONGO_RUNNER_SUBDIR = "mongorunner"
 
 # Names below correspond to how they are specified via the command line or in the options YAML file.
 DEFAULTS = {
+    "basePort": 20000,
     "buildloggerUrl": "https://logkeeper.mongodb.org",
     "continueOnFailure": False,
     "dbpathPrefix": None,
@@ -62,6 +63,10 @@ DEFAULTS = {
 ##
 # Variables that are set by the user at the command line or with --options.
 ##
+
+# The starting port number to use for mongod and mongos processes spawned by resmoke.py and the
+# mongo shell.
+BASE_PORT = None
 
 # The root url of the buildlogger server.
 BUILDLOGGER_URL = None
