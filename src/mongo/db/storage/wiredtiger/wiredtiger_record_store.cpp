@@ -1378,23 +1378,24 @@ Status WiredTigerRecordStore::validate(OperationContext* txn,
     Cursor cursor(txn, *this, true);
     while (auto record = cursor.next()) {
         ++nrecords;
+        auto dataSize = record->data.size();
+        dataSizeTotal += dataSize;
         if (full && scanData) {
-            size_t dataSize;
-            Status status = adaptor->validate(record->data, &dataSize);
-            if (!status.isOK()) {
+            size_t validatedSize;
+            Status status = adaptor->validate(record->data, &validatedSize);
+            if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
                 results->valid = false;
                 results->errors.push_back(str::stream() << record->id << " is corrupted");
             }
-            dataSizeTotal += static_cast<long long>(dataSize);
         }
     }
 
-    if (_sizeStorer && full && scanData && results->valid) {
+    if (_sizeStorer && results->valid) {
         if (nrecords != _numRecords.load() || dataSizeTotal != _dataSize.load()) {
             warning() << _uri << ": Existing record and data size counters (" << _numRecords.load()
                       << " records " << _dataSize.load() << " bytes) "
-                      << "are inconsistent with full validation results (" << nrecords
-                      << " records " << dataSizeTotal << " bytes). "
+                      << "are inconsistent with validation results (" << nrecords << " records "
+                      << dataSizeTotal << " bytes). "
                       << "Updating counters with new values.";
         }
 
@@ -1407,7 +1408,7 @@ Status WiredTigerRecordStore::validate(OperationContext* txn,
         if (nrecords != oldNumRecords || dataSizeTotal != oldDataSize) {
             warning() << _uri << ": Existing data in size storer (" << oldNumRecords << " records "
                       << oldDataSize << " bytes) "
-                      << "is inconsistent with full validation results (" << _numRecords.load()
+                      << "is inconsistent with validation results (" << _numRecords.load()
                       << " records " << _dataSize.load() << " bytes). "
                       << "Updating size storer with new values.";
         }

@@ -456,7 +456,7 @@ protected:
     long long expectedDataSize;
 };
 
-// Basic validation - size storer data is not updated.
+// Basic validation - size storer data is updated.
 TEST_F(SizeStorerValidateTest, Basic) {
     unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
     ValidateResults results;
@@ -464,8 +464,8 @@ TEST_F(SizeStorerValidateTest, Basic) {
     ASSERT_OK(rs->validate(opCtx.get(), false, false, NULL, &results, &output));
     BSONObj obj = output.obj();
     ASSERT_EQUALS(expectedNumRecords, obj.getIntField("nrecords"));
-    ASSERT_EQUALS(0, getNumRecords());
-    ASSERT_EQUALS(0, getDataSize());
+    ASSERT_EQUALS(expectedNumRecords, getNumRecords());
+    ASSERT_EQUALS(expectedDataSize, getDataSize());
 }
 
 // Full validation - size storer data is updated.
