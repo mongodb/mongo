@@ -2986,6 +2986,7 @@ buildvariants:
   - enterprise
   run_on:
   - osx-108
+  batchtime: 1440 # 1 day
   expansions:
     push_path: osx
     push_bucket: downloads.10gen.com
