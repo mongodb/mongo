@@ -253,6 +253,11 @@ env.CppUnitTest('topology_coordinator_impl_test',
                 LIBDEPS=['topology_coordinator_impl',
                          'replica_set_messages'])
 
+env.CppUnitTest('topology_coordinator_impl_v1_test',
+                'topology_coordinator_impl_v1_test.cpp',
+                LIBDEPS=['topology_coordinator_impl',
+                         'replica_set_messages'])
+
 env.Library('repl_coordinator_impl',
             [
                 'check_quorum_for_config_change.cpp',
