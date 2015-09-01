@@ -27,7 +27,10 @@
 */
 
 namespace mongo {
+
+struct ServerGlobalParams;
+
 // Checks various startup conditions and logs any necessary warnings that
 // are common to both mongod and mongos processes.
-void logCommonStartupWarnings();
+void logCommonStartupWarnings(const ServerGlobalParams& serverParams);
 }  // namespace mongo

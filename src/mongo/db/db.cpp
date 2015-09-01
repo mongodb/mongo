@@ -82,6 +82,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/restapi.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
@@ -531,7 +532,7 @@ static void _initAndListen(int listenPort) {
 
     getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
 
-    logMongodStartupWarnings(storageGlobalParams);
+    logMongodStartupWarnings(storageGlobalParams, serverGlobalParams);
 
     {
         stringstream ss;
