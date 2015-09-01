@@ -38,6 +38,7 @@
 #include <sys/resource.h>
 #endif
 
+#include "mongo/db/server_options.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/mongoutils/str.h"
@@ -130,8 +131,9 @@ StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter
     return StatusWith<std::string>(opMode);
 }
 
-void logMongodStartupWarnings(const StorageGlobalParams& params) {
-    logCommonStartupWarnings();
+void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
+                              const ServerGlobalParams& serverParams) {
+    logCommonStartupWarnings(serverParams);
 
     bool warned = false;
 
@@ -140,7 +142,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& params) {
         log() << "** NOTE: This is a 32 bit MongoDB binary." << startupWarningsLog;
         log() << "**       32 bit builds are limited to less than 2GB of data "
               << "(or less with --journal)." << startupWarningsLog;
-        if (!params.dur) {
+        if (!storageParams.dur) {
             log() << "**       Note that journaling defaults to off for 32 bit "
                   << "and is currently off." << startupWarningsLog;
         }
@@ -219,7 +221,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& params) {
         }
     }
 
-    if (params.dur) {
+    if (storageParams.dur) {
         std::fstream f("/proc/sys/vm/overcommit_memory", ios_base::in);
         unsigned val;
         f >> val;

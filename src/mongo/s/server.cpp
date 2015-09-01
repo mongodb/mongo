@@ -52,6 +52,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/startup_warnings_common.h"
@@ -392,7 +393,7 @@ int mongoSMain(int argc, char* argv[], char** envp) {
     startupConfigActions(std::vector<std::string>(argv, argv + argc));
     cmdline_utils::censorArgvArray(argc, argv);
 
-    mongo::logCommonStartupWarnings();
+    mongo::logCommonStartupWarnings(serverGlobalParams);
 
     try {
         int exitCode = _main();

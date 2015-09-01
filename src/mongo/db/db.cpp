@@ -81,6 +81,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/restapi.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
@@ -463,7 +464,7 @@ static void _initAndListen(int listenPort) {
     }
 
     DEV log(LogComponent::kControl) << "DEBUG build (which is slower)" << endl;
-    logMongodStartupWarnings(storageGlobalParams);
+    logMongodStartupWarnings(storageGlobalParams, serverGlobalParams);
 
 #if defined(_WIN32)
     printTargetMinOS();
