@@ -51,7 +51,7 @@ const std::string ReplicaSetConfig::kVersionFieldName = "version";
 const std::string ReplicaSetConfig::kMajorityWriteConcernModeName = "$majority";
 const Milliseconds ReplicaSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
-const Milliseconds ReplicaSetConfig::kDefaultElectionTimeoutPeriod(2000);
+const Milliseconds ReplicaSetConfig::kDefaultElectionTimeoutPeriod(10000);
 
 namespace {
 

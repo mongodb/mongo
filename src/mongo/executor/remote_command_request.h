@@ -55,7 +55,7 @@ struct RemoteCommandRequest {
                          const std::string& theDbName,
                          const BSONObj& theCmdObj,
                          const BSONObj& metadataObj,
-                         const Milliseconds timeoutMillis = kNoTimeout)
+                         Milliseconds timeoutMillis = kNoTimeout)
         : target(theTarget),
           dbname(theDbName),
           metadata(metadataObj),
@@ -69,13 +69,13 @@ struct RemoteCommandRequest {
     RemoteCommandRequest(const HostAndPort& theTarget,
                          const std::string& theDbName,
                          const BSONObj& theCmdObj,
-                         const Milliseconds timeoutMillis = kNoTimeout)
+                         Milliseconds timeoutMillis = kNoTimeout)
         : RemoteCommandRequest(
               theTarget, theDbName, theCmdObj, rpc::makeEmptyMetadata(), timeoutMillis) {}
 
     RemoteCommandRequest(const HostAndPort& theTarget,
                          const rpc::RequestInterface& request,
-                         const Milliseconds timeoutMillis = kNoTimeout)
+                         Milliseconds timeoutMillis = kNoTimeout)
         : RemoteCommandRequest(theTarget,
                                request.getDatabase().toString(),
                                request.getCommandArgs(),
