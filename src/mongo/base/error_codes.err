@@ -145,6 +145,7 @@ error_code("JSUncatchableError", 142)
 error_code("CursorInUse", 143)
 error_code("IncompatibleCatalogManager", 144)
 error_code("PooledConnectionsDropped", 145)
+error_code("ExceededMemoryLimit", 146)
 
 # Non-sequential error codes (for compatibility only)
 error_code("RecvStaleConfig", 9996)

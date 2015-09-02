@@ -366,32 +366,34 @@ public:
         BSONElement maxSizeElem = cmdObj["maxChunkSizeBytes"];
 
         if (ns.empty()) {
-            errmsg = "need to specify namespace in command";
-            return false;
+            return appendCommandStatus(
+                result, Status(ErrorCodes::InvalidOptions, "need to specify namespace in command"));
         }
 
         if (toShardName.empty()) {
-            errmsg = "need to specify shard to move chunk to";
-            return false;
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::InvalidOptions, "need to specify shard to move chunk to"));
         }
         if (fromShardName.empty()) {
-            errmsg = "need to specify shard to move chunk from";
-            return false;
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::InvalidOptions, "need to specify shard to move chunk from"));
         }
 
         if (min.isEmpty()) {
-            errmsg = "need to specify a min";
-            return false;
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::InvalidOptions, "need to specify a min"));
         }
 
         if (max.isEmpty()) {
-            errmsg = "need to specify a max";
-            return false;
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::InvalidOptions, "need to specify a max"));
         }
 
         if (maxSizeElem.eoo() || !maxSizeElem.isNumber()) {
-            errmsg = "need to specify maxChunkSizeBytes";
-            return false;
+            return appendCommandStatus(
+                result, Status(ErrorCodes::InvalidOptions, "need to specify maxChunkSizeBytes"));
         }
 
         const long long maxChunkSize = maxSizeElem.numberLong();  // in bytes
@@ -402,9 +404,9 @@ public:
         // sharding state for this shard.
         if (!shardingState->enabled()) {
             if (cmdObj["configdb"].type() != String) {
-                errmsg = "sharding not enabled";
-                warning() << errmsg;
-                return false;
+                const string msg = "sharding not enabled";
+                warning() << msg;
+                return appendCommandStatus(result, Status(ErrorCodes::IllegalOperation, msg));
             }
 
             const string configdb = cmdObj["configdb"].String();
@@ -431,9 +433,11 @@ public:
         // 2.
 
         if (shardingState->migrationSourceManager()->isActive()) {
-            errmsg = "migration already in progress";
-            warning() << errmsg;
-            return false;
+            const std::string msg =
+                "Not starting chunk migration because another migration is already in progress";
+            warning() << msg;
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::ConflictingOperationInProgress, msg));
         }
 
         //
@@ -445,12 +449,11 @@ public:
         auto scopedDistLock = grid.forwardingCatalogManager()->distLock(txn, ns, whyMessage);
 
         if (!scopedDistLock.isOK()) {
-            errmsg = stream() << "could not acquire collection lock for " << ns
-                              << " to migrate chunk [" << minKey << "," << maxKey << ")"
-                              << causedBy(scopedDistLock.getStatus());
-
-            warning() << errmsg;
-            return false;
+            const string msg = stream() << "could not acquire collection lock for " << ns
+                                        << " to migrate chunk [" << minKey << "," << maxKey << ")"
+                                        << causedBy(scopedDistLock.getStatus());
+            warning() << msg;
+            return appendCommandStatus(result, Status(scopedDistLock.getStatus().code(), msg));
         }
 
         BSONObj chunkInfo =
@@ -464,22 +467,23 @@ public:
         Status refreshStatus = shardingState->refreshMetadataNow(txn, ns, &origShardVersion);
 
         if (!refreshStatus.isOK()) {
-            errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
-                                   << "[" << minKey << "," << maxKey << ")"
-                                   << causedBy(refreshStatus.reason());
+            const string msg = str::stream() << "moveChunk cannot start migrate of chunk "
+                                             << "[" << minKey << "," << maxKey << ")"
+                                             << causedBy(refreshStatus.reason());
 
-            warning() << errmsg;
-            return false;
+            warning() << msg;
+            return appendCommandStatus(result, Status(refreshStatus.code(), msg));
         }
 
         if (origShardVersion.majorVersion() == 0) {
             // It makes no sense to migrate if our version is zero and we have no chunks
-            errmsg = str::stream() << "moveChunk cannot start migrate of chunk "
-                                   << "[" << minKey << "," << maxKey << ")"
-                                   << " with zero shard version";
+            const string msg = str::stream() << "moveChunk cannot start migrate of chunk "
+                                             << "[" << minKey << "," << maxKey << ")"
+                                             << " with zero shard version";
 
-            warning() << errmsg;
-            return false;
+            warning() << msg;
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::IncompatibleShardingMetadata, msg));
         }
 
         // From mongos >= v3.0.
@@ -488,13 +492,14 @@ public:
             OID cmdEpoch = epochElem.OID();
 
             if (cmdEpoch != origShardVersion.epoch()) {
-                errmsg = str::stream() << "moveChunk cannot move chunk "
-                                       << "[" << minKey << "," << maxKey << "), "
-                                       << "collection may have been dropped. "
-                                       << "current epoch: " << origShardVersion.epoch()
-                                       << ", cmd epoch: " << cmdEpoch;
-                warning() << errmsg;
-                return false;
+                const string msg = str::stream() << "moveChunk cannot move chunk "
+                                                 << "[" << minKey << "," << maxKey << "), "
+                                                 << "collection may have been dropped. "
+                                                 << "current epoch: " << origShardVersion.epoch()
+                                                 << ", cmd epoch: " << cmdEpoch;
+                warning() << msg;
+                return appendCommandStatus(result,
+                                           Status(ErrorCodes::IncompatibleShardingMetadata, msg));
             }
         }
 
@@ -518,12 +523,13 @@ public:
         if (!origCollMetadata->getNextChunk(min, &origChunk) || origChunk.getMin().woCompare(min) ||
             origChunk.getMax().woCompare(max)) {
             // Our boundaries are different from those passed in
-            errmsg = str::stream() << "moveChunk cannot find chunk "
-                                   << "[" << minKey << "," << maxKey << ")"
-                                   << " to migrate, the chunk boundaries may be stale";
+            const string msg = str::stream() << "moveChunk cannot find chunk "
+                                             << "[" << minKey << "," << maxKey << ")"
+                                             << " to migrate, the chunk boundaries may be stale";
 
-            warning() << errmsg;
-            return false;
+            warning() << msg;
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::IncompatibleShardingMetadata, msg));
         }
 
         log() << "moveChunk request accepted at version " << origShardVersion;
@@ -537,9 +543,12 @@ public:
             txn, shardingState->migrationSourceManager(), ns, min, max, shardKeyPattern);
 
         if (statusHolder.isAnotherMigrationActive()) {
-            errmsg = "moveChunk is already in progress from this shard";
-            warning() << errmsg;
-            return false;
+            const std::string msg =
+                "Not starting chunk migration because another migration is already in progress "
+                "from this shard";
+            warning() << msg;
+            return appendCommandStatus(result,
+                                       Status(ErrorCodes::ConflictingOperationInProgress, msg));
         }
 
         ConnectionString fromShardCS;
@@ -574,7 +583,6 @@ public:
             }
 
             BSONObj res;
-            bool ok;
 
             const bool isSecondaryThrottle(writeConcern.shouldWaitForOtherNodes());
 
@@ -596,22 +604,25 @@ public:
 
             try {
                 ScopedDbConnection connTo(toShardCS);
-                ok = connTo->runCommand("admin", recvChunkStartBuilder.done(), res);
+                connTo->runCommand("admin", recvChunkStartBuilder.done(), res);
                 connTo.done();
-            } catch (DBException& e) {
-                errmsg = str::stream() << "moveChunk could not contact to: shard " << toShardName
-                                       << " to start transfer" << causedBy(e);
-                warning() << errmsg;
-                return false;
+            } catch (const DBException& e) {
+                Status exceptionStatus = e.toStatus();
+                const string msg = str::stream() << "moveChunk could not contact to: shard "
+                                                 << toShardName << " to start transfer"
+                                                 << causedBy(exceptionStatus);
+                warning() << msg;
+                return appendCommandStatus(result, exceptionStatus);
             }
 
-            if (!ok) {
-                errmsg = "moveChunk failed to engage TO-shard in the data transfer: ";
-                verify(res["errmsg"].type());
-                errmsg += res["errmsg"].String();
+            Status recvChunkStartStatus = getStatusFromCommandResult(res);
+            if (!recvChunkStartStatus.isOK()) {
+                const string msg = str::stream()
+                    << "moveChunk failed to engage TO-shard in the data transfer: "
+                    << causedBy(recvChunkStartStatus);
                 result.append("cause", res);
-                warning() << errmsg;
-                return false;
+                warning() << msg;
+                return appendCommandStatus(result, Status(recvChunkStartStatus.code(), msg));
             }
         }
 
@@ -631,19 +642,37 @@ public:
             sleepmillis(1 << std::min(i, 10));
 
             ScopedDbConnection conn(toShardCS);
-            bool ok;
             res = BSONObj();
             try {
-                ok = conn->runCommand("admin", BSON("_recvChunkStatus" << 1), res);
+                conn->runCommand("admin", BSON("_recvChunkStatus" << 1), res);
                 res = res.getOwned();
             } catch (DBException& e) {
-                errmsg = str::stream() << "moveChunk could not contact to: shard " << toShardName
-                                       << " to monitor transfer" << causedBy(e);
-                warning() << errmsg;
-                return false;
+                Status exceptionStatus = e.toStatus();
+                const string msg = str::stream() << "moveChunk could not contact to: shard "
+                                                 << toShardName << " to monitor transfer"
+                                                 << causedBy(exceptionStatus);
+                warning() << msg;
+                return appendCommandStatus(result, exceptionStatus);
+            }
+            conn.done();
+
+            Status recvChunkStatus = getStatusFromCommandResult(res);
+            if (!recvChunkStatus.isOK()) {
+                const string msg = str::stream()
+                    << "moveChunk failed to contact TO-shard to monitor the data transfer: "
+                    << causedBy(recvChunkStatus);
+                warning() << msg;
+                return appendCommandStatus(result, Status(recvChunkStatus.code(), msg));
             }
 
-            conn.done();
+            if (res["state"].String() == "fail") {
+                warning() << "moveChunk error transferring data caused migration abort: " << res
+                          << migrateLog;
+                errmsg = "data transfer error";
+                result.append("cause", res);
+                result.append("code", ErrorCodes::OperationFailed);
+                return false;
+            }
 
             if (res["ns"].str() != ns || res["from"].str() != fromShardCS.toString() ||
                 !res["min"].isABSONObj() || res["min"].Obj().woCompare(min) != 0 ||
@@ -653,23 +682,15 @@ public:
                 // to the abort state. This is currently possible only if multiple migrations
                 // are happening at once. This is an unfortunate consequence of the shards not
                 // being able to keep track of multiple incoming and outgoing migrations.
-                errmsg = str::stream() << "Destination shard aborted migration, "
-                                          "now running a new one: " << res;
-                warning() << errmsg;
-                return false;
+                const string msg = str::stream() << "Destination shard aborted migration, "
+                                                    "now running a new one: " << res;
+                warning() << msg;
+                return appendCommandStatus(result, Status(ErrorCodes::OperationIncomplete, msg));
             }
 
             LOG(0) << "moveChunk data transfer progress: " << res
                    << " my mem used: " << shardingState->migrationSourceManager()->mbUsed()
                    << migrateLog;
-
-            if (!ok || res["state"].String() == "fail") {
-                warning() << "moveChunk error transferring data caused migration abort: " << res
-                          << migrateLog;
-                errmsg = "data transfer error";
-                result.append("cause", res);
-                return false;
-            }
 
             if (res["state"].String() == "steady")
                 break;
@@ -691,6 +712,7 @@ public:
                         << migrateLog;
                 errmsg = "aborting migrate because too much memory used";
                 result.appendBool("split", true);
+                result.append("code", ErrorCodes::ExceededMemoryLimit);
                 return false;
             }
 
@@ -711,23 +733,24 @@ public:
         // Ensure all cloned docs have actually been transferred
         std::size_t locsRemaining = shardingState->migrationSourceManager()->cloneLocsRemaining();
         if (locsRemaining != 0) {
-            errmsg = str::stream() << "moveChunk cannot enter critical section before all data is"
-                                   << " cloned, " << locsRemaining << " locs were not transferred"
-                                   << " but to-shard reported " << res;
+            const string msg = str::stream()
+                << "moveChunk cannot enter critical section before all data is"
+                << " cloned, " << locsRemaining << " locs were not transferred"
+                << " but to-shard reported " << res;
 
             // Should never happen, but safe to abort before critical section
-            error() << errmsg << migrateLog;
+            error() << msg << migrateLog;
             dassert(false);
-            return false;
+            return appendCommandStatus(result, Status(ErrorCodes::OperationIncomplete, msg));
         }
 
         // Ensure distributed lock still held
         Status lockStatus = scopedDistLock.getValue().checkStatus();
         if (!lockStatus.isOK()) {
-            errmsg = str::stream() << "not entering migrate critical section because "
-                                   << lockStatus.toString();
-            warning() << errmsg;
-            return false;
+            const string msg = str::stream() << "not entering migrate critical section because "
+                                             << lockStatus.toString();
+            warning() << msg;
+            return appendCommandStatus(result, Status(lockStatus.code(), msg));
         }
 
         log() << "About to enter migrate critical section";
@@ -759,21 +782,21 @@ public:
             // no other state change could be ongoing
 
             BSONObj res;
-            bool ok;
-
+            Status recvChunkCommitStatus{ErrorCodes::InternalError, "status not set"};
             try {
                 ScopedDbConnection connTo(toShardCS, 35.0);
-                ok = connTo->runCommand("admin", BSON("_recvChunkCommit" << 1), res);
+                connTo->runCommand("admin", BSON("_recvChunkCommit" << 1), res);
+                recvChunkCommitStatus = getStatusFromCommandResult(res);
                 connTo.done();
-            } catch (DBException& e) {
+            } catch (const DBException& e) {
                 errmsg = str::stream() << "moveChunk could not contact to: shard "
                                        << toShardCS.toString() << " to commit transfer"
                                        << causedBy(e);
                 warning() << errmsg;
-                ok = false;
+                recvChunkCommitStatus = e.toStatus();
             }
 
-            if (!ok || MONGO_FAIL_POINT(failMigrationCommit)) {
+            if (!recvChunkCommitStatus.isOK() || MONGO_FAIL_POINT(failMigrationCommit)) {
                 log() << "moveChunk migrate commit not accepted by TO-shard: " << res
                       << " resetting shard version to: " << origShardVersion << migrateLog;
                 {
@@ -790,8 +813,13 @@ public:
                 }
                 log() << "Shard version successfully reset to clean up failed migration";
 
-                errmsg = "_recvChunkCommit failed!";
+                errmsg = str::stream()
+                    << "_recvChunkCommit failed: " << causedBy(recvChunkCommitStatus);
                 result.append("cause", res);
+                if (!recvChunkCommitStatus.isOK()) {
+                    // Can't appendCommandStatus in case we're failing due to the failpoint
+                    result.append("code", recvChunkCommitStatus.code());
+                }
                 return false;
             }
 
@@ -940,8 +968,9 @@ public:
 
                 log() << "Shard version successfully reset to clean up failed migration";
 
-                errmsg = "Failed to send migrate commit to configs because " + errmsg;
-                return false;
+                const string msg =
+                    "Failed to send migrate commit to configs" + causedBy(applyOpsStatus);
+                return appendCommandStatus(result, Status(applyOpsStatus.code(), msg));
 
             } else if (!applyOpsStatus.isOK()) {
                 // this could be a blip in the connectivity
