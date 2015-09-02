@@ -147,7 +147,7 @@ private:
     // Task executor used to run find/getMore commands on sync source.
     executor::ThreadPoolTaskExecutor _threadPoolTaskExecutor;
 
-    // _mutex protects all of the class variables except _syncSourceReader and _buffer
+    // _mutex protects all of the class variables except _buffer
     mutable stdx::mutex _mutex;
 
     OpTime _lastOpTimeFetched;

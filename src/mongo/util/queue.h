@@ -58,14 +58,13 @@ class BlockingQueue {
 
 public:
     BlockingQueue()
-        : _maxSize(std::numeric_limits<std::size_t>::max()),
-          _currentSize(0),
-          _getSize(&_getSizeDefault) {}
-    BlockingQueue(size_t size) : _maxSize(size), _currentSize(0), _getSize(&_getSizeDefault) {}
-    BlockingQueue(size_t size, getSizeFunc f) : _maxSize(size), _currentSize(0), _getSize(f) {}
+        : _maxSize(std::numeric_limits<std::size_t>::max()), _getSize(&_getSizeDefault) {}
+    BlockingQueue(size_t size) : _maxSize(size), _getSize(&_getSizeDefault) {}
+    BlockingQueue(size_t size, getSizeFunc f) : _maxSize(size), _getSize(f) {}
 
     void push(T const& t) {
         stdx::unique_lock<stdx::mutex> l(_lock);
+        _clearing = false;
         size_t tSize = _getSize(t);
         while (_currentSize + tSize > _maxSize) {
             _cvNoLongerFull.wait(l);
@@ -105,9 +104,11 @@ public:
 
     void clear() {
         stdx::lock_guard<stdx::mutex> l(_lock);
+        _clearing = true;
         _queue = std::queue<T>();
         _currentSize = 0;
         _cvNoLongerFull.notify_one();
+        _cvNoLongerEmpty.notify_one();
     }
 
     bool tryPop(T& t) {
@@ -125,8 +126,12 @@ public:
 
     T blockingPop() {
         stdx::unique_lock<stdx::mutex> l(_lock);
-        while (_queue.empty())
+        _clearing = false;
+        while (_queue.empty() && !_clearing)
             _cvNoLongerEmpty.wait(l);
+        if (_clearing) {
+            return T{};
+        }
 
         T t = _queue.front();
         _queue.pop();
@@ -146,11 +151,15 @@ public:
         using namespace stdx::chrono;
         const auto deadline = system_clock::now() + seconds(maxSecondsToWait);
         stdx::unique_lock<stdx::mutex> l(_lock);
-        while (_queue.empty()) {
+        _clearing = false;
+        while (_queue.empty() && !_clearing) {
             if (stdx::cv_status::timeout == _cvNoLongerEmpty.wait_until(l, deadline))
                 return false;
         }
 
+        if (_clearing) {
+            return false;
+        }
         t = _queue.front();
         _queue.pop();
         _currentSize -= _getSize(t);
@@ -164,11 +173,14 @@ public:
         using namespace stdx::chrono;
         const auto deadline = system_clock::now() + seconds(maxSecondsToWait);
         stdx::unique_lock<stdx::mutex> l(_lock);
-        while (_queue.empty()) {
+        _clearing = false;
+        while (_queue.empty() && !_clearing) {
             if (stdx::cv_status::timeout == _cvNoLongerEmpty.wait_until(l, deadline))
                 return false;
         }
-
+        if (_clearing) {
+            return false;
+        }
         t = _queue.front();
         return true;
     }
@@ -189,8 +201,9 @@ private:
     mutable stdx::mutex _lock;
     std::queue<T> _queue;
     const size_t _maxSize;
-    size_t _currentSize;
+    size_t _currentSize = 0;
     getSizeFunc _getSize;
+    bool _clearing = false;
 
     stdx::condition_variable _cvNoLongerFull;
     stdx::condition_variable _cvNoLongerEmpty;

@@ -228,6 +228,10 @@ void BackgroundSync::_producerThread() {
         if (!isPaused()) {
             stop();
         }
+        if (_replCoord->isWaitingForApplierToDrain() && _buffer.empty()) {
+            // This will wake up the applier if it is sitting in blockingPeek().
+            _buffer.clear();
+        }
         sleepsecs(1);
         return;
     }
