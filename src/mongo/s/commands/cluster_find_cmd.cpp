@@ -44,6 +44,8 @@ using std::unique_ptr;
 using std::string;
 using std::vector;
 
+const char kTermField[] = "term";
+
 /**
  * Implements the find command on mongos.
  */
@@ -88,14 +90,9 @@ public:
     Status checkAuthForCommand(ClientBasic* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-        ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
-
-        if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::find)) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+        NamespaceString nss(parseNs(dbname, cmdObj));
+        auto hasTerm = cmdObj.hasField(kTermField);
+        return AuthorizationSession::get(client)->checkAuthForFind(nss, hasTerm);
     }
 
     Status explain(OperationContext* txn,

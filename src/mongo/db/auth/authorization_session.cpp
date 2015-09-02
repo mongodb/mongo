@@ -177,7 +177,7 @@ PrivilegeVector AuthorizationSession::getDefaultPrivileges() {
     return defaultPrivileges;
 }
 
-Status AuthorizationSession::checkAuthForQuery(const NamespaceString& ns, const BSONObj& query) {
+Status AuthorizationSession::checkAuthForFind(const NamespaceString& ns, bool hasTerm) {
     if (MONGO_unlikely(ns.isCommand())) {
         return Status(ErrorCodes::InternalError,
                       str::stream() << "Checking query auth on command namespace " << ns.ns());
@@ -186,10 +186,23 @@ Status AuthorizationSession::checkAuthForQuery(const NamespaceString& ns, const 
         return Status(ErrorCodes::Unauthorized,
                       str::stream() << "not authorized for query on " << ns.ns());
     }
+
+    // Only internal clients (such as other nodes in a replica set) are allowed to use
+    // the 'term' field in a find operation. Use of this field could trigger changes
+    // in the receiving server's replication state and should be protected.
+    if (hasTerm &&
+        !isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                          ActionType::internal)) {
+        return Status(ErrorCodes::Unauthorized,
+                      str::stream() << "not authorized for query with term on " << ns.ns());
+    }
+
     return Status::OK();
 }
 
-Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns, long long cursorID) {
+Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
+                                                 long long cursorID,
+                                                 bool hasTerm) {
     // "ns" can be in one of three formats: "listCollections" format, "listIndexes" format, and
     // normal format.
     if (ns.isListCollectionsCursorNS()) {
@@ -216,6 +229,17 @@ Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns, long
                           str::stream() << "not authorized for getMore on " << ns.ns());
         }
     }
+
+    // Only internal clients (such as other nodes in a replica set) are allowed to use
+    // the 'term' field in a getMore operation. Use of this field could trigger changes
+    // in the receiving server's replication state and should be protected.
+    if (hasTerm &&
+        !isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                          ActionType::internal)) {
+        return Status(ErrorCodes::Unauthorized,
+                      str::stream() << "not authorized for getMore with term on " << ns.ns());
+    }
+
     return Status::OK();
 }
 

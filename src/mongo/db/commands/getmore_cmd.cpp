@@ -128,7 +128,7 @@ public:
         const GetMoreRequest& request = parseStatus.getValue();
 
         return AuthorizationSession::get(client)
-            ->checkAuthForGetMore(request.nss, request.cursorid);
+            ->checkAuthForGetMore(request.nss, request.cursorid, request.term.is_initialized());
     }
 
     bool run(OperationContext* txn,

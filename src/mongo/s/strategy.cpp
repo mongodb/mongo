@@ -158,7 +158,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
     NamespaceString ns(q.ns);
     ClientBasic* client = txn->getClient();
     AuthorizationSession* authSession = AuthorizationSession::get(client);
-    Status status = authSession->checkAuthForQuery(ns, q.query);
+    Status status = authSession->checkAuthForFind(ns, false);
     audit::logQueryAuthzCheck(client, ns, q.query, status.code());
     uassertStatusOK(status);
 
@@ -625,7 +625,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
     ClientBasic* client = ClientBasic::getCurrent();
     NamespaceString nsString(ns);
     AuthorizationSession* authSession = AuthorizationSession::get(client);
-    Status status = authSession->checkAuthForGetMore(nsString, id);
+    Status status = authSession->checkAuthForGetMore(nsString, id, false);
     audit::logGetMoreAuthzCheck(client, nsString, id, status.code());
     uassertStatusOK(status);
 

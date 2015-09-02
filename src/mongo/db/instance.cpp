@@ -370,7 +370,7 @@ static void receivedQuery(OperationContext* txn,
 
     try {
         Client* client = txn->getClient();
-        Status status = AuthorizationSession::get(client)->checkAuthForQuery(nss, q.query);
+        Status status = AuthorizationSession::get(client)->checkAuthForFind(nss, false);
         audit::logQueryAuthzCheck(client, nss, q.query, status.code());
         uassertStatusOK(status);
 
@@ -863,8 +863,8 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
         const NamespaceString nsString(ns);
         uassert(16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid());
 
-        Status status =
-            AuthorizationSession::get(txn->getClient())->checkAuthForGetMore(nsString, cursorid);
+        Status status = AuthorizationSession::get(txn->getClient())
+                            ->checkAuthForGetMore(nsString, cursorid, false);
         audit::logGetMoreAuthzCheck(txn->getClient(), nsString, cursorid, status.code());
         uassertStatusOK(status);
 

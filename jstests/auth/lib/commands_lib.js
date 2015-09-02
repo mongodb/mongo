@@ -1140,6 +1140,21 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "findWithTerm",
+            command: {find: "foo", limit: -1, term: NumberLong(1)},
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {__system: 1},
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "foo"}, actions: ["find"] },
+                        { resource: {cluster: true}, actions: ["internal"] }
+                    ],
+                    expectFail: true // because of invalid limit
+                },
+            ]
+        },
+        {
             testname: "findAndModify",
             command: {findAndModify: "x", query: {_id: "abc"}, update: {$inc: {n: 1}}},
             setup: function (db) {
@@ -1325,6 +1340,21 @@ var authCommandsLib = {
                     roles: roles_readAny,
                     privileges: [
                         { resource: {db: secondDbName, collection: "foo"}, actions: ["find"] }
+                    ],
+                    expectFail: true
+                }
+            ]
+        },
+        {
+            testname: "getMoreWithTerm",
+            command: {getMore: NumberLong("1"), collection: "foo", term: NumberLong(1)},
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {__system: 1},
+                    privileges: [
+                        { resource: {db: firstDbName, collection: "foo"}, actions: ["find"] },
+                        { resource: {cluster: true}, actions: ["internal"] }
                     ],
                     expectFail: true
                 }
