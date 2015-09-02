@@ -116,9 +116,6 @@ zfree(void *cookie, void *p)
  *	YSD: The dst_len is calculated in __wt_bt_write before invoking this function. It's
  *	big enough to hold the compressed value of src even in the worst senario. So deflate
  *	called here will not stop before compressing all the data in src.
- *	And we can look into deflate a little deeper. Disk flush may be done inside it.
- *	Accordding to information from the Internet, disk flush will be done when the compressed
- *	data reaches the size of 32k. Need to confirm in the interface.
  */
 static int
 zlib_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
