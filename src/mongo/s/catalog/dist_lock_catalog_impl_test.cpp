@@ -1031,8 +1031,7 @@ TEST_F(DistLockCatalogFixture, BasicGetServerInfo) {
 
         return fromjson(R"({
                 localTime: { $date: "2015-05-26T13:06:27.293Z" },
-                $gleStats: {
-                    lastOpTime: { $timestamp: { t: 0, i: 0 }},
+                repl: {
                     electionId: ObjectId("555fa85d4d8640862a0fc79b")
                 },
                 ok: 1

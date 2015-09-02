@@ -118,21 +118,19 @@ StatusWith<BSONObj> extractFindAndModifyNewObj(const BSONObj& responseObj) {
 }
 
 /**
- * Extract the electionId from a command response.
- *
- * TODO: this needs to support OP_COMMAND metadata.
+ * Extract the electionId from a serverStatus command response.
  */
 StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
-    BSONElement gleStatsElem;
-    auto gleStatus = bsonExtractTypedField(responseObj, "$gleStats", Object, &gleStatsElem);
+    BSONElement replElem;
+    auto replElemStatus = bsonExtractTypedField(responseObj, "repl", Object, &replElem);
 
-    if (!gleStatus.isOK()) {
-        return {ErrorCodes::UnsupportedFormat, gleStatus.reason()};
+    if (!replElemStatus.isOK()) {
+        return {ErrorCodes::UnsupportedFormat, replElemStatus.reason()};
     }
 
     OID electionId;
 
-    auto electionIdStatus = bsonExtractOIDField(gleStatsElem.Obj(), "electionId", &electionId);
+    auto electionIdStatus = bsonExtractOIDField(replElem.Obj(), "electionId", &electionId);
 
     if (!electionIdStatus.isOK()) {
         return {ErrorCodes::UnsupportedFormat, electionIdStatus.reason()};
