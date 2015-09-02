@@ -37,10 +37,20 @@ var $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
-        // The TTL thread runs every 60 seconds, so for reliability, wait more than ttlSeconds
-        // plus a minute.
-        sleep((2 * this.ttlSeconds + 70) * 1000);
-        assertWhenOwnColl.eq(0, db[collName].find({ first: true }).itcount());
+        // By default, the TTL monitor thread runs every 60 seconds.
+        var defaultTTLSecs = 60;
+
+        // We need to wait for the initial documents to expire. It's possible for this code to run
+        // right after the TTL thread has started to sleep, which requires us to wait at least ~60
+        // seconds for it to wake up and delete the expired documents. We wait at least another
+        // minute just to avoid race-prone tests on overloaded test hosts.
+        var timeoutMS = 2 * Math.max(defaultTTLSecs, this.ttlSeconds) * 1000;
+
+        assertWhenOwnColl.soon(function checkTTLCount() {
+            // All initial documents should be removed by the end of the workload.
+            var count = db[collName].find({ first: true }).itcount();
+            return count === 0;
+        }, 'Expected oldest documents with TTL fields to be removed', timeoutMS);
     }
 
     return {
