@@ -4706,6 +4706,12 @@ err:	__wt_scr_free(session, &tmpkey);
 /*
  * __rec_row_leaf_insert --
  *	Walk an insert chain, writing K/V pairs.
+ *	YSD: ins contains the value to be insertted. The for loop reads one from ins each time,
+ *	builds the key and value structure. Note that the pointers for key and value are stored
+ *	in r separately. The key is formated in __rec_cell_build_leaf_key, and the value is
+ *	formated in __rec__cell_build_val.
+ *	The key and value are then copied onto the image page. Note that when copying the value,
+ *	dictionary compress will be used if it's configurated.
  */
 static int
 __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
