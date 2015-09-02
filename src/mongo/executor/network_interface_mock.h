@@ -95,6 +95,10 @@ public:
                               const RemoteCommandRequest& request,
                               const RemoteCommandCompletionFn& onFinish);
     virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle);
+    /**
+     * Not implemented.
+     */
+    void cancelAllCommands() override {}
     virtual void setAlarm(Date_t when, const stdx::function<void()>& action);
 
 

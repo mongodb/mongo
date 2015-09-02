@@ -199,6 +199,13 @@ void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbH
     }
 }
 
+void NetworkInterfaceASIO::cancelAllCommands() {
+    stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+    for (auto iter = _inProgress.begin(); iter != _inProgress.end(); ++iter) {
+        iter->first->cancel();
+    }
+}
+
 void NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>& action) {
     // "alarm" must stay alive until it expires, hence the shared_ptr.
     auto alarm = std::make_shared<asio::steady_timer>(_io_service, when - now());

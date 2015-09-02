@@ -95,6 +95,7 @@ public:
                       const RemoteCommandRequest& request,
                       const RemoteCommandCompletionFn& onFinish) override;
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) override;
+    void cancelAllCommands() override;
     void setAlarm(Date_t when, const stdx::function<void()>& action) override;
 
     bool inShutdown() const;

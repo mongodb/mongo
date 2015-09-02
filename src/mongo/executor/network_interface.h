@@ -118,6 +118,11 @@ public:
     virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) = 0;
 
     /**
+     * Requests cancelation of incomplete network activity.
+     */
+    virtual void cancelAllCommands() = 0;
+
+    /**
      * Sets an alarm, which schedules "action" to run no sooner than "when".
      *
      * "action" should not do anything that requires a lot of computation, or that might block for a
