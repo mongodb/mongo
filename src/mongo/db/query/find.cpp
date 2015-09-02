@@ -151,9 +151,9 @@ void endQueryOp(OperationContext* txn,
     // Fill out curop based on explain summary statistics.
     PlanSummaryStats summaryStats;
     Explain::getSummaryStats(exec, &summaryStats);
-    curop->debug().scanAndOrder = summaryStats.hasSortStage;
-    curop->debug().nscanned = summaryStats.totalKeysExamined;
-    curop->debug().nscannedObjects = summaryStats.totalDocsExamined;
+    curop->debug().hasSortStage = summaryStats.hasSortStage;
+    curop->debug().keysExamined = summaryStats.totalKeysExamined;
+    curop->debug().docsExamined = summaryStats.totalDocsExamined;
     curop->debug().idhack = summaryStats.isIdhack;
 
     const logger::LogComponent queryLogComponent = logger::LogComponent::kQuery;

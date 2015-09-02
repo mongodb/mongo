@@ -1,4 +1,4 @@
-// Basic test to ensure that the nscanned and nscannedObjects are tracked
+// Basic test to ensure that the keysExamined and docsExamined are tracked
 // correctly for updates.
 
 var t = db.jstests_update_profile;
@@ -27,8 +27,8 @@ printjson(prof);
 
 // Since we're doing a collection scan, we should have examined zero
 // index keys and all 5 documents.
-assert.eq(0, prof.nscanned, "wrong nscanned");
-assert.eq(5, prof.nscannedObjects, "wrong nscannedObjects");
+assert.eq(0, prof.keysExamined, "wrong keysExamined");
+assert.eq(5, prof.docsExamined, "wrong docsExamined");
 
 // Disable profiling and drop the profiler data.
 db.setProfilingLevel(0);

@@ -50,9 +50,8 @@ for (var j = 0; j < initialAdvance; j++) {
 assert(cursor.hasNext())
 
 // Cursor was advanced 10 times, batchSize=4 => 1 query + 2 getmore.
-// TODO: re-enable once SERVER-19566 is implemented
-// assert.eq(1, db.system.profile.count({op: "query", ns: t.getFullName()}));
-// assert.eq(2, db.system.profile.count({op: "getmore", ns: t.getFullName()}));
+assert.eq(1, db.system.profile.count({op: "query", ns: t.getFullName()}));
+assert.eq(2, db.system.profile.count({op: "getmore", ns: t.getFullName()}));
 
 for (var k = initialAdvance; k < totalPointCount; k++) {
     assert(cursor.hasNext())
@@ -60,9 +59,8 @@ for (var k = initialAdvance; k < totalPointCount; k++) {
 }
 
 // Cursor was advanced 200 times, batchSize=4 => 1 query + 49 getmore.
-// TODO: re-enable once SERVER-19566 is implemented
-// assert.eq(1, db.system.profile.count({op: "query", ns: t.getFullName()}));
-// assert.eq(49, db.system.profile.count({op: "getmore", ns: t.getFullName()}));
+assert.eq(1, db.system.profile.count({op: "query", ns: t.getFullName()}));
+assert.eq(49, db.system.profile.count({op: "getmore", ns: t.getFullName()}));
 
 // Disable profiling again - no longer needed for remainder of test
 db.setProfilingLevel(0);

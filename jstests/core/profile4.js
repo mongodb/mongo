@@ -1,138 +1,198 @@
-// Check debug information recorded for a query.
+/**
+ * Check debug information recorded for a query.
+ */
 
-// special db so that it can be run in parallel tests
+function profileCursor() {
+    var userStr = username + "@" + db.getName();
+    return db.system.profile.find({user: userStr});
+}
+
+function getLastOp() {
+    return profileCursor().sort({$natural: -1}).next();
+}
+
+// Special db so that it can be run in parallel tests. Also need to create a user so that
+// operations run by this test (and not other tests running in parallel) can be identified.
 var stddb = db;
 var db = db.getSisterDB("profile4");
 
 db.dropAllUsers();
-t = db.profile4;
-t.drop();
+var coll = db.profile4;
+coll.drop();
 
-function profileCursor() {
-    return db.system.profile.find( { user:username + "@" + db.getName() } );
-}
-
-function lastOp() {
-    p = profileCursor().sort( { $natural:-1 } ).next();
-//    printjson( p );
-    return p;
-}
-
-function checkLastOp( spec ) {
-    p = lastOp();
-    for( i in spec ) {
-        s = spec[ i ];
-        assert.eq( s[ 1 ], p[ s[ 0 ] ], s[ 0 ] );
-    }
-}
+var username = "jstests_profile4_user";
+db.createUser({user: username, pwd: "password", roles: jsTest.basicUserRoles});
+db.auth(username, "password");
 
 try {
-    username = "jstests_profile4_user";
-    db.createUser({user: username, pwd: "password", roles: jsTest.basicUserRoles});
-    db.auth( username, "password" );
-    
+    var lastOp;
+
+    // Clear the profiling collection.
     db.setProfilingLevel(0);
-    
     db.system.profile.drop();
-    assert.eq( 0 , profileCursor().count() )
-    
+    assert.eq(0 , profileCursor().count());
+
+    // Enable profiling. It will be disabled again at the end of the test, or if the test fails.
     db.setProfilingLevel(2);
 
-    t.find().itcount();
-    checkLastOp( [// TODO re-enable when SERVER-19566 is implemented.
-                  // [ "op", "query" ],
-                  // [ "query", {} ],
-                  // [ "responseLength", 20 ],
-                  [ "ns", "profile4.profile4" ],
-                  [ "ntoreturn", 0 ],
-                  [ "ntoskip", 0 ],
-                  [ "nscanned", 0 ],
-                  [ "keyUpdates", 0 ],
-                  [ "nreturned", 0 ],
-                  [ "cursorExhausted", true] ] );
-    
-    // check write lock stats are set
-    t.save( {} );
-    o = lastOp();
-    assert.eq('insert', o.op);
-    printjson(o.locks);
-    assert.lt( 0, Object.keys(o.locks).length );
+    coll.find().itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "query");
+    assert.eq(lastOp.query.find, coll.getName());
+    assert.eq(lastOp.ns, coll.getFullName());
+    assert.eq(lastOp.keysExamined, 0);
+    assert.eq(lastOp.keyUpdates, 0);
+    assert.eq(lastOp.nreturned, 0);
+    assert.eq(lastOp.cursorExhausted, true);
 
-    // check read lock stats are set
-    t.find();
-    o = lastOp();
-    // TODO re-enable when SERVER-19566 is implemented.
-    // assert.eq('query', o.op);
-    printjson(o.locks);
-    assert.lt( 0, Object.keys(o.locks).length );
+    // Check write lock stats are set.
+    coll.save({});
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "insert");
+    assert.lt(0, Object.keys(lastOp.locks).length);
 
-    t.save( {} );
-    t.save( {} );
-    t.find().skip( 1 ).limit( 4 ).itcount();
-    checkLastOp( [// TODO re-enable when SERVER-19566 is implemented.
-                  // [ "ntoreturn", 4 ],
-                  [ "ntoskip", 1 ],
-                  [ "nscannedObjects", 3 ],
-                  [ "nreturned", 2 ] ] );
+    // Check read lock stats are set.
+    coll.find();
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "query");
+    assert.lt(0, Object.keys(lastOp.locks).length);
 
-    t.find().batchSize( 2 ).next();
-    o = lastOp();
-    assert.lt( 0, o.cursorid );
-    
-    t.find( {a:1} ).itcount();
-    // TODO re-enable when SERVER-19566 is implemented.
-    // checkLastOp( [ [ "query", {a:1} ] ] );
-    
-    t.find( {_id:0} ).itcount();
-    checkLastOp( [ [ "idhack", true ] ] );
-    
-    t.find().sort( {a:1} ).itcount();
-    checkLastOp( [ [ "scanAndOrder", true ] ] );
-    
-    t.ensureIndex( {a:1} );
-    t.find( {a:1} ).itcount();
-    o = lastOp();
-    assert.eq( "FETCH", o.execStats.stage, tojson( o.execStats ) );
-    assert.eq( "IXSCAN", o.execStats.inputStage.stage, tojson( o.execStats ) );
+    coll.save({});
+    coll.save({});
+    coll.find().skip(1).limit(4).itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.query.skip, 1)
+    assert.eq(lastOp.docsExamined, 3);
+    assert.eq(lastOp.nreturned, 2);
+    // Find command will use "limit", OP_QUERY will use ntoreturn.
+    var expectedField = db.getMongo().useReadCommands() ? "limit" : "ntoreturn";
+    assert.eq(lastOp.query[expectedField], 4);
 
-    // For queries with a lot of stats data, the execution stats in the profile
-    // is replaced by the plan summary.
+    coll.find().batchSize(2).next();
+    lastOp = getLastOp();
+    assert.lt(0, lastOp.cursorid);
+
+    coll.find({a: 1}).itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.query.filter, {a: 1});
+
+    coll.find({_id: 0}).itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.idhack, true);
+
+    coll.find().sort({a: 1}).itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.hasSortStage, true);
+
+    coll.ensureIndex({a: 1});
+    coll.find({a: 1}).itcount();
+    lastOp = getLastOp();
+    assert.eq("FETCH", lastOp.execStats.stage, tojson(lastOp.execStats));
+    assert.eq("IXSCAN", lastOp.execStats.inputStage.stage, tojson(lastOp.execStats));
+
+    // For queries with a lot of stats data, the execution stats in the profile is replaced by
+    // the plan summary.
     var orClauses = 32;
     var bigOrQuery = { $or: [] };
-    for ( var i = 0; i < orClauses; ++i ) {
+    for (var i = 0; i < orClauses; ++i) {
         var indexSpec = {};
-        indexSpec[ "a" + i ] = 1;
-        t.ensureIndex( indexSpec );
-        bigOrQuery[ "$or" ].push( indexSpec );
+        indexSpec["a" + i] = 1;
+        coll.ensureIndex(indexSpec);
+        bigOrQuery["$or"].push(indexSpec);
     }
-    t.find( bigOrQuery ).itcount();
-    o = lastOp();
-    assert.neq( undefined, o.execStats.summary, tojson( o.execStats ) );
+    coll.find(bigOrQuery).itcount();
+    lastOp = getLastOp();
+    assert.neq(undefined, lastOp.execStats.summary, tojson(lastOp.execStats));
 
     // Confirm "cursorExhausted" not set when cursor is open.
-    t.drop();
-    t.insert([{_id:0},{_id:1},{_id:2},{_id:3},{_id:4}]);
-    t.find().batchSize(2).next(); // Query performed leaving open cursor
-    var operation = lastOp();
-    // TODO re-enable when SERVER-19566 is implemented.
-    // assert.eq("query", operation.op);
-    assert(!("cursorExhausted" in operation));
+    coll.drop();
+    coll.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]);
+    coll.find().batchSize(2).next(); // Query performed leaving open cursor
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "query");
+    assert(!("cursorExhausted" in lastOp));
 
-    var cursor = t.find().batchSize(2);
+    var cursor = coll.find().batchSize(2);
     cursor.next(); // Perform initial query and consume first of 2 docs returned.
     cursor.next(); // Consume second of 2 docs from initial query.
     cursor.next(); // getMore performed, leaving open cursor.
-    operation = lastOp();
-    // TODO re-enable when SERVER-19566 is implemented.
-    // assert.eq("getmore", operation.op);
-    assert(!("cursorExhausted" in operation));
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "getmore");
+    assert(!("cursorExhausted" in lastOp));
 
     // Exhaust cursor and confirm getMore has "cursorExhausted:true".
     cursor.itcount();
-    checkLastOp( [ [ "cursorExhausted", true] ] );
+    lastOp = getLastOp();
+    assert.eq(lastOp.cursorExhausted, true);
+
+    // OP_QUERY-specific test for the "wrapped" query predicate form.
+    if (!db.getMongo().useReadCommands()) {
+        // Must accept non-dollar-prefixed forms of "query" and "orderby".
+        coll.find({query: {_id: {$gte: 0}}, orderby: {_id: 1}}).itcount();
+        lastOp = getLastOp();
+        assert.eq(lastOp.op, "query");
+        assert.eq(lastOp.query.find, coll.getName());
+        assert.eq(lastOp.query.filter, {_id: {$gte: 0}});
+        assert.eq(lastOp.query.sort, {_id: 1});
+
+        // Should also work with dollar-prefixed forms.
+        coll.find({$query: {_id: {$gte: 0}}, $orderby: {_id: 1}}).itcount();
+        lastOp = getLastOp();
+        assert.eq(lastOp.op, "query");
+        assert.eq(lastOp.query.find, coll.getName());
+        assert.eq(lastOp.query.filter, {_id: {$gte: 0}});
+        assert.eq(lastOp.query.sort, {_id: 1});
+
+        // Negative ntoreturn.
+        coll.find().limit(-3).itcount();
+        lastOp = getLastOp();
+        assert.eq(lastOp.query.ntoreturn, -3);
+    }
+
+    // getMore command should show up as a getMore operation, not a command.
+    var cmdRes = db.runCommand({find: coll.getName(), batchSize: 1});
+    assert.commandWorked(cmdRes);
+    db.runCommand({getMore: cmdRes.cursor.id, collection: coll.getName()});
+    lastOp = getLastOp();
+    assert.eq(lastOp.op, "getmore");
+    assert.eq(lastOp.ns, coll.getFullName());
+
+    // Ensure that special $-prefixed OP_QUERY options like $hint and $returnKey get added to the
+    // profiler entry correctly.
+    coll.find().hint({_id: 1}).itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.query.hint, {_id: 1});
+
+    coll.find().comment("a comment").itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.query.comment, "a comment");
+
+    coll.find().maxScan(3000).itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.query.maxScan, 3000);
+
+    coll.find().maxTimeMS(4000).itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.query.maxTimeMS, 4000);
+
+    coll.find().max({_id: 3}).itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.query.max, {_id: 3});
+
+    coll.find().min({_id: 0}).itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.query.min, {_id: 0});
+
+    coll.find().returnKey().itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.query.returnKey, true);
+
+    coll.find().snapshot().itcount();
+    lastOp = getLastOp();
+    assert.eq(lastOp.query.snapshot, true);
 
     db.setProfilingLevel(0);
-    db.system.profile.drop();    
+    db.system.profile.drop();
 }
 finally {
     db.setProfilingLevel(0);

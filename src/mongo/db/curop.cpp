@@ -391,10 +391,10 @@ void OpDebug::reset() {
     ntoskip = -1;
     exhaust = false;
 
-    nscanned = -1;
-    nscannedObjects = -1;
+    keysExamined = -1;
+    docsExamined = -1;
     idhack = false;
-    scanAndOrder = false;
+    hasSortStage = false;
     nMatched = -1;
     nModified = -1;
     ninserted = -1;
@@ -475,10 +475,10 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     OPDEBUG_TOSTRING_HELP(ntoskip);
     OPDEBUG_TOSTRING_HELP_BOOL(exhaust);
 
-    OPDEBUG_TOSTRING_HELP(nscanned);
-    OPDEBUG_TOSTRING_HELP(nscannedObjects);
+    OPDEBUG_TOSTRING_HELP(keysExamined);
+    OPDEBUG_TOSTRING_HELP(docsExamined);
     OPDEBUG_TOSTRING_HELP_BOOL(idhack);
-    OPDEBUG_TOSTRING_HELP_BOOL(scanAndOrder);
+    OPDEBUG_TOSTRING_HELP_BOOL(hasSortStage);
     OPDEBUG_TOSTRING_HELP(nmoved);
     OPDEBUG_TOSTRING_HELP(nMatched);
     OPDEBUG_TOSTRING_HELP(nModified);
@@ -552,22 +552,113 @@ void appendAsObjOrString(StringData name,
 }
 }  // namespace
 
+const std::vector<const char*> OpDebug::kDollarQueryModifiers = {
+    "$hint",
+    "$comment",
+    "$maxScan",
+    "$max",
+    "$min",
+    "$returnKey",
+    "$showDiskLoc",
+    "$snapshot",
+    "$maxTimeMS",
+};
+
+bool OpDebug::isFindCommand() const {
+    return iscommand && str::equals(query.firstElement().fieldName(), "find");
+}
+
+bool OpDebug::isGetMoreCommand() const {
+    return iscommand && str::equals(query.firstElement().fieldName(), "getMore");
+}
+
+int OpDebug::getLogicalOpType() const {
+    if (isFindCommand()) {
+        return dbQuery;
+    } else if (isGetMoreCommand()) {
+        return dbGetMore;
+    } else if (iscommand) {
+        return dbCommand;
+    } else {
+        return op;
+    }
+}
+
+BSONObj OpDebug::upconvertQueryEntry(const NamespaceString& nss) const {
+    BSONObjBuilder bob;
+
+    bob.append("find", nss.coll());
+
+    // Whether or not the query predicate is wrapped inside a "query" or "$query" field so that
+    // other options can be passed alongside the predicate.
+    bool predicateIsWrapped = false;
+
+    // Extract the query predicate.
+    BSONObj filter;
+    if (auto elem = query["query"]) {
+        predicateIsWrapped = true;
+        bob.appendAs(elem, "filter");
+    } else if (auto elem = query["$query"]) {
+        predicateIsWrapped = true;
+        bob.appendAs(elem, "filter");
+    } else if (!query.isEmpty()) {
+        bob.append("filter", query);
+    }
+
+    if (ntoskip) {
+        bob.append("skip", ntoskip);
+    }
+    if (ntoreturn) {
+        bob.append("ntoreturn", ntoreturn);
+    }
+
+    // The remainder of the query options are only available if the predicate is passed in wrapped
+    // form. If the predicate is not wrapped, we're done.
+    if (!predicateIsWrapped) {
+        return bob.obj();
+    }
+
+    // Extract the sort.
+    if (auto elem = query["orderby"]) {
+        bob.appendAs(elem, "sort");
+    } else if (auto elem = query["$orderby"]) {
+        bob.appendAs(elem, "sort");
+    }
+
+    // Add $-prefixed OP_QUERY modifiers, like $hint.
+    for (auto modifier : kDollarQueryModifiers) {
+        if (auto elem = query[modifier]) {
+            // Use "+ 1" to omit the leading dollar sign.
+            bob.appendAs(elem, modifier + 1);
+        }
+    }
+
+    return bob.obj();
+}
+
 #define OPDEBUG_APPEND_NUMBER(x) \
     if (x != -1)                 \
     b.appendNumber(#x, (x))
 #define OPDEBUG_APPEND_BOOL(x) \
     if (x)                     \
     b.appendBool(#x, (x))
+
 void OpDebug::append(const CurOp& curop,
                      const SingleThreadedLockStats& lockStats,
                      BSONObjBuilder& b) const {
     const size_t maxElementSize = 50 * 1024;
 
-    b.append("op", iscommand ? "command" : opToString(op));
-    b.append("ns", curop.getNS());
+    int logicalOpType = getLogicalOpType();
+    b.append("op", opToString(logicalOpType));
 
-    if (!query.isEmpty()) {
-        appendAsObjOrString(iscommand ? "command" : "query", query, maxElementSize, &b);
+    NamespaceString nss = NamespaceString(curop.getNS());
+    b.append("ns", nss.ns());
+
+    if (!iscommand && op == dbQuery) {
+        appendAsObjOrString("query", upconvertQueryEntry(nss), maxElementSize, &b);
+    } else if (!query.isEmpty()) {
+        const char* fieldName = (logicalOpType == dbCommand) ? "command" : "query";
+        appendAsObjOrString(fieldName, query, maxElementSize, &b);
     } else if (!iscommand && curop.haveQuery()) {
         appendAsObjOrString("query", curop.query(), maxElementSize, &b);
     }
@@ -579,14 +670,12 @@ void OpDebug::append(const CurOp& curop,
     const bool moved = (nmoved >= 1);
 
     OPDEBUG_APPEND_NUMBER(cursorid);
-    OPDEBUG_APPEND_NUMBER(ntoreturn);
-    OPDEBUG_APPEND_NUMBER(ntoskip);
     OPDEBUG_APPEND_BOOL(exhaust);
 
-    OPDEBUG_APPEND_NUMBER(nscanned);
-    OPDEBUG_APPEND_NUMBER(nscannedObjects);
+    OPDEBUG_APPEND_NUMBER(keysExamined);
+    OPDEBUG_APPEND_NUMBER(docsExamined);
     OPDEBUG_APPEND_BOOL(idhack);
-    OPDEBUG_APPEND_BOOL(scanAndOrder);
+    OPDEBUG_APPEND_BOOL(hasSortStage);
     OPDEBUG_APPEND_BOOL(moved);
     OPDEBUG_APPEND_NUMBER(nmoved);
     OPDEBUG_APPEND_NUMBER(nMatched);

@@ -1039,8 +1039,8 @@ UpdateResult UpdateStage::makeUpdateResult(const PlanExecutor& exec, OpDebug* op
     // Get summary information about the plan.
     PlanSummaryStats stats;
     Explain::getSummaryStats(exec, &stats);
-    opDebug->nscanned = stats.totalKeysExamined;
-    opDebug->nscannedObjects = stats.totalDocsExamined;
+    opDebug->keysExamined = stats.totalKeysExamined;
+    opDebug->docsExamined = stats.totalDocsExamined;
 
     return UpdateResult(updateStats->nMatched > 0 /* Did we update at least one obj? */,
                         !updateStats->isDocReplacement /* $mod or obj replacement */,
