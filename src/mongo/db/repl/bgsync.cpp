@@ -53,7 +53,6 @@
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -74,6 +73,15 @@ namespace {
 const char hashFieldName[] = "h";
 int SleepToAllowBatchingMillis = 2;
 const int BatchIsSmallish = 40000;  // bytes
+
+/**
+ * Returns new thread pool for thead pool task executor.
+ */
+std::unique_ptr<ThreadPool> makeThreadPool() {
+    ThreadPool::Options threadPoolOptions;
+    threadPoolOptions.poolName = "rsBackgroundSync";
+    return stdx::make_unique<ThreadPool>(threadPoolOptions);
+}
 
 /**
  * Checks the criteria for rolling back.
@@ -147,6 +155,7 @@ size_t getSize(const BSONObj& o) {
 
 BackgroundSync::BackgroundSync()
     : _buffer(bufferMaxSizeGauge, &getSize),
+      _threadPoolTaskExecutor(makeThreadPool(), executor::makeNetworkInterface()),
       _lastOpTimeFetched(Timestamp(std::numeric_limits<int>::max(), 0),
                          std::numeric_limits<long long>::max()),
       _lastFetchedHash(0),
@@ -191,24 +200,15 @@ void BackgroundSync::producerThread(executor::TaskExecutor* taskExecutor) {
     Client::initThread("rsBackgroundSync");
     AuthorizationSession::get(cc())->grantInternalAuthorization();
 
-    // Disregard task executor passed into this function and use a local thread pool task executor
-    // instead. This ensures that potential blocking operations inside the fetcher callback will
-    // not affect other coordinators (such as the replication coordinator) that might be dependent
-    // on the shared task executor.
-    ThreadPool::Options threadPoolOptions;
-    threadPoolOptions.poolName = "rsBackgroundSync";
-    executor::ThreadPoolTaskExecutor threadPoolTaskExecutor(
-        stdx::make_unique<ThreadPool>(threadPoolOptions), executor::makeNetworkInterface());
-    taskExecutor = &threadPoolTaskExecutor;
-    taskExecutor->startup();
-    ON_BLOCK_EXIT([taskExecutor]() {
-        taskExecutor->shutdown();
-        taskExecutor->join();
+    _threadPoolTaskExecutor.startup();
+    ON_BLOCK_EXIT([this]() {
+        _threadPoolTaskExecutor.shutdown();
+        _threadPoolTaskExecutor.join();
     });
 
     while (!inShutdown()) {
         try {
-            _producerThread(taskExecutor);
+            _producerThread(&_threadPoolTaskExecutor);
         } catch (const DBException& e) {
             std::string msg(str::stream() << "sync producer problem: " << e.toString());
             error() << msg;
@@ -607,6 +607,10 @@ HostAndPort BackgroundSync::getSyncTarget() {
 void BackgroundSync::clearSyncTarget() {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     _syncSourceHost = HostAndPort();
+}
+
+void BackgroundSync::cancelFetcher() {
+    _threadPoolTaskExecutor.cancelAllCommands();
 }
 
 void BackgroundSync::stop() {

@@ -32,6 +32,7 @@
 #include "mongo/client/fetcher.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -121,6 +122,11 @@ public:
     // Clears any fetched and buffered oplog entries.
     void clearBuffer();
 
+    /**
+     * Cancel existing find/getMore commands on the sync source's oplog collection.
+     */
+    void cancelFetcher();
+
     bool getInitialSyncRequestedFlag();
     void setInitialSyncRequestedFlag(bool value);
 
@@ -143,6 +149,9 @@ private:
 
     // Production thread
     BlockingQueue<BSONObj> _buffer;
+
+    // Task executor used to run find/getMore commands on sync source.
+    executor::ThreadPoolTaskExecutor _threadPoolTaskExecutor;
 
     // _mutex protects all of the class variables except _syncSourceReader and _buffer
     mutable stdx::mutex _mutex;

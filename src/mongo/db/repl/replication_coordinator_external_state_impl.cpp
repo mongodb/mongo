@@ -341,6 +341,7 @@ void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToCancelFetcher() {
+    BackgroundSync::get()->cancelFetcher();
 }
 
 OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext(
