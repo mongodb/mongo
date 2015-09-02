@@ -1556,6 +1556,7 @@ void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig,
     invariant(selfIndex < newConfig.getNumMembers());
 
     _updateHeartbeatDataForReconfig(newConfig, selfIndex, now);
+    _stepDownPending = false;
     _rsConfig = newConfig;
     _selfIndex = selfIndex;
     _forceSyncSourceIndex = -1;
@@ -1575,7 +1576,6 @@ void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig,
 
     // By this point we know we are in Role::follower
     _currentPrimaryIndex = -1;  // force secondaries to re-detect who the primary is
-    _stepDownPending = false;
 
     if (_followerMode == MemberState::RS_SECONDARY && _rsConfig.getNumMembers() == 1 &&
         _selfIndex == 0 && _rsConfig.getMemberAt(_selfIndex).isElectable()) {
