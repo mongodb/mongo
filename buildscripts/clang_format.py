@@ -586,21 +586,20 @@ def usage():
 def main():
     """Main entry point
     """
-    if len(sys.argv) > 1:
-        command = sys.argv[1]
+    parser = OptionParser()
+    parser.add_option("-c", "--clang-format", type="string", dest="clang_format")
 
-        parser = OptionParser()
-        parser.add_option("-c", "--clang-format", type="string", dest="clang_format")
+    (options, args) = parser.parse_args(args=sys.argv)
+
+    if len(args) > 1:
+        command = args[1]
 
         if command == "lint":
-            (options, args) = parser.parse_args(args=sys.argv[2:])
-            lint(options.clang_format, args)
+            lint(options.clang_format, args[2:])
         elif command == "lint-patch":
-            (options, args) = parser.parse_args(args=sys.argv[2:])
-            lint_patch(options.clang_format, args)
+            lint_patch(options.clang_format, args[2:])
         elif command == "format":
-            (options, args) = parser.parse_args(args=sys.argv[2:])
-            format_func(options.clang_format, args)
+            format_func(options.clang_format, args[2:])
         else:
             usage()
     else:
