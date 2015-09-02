@@ -185,6 +185,12 @@ protected:
      */
     int64_t countLogLinesContaining(const std::string& needle);
 
+    /**
+     * Receive the heartbeat request from replication coordinator and reply with a response.
+     */
+    void replyToReceivedHeartbeat();
+    void replyToReceivedHeartbeatV1();
+
 private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
     // Owned by ReplicationCoordinatorImpl

@@ -2256,6 +2256,8 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             invariant(nextAction != kActionWinElection);
             lk.unlock();
             _performPostMemberStateUpdateAction(nextAction);
+            // Notify all secondaries of the election win.
+            _scheduleElectionWinNotification();
             break;
         }
         case kActionStartSingleNodeElection:
@@ -2371,7 +2373,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
     if (_selfIndex >= 0) {
         // Don't send heartbeats if we're not in the config, if we get re-added one of the
         // nodes in the set will contact us.
-        _startHeartbeats(cbData);
+        _startHeartbeats_inlock(cbData);
     }
     _updateLastCommittedOpTime_inlock();
     _wakeReadyWaiters_inlock();
@@ -2555,7 +2557,7 @@ void ReplicationCoordinatorImpl::_chooseNewSyncSource(
     if (newSyncSource->empty() && _justLostSyncSource && _selfIndex >= 0 &&
         !_getMemberState_inlock().primary()) {
         _cancelHeartbeats();
-        _startHeartbeats(cbData);
+        _startHeartbeats_inlock(cbData);
         _justLostSyncSource = false;
     } else {
         _justLostSyncSource = true;
@@ -3168,6 +3170,27 @@ void ReplicationCoordinatorImpl::_scheduleWorkAndWaitForCompletion(
     }
     fassert(28800, cbh.getStatus());
     executor->wait(cbh.getValue());
+}
+
+void ReplicationCoordinatorImpl::_scheduleElectionWinNotification() {
+    auto electionWinNotificationCallback = [this](const CallbackArgs& cbData) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (!_getMemberState_inlock().primary()) {
+            return;
+        }
+
+        _cancelHeartbeats();
+        _startHeartbeats_inlock(cbData);
+    };
+
+    auto cbStatus = _replExecutor.scheduleWork(electionWinNotificationCallback);
+    if (!cbStatus.getStatus().isOK()) {
+        warning() << "Error in scheduling notification of election win: " << cbStatus.getStatus();
+    }
 }
 
 }  // namespace repl

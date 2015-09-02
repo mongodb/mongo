@@ -218,6 +218,11 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
 
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
+
+    // Consume the notification of election win.
+    for (int i = 0; i < rsConfig.getNumMembers() - 1; i++) {
+        replyToReceivedHeartbeatV1();
+    }
 }
 
 void ReplCoordTest::simulateSuccessfulElection() {
@@ -274,6 +279,11 @@ void ReplCoordTest::simulateSuccessfulElection() {
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
 
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
+
+    // Consume the notification of election win.
+    for (int i = 0; i < rsConfig.getNumMembers() - 1; i++) {
+        replyToReceivedHeartbeat();
+    }
 }
 
 void ReplCoordTest::simulateStepDownOnIsolation() {
@@ -313,6 +323,46 @@ int64_t ReplCoordTest::countLogLinesContaining(const std::string& needle) {
     return std::count_if(getCapturedLogMessages().begin(),
                          getCapturedLogMessages().end(),
                          stdx::bind(stringContains, stdx::placeholders::_1, needle));
+}
+
+void ReplCoordTest::replyToReceivedHeartbeat() {
+    NetworkInterfaceMock* net = getNet();
+    net->enterNetwork();
+    const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+    const RemoteCommandRequest& request = noi->getRequest();
+    const ReplicaSetConfig rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+    repl::ReplSetHeartbeatArgs hbArgs;
+    ASSERT_OK(hbArgs.initialize(request.cmdObj));
+    repl::ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName(rsConfig.getReplSetName());
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    BSONObjBuilder respObj;
+    respObj << "ok" << 1;
+    hbResp.addToBSON(&respObj, false);
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
+    net->runReadyNetworkOperations();
+    getNet()->exitNetwork();
+}
+
+void ReplCoordTest::replyToReceivedHeartbeatV1() {
+    NetworkInterfaceMock* net = getNet();
+    net->enterNetwork();
+    const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+    const RemoteCommandRequest& request = noi->getRequest();
+    const ReplicaSetConfig rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+    repl::ReplSetHeartbeatArgsV1 hbArgs;
+    ASSERT_OK(hbArgs.initialize(request.cmdObj));
+    repl::ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName(rsConfig.getReplSetName());
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setConfigVersion(rsConfig.getConfigVersion());
+    BSONObjBuilder respObj;
+    respObj << "ok" << 1;
+    hbResp.addToBSON(&respObj, false);
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
+    net->runReadyNetworkOperations();
+    getNet()->exitNetwork();
 }
 
 }  // namespace repl

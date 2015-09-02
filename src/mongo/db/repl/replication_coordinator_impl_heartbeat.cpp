@@ -507,7 +507,8 @@ void ReplicationCoordinatorImpl::_cancelHeartbeats() {
     // CallbackCanceled status, so it's better to leave the handles in the list, for now.
 }
 
-void ReplicationCoordinatorImpl::_startHeartbeats(const ReplicationExecutor::CallbackArgs& cbData) {
+void ReplicationCoordinatorImpl::_startHeartbeats_inlock(
+    const ReplicationExecutor::CallbackArgs& cbData) {
     const Date_t now = _replExecutor.now();
     _seedList.clear();
     for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {

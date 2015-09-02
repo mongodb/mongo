@@ -701,7 +701,7 @@ private:
      * Starts a heartbeat for each member in the current config.  Called within the executor
      * context.
      */
-    void _startHeartbeats(const ReplicationExecutor::CallbackArgs& cbData);
+    void _startHeartbeats_inlock(const ReplicationExecutor::CallbackArgs& cbData);
 
     /**
      * Cancels all heartbeats.  Called within executor context.
@@ -1047,6 +1047,11 @@ private:
      */
     void _scheduleWorkAndWaitForCompletion(executor::TaskExecutor* executor,
                                            const executor::TaskExecutor::CallbackFn& work);
+
+    /**
+     * Schedule notification of election win.
+     */
+    void _scheduleElectionWinNotification();
 
     //
     // All member variables are labeled with one of the following codes indicating the
