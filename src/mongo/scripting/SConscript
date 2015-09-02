@@ -92,6 +92,8 @@ if usemozjs:
         ]
     )
 
+    env.Alias('generated-sources', 'mozjs/mongohelpers_js.cpp')
+
     scriptingEnv.Library(
         target='scripting',
         source=[

@@ -106,6 +106,8 @@ env.Substfile(
     ],
     SUBST_DICT=replacements)
 
+env.Alias('generated-sources', "wiredtiger.h")
+
 #
 # WiredTiger library
 #
