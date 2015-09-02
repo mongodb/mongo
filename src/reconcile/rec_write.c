@@ -46,24 +46,6 @@ typedef struct {
 	int leave_dirty;
 
 	/*
-	 * When evicting pages having uncommitted updates or committed updates
-	 * that are not yet globally visible, there are two ways forward: first,
-	 * uncommitted updates can be saved/restored, that is, evict most of the
-	 * page and create a new, smaller page in which we re-instantiate the
-	 * uncommitted updates. If there are no uncommitted updates, but are
-	 * updates not yet visible to all readers in the system, we can write
-	 * those updates into a database side store, restoring them on demand
-	 * if/when the page is read back into memory.
-	 *
-	 * Both are configured from outside of reconciliation: saving/restoring
-	 * updates is the WT_EVICT_UPDATE_RESTORE flag. Writing not-yet-visible
-	 * updates is the WT_EVICT_LOOKASIDE flag. Both may be set, in which
-	 * case the decision is made once we determine if there are uncommitted
-	 * updates on the page.
-	 */
-	int evict_skipped_updates;
-
-	/*
 	 * Raw compression (don't get me started, as if normal reconciliation
 	 * wasn't bad enough).  If an application wants absolute control over
 	 * what gets written to disk, we give it a list of byte strings and it
@@ -237,8 +219,10 @@ typedef struct {
 	size_t	 space_avail;		/* Remaining space in this chunk */
 
 	/*
-	 * While reviewing updates for each page, we save WT_UPDATE lists here,
-	 * and then move them to per-block areas as the blocks are defined.
+	 * Saved update list, supporting the WT_EVICT_UPDATE_RESTORE and
+	 * WT_EVICT_LOOKASIDE configurations. While reviewing updates for each
+	 * page, we save WT_UPDATE lists here, and then move them to per-block
+	 * areas as the blocks are defined.
 	 */
 	WT_SAVE_UPD *supd;		/* Saved updates */
 	uint32_t     supd_next;
@@ -504,8 +488,7 @@ __rec_write_status(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	mod = page->modify;
 
 	/*
-	 * Return based on how we were called (eviction or checkpoint) and if
-	 * we cleaned the page.
+	 * Set the page's status based on whether or not we cleaned the page.
 	 */
 	if (r->leave_dirty) {
 		/*
@@ -526,9 +509,13 @@ __rec_write_status(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		btree->modified = 1;
 		WT_FULL_BARRIER();
 
-		/* If evicting, we've failed. */
-		if (F_ISSET(r, WT_EVICTING))
-			return (EBUSY);
+		/*
+		 * Eviction should only be here if following the save/restore
+		 * eviction path.
+		 */
+		WT_ASSERT(session,
+		    !F_ISSET(r, WT_EVICTING) ||
+		    F_ISSET(r, WT_EVICT_UPDATE_RESTORE));
 	} else {
 		/*
 		 * Track the page's maximum transaction ID (used to decide if
@@ -764,9 +751,6 @@ __rec_write_init(WT_SESSION_IMPL *session,
 
 	/* Track if the page can be marked clean. */
 	r->leave_dirty = 0;
-
-	/* Track if saving/restoring updates. */
-	r->evict_skipped_updates = 0;
 
 	/* Raw compression. */
 	r->raw_compression =
@@ -1133,26 +1117,31 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	}
 
 	/*
-	 * Evicting and there are either uncommitted changes or updates not yet
-	 * globally visible. There are two ways to continue with the eviction,
-	 * based on whether or not there are uncommitted updates.
+	 * Evicting with either uncommitted changes or not-yet-globally-visible
+	 * changes. There are two ways to continue, the save/restore eviction
+	 * path or the lookaside table eviction path. Both cannot be configured
+	 * because the paths track different information. The save/restore path
+	 * can handle both uncommitted and not-yet-globally-visible changes, by
+	 * evicting most of the page and then creating a new, smaller page into
+	 * which we re-instantiate those changes. The lookaside table path can
+	 * only handle not-yet-globally-visible changes by writing those changes
+	 * into the lookaside table and restoring them on demand if and when the
+	 * page is read back into memory.
 	 *
-	 * First, if there are uncommitted updates, we can evict most of the
-	 * page and create a new, smaller page with just the skipped updates.
+	 * Both paths are configured outside of reconciliation: the save/restore
+	 * path is the WT_EVICT_UPDATE_RESTORE flag, the lookaside table path is
+	 * the WT_EVICT_LOOKASIDE flag.
 	 */
-	append_origv = 0;
-	if (skipped) {
-		/*
-		 * The save/restore eviction path is only configured if forcibly
-		 * evicting pages (it's intended for large pages that split into
-		 * many smaller pages). If not configured to save/restore the
-		 * updates, fail eviction.
-		 */
-		if (!F_ISSET(r, WT_EVICT_UPDATE_RESTORE))
-			return (EBUSY);
-		r->evict_skipped_updates = 1;
+	if (!F_ISSET(r, WT_EVICT_LOOKASIDE | WT_EVICT_UPDATE_RESTORE))
+		return (EBUSY);
+	if (skipped && !F_ISSET(r, WT_EVICT_UPDATE_RESTORE))
+		return (EBUSY);
 
+	append_origv = 0;
+	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE)) {
 		/*
+		 * The save/restore eviction path.
+		 *
 		 * Clear the returned update so our caller ignores the key/value
 		 * pair in the case of an insert/append list entry (everything
 		 * we need is in the update list), and otherwise writes the
@@ -1201,24 +1190,10 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		    vpack->raw == WT_CELL_VALUE_OVFL_RM &&
 		    !__wt_txn_visible_all(session, min_txn))
 			append_origv = 1;
-	}
-
-	/*
-	 * Second, if we did NOT skip updates, we can save a copy of the update
-	 * list in the lookaside table and proceed with eviction. If/when the
-	 * page is read back into the cache, we'll re-apply the update list (if
-	 * any of the old readers are still around).
-	 */
-	if (!skipped) {
+	} else {
 		/*
-		 * Lookaside table eviction is only configured when eviction is
-		 * getting aggressive. If not configured to write the lookaside
-		 * table, fail eviction.
-		 */
-		if (!F_ISSET(r, WT_EVICT_LOOKASIDE))
-			return (EBUSY);
-
-		/*
+		 * The lookaside table eviction path.
+		 *
 		 * If at least one update is globally visible, copy the update
 		 * list and ignore the current on-page value. If no update is
 		 * globally visible, readers require the page's original value.
@@ -1277,8 +1252,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * that transaction ID is globally visible, we know we no longer need
 	 * the lookaside table records, allowing them to be discarded.
 	 */
-	return (__rec_update_save(
-	    session, r, ins, rip, skipped ? WT_TXN_NONE : (*updp)->txnid));
+	return (__rec_update_save(session,
+	    r, ins, rip, (*updp == NULL) ? WT_TXN_NONE : (*updp)->txnid));
 }
 
 /*
@@ -2136,7 +2111,7 @@ __rec_split_row_promote(
 	 * the last key and smaller than the current key.
 	 */
 	max = r->last;
-	if (r->evict_skipped_updates)
+	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE))
 		for (i = r->supd_next; i > 0; --i) {
 			supd = &r->supd[i - 1];
 			if (supd->ins == NULL)
@@ -2904,14 +2879,14 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 			return (0);
 
 		/*
-		 * If the page has skipped updates, continue on the write path,
-		 * it will be saved/restored after we finish.
+		 * If using the save/restore eviction path, continue with the
+		 * write, the page will be restored after we finish.
 		 *
-		 * If the page has not-yet-globally visible updates, we can't
-		 * continue (we need a page to be written, otherwise we won't
-		 * ever find the updates for future reads). For now, quit.
+		 * If using the lookaside table eviction path, we can't continue
+		 * (we need a page to be written, otherwise we won't ever find
+		 * the updates for future reads).
 		 */
-		if (!r->evict_skipped_updates)
+		if (F_ISSET(r, WT_EVICT_LOOKASIDE))
 			return (EBUSY);
 	}
 
@@ -3152,20 +3127,22 @@ supd_check_complete:
 	r->supd_next = j;
 
 	/*
-	 * If we found updates that weren't globally visible when reconciling
-	 * this page, note that in the page header.
+	 * If using the lookaside table eviction path and we found updates that
+	 * weren't globally visible when reconciling this page, note that in the
+	 * page header.
 	 */
-	if (!r->evict_skipped_updates && bnd->supd != NULL) {
+	if (F_ISSET(r, WT_EVICT_LOOKASIDE) && bnd->supd != NULL) {
 		F_SET(dsk, WT_PAGE_LAS_UPDATE);
 		r->cache_write_lookaside = 1;
 	}
 
 	/*
-	 * If we had to skip updates in order to build this disk image, we can't
-	 * actually write it. Instead, we will re-instantiate the page using the
-	 * disk image and the list of updates we skipped.
+	 * If using the save/restore eviction path and we had to skip updates in
+	 * order to build this disk image, we can't actually write it. Instead,
+	 * we will re-instantiate the page using the disk image and the list of
+	 * updates we skipped.
 	 */
-	if (r->evict_skipped_updates && bnd->supd != NULL) {
+	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) {
 		r->cache_write_restore = 1;
 
 		/*
@@ -3234,10 +3211,11 @@ supd_check_complete:
 	bnd->addr.size = (uint8_t)addr_size;
 
 	/*
-	 * If we found updates that weren't globally visible when reconciling
-	 * this page, copy those updates into the database's lookaside store.
+	 * If using the lookaside table eviction path and we found updates that
+	 * weren't globally visible when reconciling this page, copy them into
+	 * the database's lookaside store.
 	 */
-	if (!r->evict_skipped_updates && bnd->supd != NULL)
+	if (F_ISSET(r, WT_EVICT_LOOKASIDE) && bnd->supd != NULL)
 		ret = __rec_update_las(session, r, btree->id, bnd);
 
 done:
@@ -5366,7 +5344,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * nothing to write. Allocate, then initialize the array of
 		 * replacement blocks.
 		 */
-		if (r->evict_skipped_updates) {
+		if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) {
 			WT_RET(__wt_calloc_def(
 			    session, r->bnd_next, &mod->mod_multi));
 			multi = mod->mod_multi;
@@ -5561,7 +5539,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_RET(__wt_row_ikey_alloc(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
 
-		if (r->evict_skipped_updates && bnd->supd != NULL) {
+		if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) {
 			multi->supd = bnd->supd;
 			multi->supd_entries = bnd->supd_next;
 			bnd->supd = NULL;
@@ -5601,7 +5579,7 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
 		multi->key.recno = bnd->recno;
 
-		if (r->evict_skipped_updates && bnd->supd != NULL) {
+		if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) {
 			multi->supd = bnd->supd;
 			multi->supd_entries = bnd->supd_next;
 			bnd->supd = NULL;

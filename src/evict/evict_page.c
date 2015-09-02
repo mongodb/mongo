@@ -364,17 +364,12 @@ __evict_review(
 	if (!__wt_page_is_modified(page))
 		return (0);
 
-	/* If the page is dirty, reconcile it to decide if we can evict it. */
-	flags = WT_EVICTING;
-
 	/*
+	 * If the page is dirty, reconcile it to decide if we can evict it.
+	 *
 	 * If we have an exclusive lock (we're discarding the tree), assert
 	 * there are no updates we cannot read.
-	 */
-	if (closing)
-		LF_SET(WT_VISIBILITY_ERR);
-
-	/*
+	 *
 	 * Otherwise, if the page we're evicting is a leaf page marked for
 	 * forced eviction, set the update-restore flag, so reconciliation will
 	 * write blocks it can write and create a list of skipped updates for
@@ -384,14 +379,6 @@ __evict_review(
 	 * in-memory pages, (restoring the updates that stopped us from writing
 	 * the block), and inserting the whole mess into the page's parent.
 	 *
-	 * Don't set the update-restore flag for internal pages, they don't have
-	 * updates that can be saved and restored.
-	 */
-	if (!closing &&
-	    !WT_PAGE_IS_INTERNAL(page) && page->read_gen == WT_READGEN_OLDEST)
-		LF_SET(WT_EVICT_UPDATE_RESTORE);
-
-	/*
 	 * Otherwise, if eviction is getting pressed and checkpoint allows it,
 	 * configure reconciliation to write not-yet-globally-visible updates
 	 * to the lookaside table, allowing the eviction of pages we'd otherwise
@@ -404,11 +391,22 @@ __evict_review(
 	 * either has finished with, or doesn't care about, this file), future
 	 * checkpoints must include all committed modifications from this page,
 	 * which is what reconciliation will write.
+	 *
+	 * Don't set the update-restore or lookaside table flags for internal
+	 * pages, they don't have update lists that can be saved and restored.
 	 */
-	if (!closing && __wt_eviction_aggressive(session) &&
-	    (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT) ||
-	    btree->checkpoint_gen == S2C(session)->txn_global.checkpoint_gen))
-		LF_SET(WT_EVICT_LOOKASIDE);
+	flags = WT_EVICTING;
+	if (closing)
+		LF_SET(WT_VISIBILITY_ERR);
+	else if (!WT_PAGE_IS_INTERNAL(page)) {
+		if (page->read_gen == WT_READGEN_OLDEST)
+			LF_SET(WT_EVICT_UPDATE_RESTORE);
+		else if (__wt_eviction_aggressive(session) &&
+		    (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT) ||
+		    btree->checkpoint_gen ==
+		    S2C(session)->txn_global.checkpoint_gen))
+			LF_SET(WT_EVICT_LOOKASIDE);
+	}
 
 	WT_RET(__wt_reconcile(session, ref, NULL, flags));
 
