@@ -44,12 +44,6 @@ namespace mongo {
 class DBClientBase;
 class OperationContext;
 
-namespace executor {
-
-class TaskExecutor;
-
-}  // namespace executor
-
 namespace repl {
 
 class Member;
@@ -103,7 +97,7 @@ public:
     virtual ~BackgroundSync() {}
 
     // starts the producer thread
-    void producerThread(executor::TaskExecutor* taskExecutor);
+    void producerThread();
     // starts the sync target notifying thread
     void notifierThread();
 
@@ -175,8 +169,8 @@ private:
     BackgroundSync operator=(const BackgroundSync& s);
 
     // Production thread
-    void _producerThread(executor::TaskExecutor* taskExecutor);
-    void _produce(OperationContext* txn, executor::TaskExecutor* taskExecutor);
+    void _producerThread();
+    void _produce(OperationContext* txn);
 
     /**
      * Processes query responses from fetcher.

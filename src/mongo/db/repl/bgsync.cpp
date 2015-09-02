@@ -196,7 +196,7 @@ void BackgroundSync::notify(OperationContext* txn) {
     }
 }
 
-void BackgroundSync::producerThread(executor::TaskExecutor* taskExecutor) {
+void BackgroundSync::producerThread() {
     Client::initThread("rsBackgroundSync");
     AuthorizationSession::get(cc())->grantInternalAuthorization();
 
@@ -208,7 +208,7 @@ void BackgroundSync::producerThread(executor::TaskExecutor* taskExecutor) {
 
     while (!inShutdown()) {
         try {
-            _producerThread(&_threadPoolTaskExecutor);
+            _producerThread();
         } catch (const DBException& e) {
             std::string msg(str::stream() << "sync producer problem: " << e.toString());
             error() << msg;
@@ -221,7 +221,7 @@ void BackgroundSync::producerThread(executor::TaskExecutor* taskExecutor) {
     stop();
 }
 
-void BackgroundSync::_producerThread(executor::TaskExecutor* taskExecutor) {
+void BackgroundSync::_producerThread() {
     const MemberState state = _replCoord->getMemberState();
     // we want to pause when the state changes to primary
     if (_replCoord->isWaitingForApplierToDrain() || state.primary()) {
@@ -251,10 +251,10 @@ void BackgroundSync::_producerThread(executor::TaskExecutor* taskExecutor) {
         start(&txn);
     }
 
-    _produce(&txn, taskExecutor);
+    _produce(&txn);
 }
 
-void BackgroundSync::_produce(OperationContext* txn, executor::TaskExecutor* taskExecutor) {
+void BackgroundSync::_produce(OperationContext* txn) {
     // this oplog reader does not do a handshake because we don't want the server it's syncing
     // from to track how far it has synced
     {
@@ -351,10 +351,10 @@ void BackgroundSync::_produce(OperationContext* txn, executor::TaskExecutor* tas
         metadataBob.append(rpc::kReplSetMetadataFieldName, 1);
     }
 
+    auto dbName = nsToDatabase(rsOplogName);
     auto cmdObj = cmdBob.obj();
     auto metadataObj = metadataBob.obj();
-    Fetcher fetcher(
-        taskExecutor, source, nsToDatabase(rsOplogName), cmdObj, fetcherCallback, metadataObj);
+    Fetcher fetcher(&_threadPoolTaskExecutor, source, dbName, cmdObj, fetcherCallback, metadataObj);
     auto scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
         warning() << "unable to schedule fetcher to read remote oplog on " << source << ": "

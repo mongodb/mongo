@@ -96,8 +96,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(executor::TaskExecuto
     log() << "Starting replication applier threads";
     _applierThread.reset(new stdx::thread(runSyncThread));
     BackgroundSync* bgsync = BackgroundSync::get();
-    _producerThread.reset(
-        new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync, taskExecutor)));
+    _producerThread.reset(new stdx::thread(stdx::bind(&BackgroundSync::producerThread, bgsync)));
     _syncSourceFeedbackThread.reset(
         new stdx::thread(stdx::bind(&SyncSourceFeedback::run, &_syncSourceFeedback)));
     if (enableReplSnapshotThread) {
