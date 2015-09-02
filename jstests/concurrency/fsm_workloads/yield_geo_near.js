@@ -16,7 +16,7 @@ var $config = extendWorkload($config, function($config, $super) {
      * environment. Unfortunately this means we cannot batch the request.
      */
     $config.states.query = function geoNear(db, collName) {
-        // This distance gets about 80 docs around the origin. There is one doc inserted 
+        // This distance gets about 80 docs around the origin. There is one doc inserted
         // every 1m^2 and the area scanned by a 5m radius is PI*(5m)^2 ~ 79.
         var maxDistance = 5;
 
@@ -35,11 +35,11 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.data.genUpdateDoc = function genUpdateDoc() {
-        var P = Math.floor(Math.sqrt($config.data.nDocs));
-        
+        var P = Math.floor(Math.sqrt(this.nDocs));
+
         // Move the point to another location within the PxP grid.
         var newX = Random.randInt(P) - P/2;
-        var newY = Random.randInt(P) - P/2
+        var newY = Random.randInt(P) - P/2;
         return { $set: { geo: [newX, newY] } };
     };
 
@@ -56,20 +56,20 @@ var $config = extendWorkload($config, function($config, $super) {
      */
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
-        
-        var P = Math.floor(Math.sqrt($config.data.nDocs));
+
+        var P = Math.floor(Math.sqrt(this.nDocs));
         var i = 0;
         // Set up some points to query (in a PxP grid around 0,0).
         var bulk = db[collName].initializeUnorderedBulkOp();
         for (var x = 0; x < P; x++) {
             for (var y = 0; y < P; y++) {
                 var coords = [x - P/2, y - P/2];
-                bulk.find({ _id: i }).upsert().replaceOne($config.data.getReplaceSpec(i, coords));
+                bulk.find({ _id: i }).upsert().replaceOne(this.getReplaceSpec(i, coords));
                 i++;
             }
         }
         assertAlways.writeOK(bulk.execute());
-        assertAlways.commandWorked(db[collName].ensureIndex($config.data.getIndexSpec()));
+        assertAlways.commandWorked(db[collName].ensureIndex(this.getIndexSpec()));
     };
 
     return $config;

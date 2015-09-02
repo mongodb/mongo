@@ -30,8 +30,8 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.data.genUpdateDoc = function genUpdateDoc() {
-        var newC = Random.randInt($config.data.nDocs);
-        var newD = Random.randInt($config.data.nDocs);
+        var newC = Random.randInt(this.nDocs);
+        var newD = Random.randInt(this.nDocs);
         return { $set: { c: newC, d: newD } };
     };
 
