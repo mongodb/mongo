@@ -80,6 +80,11 @@ public:
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle) override;
 
+    /**
+     * Cancels all commands on the network interface.
+     */
+    void cancelAllCommands();
+
 private:
     class CallbackState;
     class EventState;

@@ -342,6 +342,10 @@ void ThreadPoolTaskExecutor::wait(const CallbackHandle& cbHandle) {
     waitForEvent(cbState->finishedEvent);
 }
 
+void ThreadPoolTaskExecutor::cancelAllCommands() {
+    _net->cancelAllCommands();
+}
+
 StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::enqueueCallbackState_inlock(
     WorkQueue* queue, CallbackFn work, Date_t when) {
     auto event = makeEvent_inlock();
