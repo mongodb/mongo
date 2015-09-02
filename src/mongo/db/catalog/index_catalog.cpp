@@ -126,35 +126,6 @@ Status IndexCatalog::init(OperationContext* txn) {
     return Status::OK();
 }
 
-namespace {
-class IndexCleanupOnRollback : public RecoveryUnit::Change {
-public:
-    /**
-     * None of these pointers are owned by this class.
-     */
-    IndexCleanupOnRollback(OperationContext* txn,
-                           Collection* collection,
-                           IndexCatalogEntryContainer* entries,
-                           const IndexDescriptor* desc)
-        : _txn(txn), _collection(collection), _entries(entries), _desc(desc) {}
-
-    virtual void commit() {}
-
-    virtual void rollback() {
-        // Need to preserve indexName as _desc no longer exists after remove().
-        const std::string indexName = _desc->indexName();
-        _entries->remove(_desc);
-        _collection->infoCache()->droppedIndex(_txn, indexName);
-    }
-
-private:
-    OperationContext* _txn;
-    Collection* _collection;
-    IndexCatalogEntryContainer* _entries;
-    const IndexDescriptor* _desc;
-};
-}  // namespace
-
 IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* txn,
                                                           IndexDescriptor* descriptor,
                                                           bool initFromDisk) {
@@ -179,8 +150,12 @@ IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* txn,
     _entries.add(entry.release());
 
     if (!initFromDisk) {
-        txn->recoveryUnit()->registerChange(
-            new IndexCleanupOnRollback(txn, _collection, &_entries, descriptor));
+        txn->recoveryUnit()->onRollback([this, txn, descriptor] {
+            // Need to preserve indexName as descriptor no longer exists after remove().
+            const std::string indexName = descriptor->indexName();
+            _entries.remove(descriptor);
+            _collection->infoCache()->droppedIndex(txn, indexName);
+        });
     }
 
     invariant(save == _entries.find(descriptor));
