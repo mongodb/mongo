@@ -296,12 +296,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 */
 	if (conn->las_sweep_call != 0 && key->data != NULL) {
 		__wt_cursor_set_raw_key(cursor, key);
-		if ((ret =
-		    cursor->search_near(cursor, &notused)) == WT_NOTFOUND) {
-			WT_ERR(cursor->reset(cursor));
-			return (0);
-		}
-		WT_ERR(ret);
+		if ((ret = cursor->search_near(cursor, &notused)) != 0)
+			goto srch_notfound;
 	}
 
 	/*
@@ -375,6 +371,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		if (conn->las_sweep_call > WT_SWEEP_LOOKASIDE_PASS_TARGET)
 			conn->las_sweep_cnt += WT_SWEEP_LOOKASIDE_MIN_CNT;
 	}
+
+srch_notfound:
 	if (ret == WT_NOTFOUND)
 		conn->las_sweep_call = 0;
 
