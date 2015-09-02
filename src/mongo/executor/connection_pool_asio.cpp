@@ -34,6 +34,7 @@
 #include "mongo/executor/async_stream_factory_interface.h"
 
 #include "mongo/rpc/factory.h"
+#include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/memory.h"
 
@@ -41,22 +42,37 @@ namespace mongo {
 namespace executor {
 namespace connection_pool_asio {
 
-ASIOTimer::ASIOTimer(asio::io_service* io_service) : _io_service(io_service), _impl(*io_service) {}
+ASIOTimer::ASIOTimer(asio::io_service* io_service)
+    : _io_service(io_service), _impl(*io_service), _canceled(true) {}
+
+ASIOTimer::~ASIOTimer() {
+    cancelTimeout();
+}
 
 void ASIOTimer::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
     _cb = std::move(cb);
 
     cancelTimeout();
     _impl.expires_after(timeout);
-    _impl.async_wait([this](const asio::error_code& error) {
-        auto cb = std::move(_cb);
+    _canceled = false;
 
-        if (error != asio::error::operation_aborted)
+    _impl.async_wait([this](const asio::error_code& error) {
+        if (error == asio::error::operation_aborted) {
+            return;
+        }
+
+        bool wasCanceled = _canceled;
+        _canceled = true;
+
+        if (!wasCanceled) {
+            auto cb = std::move(_cb);
             cb();
+        }
     });
 }
 
 void ASIOTimer::cancelTimeout() {
+    _canceled = true;
     _impl.cancel();
 }
 
@@ -71,8 +87,8 @@ void ASIOConnection::indicateUsed() {
     _lastUsed = _global->now();
 }
 
-void ASIOConnection::indicateFailed() {
-    _isFailed = true;
+void ASIOConnection::indicateFailed(Status status) {
+    _status = std::move(status);
 }
 
 const HostAndPort& ASIOConnection::getHostAndPort() const {
@@ -83,8 +99,8 @@ Date_t ASIOConnection::getLastUsed() const {
     return _lastUsed;
 }
 
-bool ASIOConnection::isFailed() const {
-    return _isFailed;
+const Status& ASIOConnection::getStatus() const {
+    return _status;
 }
 
 size_t ASIOConnection::getGeneration() const {
@@ -95,7 +111,8 @@ std::unique_ptr<NetworkInterfaceASIO::AsyncOp> ASIOConnection::makeAsyncOp(ASIOC
     return stdx::make_unique<NetworkInterfaceASIO::AsyncOp>(
         conn->_global->_impl,
         TaskExecutor::CallbackHandle(),
-        makeIsMasterRequest(conn),
+        RemoteCommandRequest{
+            conn->getHostAndPort(), std::string("admin"), BSON("isMaster" << 1), BSONObj()},
         [conn](const TaskExecutor::ResponseStatus& status) {
             auto cb = std::move(conn->_setupCallback);
             cb(conn, status.isOK() ? Status::OK() : status.getStatus());
@@ -103,8 +120,14 @@ std::unique_ptr<NetworkInterfaceASIO::AsyncOp> ASIOConnection::makeAsyncOp(ASIOC
         conn->_global->now());
 }
 
-RemoteCommandRequest ASIOConnection::makeIsMasterRequest(ASIOConnection* conn) {
-    return {conn->_hostAndPort, std::string("admin"), BSON("isMaster" << 1), BSONObj()};
+Message ASIOConnection::makeIsMasterRequest(ASIOConnection* conn) {
+    rpc::LegacyRequestBuilder requestBuilder{};
+    requestBuilder.setDatabase("admin");
+    requestBuilder.setCommandName("isMaster");
+    requestBuilder.setMetadata(rpc::makeEmptyMetadata());
+    requestBuilder.setCommandArgs(BSON("isMaster" << 1));
+
+    return std::move(*(requestBuilder.done()));
 }
 
 void ASIOConnection::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
@@ -138,6 +161,7 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
     if (!beginStatus.isOK()) {
         auto cb = std::move(_refreshCallback);
         cb(this, beginStatus);
+        return;
     }
 
     _global->_impl->_asyncRunCommand(
@@ -145,11 +169,11 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
         [this, op](std::error_code ec, size_t bytes) {
             cancelTimeout();
 
-            if (ec) {
-                return _refreshCallback(this, Status(ErrorCodes::HostUnreachable, ec.message()));
-            }
-
             auto cb = std::move(_refreshCallback);
+
+            if (ec)
+                return cb(this, Status(ErrorCodes::HostUnreachable, ec.message()));
+
             cb(this, Status::OK());
         });
 }

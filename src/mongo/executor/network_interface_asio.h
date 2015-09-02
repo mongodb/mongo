@@ -319,6 +319,8 @@ private:
 
     std::unique_ptr<AsyncStreamFactoryInterface> _streamFactory;
 
+    ConnectionPool _connectionPool;
+
     stdx::mutex _inProgressMutex;
     std::unordered_map<AsyncOp*, std::unique_ptr<AsyncOp>> _inProgress;
     std::vector<TaskExecutor::CallbackHandle> _inGetConnection;
@@ -326,8 +328,6 @@ private:
     stdx::mutex _executorMutex;
     bool _isExecutorRunnable;
     stdx::condition_variable _isExecutorRunnableCondition;
-
-    ConnectionPool _connectionPool;
 };
 
 template <typename T, typename R, typename... MethodArgs, typename... DeducedArgs>

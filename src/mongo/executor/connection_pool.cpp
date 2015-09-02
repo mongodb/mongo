@@ -56,8 +56,6 @@ public:
     SpecificPool(ConnectionPool* parent, const HostAndPort& hostAndPort);
     ~SpecificPool();
 
-    void dropConnections(stdx::unique_lock<stdx::mutex> lk);
-
     /**
      * Get's a connection from the specific pool. Sinks a unique_lock from the
      * parent to preserve the lock on _mutex
@@ -66,6 +64,13 @@ public:
                        Milliseconds timeout,
                        stdx::unique_lock<stdx::mutex> lk,
                        GetConnectionCallback cb);
+
+    /**
+     * Cascade a failure across existing connections and requests. Invoking
+     * this function drops all current connections and fails all current
+     * requests with the passed status.
+     */
+    void processFailure(const Status& status, stdx::unique_lock<stdx::mutex> lk);
 
     /**
      * Returns a connection to a specific pool. Sinks a unique_lock from the
@@ -84,8 +89,6 @@ private:
     };
 
     void addToReady(stdx::unique_lock<stdx::mutex>& lk, OwnedConnection conn);
-
-    void failAllRequests(const Status& status, stdx::unique_lock<stdx::mutex> lk);
 
     void fulfillRequests(stdx::unique_lock<stdx::mutex>& lk);
 
@@ -143,8 +146,8 @@ private:
 
 // TODO: revisit these durations when we come up with a more pervasive solution
 // for NetworkInterfaceASIO's timers
-Milliseconds const ConnectionPool::kDefaultRefreshTimeout = Seconds(30);
-Milliseconds const ConnectionPool::kDefaultRefreshRequirement = Minutes(1);
+Milliseconds const ConnectionPool::kDefaultRefreshTimeout = Minutes(5);
+Milliseconds const ConnectionPool::kDefaultRefreshRequirement = Minutes(5);
 Milliseconds const ConnectionPool::kDefaultHostTimeout = Minutes(5);
 
 ConnectionPool::ConnectionPool(std::unique_ptr<DependentTypeFactoryInterface> impl, Options options)
@@ -160,7 +163,8 @@ void ConnectionPool::dropConnections(const HostAndPort& hostAndPort) {
     if (iter == _pools.end())
         return;
 
-    iter->second.get()->dropConnections(std::move(lk));
+    iter->second.get()->processFailure(
+        Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"), std::move(lk));
 }
 
 void ConnectionPool::get(const HostAndPort& hostAndPort,
@@ -207,21 +211,6 @@ ConnectionPool::SpecificPool::~SpecificPool() {
     DESTRUCTOR_GUARD(_requestTimer->cancelTimeout();)
 }
 
-void ConnectionPool::SpecificPool::dropConnections(stdx::unique_lock<stdx::mutex> lk) {
-    _generation++;
-
-    _readyPool.clear();
-
-    for (auto&& x : _processingPool) {
-        _droppedProcessingPool[x.first] = std::move(x.second);
-    }
-
-    _processingPool.clear();
-
-    failAllRequests(Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"),
-                    std::move(lk));
-}
-
 void ConnectionPool::SpecificPool::getConnection(const HostAndPort& hostAndPort,
                                                  Milliseconds timeout,
                                                  stdx::unique_lock<stdx::mutex> lk,
@@ -239,15 +228,25 @@ void ConnectionPool::SpecificPool::getConnection(const HostAndPort& hostAndPort,
 void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr,
                                                     stdx::unique_lock<stdx::mutex> lk) {
     auto needsRefreshTP = connPtr->getLastUsed() + _parent->_options.refreshRequirement;
-    auto now = _parent->_factory->now();
 
     auto conn = takeFromPool(_checkedOutPool, connPtr);
 
-    if (conn->isFailed() || conn->getGeneration() != _generation) {
-        // If the connection failed or has been dropped, simply let it lapse
+    updateStateInLock();
+
+    if (conn->getGeneration() != _generation) {
+        // If the connection is from an older generation, just return.
+        return;
+    }
+
+    if (!conn->getStatus().isOK()) {
+        // If the connection failed cascade to all callers.
         //
         // TODO: alert via some callback if the host is bad
-    } else if (needsRefreshTP <= now) {
+        return processFailure(conn->getStatus(), std::move(lk));
+    }
+
+    auto now = _parent->_factory->now();
+    if (needsRefreshTP <= now) {
         // If we need to refresh this connection
 
         if (_readyPool.size() + _processingPool.size() + _checkedOutPool.size() >=
@@ -284,7 +283,7 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
                              }
 
                              // Otherwise pass the failure on through
-                             failAllRequests(status, std::move(lk));
+                             processFailure(status, std::move(lk));
                          });
         lk.lock();
     } else {
@@ -295,9 +294,7 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
     updateStateInLock();
 }
 
-/**
- * Adds a live connection to the ready pool
- */
+// Adds a live connection to the ready pool
 void ConnectionPool::SpecificPool::addToReady(stdx::unique_lock<stdx::mutex>& lk,
                                               OwnedConnection conn) {
     auto connPtr = conn.get();
@@ -327,12 +324,25 @@ void ConnectionPool::SpecificPool::addToReady(stdx::unique_lock<stdx::mutex>& lk
     fulfillRequests(lk);
 }
 
-void ConnectionPool::SpecificPool::failAllRequests(const Status& status,
-                                                   stdx::unique_lock<stdx::mutex> lk) {
+// Drop connections and fail all requests
+void ConnectionPool::SpecificPool::processFailure(const Status& status,
+                                                  stdx::unique_lock<stdx::mutex> lk) {
+    // Bump the generation so we don't reuse any pending or checked out
+    // connections
+    _generation++;
+
+    // Drop ready connections
+    _readyPool.clear();
+
+    // Migrate processing connections to the dropped pool
+    for (auto&& x : _processingPool) {
+        _droppedProcessingPool[x.first] = std::move(x.second);
+    }
+    _processingPool.clear();
+
     // Move the requests out so they aren't visible
     // in other threads
     decltype(_requests) requestsToFail;
-
     {
         using std::swap;
         swap(requestsToFail, _requests);
@@ -423,11 +433,9 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
                                // connection lapse
                            } else if (status.isOK()) {
                                addToReady(lk, std::move(conn));
-                           } else if (_requests.size()) {
-                               // If the setup request failed, immediately fail
-                               // all other pending requests.
-
-                               failAllRequests(status, std::move(lk));
+                           } else {
+                               // If the setup failed, cascade the failure edge
+                               processFailure(status, std::move(lk));
                            }
                        });
         // Note that this assumes that the refreshTimeout is sound for the

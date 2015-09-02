@@ -91,7 +91,7 @@ TEST(ConnectionPoolASIO, TestPing) {
     net.startup();
     auto guard = MakeGuard([&] { net.shutdown(); });
 
-    const int N = 500;
+    const int N = 50;
 
     std::array<stdx::thread, N> threads;
 

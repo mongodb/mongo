@@ -196,7 +196,7 @@ public:
      * Indicates that a connection has failed. This will prevent the connection
      * from re-entering the connection pool.
      */
-    virtual void indicateFailed() = 0;
+    virtual void indicateFailed(Status status) = 0;
 
     /**
      * The HostAndPort for the connection. This should be the same as the
@@ -219,10 +219,10 @@ private:
     virtual Date_t getLastUsed() const = 0;
 
     /**
-     * Returns true if the connection is failed. This implies that it should
-     * not be returned to the pool.
+     * Returns the status associated with the connection. If the status is not
+     * OK, the connection will not be returned to the pool.
      */
-    virtual bool isFailed() const = 0;
+    virtual const Status& getStatus() const = 0;
 
     /**
      * Sets up the connection. This should include connection + auth + any

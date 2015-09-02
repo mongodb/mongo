@@ -82,7 +82,7 @@ public:
 
     void indicateUsed() override;
 
-    void indicateFailed() override;
+    void indicateFailed(Status status) override;
 
     const HostAndPort& getHostAndPort() const override;
 
@@ -100,7 +100,7 @@ public:
 private:
     Date_t getLastUsed() const override;
 
-    bool isFailed() const override;
+    const Status& getStatus() const override;
 
     void setTimeout(Milliseconds timeout, TimeoutCallback cb) override;
 
@@ -114,7 +114,7 @@ private:
 
     HostAndPort _hostAndPort;
     Date_t _lastUsed;
-    bool _isFailed = false;
+    Status _status = Status::OK();
     SetupCallback _setupCallback;
     RefreshCallback _refreshCallback;
     TimerImpl _timer;

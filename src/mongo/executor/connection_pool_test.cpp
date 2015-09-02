@@ -99,7 +99,7 @@ TEST_F(ConnectionPoolTest, FailedConnDifferentConn) {
              Milliseconds(5000),
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  conn1Id = CONN2ID(swConn);
-                 swConn.getValue()->indicateFailed();
+                 swConn.getValue()->indicateFailed(Status(ErrorCodes::BadValue, "error"));
              });
 
     // Grab the second id

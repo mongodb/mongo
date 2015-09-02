@@ -61,9 +61,9 @@ NetworkInterfaceASIO::NetworkInterfaceASIO(
       _resolver(_io_service),
       _state(State::kReady),
       _streamFactory(std::move(streamFactory)),
-      _isExecutorRunnable(false),
       _connectionPool(stdx::make_unique<connection_pool_asio::ASIOImpl>(this),
-                      _options.connectionPoolOptions) {}
+                      _options.connectionPoolOptions),
+      _isExecutorRunnable(false) {}
 
 std::string NetworkInterfaceASIO::getDiagnosticString() {
     str::stream output;
@@ -152,6 +152,7 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
             }
 
             onFinish(swConn.getStatus());
+            signalWorkAvailable();
             return;
         }
 
@@ -182,11 +183,11 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         _beginCommunication(op);
     };
 
-    // TODO: thread some higher level timeout through, rather than 10 seconds,
+    // TODO: thread some higher level timeout through, rather than 5 minutes,
     // once we make timeouts pervasive in this api.
     asio::post(
         _io_service,
-        [this, request, nextStep] { _connectionPool.get(request.target, Seconds(10), nextStep); });
+        [this, request, nextStep] { _connectionPool.get(request.target, Minutes(5), nextStep); });
 }
 
 void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {

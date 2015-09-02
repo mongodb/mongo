@@ -42,6 +42,7 @@ namespace connection_pool_asio {
 class ASIOTimer final : public ConnectionPool::TimerInterface {
 public:
     ASIOTimer(asio::io_service* service);
+    ~ASIOTimer();
 
     void setTimeout(Milliseconds timeout, TimeoutCallback cb) override;
     void cancelTimeout() override;
@@ -50,6 +51,7 @@ private:
     TimeoutCallback _cb;
     asio::io_service* const _io_service;
     asio::steady_timer _impl;
+    bool _canceled;
 };
 
 /**
@@ -62,7 +64,7 @@ public:
     ASIOConnection(const HostAndPort& hostAndPort, size_t generation, ASIOImpl* global);
 
     void indicateUsed() override;
-    void indicateFailed() override;
+    void indicateFailed(Status status) override;
     const HostAndPort& getHostAndPort() const override;
 
     std::unique_ptr<NetworkInterfaceASIO::AsyncOp> releaseAsyncOp();
@@ -70,7 +72,7 @@ public:
 
 private:
     Date_t getLastUsed() const override;
-    bool isFailed() const override;
+    const Status& getStatus() const override;
 
     void setTimeout(Milliseconds timeout, TimeoutCallback cb) override;
     void cancelTimeout() override;
@@ -81,7 +83,7 @@ private:
     size_t getGeneration() const override;
 
     static std::unique_ptr<NetworkInterfaceASIO::AsyncOp> makeAsyncOp(ASIOConnection* conn);
-    static RemoteCommandRequest makeIsMasterRequest(ASIOConnection* conn);
+    static Message makeIsMasterRequest(ASIOConnection* conn);
 
 private:
     SetupCallback _setupCallback;
@@ -89,7 +91,7 @@ private:
     ASIOImpl* const _global;
     ASIOTimer _timer;
     Date_t _lastUsed;
-    bool _isFailed = false;
+    Status _status = Status::OK();
     HostAndPort _hostAndPort;
     size_t _generation;
     std::unique_ptr<NetworkInterfaceASIO::AsyncOp> _impl;

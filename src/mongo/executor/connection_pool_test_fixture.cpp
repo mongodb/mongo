@@ -81,8 +81,8 @@ void ConnectionImpl::indicateUsed() {
     _lastUsed = _global->now();
 }
 
-void ConnectionImpl::indicateFailed() {
-    _isFailed = true;
+void ConnectionImpl::indicateFailed(Status status) {
+    _status = std::move(status);
 }
 
 size_t ConnectionImpl::id() const {
@@ -132,8 +132,8 @@ Date_t ConnectionImpl::getLastUsed() const {
     return _lastUsed;
 }
 
-bool ConnectionImpl::isFailed() const {
-    return _isFailed;
+const Status& ConnectionImpl::getStatus() const {
+    return _status;
 }
 
 void ConnectionImpl::setTimeout(Milliseconds timeout, TimeoutCallback cb) {

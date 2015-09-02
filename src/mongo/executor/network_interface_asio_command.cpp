@@ -215,7 +215,7 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
     // codepath.
     if (op->_inSetup) {
         op->_inSetup = false;
-        op->finish(op->command()->response(rpc::Protocol::kOpQuery, now()));
+        op->finish(RemoteCommandResponse());
         return;
     }
 
@@ -274,7 +274,11 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
     auto asioConn = static_cast<connection_pool_asio::ASIOConnection*>(conn.get());
 
     asioConn->bindAsyncOp(std::move(ownedOp));
-    asioConn->indicateUsed();
+    if (!resp.isOK()) {
+        asioConn->indicateFailed(resp.getStatus());
+    } else {
+        asioConn->indicateUsed();
+    }
 
     signalWorkAvailable();
 }
