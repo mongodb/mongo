@@ -184,29 +184,47 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        string coll = cmdObj["captrunc"].valuestrsafe();
-        uassert(13416, "captrunc must specify a collection", !coll.empty());
-        NamespaceString nss(dbname, coll);
+        const std::string fullNs = parseNsCollectionRequired(dbname, cmdObj);
         int n = cmdObj.getIntField("n");
         bool inc = cmdObj.getBoolField("inc");  // inclusive range?
 
-        OldClientWriteContext ctx(txn, nss.ns());
+        OldClientWriteContext ctx(txn, fullNs);
         Collection* collection = ctx.getCollection();
-        massert(13417, "captrunc collection not found or empty", collection);
+
+        if (!collection) {
+            return appendCommandStatus(
+                result,
+                {ErrorCodes::NamespaceNotFound,
+                 str::stream() << "collection " << fullNs << " does not exist"});
+        }
+
+        if (!collection->isCapped()) {
+            return appendCommandStatus(result,
+                                       {ErrorCodes::IllegalOperation, "collection must be capped"});
+        }
 
         RecordId end;
         {
+            // Scan backwards through the collection to find the document to start truncating from.
+            // We will remove 'n' documents, so start truncating from the (n + 1)th document to the
+            // end.
             std::unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-                txn, nss.ns(), collection, PlanExecutor::YIELD_MANUAL, InternalPlanner::BACKWARD));
-            // We remove 'n' elements so the start is one past that
+                txn, fullNs, collection, PlanExecutor::YIELD_MANUAL, InternalPlanner::BACKWARD));
+
             for (int i = 0; i < n + 1; ++i) {
-                PlanExecutor::ExecState state = exec->getNext(NULL, &end);
-                massert(13418, "captrunc invalid n", PlanExecutor::ADVANCED == state);
+                PlanExecutor::ExecState state = exec->getNext(nullptr, &end);
+                if (PlanExecutor::ADVANCED != state) {
+                    return appendCommandStatus(result,
+                                               {ErrorCodes::IllegalOperation,
+                                                str::stream()
+                                                    << "invalid n, collection contains fewer than "
+                                                    << n << " documents"});
+                }
             }
         }
-        WriteUnitOfWork wuow(txn);
+
         collection->temp_cappedTruncateAfter(txn, end, inc);
-        wuow.commit();
+
         return true;
     }
 };
