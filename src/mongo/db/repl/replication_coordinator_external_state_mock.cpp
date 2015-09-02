@@ -57,7 +57,7 @@ ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock
 
 ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
 
-void ReplicationCoordinatorExternalStateMock::startThreads(executor::TaskExecutor* taskExecutor) {}
+void ReplicationCoordinatorExternalStateMock::startThreads() {}
 void ReplicationCoordinatorExternalStateMock::startMasterSlave(OperationContext*) {}
 void ReplicationCoordinatorExternalStateMock::initiateOplog(OperationContext* txn,
                                                             bool updateReplOpTime) {}

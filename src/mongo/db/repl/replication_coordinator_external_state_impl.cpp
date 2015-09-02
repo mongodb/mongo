@@ -88,7 +88,7 @@ ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl
     : _startedThreads(false), _nextThreadId(0) {}
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
-void ReplicationCoordinatorExternalStateImpl::startThreads(executor::TaskExecutor* taskExecutor) {
+void ReplicationCoordinatorExternalStateImpl::startThreads() {
     stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_startedThreads) {
         return;

@@ -373,7 +373,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         lk.unlock();
     }
     _performPostMemberStateUpdateAction(action);
-    _externalState->startThreads(&_replExecutor);
+    _externalState->startThreads();
 }
 
 void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
@@ -2119,7 +2119,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
     const auto updateReplOpTime = replEnabled;
     _externalState->initiateOplog(txn, updateReplOpTime);
     if (replEnabled) {
-        _externalState->startThreads(&_replExecutor);
+        _externalState->startThreads();
     }
 
     return Status::OK();

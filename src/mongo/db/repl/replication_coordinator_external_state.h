@@ -46,12 +46,6 @@ struct HostAndPort;
 template <typename T>
 class StatusWith;
 
-namespace executor {
-
-class TaskExecutor;
-
-}  // namespace executor
-
 namespace repl {
 
 class LastVote;
@@ -74,7 +68,7 @@ public:
      *
      * NOTE: Only starts threads if they are not already started,
      */
-    virtual void startThreads(executor::TaskExecutor* taskExecutor) = 0;
+    virtual void startThreads() = 0;
 
     /**
      * Starts the Master/Slave threads and sets up logOp

@@ -52,7 +52,7 @@ public:
 
     ReplicationCoordinatorExternalStateMock();
     virtual ~ReplicationCoordinatorExternalStateMock();
-    void startThreads(executor::TaskExecutor* taskExecutor) override;
+    virtual void startThreads() override;
     virtual void startMasterSlave(OperationContext*);
     virtual void shutdown();
     virtual void initiateOplog(OperationContext* txn, bool updateReplOpTime);
