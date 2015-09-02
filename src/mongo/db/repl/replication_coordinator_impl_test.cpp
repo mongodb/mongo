@@ -684,6 +684,8 @@ TEST_F(ReplCoordTest, AwaitReplicationReplSetBaseCases) {
 
     statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
     ASSERT_OK(statusAndDur.status);
+
+    ASSERT_TRUE(getExternalState()->isApplierSignaledToCancelFetcher());
 }
 
 TEST_F(ReplCoordTest, AwaitReplicationNumberOfNodesNonBlocking) {

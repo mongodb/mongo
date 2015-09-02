@@ -2259,6 +2259,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             _electionId = OID(_topCoord->getTerm());
             _topCoord->processWinElection(_electionId, getNextGlobalTimestamp());
             _isWaitingForDrainToComplete = true;
+            _externalState->signalApplierToCancelFetcher();
             const PostMemberStateUpdateAction nextAction =
                 _updateMemberStateFromTopologyCoordinator_inlock();
             invariant(nextAction != kActionWinElection);

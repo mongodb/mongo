@@ -340,6 +340,9 @@ void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource
     BackgroundSync::get()->clearSyncTarget();
 }
 
+void ReplicationCoordinatorExternalStateImpl::signalApplierToCancelFetcher() {
+}
+
 OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext(
     const std::string& threadName) {
     Client::initThreadIfNotAlready(threadName.c_str());

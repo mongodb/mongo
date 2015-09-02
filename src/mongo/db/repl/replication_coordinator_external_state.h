@@ -181,6 +181,11 @@ public:
     virtual void signalApplierToChooseNewSyncSource() = 0;
 
     /**
+     * Notifies the bgsync to cancel the current oplog fetcher.
+     */
+    virtual void signalApplierToCancelFetcher() = 0;
+
+    /**
      * Returns an OperationContext, owned by the caller, that may be used in methods of
      * the same instance that require an OperationContext.
      */

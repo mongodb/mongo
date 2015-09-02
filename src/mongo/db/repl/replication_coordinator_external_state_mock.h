@@ -71,6 +71,7 @@ public:
     virtual void killAllUserOperations(OperationContext* txn);
     virtual void clearShardingState();
     virtual void signalApplierToChooseNewSyncSource();
+    virtual void signalApplierToCancelFetcher();
     virtual OperationContext* createOperationContext(const std::string& threadName);
     virtual void dropAllTempCollections(OperationContext* txn);
     virtual void dropAllSnapshots();
@@ -128,6 +129,11 @@ public:
      */
     void setStoreLocalLastVoteDocumentToHang(bool hang);
 
+    /**
+     * Returns true if applier was signaled to cancel fetcher.
+     */
+    bool isApplierSignaledToCancelFetcher() const;
+
 private:
     StatusWith<BSONObj> _localRsConfigDocument;
     StatusWith<LastVote> _localRsLastVoteDocument;
@@ -144,6 +150,7 @@ private:
     stdx::condition_variable _shouldHangLastVoteCondVar;
     bool _storeLocalConfigDocumentShouldHang;
     bool _storeLocalLastVoteDocumentShouldHang;
+    bool _isApplierSignaledToCancelFetcher;
     bool _connectionsClosed;
     HostAndPort _clientHostAndPort;
 };
