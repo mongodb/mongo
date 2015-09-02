@@ -298,12 +298,9 @@ static int
 __evict_review(
     WT_SESSION_IMPL *session, WT_REF *ref, int *inmem_splitp, int closing)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t flags;
-
-	btree = S2BT(session);
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
