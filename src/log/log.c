@@ -1184,12 +1184,12 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	WT_LOG *log;
 	WT_LSN sync_lsn;
 	size_t write_size;
-	int locked, yield_count;
+	int locked, need_relock, yield_count;
 	int64_t release_bytes;
 
 	conn = S2C(session);
 	log = conn->log;
-	locked = yield_count = 0;
+	locked = need_relock = yield_count = 0;
 	if (freep != NULL)
 		*freep = 1;
 	if (F_ISSET(slot, WT_SLOT_BUFFERED))
@@ -1249,12 +1249,26 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	 * be holes in the log file.
 	 */
 	WT_STAT_FAST_CONN_INCR(session, log_release_write_lsn);
-	while (__wt_log_cmp(&log->write_lsn, &slot->slot_release_lsn) != 0)
+	while (__wt_log_cmp(&log->write_lsn, &slot->slot_release_lsn) != 0) {
+		/*
+		 * If we're on a locked path and the write LSN is not advancing,
+		 * unlock in case an earlier thread is trying to switch its
+		 * slot and complete its operation.
+		 */
+		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT)) {
+			__wt_spin_unlock(session, &log->log_slot_lock);
+			need_relock = 1;
+		}
 		if (++yield_count < 1000)
 			__wt_yield();
 		else
 			WT_ERR(__wt_cond_wait(
 			    session, log->log_write_cond, 200));
+		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT)) {
+			__wt_spin_lock(session, &log->log_slot_lock);
+			need_relock = 0;
+		}
+	}
 
 	log->write_start_lsn = slot->slot_start_lsn;
 	log->write_lsn = slot->slot_end_lsn;
@@ -1332,6 +1346,8 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 	}
 err:	if (locked)
 		__wt_spin_unlock(session, &log->log_sync_lock);
+	if (need_relock)
+		__wt_spin_lock(session, &log->log_slot_lock);
 	if (ret != 0 && slot->slot_error == 0)
 		slot->slot_error = ret;
 done:
@@ -1700,8 +1716,8 @@ __log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	tmp.slot_end_lsn.offset += (wt_off_t)record->size;
 	tmp.slot_direct_size = (int64_t)record->size;
 	WT_RET(__log_fill(session, &myslot, 1, record, lsnp));
-	WT_RET(__log_release(session, myslot.slot, NULL));
 	log->alloc_lsn = tmp.slot_end_lsn;
+	WT_RET(__log_release(session, myslot.slot, NULL));
 	/*
 	 * Now that we have written our buffer, we can set up a new slot.
 	 * This is split out from the forced write call so that the LSN
