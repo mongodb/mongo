@@ -32,6 +32,7 @@
 
 #include "mongo/executor/network_interface_asio.h"
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/async_stream_interface.h"
@@ -39,6 +40,7 @@
 #include "mongo/executor/downconvert_find_and_getmore_commands.h"
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/rpc/factory.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/request_builder_interface.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
@@ -50,21 +52,41 @@ using asio::ip::tcp;
 
 namespace {
 
-std::unique_ptr<Message> messageFromRequest(const RemoteCommandRequest& request,
-                                            rpc::Protocol protocol) {
+// Metadata listener can be nullptr.
+StatusWith<std::unique_ptr<Message>> messageFromRequest(const RemoteCommandRequest& request,
+                                                        rpc::Protocol protocol,
+                                                        rpc::EgressMetadataHook* metadataHook) {
     BSONObj query = request.cmdObj;
     auto requestBuilder = rpc::makeRequestBuilder(protocol);
 
-    // TODO: handle metadata writers
+    BSONObj maybeAugmented;
+    // Handle outgoing request metadata.
+    if (metadataHook) {
+        BSONObjBuilder augmentedBob;
+        augmentedBob.appendElements(request.metadata);
+
+        auto writeStatus = callNoexcept(*metadataHook,
+                                        &rpc::EgressMetadataHook::writeRequestMetadata,
+                                        request.target,
+                                        &augmentedBob);
+        if (!writeStatus.isOK()) {
+            return writeStatus;
+        }
+
+        maybeAugmented = augmentedBob.obj();
+    } else {
+        maybeAugmented = request.metadata;
+    }
+
     auto toSend = rpc::makeRequestBuilder(protocol)
                       ->setDatabase(request.dbname)
                       .setCommandName(request.cmdObj.firstElementFieldName())
-                      .setMetadata(request.metadata)
+                      .setMetadata(maybeAugmented)
                       .setCommandArgs(request.cmdObj)
                       .done();
 
     toSend->header().setId(nextMessageId());
-    return toSend;
+    return std::move(toSend);
 }
 
 }  // namespace
@@ -118,17 +140,19 @@ void NetworkInterfaceASIO::AsyncOp::setConnection(AsyncConnection&& conn) {
 }
 
 Status NetworkInterfaceASIO::AsyncOp::beginCommand(Message&& newCommand,
-                                                   AsyncCommand::CommandType type) {
+                                                   AsyncCommand::CommandType type,
+                                                   const HostAndPort& target) {
     // NOTE: We operate based on the assumption that AsyncOp's
     // AsyncConnection does not change over its lifetime.
     invariant(_connection.is_initialized());
 
     // Construct a new AsyncCommand object for each command.
-    _command.emplace(_connection.get_ptr(), type, std::move(newCommand), _owner->now());
+    _command.emplace(_connection.get_ptr(), type, std::move(newCommand), _owner->now(), target);
     return Status::OK();
 }
 
-Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& request) {
+Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& request,
+                                                   rpc::EgressMetadataHook* metadataHook) {
     // Check if we need to downconvert find or getMore commands.
     StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
     const auto isFindCmd = commandName == LiteParsedQuery::kFindCommandName;
@@ -138,15 +162,20 @@ Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& r
     // If we aren't sending a find or getMore, or the server supports OP_COMMAND we don't have
     // to worry about downconversion.
     if (!isFindOrGetMoreCmd || connection().serverProtocols() == rpc::supports::kAll) {
-        auto newCommand = messageFromRequest(request, operationProtocol());
-        return beginCommand(std::move(*newCommand), AsyncCommand::CommandType::kRPC);
+        auto newCommand = messageFromRequest(request, operationProtocol(), metadataHook);
+        if (!newCommand.isOK()) {
+            return newCommand.getStatus();
+        }
+        return beginCommand(
+            std::move(*newCommand.getValue()), AsyncCommand::CommandType::kRPC, request.target);
     } else if (isFindCmd) {
         auto downconvertedFind = downconvertFindCommandRequest(request);
         if (!downconvertedFind.isOK()) {
             return downconvertedFind.getStatus();
         }
         return beginCommand(std::move(downconvertedFind.getValue()),
-                            AsyncCommand::CommandType::kDownConvertedFind);
+                            AsyncCommand::CommandType::kDownConvertedFind,
+                            request.target);
     } else {
         invariant(isGetMoreCmd);
         auto downconvertedGetMore = downconvertGetMoreCommandRequest(request);
@@ -154,7 +183,8 @@ Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& r
             return downconvertedGetMore.getStatus();
         }
         return beginCommand(std::move(downconvertedGetMore.getValue()),
-                            AsyncCommand::CommandType::kDownConvertedGetMore);
+                            AsyncCommand::CommandType::kDownConvertedGetMore,
+                            request.target);
     }
 }
 

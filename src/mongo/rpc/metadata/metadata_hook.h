@@ -28,38 +28,44 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
-#include "mongo/executor/network_interface.h"
-
 namespace mongo {
 
+class BSONObj;
+class BSONObjBuilder;
+struct HostAndPort;
+class Status;
+
 namespace rpc {
-class EgressMetadataHook;
+
+/**
+ * An interface for augmenting egress networking components with domain-specific metadata handling
+ * logic.
+ *
+ * TODO: At some point we will want the opposite of this interface (readRequestMetadata,
+ * writeReplyMetadata) that we will use for ingress networking. This will allow us to move much
+ * of the metadata handling logic out of Command::run.
+ */
+class EgressMetadataHook {
+public:
+    virtual ~EgressMetadataHook() = default;
+
+    /**
+     * Writes to an outgoing request metadata object. This method must not throw or block on
+     * database or network operations and can be called by multiple concurrent threads.
+     */
+    virtual Status writeRequestMetadata(const HostAndPort& requestDestination,
+                                        BSONObjBuilder* metadataBob) = 0;
+
+    /**
+     * Reads metadata from an incoming command reply. This method must not throw or block on
+     * database or network operations and can be called by multiple concurrent threads.
+     */
+    virtual Status readReplyMetadata(const HostAndPort& replySource,
+                                     const BSONObj& metadataObj) = 0;
+
+protected:
+    EgressMetadataHook() = default;
+};
+
 }  // namespace rpc
-
-namespace executor {
-
-class NetworkConnectionHook;
-
-/**
- * Returns a new NetworkInterface.
- *
- * Different NetworkInterface implementations may be specified setting the
- * 'outboundNetworkImpl' at startup.
- */
-std::unique_ptr<NetworkInterface> makeNetworkInterface();
-
-/**
- * Returns a new NetworkInterface with the given connection hook set.
- *
- * Different NetworkInterface implementations may be specified setting the
- * 'outboundNetworkImpl' at startup.
- */
-std::unique_ptr<NetworkInterface> makeNetworkInterface(
-    std::unique_ptr<NetworkConnectionHook> hook,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
-
-}  // namespace executor
 }  // namespace mongo

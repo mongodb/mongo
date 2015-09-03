@@ -32,6 +32,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/executor/async_stream_factory.h"
+#include "mongo/executor/async_timer_asio.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/future.h"
@@ -82,11 +83,11 @@ TEST(ConnectionPoolASIO, TestPing) {
     auto fixture = unittest::getFixtureConnectionString();
 
     NetworkInterfaceASIO::Options options;
+    options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
+    options.networkConnectionHook = stdx::make_unique<MyNetworkConnectionHook>();
     options.connectionPoolOptions.maxConnections = 10;
-
-    NetworkInterfaceASIO net{stdx::make_unique<AsyncStreamFactory>(),
-                             stdx::make_unique<MyNetworkConnectionHook>(),
-                             std::move(options)};
+    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+    NetworkInterfaceASIO net{std::move(options)};
 
     net.startup();
     auto guard = MakeGuard([&] { net.shutdown(); });

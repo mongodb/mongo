@@ -39,6 +39,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/system_error.h"
+#include "mongo/executor/async_stream_factory_interface.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/async_timer_interface.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -46,6 +47,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
@@ -54,15 +56,15 @@
 #include "mongo/util/net/message.h"
 
 namespace mongo {
+
 namespace executor {
 
 namespace connection_pool_asio {
 class ASIOConnection;
 class ASIOTimer;
 class ASIOImpl;
-}
+}  // connection_pool_asio
 
-class AsyncStreamFactoryInterface;
 class AsyncStreamInterface;
 
 /**
@@ -89,13 +91,13 @@ public:
 
         ConnectionPool::Options connectionPoolOptions;
         std::unique_ptr<AsyncTimerFactoryInterface> timerFactory;
+        std::unique_ptr<NetworkConnectionHook> networkConnectionHook;
+        std::unique_ptr<AsyncStreamFactoryInterface> streamFactory;
+        std::unique_ptr<rpc::EgressMetadataHook> metadataHook;
     };
 
-    NetworkInterfaceASIO(std::unique_ptr<AsyncStreamFactoryInterface> streamFactory,
-                         std::unique_ptr<NetworkConnectionHook> networkConnectionHook,
-                         Options = Options());
-    NetworkInterfaceASIO(std::unique_ptr<AsyncStreamFactoryInterface> streamFactory,
-                         Options = Options());
+    NetworkInterfaceASIO(Options = Options());
+
     std::string getDiagnosticString() override;
     std::string getHostName() override;
     void startup() override;
@@ -178,7 +180,11 @@ private:
             kDownConvertedGetMore,
         };
 
-        AsyncCommand(AsyncConnection* conn, CommandType type, Message&& command, Date_t now);
+        AsyncCommand(AsyncConnection* conn,
+                     CommandType type,
+                     Message&& command,
+                     Date_t now,
+                     const HostAndPort& target);
 
         NetworkInterfaceASIO::AsyncConnection& conn();
 
@@ -186,7 +192,9 @@ private:
         Message& toRecv();
         MSGHEADER::Value& header();
 
-        ResponseStatus response(rpc::Protocol protocol, Date_t now);
+        ResponseStatus response(rpc::Protocol protocol,
+                                Date_t now,
+                                rpc::EgressMetadataHook* metadataHook = nullptr);
 
     private:
         NetworkInterfaceASIO::AsyncConnection* const _conn;
@@ -200,6 +208,8 @@ private:
         MSGHEADER::Value _header;
 
         const Date_t _start;
+
+        HostAndPort _target;
     };
 
     /**
@@ -228,9 +238,14 @@ private:
         // AsyncOp may run multiple commands over its lifetime (for example, an ismaster
         // command, the command provided to the NetworkInterface via startCommand(), etc.)
         // Calling beginCommand() resets internal state to prepare to run newCommand.
-        Status beginCommand(const RemoteCommandRequest& request);
+        Status beginCommand(const RemoteCommandRequest& request,
+                            rpc::EgressMetadataHook* metadataHook = nullptr);
+
+        // This form of beginCommand takes a raw message. It is needed if the caller
+        // has to form the command manually (e.g. to use a specific requestBuilder).
         Status beginCommand(Message&& newCommand,
-                            AsyncCommand::CommandType = AsyncCommand::CommandType::kRPC);
+                            AsyncCommand::CommandType,
+                            const HostAndPort& target);
 
         AsyncCommand* command();
 
@@ -332,7 +347,9 @@ private:
     asio::io_service _io_service;
     stdx::thread _serviceRunner;
 
-    std::unique_ptr<NetworkConnectionHook> _hook;
+    const std::unique_ptr<rpc::EgressMetadataHook> _metadataHook;
+
+    const std::unique_ptr<NetworkConnectionHook> _hook;
 
     asio::ip::tcp::resolver _resolver;
 

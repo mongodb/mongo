@@ -58,7 +58,8 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
     requestBuilder.setCommandArgs(BSON("isMaster" << 1));
 
     // Set current command to ismaster request and run
-    auto beginStatus = op->beginCommand(std::move(*(requestBuilder.done())));
+    auto beginStatus = op->beginCommand(
+        std::move(*(requestBuilder.done())), AsyncCommand::CommandType::kRPC, op->request().target);
     if (!beginStatus.isOK()) {
         return _completeOperation(op, beginStatus);
     }
@@ -131,13 +132,15 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
     auto runCommandHook = [this, op](executor::RemoteCommandRequest request,
                                      auth::AuthCompletionHandler handler) {
 
-        auto beginStatus = op->beginCommand(request);
+        // SERVER-14170: Set the metadataHook to nullptr explicitly as we cannot write metadata
+        // here.
+        auto beginStatus = op->beginCommand(request, nullptr);
         if (!beginStatus.isOK()) {
             return handler(beginStatus);
         }
 
         auto callAuthCompletionHandler = [this, op, handler]() {
-            auto authResponse = op->command()->response(op->operationProtocol(), now());
+            auto authResponse = op->command()->response(op->operationProtocol(), now(), nullptr);
             handler(authResponse);
         };
 

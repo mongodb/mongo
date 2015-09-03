@@ -39,6 +39,7 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/executor/network_interface_impl.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/net/ssl_manager.h"
 
@@ -62,29 +63,25 @@ MONGO_INITIALIZER(outboundNetworkImpl)(InitializerContext*) {
 }
 
 std::unique_ptr<NetworkInterface> makeNetworkInterface() {
-    return makeNetworkInterface(nullptr);
+    return makeNetworkInterface(nullptr, nullptr);
 }
 
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
-    std::unique_ptr<NetworkConnectionHook> hook) {
+    std::unique_ptr<NetworkConnectionHook> hook,
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
     if (outboundNetworkImpl == kNetworkImplASIO) {
-        NetworkInterfaceASIO::Options options;
-
-        // Set up a timer factory
-        auto timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
-        options.timerFactory = std::move(timerFactory);
-
+        NetworkInterfaceASIO::Options options{};
+        options.networkConnectionHook = std::move(hook);
+        options.metadataHook = std::move(metadataHook);
+        options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
 #ifdef MONGO_CONFIG_SSL
         if (SSLManagerInterface* manager = getSSLManager()) {
-            auto factory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
-            return stdx::make_unique<NetworkInterfaceASIO>(
-                std::move(factory), std::move(hook), std::move(options));
+            options.streamFactory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
+            return stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
         }
 #endif
-        auto factory = stdx::make_unique<AsyncStreamFactory>();
-        return stdx::make_unique<NetworkInterfaceASIO>(
-            std::move(factory), std::move(hook), std::move(options));
-
+        options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
+        return stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
     } else {
         return stdx::make_unique<NetworkInterfaceImpl>(std::move(hook));
     }

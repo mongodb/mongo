@@ -32,7 +32,7 @@
 #include <asio.hpp>
 
 #include "mongo/executor/async_stream_factory_interface.h"
-
+#include "mongo/executor/network_interface_asio.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/reply_interface.h"
@@ -157,7 +157,9 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
                });
 
     // Our pings are isMaster's
-    auto beginStatus = op->beginCommand(makeIsMasterRequest(this));
+    auto beginStatus = op->beginCommand(makeIsMasterRequest(this),
+                                        NetworkInterfaceASIO::AsyncCommand::CommandType::kRPC,
+                                        _hostAndPort);
     if (!beginStatus.isOK()) {
         auto cb = std::move(_refreshCallback);
         cb(this, beginStatus);

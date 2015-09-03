@@ -73,12 +73,11 @@ public:
         _timerFactory = timerFactory.get();
         options.timerFactory = std::move(timerFactory);
 
+        auto factory = stdx::make_unique<AsyncMockStreamFactory>();
         // keep unowned pointer, but pass ownership to NIA
-        auto streamFactory = stdx::make_unique<AsyncMockStreamFactory>();
-        _streamFactory = streamFactory.get();
-        _net =
-            stdx::make_unique<NetworkInterfaceASIO>(std::move(streamFactory), std::move(options));
-
+        _streamFactory = factory.get();
+        options.streamFactory = std::move(factory);
+        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
         _net->startup();
     }
 
@@ -157,7 +156,7 @@ TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
 }
 
 TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
-    std::promise<bool> timedOut;
+    stdx::promise<bool> timedOut;
     auto timedOutFuture = timedOut.get_future();
 
     // Kick off operation
@@ -262,8 +261,10 @@ public:
         auto factory = stdx::make_unique<AsyncMockStreamFactory>();
         // keep unowned pointer, but pass ownership to NIA
         _streamFactory = factory.get();
-        _net = stdx::make_unique<NetworkInterfaceASIO>(
-            std::move(factory), std::move(hook), NetworkInterfaceASIO::Options());
+        NetworkInterfaceASIO::Options options{};
+        options.streamFactory = std::move(factory);
+        options.networkConnectionHook = std::move(hook);
+        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
         _net->startup();
     }
 };
@@ -544,6 +545,77 @@ TEST_F(NetworkInterfaceASIOTest, setAlarm) {
 
     status = executed2.wait_for(Milliseconds(0));
     ASSERT(status == stdx::future_status::timeout);
+}
+
+class NetworkInterfaceASIOMetadataTest : public NetworkInterfaceASIOTest {
+protected:
+    void setUp() override {}
+
+    void start(std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
+        auto factory = stdx::make_unique<AsyncMockStreamFactory>();
+        _streamFactory = factory.get();
+        NetworkInterfaceASIO::Options options{};
+        options.streamFactory = std::move(factory);
+        options.metadataHook = std::move(metadataHook);
+        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
+        _net->startup();
+    }
+};
+
+class TestMetadataHook : public rpc::EgressMetadataHook {
+public:
+    TestMetadataHook(bool* wroteRequestMetadata, bool* gotReplyMetadata)
+        : _wroteRequestMetadata(wroteRequestMetadata), _gotReplyMetadata(gotReplyMetadata) {}
+
+    Status writeRequestMetadata(const HostAndPort& requestDestination,
+                                BSONObjBuilder* metadataBob) override {
+        metadataBob->append("foo", "bar");
+        *_wroteRequestMetadata = true;
+        return Status::OK();
+    }
+
+    Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) override {
+        *_gotReplyMetadata = (metadataObj["baz"].str() == "garply");
+        return Status::OK();
+    }
+
+private:
+    bool* _wroteRequestMetadata;
+    bool* _gotReplyMetadata;
+};
+
+TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
+    bool wroteRequestMetadata = false;
+    bool gotReplyMetadata = false;
+    start(stdx::make_unique<TestMetadataHook>(&wroteRequestMetadata, &gotReplyMetadata));
+
+    std::promise<void> done;
+
+    net().startCommand({},
+                       {testHost, "blah", BSON("ping" << 1)},
+                       [&](StatusWith<RemoteCommandResponse> result) { done.set_value(); });
+
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    // Simulate hook reply
+    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+                           [&](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               ASSERT(request.metadata["foo"].str() == "bar");
+                               RemoteCommandResponse response;
+                               response.data = BSON("ok" << 1);
+                               response.metadata = BSON("baz"
+                                                        << "garply");
+                               return response;
+                           });
+    done.get_future().get();
+    ASSERT(wroteRequestMetadata);
+    ASSERT(gotReplyMetadata);
 }
 
 }  // namespace

@@ -33,6 +33,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/executor/async_stream_factory.h"
 #include "mongo/executor/async_stream_interface.h"
+#include "mongo/executor/async_timer_asio.h"
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -50,8 +51,10 @@ namespace {
 TEST(NetworkInterfaceASIO, TestPing) {
     auto fixture = unittest::getFixtureConnectionString();
 
-    NetworkInterfaceASIO net{stdx::make_unique<AsyncStreamFactory>(),
-                             NetworkInterfaceASIO::Options()};
+    NetworkInterfaceASIO::Options options{};
+    options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
+    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+    NetworkInterfaceASIO net{std::move(options)};
 
     net.startup();
     auto guard = MakeGuard([&] { net.shutdown(); });

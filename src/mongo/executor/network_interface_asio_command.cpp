@@ -35,13 +35,14 @@
 #include <type_traits>
 #include <utility>
 
-#include "mongo/executor/connection_pool_asio.h"
-#include "mongo/executor/async_stream_interface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/executor/async_stream_interface.h"
+#include "mongo/executor/async_stream_interface.h"
+#include "mongo/executor/connection_pool_asio.h"
 #include "mongo/executor/downconvert_find_and_getmore_commands.h"
 #include "mongo/rpc/factory.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/request_builder_interface.h"
@@ -126,7 +127,11 @@ void asyncRecvMessageBody(AsyncStreamInterface& stream,
     stream.read(asio::buffer(mdView.data(), bodyLength), std::forward<Handler>(handler));
 }
 
-ResponseStatus decodeRPC(Message* received, rpc::Protocol protocol, Milliseconds elapsed) {
+ResponseStatus decodeRPC(Message* received,
+                         rpc::Protocol protocol,
+                         Milliseconds elapsed,
+                         const HostAndPort& source,
+                         rpc::EgressMetadataHook* metadataHook) {
     try {
         // makeReply will throw if the reply is invalid
         auto reply = rpc::makeReply(received);
@@ -143,6 +148,18 @@ ResponseStatus decodeRPC(Message* received, rpc::Protocol protocol, Milliseconds
         }
         auto ownedCommandReply = reply->getCommandReply().getOwned();
         auto ownedReplyMetadata = reply->getMetadata().getOwned();
+
+        // Handle incoming reply metadata.
+        if (metadataHook) {
+            auto listenStatus = callNoexcept(*metadataHook,
+                                             &rpc::EgressMetadataHook::readReplyMetadata,
+                                             source,
+                                             ownedReplyMetadata);
+            if (!listenStatus.isOK()) {
+                return listenStatus;
+            }
+        }
+
         return {RemoteCommandResponse(
             std::move(ownedCommandReply), std::move(ownedReplyMetadata), elapsed)};
     } catch (...) {
@@ -155,8 +172,9 @@ ResponseStatus decodeRPC(Message* received, rpc::Protocol protocol, Milliseconds
 NetworkInterfaceASIO::AsyncCommand::AsyncCommand(AsyncConnection* conn,
                                                  CommandType type,
                                                  Message&& command,
-                                                 Date_t now)
-    : _conn(conn), _type(type), _toSend(std::move(command)), _start(now) {
+                                                 Date_t now,
+                                                 const HostAndPort& target)
+    : _conn(conn), _type(type), _toSend(std::move(command)), _start(now), _target(target) {
     _toSend.header().setResponseTo(0);
 }
 
@@ -176,11 +194,13 @@ MSGHEADER::Value& NetworkInterfaceASIO::AsyncCommand::header() {
     return _header;
 }
 
-ResponseStatus NetworkInterfaceASIO::AsyncCommand::response(rpc::Protocol protocol, Date_t now) {
+ResponseStatus NetworkInterfaceASIO::AsyncCommand::response(rpc::Protocol protocol,
+                                                            Date_t now,
+                                                            rpc::EgressMetadataHook* metadataHook) {
     auto& received = _toRecv;
     switch (_type) {
         case CommandType::kRPC: {
-            return decodeRPC(&received, protocol, now - _start);
+            return decodeRPC(&received, protocol, now - _start, _target, metadataHook);
         }
         case CommandType::kDownConvertedFind: {
             auto ns = DbMessage(_toSend).getns();
@@ -213,13 +233,14 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
     // return to the connection pool's get() callback with _inSetup == false,
     // so we can proceed with user operations after they return to this
     // codepath.
+
     if (op->_inSetup) {
         op->_inSetup = false;
         op->finish(RemoteCommandResponse());
         return;
     }
 
-    auto beginStatus = op->beginCommand(op->request());
+    auto beginStatus = op->beginCommand(op->request(), _metadataHook.get());
     if (!beginStatus.isOK()) {
         return _completeOperation(op, beginStatus);
     }
@@ -231,8 +252,7 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
 }
 
 void NetworkInterfaceASIO::_completedOpCallback(AsyncOp* op) {
-    // TODO: handle metadata readers.
-    auto response = op->command()->response(op->operationProtocol(), now());
+    auto response = op->command()->response(op->operationProtocol(), now(), _metadataHook.get());
     _completeOperation(op, response);
 }
 
@@ -357,13 +377,14 @@ void NetworkInterfaceASIO::_runConnectionHook(AsyncOp* op) {
         return _beginCommunication(op);
     }
 
-    auto beginStatus = op->beginCommand(*optionalRequest);
+    auto beginStatus = op->beginCommand(*optionalRequest, _metadataHook.get());
     if (!beginStatus.isOK()) {
         return _completeOperation(op, beginStatus);
     }
 
     auto finishHook = [this, op]() {
-        auto response = op->command()->response(op->operationProtocol(), now());
+        auto response =
+            op->command()->response(op->operationProtocol(), now(), _metadataHook.get());
 
         if (!response.isOK()) {
             return _completeOperation(op, response.getStatus());

@@ -34,12 +34,13 @@
 
 #include <utility>
 
-#include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/async_stream_factory.h"
+#include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/async_timer_asio.h"
 #include "mongo/executor/async_timer_interface.h"
 #include "mongo/executor/async_timer_mock.h"
 #include "mongo/executor/connection_pool_asio.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -53,30 +54,30 @@ namespace executor {
 #if defined(_MSC_VER) && _MSC_VER < 1900
 NetworkInterfaceASIO::Options::Options(Options&& other)
     : connectionPoolOptions(std::move(other.connectionPoolOptions)),
-      timerFactory(std::move(other.timerFactory)) {}
+      timerFactory(std::move(other.timerFactory)),
+      networkConnectionHook(std::move(other.networkConnectionHook)),
+      streamFactory(std::move(other.streamFactory)),
+      metadataHook(std::move(other.metadataHook)) {}
 
 NetworkInterfaceASIO::Options& NetworkInterfaceASIO::Options::operator=(Options&& other) {
     connectionPoolOptions = std::move(other.connectionPoolOptions);
     timerFactory = std::move(other.timerFactory);
+    networkConnectionHook = std::move(other.networkConnectionHook);
+    streamFactory = std::move(other.streamFactory);
+    metadataHook = std::move(other.metadataHook);
     return *this;
 }
 #endif
 
-NetworkInterfaceASIO::NetworkInterfaceASIO(
-    std::unique_ptr<AsyncStreamFactoryInterface> streamFactory, Options options)
-    : NetworkInterfaceASIO(std::move(streamFactory), nullptr, std::move(options)) {}
-
-NetworkInterfaceASIO::NetworkInterfaceASIO(
-    std::unique_ptr<AsyncStreamFactoryInterface> streamFactory,
-    std::unique_ptr<NetworkConnectionHook> networkConnectionHook,
-    Options options)
+NetworkInterfaceASIO::NetworkInterfaceASIO(Options options)
     : _options(std::move(options)),
       _io_service(),
-      _hook(std::move(networkConnectionHook)),
+      _metadataHook(std::move(_options.metadataHook)),
+      _hook(std::move(_options.networkConnectionHook)),
       _resolver(_io_service),
       _state(State::kReady),
       _timerFactory(std::move(_options.timerFactory)),
-      _streamFactory(std::move(streamFactory)),
+      _streamFactory(std::move(_options.streamFactory)),
       _connectionPool(stdx::make_unique<connection_pool_asio::ASIOImpl>(this),
                       _options.connectionPoolOptions),
       _isExecutorRunnable(false) {}
