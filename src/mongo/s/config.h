@@ -213,19 +213,22 @@ public:
     static void reloadSettings(OperationContext* txn);
 
     /**
-     * For use in mongod which only needs notifications about the config server replset membership
-     * changes, to update the ShardRegistry.
+     * For use in mongos and mongod which needs notifications about changes to config server replset
+     * membership to update the ShardRegistry.
+     *
+     * This is expected to be run in an existing thread.
      */
     static void configReplicaSetChange(const std::string& setName,
                                        const std::string& newConnectionString);
 
     /**
-     * For use in mongos which needs notifications about changes to both the config server replset
-     * membership (to update the ShardRegistry, same as in mongod) and for changes to regular shard
-     * replset membership changes to update the config.shards collection.
+     * For use in mongos which needs notifications about changes to shard replset membership to
+     * update the config.shards collection.
+     *
+     * This is expected to be run in a brand new thread.
      */
-    static void configOrShardReplicaSetChange(const std::string& setName,
-                                              const std::string& newConnectionString);
+    static void shardReplicaSetChange(const std::string& setName,
+                                      const std::string& newConnectionString);
 };
 
 }  // namespace mongo

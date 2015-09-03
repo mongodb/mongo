@@ -792,8 +792,18 @@ void ConfigServer::reloadSettings(OperationContext* txn) {
     }
 }
 
-void ConfigServer::configOrShardReplicaSetChange(const string& setName,
-                                                 const string& newConnectionString) {
+void ConfigServer::configReplicaSetChange(const string& setName,
+                                          const string& newConnectionString) {
+    auto shard = grid.shardRegistry()->lookupRSName(setName);
+    if (shard && shard->isConfig()) {
+        // If this is the config server we're monitoring, inform the ShardRegsitry of the
+        // new connection string for the config servers.
+        grid.shardRegistry()->updateConfigServerConnectionString(
+            fassertStatusOK(28805, ConnectionString::parse(newConnectionString)));
+    }
+}
+
+void ConfigServer::shardReplicaSetChange(const string& setName, const string& newConnectionString) {
     // This is run in it's own thread. Exceptions escaping would result in a call to terminate.
     Client::initThread("replSetChange");
     auto txn = cc().makeOperationContext();
@@ -806,55 +816,27 @@ void ConfigServer::configOrShardReplicaSetChange(const string& setName,
         }
 
         if (s->isConfig()) {
-            grid.shardRegistry()->updateConfigServerConnectionString(
-                fassertStatusOK(28783, ConnectionString::parse(newConnectionString)));
-        } else {
-            Status result = grid.catalogManager(txn.get())
-                                ->update(txn.get(),
-                                         ShardType::ConfigNS,
-                                         BSON(ShardType::name(s->getId())),
-                                         BSON("$set" << BSON(ShardType::host(newConnectionString))),
-                                         false,  // upsert
-                                         false,  // multi
-                                         NULL);
-            if (!result.isOK()) {
-                error() << "RSChangeWatcher: could not update config db for set: " << setName
-                        << " to: " << newConnectionString << ": " << result.reason();
-            }
+            // No need to tell the config servers their own connection string.
+            return;
         }
+
+        Status result = grid.catalogManager(txn.get())
+                            ->update(txn.get(),
+                                     ShardType::ConfigNS,
+                                     BSON(ShardType::name(s->getId())),
+                                     BSON("$set" << BSON(ShardType::host(newConnectionString))),
+                                     false,  // upsert
+                                     false,  // multi
+                                     NULL);
+        if (!result.isOK()) {
+            error() << "RSChangeWatcher: could not update config db for set: " << setName
+                    << " to: " << newConnectionString << ": " << result.reason();
+        }
+
     } catch (const std::exception& e) {
         warning() << "caught exception while updating config servers: " << e.what();
     } catch (...) {
         warning() << "caught unknown exception while updating config servers";
-    }
-}
-
-void ConfigServer::configReplicaSetChange(const string& setName,
-                                          const string& newConnectionString) {
-    // This is run in it's own thread. Exceptions escaping would result in a call to terminate.
-    Client::initThread("replSetChange");
-    auto txn = cc().makeOperationContext();
-
-    try {
-        std::shared_ptr<Shard> s = grid.shardRegistry()->lookupRSName(setName);
-        if (!s) {
-            LOG(1) << "shard not found for set: " << newConnectionString;
-            return;
-        }
-
-        if (!s->isConfig()) {
-            return;
-        }
-
-        grid.shardRegistry()->updateConfigServerConnectionString(
-            fassertStatusOK(28801, ConnectionString::parse(newConnectionString)));
-
-    } catch (const std::exception& e) {
-        warning() << "caught exception while updating shard registry with new address for config "
-                     "servers: " << e.what();
-    } catch (...) {
-        warning() << "caught unknown exception while updating shard registry with new address for "
-                     "config servers";
     }
 }
 

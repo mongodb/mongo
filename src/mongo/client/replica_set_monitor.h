@@ -162,7 +162,19 @@ public:
      *
      * The hook must not be changed while the program has multiple threads.
      */
-    static void setConfigChangeHook(ConfigChangeHook hook);
+    static void setAsynchronousConfigChangeHook(ConfigChangeHook hook);
+
+    /**
+     * Sets the hook to be called whenever the config of any replica set changes.
+     * Currently only 1 globally, so this asserts if one already exists.
+     *
+     * The hook will be called inline while refreshing the ReplicaSetMonitor's view of the set
+     * membership.  It is important that the hook not block for long as it will be running under
+     * the ReplicaSetMonitor's mutex.
+     *
+     * The hook must not be changed while the program has multiple threads.
+     */
+    static void setSynchronousConfigChangeHook(ConfigChangeHook hook);
 
     /**
      * Permanently stops all monitoring on replica sets and clears all cached information

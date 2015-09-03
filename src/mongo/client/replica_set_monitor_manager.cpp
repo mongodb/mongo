@@ -104,12 +104,18 @@ void ReplicaSetMonitorManager::removeAllMonitors() {
 }
 
 void ReplicaSetMonitorManager::report(BSONObjBuilder* builder) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    for (const auto& monitorPair : _monitors) {
-        BSONObjBuilder monitorInfo(builder->subobjStart(monitorPair.first));
-        monitorPair.second->appendInfo(monitorInfo);
-        monitorInfo.done();
+    // Don't hold _mutex the whole time to avoid ever taking a monitor's mutex while holding the
+    // manager's mutex.  Otherwise we could get a deadlock between the manager's, monitor's, and
+    // ShardRegistry's mutex due to the ReplicaSetMonitor's AsynchronousConfigChangeHook potentially
+    // calling ShardRegistry::updateConfigServerConnectionString.
+    auto setNames = getAllSetNames();
+    for (const auto& setName : setNames) {
+        auto monitor = getMonitor(setName);
+        if (!monitor) {
+            continue;
+        }
+        BSONObjBuilder monitorInfo(builder->subobjStart(setName));
+        monitor->appendInfo(monitorInfo);
     }
 }
 

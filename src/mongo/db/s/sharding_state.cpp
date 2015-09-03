@@ -157,7 +157,7 @@ void ShardingState::initialize(OperationContext* txn, const string& server) {
     }
 
     ShardedConnectionInfo::addHook();
-    ReplicaSetMonitor::setConfigChangeHook(&ConfigServer::configReplicaSetChange);
+    ReplicaSetMonitor::setSynchronousConfigChangeHook(&ConfigServer::configReplicaSetChange);
 
     ConnectionString configServerCS = uassertStatusOK(ConnectionString::parse(server));
     uassertStatusOK(initializeGlobalShardingState(txn, configServerCS, false));

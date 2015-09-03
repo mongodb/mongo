@@ -75,7 +75,8 @@ typedef SetState::Nodes Nodes;
 const double socketTimeoutSecs = 5;
 
 // TODO: Move to ReplicaSetMonitorManager
-ReplicaSetMonitor::ConfigChangeHook configChangeHook;
+ReplicaSetMonitor::ConfigChangeHook asyncConfigChangeHook;
+ReplicaSetMonitor::ConfigChangeHook syncConfigChangeHook;
 
 // global background job responsible for checking every X amount of time
 class ReplicaSetMonitorWatcher : public BackgroundJob {
@@ -357,9 +358,14 @@ void ReplicaSetMonitor::remove(const string& name) {
     globalConnPool.removeHost(name);
 }
 
-void ReplicaSetMonitor::setConfigChangeHook(ConfigChangeHook hook) {
-    massert(13610, "ConfigChangeHook already specified", !configChangeHook);
-    configChangeHook = hook;
+void ReplicaSetMonitor::setAsynchronousConfigChangeHook(ConfigChangeHook hook) {
+    invariant(!asyncConfigChangeHook);
+    asyncConfigChangeHook = hook;
+}
+
+void ReplicaSetMonitor::setSynchronousConfigChangeHook(ConfigChangeHook hook) {
+    invariant(!syncConfigChangeHook);
+    syncConfigChangeHook = hook;
 }
 
 // TODO move to correct order with non-statics before pushing
@@ -643,10 +649,14 @@ bool Refresher::receivedIsMasterFromMaster(const IsMasterReply& reply) {
         // and we want to record our changes
         log() << "changing hosts to " << _set->getServerAddress() << " from " << oldAddr;
 
-        if (configChangeHook) {
+        if (syncConfigChangeHook) {
+            syncConfigChangeHook(_set->name, _set->getServerAddress());
+        }
+
+        if (asyncConfigChangeHook) {
             // call from a separate thread to avoid blocking and holding lock while potentially
             // going over the network
-            stdx::thread bg(configChangeHook, _set->name, _set->getServerAddress());
+            stdx::thread bg(asyncConfigChangeHook, _set->name, _set->getServerAddress());
             bg.detach();
         }
     }
