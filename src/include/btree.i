@@ -1041,11 +1041,22 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 
 	btree = S2BT(session);
 	mod = page->modify;
-	txn_global = &S2C(session)->txn_global;
 
 	/* Pages that have never been modified can always be evicted. */
 	if (mod == NULL)
 		return (1);
+
+	/*
+	 * Check for in-memory splits before other eviction tests. If the page
+	 * should split in-memory, return success immediately and skip more
+	 * detailed eviction tests. We don't need further tests since the page
+	 * won't be written or discarded from the cache.
+	 */
+	if (__wt_page_can_split(session, page)) {
+		if (inmem_splitp != NULL)
+			*inmem_splitp = 1;
+		return (1);
+	}
 
 	/*
 	 * If the tree was deepened, there's a requirement that newly created
@@ -1059,19 +1070,6 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	if (WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (0);
-
-	/*
-	 * Allow for the splitting of pages when a checkpoint is underway only
-	 * if the allow_splits flag has been passed, we know we are performing
-	 * a checkpoint, the page is larger than the stated maximum and there
-	 * has not already been a split on this page as the WT_PM_REC_MULTIBLOCK
-	 * flag is unset.
-	 */
-	if (__wt_page_can_split(session, page)) {
-		if (inmem_splitp != NULL)
-			*inmem_splitp = 1;
-		return (1);
-	}
 
 	/*
 	 * If the file is being checkpointed, we can't evict dirty pages:
@@ -1093,9 +1091,11 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * similar to __wt_txn_visible_all, but ignores the checkpoint's
 	 * transaction.
 	 */
-	if (check_splits &&
-	    WT_TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
-		return (0);
+	if (check_splits) {
+		txn_global = &S2C(session)->txn_global;
+		if (WT_TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
+			return (0);
+	}
 
 	return (1);
 }
