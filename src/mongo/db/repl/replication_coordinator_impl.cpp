@@ -2368,6 +2368,9 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
         log() << "This node is not a member of the config";
     }
 
+    if (_priorityTakeoverCbh.isValid()) {
+        _replExecutor.cancel(_priorityTakeoverCbh);
+    }
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
     _updateSlaveInfoFromConfig_inlock();
     if (_selfIndex >= 0) {
@@ -3022,6 +3025,10 @@ bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term) {
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _cachedTerm = _topCoord->getTerm();
+
+        if (updated && _priorityTakeoverCbh.isValid()) {
+            _replExecutor.cancel(_priorityTakeoverCbh);
+        }
     }
 
     if (updated && getMemberState().primary()) {

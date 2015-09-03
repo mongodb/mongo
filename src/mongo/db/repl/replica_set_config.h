@@ -277,11 +277,27 @@ public:
         return _protocolVersion;
     }
 
+    /**
+     * Returns the duration to wait before running for election when this node (indicated by
+     * "memberIdx") sees that it has higher priority than the current primary.
+     */
+    Milliseconds getPriorityTakeoverDelay(int memberIdx) const;
+
+    /**
+     * Returns the position of the node at "memberIdx" relative to all voting nodes.
+     */
+    int getVoterPosition(int memberIdx) const;
+
 private:
     /**
      * Parses the "settings" subdocument of a replica set configuration.
      */
     Status _parseSettingsSubdocument(const BSONObj& settings);
+
+    /**
+     * Return the number of members with a priority greater than "priority".
+     */
+    int _calculatePriorityRank(int priority) const;
 
     /**
      * Calculates and stores the majority for electing a primary (_majorityVoteCount).

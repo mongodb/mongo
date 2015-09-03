@@ -44,7 +44,14 @@ public:
     /**
      * Actions taken based on heartbeat responses
      */
-    enum Action { NoAction, Reconfig, StartElection, StepDownSelf, StepDownRemotePrimary };
+    enum Action {
+        NoAction,
+        Reconfig,
+        StartElection,
+        StepDownSelf,
+        StepDownRemotePrimary,
+        PriorityTakeover
+    };
 
     /**
      * Makes a new action representing doing nothing.
@@ -60,6 +67,12 @@ public:
      * Makes a new action telling the current node to attempt to elect itself primary.
      */
     static HeartbeatResponseAction makeElectAction();
+
+    /**
+     * Makes a new action telling the current node to schedule an event to attempt to elect itself
+     * primary after the appropriate priority takeover delay.
+     */
+    static HeartbeatResponseAction makePriorityTakeoverAction();
 
     /**
      * Makes a new action telling the current node to step down as primary.

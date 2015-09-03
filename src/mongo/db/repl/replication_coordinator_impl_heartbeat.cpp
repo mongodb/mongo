@@ -224,6 +224,23 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
                 _rsConfig.getMemberAt(action.getPrimaryConfigIndex()).getHostAndPort());
             break;
         }
+        case HeartbeatResponseAction::PriorityTakeover: {
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            if (!_priorityTakeoverCbh.isValid()) {
+                Milliseconds delay = _rsConfig.getPriorityTakeoverDelay(_selfIndex);
+                auto cbh = _replExecutor.scheduleWorkAt(
+                    _replExecutor.now() + delay,
+                    stdx::bind(&ReplicationCoordinatorImpl::_priorityTakeover,
+                               this,
+                               stdx::placeholders::_1));
+                if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+                    return;
+                }
+                fassert(28806, cbh.getStatus());
+                _priorityTakeoverCbh = cbh.getValue();
+            }
+            break;
+        }
         default:
             severe() << "Illegal heartbeat response action code " << int(action.getAction());
             invariant(false);
@@ -627,6 +644,20 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleLivenessUpdate_inlock(int u
     }
     _replExecutor.scheduleWork(stdx::bind(
         &ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate, this, stdx::placeholders::_1));
+}
+
+void ReplicationCoordinatorImpl::_priorityTakeover(
+    const ReplicationExecutor::CallbackArgs& cbData) {
+    if (!cbData.status.isOK()) {
+        return;
+    }
+    if (!isV1ElectionProtocol()) {
+        return;
+    }
+    if (!_topCoord->amIElectable(_replExecutor.now(), getMyLastOptime())) {
+        return;
+    }
+    _startElectSelfV1();
 }
 
 }  // namespace repl

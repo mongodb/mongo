@@ -5480,6 +5480,37 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataRelinquishPrimaryDueToNodeDis
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
 }
 
+TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPriorTakeoverDueToHigherPriority) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017"
+                                               << "priority" << 2)
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host2:27017") << BSON("_id" << 6 << "host"
+                                                                                  << "host7:27017"))
+                      << "protocolVersion" << 1 << "settings"
+
+                      << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    OpTime election = OpTime(Timestamp(400, 0), 0);
+    OpTime lastOpTimeApplied = OpTime(Timestamp(300, 0), 0);
+
+    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                            "rs0",
+                                                            MemberState::RS_PRIMARY,
+                                                            election,
+                                                            election,
+                                                            lastOpTimeApplied);
+    ASSERT_EQUALS(HeartbeatResponseAction::PriorityTakeover, nextAction.getAction());
+    ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+}
+
 TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPrimaryDownMajorityOfVotersUp) {
     updateConfig(BSON("_id"
                       << "rs0"
@@ -6271,7 +6302,7 @@ TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStartElection) {
         election);
     ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(9900), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(9500), action.getNextHeartbeatStartDate());
 }
 
 TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStepDownRemotePrimary) {
@@ -6334,7 +6365,7 @@ TEST_F(HeartbeatResponseTestOneRetryV1, DecideToReconfig) {
         OpTime(Timestamp(0, 0), 0));  // We've never applied anything.
     ASSERT_EQUALS(HeartbeatResponseAction::Reconfig, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(9900), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(9500), action.getNextHeartbeatStartDate());
 }
 
 class HeartbeatResponseTestTwoRetriesV1 : public HeartbeatResponseTestOneRetryV1 {
@@ -6412,7 +6443,7 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStartElection) {
         election);
     ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(10300), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(10000), action.getNextHeartbeatStartDate());
 }
 
 TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStepDownSelf) {
@@ -6538,7 +6569,7 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatThreeNonconsecutiveFailures) 
     ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     // Because the heartbeat succeeded, we'll retry in 1 second (half of the election timeout).
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(9900), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(9500), action.getNextHeartbeatStartDate());
 
     // request next heartbeat
     getTopoCoord().prepareHeartbeatRequest(

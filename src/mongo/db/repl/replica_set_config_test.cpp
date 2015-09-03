@@ -1080,6 +1080,62 @@ TEST(ReplicaSetConfig, CheckConfigServerCantHaveArbiters) {
     ASSERT_NOT_OK(configA.validate());
 }
 
+TEST(ReplicaSetConfig, GetPriorityTakeoverDelay) {
+    ReplicaSetConfig configA;
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345"
+                                                               << "priority" << 1)
+                                                    << BSON("_id" << 1 << "host"
+                                                                  << "localhost:54321"
+                                                                  << "priority" << 2)
+                                                    << BSON("_id" << 2 << "host"
+                                                                  << "localhost:5321"
+                                                                  << "priority" << 3)
+                                                    << BSON("_id" << 3 << "host"
+                                                                  << "localhost:5421"
+                                                                  << "priority" << 4)
+                                                    << BSON("_id" << 4 << "host"
+                                                                  << "localhost:5431"
+                                                                  << "priority" << 5)) << "settings"
+                                      << BSON("electionTimeoutMillis" << 1000))));
+    ASSERT_OK(configA.validate());
+    ASSERT_EQUALS(Milliseconds(5000), configA.getPriorityTakeoverDelay(0));
+    ASSERT_EQUALS(Milliseconds(4200), configA.getPriorityTakeoverDelay(1));
+    ASSERT_EQUALS(Milliseconds(3400), configA.getPriorityTakeoverDelay(2));
+    ASSERT_EQUALS(Milliseconds(2600), configA.getPriorityTakeoverDelay(3));
+    ASSERT_EQUALS(Milliseconds(1800), configA.getPriorityTakeoverDelay(4));
+
+    ReplicaSetConfig configB;
+    ASSERT_OK(configB.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345"
+                                                               << "priority" << 1)
+                                                    << BSON("_id" << 1 << "host"
+                                                                  << "localhost:54321"
+                                                                  << "priority" << 2)
+                                                    << BSON("_id" << 2 << "host"
+                                                                  << "localhost:5321"
+                                                                  << "priority" << 2)
+                                                    << BSON("_id" << 3 << "host"
+                                                                  << "localhost:5421"
+                                                                  << "priority" << 3)
+                                                    << BSON("_id" << 4 << "host"
+                                                                  << "localhost:5431"
+                                                                  << "priority" << 3)) << "settings"
+                                      << BSON("electionTimeoutMillis" << 1000))));
+    ASSERT_OK(configB.validate());
+    ASSERT_EQUALS(Milliseconds(5000), configB.getPriorityTakeoverDelay(0));
+    ASSERT_EQUALS(Milliseconds(3200), configB.getPriorityTakeoverDelay(1));
+    ASSERT_EQUALS(Milliseconds(3400), configB.getPriorityTakeoverDelay(2));
+    ASSERT_EQUALS(Milliseconds(1600), configB.getPriorityTakeoverDelay(3));
+    ASSERT_EQUALS(Milliseconds(1800), configB.getPriorityTakeoverDelay(4));
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

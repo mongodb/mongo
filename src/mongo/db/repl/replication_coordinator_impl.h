@@ -1037,6 +1037,11 @@ private:
     void _cancelAndRescheduleLivenessUpdate_inlock(int updatedMemberId);
 
     /**
+     * Callback which starts an election if this node is electable and using protocolVersion 1.
+     */
+    void _priorityTakeover(const ReplicationExecutor::CallbackArgs& cbData);
+
+    /**
      * Reset the term of last vote to 0 to prevent any node from voting for term 0.
      * Blocking until last vote write finishes. Must be called without holding _mutex.
      */
@@ -1225,6 +1230,9 @@ private:
 
     // Callback Handle used to cancel a scheduled LivenessTimeout callback.
     ReplicationExecutor::CallbackHandle _handleLivenessTimeoutCbh;  // (M)
+
+    // Callback Handle used to cancel a scheduled PriorityTakover callback.
+    ReplicationExecutor::CallbackHandle _priorityTakeoverCbh;  // (M)
 
     // The id of the earliest member, for which the handleLivenessTimeout callback has been
     // scheduled.  We need this so that we don't needlessly cancel and reschedule the callback on

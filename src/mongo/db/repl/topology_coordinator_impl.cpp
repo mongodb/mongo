@@ -875,22 +875,6 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinatorImpl::prepare
     return std::make_pair(hbArgs, timeout);
 }
 
-int TopologyCoordinatorImpl::_selfVoterPosition() {
-    int pos = 0;
-    int idx = 0;
-    for (auto mem = _rsConfig.membersBegin(); mem != _rsConfig.membersEnd(); ++mem) {
-        if (mem->isVoter()) {
-            pos++;
-        }
-
-        if (idx == _selfIndex) {
-            break;
-        }
-        idx++;
-    }
-    return pos;
-}
-
 Milliseconds TopologyCoordinatorImpl::getTimeoutDelayForMember(int memberId) {
     const MemberConfig* member = _rsConfig.findMemberByID(memberId);
     if (!member) {
@@ -903,7 +887,7 @@ Milliseconds TopologyCoordinatorImpl::getTimeoutDelayForMember(int memberId) {
     }
 
     Milliseconds pingTime = _pings[target].getMillis();
-    return pingTime * _selfVoterPosition();
+    return pingTime * (_rsConfig.getVoterPosition(_selfIndex) + 1);
 }
 
 HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
@@ -943,8 +927,8 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
         (getMemberState().arbiter() || (getSyncSourceAddress().empty() && !_iAmPrimary()))) {
         // We want to delay by ping time times our position relative to other voters, in order to
         // avoid having two nodes stand for election at the same time.
-        heartbeatInterval =
-            _rsConfig.getElectionTimeoutPeriod() / 2 + hbStats.getMillis() * _selfVoterPosition();
+        heartbeatInterval = _rsConfig.getElectionTimeoutPeriod() / 2 +
+            hbStats.getMillis() * _rsConfig.getVoterPosition(_selfIndex);
     } else {
         heartbeatInterval = _rsConfig.getHeartbeatInterval();
     }
@@ -1120,6 +1104,10 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBDataV1(
             setMyHeartbeatMessage(now, "");
 
             _currentPrimaryIndex = remotePrimaryIndex;
+            if (_rsConfig.getMemberAt(remotePrimaryIndex).getPriority() <
+                _rsConfig.getMemberAt(_selfIndex).getPriority()) {
+                return HeartbeatResponseAction::makePriorityTakeoverAction();
+            }
             return HeartbeatResponseAction::makeNoAction();
         }
     }
@@ -2437,6 +2425,10 @@ void TopologyCoordinatorImpl::voteForMyselfV1() {
 
 void TopologyCoordinatorImpl::setPrimaryIndex(long long primaryIndex) {
     _currentPrimaryIndex = primaryIndex;
+}
+
+bool TopologyCoordinatorImpl::amIElectable(const Date_t now, const OpTime& lastOpApplied) const {
+    return _getMyUnelectableReason(now, lastOpApplied) == 0;
 }
 
 }  // namespace repl

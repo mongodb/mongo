@@ -649,5 +649,39 @@ std::vector<std::string> ReplicaSetConfig::getWriteConcernNames() const {
     return names;
 }
 
+Milliseconds ReplicaSetConfig::getPriorityTakeoverDelay(int memberIdx) const {
+    auto member = getMemberAt(memberIdx);
+    int priorityRank = _calculatePriorityRank(member.getPriority());
+    Milliseconds nodeSpecificDelay =
+        getVoterPosition(memberIdx) * getElectionTimeoutPeriod() / getTotalVotingMembers();
+    return (priorityRank + 1) * getElectionTimeoutPeriod() + nodeSpecificDelay;
+}
+
+int ReplicaSetConfig::_calculatePriorityRank(int priority) const {
+    int count = 0;
+    for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
+        if (mem->getPriority() > priority) {
+            count++;
+        }
+    }
+    return count;
+}
+
+int ReplicaSetConfig::getVoterPosition(int memberIdx) const {
+    int pos = 0;
+    int idx = 0;
+    for (auto mem = membersBegin(); mem != membersEnd(); ++mem) {
+        if (idx == memberIdx) {
+            break;
+        }
+
+        if (mem->isVoter()) {
+            pos++;
+        }
+        idx++;
+    }
+    return pos;
+}
+
 }  // namespace repl
 }  // namespace mongo

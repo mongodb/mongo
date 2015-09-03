@@ -445,6 +445,11 @@ public:
      */
     virtual Milliseconds getTimeoutDelayForMember(int memberId) = 0;
 
+    /**
+     * Returns true if _getMyUnelectableReason finds no reason.
+     */
+    virtual bool amIElectable(const Date_t now, const OpTime& lastOpApplied) const = 0;
+
 protected:
     TopologyCoordinator() {}
 };
