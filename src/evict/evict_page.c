@@ -303,8 +303,6 @@ __evict_review(
 	WT_PAGE *page;
 	uint32_t flags;
 
-	*inmem_splitp = 0;
-
 	btree = S2BT(session);
 
 	/*
@@ -348,7 +346,7 @@ __evict_review(
 		if (__wt_page_is_modified(page))
 			__wt_txn_update_oldest(session, 1);
 
-		if (!__wt_page_can_evict(session, page, 0))
+		if (!__wt_page_can_evict(session, page, 0, inmem_splitp))
 			return (EBUSY);
 
 		/*
@@ -358,10 +356,8 @@ __evict_review(
 		 * the page stays in memory and the tree is left in the desired
 		 * state: avoid the usual cleanup.
 		 */
-		if (__wt_page_can_split(session, page)) {
-			*inmem_splitp = 1;
+		if (*inmem_splitp)
 			return (__wt_split_insert(session, ref));
-		}
 	}
 
 	/* If the page is clean, we're done and we can evict. */

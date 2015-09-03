@@ -1029,11 +1029,15 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Check whether a page can be evicted.
  */
 static inline int
-__wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
+__wt_page_can_evict(WT_SESSION_IMPL *session,
+    WT_PAGE *page, int check_splits, int *inmem_splitp)
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_GLOBAL *txn_global;
+
+	if (inmem_splitp != NULL)
+		*inmem_splitp = 0;
 
 	btree = S2BT(session);
 	mod = page->modify;
@@ -1079,6 +1083,16 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int check_splits)
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (0);
 	}
+
+	/*
+	 * Allow for the splitting of pages when a checkpoint is underway only
+	 * if the allow_splits flag has been passed, we know we are performing
+	 * a checkpoint, the page is larger than the stated maximum and there
+	 * has not already been a split on this page as the WT_PM_REC_MULTIBLOCK
+	 * flag is unset.
+	 */
+	if (inmem_splitp != NULL && __wt_page_can_split(session, page))
+		*inmem_splitp = 1;
 
 	return (1);
 }
@@ -1172,7 +1186,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    LF_ISSET(WT_READ_NO_EVICT) ||
 	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    !__wt_page_can_evict(session, page, 1))
+	    !__wt_page_can_evict(session, page, 1, NULL))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
