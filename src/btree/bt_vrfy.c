@@ -245,11 +245,6 @@ err:	/* Inform the underlying block manager we're done. */
 	if (ckptbase != NULL)
 		__wt_meta_ckptlist_free(session, ckptbase);
 
-	/* Wrap up reporting. */
-#define	WT_VERIFY_PROGRESS_INTERVAL	100
-	if (vs->fcnt > WT_VERIFY_PROGRESS_INTERVAL)
-		WT_TRET(__wt_progress(session, NULL, vs->fcnt));
-
 	/* Free allocated memory. */
 	__wt_scr_free(session, &vs->max_key);
 	__wt_scr_free(session, &vs->max_addr);
@@ -347,6 +342,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	 *
 	 * Report progress occasionally.
 	 */
+#define	WT_VERIFY_PROGRESS_INTERVAL	100
 	if (++vs->fcnt % WT_VERIFY_PROGRESS_INTERVAL == 0)
 		WT_RET(__wt_progress(session, NULL, vs->fcnt));
 
