@@ -285,6 +285,7 @@ void warnOnMultiVersion(const ShardInfoMap& shardInfo) {
 }
 
 void Balancer::_doBalanceRound(OperationContext* txn,
+                               ForwardingCatalogManager::ScopedDistLock* distLock,
                                vector<shared_ptr<MigrateInfo>>* candidateChunks) {
     invariant(candidateChunks);
 
@@ -323,6 +324,8 @@ void Balancer::_doBalanceRound(OperationContext* txn,
 
     // For each collection, check if the balancing policy recommends moving anything around.
     for (const auto& coll : collections) {
+        uassertStatusOK(distLock->checkForPendingCatalogSwap());
+
         // Skip collections for which balancing is disabled
         const NamespaceString& nss = coll.getNs();
 
@@ -567,7 +570,7 @@ void Balancer::run() {
                        << (writeConcern.get() ? writeConcern->toBSON().toString() : "default");
 
                 vector<shared_ptr<MigrateInfo>> candidateChunks;
-                _doBalanceRound(txn.get(), &candidateChunks);
+                _doBalanceRound(txn.get(), &scopedDistLock.getValue(), &candidateChunks);
 
                 if (candidateChunks.size() == 0) {
                     LOG(1) << "no need to move any chunk";

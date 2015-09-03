@@ -30,7 +30,7 @@
 
 #pragma once
 
-
+#include "mongo/s/catalog/forwarding_catalog_manager.h"
 #include "mongo/util/background.h"
 
 namespace mongo {
@@ -94,6 +94,7 @@ private:
      *                          possibly be moved
      */
     void _doBalanceRound(OperationContext* txn,
+                         ForwardingCatalogManager::ScopedDistLock* distLock,
                          std::vector<std::shared_ptr<MigrateInfo>>* candidateChunks);
 
     /**

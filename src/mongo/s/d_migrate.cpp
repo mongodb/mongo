@@ -446,15 +446,17 @@ public:
 
         string whyMessage(str::stream() << "migrating chunk [" << minKey << ", " << maxKey
                                         << ") in " << ns);
-        auto scopedDistLock = grid.forwardingCatalogManager()->distLock(txn, ns, whyMessage);
+        auto scopedDistLockStatus = grid.forwardingCatalogManager()->distLock(txn, ns, whyMessage);
 
-        if (!scopedDistLock.isOK()) {
+        if (!scopedDistLockStatus.isOK()) {
             const string msg = stream() << "could not acquire collection lock for " << ns
                                         << " to migrate chunk [" << minKey << "," << maxKey << ")"
-                                        << causedBy(scopedDistLock.getStatus());
+                                        << causedBy(scopedDistLockStatus.getStatus());
             warning() << msg;
-            return appendCommandStatus(result, Status(scopedDistLock.getStatus().code(), msg));
+            return appendCommandStatus(result,
+                                       Status(scopedDistLockStatus.getStatus().code(), msg));
         }
+        auto& distLock = scopedDistLockStatus.getValue();
 
         BSONObj chunkInfo =
             BSON("min" << min << "max" << max << "from" << fromShardName << "to" << toShardName);
@@ -533,6 +535,13 @@ public:
         }
 
         log() << "moveChunk request accepted at version " << origShardVersion;
+
+        Status distLockStatus = distLock.checkForPendingCatalogSwap();
+        if (!distLockStatus.isOK()) {
+            warning() << "Aborting migration due to need to swap current catalog manager"
+                      << causedBy(distLockStatus);
+            return appendCommandStatus(result, distLockStatus);
+        }
 
         timing.done(2);
 
@@ -628,6 +637,13 @@ public:
 
         timing.done(3);
 
+        distLockStatus = distLock.checkForPendingCatalogSwap();
+        if (!distLockStatus.isOK()) {
+            warning() << "Aborting migration due to need to swap current catalog manager"
+                      << causedBy(distLockStatus);
+            return appendCommandStatus(result, distLockStatus);
+        }
+
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep3);
 
         // 4.
@@ -717,9 +733,23 @@ public:
             }
 
             txn->checkForInterrupt();
+
+            distLockStatus = distLock.checkForPendingCatalogSwap();
+            if (!distLockStatus.isOK()) {
+                warning() << "Aborting migration due to need to swap current catalog manager"
+                          << causedBy(distLockStatus);
+                return appendCommandStatus(result, distLockStatus);
+            }
         }
 
         timing.done(4);
+
+        distLockStatus = distLock.checkForPendingCatalogSwap();
+        if (!distLockStatus.isOK()) {
+            warning() << "Aborting migration due to need to swap current catalog manager"
+                      << causedBy(distLockStatus);
+            return appendCommandStatus(result, distLockStatus);
+        }
 
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep4);
 
@@ -745,7 +775,7 @@ public:
         }
 
         // Ensure distributed lock still held
-        Status lockStatus = scopedDistLock.getValue().checkStatus();
+        Status lockStatus = distLock.checkStatus();
         if (!lockStatus.isOK()) {
             const string msg = str::stream() << "not entering migrate critical section because "
                                              << lockStatus.toString();
@@ -1042,7 +1072,6 @@ public:
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
 
         // 6.
-        // NOTE: It is important that the distributed collection lock be held for this step.
         RangeDeleter* deleter = getDeleter();
         RangeDeleterOptions deleterOptions(
             KeyRange(ns, min.getOwned(), max.getOwned(), shardKeyPattern));

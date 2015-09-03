@@ -252,9 +252,19 @@ public:
 
     ScopedDistLock& operator=(ScopedDistLock&& other);
 
-    Status checkStatus() {
-        return _lock.checkStatus();
-    }
+    /**
+     * Checks to see if we are currently waiting to swap the catalog manager.  If so, holding on to
+     * this ScopedDistLock will block the swap from happening, so it is important that if this
+     * returns a non-OK status the caller must release the lock (most likely by failing the current
+     * operation).
+     */
+    Status checkForPendingCatalogSwap();
+
+    /**
+     * Queries the config server to make sure the lock is still present, as well as checking
+     * if we need to swap the catalog manager
+     */
+    Status checkStatus();
 
 private:
     OperationContext* _txn;

@@ -200,6 +200,26 @@ ForwardingCatalogManager::ScopedDistLock& ForwardingCatalogManager::ScopedDistLo
     return *this;
 }
 
+Status ForwardingCatalogManager::ScopedDistLock::checkForPendingCatalogSwap() {
+    stdx::lock_guard<stdx::mutex> lk(_fcm->_observerMutex);
+    if (!_fcm->_nextConfigChangeComplete.isValid()) {
+        return Status::OK();
+    }
+    return Status(ErrorCodes::IncompatibleCatalogManager,
+                  "Need to swap sharding catalog manager.  Config server "
+                  "reports that it is in replica set mode, but we are still using the "
+                  "legacy SCCC protocol for config server communication");
+}
+
+Status ForwardingCatalogManager::ScopedDistLock::checkStatus() {
+    Status status = checkForPendingCatalogSwap();
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return _lock.checkStatus();
+}
+
 Status ForwardingCatalogManager::scheduleReplaceCatalogManagerIfNeeded(
     ConfigServerMode desiredMode, StringData replSetName, const HostAndPort& knownServer) {
     stdx::lock_guard<stdx::mutex> lk(_observerMutex);
