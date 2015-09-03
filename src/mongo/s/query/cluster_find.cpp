@@ -42,9 +42,11 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_explain.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
@@ -327,6 +329,37 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
         ? CursorId(0)
         : request.cursorid;
     return CursorResponse(request.nss, idToReturn, std::move(batch), startingFrom);
+}
+
+Status ClusterFind::runExplain(OperationContext* txn,
+                               const BSONObj& findCommand,
+                               const LiteParsedQuery& lpq,
+                               ExplainCommon::Verbosity verbosity,
+                               const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                               BSONObjBuilder* out) {
+    BSONObjBuilder explainCmdBob;
+    int options = 0;
+    ClusterExplain::wrapAsExplain(
+        findCommand, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
+
+    // We will time how long it takes to run the commands on the shards.
+    Timer timer;
+
+    std::vector<Strategy::CommandResult> shardResults;
+    Strategy::commandOp(txn,
+                        lpq.nss().db().toString(),
+                        explainCmdBob.obj(),
+                        options,
+                        lpq.nss().toString(),
+                        lpq.getFilter(),
+                        &shardResults);
+
+    long long millisElapsed = timer.millis();
+
+    const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, findCommand);
+
+    return ClusterExplain::buildExplainResult(
+        txn, shardResults, mongosStageName, millisElapsed, out);
 }
 
 StatusWith<ReadPreferenceSetting> ClusterFind::extractUnwrappedReadPref(const BSONObj& cmdObj,

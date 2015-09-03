@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/explain_common.h"
 
 namespace mongo {
 
@@ -42,6 +43,10 @@ class CanonicalQuery;
 class OperationContext;
 struct GetMoreRequest;
 struct ReadPreferenceSetting;
+
+namespace rpc {
+class ServerSelectionMetadata;
+}  // namespace rpc
 
 /**
  * Methods for running find and getMore operations across a sharded cluster.
@@ -69,6 +74,21 @@ public:
      */
     static StatusWith<CursorResponse> runGetMore(OperationContext* txn,
                                                  const GetMoreRequest& request);
+
+    /**
+     * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of
+     * the of the explain command on success. On failure, returns a non-OK status and does not
+     * modify 'out'.
+     *
+     * Used both if mongos receives an explain command and if it receives an OP_QUERY find with the
+     * $explain modifier.
+     */
+    static Status runExplain(OperationContext* txn,
+                             const BSONObj& findCommand,
+                             const LiteParsedQuery& lpq,
+                             ExplainCommon::Verbosity verbosity,
+                             const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                             BSONObjBuilder* out);
 
     /**
      * Extracts the read preference from 'cmdObj', or determines the read pref based on 'isSlaveOk'

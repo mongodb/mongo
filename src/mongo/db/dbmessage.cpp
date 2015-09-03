@@ -172,7 +172,7 @@ T DbMessage::readAndAdvance() {
 void replyToQuery(int queryResultFlags,
                   AbstractMessagingPort* p,
                   Message& requestMsg,
-                  void* data,
+                  const void* data,
                   int size,
                   int nReturned,
                   int startingFrom,

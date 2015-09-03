@@ -49,6 +49,7 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
@@ -194,6 +195,34 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
         auto canonicalQuery = CanonicalQuery::canonicalize(q, WhereCallbackNoop());
         uassertStatusOK(canonicalQuery.getStatus());
 
+        // If the $explain flag was set, we must run the operation on the shards as an explain
+        // command rather than a find command.
+        if (canonicalQuery.getValue()->getParsed().isExplain()) {
+            const LiteParsedQuery& lpq = canonicalQuery.getValue()->getParsed();
+            BSONObj findCommand = lpq.asFindCommand();
+
+            // We default to allPlansExecution verbosity.
+            auto verbosity = ExplainCommon::EXEC_ALL_PLANS;
+
+            const bool secondaryOk = (readPreference.pref != ReadPreference::PrimaryOnly);
+            rpc::ServerSelectionMetadata metadata(secondaryOk, readPreference);
+
+            BSONObjBuilder explainBuilder;
+            uassertStatusOK(ClusterFind::runExplain(
+                txn, findCommand, lpq, verbosity, metadata, &explainBuilder));
+
+            BSONObj explainObj = explainBuilder.done();
+            replyToQuery(0,  // query result flags
+                         request.p(),
+                         request.m(),
+                         static_cast<const void*>(explainObj.objdata()),
+                         explainObj.objsize(),
+                         1,  // numResults
+                         0,  // startingFrom
+                         CursorId(0));
+            return;
+        }
+
         // Do the work to generate the first batch of results. This blocks waiting to get responses
         // from the shard(s).
         std::vector<BSONObj> batch;
@@ -205,11 +234,11 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
             ClusterFind::runQuery(txn, *canonicalQuery.getValue(), readPreference, &batch);
         uassertStatusOK(cursorId.getStatus());
 
-        // Build the response document.
         // TODO: this constant should be shared between mongos and mongod, and should
         // not be inside ShardedClientCursor.
         BufBuilder buffer(ShardedClientCursor::INIT_REPLY_BUFFER_SIZE);
 
+        // Fill out the response buffer.
         int numResults = 0;
         for (const auto& obj : batch) {
             buffer.appendBuf((void*)obj.objdata(), obj.objsize());

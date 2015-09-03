@@ -35,10 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/s/cluster_explain.h"
 #include "mongo/s/query/cluster_find.h"
-#include "mongo/s/strategy.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace {
@@ -116,31 +113,13 @@ public:
 
         // Parse the command BSON to a LiteParsedQuery.
         bool isExplain = true;
-        auto lpqStatus = LiteParsedQuery::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
-        if (!lpqStatus.isOK()) {
-            return lpqStatus.getStatus();
+        auto lpq = LiteParsedQuery::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
+        if (!lpq.isOK()) {
+            return lpq.getStatus();
         }
 
-        auto& lpq = lpqStatus.getValue();
-
-        BSONObjBuilder explainCmdBob;
-        int options = 0;
-        ClusterExplain::wrapAsExplain(
-            cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
-
-        // We will time how long it takes to run the commands on the shards.
-        Timer timer;
-
-        vector<Strategy::CommandResult> shardResults;
-        Strategy::commandOp(
-            txn, dbname, explainCmdBob.obj(), options, fullns, lpq->getFilter(), &shardResults);
-
-        long long millisElapsed = timer.millis();
-
-        const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);
-
-        return ClusterExplain::buildExplainResult(
-            txn, shardResults, mongosStageName, millisElapsed, out);
+        return ClusterFind::runExplain(
+            txn, cmdObj, *lpq.getValue(), verbosity, serverSelectionMetadata, out);
     }
 
     bool run(OperationContext* txn,
