@@ -447,6 +447,10 @@ public:
         return _numYields;
     }
 
+    /**
+     * Access to _expectedLatencyMs is not synchronized, so it is illegal for threads other than the
+     * one executing the operation to call getExpectedLatencyMs() and setExpectedLatencyMs().
+     */
     long long getExpectedLatencyMs() const {
         return _expectedLatencyMs;
     }

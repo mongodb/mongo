@@ -393,6 +393,10 @@ QueryResult::View getMore(OperationContext* txn,
             notifier->waitForInsert(lastInsertCount, timeout);
             notifier.reset();
 
+            // Set expected latency to match wait time. This makes sure the logs aren't spammed
+            // by awaitData queries that exceed slowms due to blocking on the CappedInsertNotifier.
+            curop.setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
+
             // Reacquiring locks.
             ctx = make_unique<AutoGetCollectionForRead>(txn, nss);
             exec->restoreState();

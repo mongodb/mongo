@@ -308,6 +308,10 @@ public:
             notifier->waitForInsert(lastInsertCount, timeout);
             notifier.reset();
 
+            // Set expected latency to match wait time. This makes sure the logs aren't spammed
+            // by awaitData queries that exceed slowms due to blocking on the CappedInsertNotifier.
+            CurOp::get(txn)->setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
+
             ctx.reset(new AutoGetCollectionForRead(txn, request.nss));
             exec->restoreState();
 
