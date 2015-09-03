@@ -111,6 +111,31 @@ private:
     std::auto_ptr<WriteErrorDetail> _error;
 };
 
+/**
+ * Stores the shard version of a namespace on creation and restores it
+ * back on destruction if the version was changed to ignored.
+ */
+class UndoShardVersionIgnore {
+public:
+    UndoShardVersionIgnore(const std::string& ns, ShardedConnectionInfo* info)
+        : _ns(ns), _info(info) {
+        if (_info) {
+            _originalVersion = _info->getVersion(_ns);
+        }
+    }
+
+    ~UndoShardVersionIgnore() {
+        if (_info && ChunkVersion::isIgnoredVersion(_info->getVersion(_ns))) {
+            _info->setVersion(_ns, _originalVersion);
+        }
+    }
+
+private:
+    std::string _ns;
+    ChunkVersion _originalVersion;
+    ShardedConnectionInfo* _info;
+};
+
 }  // namespace
 
 // TODO: Determine queueing behavior we want here
@@ -265,6 +290,8 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
     // Stops on error if batch is ordered.
     //
 
+    UndoShardVersionIgnore undoShardVersionIgnore(request.getTargetingNS(),
+                                                  ShardedConnectionInfo::get(false));
     bulkExecute(request, writeConcern, &upserted, &writeErrors);
 
     //
