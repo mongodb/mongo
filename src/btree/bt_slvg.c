@@ -349,9 +349,6 @@ err:	WT_TRET(bm->salvage_end(bm, session));
 	__wt_scr_free(session, &ss->tmp1);
 	__wt_scr_free(session, &ss->tmp2);
 
-	/* Wrap up reporting. */
-	WT_TRET(__wt_progress(session, NULL, ss->fcnt));
-
 	return (ret);
 }
 
@@ -381,8 +378,9 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		if (eof)
 			break;
 
-		/* Report progress every 10 chunks. */
-		if (++ss->fcnt % 10 == 0)
+		/* Report progress occasionally. */
+#define	WT_SALVAGE_PROGRESS_INTERVAL	100
+		if (++ss->fcnt % WT_SALVAGE_PROGRESS_INTERVAL == 0)
 			WT_ERR(__wt_progress(session, NULL, ss->fcnt));
 
 		/*
