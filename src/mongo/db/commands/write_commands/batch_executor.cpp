@@ -83,6 +83,31 @@ namespace mongo {
             std::auto_ptr<WriteErrorDetail> _error;
         };
 
+        /**
+	 * Stores the shard version of a namespace on creation and restores it
+	 * back on destruction if the version was changed to ignored.
+	 */
+        class UndoShardVersionIgnore {
+        public:
+	    UndoShardVersionIgnore(const std::string& ns, ShardedConnectionInfo* info)
+	        : _ns(ns), _info(info) {
+	        if (_info) {
+	            _originalVersion = _info->getVersion(_ns);
+            }
+        }
+
+        ~UndoShardVersionIgnore() {
+            if (_info && ChunkVersion::isIgnoredVersion(_info->getVersion(_ns))) {
+                _info->setVersion(_ns, _originalVersion);
+            }
+        }
+
+        private:
+	    std::string _ns;
+	    ChunkVersion _originalVersion;
+	    ShardedConnectionInfo* _info;
+	};
+
     }  // namespace
 
     // TODO: Determine queueing behavior we want here
@@ -179,7 +204,6 @@ namespace mongo {
 
         Status wcStatus = Status::OK();
         if ( wcDoc.isEmpty() ) {
-
             // The default write concern if empty is w : 1
             // Specifying w : 0 is/was allowed, but is interpreted identically to w : 1
 
@@ -234,6 +258,9 @@ namespace mongo {
 
         OwnedPointerVector<BatchedUpsertDetail> upsertedOwned;
         vector<BatchedUpsertDetail*>& upserted = upsertedOwned.mutableVector();
+
+	UndoShardVersionIgnore undoShardVersionIgnore(request.getTargetingNS(),
+                                                      ShardedConnectionInfo::get(false));
 
         //
         // Apply each batch item, possibly bulking some items together in the write lock.
