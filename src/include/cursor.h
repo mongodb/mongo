@@ -261,6 +261,7 @@ struct __wt_cursor_index {
 
 	WT_CURSOR *child;
 	WT_CURSOR **cg_cursors;
+	uint8_t	*cg_needvalue;
 };
 
 struct __wt_cursor_json {
