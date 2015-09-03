@@ -487,7 +487,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	int bitmap, bulk;
 	uint32_t flags;
 
-	bulk = 0;
+	bitmap = bulk = 0;
 	flags = 0;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "bulk", 0, &cval));
@@ -500,7 +500,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		bitmap = bulk = 1;
 	else if (WT_STRING_MATCH("unordered", cval.str, cval.len))
 		/*
-		 * Unordered bulk insert is a special case used internally for
+		 * Unordered bulk insert is a special case used internally by
 		 * index creation on existing tables. It requires exclusive
 		 * access, but not the other bulk semantics. It primarily
 		 * exists to avoid some locking problems with LSM trees and
