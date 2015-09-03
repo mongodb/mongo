@@ -246,7 +246,9 @@ err:	/* Inform the underlying block manager we're done. */
 		__wt_meta_ckptlist_free(session, ckptbase);
 
 	/* Wrap up reporting. */
-	WT_TRET(__wt_progress(session, NULL, vs->fcnt));
+#define	WT_VERIFY_PROGRESS_INTERVAL	100
+	if (vs->fcnt > WT_VERIFY_PROGRESS_INTERVAL)
+		WT_TRET(__wt_progress(session, NULL, vs->fcnt));
 
 	/* Free allocated memory. */
 	__wt_scr_free(session, &vs->max_key);
@@ -343,9 +345,9 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	 * of the page to be built, and then a subsequent logical verification
 	 * which happens here.
 	 *
-	 * Report progress every 10 pages.
+	 * Report progress occasionally.
 	 */
-	if (++vs->fcnt % 10 == 0)
+	if (++vs->fcnt % WT_VERIFY_PROGRESS_INTERVAL == 0)
 		WT_RET(__wt_progress(session, NULL, vs->fcnt));
 
 #ifdef HAVE_DIAGNOSTIC
