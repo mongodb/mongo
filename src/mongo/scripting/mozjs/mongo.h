@@ -80,11 +80,12 @@ struct MongoExternalInfo : public MongoBase {
     static void construct(JSContext* cx, JS::CallArgs args);
 
     struct Functions {
+        MONGO_DEFINE_JS_FUNCTION(_forgetReplSet);
         MONGO_DEFINE_JS_FUNCTION(load);
         MONGO_DEFINE_JS_FUNCTION(quit);
     };
 
-    static const JSFunctionSpec freeFunctions[3];
+    static const JSFunctionSpec freeFunctions[4];
 };
 
 }  // namespace mozjs

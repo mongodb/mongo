@@ -816,7 +816,8 @@ ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
             }
         }   
     }
-    
+    _forgetReplSet(this.name);
+
     print('ReplSetTest stopSet *** Shut down repl set - test worked ****' )
 };
 

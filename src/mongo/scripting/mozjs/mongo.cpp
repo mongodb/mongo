@@ -31,6 +31,7 @@
 #include "mongo/scripting/mozjs/mongo.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/global_conn_pool.h"
 #include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
@@ -65,8 +66,11 @@ const JSFunctionSpec MongoBase::methods[] = {
 
 const char* const MongoBase::className = "Mongo";
 
-const JSFunctionSpec MongoExternalInfo::freeFunctions[3] = {
-    MONGO_ATTACH_JS_FUNCTION(load), MONGO_ATTACH_JS_FUNCTION(quit), JS_FS_END,
+const JSFunctionSpec MongoExternalInfo::freeFunctions[4] = {
+    MONGO_ATTACH_JS_FUNCTION(_forgetReplSet),
+    MONGO_ATTACH_JS_FUNCTION(load),
+    MONGO_ATTACH_JS_FUNCTION(quit),
+    JS_FS_END,
 };
 
 namespace {
@@ -633,6 +637,19 @@ void MongoExternalInfo::Functions::quit(JSContext* cx, JS::CallArgs args) {
     scope->setQuickExit(args.get(0).isNumber() ? args.get(0).toNumber() : 0);
 
     uasserted(ErrorCodes::JSUncatchableError, "Calling Quit");
+}
+
+void MongoExternalInfo::Functions::_forgetReplSet(JSContext* cx, JS::CallArgs args) {
+    if (args.length() != 1) {
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "_forgetReplSet takes exactly 1 argument, but was given "
+                                << args.length());
+    }
+
+    std::string rsName = ValueWriter(cx, args.get(0)).toString();
+    globalRSMonitorManager.removeMonitor(rsName);
+
+    args.rval().setUndefined();
 }
 
 }  // namespace mozjs
