@@ -153,16 +153,6 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
                  const BSONObj& findCmdObj,
                  const CallbackFn& work,
                  const BSONObj& metadata)
-    : Fetcher(
-          executor, source, dbname, findCmdObj, work, metadata, RemoteCommandRequest::kNoTimeout) {}
-
-Fetcher::Fetcher(executor::TaskExecutor* executor,
-                 const HostAndPort& source,
-                 const std::string& dbname,
-                 const BSONObj& findCmdObj,
-                 const CallbackFn& work,
-                 const BSONObj& metadata,
-                 Milliseconds timeout)
     : _executor(executor),
       _source(source),
       _dbname(dbname),
@@ -171,8 +161,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
       _work(work),
       _active(false),
       _first(true),
-      _remoteCommandCallbackHandle(),
-      _timeout(timeout) {
+      _remoteCommandCallbackHandle() {
     uassert(ErrorCodes::BadValue, "null replication executor", executor);
     uassert(ErrorCodes::BadValue, "database name cannot be empty", !dbname.empty());
     uassert(ErrorCodes::BadValue, "command object cannot be empty", !findCmdObj.isEmpty());
@@ -193,7 +182,6 @@ std::string Fetcher::getDiagnosticString() const {
     output << " query: " << _cmdObj;
     output << " query metadata: " << _metadata;
     output << " active: " << _active;
-    output << " timeout: " << _timeout;
     return output;
 }
 
@@ -234,7 +222,7 @@ void Fetcher::wait() {
 Status Fetcher::_schedule_inlock(const BSONObj& cmdObj, const char* batchFieldName) {
     StatusWith<executor::TaskExecutor::CallbackHandle> scheduleResult =
         _executor->scheduleRemoteCommand(
-            RemoteCommandRequest(_source, _dbname, cmdObj, _metadata, _timeout),
+            RemoteCommandRequest(_source, _dbname, cmdObj, _metadata),
             stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, batchFieldName));
 
     if (!scheduleResult.isOK()) {

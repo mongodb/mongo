@@ -99,6 +99,7 @@ myprint("paritions: [0-1-2-0] [3] [4]")
 myprint("test1");
 myprint("2 should be primary");
 master = replTest.getMaster();
+replTest.awaitReplication();
 
 printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
 
