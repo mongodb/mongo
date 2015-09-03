@@ -117,15 +117,15 @@ private:
     };
 
     // Initializes _scope, _reduceFunction and _keyFunction using the global scripting engine.
-    void initGroupScripting();
+    Status initGroupScripting();
 
     // Updates _groupMap and _scope to account for the group key associated with this object.
     // Returns an error status if an error occurred, else Status::OK().
     Status processObject(const BSONObj& obj);
 
-    // Finalize the results for this group operation.  Returns an owned BSONObj with the results
-    // array.
-    BSONObj finalizeResults();
+    // Finalize the results for this group operation. On success, returns with a BSONObj with
+    // the results array. On failure, returns a non-OK status. Does not throw.
+    StatusWith<BSONObj> finalizeResults();
 
     GroupRequest _request;
 

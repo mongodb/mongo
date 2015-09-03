@@ -52,10 +52,10 @@ Status getKey(
         BSONObjBuilder b(obj.objsize() + 32);
         b.append("0", obj);
         const BSONObj& k = b.obj();
-        int res = s->invoke(func, &k, 0);
-        if (res != 0) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "invoke failed in $keyf: " << s->getError());
+        try {
+            s->invoke(func, &k, 0);
+        } catch (const UserException& e) {
+            return e.toStatus("Failed to invoke group keyf function: ");
         }
         int type = s->type("__returnValue");
         if (type != Object) {
@@ -87,7 +87,7 @@ GroupStage::GroupStage(OperationContext* txn,
     _children.emplace_back(child);
 }
 
-void GroupStage::initGroupScripting() {
+Status GroupStage::initGroupScripting() {
     // Initialize _scope.
     const std::string userToken =
         AuthorizationSession::get(ClientBasic::getCurrent())->getAuthenticatedUserNamesToken();
@@ -99,9 +99,15 @@ void GroupStage::initGroupScripting() {
         _scope->init(&_request.reduceScope);
     }
     _scope->setObject("$initial", _request.initial, true);
-    _scope->exec(
-        "$reduce = " + _request.reduceCode, "$group reduce setup", false, true, true, 2 * 1000);
-    _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 2 * 1000);
+
+    try {
+        _scope->exec(
+            "$reduce = " + _request.reduceCode, "group reduce init", false, true, true, 2 * 1000);
+    } catch (const UserException& e) {
+        return e.toStatus("Failed to initialize group reduce function: ");
+    }
+    invariant(_scope->exec(
+        "$arr = [];", "group reduce init 2", false, true, false /*assertOnError*/, 2 * 1000));
 
     // Initialize _reduceFunction.
     _reduceFunction = _scope->createFunction(
@@ -120,6 +126,8 @@ void GroupStage::initGroupScripting() {
     if (_request.keyFunctionCode.size()) {
         _keyFunction = _scope->createFunction(_request.keyFunctionCode.c_str());
     }
+
+    return Status::OK();
 }
 
 Status GroupStage::processObject(const BSONObj& obj) {
@@ -140,22 +148,28 @@ Status GroupStage::processObject(const BSONObj& obj) {
 
     _scope->setObject("obj", obj, true);
     _scope->setNumber("n", n - 1);
-    if (_scope->invoke(_reduceFunction, 0, 0, 0, true)) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "reduce invoke failed: " << _scope->getError());
+
+    try {
+        _scope->invoke(_reduceFunction, 0, 0, 0, true /*assertOnError*/);
+    } catch (const UserException& e) {
+        return e.toStatus("Failed to invoke group reduce function: ");
     }
 
     return Status::OK();
 }
 
-BSONObj GroupStage::finalizeResults() {
+StatusWith<BSONObj> GroupStage::finalizeResults() {
     if (!_request.finalize.empty()) {
-        _scope->exec("$finalize = " + _request.finalize,
-                     "$group finalize define",
-                     false,
-                     true,
-                     true,
-                     2 * 1000);
+        try {
+            _scope->exec("$finalize = " + _request.finalize,
+                         "group finalize init",
+                         false,  // printResult
+                         true,   // reportError
+                         true,   // assertOnError
+                         2 * 1000);
+        } catch (const UserException& e) {
+            return e.toStatus("Failed to initialize group finalize function: ");
+        }
         ScriptingFunction finalizeFunction = _scope->createFunction(
             "function(){ "
             "  for(var i=0; i < $arr.length; i++){ "
@@ -164,14 +178,19 @@ BSONObj GroupStage::finalizeResults() {
             "    $arr[i] = ret; "
             "  } "
             "}");
-        _scope->invoke(finalizeFunction, 0, 0, 0, true);
+        try {
+            _scope->invoke(finalizeFunction, 0, 0, 0, true /*assertOnError*/);
+        } catch (const UserException& e) {
+            return e.toStatus("Failed to invoke group finalize function: ");
+        }
     }
 
     _specificStats.nGroups = _groupMap.size();
 
     BSONObj results = _scope->getObject("$arr").getOwned();
 
-    _scope->exec("$arr = [];", "$group reduce setup 2", false, true, true, 2 * 1000);
+    invariant(_scope->exec(
+        "$arr = [];", "group clean up", false, true, false /*assertOnError*/, 2 * 1000));
     _scope->gc();
 
     return results;
@@ -188,7 +207,11 @@ PlanStage::StageState GroupStage::work(WorkingSetID* out) {
 
     // On the first call to work(), call initGroupScripting().
     if (_groupState == GroupState_Initializing) {
-        initGroupScripting();
+        Status status = initGroupScripting();
+        if (!status.isOK()) {
+            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
+            return PlanStage::FAILURE;
+        }
         _groupState = GroupState_ReadingFromChild;
         ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
@@ -238,14 +261,18 @@ PlanStage::StageState GroupStage::work(WorkingSetID* out) {
         // We're done reading from our child.
         invariant(PlanStage::IS_EOF == state);
 
+        auto results = finalizeResults();
+        if (!results.isOK()) {
+            *out = WorkingSetCommon::allocateStatusMember(_ws, results.getStatus());
+            return PlanStage::FAILURE;
+        }
+
         // Transition to state "done."  Future calls to work() will return IS_EOF.
         _groupState = GroupState_Done;
 
-        BSONObj results = finalizeResults();
-
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
-        member->obj = Snapshotted<BSONObj>(SnapshotId(), results);
+        member->obj = Snapshotted<BSONObj>(SnapshotId(), results.getValue());
         member->transitionToOwnedObj();
 
         ++_commonStats.advanced;
