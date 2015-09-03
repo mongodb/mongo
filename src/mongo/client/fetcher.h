@@ -122,6 +122,14 @@ public:
             const CallbackFn& work,
             const BSONObj& metadata = rpc::makeEmptyMetadata());
 
+    Fetcher(executor::TaskExecutor* executor,
+            const HostAndPort& source,
+            const std::string& dbname,
+            const BSONObj& cmdObj,
+            const CallbackFn& work,
+            const BSONObj& metadata,
+            Milliseconds timeout);
+
     virtual ~Fetcher();
 
     /**
@@ -199,6 +207,9 @@ private:
 
     // Callback handle to the scheduled remote command.
     executor::TaskExecutor::CallbackHandle _remoteCommandCallbackHandle;
+
+    // Socket timeout
+    Milliseconds _timeout;
 };
 
 }  // namespace mongo

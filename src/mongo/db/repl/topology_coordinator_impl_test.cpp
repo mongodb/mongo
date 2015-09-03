@@ -2027,7 +2027,7 @@ TEST_F(HeartbeatResponseTest, HeartbeatTimeoutSuppressesFirstRetry) {
 }
 
 TEST_F(HeartbeatResponseTestOneRetry, HeartbeatTimeoutSuppressesSecondRetry) {
-    // Confirm that the topology coordinator does not schedule an second heartbeat retry if
+    // Confirm that the topology coordinator does not schedule a second heartbeat retry if
     // the heartbeat timeout period expired before the first retry completed.
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
         firstRequestDate() + Milliseconds(5010),  // Entire heartbeat period elapsed;
@@ -6040,7 +6040,7 @@ TEST_F(HeartbeatResponseTestV1, HeartbeatTimeoutSuppressesFirstRetry) {
     ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     // Because the heartbeat timed out, we'll retry in 1 second (half of the election timeout).
-    ASSERT_EQUALS(firstRequestDate + Milliseconds(6000), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate + Milliseconds(10000), action.getNextHeartbeatStartDate());
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceFresherMemberDoesNotBuildIndexes) {
@@ -6236,7 +6236,7 @@ TEST_F(HeartbeatResponseTestOneRetryV1, HeartbeatTimeoutSuppressesSecondRetry) {
     ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     // Because the heartbeat timed out, we'll retry in 1 second (half of the election timeout).
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(6010), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(10010), action.getNextHeartbeatStartDate());
 }
 
 TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStartElection) {
@@ -6271,7 +6271,7 @@ TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStartElection) {
         election);
     ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(5900), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(9900), action.getNextHeartbeatStartDate());
 }
 
 TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStepDownRemotePrimary) {
@@ -6334,7 +6334,7 @@ TEST_F(HeartbeatResponseTestOneRetryV1, DecideToReconfig) {
         OpTime(Timestamp(0, 0), 0));  // We've never applied anything.
     ASSERT_EQUALS(HeartbeatResponseAction::Reconfig, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(5900), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(9900), action.getNextHeartbeatStartDate());
 }
 
 class HeartbeatResponseTestTwoRetriesV1 : public HeartbeatResponseTestOneRetryV1 {
@@ -6412,7 +6412,7 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStartElection) {
         election);
     ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(6300), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(10300), action.getNextHeartbeatStartDate());
 }
 
 TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStepDownSelf) {
@@ -6497,7 +6497,7 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatRetriesAtMostTwice) {
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     // Because this is the second retry, rather than retry again, we expect to wait for half of the
     // election timeout interval of 2 seconds to elapse.
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(5800), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(9800), action.getNextHeartbeatStartDate());
 
     // Ensure a third failed heartbeat caused the node to be marked down
     BSONObjBuilder statusBuilder;
@@ -6538,7 +6538,7 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatThreeNonconsecutiveFailures) 
     ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     // Because the heartbeat succeeded, we'll retry in 1 second (half of the election timeout).
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(5900), action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(firstRequestDate() + Milliseconds(9900), action.getNextHeartbeatStartDate());
 
     // request next heartbeat
     getTopoCoord().prepareHeartbeatRequest(

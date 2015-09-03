@@ -358,7 +358,14 @@ void BackgroundSync::_produce(OperationContext* txn) {
     auto dbName = nsToDatabase(rsOplogName);
     auto cmdObj = cmdBob.obj();
     auto metadataObj = metadataBob.obj();
-    Fetcher fetcher(&_threadPoolTaskExecutor, source, dbName, cmdObj, fetcherCallback, metadataObj);
+    Fetcher fetcher(&_threadPoolTaskExecutor,
+                    source,
+                    dbName,
+                    cmdObj,
+                    fetcherCallback,
+                    metadataObj,
+                    _replCoord->getConfig().getElectionTimeoutPeriod());
+
     auto scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
         warning() << "unable to schedule fetcher to read remote oplog on " << source << ": "
