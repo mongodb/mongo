@@ -110,7 +110,7 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
                                           lpq.isOplogReplay(),
                                           lpq.isNoCursorTimeout(),
                                           lpq.isAwaitData(),
-                                          lpq.isPartial());
+                                          lpq.isAllowPartialResults());
 }
 
 StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,

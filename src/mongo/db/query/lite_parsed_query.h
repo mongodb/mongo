@@ -109,7 +109,7 @@ public:
         bool isOplogReplay = false,
         bool isNoCursorTimeout = false,
         bool isAwaitData = false,
-        bool isPartial = false);
+        bool allowPartialResults = false);
 
     /**
      * Converts this LPQ into a find command.
@@ -269,8 +269,8 @@ public:
     bool isExhaust() const {
         return _exhaust;
     }
-    bool isPartial() const {
-        return _partial;
+    bool isAllowPartialResults() const {
+        return _allowPartialResults;
     }
 
     boost::optional<long long> getReplicationTerm() const {
@@ -391,7 +391,7 @@ private:
     bool _noCursorTimeout = false;
     bool _awaitData = false;
     bool _exhaust = false;
-    bool _partial = false;
+    bool _allowPartialResults = false;
 
     boost::optional<long long> _replicationTerm;
 };

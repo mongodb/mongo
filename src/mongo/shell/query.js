@@ -214,7 +214,7 @@ DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
     }
 
     if ((this._options & DBQuery.Option.partial) != 0) {
-        cmd["partial"] = true;
+        cmd["allowPartialResults"] = true;
     }
 
     if (canAttachReadPref) {

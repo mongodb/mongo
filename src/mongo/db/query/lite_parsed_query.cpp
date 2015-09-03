@@ -93,7 +93,7 @@ const char kTailableField[] = "tailable";
 const char kOplogReplayField[] = "oplogReplay";
 const char kNoCursorTimeoutField[] = "noCursorTimeout";
 const char kAwaitDataField[] = "awaitData";
-const char kPartialField[] = "partial";
+const char kPartialResultsField[] = "allowPartialResults";
 const char kTermField[] = "term";
 const char kOptionsField[] = "options";
 const char kShardVersionField[] = "shardVersion";
@@ -321,13 +321,13 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_awaitData = el.boolean();
-        } else if (str::equals(fieldName, kPartialField)) {
+        } else if (str::equals(fieldName, kPartialResultsField)) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
                 return status;
             }
 
-            pq->_partial = el.boolean();
+            pq->_allowPartialResults = el.boolean();
         } else if (str::equals(fieldName, kOptionsField)) {
             // 3.0.x versions of the shell may generate an explain of a find command with an
             // 'options' field. We accept this only if the 'options' field is empty so that
@@ -435,7 +435,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     bool isOplogReplay,
     bool isNoCursorTimeout,
     bool isAwaitData,
-    bool isPartial) {
+    bool allowPartialResults) {
     unique_ptr<LiteParsedQuery> pq(new LiteParsedQuery(std::move(nss)));
     // ntoreturn and batchSize or limit are mutually exclusive.
     if (batchSize || limit) {
@@ -470,7 +470,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     pq->_oplogReplay = isOplogReplay;
     pq->_noCursorTimeout = isNoCursorTimeout;
     pq->_awaitData = isAwaitData;
-    pq->_partial = isPartial;
+    pq->_allowPartialResults = allowPartialResults;
 
     return pq;
 }
@@ -568,8 +568,8 @@ void LiteParsedQuery::asFindCommand(BSONObjBuilder* cmdBuilder) const {
         cmdBuilder->append(kAwaitDataField, true);
     }
 
-    if (_partial) {
-        cmdBuilder->append(kPartialField, true);
+    if (_allowPartialResults) {
+        cmdBuilder->append(kPartialResultsField, true);
     }
 
     if (_replicationTerm) {
@@ -948,7 +948,7 @@ int LiteParsedQuery::getOptions() const {
     if (_exhaust) {
         options |= QueryOption_Exhaust;
     }
-    if (_partial) {
+    if (_allowPartialResults) {
         options |= QueryOption_PartialResults;
     }
     return options;
@@ -961,7 +961,7 @@ void LiteParsedQuery::initFromInt(int options) {
     _noCursorTimeout = (options & QueryOption_NoCursorTimeout) != 0;
     _awaitData = (options & QueryOption_AwaitData) != 0;
     _exhaust = (options & QueryOption_Exhaust) != 0;
-    _partial = (options & QueryOption_PartialResults) != 0;
+    _allowPartialResults = (options & QueryOption_PartialResults) != 0;
 }
 
 void LiteParsedQuery::addMetaProjection() {
