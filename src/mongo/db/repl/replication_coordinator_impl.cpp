@@ -1870,15 +1870,6 @@ void ReplicationCoordinatorImpl::_processHeartbeatFinish(
             int senderIndex = _rsConfig.findMemberIndexByHostAndPort(senderHost);
             _scheduleHeartbeatToTarget(senderHost, senderIndex, now);
         }
-    } else if (outStatus->isOK()) {
-        // Update liveness for sending node.
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        auto slaveInfo = _findSlaveInfoByMemberID_inlock(args.getSenderId());
-        if (!slaveInfo) {
-            return;
-        }
-        slaveInfo->lastUpdate = _replExecutor.now();
-        slaveInfo->down = false;
     }
 }
 
@@ -2909,6 +2900,8 @@ void ReplicationCoordinatorImpl::_processHeartbeatFinishV1(
         return;
     }
     fassert(28655, cbData.status);
+
+    auto senderHost(args.getSenderHost());
     const Date_t now = _replExecutor.now();
     *outStatus = _topCoord->prepareHeartbeatResponseV1(
         now, args, _settings.ourSetName(), getMyLastOptime(), response);
@@ -2919,17 +2912,26 @@ void ReplicationCoordinatorImpl::_processHeartbeatFinishV1(
         // back to any node that sends us a heartbeat, in case one of those remote nodes has
         // a configuration that contains us.  Chances are excellent that it will, since that
         // is the only reason for a remote node to send this node a heartbeat request.
-        if (!args.getSenderHost().empty() && _seedList.insert(args.getSenderHost()).second) {
-            _scheduleHeartbeatToTarget(args.getSenderHost(), -1, now);
+        if (!senderHost.empty() && _seedList.insert(senderHost).second) {
+            _scheduleHeartbeatToTarget(senderHost, -1, now);
         }
     } else if (outStatus->isOK() && response->getConfigVersion() < args.getConfigVersion()) {
         // Schedule a heartbeat to the sender to fetch the new config.
         // We cannot cancel the enqueued heartbeat, but either this one or the enqueued heartbeat
         // will trigger reconfig, which cancels and reschedules all heartbeats.
         if (args.hasSender()) {
-            int senderIndex = _rsConfig.findMemberIndexByHostAndPort(args.getSenderHost());
-            _scheduleHeartbeatToTarget(args.getSenderHost(), senderIndex, now);
+            int senderIndex = _rsConfig.findMemberIndexByHostAndPort(senderHost);
+            _scheduleHeartbeatToTarget(senderHost, senderIndex, now);
         }
+    } else if (outStatus->isOK()) {
+        // Update liveness for sending node.
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        auto slaveInfo = _findSlaveInfoByMemberID_inlock(args.getSenderId());
+        if (!slaveInfo) {
+            return;
+        }
+        slaveInfo->lastUpdate = _replExecutor.now();
+        slaveInfo->down = false;
     }
 }
 
