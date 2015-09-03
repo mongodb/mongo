@@ -976,6 +976,8 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_INSERT_HEAD *ins_head;
+	WT_INSERT *ins;
+	int i;
 
 	btree = S2BT(session);
 
@@ -1006,22 +1008,22 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * There is no point splitting if the list is small, no deep items is
-	 * our heuristic for that. (A 1/4 probability of adding a new skiplist
-	 * level means there will be a new 6th level for roughly each 4KB of
-	 * entries in the list. If we have at least two 6th level entries, the
-	 * list is at least large enough to work with.)
+	 * our heuristic for that. A 1/4 probability of adding a new skiplist
+	 * level, with level-0 always created, means there will be a 5th level
+	 * entry for roughly every 1024 entries in the list. If there are at
+	 * least 4 5th level entries (4K items), the list is large enough.
 	 */
-#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(6, WT_SKIP_MAXDEPTH - 1)
+#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(5, WT_SKIP_MAXDEPTH - 1)
 	ins_head = page->pg_row_entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
 	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
-	if (ins_head == NULL ||
-	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL ||
-	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] ==
-	    ins_head->tail[WT_MIN_SPLIT_SKIPLIST_DEPTH])
+	if (ins_head == NULL)
 		return (0);
-
-	return (1);
+	for (i = 0, ins = ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH];
+	    ins != NULL; ins = ins->next[WT_MIN_SPLIT_SKIPLIST_DEPTH])
+		if (++i == 4)
+			return (1);
+	return (0);
 }
 
 /*
