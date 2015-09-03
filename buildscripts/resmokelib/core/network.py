@@ -53,7 +53,7 @@ class PortAllocator(object):
 
     # Each job gets a contiguous range of _PORTS_PER_JOB ports, with job 0 getting the first block
     # of ports, job 1 getting the second block, and so on.
-    _PORTS_PER_JOB = 30
+    _PORTS_PER_JOB = 250
 
     # The first _PORTS_PER_FIXTURE ports of each range are reserved for the fixtures, the remainder
     # of the port range is used by tests.
