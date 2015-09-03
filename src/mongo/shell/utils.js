@@ -177,6 +177,8 @@ jsTestOptions = function(){
                               useLegacyConfigServers: TestData.useLegacyConfigServers || false,
                               enableEncryption: TestData.enableEncryption,
                               encryptionKeyFile: TestData.encryptionKeyFile,
+                              minPort: TestData.minPort,
+                              maxPort: TestData.maxPort,
                             }
                         );
     }
