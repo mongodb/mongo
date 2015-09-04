@@ -178,6 +178,11 @@ public:
          */
         long long getNumReturnedSoFar() const;
 
+        /**
+         * Stashes 'obj' to be returned later by this cursor. A cursor must be owned.
+         */
+        void queueResult(const BSONObj& obj);
+
     private:
         // ClusterCursorManager is a friend so that its methods can call the PinnedCursor
         // constructor declared below, which is private to prevent clients from calling it directly.

@@ -29,6 +29,7 @@
 #pragma once
 
 #include <memory>
+#include <queue>
 
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/cluster_client_cursor.h"
@@ -62,6 +63,8 @@ public:
 
     long long getNumReturnedSoFar() const final;
 
+    void queueResult(const BSONObj& obj) final;
+
 private:
     /**
      * Constructs the pipeline of MergerPlanStages which will be used to answer the query.
@@ -76,6 +79,9 @@ private:
 
     // The root stage of the pipeline used to return the result set, merged from the remote nodes.
     std::unique_ptr<RouterExecStage> _root;
+
+    // Stores documents queued by queueResult(). Stashed BSONObjs must be owned.
+    std::queue<BSONObj> _stash;
 };
 
 }  // namespace mongo

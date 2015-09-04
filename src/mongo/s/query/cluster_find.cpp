@@ -61,6 +61,12 @@ namespace {
 static const BSONObj kSortKeyMetaProjection = BSON("$meta"
                                                    << "sortKey");
 
+// We must allow some amount of overhead per result document, since when we make a cursor response
+// the documents are elements of a BSONArray. The overhead is 1 byte/doc for the type + 1 byte/doc
+// for the field name's null terminator + 1 byte per digit in the array index. The index can be no
+// more than 8 decimal digits since the response is at most 16MB, and 16 * 1024 * 1024 < 1 * 10^8.
+static const int kPerDocumentOverheadBytesUpperBound = 10;
+
 /**
  * Given the LiteParsedQuery 'lpq' being executed by mongos, returns a copy of the query which is
  * suitable for forwarding to the targeted hosts.
@@ -214,6 +220,17 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
             break;
         }
 
+        // If adding this object will cause us to exceed the BSON size limit, then we stash it for
+        // later. By using BSONObjMaxUserSize, we ensure that there is enough room for the
+        // "envelope" (e.g. the "ns" and "id" fields included in the response) before exceeding
+        // BSONObjMaxInternalSize.
+        int sizeEstimate = bytesBuffered + next.getValue()->objsize() +
+            ((results->size() + 1U) * kPerDocumentOverheadBytesUpperBound);
+        if (sizeEstimate > BSONObjMaxUserSize && !results->empty()) {
+            pinnedCursor.queueResult(*next.getValue());
+            break;
+        }
+
         // Add doc to the batch.
         bytesBuffered += next.getValue()->objsize();
         results->push_back(std::move(*next.getValue()));
@@ -314,6 +331,17 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
             if (!pinnedCursor.getValue().isTailable()) {
                 cursorState = ClusterCursorManager::CursorState::Exhausted;
             }
+            break;
+        }
+
+        // If adding this object will cause us to exceed the BSON size limit, then we stash it for
+        // later. By using BSONObjMaxUserSize, we ensure that there is enough room for the
+        // "envelope" (e.g. the "ns" and "id" fields included in the response) before exceeding
+        // BSONObjMaxInternalSize.
+        int sizeEstimate = bytesBuffered + next.getValue()->objsize() +
+            ((batch.size() + 1U) * kPerDocumentOverheadBytesUpperBound);
+        if (sizeEstimate > BSONObjMaxUserSize && !batch.empty()) {
+            pinnedCursor.getValue().queueResult(*next.getValue());
             break;
         }
 

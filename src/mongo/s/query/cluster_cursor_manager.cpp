@@ -133,6 +133,11 @@ long long ClusterCursorManager::PinnedCursor::getNumReturnedSoFar() const {
     return _cursor->getNumReturnedSoFar();
 }
 
+void ClusterCursorManager::PinnedCursor::queueResult(const BSONObj& obj) {
+    invariant(_cursor);
+    _cursor->queueResult(obj);
+}
+
 void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
     invariant(_cursor);
 

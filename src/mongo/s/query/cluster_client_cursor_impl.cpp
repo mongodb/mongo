@@ -49,6 +49,14 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock
     : _root(std::move(root)) {}
 
 StatusWith<boost::optional<BSONObj>> ClusterClientCursorImpl::next() {
+    // First return stashed results, if there are any.
+    if (!_stash.empty()) {
+        BSONObj front = std::move(_stash.front());
+        _stash.pop();
+        ++_numReturnedSoFar;
+        return {front};
+    }
+
     auto next = _root->next();
     if (next.isOK() && next.getValue()) {
         ++_numReturnedSoFar;
@@ -66,6 +74,11 @@ bool ClusterClientCursorImpl::isTailable() const {
 
 long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
+}
+
+void ClusterClientCursorImpl::queueResult(const BSONObj& obj) {
+    invariant(obj.isOwned());
+    _stash.push(obj);
 }
 
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(

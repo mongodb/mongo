@@ -80,6 +80,16 @@ public:
      * Returns the number of result documents returned so far by this cursor via the next() method.
      */
     virtual long long getNumReturnedSoFar() const = 0;
+
+    /**
+     * Stash the BSONObj so that it gets returned from the CCC on a later call to next().
+     *
+     * Queued documents are returned in FIFO order. The queued results are exhausted before
+     * generating further results from the underlying mongos query stages.
+     *
+     * 'obj' must be owned BSON.
+     */
+    virtual void queueResult(const BSONObj& obj) = 0;
 };
 
 }  // namespace mongo

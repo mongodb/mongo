@@ -75,7 +75,7 @@ bool ClusterClientCursorMock::isTailable() const {
     return false;
 }
 
-void ClusterClientCursorMock::queueResult(BSONObj obj) {
+void ClusterClientCursorMock::queueResult(const BSONObj& obj) {
     _resultsQueue.push({obj});
 }
 

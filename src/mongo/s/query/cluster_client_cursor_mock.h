@@ -51,10 +51,7 @@ public:
 
     long long getNumReturnedSoFar() const final;
 
-    /**
-     * Queues a BSONObj to be returned.
-     */
-    void queueResult(BSONObj obj);
+    void queueResult(const BSONObj& obj) final;
 
     /**
      * Queues an error response.
