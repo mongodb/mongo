@@ -1,0 +1,77 @@
+selector:
+  js_test:
+    roots:
+    - jstests/core/*.js
+    exclude_files:
+    # The following tests fail because a certain command or functionality is not supported by
+    # mongos. This command or functionality is placed in a comment next to the failing test.
+    - jstests/core/apitest_db.js  # profiling.
+    - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
+    - jstests/core/capped*.js  # capped collections.
+    - jstests/core/check_shard_index.js  # checkShardingIndex.
+    - jstests/core/collection_truncate.js  # emptycapped.
+    - jstests/core/compact_keeps_indexes.js  # compact.
+    - jstests/core/auth_copydb.js # copyDatabase.
+    - jstests/core/copydb.js # copyDatabase.
+    - jstests/core/dbadmin.js  # "local" database.
+    - jstests/core/dbhash.js  # dbhash.
+    - jstests/core/dbhash2.js  # dbhash.
+    - jstests/core/dropdb_race.js  # syncdelay.
+    - jstests/core/evalb.js  # profiling.
+    - jstests/core/fsync.js  # fsync.
+    - jstests/core/geo_haystack*.js  # geoSearch.
+    - jstests/core/geo_s2cursorlimitskip.js  # profiling.
+    - jstests/core/geo_update_btree2.js  # notablescan.
+    - jstests/core/index_bigkeys_nofail.js  # failIndexKeyTooLong.
+    - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
+    - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
+    - jstests/core/notablescan.js  # notablescan.
+    - jstests/core/profile*.js  # profiling.
+    - jstests/core/rename*.js # renameCollection.
+    - jstests/core/stages*.js  # stageDebug.
+    - jstests/core/storageDetailsCommand.js  # diskStorageStats.
+    - jstests/core/tailable_skip_limit.js # capped collections.
+    - jstests/core/top.js  # top.
+    # The following tests fail because mongos behaves differently from mongod when testing certain
+    # functionality. The differences are in a comment next to the failing test.
+    - jstests/core/explain_missing_database.js  # Behavior with no db different on mongos, SERVER-18047.
+    - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
+    - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
+    - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
+    - jstests/core/loglong.js  # Log lines different on mongos.
+    # TODO: SERVER-17284 remove once find cmd is implemented in mongos.
+    - jstests/core/read_after_optime.js
+    # TODO: SERVER-18292 remove once OP_COMMAND is implemented in mongos.
+    - jstests/core/invalid_db_name.js
+    - jstests/core/validate_cmd_ns.js
+    # The following tests fail because they count indexes. These counts do not take into account the
+    # additional hashed shard key indexes that are automatically added by this passthrough.
+    - jstests/core/apitest_dbcollection.js
+    - jstests/core/bad_index_plugin.js
+    - jstests/core/collection_info_cache_race.js
+    - jstests/core/create_indexes.js
+    - jstests/core/indexOtherNamespace.js
+    - jstests/core/list_indexes_non_existent_ns.js
+    - jstests/core/rename6.js
+    # The following tests fail because they expect no databases to be created. However a DB is created
+    # automatically when we shard a collection.
+    - jstests/core/dbcase.js
+    - jstests/core/dbcase2.js
+    - jstests/core/no_db_created.js
+    - jstests/core/ns_length.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+        eval: load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
+    fixture:
+      class: ShardedClusterFixture
+      mongos_options:
+        set_parameters:
+          enableTestCommands: 1
+      mongod_options:
+        nopreallocj: ''
+        set_parameters:
+          enableTestCommands: 1

@@ -1002,6 +1002,26 @@ tasks:
       resmoke_args: --suites=slow2 --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: sharded_collections_jscore_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharded_collections_jscore_passthrough --storageEngine=mmapv1
+
+- <<: *task_template
+  name: sharded_collections_jscore_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharded_collections_jscore_passthrough --storageEngine=wiredTiger
+
+- <<: *task_template
   name: sharding_jscore_passthrough
   commands:
   - func: "do setup"
@@ -1874,6 +1894,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: tool
@@ -1988,6 +2010,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: tool
@@ -2096,6 +2120,7 @@ buildvariants:
   - name: sharding_WT
   - name: slow1_WT
   - name: slow2_WT
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_WT
   - name: tool_WT
 
@@ -2330,6 +2355,8 @@ buildvariants:
   - name: dbtest_WT
   - name: ese_WT
   - name: failpoints_auth
+  - name: jsCore
+  - name: jsCore_WT
   - name: jsCore_auth
   - name: jsCore_WT_ese
   - name: jstestfuzz
@@ -2350,6 +2377,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: snmp
@@ -2446,6 +2475,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: ssl
@@ -2598,6 +2629,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: tool
@@ -2687,6 +2720,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: tool
@@ -2879,6 +2914,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: tool
@@ -3000,6 +3037,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: tool
@@ -3911,6 +3950,8 @@ buildvariants:
   - name: replication
   - name: replication_WT
   - name: sharding
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_WT
@@ -4062,6 +4103,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: ssl
@@ -4339,6 +4382,8 @@ buildvariants:
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
+  - name: sharded_collections_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: ssl
