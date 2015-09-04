@@ -309,6 +309,15 @@ public:
     Status setLastOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
 
     /**
+     * Non-blocking version of setFollowerMode.
+     * Returns event handle that we can use to wait for the operation to complete.
+     * When the operation is complete (wait() returns), 'success' will be set to true
+     * if the member state has been set successfully.
+     */
+    ReplicationExecutor::EventHandle setFollowerMode_nonBlocking(const MemberState& newState,
+                                                                 bool* success);
+
+    /**
      * If called after _startElectSelfV1(), blocks until all asynchronous
      * activities associated with election complete.
      */

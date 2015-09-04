@@ -480,21 +480,28 @@ void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
     _scheduleWorkAndWaitForCompletion(work);
 }
 
-bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
+ReplicationExecutor::EventHandle ReplicationCoordinatorImpl::setFollowerMode_nonBlocking(
+    const MemberState& newState, bool* success) {
     StatusWith<ReplicationExecutor::EventHandle> finishedSettingFollowerMode =
         _replExecutor.makeEvent();
     if (finishedSettingFollowerMode.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return false;
+        return ReplicationExecutor::EventHandle();
     }
     fassert(18812, finishedSettingFollowerMode.getStatus());
-    bool success = false;
     _scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
                              this,
                              stdx::placeholders::_1,
                              newState,
                              finishedSettingFollowerMode.getValue(),
-                             &success));
-    _replExecutor.waitForEvent(finishedSettingFollowerMode.getValue());
+                             success));
+    return finishedSettingFollowerMode.getValue();
+}
+
+bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
+    bool success = false;
+    if (auto eventHandle = setFollowerMode_nonBlocking(newState, &success)) {
+        _replExecutor.waitForEvent(eventHandle);
+    }
     return success;
 }
 

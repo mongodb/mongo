@@ -341,6 +341,13 @@ public:
         return _event.get();
     }
 
+    /**
+     * True if this event handle is valid.
+     */
+    explicit operator bool() const {
+        return isValid();
+    }
+
 private:
     void setEvent(std::shared_ptr<EventState> event) {
         _event = event;
