@@ -708,6 +708,25 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorDestructorKill) {
     ASSERT(isMockCursorKilled(0));
 }
 
+// Test that cursors checked back in as exhausted are killed. Even exhausted cursors may have open
+// cursors on the remote shards, so they need to be killed in order to properly clean up these
+// remote cursors.
+TEST_F(ClusterCursorManagerTest, ExhaustedCursorKill) {
+    auto pinnedCursor =
+        getManager()->registerCursor(allocateMockCursor(),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal);
+    ASSERT(!isMockCursorKilled(0));
+    pinnedCursor.returnCursor(ClusterCursorManager::CursorState::Exhausted);
+
+    // Despite being returned as exhausted, the cursor should be alive until zombie cursors are
+    // reaped.
+    ASSERT(!isMockCursorKilled(0));
+    getManager()->reapZombieCursors();
+    ASSERT(isMockCursorKilled(0));
+}
+
 }  // namespace
 
 }  // namespace mongo
