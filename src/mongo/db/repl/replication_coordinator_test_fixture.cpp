@@ -108,9 +108,10 @@ void ReplCoordTest::init() {
     _topo = new TopologyCoordinatorImpl(settings);
     _net = new NetworkInterfaceMock;
     _storage = new StorageInterfaceMock;
+    _replExec.reset(new ReplicationExecutor(_net, _storage, seed));
     _externalState = new ReplicationCoordinatorExternalStateMock;
     _repl.reset(
-        new ReplicationCoordinatorImpl(_settings, _externalState, _net, _storage, _topo, seed));
+        new ReplicationCoordinatorImpl(_settings, _externalState, _topo, _replExec.get(), seed));
 }
 
 void ReplCoordTest::init(const ReplSettings& settings) {

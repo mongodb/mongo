@@ -80,6 +80,13 @@ protected:
     }
 
     /**
+     * Gets the replication executor under test.
+     */
+    ReplicationExecutor* getReplExec() {
+        return _replExec.get();
+    }
+
+    /**
      * Gets the replication coordinator under test.
      */
     ReplicationCoordinatorImpl* getReplCoord() {
@@ -195,10 +202,11 @@ private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
     // Owned by ReplicationCoordinatorImpl
     TopologyCoordinatorImpl* _topo = nullptr;
-    // Owned by ReplicationCoordinatorImpl
+    // Owned by ReplicationExecutor
     executor::NetworkInterfaceMock* _net = nullptr;
-    // Owned by ReplicationCoordinatorImpl
+    // Owned by ReplicationExecutor
     StorageInterfaceMock* _storage = nullptr;
+    std::unique_ptr<ReplicationExecutor> _replExec;
     // Owned by ReplicationCoordinatorImpl
     ReplicationCoordinatorExternalStateMock* _externalState = nullptr;
     ReplSettings _settings;
