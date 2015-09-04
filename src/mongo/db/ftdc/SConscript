@@ -1,0 +1,36 @@
+# -*- mode: python -*-
+Import("env")
+
+ftdcEnv = env.Clone()
+ftdcEnv.InjectThirdPartyIncludePaths(libraries=['zlib'])
+
+ftdcEnv.Library(
+    target='ftdc',
+    source=[
+        'block_compressor.cpp',
+        'compressor.cpp',
+        'decompressor.cpp',
+        'util.cpp',
+        'varint.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/third_party/s2/s2', # For VarInt
+        '$BUILD_DIR/third_party/shim_zlib',
+    ],
+)
+
+env.CppUnitTest(
+    target='ftdc_test',
+    source=[
+        'compressor_test.cpp',
+        'ftdc_test.cpp',
+        'util_test.cpp',
+        'varint_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        'ftdc',
+    ])
+
