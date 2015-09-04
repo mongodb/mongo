@@ -486,6 +486,7 @@ extern int __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t siz
 extern int __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size);
 extern int __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len, void **mappingcookie);
 extern int __wt_cond_alloc(WT_SESSION_IMPL *session, const char *name, int is_signalled, WT_CONDVAR **condp);
+extern int __wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, int *signalled);
 extern int __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs);
 extern int __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp);

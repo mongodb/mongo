@@ -610,12 +610,22 @@ __log_server(void *arg)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
+	uint64_t count, freq_per_sec, wait_time;
 	u_int arch_lock;
+	int signalled;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
 	arch_lock = 0;
+	/*
+	 * Set this to the number of times per second we want to force out the
+	 * log slot buffer.
+	 */
+	signalled = 0;
+	count = 0;
+	freq_per_sec = 20;
+	wait_time = WT_MILLION / freq_per_sec;
 	/*
 	 * The log server thread does a variety of work.  It forces out any
 	 * buffered log writes.  It pre-allocates log files and it performs
@@ -637,29 +647,37 @@ __log_server(void *arg)
 		 */
 		WT_ERR(__wt_log_force_write(session, 1));
 		/*
-		 * Perform log pre-allocation.
+		 * We don't want to archive or pre-allocate files as often as
+		 * we want to force out log buffers.  Only do it once per second
+		 * or if the condition was signalled.
 		 */
-		if (conn->log_prealloc > 0)
-			WT_ERR(__log_prealloc_once(session));
+		if ((++count % freq_per_sec == 0) || signalled != 0) {
+			/*
+			 * Perform log pre-allocation.
+			 */
+			if (conn->log_prealloc > 0)
+				WT_ERR(__log_prealloc_once(session));
 
-		/*
-		 * Perform the archive.
-		 */
-		if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE)) {
-			if (__wt_try_writelock(
-			    session, log->log_archive_lock) == 0) {
-				arch_lock = 1;
-				WT_ERR(__log_archive_once(session, 0));
-				WT_ERR(	__wt_writeunlock(
-				    session, log->log_archive_lock));
-				arch_lock = 0;
-			} else
-				WT_ERR(__wt_verbose(session, WT_VERB_LOG,
-				    "log_archive: Blocked due to open log "
-				    "cursor holding archive lock"));
+			/*
+			 * Perform the archive.
+			 */
+			if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE)) {
+				if (__wt_try_writelock(
+				    session, log->log_archive_lock) == 0) {
+					arch_lock = 1;
+					WT_ERR(__log_archive_once(session, 0));
+					WT_ERR(	__wt_writeunlock(
+					    session, log->log_archive_lock));
+					arch_lock = 0;
+				} else
+					WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+					    "log_archive: Blocked due to open "
+					    "log cursor holding archive lock"));
+			}
+			/* Wait until the next event. */
 		}
-		/* Wait until the next event. */
-		WT_ERR(__wt_cond_wait(session, conn->log_cond, WT_MILLION));
+		WT_ERR(__wt_cond_wait_signal(
+		    session, conn->log_cond, wait_time, &signalled));
 	}
 
 	if (0) {
