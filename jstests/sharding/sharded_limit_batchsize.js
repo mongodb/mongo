@@ -2,23 +2,6 @@
 // of limit and batchSize with sort return the correct results, and do not issue
 // unnecessary getmores (see SERVER-14299).
 
-
-/**
- * This function checks that the log on the mongoD never shows the mongoS asking for all documents
- * to be returned.  This occurs if ntoreturn:0 is present in the log.
- */
-function checkLogForBatching(log) {
-	var haveGetMore = false;
-	log.forEach(function(logline) {
-		if (logline.search("getmore") != 0) {
-			haveGetMore = true;
-			//All ntoreturn should be the batch size, not 0
-			assert.eq(logline.search("ntoreturn:0"), -1)
-		}
-	});
-	assert.eq(haveGetMore, true);
-}
-
 /**
  * Test the correctness of queries with sort and batchSize on a sharded cluster,
  * running the queries against collection 'coll'.
@@ -105,7 +88,6 @@ jsTest.log("Running batchSize tests against sharded collection.");
 st.shard0.adminCommand({setParameter: 1, logLevel : 1});
 testBatchSize(shardedCol);
 st.shard0.adminCommand({setParameter: 1, logLevel : 0});
-checkLogForBatching(st.shard0.adminCommand({ getLog: 'global' }).log);
 
 jsTest.log("Running batchSize tests against non-sharded collection.");
 testBatchSize(unshardedCol);
