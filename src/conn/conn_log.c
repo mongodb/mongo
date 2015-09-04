@@ -610,12 +610,12 @@ __log_server(void *arg)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	int arch_lock, freq_per_sec, signalled;
+	int freq_per_sec, signalled;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	arch_lock = signalled = 0;
+	signalled = 0;
 
 	/*
 	 * Set this to the number of times per second we want to force out the
@@ -665,19 +665,19 @@ __log_server(void *arg)
 			if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE)) {
 				if (__wt_try_writelock(
 				    session, log->log_archive_lock) == 0) {
-					arch_lock = 1;
-					WT_ERR(__log_archive_once(session, 0));
-					WT_ERR(	__wt_writeunlock(
+					ret = __log_archive_once(session, 0);
+					WT_TRET(__wt_writeunlock(
 					    session, log->log_archive_lock));
-					arch_lock = 0;
+					WT_ERR(ret);
 				} else
 					WT_ERR(
 					    __wt_verbose(session, WT_VERB_LOG,
 					    "log_archive: Blocked due to open "
 					    "log cursor holding archive lock"));
 			}
-			/* Wait until the next event. */
 		}
+
+		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait_signal(session, conn->log_cond,
 		    WT_MILLION / WT_FORCE_PER_SECOND, &signalled));
 	}
@@ -685,8 +685,6 @@ __log_server(void *arg)
 	if (0) {
 err:		__wt_err(session, ret, "log server error");
 	}
-	if (arch_lock)
-		(void)__wt_writeunlock(session, log->log_archive_lock);
 	return (WT_THREAD_RET_VALUE);
 }
 
