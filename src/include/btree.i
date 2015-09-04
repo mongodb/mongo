@@ -1069,7 +1069,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * a transaction value, once that's globally visible, we know we can
 	 * evict the created page.
 	 */
-	if (WT_PAGE_IS_INTERNAL(page) &&
+	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (0);
 
