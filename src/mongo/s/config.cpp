@@ -792,18 +792,18 @@ void ConfigServer::reloadSettings(OperationContext* txn) {
     }
 }
 
-void ConfigServer::configReplicaSetChange(const string& setName,
-                                          const string& newConnectionString) {
+void ConfigServer::replicaSetChangeShardRegistryUpdateHook(const string& setName,
+                                                           const string& newConnectionString) {
     auto shard = grid.shardRegistry()->lookupRSName(setName);
-    if (shard && shard->isConfig()) {
-        // If this is the config server we're monitoring, inform the ShardRegsitry of the
-        // new connection string for the config servers.
-        grid.shardRegistry()->updateConfigServerConnectionString(
-            fassertStatusOK(28805, ConnectionString::parse(newConnectionString)));
+    if (shard) {
+        // Inform the ShardRegsitry of the new connection string for the shard.
+        grid.shardRegistry()->updateLookupMapsForShard(
+            std::move(shard), fassertStatusOK(28805, ConnectionString::parse(newConnectionString)));
     }
 }
 
-void ConfigServer::shardReplicaSetChange(const string& setName, const string& newConnectionString) {
+void ConfigServer::replicaSetChangeConfigServerUpdateHook(const string& setName,
+                                                          const string& newConnectionString) {
     // This is run in it's own thread. Exceptions escaping would result in a call to terminate.
     Client::initThread("replSetChange");
     auto txn = cc().makeOperationContext();

@@ -32,6 +32,8 @@
 
 #include "mongo/s/client/shard_registry.h"
 
+#include <set>
+
 #include "mongo/client/connection_string.h"
 #include "mongo/client/query_fetcher.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -53,6 +55,7 @@
 namespace mongo {
 
 using std::shared_ptr;
+using std::set;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -168,13 +171,18 @@ shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) const {
 void ShardRegistry::remove(const ShardId& id) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    for (ShardMap::iterator i = _lookup.begin(); i != _lookup.end();) {
-        shared_ptr<Shard> s = i->second;
+    set<string> entriesToRemove;
+    for (const auto& i : _lookup) {
+        shared_ptr<Shard> s = i.second;
         if (s->getId() == id) {
-            _lookup.erase(i++);
-        } else {
-            ++i;
+            entriesToRemove.insert(i.first);
+            for (const auto& host : s->getConnString().getServers()) {
+                entriesToRemove.insert(host.toString());
+            }
         }
+    }
+    for (const auto& entry : entriesToRemove) {
+        _lookup.erase(entry);
     }
 
     for (ShardMap::iterator i = _rsLookup.begin(); i != _rsLookup.end();) {
@@ -255,19 +263,35 @@ void ShardRegistry::_addShard_inlock(const ShardType& shardType) {
             shardType.getName(), shardHost, std::move(_targeterFactory->create(shardHost)));
     }
 
-    _lookup[shardType.getName()] = shard;
+    _updateLookupMapsForShard_inlock(std::move(shard), shardHost);
+}
 
-    if (shardHost.type() == ConnectionString::SET) {
-        _rsLookup[shardHost.getSetName()] = shard;
+void ShardRegistry::updateLookupMapsForShard(shared_ptr<Shard> shard,
+                                             const ConnectionString& newConnString) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _updateLookupMapsForShard_inlock(std::move(shard), newConnString);
+}
+
+void ShardRegistry::_updateLookupMapsForShard_inlock(shared_ptr<Shard> shard,
+                                                     const ConnectionString& newConnString) {
+    auto oldConnString = shard->getConnString();
+    for (const auto& host : oldConnString.getServers()) {
+        _lookup.erase(host.toString());
+    }
+
+    _lookup[shard->getId()] = shard;
+
+    if (newConnString.type() == ConnectionString::SET) {
+        _rsLookup[newConnString.getSetName()] = shard;
     }
 
     // TODO: The only reason to have the shard host names in the lookup table is for the
     // setShardVersion call, which resolves the shard id from the shard address. This is
     // error-prone and will go away eventually when we switch all communications to go through
-    // the remote command runner.
-    _lookup[shardType.getHost()] = shard;
+    // the remote command runner and all nodes are sharding aware by default.
+    _lookup[newConnString.toString()] = shard;
 
-    for (const HostAndPort& hostAndPort : shardHost.getServers()) {
+    for (const HostAndPort& hostAndPort : newConnString.getServers()) {
         _lookup[hostAndPort.toString()] = shard;
     }
 }
@@ -364,11 +388,6 @@ StatusWith<BSONObj> ShardRegistry::runCommand(OperationContext* txn,
                                               const BSONObj& cmdObj) {
     auto status =
         _runCommandWithMetadata(_executor.get(), host, dbName, cmdObj, rpc::makeEmptyMetadata());
-    if (status.getStatus() == ErrorCodes::ShardNotFound) {  // One retry if the shard isn't found.
-        reload(txn);
-        status = _runCommandWithMetadata(
-            _executor.get(), host, dbName, cmdObj, rpc::makeEmptyMetadata());
-    }
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -422,11 +441,6 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationConte
     auto shard = getShard(txn, shardId);
     auto response = _runCommandWithNotMasterRetries(
         _executor.get(), shard->getTargeter(), dbname, cmdObj, rpc::makeEmptyMetadata());
-    if (response.getStatus() == ErrorCodes::ShardNotFound) {  // One retry if the shard isn't found.
-        reload(txn);
-        response = _runCommandWithNotMasterRetries(
-            _executor.get(), shard->getTargeter(), dbname, cmdObj, rpc::makeEmptyMetadata());
-    }
     if (!response.isOK()) {
         return response.getStatus();
     }

@@ -128,7 +128,20 @@ public:
         return _configServerCS;
     }
 
+    /**
+     * Reloads the ShardRegistry based on the contents of the config server's config.shards
+     * collection.
+     */
     void reload(OperationContext* txn);
+
+    /**
+     * Updates _lookup and _rsLookup based on the given new version of the given Shard's
+     * ConnectionString.
+     * Used to update the ShardRegistry when a change in replica set membership is detected by the
+     * ReplicaSetMonitor.
+     */
+    void updateLookupMapsForShard(std::shared_ptr<Shard> shard,
+                                  const ConnectionString& newConnString);
 
     /**
      * Returns a shared pointer to the shard object with the given shard id.
@@ -192,9 +205,6 @@ public:
     /**
      * Runs a command against the specified host and returns the result.  It is the responsibility
      * of the caller to check the returned BSON for command-specific failures.
-     * Also includes logic to refresh the shard registry and retry if the
-     * ShardingNetworkConnectionHook causes the command to fail to be run and to return
-     * ErrorCodes::ShardNotFound.
      */
     StatusWith<BSONObj> runCommand(OperationContext* txn,
                                    const HostAndPort& host,
@@ -202,8 +212,7 @@ public:
                                    const BSONObj& cmdObj);
 
     /**
-     * Same as runCommand above but used for talking to nodes that are not yet in the ShardRegistry,
-     * and without retry logic for ShardNotFound errors.
+     * Same as runCommand above but used for talking to nodes that are not yet in the ShardRegistry.
      */
     StatusWith<BSONObj> runCommandForAddShard(OperationContext* txn,
                                               const HostAndPort& host,
@@ -231,9 +240,6 @@ public:
      * response indicates failure.  Thus the caller is responsible for checking the command
      * response object for any kind of command-specific failure.  The only exception is
      * NotMaster errors, which we intercept and follow the rules described above for handling.
-     * Also includes logic to refresh the shard registry and retry if the
-     * ShardingNetworkConnectionHook causes the command to fail to be run and to return
-     * ErrorCodes::ShardNotFound.
      */
     StatusWith<BSONObj> runCommandWithNotMasterRetries(OperationContext* txn,
                                                        const ShardId& shard,
@@ -260,18 +266,14 @@ private:
      */
     void _addConfigShard_inlock();
 
+    void _updateLookupMapsForShard_inlock(std::shared_ptr<Shard> shard,
+                                          const ConnectionString& newConnString);
+
     std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
 
     /**
      * Runs a command against the specified host and returns the result.  It is the responsibility
      * of the caller to check the returned BSON for command-specific failures.
-     *
-     * Known non-ok return values include all manner of network/socket errors as well as
-     * ShardNotFound if the executor passed in is _executor.  ShardNotFound can be
-     * returned when the ShardingNetworkConnectionHook is run on a new connection but cannot
-     * find a shard associated with the given host in the ShardRegistry.  This most likely means
-     * that the shard was either just added or just removed, and the correct behavior is to reload()
-     * the ShardRegistry and retry.
      */
     StatusWith<CommandResponse> _runCommandWithMetadata(executor::TaskExecutor* executor,
                                                         const HostAndPort& host,
@@ -279,11 +281,6 @@ private:
                                                         const BSONObj& cmdObj,
                                                         const BSONObj& metadata);
 
-    /**
-     * See comment for runCommandWithNotMasterRetries above for more details about how this works,
-     * and also see the comment for _runCommandWithMetadata above for details about when this might
-     * return a ShardNotFound error.
-     */
     StatusWith<CommandResponse> _runCommandWithNotMasterRetries(executor::TaskExecutor* executor,
                                                                 RemoteCommandTargeter* targeter,
                                                                 const std::string& dbname,
