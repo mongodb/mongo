@@ -82,13 +82,6 @@ var keys = Object.keySet(latestStartUpLog.buildinfo);
 assert(arrayIsSubset(expectedKeys, keys), "buildinfo keys failed! \n expected:\t" + expectedKeys + "\n actual:\t" + keys);
 assert.eq(buildinfo, latestStartUpLog.buildinfo, "buildinfo doesn't match that from buildinfo command");
 
-var expectedBuildEnvKeys = [ "build_command", "cc", "ccflags", "cflags", "cxx", "cxxflags",
-    "linkflags", "modules", "target_arch", "target_os" ];
-var buildEnvKeys = Object.keySet(latestStartUpLog.buildinfo.buildEnvironment);
-assert(arrayIsSubset(expectedBuildEnvKeys, buildEnvKeys,
-    "buildEnvironment keys failed! \n expected: \t" + expectedBuildEnvKeys + "\n actual:\t" +
-    buildEnvKeys));
-
 // Test version and version Array
 var version = latestStartUpLog.buildinfo.version.split('-')[0];
 var versionArray = latestStartUpLog.buildinfo.versionArray;
