@@ -42,7 +42,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
  *	before the time out period expires, let the caller know.
  */
 int
-__wt_cond_wait_isngal(WT_SESSION_IMPL *session,
+__wt_cond_wait_signal(WT_SESSION_IMPL *session,
     WT_CONDVAR *cond, uint64_t usecs, int *signalled)
 {
 	DWORD milliseconds;
