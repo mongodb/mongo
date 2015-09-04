@@ -442,7 +442,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
 	btree = S2BT(session);
 
-	for (force_attempts = oldgen = 0, wait_cnt = 0;;) {
+	for (force_attempts = oldgen = 0, sleep_cnt = wait_cnt = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
@@ -469,14 +469,14 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
 			/* Waiting on another thread's read, stall. */
 			WT_STAT_FAST_CONN_INCR(session, page_read_blocked);
-			goto stall;
+			break;
 		case WT_REF_LOCKED:
 			if (LF_ISSET(WT_READ_NO_WAIT))
 				return (WT_NOTFOUND);
 
 			/* Waiting on eviction, stall. */
 			WT_STAT_FAST_CONN_INCR(session, page_locked_blocked);
-			goto stall;
+			break;
 		case WT_REF_SPLIT:
 			return (WT_RESTART);
 		case WT_REF_MEM:
@@ -530,7 +530,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 					ret = 0;
 					WT_STAT_FAST_CONN_INCR(session,
 					    page_forcible_evict_blocked);
-					goto stall;
+					break;
 				}
 				WT_RET(ret);
 
@@ -574,28 +574,24 @@ skip_evict:
 		 * we've yielded enough times, start sleeping so we don't burn
 		 * CPU to no purpose.
 		 */
-		if (++wait_cnt < 1000)
+		if (++wait_cnt < 1000) {
 			__wt_yield();
-		else {
-			if (0) {
-stall:				wait_cnt += 1000;
-			}
-
-			/*
-			 * If stalling and this thread is allowed to do eviction
-			 * work, check if the cache needs help. If we do work
-			 * for the cache, substitute that for a sleep.
-			 */
-			if (!LF_ISSET(WT_READ_NO_EVICT)) {
-				WT_RET(__wt_cache_eviction_check(
-				    session, 1, &cache_work));
-				if (cache_work)
-					continue;
-			}
-			sleep_cnt = WT_MIN(wait_cnt, 10000);
-			wait_cnt *= 2;
-			WT_STAT_FAST_CONN_INCRV(session, page_sleep, sleep_cnt);
-			__wt_sleep(0, sleep_cnt);
+			continue;
 		}
+
+		/*
+		 * If stalling and this thread is allowed to do eviction work,
+		 * check if the cache needs help. If we do work for the cache,
+		 * substitute that for a sleep.
+		 */
+		if (!LF_ISSET(WT_READ_NO_EVICT)) {
+			WT_RET(
+			    __wt_cache_eviction_check(session, 1, &cache_work));
+			if (cache_work)
+				continue;
+		}
+		sleep_cnt = WT_MIN(sleep_cnt + 1000, 10000);
+		WT_STAT_FAST_CONN_INCRV(session, page_sleep, sleep_cnt);
+		__wt_sleep(0, sleep_cnt);
 	}
 }

@@ -976,6 +976,8 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_INSERT_HEAD *ins_head;
+	WT_INSERT *ins;
+	int i;
 
 	btree = S2BT(session);
 
@@ -990,9 +992,8 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Check for pages with append-only workloads. A common application
 	 * pattern is to have multiple threads frantically appending to the
 	 * tree. We want to reconcile and evict this page, but we'd like to
-	 * do it without making the appending threads wait. If we're not
-	 * discarding the tree, check and see if it's worth doing a split to
-	 * let the threads continue before doing eviction.
+	 * do it without making the appending threads wait. See if it's worth
+	 * doing a split to let the threads continue before doing eviction.
 	 *
 	 * Ignore anything other than large, dirty row-store leaf pages.
 	 */
@@ -1007,25 +1008,22 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * There is no point splitting if the list is small, no deep items is
-	 * our heuristic for that. (A 1/4 probability of adding a new skiplist
-	 * level means there will be a new 6th level for roughly each 4KB of
-	 * entries in the list. If we have at least two 6th level entries, the
-	 * list is at least large enough to work with.)
-	 *
-	 * The following code requires at least two items on the insert list,
-	 * this test serves the additional purpose of confirming that.
+	 * our heuristic for that. A 1/4 probability of adding a new skiplist
+	 * level, with level-0 always created, means there will be a 5th level
+	 * entry for roughly every 1024 entries in the list. If there are at
+	 * least 4 5th level entries (4K items), the list is large enough.
 	 */
-#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(6, WT_SKIP_MAXDEPTH - 1)
+#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(5, WT_SKIP_MAXDEPTH - 1)
 	ins_head = page->pg_row_entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
 	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
-	if (ins_head == NULL ||
-	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL ||
-	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] ==
-	    ins_head->tail[WT_MIN_SPLIT_SKIPLIST_DEPTH])
+	if (ins_head == NULL)
 		return (0);
-
-	return (1);
+	for (i = 0, ins = ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH];
+	    ins != NULL; ins = ins->next[WT_MIN_SPLIT_SKIPLIST_DEPTH])
+		if (++i == 4)
+			return (1);
+	return (0);
 }
 
 /*
@@ -1045,11 +1043,22 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 
 	btree = S2BT(session);
 	mod = page->modify;
-	txn_global = &S2C(session)->txn_global;
 
 	/* Pages that have never been modified can always be evicted. */
 	if (mod == NULL)
 		return (1);
+
+	/*
+	 * Check for in-memory splits before other eviction tests. If the page
+	 * should split in-memory, return success immediately and skip more
+	 * detailed eviction tests. We don't need further tests since the page
+	 * won't be written or discarded from the cache.
+	 */
+	if (__wt_page_can_split(session, page)) {
+		if (inmem_splitp != NULL)
+			*inmem_splitp = 1;
+		return (1);
+	}
 
 	/*
 	 * If the tree was deepened, there's a requirement that newly created
@@ -1063,19 +1072,6 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (0);
-
-	/*
-	 * Allow for the splitting of pages when a checkpoint is underway only
-	 * if the allow_splits flag has been passed, we know we are performing
-	 * a checkpoint, the page is larger than the stated maximum and there
-	 * has not already been a split on this page as the WT_PM_REC_MULTIBLOCK
-	 * flag is unset.
-	 */
-	if (__wt_page_can_split(session, page)) {
-		if (inmem_splitp != NULL)
-			*inmem_splitp = 1;
-		return (1);
-	}
 
 	/*
 	 * If the file is being checkpointed, we can't evict dirty pages:
@@ -1097,9 +1093,11 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * similar to __wt_txn_visible_all, but ignores the checkpoint's
 	 * transaction.
 	 */
-	if (check_splits &&
-	    WT_TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
-		return (0);
+	if (check_splits) {
+		txn_global = &S2C(session)->txn_global;
+		if (WT_TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
+			return (0);
+	}
 
 	return (1);
 }
