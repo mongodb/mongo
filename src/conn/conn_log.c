@@ -611,18 +611,17 @@ __log_server(void *arg)
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
 	uint64_t count, freq_per_sec, wait_time;
-	u_int arch_lock;
-	int signalled;
+	int arch_lock, signalled;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	arch_lock = 0;
+	arch_lock = signalled = 0;
+
 	/*
 	 * Set this to the number of times per second we want to force out the
 	 * log slot buffer.
 	 */
-	signalled = 0;
 	count = 0;
 	freq_per_sec = 20;
 	wait_time = WT_MILLION / freq_per_sec;
