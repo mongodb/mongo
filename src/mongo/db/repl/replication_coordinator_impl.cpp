@@ -2680,7 +2680,7 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     }
 
     invariant(votingNodesOpTimes.size() > 0);
-    if (votingNodesOpTimes.size() < static_cast<unsigned long>(_rsConfig.getMajorityVoteCount())) {
+    if (votingNodesOpTimes.size() < static_cast<unsigned long>(_rsConfig.getWriteMajority())) {
         return;
     }
 
@@ -2688,7 +2688,7 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
 
     // need the majority to have this OpTime
     OpTime committedOpTime =
-        votingNodesOpTimes[votingNodesOpTimes.size() - _rsConfig.getMajorityVoteCount()];
+        votingNodesOpTimes[votingNodesOpTimes.size() - _rsConfig.getWriteMajority()];
 
     _setLastCommittedOpTime_inlock(committedOpTime);
 }
