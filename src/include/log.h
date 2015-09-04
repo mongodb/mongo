@@ -222,7 +222,7 @@ struct __wt_log {
 	WT_LOGSLOT	*active_slot;			/* Active slot */
 	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
 	size_t		 slot_buf_size;		/* Buffer size for slots */
-#ifdef HAVE_DIAGNOSTIC
+#ifdef ENABLE_DIRECT_LOG_WRITES
 	uint64_t	 write_calls;		/* Calls to log_write */
 #endif
 

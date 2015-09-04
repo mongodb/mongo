@@ -1888,7 +1888,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	int64_t release_size;
 	uint32_t force, rdup_len;
 	int free_slot;
-#ifdef HAVE_DIAGNOSTIC
+#ifdef ENABLE_DIRECT_LOG_WRITES
 	int direct_force;
 #endif
 
@@ -1931,7 +1931,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * will turn on consolidation automatically so this code could
 	 * be simplified some for that case.
 	 */
-#ifdef HAVE_DIAGNOSTIC
+#ifdef ENABLE_DIRECT_LOG_WRITES
 	/*
 	 * XXX Test out an intermittent direct write call.  We expect this
 	 * to be rare but need to verify the code path.
