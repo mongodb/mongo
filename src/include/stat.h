@@ -276,6 +276,7 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_walk;
 	int64_t cache_eviction_worker_evicting;
 	int64_t cache_inmem_split;
+	int64_t cache_inmem_splittable;
 	int64_t cache_lookaside_insert;
 	int64_t cache_lookaside_remove;
 	int64_t cache_overhead;
@@ -429,6 +430,7 @@ struct __wt_dsrc_stats {
 	int64_t cache_eviction_internal;
 	int64_t cache_eviction_split;
 	int64_t cache_inmem_split;
+	int64_t cache_inmem_splittable;
 	int64_t cache_overflow_value;
 	int64_t cache_read;
 	int64_t cache_read_lookaside;
