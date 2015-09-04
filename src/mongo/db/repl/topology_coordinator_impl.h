@@ -151,7 +151,7 @@ public:
     virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const;
     virtual int getMaintenanceCount() const;
     virtual long long getTerm();
-    virtual bool updateTerm(long long term);
+    virtual bool updateTerm(long long term, Date_t now);
     virtual void setForceSyncSourceIndex(int index);
     virtual HostAndPort chooseNewSyncSource(Date_t now, const Timestamp& lastTimestampApplied);
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
@@ -419,6 +419,8 @@ private:
     Date_t _stepDownUntil;
 
     // A time before which this node will not stand for election.
+    // In protocol version 1, this is used to prevent running for election after seeing
+    // a new term.
     Date_t _electionSleepUntil;
 
     // The number of calls we have had to enter maintenance mode

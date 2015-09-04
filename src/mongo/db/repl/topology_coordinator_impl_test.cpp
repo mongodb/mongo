@@ -4913,7 +4913,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommands) {
                                                               << "rs0"
                                                               << "term" << 2 << "winnerId" << 30));
     long long responseTerm;
-    ASSERT(getTopoCoord().updateTerm(winnerArgs.getTerm()));
+    ASSERT(getTopoCoord().updateTerm(winnerArgs.getTerm(), now()));
     ASSERT_OK(getTopoCoord().processReplSetDeclareElectionWinner(winnerArgs, &responseTerm));
     ASSERT_EQUALS(2, responseTerm);
 
@@ -4958,7 +4958,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommandsDryRun) {
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
     // set term to 1
-    ASSERT(getTopoCoord().updateTerm(1));
+    ASSERT(getTopoCoord().updateTerm(1, now()));
     // and make sure we voted in term 1
     ReplSetRequestVotesArgs argsForRealVote;
     argsForRealVote.initialize(BSON("replSetRequestVotes"
@@ -5071,7 +5071,7 @@ TEST_F(TopoCoordTest, ProcessDeclareElectionWinner) {
                                                               << "rs0"
                                                               << "term" << 2 << "winnerId" << 30));
     long long responseTerm = -1;
-    ASSERT(getTopoCoord().updateTerm(winnerArgs.getTerm()));
+    ASSERT(getTopoCoord().updateTerm(winnerArgs.getTerm(), now()));
     ASSERT_OK(getTopoCoord().processReplSetDeclareElectionWinner(winnerArgs, &responseTerm));
     ASSERT_EQUALS(2, responseTerm);
 

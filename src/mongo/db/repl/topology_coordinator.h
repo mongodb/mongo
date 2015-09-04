@@ -117,7 +117,7 @@ public:
      * the value passed in as "term".
      * Returns true if the local term value is changed.
      */
-    virtual bool updateTerm(long long term) = 0;
+    virtual bool updateTerm(long long term, Date_t now) = 0;
 
     ////////////////////////////////////////////////////////////
     //

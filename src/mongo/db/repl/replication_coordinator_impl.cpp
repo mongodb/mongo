@@ -2955,7 +2955,8 @@ Status ReplicationCoordinatorImpl::updateTerm(long long term) {
 }
 
 bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term) {
-    bool updated = _topCoord->updateTerm(term);
+    auto now = _replExecutor.now();
+    bool updated = _topCoord->updateTerm(term, now);
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _cachedTerm = _topCoord->getTerm();

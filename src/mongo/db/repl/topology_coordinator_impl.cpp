@@ -1368,8 +1368,14 @@ bool TopologyCoordinatorImpl::checkShouldStandForElection(Date_t now, const OpTi
         return false;
     }
     if (_electionSleepUntil > now) {
-        LOG(2) << "Not standing for election before " << dateToISOStringLocal(_electionSleepUntil)
-               << " because I stood too recently";
+        if (_rsConfig.getProtocolVersion() == 1) {
+            LOG(2) << "Not standing for election before "
+                   << dateToISOStringLocal(_electionSleepUntil)
+                   << " because I stood up or learned about a new term too recently";
+        } else {
+            LOG(2) << "Not standing for election before "
+                   << dateToISOStringLocal(_electionSleepUntil) << " because I stood too recently";
+        }
         return false;
     }
     // All checks passed, become a candidate and start election proceedings.
@@ -2289,10 +2295,12 @@ int TopologyCoordinatorImpl::getMaintenanceCount() const {
     return _maintenanceModeCalls;
 }
 
-bool TopologyCoordinatorImpl::updateTerm(long long term) {
+bool TopologyCoordinatorImpl::updateTerm(long long term, Date_t now) {
     if (term <= _term) {
         return false;
     }
+    // Don't run election if we just stood up or learned about a new term.
+    _electionSleepUntil = now + _rsConfig.getElectionTimeoutPeriod();
     _term = term;
     return true;
 }

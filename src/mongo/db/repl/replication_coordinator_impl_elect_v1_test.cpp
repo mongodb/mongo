@@ -691,6 +691,58 @@ TEST_F(ReplCoordElectV1Test, ElectTermChangeDuringActualElection) {
     ASSERT_EQUALS(1,
                   countLogLinesContaining("not becoming primary, we have been superceded already"));
 }
+
+TEST_F(ReplCoordElectV1Test, LearningAboutNewTermDelaysElection) {
+    startCapturingLogMessages();
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345")) << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+    OperationContextNoop txn;
+    OpTime time1(Timestamp(100, 1), 0);
+    getReplCoord()->setMyLastOptime(time1);
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(2));
+    // Learned about a new term. The following HB won't trigger election during a timeout interval.
+    getReplCoord()->updateTerm(10);
+    simulateEnoughHeartbeatsForElectability();
+    stopCapturingLogMessages();
+    ASSERT(getReplCoord()->getMemberState().secondary())
+        << getReplCoord()->getMemberState().toString();
+    ASSERT_EQ(
+        2, countLogLinesContaining("because I stood up or learned about a new term too recently"));
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
+
+    auto net = getNet();
+    auto startingTime = net->now();
+
+    // Wait until the node is able to run election again by replying received heartbeats.
+    // Updating the term will delay a new election for the duration of the election timeout,
+    // while the heartbeat interval is half of that, so we wait for two more rounds.
+    net->enterNetwork();
+    net->runUntil(startingTime + config.getElectionTimeoutPeriod() / 2);
+    net->exitNetwork();
+    simulateEnoughHeartbeatsForElectability();
+
+    net->enterNetwork();
+    net->runUntil(startingTime + config.getElectionTimeoutPeriod());
+    net->exitNetwork();
+    simulateEnoughHeartbeatsForElectability();
+
+    simulateSuccessfulV1Election();
+    ASSERT(getReplCoord()->getMemberState().primary())
+        << getReplCoord()->getMemberState().toString();
+}
 }
 }
 }
