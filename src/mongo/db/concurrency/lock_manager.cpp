@@ -828,8 +828,6 @@ void LockManager::_dumpBucket(const LockBucket* bucket) const {
                << "CompatibleFirst = " << iter->compatibleFirst << "; " << '\n';
         }
 
-        sb << '\n';
-
         sb << "PENDING:\n";
         for (const LockRequest* iter = lock->conflictList._front; iter != NULL; iter = iter->next) {
             sb << '\t' << "LockRequest " << iter->locker->getId() << " @ " << iter->locker << ": "
@@ -838,6 +836,8 @@ void LockManager::_dumpBucket(const LockBucket* bucket) const {
                << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
                << "CompatibleFirst = " << iter->compatibleFirst << "; " << '\n';
         }
+
+        sb << "-----------------------------------------------------------\n";
 
         log() << sb.str();
     }
