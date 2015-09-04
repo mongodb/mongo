@@ -610,8 +610,7 @@ __log_server(void *arg)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	uint64_t count, freq_per_sec, wait_time;
-	int arch_lock, signalled;
+	int arch_lock, freq_per_sec, signalled;
 
 	session = arg;
 	conn = S2C(session);
@@ -622,9 +621,9 @@ __log_server(void *arg)
 	 * Set this to the number of times per second we want to force out the
 	 * log slot buffer.
 	 */
-	count = 0;
-	freq_per_sec = 20;
-	wait_time = WT_MILLION / freq_per_sec;
+#define	WT_FORCE_PER_SECOND	20
+	freq_per_sec = WT_FORCE_PER_SECOND;
+
 	/*
 	 * The log server thread does a variety of work.  It forces out any
 	 * buffered log writes.  It pre-allocates log files and it performs
@@ -645,12 +644,15 @@ __log_server(void *arg)
 		 * in the case of a synchronous buffer.  We end up with a hang.
 		 */
 		WT_ERR(__wt_log_force_write(session, 1));
+
 		/*
 		 * We don't want to archive or pre-allocate files as often as
 		 * we want to force out log buffers.  Only do it once per second
 		 * or if the condition was signalled.
 		 */
-		if ((++count % freq_per_sec == 0) || signalled != 0) {
+		if (--freq_per_sec <= 0 || signalled != 0) {
+			freq_per_sec = WT_FORCE_PER_SECOND;
+
 			/*
 			 * Perform log pre-allocation.
 			 */
@@ -676,8 +678,8 @@ __log_server(void *arg)
 			}
 			/* Wait until the next event. */
 		}
-		WT_ERR(__wt_cond_wait_signal(
-		    session, conn->log_cond, wait_time, &signalled));
+		WT_ERR(__wt_cond_wait_signal(session, conn->log_cond,
+		    WT_MILLION / WT_FORCE_PER_SECOND, &signalled));
 	}
 
 	if (0) {
