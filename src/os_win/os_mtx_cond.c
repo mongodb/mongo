@@ -94,18 +94,14 @@ __wt_cond_wait_signal(
 		ret = SleepConditionVariableCS(
 		    &cond->cond, &cond->mtx, INFINITE);
 
-	if (ret == 0) {
-		if (GetLastError() == ERROR_TIMEOUT) {
-			*signalled = 0;
-			ret = 1;
-		}
-	}
+	if (ret == 0 && GetLastError() == ERROR_TIMEOUT)
+		*signalled = 0;
 
 	(void)__wt_atomic_subi32(&cond->waiters, 1);
 
 	if (locked)
 		LeaveCriticalSection(&cond->mtx);
-	if (ret != 0)
+	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, ret, "SleepConditionVariableCS");
 }
