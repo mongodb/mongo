@@ -46,8 +46,8 @@ err:	__wt_free(session, cond);
  *	before the time out period expires, let the caller know.
  */
 int
-__wt_cond_wait_signal(WT_SESSION_IMPL *session,
-    WT_CONDVAR *cond, uint64_t usecs, int *signalled)
+__wt_cond_wait_signal(
+    WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, int *signalled)
 {
 	struct timespec ts;
 	WT_DECL_RET;
@@ -56,8 +56,7 @@ __wt_cond_wait_signal(WT_SESSION_IMPL *session,
 	locked = 0;
 
 	/* Fast path if already signalled. */
-	if (signalled != NULL)
-		*signalled = 1;
+	*signalled = 1;
 	if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
 		return (0);
 
@@ -93,8 +92,7 @@ __wt_cond_wait_signal(WT_SESSION_IMPL *session,
 	    ret == ETIME ||
 #endif
 	    ret == ETIMEDOUT) {
-		if (signalled != NULL)
-			*signalled = 0;
+		*signalled = 0;
 		ret = 0;
 	}
 
@@ -105,16 +103,6 @@ err:	if (locked)
 	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, ret, "pthread_cond_wait");
-}
-
-/*
- * __wt_cond_wait --
- *	Wait on a mutex, optionally timing out.
- */
-int
-__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
-{
-	return (__wt_cond_wait_signal(session, cond, usecs, NULL));
 }
 
 /*
