@@ -1434,7 +1434,7 @@ in_memory:
 	 * reason to write the cell.
 	 */
 	mod = ref->page->modify;
-	if (mod != NULL && mod->flags != 0)
+	if (mod != NULL && F_ISSET(mod, WT_PM_REC_MASK))
 		*statep = WT_CHILD_MODIFIED;
 	else if (ref->addr == NULL) {
 		*statep = WT_CHILD_IGNORE;
