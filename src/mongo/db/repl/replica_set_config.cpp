@@ -428,6 +428,18 @@ Status ReplicaSetConfig::validate() const {
                           "Arbiters are not allowed in replica set configurations being used for "
                           "config servers");
         }
+        for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
+            if (!mem->shouldBuildIndexes()) {
+                return Status(ErrorCodes::BadValue,
+                              "Members in replica set configurations being used for config "
+                              "servers must build indexes");
+            }
+            if (mem->getSlaveDelay() != Seconds(0)) {
+                return Status(ErrorCodes::BadValue,
+                              "Members in replica set configurations being used for config "
+                              "servers cannot have a non-zero slaveDelay");
+            }
+        }
         if (!serverGlobalParams.configsvr) {
             return Status(ErrorCodes::BadValue,
                           "Nodes being used for config servers must be started with the "

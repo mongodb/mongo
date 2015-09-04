@@ -1077,8 +1077,43 @@ TEST(ReplicaSetConfig, CheckConfigServerCantHaveArbiters) {
                                                     << BSON("_id" << 1 << "host"
                                                                   << "localhost:54321"
                                                                   << "arbiterOnly" << true)))));
-    ASSERT_NOT_OK(configA.validate());
+    Status status = configA.validate();
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "Arbiters are not allowed");
 }
+
+TEST(ReplicaSetConfig, CheckConfigServerMustBuildIndexes) {
+    ReplicaSetConfig configA;
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "configsvr" << true << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345")
+                                                    << BSON("_id" << 1 << "host"
+                                                                  << "localhost:54321"
+                                                                  << "priority" << 0
+                                                                  << "buildIndexes" << false)))));
+    Status status = configA.validate();
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "must build indexes");
+}
+
+TEST(ReplicaSetConfig, CheckConfigServerCantHaveSlaveDelay) {
+    ReplicaSetConfig configA;
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "version" << 1 << "configsvr" << true << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345")
+                                                    << BSON("_id" << 1 << "host"
+                                                                  << "localhost:54321"
+                                                                  << "priority" << 0 << "slaveDelay"
+                                                                  << 3)))));
+    Status status = configA.validate();
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "cannot have a non-zero slaveDelay");
+}
+
 
 TEST(ReplicaSetConfig, GetPriorityTakeoverDelay) {
     ReplicaSetConfig configA;
