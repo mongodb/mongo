@@ -530,6 +530,39 @@ TEST_F(ReplCoordElectV1Test, ElectNotEnoughVotes) {
                   countLogLinesContaining("not becoming primary, we received insufficient votes"));
 }
 
+TEST_F(ReplCoordElectV1Test, RollbackDuringElection) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345")) << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+    OperationContextNoop txn;
+    OpTime time1(Timestamp(100, 1), 0);
+    getReplCoord()->setMyLastOptime(time1);
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    simulateEnoughHeartbeatsForElectability();
+    simulateSuccessfulDryRun();
+
+    bool success = false;
+    auto event = getReplCoord()->setFollowerMode_nonBlocking(MemberState::RS_ROLLBACK, &success);
+
+    // We do not need to respond to any pending network operations because setFollowerMode() will
+    // cancel the vote requester.
+    getReplCoord()->waitForElectionFinish_forTest();
+    getReplExec()->waitForEvent(event);
+    ASSERT_TRUE(success);
+    ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
+}
+
 TEST_F(ReplCoordElectV1Test, ElectStaleTerm) {
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
