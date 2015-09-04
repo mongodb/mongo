@@ -28,32 +28,37 @@
  *    then also delete it in the license file.
  */
 
+#pragma once
+
 #include "mongo/util/assert_util.h"
+#include "mongo/util/unordered_fast_key_table.h"
 
 namespace mongo {
 template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
 inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::Area(unsigned capacity,
-                                                                     double maxProbeRatio)
-    : _capacity(capacity),
-      _maxProbe(static_cast<unsigned>(capacity * maxProbeRatio)),
-      _entries(new Entry[_capacity]) {}
+                                                                     unsigned maxProbe)
+    : _hashMask(capacity - 1),
+      _maxProbe(maxProbe),
+      _entries(capacity ? new Entry[capacity] : nullptr) {
+    // Capacity must be a power of two or zero. See the comment on _hashMask for why.
+    dassert((capacity & (capacity - 1)) == 0);
+}
 
 template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
 inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::Area(const Area& other)
-    : _capacity(other._capacity), _maxProbe(other._maxProbe), _entries(new Entry[_capacity]) {
-    for (unsigned i = 0; i < _capacity; i++) {
-        _entries[i] = other._entries[i];
-    }
+    : Area(other.capacity(), other._maxProbe) {
+    std::copy(other.begin(), other.end(), begin());
 }
 
 template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
 inline int UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::find(
-    const K_L& key, size_t hash, int* firstEmpty, const UnorderedFastKeyTable& sm) const {
-    if (firstEmpty)
-        *firstEmpty = -1;
+    const K_L& key, uint32_t hash, int* firstEmpty, const UnorderedFastKeyTable& sm) const {
+    dassert(capacity());                        // Caller must special-case empty tables.
+    dassert(!firstEmpty || *firstEmpty == -1);  // Caller must initialize *firstEmpty.
 
-    for (unsigned probe = 0; probe < _maxProbe; probe++) {
-        unsigned pos = (hash + probe) % _capacity;
+    unsigned probe = 0;
+    do {
+        unsigned pos = (hash + probe) & _hashMask;
 
         if (!_entries[pos].used) {
             // space is empty
@@ -78,43 +83,34 @@ inline int UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::find(
         // hashes and strings are equal
         // yay!
         return pos;
-    }
+    } while (++probe < _maxProbe);
     return -1;
 }
 
 template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
 inline bool UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::transfer(
     Area* newArea, const UnorderedFastKeyTable& sm) const {
-    for (unsigned i = 0; i < _capacity; i++) {
-        if (!_entries[i].used)
+    for (auto&& entry : *this) {
+        if (!entry.used)
             continue;
 
         int firstEmpty = -1;
-        int loc = newArea->find(
-            sm._convertor(_entries[i].data.first), _entries[i].curHash, &firstEmpty, sm);
+        int loc = newArea->find(sm._convertor(entry.data.first), entry.curHash, &firstEmpty, sm);
 
         verify(loc == -1);
         if (firstEmpty < 0) {
             return false;
         }
 
-        newArea->_entries[firstEmpty] = _entries[i];
+        newArea->_entries[firstEmpty] = entry;
     }
     return true;
 }
 
 template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
 inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::UnorderedFastKeyTable(
-    unsigned startingCapacity, double maxProbeRatio)
-    : _maxProbeRatio(maxProbeRatio), _area(startingCapacity, maxProbeRatio) {
-    _size = 0;
-}
-
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::UnorderedFastKeyTable(
     const UnorderedFastKeyTable& other)
     : _size(other._size),
-      _maxProbeRatio(other._maxProbeRatio),
       _area(other._area),
       _hash(other._hash),
       _equals(other._equals),
@@ -138,14 +134,19 @@ template <typename K_L, typename K_S, typename V, typename H, typename E, typena
 inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::copyTo(
     UnorderedFastKeyTable* out) const {
     out->_size = _size;
-    out->_maxProbeRatio = _maxProbeRatio;
     Area x(_area);
     out->_area.swap(&x);
 }
 
 template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
 inline V& UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::get(const K_L& key) {
-    const size_t hash = _hash(key);
+    if (!_area._entries) {
+        // This is the first insert ever. Need to allocate initial space.
+        dassert(_area.capacity() == 0);
+        _grow();
+    }
+
+    const uint32_t hash = _hash(key);
 
     for (int numGrowTries = 0; numGrowTries < 5; numGrowTries++) {
         int firstEmpty = -1;
@@ -172,7 +173,10 @@ inline V& UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::get(const K_L& key)
 
 template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
 inline size_t UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::erase(const K_L& key) {
-    const size_t hash = _hash(key);
+    if (_size == 0)
+        return 0;  // Nothing to delete.
+
+    const uint32_t hash = _hash(key);
     int pos = _area.find(key, hash, NULL, *this);
 
     if (pos < 0)
@@ -196,10 +200,19 @@ void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::erase(const_iterator it)
 
 template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
 inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::_grow() {
-    unsigned capacity = _area._capacity;
+    unsigned capacity = _area.capacity();
     for (int numGrowTries = 0; numGrowTries < 5; numGrowTries++) {
-        capacity *= 2;
-        Area newArea(capacity, _maxProbeRatio);
+        if (capacity == 0) {
+            const unsigned kDefaultStartingCapacity = 16;
+            capacity = kDefaultStartingCapacity;
+        } else {
+            capacity *= 2;
+        }
+
+        const double kMaxProbeRatio = 0.05;
+        unsigned maxProbes = (capacity * kMaxProbeRatio) + 1;  // Round up
+
+        Area newArea(capacity, maxProbes);
         bool success = _area.transfer(&newArea, *this);
         if (!success) {
             continue;
@@ -216,8 +229,6 @@ UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::find(const K_L& key) const {
     if (_size == 0)
         return const_iterator();
     int pos = _area.find(key, _hash(key), 0, *this);
-    if (pos < 0)
-        return const_iterator();
     return const_iterator(&_area, pos);
 }
 

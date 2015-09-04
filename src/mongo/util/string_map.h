@@ -29,12 +29,20 @@
 
 #pragma once
 
+#include <third_party/murmurhash3/MurmurHash3.h>
+
 #include "mongo/base/string_data.h"
 #include "mongo/util/unordered_fast_key_table.h"
 
 namespace mongo {
 
-typedef StringData::Hasher StringMapDefaultHash;
+struct StringMapDefaultHash {
+    uint32_t operator()(StringData a) const {
+        uint32_t hash;
+        MurmurHash3_x86_32(a.rawData(), a.size(), 0, &hash);
+        return hash;
+    }
+};
 
 struct StringMapDefaultEqual {
     bool operator()(StringData a, StringData b) const {

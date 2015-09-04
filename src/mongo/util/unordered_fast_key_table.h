@@ -62,16 +62,17 @@ private:
 
         bool used;
         bool everUsed;
-        size_t curHash;
+        uint32_t curHash;
         value_type data;
     };
 
     struct Area {
-        Area(unsigned capacity, double maxProbeRatio);
+        Area() = default;  // TODO constexpr
+        Area(unsigned capacity, unsigned maxProbe);
         Area(const Area& other);
 
         int find(const K_L& key,
-                 size_t hash,
+                 uint32_t hash,
                  int* firstEmpty,
                  const UnorderedFastKeyTable& sm) const;
 
@@ -79,27 +80,40 @@ private:
 
         void swap(Area* other) {
             using std::swap;
-            swap(_capacity, other->_capacity);
+            swap(_hashMask, other->_hashMask);
             swap(_maxProbe, other->_maxProbe);
             swap(_entries, other->_entries);
         }
 
-        unsigned _capacity;
-        unsigned _maxProbe;
-        std::unique_ptr<Entry[]> _entries;
+        unsigned capacity() const {
+            return _hashMask + 1;
+        }
+
+        Entry* begin() {
+            return _entries.get();
+        }
+        Entry* end() {
+            return _entries.get() + capacity();
+        }
+
+        const Entry* begin() const {
+            return _entries.get();
+        }
+        const Entry* end() const {
+            return _entries.get() + capacity();
+        }
+
+        // Capacity is always a power of two. This means that the operation (hash % capacity) can be
+        // preformed by (hash & (capacity - 1)). Since we need the mask more than the capacity we
+        // store it directly and derive the capacity from it. The default capacity is 0 so the
+        // default hashMask is -1.
+        unsigned _hashMask = -1;
+        unsigned _maxProbe = 0;
+        std::unique_ptr<Entry[]> _entries = {};
     };
 
 public:
-    static const unsigned DEFAULT_STARTING_CAPACITY = 20;
-
-    /**
-     * @param startingCapacity how many buckets should exist on initial creation
-     *                         DEFAULT_STARTING_CAPACITY
-     * @param maxProbeRatio the percentage of buckets we're willing to probe
-     *                      no defined default as you can't have a static const double on windows
-     */
-    UnorderedFastKeyTable(unsigned startingCapacity = DEFAULT_STARTING_CAPACITY,
-                          double maxProbeRatio = 0.05);
+    UnorderedFastKeyTable() = default;  // TODO constexpr
 
     UnorderedFastKeyTable(const UnorderedFastKeyTable& other);
 
@@ -127,7 +141,7 @@ public:
      * @return storage space
      */
     size_t capacity() const {
-        return _area._capacity;
+        return _area.capacity();
     }
 
     V& operator[](const K_L& key) {
@@ -151,7 +165,7 @@ public:
         const_iterator(const Area* area) {
             _area = area;
             _position = 0;
-            _max = _area->_capacity - 1;
+            _max = _area->capacity() - 1;
             _skip();
         }
         const_iterator(const Area* area, int pos) {
@@ -172,10 +186,7 @@ public:
             if (_position < 0)
                 return *this;
             _position++;
-            if (_position > _max)
-                _position = -1;
-            else
-                _skip();
+            _skip();
             return *this;
         }
 
@@ -189,12 +200,12 @@ public:
     private:
         void _skip() {
             while (true) {
-                if (_area->_entries[_position].used)
-                    break;
-                if (_position >= _max) {
+                if (_position > _max) {
                     _position = -1;
                     break;
                 }
+                if (_area->_entries[_position].used)
+                    break;
                 ++_position;
             }
         }
@@ -216,19 +227,11 @@ public:
     const_iterator end() const;
 
 private:
-    /*
-     * @param firstEmpty, if we return -1, and firstEmpty != NULL,
-     *                    this will be set to the first empty bucket we found
-     * @retrun offset into _entries or -1 if not there
-     */
-    int _find(const K_L& key, int hash, int* firstEmpty) const;
-
     void _grow();
 
     // ----
 
-    size_t _size;
-    double _maxProbeRatio;
+    size_t _size = 0;
     Area _area;
 
     H _hash;
