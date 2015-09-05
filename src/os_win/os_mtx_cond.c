@@ -45,7 +45,7 @@ int
 __wt_cond_wait_signal(
     WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, int *signalled)
 {
-	DWORD milliseconds;
+	DWORD err, milliseconds;
 	WT_DECL_RET;
 	uint64_t milliseconds64;
 	int locked;
@@ -94,18 +94,25 @@ __wt_cond_wait_signal(
 		ret = SleepConditionVariableCS(
 		    &cond->cond, &cond->mtx, INFINITE);
 
+	/*
+	 * SleepConditionVariableCS returns non-zero on success, 0 on timeout
+	 * or failure. Check for timeout, else convert to a WiredTiger error
+	 * value and fail.
+	 */
 	if (ret == 0) {
-		if (GetLastError() == ERROR_TIMEOUT) {
+		if ((err = GetLastError()) == ERROR_TIMEOUT)
 			*signalled = 0;
-			ret = 1;
-		}
-	}
+		else
+			ret = __wt_errno();
+	} else
+		ret = 0;
 
 	(void)__wt_atomic_subi32(&cond->waiters, 1);
 
 	if (locked)
 		LeaveCriticalSection(&cond->mtx);
-	if (ret != 0)
+
+	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, ret, "SleepConditionVariableCS");
 }
