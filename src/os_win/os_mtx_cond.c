@@ -103,16 +103,18 @@ __wt_cond_wait_signal(
 		if ((err = GetLastError()) == ERROR_TIMEOUT)
 			*signalled = 0;
 		else
-			WT_RET_MSG(session,
-			    __wt_errno(),
-			    "SleepConditionVariableCS");
-	}
+			ret = __wt_errno();
+	} else
+		ret = 0;
 
 	(void)__wt_atomic_subi32(&cond->waiters, 1);
 
 	if (locked)
 		LeaveCriticalSection(&cond->mtx);
-	return (0);
+
+	if (ret == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "SleepConditionVariableCS");
 }
 
 /*
