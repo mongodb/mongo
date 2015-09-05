@@ -328,6 +328,13 @@ public:
     void waitForStepDownFinish_forTest();
 
 private:
+    using CallbackFn = executor::TaskExecutor::CallbackFn;
+
+    using CallbackHandle = executor::TaskExecutor::CallbackHandle;
+
+    using ScheduleFn = stdx::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
+        const executor::TaskExecutor::CallbackFn& work)>;
+
     struct SnapshotInfo {
         OpTime opTime;
         SnapshotName name;
@@ -534,10 +541,6 @@ private:
                                       int secs,
                                       BSONObjBuilder* response,
                                       Status* result);
-    /*
-     * Bottom half of clearSyncSourceBlacklist
-     */
-    void _clearSyncSourceBlacklist_finish(const ReplicationExecutor::CallbackArgs& cbData);
 
     /**
      * Bottom half of processReplSetDeclareElectionWinner.
@@ -612,7 +615,6 @@ private:
      * to decide whether or not to finish a step down.
      * Should only be called from executor callbacks.
      */
-    void _signalStepDownWaitersFromCallback(const ReplicationExecutor::CallbackArgs& cbData);
     void _signalStepDownWaiters();
 
     /**
@@ -983,11 +985,6 @@ private:
     /**
      * Callback that attempts to set the current term in topology coordinator and
      * relinquishes primary if the term actually changes and we are primary.
-     */
-    void _updateTerm_helper(const ReplicationExecutor::CallbackArgs& cbData,
-                            long long term,
-                            bool* updated);
-    /**
      * Returns true if the term increased.
      */
     bool _updateTerm_incallback(long long term);
@@ -997,8 +994,6 @@ private:
      * replica set member and updates protocol version 1 information (most recent optime that is
      * committed, member id of the current PRIMARY, the current config version and the current term)
      */
-    void _processReplSetMetadata_helper(const ReplicationExecutor::CallbackArgs& cbData,
-                                        const rpc::ReplSetMetadata& replMetadata);
     void _processReplSetMetadata_incallback(const rpc::ReplSetMetadata& replMetadata);
 
     /**
@@ -1048,10 +1043,37 @@ private:
     void _resetElectionInfoOnProtocolVersionUpgrade(const ReplicaSetConfig& newConfig);
 
     /**
+     * Schedules work and returns handle to callback.
+     * If work cannot be scheduled due to shutdown, returns empty handle.
+     * All other non-shutdown scheduling failures will abort the process.
+     * Does not run 'work' if callback is canceled.
+     */
+    CallbackHandle _scheduleWork(const CallbackFn& work);
+
+    /**
+     * Schedules work to be run no sooner than 'when' and returns handle to callback.
+     * If work cannot be scheduled due to shutdown, returns empty handle.
+     * All other non-shutdown scheduling failures will abort the process.
+     * Does not run 'work' if callback is canceled.
+     */
+    CallbackHandle _scheduleWorkAt(Date_t when, const CallbackFn& work);
+
+    /**
      * Schedules work and waits for completion.
      */
-    void _scheduleWorkAndWaitForCompletion(executor::TaskExecutor* executor,
-                                           const executor::TaskExecutor::CallbackFn& work);
+    void _scheduleWorkAndWaitForCompletion(const CallbackFn& work);
+
+    /**
+     * Schedules work to be run no sooner than 'when' and waits for completion.
+     */
+    void _scheduleWorkAtAndWaitForCompletion(Date_t when, const CallbackFn& work);
+
+    /**
+     * Does the actual work of scheduling the work with the executor.
+     * Used by _scheduleWork() and _scheduleWorkAt() only.
+     * Do not call this function directly.
+     */
+    static CallbackHandle _wrapAndScheduleWork(ScheduleFn scheduleFn, const CallbackFn& work);
 
     /**
      * Schedule notification of election win.
