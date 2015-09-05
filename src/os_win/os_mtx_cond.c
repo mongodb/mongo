@@ -104,7 +104,7 @@ __wt_cond_wait_signal(
 			*signalled = 0;
 		else
 			WT_RET_MSG(session,
-			    __wt_map_windows_error_to_error(err)),
+			    __wt_errno(),
 			    "SleepConditionVariableCS");
 	}
 
