@@ -77,11 +77,8 @@
 namespace mongo {
 namespace repl {
 
-using executor::NetworkInterface;
-using CallbackFn = executor::TaskExecutor::CallbackFn;
-using CallbackHandle = executor::TaskExecutor::CallbackHandle;
-
 namespace {
+using executor::NetworkInterface;
 
 void lockAndCall(stdx::unique_lock<stdx::mutex>* lk, const stdx::function<void()>& fn) {
     if (!lk->owns_lock()) {
@@ -476,8 +473,22 @@ Seconds ReplicationCoordinatorImpl::getSlaveDelaySecs() const {
 }
 
 void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
-    auto work = [this](const CallbackArgs&) { _topCoord->clearSyncSourceBlacklist(); };
-    _scheduleWorkAndWaitForCompletion(work);
+    CBHStatus cbh = _replExecutor.scheduleWork(
+        stdx::bind(&ReplicationCoordinatorImpl::_clearSyncSourceBlacklist_finish,
+                   this,
+                   stdx::placeholders::_1));
+    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(18907, cbh.getStatus());
+    _replExecutor.wait(cbh.getValue());
+}
+
+void ReplicationCoordinatorImpl::_clearSyncSourceBlacklist_finish(
+    const ReplicationExecutor::CallbackArgs& cbData) {
+    if (cbData.status == ErrorCodes::CallbackCanceled)
+        return;
+    _topCoord->clearSyncSourceBlacklist();
 }
 
 bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
@@ -488,12 +499,17 @@ bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
     }
     fassert(18812, finishedSettingFollowerMode.getStatus());
     bool success = false;
-    _scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
-                             this,
-                             stdx::placeholders::_1,
-                             newState,
-                             finishedSettingFollowerMode.getValue(),
-                             &success));
+    CBHStatus cbh =
+        _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
+                                              this,
+                                              stdx::placeholders::_1,
+                                              newState,
+                                              finishedSettingFollowerMode.getValue(),
+                                              &success));
+    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return false;
+    }
+    fassert(18699, cbh.getStatus());
     _replExecutor.waitForEvent(finishedSettingFollowerMode.getValue());
     return success;
 }
@@ -732,8 +748,13 @@ Status ReplicationCoordinatorImpl::setLastOptimeForSlave(const OID& rid, const T
 }
 
 void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
-    _scheduleWorkAndWaitForCompletion(stdx::bind(
+    CBHStatus cbh = _replExecutor.scheduleWork(stdx::bind(
         &TopologyCoordinator::setMyHeartbeatMessage, _topCoord.get(), _replExecutor.now(), msg));
+    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(28540, cbh.getStatus());
+    _replExecutor.wait(cbh.getValue());
 }
 
 void ReplicationCoordinatorImpl::setMyLastOptimeForward(const OpTime& opTime) {
@@ -954,7 +975,10 @@ void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
         }
     }
 
-    _scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters, this));
+    _replExecutor.scheduleWork(
+        stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback,
+                   this,
+                   stdx::placeholders::_1));
 }
 
 void ReplicationCoordinatorImpl::interruptAll() {
@@ -973,7 +997,10 @@ void ReplicationCoordinatorImpl::interruptAll() {
         opTimeWaiter->condVar->notify_all();
     }
 
-    _scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters, this));
+    _replExecutor.scheduleWork(
+        stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback,
+                   this,
+                   stdx::placeholders::_1));
 }
 
 bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
@@ -1214,10 +1241,26 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
         return cbh.getStatus();
     }
     fassert(18809, cbh.getStatus());
-    _scheduleWorkAt(waitUntil,
-                    stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters, this));
+    cbh = _replExecutor.scheduleWorkAt(
+        waitUntil,
+        stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback,
+                   this,
+                   stdx::placeholders::_1));
+    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return cbh.getStatus();
+    }
+    fassert(26001, cbh.getStatus());
     _replExecutor.waitForEvent(finishedEvent.getValue());
     return result;
+}
+
+void ReplicationCoordinatorImpl::_signalStepDownWaitersFromCallback(
+    const ReplicationExecutor::CallbackArgs& cbData) {
+    if (!cbData.status.isOK()) {
+        return;
+    }
+
+    _signalStepDownWaiters();
 }
 
 void ReplicationCoordinatorImpl::_signalStepDownWaiters() {
@@ -1589,8 +1632,16 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result)
 }
 
 void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {
-    _scheduleWorkAndWaitForCompletion(stdx::bind(
-        &ReplicationCoordinatorImpl::_processReplSetMetadata_incallback, this, replMetadata));
+    CBHStatus cbh = _replExecutor.scheduleWork(
+        stdx::bind(&ReplicationCoordinatorImpl::_processReplSetMetadata_helper,
+                   this,
+                   stdx::placeholders::_1,
+                   replMetadata));
+    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return;
+    }
+    fassert(28710, cbh.getStatus());
+    _replExecutor.wait(cbh.getValue());
 }
 
 void ReplicationCoordinatorImpl::signalPrimaryUnavailable() {
@@ -1600,7 +1651,16 @@ void ReplicationCoordinatorImpl::signalPrimaryUnavailable() {
             _startElectSelfV1();
         }
     };
-    _scheduleWorkAndWaitForCompletion(work);
+    _scheduleWorkAndWaitForCompletion(&_replExecutor, work);
+}
+
+void ReplicationCoordinatorImpl::_processReplSetMetadata_helper(
+    const ReplicationExecutor::CallbackArgs& cbData, const rpc::ReplSetMetadata& replMetadata) {
+    if (cbData.status == ErrorCodes::CallbackCanceled) {
+        return;
+    }
+
+    _processReplSetMetadata_incallback(replMetadata);
 }
 
 void ReplicationCoordinatorImpl::_processReplSetMetadata_incallback(
@@ -2931,15 +2991,33 @@ Status ReplicationCoordinatorImpl::updateTerm(long long term) {
     }
 
     bool updated = false;
-    auto work =
-        [this, term, &updated](const CallbackArgs&) { updated = _updateTerm_incallback(term); };
-    _scheduleWorkAndWaitForCompletion(work);
+    CBHStatus cbh =
+        _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_updateTerm_helper,
+                                              this,
+                                              stdx::placeholders::_1,
+                                              term,
+                                              &updated));
+    if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return cbh.getStatus();
+    }
+    fassert(28670, cbh.getStatus());
+    _replExecutor.wait(cbh.getValue());
 
     if (updated) {
         return {ErrorCodes::StaleTerm, "Replication term of this node was stale; retry query"};
     }
 
     return Status::OK();
+}
+
+void ReplicationCoordinatorImpl::_updateTerm_helper(const ReplicationExecutor::CallbackArgs& cbData,
+                                                    long long term,
+                                                    bool* updated) {
+    if (cbData.status == ErrorCodes::CallbackCanceled) {
+        return;
+    }
+
+    *updated = _updateTerm_incallback(term);
 }
 
 bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term) {
@@ -3083,47 +3161,22 @@ void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
     _replExecutor.wait(cbStatus.getValue());
 }
 
-CallbackHandle ReplicationCoordinatorImpl::_scheduleWork(const CallbackFn& work) {
-    auto scheduleFn =
-        [this](const CallbackFn& workWrapped) { return _replExecutor.scheduleWork(workWrapped); };
-    return _wrapAndScheduleWork(scheduleFn, work);
-}
-
-CallbackHandle ReplicationCoordinatorImpl::_scheduleWorkAt(Date_t when, const CallbackFn& work) {
-    auto scheduleFn = [this, when](const CallbackFn& workWrapped) {
-        return _replExecutor.scheduleWorkAt(when, workWrapped);
-    };
-    return _wrapAndScheduleWork(scheduleFn, work);
-}
-
-void ReplicationCoordinatorImpl::_scheduleWorkAndWaitForCompletion(const CallbackFn& work) {
-    if (auto handle = _scheduleWork(work)) {
-        _replExecutor.wait(handle);
-    }
-}
-
-void ReplicationCoordinatorImpl::_scheduleWorkAtAndWaitForCompletion(Date_t when,
-                                                                     const CallbackFn& work) {
-    if (auto handle = _scheduleWorkAt(when, work)) {
-        _replExecutor.wait(handle);
-    }
-}
-
-// static
-CallbackHandle ReplicationCoordinatorImpl::_wrapAndScheduleWork(ScheduleFn scheduleFn,
-                                                                const CallbackFn& work) {
-    auto workWrapped = [work](const CallbackArgs& args) {
+/**
+ * Schedules work and waits for completion.
+ */
+void ReplicationCoordinatorImpl::_scheduleWorkAndWaitForCompletion(
+    executor::TaskExecutor* executor, const executor::TaskExecutor::CallbackFn& work) {
+    auto cbh = executor->scheduleWork([work](const CallbackArgs& args) {
         if (args.status == ErrorCodes::CallbackCanceled) {
             return;
         }
         work(args);
-    };
-    auto cbh = scheduleFn(workWrapped);
+    });
     if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return CallbackHandle();
+        return;
     }
     fassert(28800, cbh.getStatus());
-    return cbh.getValue();
+    executor->wait(cbh.getValue());
 }
 
 void ReplicationCoordinatorImpl::_scheduleElectionWinNotification() {
