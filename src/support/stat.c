@@ -24,6 +24,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"btree: column-store variable-size deleted values",
 	"btree: column-store fixed-size leaf pages",
 	"btree: column-store internal pages",
+	"btree: column-store variable-size RLE encoded values",
 	"btree: column-store variable-size leaf pages",
 	"btree: pages rewritten by compaction",
 	"btree: number of key/value pairs",
@@ -140,6 +141,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->btree_column_internal = 0;
 	stats->btree_column_deleted = 0;
 	stats->btree_column_variable = 0;
+	stats->btree_column_rle = 0;
 	stats->btree_fixed_len = 0;
 	stats->btree_maxintlkey = 0;
 	stats->btree_maxintlpage = 0;
@@ -249,6 +251,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->btree_column_internal += from->btree_column_internal;
 	to->btree_column_deleted += from->btree_column_deleted;
 	to->btree_column_variable += from->btree_column_variable;
+	to->btree_column_rle += from->btree_column_rle;
 	to->btree_fixed_len = from->btree_fixed_len;
 	if (from->btree_maxintlkey > to->btree_maxintlkey)
 		to->btree_maxintlkey = from->btree_maxintlkey;
@@ -363,6 +366,7 @@ __wt_stat_dsrc_aggregate(
 	to->btree_column_deleted += WT_STAT_READ(from, btree_column_deleted);
 	to->btree_column_variable +=
 	    WT_STAT_READ(from, btree_column_variable);
+	to->btree_column_rle += WT_STAT_READ(from, btree_column_rle);
 	to->btree_fixed_len = from[0]->btree_fixed_len;
 	if ((v = WT_STAT_READ(from, btree_maxintlkey)) >
 	    to->btree_maxintlkey)

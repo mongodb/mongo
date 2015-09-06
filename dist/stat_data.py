@@ -398,6 +398,8 @@ dsrc_stats = [
         'column-store fixed-size leaf pages', 'no_scale'),
     BtreeStat('btree_column_internal',
         'column-store internal pages', 'no_scale'),
+    BtreeStat('btree_column_rle',
+        'column-store variable-size RLE encoded values', 'no_scale'),
     BtreeStat('btree_column_variable',
         'column-store variable-size leaf pages', 'no_scale'),
     BtreeStat('btree_compact_rewrite', 'pages rewritten by compaction'),
