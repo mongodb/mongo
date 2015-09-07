@@ -27,12 +27,18 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/platform/random.h"
 
 #include <stdio.h>
 #include <string.h>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <bcrypt.h>
+#else
 #include <errno.h>
 #endif
 
@@ -42,7 +48,8 @@
 #include <fstream>
 #include <limits>
 
-#include "mongo/platform/basic.h"
+#include <mongo/util/log.h>
+#include <mongo/util/assert_util.h>
 
 namespace mongo {
 
@@ -99,17 +106,39 @@ SecureRandom::~SecureRandom() {}
 
 #ifdef _WIN32
 class WinSecureRandom : public SecureRandom {
-    virtual ~WinSecureRandom() {}
-    int64_t nextInt64() {
-        uint32_t a, b;
-        if (rand_s(&a)) {
-            abort();
+public:
+    WinSecureRandom() {
+        auto ntstatus = ::BCryptOpenAlgorithmProvider(
+            &_algHandle, BCRYPT_RNG_ALGORITHM, MS_PRIMITIVE_PROVIDER, 0);
+        if (ntstatus != STATUS_SUCCESS) {
+            error() << "Failed to open crypto algorithm provider while creating secure random "
+                       "object; NTSTATUS: " << ntstatus;
+            fassertFailed(28815);
         }
-        if (rand_s(&b)) {
-            abort();
-        }
-        return (static_cast<int64_t>(a) << 32) | b;
     }
+
+    virtual ~WinSecureRandom() {
+        auto ntstatus = ::BCryptCloseAlgorithmProvider(_algHandle, 0);
+        if (ntstatus != STATUS_SUCCESS) {
+            warning() << "Failed to close crypto algorithm provider destroying secure random "
+                         "object; NTSTATUS: " << ntstatus;
+        }
+    }
+
+    int64_t nextInt64() {
+        int64_t value;
+        auto ntstatus =
+            ::BCryptGenRandom(_algHandle, reinterpret_cast<PUCHAR>(&value), sizeof(value), 0);
+        if (ntstatus != STATUS_SUCCESS) {
+            error() << "Failed to generate random number from secure random object; NTSTATUS: "
+                    << ntstatus;
+            fassertFailed(28814);
+        }
+        return value;
+    }
+
+private:
+    BCRYPT_ALG_HANDLE _algHandle;
 };
 
 SecureRandom* SecureRandom::create() {
