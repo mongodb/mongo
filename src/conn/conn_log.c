@@ -850,13 +850,11 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 		WT_TRET(__wt_thread_join(session, conn->log_tid));
 		conn->log_tid_set = 0;
 	}
-	WT_TRET(__wt_cond_destroy(session, &conn->log_cond));
 	if (conn->log_file_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->log_file_cond));
 		WT_TRET(__wt_thread_join(session, conn->log_file_tid));
 		conn->log_file_tid_set = 0;
 	}
-	WT_TRET(__wt_cond_destroy(session, &conn->log_file_cond));
 	if (conn->log_file_session != NULL) {
 		wt_session = &conn->log_file_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
@@ -867,7 +865,6 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 		WT_TRET(__wt_thread_join(session, conn->log_wrlsn_tid));
 		conn->log_wrlsn_tid_set = 0;
 	}
-	WT_TRET(__wt_cond_destroy(session, &conn->log_wrlsn_cond));
 	if (conn->log_wrlsn_session != NULL) {
 		wt_session = &conn->log_wrlsn_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
@@ -883,6 +880,11 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 		WT_TRET(wt_session->close(wt_session, NULL));
 		conn->log_session = NULL;
 	}
+
+	/* Destroy the condition variables now that all threads are stopped */
+	WT_TRET(__wt_cond_destroy(session, &conn->log_cond));
+	WT_TRET(__wt_cond_destroy(session, &conn->log_file_cond));
+	WT_TRET(__wt_cond_destroy(session, &conn->log_wrlsn_cond));
 
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_write_cond));
