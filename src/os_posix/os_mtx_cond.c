@@ -41,11 +41,13 @@ err:	__wt_free(session, cond);
 }
 
 /*
- * __wt_cond_wait --
- *	Wait on a mutex, optionally timing out.
+ * __wt_cond_wait_signal --
+ *	Wait on a mutex, optionally timing out.  If we get it
+ *	before the time out period expires, let the caller know.
  */
 int
-__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
+__wt_cond_wait_signal(
+    WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, int *signalled)
 {
 	struct timespec ts;
 	WT_DECL_RET;
@@ -54,6 +56,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 	locked = 0;
 
 	/* Fast path if already signalled. */
+	*signalled = 1;
 	if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
 		return (0);
 
@@ -88,8 +91,10 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 #ifdef ETIME
 	    ret == ETIME ||
 #endif
-	    ret == ETIMEDOUT)
+	    ret == ETIMEDOUT) {
+		*signalled = 0;
 		ret = 0;
+	}
 
 	(void)__wt_atomic_subi32(&cond->waiters, 1);
 

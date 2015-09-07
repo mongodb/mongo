@@ -34,6 +34,13 @@ typedef struct {
 	uint32_t orig_write_gen;
 
 	/*
+	 * Track start/stop checkpoint generations to decide if lookaside table
+	 * records are correct.
+	 */
+	uint64_t orig_btree_checkpoint_gen;
+	uint64_t orig_txn_checkpoint_gen;
+
+	/*
 	 * Track maximum transaction ID seen and first unwritten transaction ID.
 	 */
 	uint64_t max_txn;
@@ -475,6 +482,43 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __rec_las_checkpoint_test --
+ *	Return if the lookaside table is going to collide with a checkpoint.
+ */
+static inline int
+__rec_las_checkpoint_test(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_BTREE *btree;
+
+	conn = S2C(session);
+	btree = S2BT(session);
+
+	/*
+	 * Running checkpoints can collide with the lookaside table because
+	 * reconciliation using the lookaside table writes the key's last
+	 * committed value, which might not be the value checkpoint would write.
+	 * If reconciliation was configured for lookaside table eviction, this
+	 * file participates in checkpoints, and any of the tree or system
+	 * transactional generation numbers don't match, there's a possible
+	 * collision.
+	 *
+	 * It's a complicated test, but the alternative is to have checkpoint
+	 * drain lookaside table reconciliations, and this isn't a problem for
+	 * most workloads.
+	 */
+	if (!F_ISSET(r, WT_EVICT_LOOKASIDE))
+		return (0);
+	if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
+		return (0);
+	if (r->orig_btree_checkpoint_gen == btree->checkpoint_gen &&
+	    r->orig_txn_checkpoint_gen == conn->txn_global.checkpoint_gen &&
+	    r->orig_btree_checkpoint_gen == r->orig_txn_checkpoint_gen)
+		return (0);
+	return (1);
+}
+
+/*
  * __rec_write_status --
  *	Return the final status for reconciliation.
  */
@@ -486,6 +530,10 @@ __rec_write_status(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	btree = S2BT(session);
 	mod = page->modify;
+
+	/* Check for a lookaside table and checkpoint collision. */
+	if (__rec_las_checkpoint_test(session, r))
+		return (EBUSY);
 
 	/*
 	 * Set the page's status based on whether or not we cleaned the page.
@@ -692,10 +740,12 @@ __rec_write_init(WT_SESSION_IMPL *session,
     WT_REF *ref, uint32_t flags, WT_SALVAGE_COOKIE *salvage, void *reconcilep)
 {
 	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
 	WT_PAGE *page;
 	WT_RECONCILE *r;
 
 	btree = S2BT(session);
+	conn = S2C(session);
 	page = ref->page;
 
 	if ((r = *(WT_RECONCILE **)reconcilep) == NULL) {
@@ -718,6 +768,15 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	/* Remember the configuration. */
 	r->ref = ref;
 	r->page = page;
+
+	/*
+	 * Save the page's write generation before reading the page.
+	 * Save the transaction generations before reading the page.
+	 * These are all ordered reads, but we only need one.
+	 */
+	r->orig_btree_checkpoint_gen = btree->checkpoint_gen;
+	r->orig_txn_checkpoint_gen = conn->txn_global.checkpoint_gen;
+	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
 	/*
 	 * Lookaside table eviction is configured when eviction gets aggressive,
@@ -745,6 +804,15 @@ __rec_write_init(WT_SESSION_IMPL *session,
 		 * now, turn it off.
 		 */
 		if (page->type == WT_PAGE_COL_FIX)
+			LF_CLR(WT_EVICT_LOOKASIDE);
+
+		/*
+		 * Check for a lookaside table and checkpoint collision, and if
+		 * we find one, turn off the lookaside file (we've gone to all
+		 * the effort of getting exclusive access to the page, might as
+		 * well try and evict it).
+		 */
+		if (__rec_las_checkpoint_test(session, r))
 			LF_CLR(WT_EVICT_LOOKASIDE);
 	}
 	r->flags = flags;
@@ -810,14 +878,11 @@ __rec_write_init(WT_SESSION_IMPL *session,
 
 	r->salvage = salvage;
 
-	/* Save the page's write generation before reading the page. */
-	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
-
 	/*
 	 * Running transactions may update the page after we write it, so
 	 * this is the highest ID we can be confident we will see.
 	 */
-	r->first_dirty_txn = S2C(session)->txn_global.last_running;
+	r->first_dirty_txn = conn->txn_global.last_running;
 
 	return (0);
 }
@@ -1434,7 +1499,7 @@ in_memory:
 	 * reason to write the cell.
 	 */
 	mod = ref->page->modify;
-	if (mod != NULL && mod->flags != 0)
+	if (mod != NULL && F_ISSET(mod, WT_PM_REC_MASK))
 		*statep = WT_CHILD_MODIFIED;
 	else if (ref->addr == NULL) {
 		*statep = WT_CHILD_IGNORE;

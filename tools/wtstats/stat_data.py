@@ -43,6 +43,7 @@ no_scale_per_second_list = [
     'btree: column-store internal pages',
     'btree: column-store variable-size deleted values',
     'btree: column-store variable-size leaf pages',
+    'btree: column-store variable-size RLE encoded values',
     'btree: fixed-record size',
     'btree: maximum internal page key size',
     'btree: maximum internal page size',

@@ -298,12 +298,9 @@ static int
 __evict_review(
     WT_SESSION_IMPL *session, WT_REF *ref, int *inmem_splitp, int closing)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t flags;
-
-	btree = S2BT(session);
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -379,18 +376,10 @@ __evict_review(
 	 * in-memory pages, (restoring the updates that stopped us from writing
 	 * the block), and inserting the whole mess into the page's parent.
 	 *
-	 * Otherwise, if eviction is getting pressed and checkpoint allows it,
-	 * configure reconciliation to write not-yet-globally-visible updates
-	 * to the lookaside table, allowing the eviction of pages we'd otherwise
-	 * have to retain in cache to support older readers.
-	 *
-	 * Running checkpoints can prevent this solution because reconciliation
-	 * using the lookaside table writes a key's last committed value, which
-	 * might not be the value checkpoint would write. It's sufficient to
-	 * know a checkpoint isn't running at this instant (or is running, but
-	 * either has finished with, or doesn't care about, this file), future
-	 * checkpoints must include all committed modifications from this page,
-	 * which is what reconciliation will write.
+	 * Otherwise, if eviction is getting pressed, configure reconciliation
+	 * to write not-yet-globally-visible updates to the lookaside table,
+	 * allowing the eviction of pages we'd otherwise have to retain in cache
+	 * to support older readers.
 	 *
 	 * Don't set the update-restore or lookaside table flags for internal
 	 * pages, they don't have update lists that can be saved and restored.
@@ -401,10 +390,7 @@ __evict_review(
 	else if (!WT_PAGE_IS_INTERNAL(page)) {
 		if (page->read_gen == WT_READGEN_OLDEST)
 			LF_SET(WT_EVICT_UPDATE_RESTORE);
-		else if (__wt_eviction_aggressive(session) &&
-		    (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT) ||
-		    btree->checkpoint_gen ==
-		    S2C(session)->txn_global.checkpoint_gen))
+		else if (__wt_eviction_aggressive(session))
 			LF_SET(WT_EVICT_LOOKASIDE);
 	}
 
