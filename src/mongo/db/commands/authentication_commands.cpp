@@ -188,6 +188,8 @@ bool CmdAuthenticate::run(OperationContext* txn,
         } else {
             appendCommandStatus(result, status);
         }
+
+        sleepmillis(getGlobalAuthorizationManager()->getAuthFailedDelay());
         return false;
     }
     result.append("dbname", user.getDB());

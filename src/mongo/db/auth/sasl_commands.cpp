@@ -40,6 +40,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
@@ -194,6 +195,9 @@ Status doSaslStep(const ClientBasic* client,
         log() << session->getMechanism() << " authentication failed for "
               << session->getPrincipalId() << " on " << session->getAuthenticationDatabase()
               << " from client " << clientAddr.getAddr() << " ; " << status.toString() << std::endl;
+
+        sleepmillis(
+            session->getAuthorizationSession()->getAuthorizationManager().getAuthFailedDelay());
         // All the client needs to know is that authentication has failed.
         return Status(ErrorCodes::AuthenticationFailed, "Authentication failed.");
     }

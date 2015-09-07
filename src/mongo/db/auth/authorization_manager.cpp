@@ -62,6 +62,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -253,7 +254,9 @@ AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalSt
       _privilegeDocsExist(false),
       _externalState(externalState),
       _version(schemaVersionInvalid),
-      _isFetchPhaseBusy(false) {
+      _isFetchPhaseBusy(false),
+      _authFailedDelayMutex("AuthorizationManager::_authFailedDelayMs"),
+      _authFailedDelay(0) {
     _updateCacheGeneration_inlock();
 }
 
@@ -626,6 +629,16 @@ Status AuthorizationManager::acquireUser(OperationContext* txn,
     *acquiredUser = user.release();
 
     return Status::OK();
+}
+
+uint32_t AuthorizationManager::getAuthFailedDelay() {
+    mutex::scoped_lock lock(_authFailedDelayMutex);
+    return _authFailedDelay.total_milliseconds();
+}
+
+void AuthorizationManager::setAuthFailedDelay(const Milliseconds& delay) {
+    mutex::scoped_lock lock(_authFailedDelayMutex);
+    _authFailedDelay = delay;
 }
 
 Status AuthorizationManager::_fetchUserV2(OperationContext* txn,

@@ -439,6 +439,12 @@ public:
                BSONObj* patt,
                bool* b);
 
+    /**
+     * Getter and setter for the auth delay for failed login attempts.
+     */
+    uint32_t getAuthFailedDelay();
+    void setAuthFailedDelay(const Milliseconds& delay);
+
 private:
     /**
      * Type used to guard accesses and updates to the user cache.
@@ -536,6 +542,16 @@ private:
      * Manipulated via CacheGuard.
      */
     boost::condition_variable _fetchPhaseIsReady;
+
+    /**
+     * Protects access to _authDelayMs.
+     */
+    mongo::mutex _authFailedDelayMutex;
+
+    /**
+     * Delay in ms before returning an error after a failed login attempt. Default is 0 ms.
+     */
+    Milliseconds _authFailedDelay;
 };
 
 }  // namespace mongo
