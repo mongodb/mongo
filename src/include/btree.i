@@ -1025,7 +1025,7 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 			WT_STAT_FAST_CONN_INCR(session, cache_inmem_splittable);
 			WT_STAT_FAST_DATA_INCR(session, cache_inmem_splittable);
 			return (1);
-                }
+		}
 	return (0);
 }
 
