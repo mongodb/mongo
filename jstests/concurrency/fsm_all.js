@@ -10,13 +10,6 @@ var blacklist = [
 
     // Disabled due to MongoDB restrictions and/or workload restrictions
 
-    // These workloads sometimes trigger 'Could not lock auth data update lock'
-    // errors because the AuthorizationManager currently waits for only five
-    // seconds to acquire the lock for authorization documents
-    'auth_create_role.js',
-    'auth_create_user.js',
-    'auth_drop_role.js',
-    'auth_drop_user.js',
 ].map(function(file) { return dir + '/' + file; });
 
 runWorkloadsSerially(ls(dir).filter(function(file) {
