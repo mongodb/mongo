@@ -47,12 +47,13 @@ struct CursorInfo : public BaseInfo {
 
     struct Functions {
         MONGO_DEFINE_JS_FUNCTION(hasNext);
+        MONGO_DEFINE_JS_FUNCTION(kill);
         MONGO_DEFINE_JS_FUNCTION(next);
         MONGO_DEFINE_JS_FUNCTION(objsLeftInBatch);
         MONGO_DEFINE_JS_FUNCTION(readOnly);
     };
 
-    static const JSFunctionSpec methods[5];
+    static const JSFunctionSpec methods[6];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
