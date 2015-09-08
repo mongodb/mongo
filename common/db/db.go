@@ -42,6 +42,7 @@ var (
 	ErrLostConnection     = errors.New("lost connection to server")
 	ErrNoReachableServers = errors.New("no reachable servers")
 	ErrNsNotFound         = errors.New("ns not found")
+	ErrSlaveTimeout       = errors.New("timed out waiting for slaves")
 	DefaultDialTimeout    = time.Second * 3
 	GetConnectorFuncs     = []GetConnectorFunc{}
 )
@@ -162,10 +163,9 @@ func IsConnectionError(err error) bool {
 	if err == nil {
 		return false
 	}
-	if err.Error() == ErrNoReachableServers.Error() {
-		return true
-	}
-	if err.Error() == io.EOF.Error() {
+	if err.Error() == ErrNoReachableServers.Error() ||
+		err.Error() == ErrSlaveTimeout.Error() ||
+		err.Error() == io.EOF.Error() {
 		return true
 	}
 	return false
