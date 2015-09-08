@@ -169,7 +169,7 @@ __wt_las_set_written(WT_SESSION_IMPL *session)
  * __wt_las_is_written --
  *	Return if the lookaside table has been written.
  */
-int
+bool
 __wt_las_is_written(WT_SESSION_IMPL *session)
 {
 	return (S2C(session)->las_written);

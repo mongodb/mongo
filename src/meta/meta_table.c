@@ -12,22 +12,22 @@
  * __metadata_turtle --
  *	Return if a key's value should be taken from the turtle file.
  */
-static int
+static bool
 __metadata_turtle(const char *key)
 {
 	switch (key[0]) {
 	case 'f':
 		if (strcmp(key, WT_METAFILE_URI) == 0)
-			return (1);
+			return (true);
 		break;
 	case 'W':
 		if (strcmp(key, "WiredTiger version") == 0)
-			return (1);
+			return (true);
 		if (strcmp(key, "WiredTiger version string") == 0)
-			return (1);
+			return (true);
 		break;
 	}
-	return (0);
+	return (false);
 }
 
 /*
