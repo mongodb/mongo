@@ -72,20 +72,9 @@ public:
         result.appendNumber("maxWriteBatchSize", BatchedCommandRequest::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
 
-        // Mongos can only send the wire version indicating find and getMore commands support if the
-        // config server mode has been upgraded to CSRS.
-        //
-        // TODO: This special case will no longer be required for 3.4.
-        auto catalogManager = grid.catalogManager(txn);
-        int maxVersionToSend = maxWireVersion;
-        if (maxVersionToSend == WireVersion::FIND_COMMAND &&
-            catalogManager->getMode() != CatalogManager::ConfigServerMode::CSRS) {
-            maxVersionToSend = WireVersion::RELEASE_2_7_7;
-        }
-
         // Mongos tries to keep exactly the same version range of the server for which
         // it is compiled.
-        result.append("maxWireVersion", maxVersionToSend);
+        result.append("maxWireVersion", maxWireVersion);
         result.append("minWireVersion", minWireVersion);
 
         return true;

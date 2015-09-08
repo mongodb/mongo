@@ -6,6 +6,7 @@ env.Library(
     target="cluster_query",
     source=[
         "cluster_find.cpp",
+        "store_possible_cursor.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_common',

@@ -37,8 +37,10 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
@@ -47,10 +49,13 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_explain.h"
+#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/store_possible_cursor.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 
@@ -121,6 +126,63 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
                                           lpq.isAllowPartialResults());
 }
 
+/**
+ * Runs a find command against the "config" shard in SyncClusterConnection (SCCC) mode. Special
+ * handling is required for SCCC since the config shard's NS targeter is only available if the
+ * config servers are in CSRS mode.
+ *
+ * 'query' is the query to run against the config shard. 'shard' must represent the config shard.
+ *
+ * On success, fills out 'results' with the documents returned from the config shard and returns the
+ * cursor id which should be handed back to the client.
+ *
+ * TODO: This should not be required for 3.4, since the config server mode must be config server
+ * replica set (CSRS) in order to upgrade.
+ */
+StatusWith<CursorId> runConfigServerQuerySCCC(const CanonicalQuery& query,
+                                              const Shard& shard,
+                                              std::vector<BSONObj>* results) {
+    BSONObj findCommand = query.getParsed().asFindCommand();
+
+    // XXX: This is a temporary hack. We use ScopedDbConnection and query the $cmd namespace
+    // explicitly because this gives us the particular host that the command ran on via
+    // originalHost(). We need to know the host that the remote cursor was established on in order
+    // to issue getMore or killCursors operations against this remote cursor.
+    ScopedDbConnection conn(shard.getConnString());
+    auto cursor = conn->query(str::stream() << query.nss().db() << ".$cmd",
+                              findCommand,
+                              -1,       // nToReturn
+                              0,        // nToSkip
+                              nullptr,  // fieldsToReturn
+                              0);       // options
+    BSONObj result = cursor->nextSafe().getOwned();
+    conn.done();
+
+    auto status = Command::getStatusFromCommandResult(result);
+    if (ErrorCodes::SendStaleConfig == status || ErrorCodes::RecvStaleConfig == status) {
+        throw RecvStaleConfigException("find command failed because of stale config", result);
+    }
+
+    auto transformedResult = storePossibleCursor(cursor->originalHost(),
+                                                 result,
+                                                 grid.shardRegistry()->getExecutor(),
+                                                 grid.getCursorManager());
+    if (!transformedResult.isOK()) {
+        return transformedResult.getStatus();
+    }
+
+    auto outgoingCursorResponse = CursorResponse::parseFromBSON(transformedResult.getValue());
+    if (!outgoingCursorResponse.isOK()) {
+        return outgoingCursorResponse.getStatus();
+    }
+
+    for (const auto& doc : outgoingCursorResponse.getValue().batch) {
+        results->push_back(doc.getOwned());
+    }
+
+    return outgoingCursorResponse.getValue().cursorId;
+}
+
 StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
                                              const CanonicalQuery& query,
                                              const ReadPreferenceSetting& readPref,
@@ -166,11 +228,11 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     // Use read pref to target a particular host from each shard. Also construct the find command
     // that we will forward to each shard.
     for (const auto& shard : shards) {
-        // The find command cannot be used to query config server content with legacy 3-host config
-        // servers, because the new targeting logic only works for config server replica sets.
+        // The unified targeting logic only works for config server replica sets, so we need special
+        // handling for querying config server content with legacy 3-host config servers.
         if (shard->isConfig() && shard->getConnString().type() == ConnectionString::SYNC) {
-            return Status(ErrorCodes::CommandNotSupported,
-                          "find command not supported without config server as a replica set");
+            invariant(shards.size() == 1U);
+            return runConfigServerQuerySCCC(query, *shard, results);
         }
 
         auto targeter = shard->getTargeter();

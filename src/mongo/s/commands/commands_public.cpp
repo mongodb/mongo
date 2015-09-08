@@ -56,6 +56,7 @@
 #include "mongo/s/commands/run_on_all_shards_cmd.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/scripting/engine.h"
