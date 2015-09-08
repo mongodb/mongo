@@ -177,7 +177,7 @@ bool Scope::execFile(const string& filename, bool printResult, bool reportError,
     }
 
     StringData code(data.get() + offset, len - offset);
-    return exec(code, filename, printResult, reportError, timeoutMs);
+    return exec(code, filename, printResult, reportError, false, timeoutMs);
 }
 
 class Scope::StoredFuncModLogOpHandler : public RecoveryUnit::Change {
