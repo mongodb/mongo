@@ -840,7 +840,6 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 }
 
 #define	WT_SPLIT_EXCLUSIVE	0x01		/* Page held exclusively */
-#define	WT_SPLIT_INMEM		0x02		/* In-memory split */
 
 /*
  * __split_parent --
@@ -899,14 +898,14 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 
 		/*
 		 * A checkpoint reconciling this parent page can deadlock with
-		 * our in-memory split. We have an exclusive page lock on the
-		 * child before we acquire the page's reconciliation lock, and
-		 * reconciliation acquires the page's reconciliation lock before
-		 * it will encounter the child's exclusive lock (which causes
-		 * reconciliation to loop until the exclusive lock is resolved).
-		 * If we can't lock the parent, give up to avoid that deadlock.
+		 * our split. We have an exclusive page lock on the child before
+		 * we acquire the page's reconciliation lock, and reconciliation
+		 * acquires the page's reconciliation lock before it encounters
+		 * the child's exclusive lock (which causes reconciliation to
+		 * loop until the exclusive lock is resolved). If we can't lock
+		 * the parent, give up to avoid that deadlock.
 		 */
-		if (LF_ISSET(WT_SPLIT_INMEM) && S2BT(session)->checkpointing)
+		if (S2BT(session)->checkpointing)
 			return (EBUSY);
 		__wt_yield();
 	}
@@ -1381,7 +1380,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	page = NULL;
 	if ((ret = __split_parent(
-	    session, ref, split_ref, 2, parent_incr, WT_SPLIT_INMEM)) != 0) {
+	    session, ref, split_ref, 2, parent_incr, 0)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
