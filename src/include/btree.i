@@ -1091,10 +1091,12 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * If the page was recently split in-memory, don't force it out: we
-	 * hope an eviction thread will find it first.  The check here is
-	 * similar to __wt_txn_visible_all, but ignores the checkpoint's
-	 * transaction.
+	 * If the page was recently split in-memory, don't evict it immediately:
+	 * we want to give application threads that are appending a chance to
+	 * move to the new leaf page created by the split.
+	 *
+	 * Note the check here is similar to __wt_txn_visible_all, but ignores
+	 * the checkpoint's transaction.
 	 */
 	if (check_splits) {
 		txn_global = &S2C(session)->txn_global;
