@@ -50,7 +50,7 @@ def compareOneResultNoise(this_one, reference, label, threadlevel="max", noiseLe
     return failed
 
 
-def compareResults(this_one, reference, threshold, label, noiseLevels={}, threadThreshold=None):
+def compareResults(this_one, reference, threshold, label, noiseLevels={}, noiseMultiple=1, threadThreshold=None, threadNoiseMultiple=None):
     '''
     Take two result series and compare them to see if they are acceptable.
     Return true if failed, and false if pass
@@ -62,6 +62,8 @@ def compareResults(this_one, reference, threshold, label, noiseLevels={}, thread
     # Default threadThreshold to the same as the max threshold
     if  not threadThreshold:
         threadThreshold = threshold
+    if not threadNoiseMultiple : 
+        threadNoiseMultiple = noiseMultiple
 
     # Check max throughput first
     noise = 0
@@ -69,7 +71,7 @@ def compareResults(this_one, reference, threshold, label, noiseLevels={}, thread
     if len(noiseLevels.values()) > 0:
         noise = max(noiseLevels.values())
     if compareOneResultNoise(this_one, reference, label, "max", noiseLevel=noise,
-                             minThreshold=threshold):
+                             noiseMultiple=noiseMultiple, minThreshold=threshold):
         failed = True;
     # Check for regression on threading levels
     for (level, ops_per_sec) in (((r, this_one["results"][r]['ops_per_sec']) for r in
@@ -78,7 +80,7 @@ def compareResults(this_one, reference, threshold, label, noiseLevels={}, thread
         if level in noiseLevels:
             noise = noiseLevels[level]
         if compareOneResultNoise(this_one, reference, label, level, noiseLevel=noise,
-                                 minThreshold=threadThreshold):
+                                 noiseMultiple=threadNoiseMultiple, minThreshold=threadThreshold):
             failed = True
     if not failed:
         print "\tno regression against %s and githash %s" %(label, reference["revision"][:5])
@@ -95,9 +97,13 @@ def main(args):
                         "commit from n days ago.")
     parser.add_argument("--threshold", default=0.05, type=float, dest="threshold", help=
                         "Don't flag an error if throughput is less than 'threshold'x100 percent off")
-    parser.add_argument("--threadThreshold", type=float, dest="threadThreshold", help=
+    parser.add_argument("--noiseLevel", default=1, type=float, dest="noise", help=
+                        "Don't flag an error if throughput is less than 'noise' times the computed noise level off")
+    parser.add_argument("--threadThreshold", default=0.1, type=float, dest="threadThreshold", help=
                         "Don't flag an error if thread level throughput is more than"
                         "'threadThreshold'x100 percent off")
+    parser.add_argument("--threadNoiseLevel", default=2, type=float, dest="threadNoise", help=
+                        "Don't flag an error if thread level throughput is less than 'noise' times the computed noise level off")
     parser.add_argument("--reference", dest="reference", help=
                         "Reference commit to compare against. Should be a githash")
     args = parser.parse_args()
@@ -121,15 +127,15 @@ def main(args):
             print "\tno previous data, skipping"
             continue
         if compareResults(this_one, previous[0], args.threshold, "Previous", h.noiseLevels(test),
-                          args.threadThreshold):
+                          args.noise, args.threadThreshold, args.threadNoise):
             failed = True
         daysprevious = h.seriesItemsNDaysBefore(test, args.rev,args.ndays)
         reference = h.seriesAtRevision(test, args.reference)
         if compareResults(this_one, daysprevious, args.threshold, "NDays", h.noiseLevels(test),
-                          threadThreshold=args.threadThreshold):
+                          args.noise, args.threadThreshold, args.threadNoise):
             failed = True
         if compareResults(this_one, reference, args.threshold, "Reference", h.noiseLevels(test),
-                          threadThreshold=args.threadThreshold):
+                          args.noise, args.threadThreshold, args.threadNoise):
             failed = True
 
     if failed:
