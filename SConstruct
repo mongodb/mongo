@@ -628,7 +628,7 @@ env_vars.Add('MONGO_DISTARCH',
 
 env_vars.Add('MONGO_DISTMOD',
     help='Adds a string that will be embedded in the dist archive naming',
-    default=None)
+    default='')
 
 env_vars.Add('MONGO_DISTNAME',
     help='Sets the version string to be used in dist archive naming',
