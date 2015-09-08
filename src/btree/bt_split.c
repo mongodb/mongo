@@ -839,15 +839,13 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	return (0);
 }
 
-#define	WT_SPLIT_EXCLUSIVE	0x01		/* Page held exclusively */
-
 /*
  * __split_parent --
  *	Resolve a multi-page split, inserting new information into the parent.
  */
 static int
 __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
-    WT_REF **ref_new, uint32_t new_entries, size_t parent_incr, uint32_t flags)
+    WT_REF **ref_new, uint32_t new_entries, size_t parent_incr, int exclusive)
 {
 	WT_DECL_RET;
 	WT_IKEY *ikey;
@@ -1104,8 +1102,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * Add it to the session discard list, to be freed when it's safe.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	WT_TRET(__split_safe_free(session,
-	    split_gen, LF_ISSET(WT_SPLIT_EXCLUSIVE) ? 1 : 0, pindex, size));
+	WT_TRET(__split_safe_free(session, split_gen, exclusive, pindex, size));
 	parent_decr += size;
 
 	/*
@@ -1130,7 +1127,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 *	Do the check here because we've just grown the parent page and
 	 * are holding it locked.
 	 */
-	if (ret == 0 && !LF_ISSET(WT_SPLIT_EXCLUSIVE) &&
+	if (ret == 0 && !exclusive &&
 	    __split_should_deepen(session, parent_ref))
 		ret = __split_deepen(session, parent);
 
@@ -1499,8 +1496,8 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 	 * Split into the parent; if we're closing the file, we hold it
 	 * exclusively.
 	 */
-	WT_ERR(__split_parent( session, ref, ref_new,
-	    new_entries, parent_incr, closing ? WT_SPLIT_EXCLUSIVE : 0));
+	WT_ERR(__split_parent(session, ref, ref_new,
+	    new_entries, parent_incr, closing ? 1 : 0));
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split);
