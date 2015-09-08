@@ -875,10 +875,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * memory inside of the lock and may want to invest effort in making the
 	 * locked period shorter.
 	 *
-	 * We could race with another thread deepening our parent.  To deal with
-	 * that, read the parent pointer each time we try to lock it, and check
-	 * that it's still correct after it is locked.
-	 *
 	 * We use the reconciliation lock here because not only do we have to
 	 * single-thread the split, we have to lock out reconciliation of the
 	 * parent because reconciliation of the parent can't deal with finding
@@ -890,6 +886,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 		parent = ref->home;
 		F_CAS_ATOMIC(parent, WT_PAGE_RECONCILIATION, ret);
 		if (ret == 0) {
+			/*
+			 * We can race with another thread deepening our parent.
+			 * To deal with that, read the parent pointer each time
+			 * we try to lock it, and check it's still correct after
+			 * it's locked.
+			 */
 			if (parent == ref->home)
 				break;
 			F_CLR_ATOMIC(parent, WT_PAGE_RECONCILIATION);
