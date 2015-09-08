@@ -1875,7 +1875,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		    ret = __wt_log_slot_switch(session, myslot.slot));
 	if (ret == 0)
 		ret = __log_fill(session, &myslot, 0, record, &lsn);
-	release_size = __wt_log_slot_release
+	release_size = __wt_log_slot_release(
 	    session, &myslot, (int64_t)rdup_len);
 	/*
 	 * If we get an error we still need to do proper accounting in
