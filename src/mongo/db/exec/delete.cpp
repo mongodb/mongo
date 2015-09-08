@@ -175,11 +175,10 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
             }
 
             if (_params.returnDeleted) {
-                // Save a copy of the document that is about to get deleted.
+                // Save a copy of the document that is about to get deleted, but keep it in the
+                // LOC_AND_OBJ state in case we need to retry deleting it.
                 BSONObj deletedDoc = member->obj.value();
                 member->obj.setValue(deletedDoc.getOwned());
-                member->loc = RecordId();
-                member->transitionToOwnedObj();
             }
 
             // Do the write, unless this is an explain.
@@ -199,6 +198,13 @@ PlanStage::StageState DeleteStage::work(WorkingSetID* out) {
             *out = WorkingSet::INVALID_ID;
             _commonStats.needYield++;
             return NEED_YIELD;
+        }
+
+        if (_params.returnDeleted) {
+            // After deleting the document, the RecordId associated with this member is invalid.
+            // Remove the 'loc' from the WorkingSetMember before returning it.
+            member->loc = RecordId();
+            member->transitionToOwnedObj();
         }
 
         //  As restoreState may restore (recreate) cursors, cursors are tied to the
