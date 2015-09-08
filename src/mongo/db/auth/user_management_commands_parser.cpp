@@ -662,47 +662,5 @@ Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
     return Status::OK();
 }
 
-Status parseAuthSchemaUpgradeCommand(const BSONObj& cmdObj,
-                                     const std::string& dbname,
-                                     AuthSchemaUpgradeArgs* parsedArgs) {
-    static const int minUpgradeSteps = 1;
-    static const int maxUpgradeSteps = 2;
-
-    unordered_set<std::string> validFieldNames;
-    validFieldNames.insert("authSchemaUpgrade");
-    validFieldNames.insert("maxSteps");
-    validFieldNames.insert("upgradeShards");
-    validFieldNames.insert("writeConcern");
-
-    Status status = _checkNoExtraFields(cmdObj, "authSchemaUpgrade", validFieldNames);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = bsonExtractBooleanFieldWithDefault(
-        cmdObj, "upgradeShards", true, &parsedArgs->shouldUpgradeShards);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    long long steps;
-    status = bsonExtractIntegerFieldWithDefault(cmdObj, "maxSteps", maxUpgradeSteps, &steps);
-    if (!status.isOK())
-        return status;
-    if (steps < minUpgradeSteps || steps > maxUpgradeSteps) {
-        return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << "Legal values for \"maxSteps\" are at least "
-                                                << minUpgradeSteps << " and no more than "
-                                                << maxUpgradeSteps << "; found " << steps);
-    }
-    parsedArgs->maxSteps = static_cast<int>(steps);
-
-    status = _extractWriteConcern(cmdObj, &parsedArgs->writeConcern);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return Status::OK();
-}
 }  // namespace auth
 }  // namespace mongo

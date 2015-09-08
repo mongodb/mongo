@@ -223,19 +223,5 @@ struct MergeAuthzCollectionsArgs {
 Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
                                          MergeAuthzCollectionsArgs* parsedArgs);
 
-struct AuthSchemaUpgradeArgs {
-    int maxSteps = 3;
-    bool shouldUpgradeShards = true;
-    BSONObj writeConcern;
-};
-
-/**
- * Takes a command object describing an invocation of the "authSchemaUpgrade" command and
- * parses out the write concern, maximum steps to take and whether or not shard servers should
- * also be upgraded, in the sharded deployment case.
- */
-Status parseAuthSchemaUpgradeCommand(const BSONObj& cmdObj,
-                                     const std::string& dbname,
-                                     AuthSchemaUpgradeArgs* parsedArgs);
 }  // namespace auth
 }  // namespace mongo

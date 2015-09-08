@@ -522,14 +522,6 @@ Status checkAuthForMergeAuthzCollectionsCommand(ClientBasic* client, const BSONO
     return Status::OK();
 }
 
-Status checkAuthForAuthSchemaUpgradeCommand(ClientBasic* client) {
-    AuthorizationSession* authzSession = AuthorizationSession::get(client);
-    if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                        ActionType::authSchemaUpgrade)) {
-        return Status(ErrorCodes::Unauthorized, "Not authorized to run authSchemaUpgrade command.");
-    }
-    return Status::OK();
-}
 
 }  // namespace auth
 }  // namespace mongo

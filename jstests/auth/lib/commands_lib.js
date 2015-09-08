@@ -374,25 +374,6 @@ var authCommandsLib = {
             ]
         },
         {
-            testname: "authSchemaUpgrade",
-            command: {authSchemaUpgrade: 1},
-            testcases: [
-                {
-                    runOnDb: adminDbName,
-                    roles: {
-                        userAdminAnyDatabase: 1,
-                        root: 1,
-                        __system: 1
-                    },
-                    privileges: [
-                        { resource: {cluster: true}, actions: ["authSchemaUpgrade"] }
-                    ]
-                },
-                { runOnDb: firstDbName, roles: {} },
-                { runOnDb: secondDbName, roles: {} }
-            ]
-        },
-        {
             testname: "buildInfo",
             command: {buildInfo: 1},
             testcases: [

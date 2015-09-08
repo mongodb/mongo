@@ -42,8 +42,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -804,98 +802,5 @@ public:
     }
 
 } cmdMergeAuthzCollections;
-
-namespace {
-/**
- * Runs the authSchemaUpgrade on all shards, with the given maxSteps and writeConcern
- * parameters.
- *
- * Upgrades each shard serially, and stops on first failure.  Returned error indicates that
- * failure.
- */
-Status runUpgradeOnAllShards(OperationContext* txn, int maxSteps, const BSONObj& writeConcern) {
-    BSONObjBuilder cmdObjBuilder;
-    cmdObjBuilder.append("authSchemaUpgrade", 1);
-    cmdObjBuilder.append("maxSteps", maxSteps);
-    if (!writeConcern.isEmpty()) {
-        cmdObjBuilder.append("writeConcern", writeConcern);
-    }
-    const BSONObj cmdObj = cmdObjBuilder.done();
-
-    // Upgrade each shard in turn, stopping on first failure.
-    vector<ShardType> allShards;
-    Status status = grid.catalogManager()->getAllShards(txn, &allShards);
-    if (!status.isOK()) {
-        return status;
-    }
-    auto shardRegistry = grid.shardRegistry();
-    for (const auto& shardEntry : allShards) {
-        auto cmdResult = shardRegistry->runCommandWithNotMasterRetries(
-            txn, shardEntry.getName(), "admin", cmdObj);
-
-        if (!cmdResult.isOK()) {
-            return Status(status.code(),
-                          str::stream() << "Failed to run authSchemaUpgrade on shard "
-                                        << shardEntry.getName() << causedBy(status));
-        }
-    }
-
-    return Status::OK();
-}
-}  // namespace
-
-class CmdAuthSchemaUpgrade : public Command {
-public:
-    CmdAuthSchemaUpgrade() : Command("authSchemaUpgrade") {}
-
-    virtual bool slaveOk() const {
-        return false;
-    }
-
-    virtual bool adminOnly() const {
-        return true;
-    }
-
-    virtual bool isWriteCommandForConfigServer() const {
-        return true;
-    }
-
-    virtual void help(stringstream& ss) const {
-        ss << "Upgrades the auth data storage schema";
-    }
-
-    virtual Status checkAuthForCommand(ClientBasic* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
-        return auth::checkAuthForAuthSchemaUpgradeCommand(client);
-    }
-
-    bool run(OperationContext* txn,
-             const string& dbname,
-             BSONObj& cmdObj,
-             int options,
-             string& errmsg,
-             BSONObjBuilder& result) {
-        // Run the authSchemaUpgrade command on the config servers
-        if (!grid.catalogManager(txn)
-                 ->runUserManagementWriteCommand(txn, this->name, dbname, cmdObj, &result)) {
-            return false;
-        }
-
-        auth::AuthSchemaUpgradeArgs parsedArgs;
-        Status status = auth::parseAuthSchemaUpgradeCommand(cmdObj, dbname, &parsedArgs);
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status);
-        }
-
-        // Optionally run the authSchemaUpgrade command on the individual shards
-        if (parsedArgs.shouldUpgradeShards) {
-            status = runUpgradeOnAllShards(txn, parsedArgs.maxSteps, parsedArgs.writeConcern);
-            if (!status.isOK())
-                return appendCommandStatus(result, status);
-        }
-        return true;
-    }
-} cmdAuthSchemaUpgrade;
 
 }  // namespace mongo
