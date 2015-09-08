@@ -459,14 +459,12 @@ __log_fill(WT_SESSION_IMPL *session,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 
 	/*
 	 * The WT_LOG_SLOT_BUF_MAX macro uses log.
 	 */
 	conn = S2C(session);
-	log = conn->log;
 	logrec = (WT_LOG_RECORD *)record->mem;
 	/*
 	 * Call __wt_write or copy into the buffer.  For now the offset is the
