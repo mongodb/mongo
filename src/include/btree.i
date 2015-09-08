@@ -1021,8 +1021,11 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (0);
 	for (i = 0, ins = ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH];
 	    ins != NULL; ins = ins->next[WT_MIN_SPLIT_SKIPLIST_DEPTH])
-		if (++i == 4)
+		if (++i == 4) {
+			WT_STAT_FAST_CONN_INCR(session, cache_inmem_splittable);
+			WT_STAT_FAST_DATA_INCR(session, cache_inmem_splittable);
 			return (1);
+		}
 	return (0);
 }
 
