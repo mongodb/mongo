@@ -446,9 +446,11 @@ public:
     virtual Milliseconds getTimeoutDelayForMember(int memberId) = 0;
 
     /**
-     * Returns true if _getMyUnelectableReason finds no reason.
+     * Returns true if the node is able to take over the primary because of a higher priority and
+     * the node has transitioned to the candidate role as a result of the call.
      */
-    virtual bool amIElectable(const Date_t now, const OpTime& lastOpApplied) const = 0;
+    virtual bool stagePriorityTakeoverIfElectable(const Date_t now,
+                                                  const OpTime& lastOpApplied) = 0;
 
 protected:
     TopologyCoordinator() {}

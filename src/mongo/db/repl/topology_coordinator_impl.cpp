@@ -2435,8 +2435,29 @@ void TopologyCoordinatorImpl::setPrimaryIndex(long long primaryIndex) {
     _currentPrimaryIndex = primaryIndex;
 }
 
-bool TopologyCoordinatorImpl::amIElectable(const Date_t now, const OpTime& lastOpApplied) const {
-    return _getMyUnelectableReason(now, lastOpApplied) == 0;
+bool TopologyCoordinatorImpl::stagePriorityTakeoverIfElectable(const Date_t now,
+                                                               const OpTime& lastOpApplied) {
+    if (_role == Role::leader) {
+        LOG(2) << "Not standing for election again; already primary";
+        return false;
+    }
+
+    if (_role == Role::candidate) {
+        LOG(2) << "Not standing for election again; already candidate";
+        return false;
+    }
+
+    const UnelectableReasonMask unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
+    if (unelectableReason) {
+        LOG(2) << "Not standing for election because "
+               << _getUnelectableReasonString(unelectableReason);
+        return false;
+    }
+
+    // All checks passed, become a candidate and start election proceedings.
+    _role = Role::candidate;
+
+    return true;
 }
 
 }  // namespace repl
