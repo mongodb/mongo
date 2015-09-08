@@ -1157,7 +1157,8 @@ public:
     static boost::intrusive_ptr<DocumentSourceUnwind> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const std::string& path,
-        bool includeNullIfEmptyOrMissing);
+        bool includeNullIfEmptyOrMissing,
+        bool includeArrayIndex);
 
     std::string getUnwindPath() const {
         return _unwindPath.getPath(false);
@@ -1167,16 +1168,24 @@ public:
         return _preserveNullAndEmptyArrays;
     }
 
+    bool includeArrayIndex() const {
+        return _includeArrayIndex;
+    }
+
 private:
     DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          const FieldPath& fieldPath,
-                         bool includeNullIfEmptyOrMissing);
+                         bool includeNullIfEmptyOrMissing,
+                         bool includeArrayIndex);
 
     // Configuration state.
     const FieldPath _unwindPath;
     // Documents that have a nullish value, or an empty array for the field '_unwindPath', will pass
     // through the $unwind stage unmodified if '_preserveNullAndEmptyArrays' is true.
     const bool _preserveNullAndEmptyArrays;
+    // If set, the $unwind stage will replace the unwound field with a sub-document with structure
+    // {index: <array index>, value: <array value>} instead of just the array value.
+    const bool _includeArrayIndex;
 
     // Iteration state.
     class Unwinder;

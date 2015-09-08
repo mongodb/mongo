@@ -43,7 +43,7 @@ using std::vector;
 /** Helper class to unwind array from a single document. */
 class DocumentSourceUnwind::Unwinder {
 public:
-    Unwinder(const FieldPath& unwindPath, bool preserveNullAndEmptyArrays);
+    Unwinder(const FieldPath& unwindPath, bool preserveNullAndEmptyArrays, bool includeArrayIndex);
     /** Reset the unwinder to unwind a new document. */
     void resetDocument(const Document& document);
 
@@ -67,6 +67,10 @@ private:
     // through the $unwind stage unmodified if '_preserveNullAndEmptyArrays' is true.
     const bool _preserveNullAndEmptyArrays;
 
+    // If set, the $unwind stage will replace the unwound field with a sub-document with structure
+    // {index: <array index>, value: <array value>} instead of just the array value.
+    const bool _includeArrayIndex;
+
     Value _inputArray;
 
     MutableDocument _output;
@@ -79,8 +83,11 @@ private:
 };
 
 DocumentSourceUnwind::Unwinder::Unwinder(const FieldPath& unwindPath,
-                                         bool preserveNullAndEmptyArrays)
-    : _unwindPath(unwindPath), _preserveNullAndEmptyArrays(preserveNullAndEmptyArrays) {}
+                                         bool preserveNullAndEmptyArrays,
+                                         bool includeArrayIndex)
+    : _unwindPath(unwindPath),
+      _preserveNullAndEmptyArrays(preserveNullAndEmptyArrays),
+      _includeArrayIndex(includeArrayIndex) {}
 
 void DocumentSourceUnwind::Unwinder::resetDocument(const Document& document) {
     // Reset document specific attributes.
@@ -92,6 +99,8 @@ void DocumentSourceUnwind::Unwinder::resetDocument(const Document& document) {
 }
 
 boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
+    // WARNING: Any functional changes to this method must also be implemented in the unwinding
+    // implementation of the $lookUp stage.
     if (!_haveNext) {
         return boost::none;
     }
@@ -113,7 +122,13 @@ boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
             // clone. Because the value at the end will be replaced, everything along the path
             // leading to that will be replaced in order not to share that change with any other
             // clones (or the original).
-            _output.setNestedField(_unwindPathFieldIndexes, _inputArray[_index]);
+            if (_includeArrayIndex) {
+                _output.setNestedField(_unwindPathFieldIndexes,
+                                       Value(DOC("index" << static_cast<long long>(_index)
+                                                         << "value" << _inputArray[_index])));
+            } else {
+                _output.setNestedField(_unwindPathFieldIndexes, _inputArray[_index]);
+            }
             _index++;
             _haveNext = _index < length;
         }
@@ -133,11 +148,13 @@ boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
 
 DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext>& pExpCtx,
                                            const FieldPath& fieldPath,
-                                           bool preserveNullAndEmptyArrays)
+                                           bool preserveNullAndEmptyArrays,
+                                           bool includeArrayIndex)
     : DocumentSource(pExpCtx),
       _unwindPath(fieldPath),
       _preserveNullAndEmptyArrays(preserveNullAndEmptyArrays),
-      _unwinder(new Unwinder(fieldPath, preserveNullAndEmptyArrays)) {}
+      _includeArrayIndex(includeArrayIndex),
+      _unwinder(new Unwinder(fieldPath, preserveNullAndEmptyArrays, includeArrayIndex)) {}
 
 REGISTER_DOCUMENT_SOURCE(unwind, DocumentSourceUnwind::createFromBson);
 
@@ -148,8 +165,10 @@ const char* DocumentSourceUnwind::getSourceName() const {
 intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
     const intrusive_ptr<ExpressionContext>& expCtx,
     const string& unwindPath,
-    bool preserveNullAndEmptyArrays) {
-    return new DocumentSourceUnwind(expCtx, FieldPath(unwindPath), preserveNullAndEmptyArrays);
+    bool preserveNullAndEmptyArrays,
+    bool includeArrayIndex) {
+    return new DocumentSourceUnwind(
+        expCtx, FieldPath(unwindPath), preserveNullAndEmptyArrays, includeArrayIndex);
 }
 
 boost::optional<Document> DocumentSourceUnwind::getNext() {
@@ -174,7 +193,9 @@ boost::optional<Document> DocumentSourceUnwind::getNext() {
 Value DocumentSourceUnwind::serialize(bool explain) const {
     return Value(DOC(getSourceName()
                      << DOC("path" << _unwindPath.getPath(true) << "preserveNullAndEmptyArrays"
-                                   << (_preserveNullAndEmptyArrays ? Value(true) : Value()))));
+                                   << (_preserveNullAndEmptyArrays ? Value(true) : Value())
+                                   << "includeArrayIndex"
+                                   << (_includeArrayIndex ? Value(true) : Value()))));
 }
 
 DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(DepsTracker* deps) const {
@@ -188,6 +209,7 @@ intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
     // extra options.
     string prefixedPathString;
     bool preserveNullAndEmptyArrays = false;
+    bool includeArrayIndex = false;
     if (elem.type() == Object) {
         for (auto&& subElem : elem.Obj()) {
             if (subElem.fieldNameStringData() == "path") {
@@ -203,6 +225,12 @@ intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
                                       << typeName(subElem.type()),
                         subElem.type() == Bool);
                 preserveNullAndEmptyArrays = subElem.Bool();
+            } else if (subElem.fieldNameStringData() == "includeArrayIndex") {
+                uassert(28810,
+                        str::stream() << "expected a boolean for the includeArrayIndex option to "
+                                         "$unwind stage, got " << typeName(subElem.type()),
+                        subElem.type() == Bool);
+                includeArrayIndex = subElem.Bool();
             } else {
                 uasserted(28811,
                           str::stream() << "unrecognized option to $unwind stage: "
@@ -221,6 +249,7 @@ intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
     uassert(28812, "no path specified to $unwind stage", !prefixedPathString.empty());
 
     string pathString(Expression::removeFieldPrefix(prefixedPathString));
-    return DocumentSourceUnwind::create(pExpCtx, pathString, preserveNullAndEmptyArrays);
+    return DocumentSourceUnwind::create(
+        pExpCtx, pathString, preserveNullAndEmptyArrays, includeArrayIndex);
 }
 }
