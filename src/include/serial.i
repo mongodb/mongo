@@ -298,18 +298,27 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * progress. Serialization is also needed so only one thread does the
 	 * obsolete check at a time.
 	 */
-	if (upd->next != NULL &&
-	    __wt_txn_visible_all(session, page->modify->obsolete_check_txn)) {
-		F_CAS_ATOMIC(page, WT_PAGE_RECONCILIATION, ret);
-		/* If we can't lock it, don't scan, that's okay. */
-		if (ret != 0)
-			return (0);
-		obsolete = __wt_update_obsolete_check(session, page, upd->next);
-		F_CLR_ATOMIC(page, WT_PAGE_RECONCILIATION);
-		if (obsolete != NULL) {
-			page->modify->obsolete_check_txn = WT_TXN_NONE;
-			__wt_update_obsolete_free(session, page, obsolete);
+	if (upd->next == NULL)
+		return (0);
+
+	if (page->modify->obsolete_check_txn != WT_TXN_NONE) {
+		if (!__wt_txn_visible_all(session, page->modify->obsolete_check_txn)) {
+			/* Check if the oldest ID can move forward and re-check. */
+			__wt_txn_update_oldest(session,0);
 		}
+		if (!__wt_txn_visible_all(session, page->modify->obsolete_check_txn))
+			return (0);
+	}
+	F_CAS_ATOMIC(page, WT_PAGE_RECONCILIATION, ret);
+
+	/* If we can't lock it, don't scan, that's okay. */
+	if (ret != 0)
+		return (0);
+	obsolete = __wt_update_obsolete_check(session, page, upd->next);
+	F_CLR_ATOMIC(page, WT_PAGE_RECONCILIATION);
+	if (obsolete != NULL) {
+		page->modify->obsolete_check_txn = WT_TXN_NONE;
+		__wt_update_obsolete_free(session, page, obsolete);
 	}
 
 	return (0);
