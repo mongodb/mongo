@@ -23,3 +23,7 @@ coll.save({_id:1, a:NumberInt(0)});
 res = coll.update({}, {$bit: {a: {xor: NumberInt(4)}}})
 assert.writeOK(res);
 assert.eq(coll.findOne().a, 4)
+
+// SERVER-19706 Empty bit operation.
+res = coll.update({}, {$bit: {a: {}}});
+assert.writeError(res);
