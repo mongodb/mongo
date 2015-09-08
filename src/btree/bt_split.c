@@ -1176,7 +1176,13 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	right = NULL;
 	page_decr = parent_incr = right_incr = 0;
 
+	/*
+	 * Assert splitting makes sense; specifically assert the page is dirty,
+	 * we depend on that, otherwise the page might be evicted based on its
+	 * last reconciliation which no longer matches reality after the split.
+	 */
 	WT_ASSERT(session, __wt_page_can_split(session, page));
+	WT_ASSERT(session, __wt_page_is_modified(page));
 
 	/* Find the last item on the page. */
 	ins_head = page->pg_row_entries == 0 ?

@@ -1002,10 +1002,6 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    !__wt_page_is_modified(page))
 		return (0);
 
-	/* Don't split a page that is pending a multi-block split. */
-	if (F_ISSET(page->modify, WT_PM_REC_MULTIBLOCK))
-		return (0);
-
 	/*
 	 * There is no point splitting if the list is small, no deep items is
 	 * our heuristic for that. A 1/4 probability of adding a new skiplist
