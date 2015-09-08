@@ -1193,7 +1193,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 		*freep = 1;
 	release_buffered =
 	    WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
-	release_bytes = release_bytes + slot->slot_unbuffered;
+	release_bytes = release_buffered + slot->slot_unbuffered;
 
 	/* Write the buffered records */
 	/*
