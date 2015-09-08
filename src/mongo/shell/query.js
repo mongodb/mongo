@@ -51,6 +51,7 @@ DBQuery.prototype.help = function () {
     print("\t.map( func )")
     print("\t.hasNext()")
     print("\t.next()")
+    print("\t.close()")
     print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)")
     print("\t.itcount() - iterates through documents and counts them")
     print("\t.getQueryPlan() - get query plans associated with shape. To get more info on query plans, " +
@@ -255,8 +256,10 @@ DBQuery.prototype.skip = function( skip ){
 DBQuery.prototype.hasNext = function(){
     this._exec();
 
-    if ( this._limit > 0 && this._cursorSeen >= this._limit )
+    if ( this._limit > 0 && this._cursorSeen >= this._limit ) {
+        this._cursor.close();
         return false;
+    }
     var o = this._cursor.hasNext();
     return o;
 }
@@ -624,6 +627,10 @@ DBQuery.prototype.modifiers = function(document) {
     return this;
 }
 
+DBQuery.prototype.close = function() {
+    this._cursor.close()
+}
+
 DBQuery.shellBatchSize = 20;
 
 /**
@@ -664,6 +671,22 @@ function DBCommandCursor(mongo, cmdResult, batchSize) {
 }
 
 DBCommandCursor.prototype = {};
+
+DBCommandCursor.prototype.close = function() {
+    if (!this._useReadCommands) {
+        this._cursor.close();
+    } else if (this._cursorid != 0) {
+        var killCursorCmd = {
+            killCursors: this._collName,
+            cursors: [ this._cursorid ],
+        };
+        var cmdRes = this._db.runCommand(killCursorCmd);
+        assert.commandWorked(cmdRes);
+
+        this._cursorHandle.zeroCursorId();
+        this._cursorid = NumberLong(0);
+    }
+}
 
 /**
  * Fills out this._batch by running a getMore command. If the cursor is exhausted, also resets
@@ -769,6 +792,7 @@ DBCommandCursor.prototype.help = function () {
     print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)")
     print("\t.itcount() - iterates through documents and counts them")
     print("\t.pretty() - pretty print each document, possibly over multiple lines")
+    print("\t.close()")
 }
 
 // Copy these methods from DBQuery
