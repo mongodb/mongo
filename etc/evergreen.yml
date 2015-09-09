@@ -1649,8 +1649,7 @@ tasks:
                'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl', 'windows-32'], }
 
 - name: release
-  depends_on:
-    - name: push
+  depends_on: push
   stepback: false
   commands:
     - command: shell.exec
