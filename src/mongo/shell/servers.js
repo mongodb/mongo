@@ -405,12 +405,6 @@ MongoRunner.mongoOptions = function(opts) {
     // Normalize and get the binary version to use
     opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
 
-    var shouldRemember =
-        (!opts.restart && !opts.noRemember ) || (opts.restart && opts.appendOptions);
-    if (shouldRemember) {
-        MongoRunner.savedOptions[opts.runId] = Object.merge(opts, {});
-    }
-
     // Default for waitForConnect is true
     opts.waitForConnect =
         (waitForConnect == undefined || waitForConnect == null) ? true : waitForConnect;
@@ -419,6 +413,12 @@ MongoRunner.mongoOptions = function(opts) {
 
     opts.pathOpts = Object.merge(opts.pathOpts || {},
                                  { port : "" + opts.port, runId : "" + opts.runId });
+
+    var shouldRemember =
+        (!opts.restart && !opts.noRemember ) || (opts.restart && opts.appendOptions);
+    if (shouldRemember) {
+        MongoRunner.savedOptions[opts.runId] = Object.merge(opts, {});
+    }
 
     return opts
 }
