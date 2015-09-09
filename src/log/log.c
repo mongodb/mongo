@@ -1857,7 +1857,8 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 */
 	force = LF_ISSET(WT_LOG_FLUSH | WT_LOG_FSYNC);
 	ret = 0;
-	if (myslot.end_offset >= WT_LOG_SLOT_BUF_MAX || force)
+	if (myslot.end_offset >= WT_LOG_SLOT_BUF_MAX ||
+	    F_ISSET(&myslot, WT_MYSLOT_UNBUFFERED) || force)
 		WT_WITH_SLOT_LOCK(session, log,
 		    ret = __wt_log_slot_switch(session, myslot.slot));
 	if (ret == 0)
