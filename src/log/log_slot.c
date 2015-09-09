@@ -76,7 +76,8 @@ retry:
 	if (WT_LOG_SLOT_DONE(new_state) && releasep != NULL)
 		*releasep = 1;
 	slot->slot_end_lsn = slot->slot_start_lsn;
-	end_offset = WT_LOG_SLOT_JOINED(old_state);
+	end_offset =
+	    WT_LOG_SLOT_JOINED_BUFFERED(old_state) + slot->slot_unbuffered;
 	slot->slot_end_lsn.offset += (wt_off_t)end_offset;
 	WT_STAT_FAST_CONN_INCRV(session,
 	    log_slot_consolidated, end_offset);

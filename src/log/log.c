@@ -1628,14 +1628,13 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
  *	Must be called with the slot lock held.
  */
 static int
-__log_force_write_internal(WT_SESSION_IMPL *session, int new_slot, int direct)
+__log_force_write_internal(WT_SESSION_IMPL *session, int new_slot)
 {
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
 	int free_slot, release;
 
 	log = S2C(session)->log;
-retry:
 	slot = log->active_slot;
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	/*
@@ -1646,12 +1645,6 @@ retry:
 	 * close the slot.
 	 */
 	__wt_log_slot_close(session, slot, &release);
-	if (direct && !release) {
-		__wt_spin_unlock(session, &log->log_slot_lock);
-		__wt_yield();
-		__wt_spin_lock(session, &log->log_slot_lock);
-		goto retry;
-	}
 	if (release) {
 		WT_RET(__log_release(session, slot, &free_slot));
 		if (free_slot)
@@ -1673,7 +1666,7 @@ __wt_log_force_write(WT_SESSION_IMPL *session, int new_slot)
 	WT_DECL_RET;
 
 	WT_WITH_SLOT_LOCK(session, S2C(session)->log,
-	    ret = __log_force_write_internal(session, new_slot, 0));
+	    ret = __log_force_write_internal(session, new_slot));
 	return (ret);
 }
 
