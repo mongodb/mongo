@@ -573,7 +573,6 @@ static const char * const __stats_connection_desc[] = {
 	"log: log records too small to compress",
 	"log: log records not compressed",
 	"log: log records compressed",
-	"log: log records written directly",
 	"log: maximum log file size",
 	"log: pre-allocated log files prepared",
 	"log: number of pre-allocated log files to create",
@@ -587,7 +586,6 @@ static const char * const __stats_connection_desc[] = {
 	"log: logging bytes consolidated",
 	"log: consolidated slot joins",
 	"log: consolidated slot join races",
-	"log: record size exceeded maximum",
 	"log: consolidated slot join transitions",
 	"log: log sync operations",
 	"log: log sync_dir operations",
@@ -759,7 +757,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->log_compress_writes = 0;
 	stats->log_compress_write_fails = 0;
 	stats->log_compress_small = 0;
-	stats->log_direct_writes = 0;
 	stats->log_release_write_lsn = 0;
 	stats->log_scans = 0;
 	stats->log_scan_rereads = 0;
@@ -772,7 +769,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing log_prealloc_max */
 	stats->log_prealloc_files = 0;
 	stats->log_prealloc_used = 0;
-	stats->log_slot_toobig = 0;
 	stats->log_scan_records = 0;
 	stats->log_compress_mem = 0;
 		/* not clearing log_buffer_size */
@@ -942,7 +938,6 @@ __wt_stat_connection_aggregate(
 	to->log_compress_write_fails +=
 	    WT_STAT_READ(from, log_compress_write_fails);
 	to->log_compress_small += WT_STAT_READ(from, log_compress_small);
-	to->log_direct_writes += WT_STAT_READ(from, log_direct_writes);
 	to->log_release_write_lsn +=
 	    WT_STAT_READ(from, log_release_write_lsn);
 	to->log_scans += WT_STAT_READ(from, log_scans);
@@ -957,7 +952,6 @@ __wt_stat_connection_aggregate(
 	to->log_prealloc_max += WT_STAT_READ(from, log_prealloc_max);
 	to->log_prealloc_files += WT_STAT_READ(from, log_prealloc_files);
 	to->log_prealloc_used += WT_STAT_READ(from, log_prealloc_used);
-	to->log_slot_toobig += WT_STAT_READ(from, log_slot_toobig);
 	to->log_scan_records += WT_STAT_READ(from, log_scan_records);
 	to->log_compress_mem += WT_STAT_READ(from, log_compress_mem);
 	to->log_buffer_size += WT_STAT_READ(from, log_buffer_size);
