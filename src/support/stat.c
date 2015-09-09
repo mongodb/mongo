@@ -587,6 +587,7 @@ static const char * const __stats_connection_desc[] = {
 	"log: consolidated slot joins",
 	"log: consolidated slot join races",
 	"log: consolidated slot join transitions",
+	"log: consolidated slot unbuffered writes",
 	"log: log sync operations",
 	"log: log sync_dir operations",
 	"log: log server thread advances write LSN",
@@ -752,6 +753,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->log_slot_races = 0;
 	stats->log_slot_transitions = 0;
 	stats->log_slot_joins = 0;
+	stats->log_slot_unbuffered = 0;
 	stats->log_bytes_payload = 0;
 	stats->log_bytes_written = 0;
 	stats->log_compress_writes = 0;
@@ -932,6 +934,7 @@ __wt_stat_connection_aggregate(
 	to->log_slot_races += WT_STAT_READ(from, log_slot_races);
 	to->log_slot_transitions += WT_STAT_READ(from, log_slot_transitions);
 	to->log_slot_joins += WT_STAT_READ(from, log_slot_joins);
+	to->log_slot_unbuffered += WT_STAT_READ(from, log_slot_unbuffered);
 	to->log_bytes_payload += WT_STAT_READ(from, log_bytes_payload);
 	to->log_bytes_written += WT_STAT_READ(from, log_bytes_written);
 	to->log_compress_writes += WT_STAT_READ(from, log_compress_writes);

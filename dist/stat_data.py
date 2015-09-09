@@ -263,6 +263,7 @@ connection_stats = [
     LogStat('log_slot_joins', 'consolidated slot joins'),
     LogStat('log_slot_races', 'consolidated slot join races'),
     LogStat('log_slot_transitions', 'consolidated slot join transitions'),
+    LogStat('log_slot_unbuffered', 'consolidated slot unbuffered writes'),
     LogStat('log_sync', 'log sync operations'),
     LogStat('log_sync_dir', 'log sync_dir operations'),
     LogStat('log_write_lsn', 'log server thread advances write LSN'),

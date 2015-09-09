@@ -330,6 +330,7 @@ struct __wt_connection_stats {
 	int64_t log_slot_joins;
 	int64_t log_slot_races;
 	int64_t log_slot_transitions;
+	int64_t log_slot_unbuffered;
 	int64_t log_sync;
 	int64_t log_sync_dir;
 	int64_t log_write_lsn;

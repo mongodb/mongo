@@ -373,7 +373,8 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		F_SET(slot, WT_SLOT_SYNC);
 	if (F_ISSET(myslotp, WT_MYSLOT_UNBUFFERED)) {
 		WT_ASSERT(session, slot->slot_unbuffered == 0);
-		slot->slot_unbuffered = mysize;
+		WT_STAT_FAST_CONN_INCR(session, log_slot_unbuffered);
+		slot->slot_unbuffered = (int64_t)mysize;
 	}
 	myslotp->slot = slot;
 	myslotp->offset = join_offset;
