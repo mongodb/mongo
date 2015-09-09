@@ -120,7 +120,7 @@ TEST(ConnectionPoolASIO, TestPing) {
         thread.join();
     }
 
-    ASSERT_EQ(MyNetworkConnectionHook::count(), 10);
+    ASSERT_LTE(MyNetworkConnectionHook::count(), 10);
 }
 
 }  // namespace
