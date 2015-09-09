@@ -625,7 +625,8 @@ tasks:
         else
           . ./venv/bin/activate
         fi
-        pip install -r src/mongo/db/modules/enterprise/jstests/encryptdb/libs/requirements.txt
+        # we should go back to using pip when it works on SLES
+        easy_install --upgrade `cat src/mongo/db/modules/enterprise/jstests/encryptdb/libs/requirements.txt`
   - func: "run tests"
     vars:
       resmoke_args: --suites=ese --storageEngine=wiredTiger
