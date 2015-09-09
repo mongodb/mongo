@@ -473,7 +473,7 @@ __log_fill(WT_SESSION_IMPL *session,
 	if (!force && !F_ISSET(myslot, WT_MYSLOT_UNBUFFERED))
 		memcpy((char *)myslot->slot->slot_buf.mem + myslot->offset,
 		    logrec, logrec->len);
-	else {
+	else
 		/*
 		 * If this is a force or unbuffered write, write it now.
 		 * A forced write sends in a temporary, local slot.
@@ -481,8 +481,6 @@ __log_fill(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_write(session, myslot->slot->slot_fh,
 		    myslot->offset + myslot->slot->slot_start_offset,
 		    (size_t)logrec->len, (void *)logrec));
-		myslot->slot->slot_unbuffered = logrec->len;
-	}
 
 	WT_STAT_FAST_CONN_INCRV(session, log_bytes_written, logrec->len);
 	if (lsnp != NULL) {
