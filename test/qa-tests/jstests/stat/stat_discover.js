@@ -92,10 +92,21 @@ assert(statOutputPortCheck([ rs.liveNodes.slaves[0].port ]), "after discovered i
 
 rs.stop(rs.liveNodes.slaves[1]);
 
+assert.soon( function() {
+            try {
+                conn = new Mongo(rs.liveNodes.slaves[1].host);
+                return false;
+            } catch( e ) {
+                return true;
+            }
+            return false;
+}, "mongod still available after being stopped "+ rs.liveNodes.slaves[1].host);
+
+sleep(1000);
+
 clearRawMongoProgramOutput();
 
-sleep(15000)
-
+sleep(2000)
 
 assert(!statOutputPortCheck([ rs.liveNodes.slaves[1].port ]), "after specified host is stopped, specified host is not seen");
 
