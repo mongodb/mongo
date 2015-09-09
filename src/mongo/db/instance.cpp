@@ -931,8 +931,7 @@ void checkAndInsert(OperationContext* txn,
                 verify(collection);
             }
 
-            StatusWith<RecordId> status = collection->insertDocument(txn, js, true);
-            uassertStatusOK(status.getStatus());
+            uassertStatusOK(collection->insertDocument(txn, js, true));
             wunit.commit();
             break;
         } catch (const WriteConflictException& e) {

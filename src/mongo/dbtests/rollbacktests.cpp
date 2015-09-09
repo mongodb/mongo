@@ -86,11 +86,10 @@ Status truncateCollection(OperationContext* txn, const NamespaceString& nss) {
     Collection* coll = dbHolder().get(txn, nss.db())->getCollection(nss.ns());
     return coll->truncate(txn);
 }
-RecordId insertRecord(OperationContext* txn, const NamespaceString& nss, const BSONObj& data) {
+
+void insertRecord(OperationContext* txn, const NamespaceString& nss, const BSONObj& data) {
     Collection* coll = dbHolder().get(txn, nss.db())->getCollection(nss.ns());
-    StatusWith<RecordId> status = coll->insertDocument(txn, data, false);
-    ASSERT_OK(status.getStatus());
-    return status.getValue();
+    ASSERT_OK(coll->insertDocument(txn, data, false));
 }
 void assertOnlyRecord(OperationContext* txn, const NamespaceString& nss, const BSONObj& data) {
     Collection* coll = dbHolder().get(txn, nss.db())->getCollection(nss.ns());

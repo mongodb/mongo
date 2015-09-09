@@ -225,12 +225,12 @@ struct Cloner::Fun {
                 WriteUnitOfWork wunit(txn);
 
                 BSONObj doc = tmp;
-                StatusWith<RecordId> loc = collection->insertDocument(txn, doc, true);
-                if (!loc.isOK()) {
+                Status status = collection->insertDocument(txn, doc, true);
+                if (!status.isOK()) {
                     error() << "error: exception cloning object in " << from_collection << ' '
-                            << loc.getStatus() << " obj:" << doc;
+                            << status << " obj:" << doc;
                 }
-                uassertStatusOK(loc.getStatus());
+                uassertStatusOK(status);
                 wunit.commit();
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "cloner insert", to_collection.ns());

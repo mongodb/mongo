@@ -433,18 +433,14 @@ public:
             db->dropCollection(&_txn, _ns);
             coll = db->createCollection(&_txn, _ns);
 
-            StatusWith<RecordId> swLoc1 = coll->insertDocument(&_txn,
-                                                               BSON("_id" << 1 << "a"
-                                                                          << "dup"),
-                                                               true);
-            StatusWith<RecordId> swLoc2 = coll->insertDocument(&_txn,
-                                                               BSON("_id" << 2 << "a"
-                                                                          << "dup"),
-                                                               true);
-            ASSERT_OK(swLoc1.getStatus());
-            ASSERT_OK(swLoc2.getStatus());
-            loc1 = swLoc1.getValue();
-            loc2 = swLoc2.getValue();
+            ASSERT_OK(coll->insertDocument(&_txn,
+                                           BSON("_id" << 1 << "a"
+                                                      << "dup"),
+                                           true));
+            ASSERT_OK(coll->insertDocument(&_txn,
+                                           BSON("_id" << 2 << "a"
+                                                      << "dup"),
+                                           true));
             wunit.commit();
         }
 
@@ -465,7 +461,12 @@ public:
 
         // either loc1 or loc2 should be in dups but not both.
         ASSERT_EQUALS(dups.size(), 1U);
-        ASSERT(dups.count(loc1) || dups.count(loc2));
+        for (auto recordId : dups) {
+            ASSERT_NOT_EQUALS(recordId, RecordId());
+            BSONObj obj = coll->docFor(&_txn, recordId).value();
+            int id = obj["_id"].Int();
+            ASSERT(id == 1 || id == 2);
+        }
     }
 };
 

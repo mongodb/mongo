@@ -90,9 +90,7 @@ public:
         WriteUnitOfWork wuow(&_txn);
 
         const bool enforceQuota = false;
-        StatusWith<RecordId> res = collection->insertDocument(&_txn, obj, enforceQuota);
-        ASSERT(res.isOK());
-
+        ASSERT_OK(collection->insertDocument(&_txn, obj, enforceQuota));
         wuow.commit();
     }
 
