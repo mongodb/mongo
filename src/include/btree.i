@@ -995,7 +995,11 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * do it without making the appending threads wait. See if it's worth
 	 * doing a split to let the threads continue before doing eviction.
 	 *
-	 * Ignore anything other than large, dirty row-store leaf pages.
+	 * Ignore anything other than large, dirty row-store leaf pages. The
+	 * split code only supports row-store pages, and we depend on the page
+	 * being dirty for correctness (the page must be reconciled again
+	 * before being evicted after the split, information from a previous
+	 * reconciliation will be wrong, so we can't evict immediately).
 	 */
 	if (page->type != WT_PAGE_ROW_LEAF ||
 	    page->memory_footprint < btree->maxmempage ||
