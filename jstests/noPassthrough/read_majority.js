@@ -22,6 +22,12 @@ function getReadMajorityCursor() {
     return new DBCommandCursor(db.getMongo(), res, 2);
 }
 
+function getReadMajorityAggCursor() {
+    var res = t.runCommand('aggregate', {cursor:{batchSize: 2}, readConcern: {level: "majority"}});
+    assert.commandWorked(res);
+    return new DBCommandCursor(db.getMongo(), res, 2);
+}
+
 function getReadMajorityExplainPlan(query) {
     var res = db.runCommand({explain: {find: t.getName(), filter: query},
                              readConcern: {level: "majority"}});
@@ -71,7 +77,6 @@ assertNoReadMajoritySnapshotAvailable();
 assert.writeOK(t.update({}, {$set: {version: 4}}, false, true));
 var snapshot4 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
 
-
 // Collection didn't exist in snapshot 1.
 assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot1}));
 assertNoReadMajoritySnapshotAvailable();
@@ -79,9 +84,17 @@ assertNoReadMajoritySnapshotAvailable();
 // Collection existed but was empty in snapshot 2.
 assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot2}));
 assert.eq(getReadMajorityCursor().itcount(), 0);
+assert.eq(getReadMajorityAggCursor().itcount(), 0);
 
 // In snapshot 3 the collection was filled with {version: 3} documents.
 assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot3}));
+assert.eq(getReadMajorityAggCursor().itcount(), 10);
+getReadMajorityAggCursor().forEach(function(doc) {
+    // Note: agg uses internal batching so can't reliably test flipping snapshot. However, it uses
+    // the same mechanism as find, so if one works, both should.
+    assert.eq(doc.version, 3)
+});
+
 assert.eq(getReadMajorityCursor().itcount(), 10);
 var cursor = getReadMajorityCursor(); // Note: uses batchsize=2.
 assert.eq(cursor.next().version, 3);
@@ -100,6 +113,7 @@ assert.eq(cursor.next().version, 4);
 t.ensureIndex({version: 1});
 if (false) {
     // disabled until SERVER-20439 is implemented.
+    assert.eq(getReadMajorityAggCursor().itcount(), 10);
     assert.eq(getReadMajorityCursor().itcount(), 10);
     assert(!isIxscan(getReadMajorityExplainPlan({version: 1})));
 } else {
@@ -144,12 +158,14 @@ newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
 assertNoReadMajoritySnapshotAvailable();
 assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
 assert.eq(getReadMajorityCursor().itcount(), 10);
+assert.eq(getReadMajorityAggCursor().itcount(), 10);
 
 // Dropping the collection is visible in the committed snapshot, even though it hasn't been marked
 // committed yet. This is allowed by the current specification even though it violates strict
 // read-committed semantics since we don't guarantee them on metadata operations.
 t.drop();
 assert.eq(getReadMajorityCursor().itcount(), 0);
+assert.eq(getReadMajorityAggCursor().itcount(), 0);
 
 // Creating a new collection with the same name hides the collection until that operation is in the
 // committed view.
@@ -159,6 +175,20 @@ newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
 assertNoReadMajoritySnapshotAvailable();
 assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
 assert.eq(getReadMajorityCursor().itcount(), 1);
+assert.eq(getReadMajorityAggCursor().itcount(), 1);
+
+// Commands that only support read concern 'local', (such as ping) must work when it is explicitly
+// specified and fail when 'majority' is specified.
+assert.commandWorked(db.adminCommand({ping: 1, readConcern: {level: 'local'}}));
+var res = assert.commandFailed(db.adminCommand({ping: 1, readConcern: {level: 'majority'}}));
+assert.eq(res.code, ErrorCodes.InvalidOptions);
+
+// Agg $out also doesn't support read concern majority.
+assert.commandWorked(t.runCommand('aggregate', {pipeline: [{$out: 'out'}],
+                                                readConcern: {level: 'local'}}));
+var res = assert.commandFailed(t.runCommand('aggregate', {pipeline: [{$out: 'out'}],
+                                                          readConcern: {level: 'majority'}}));
+assert.eq(res.code, ErrorCodes.InvalidOptions);
 
 MongoRunner.stopMongod(testServer);
 }());

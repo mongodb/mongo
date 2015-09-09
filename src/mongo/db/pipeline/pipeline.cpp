@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -68,6 +69,7 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
                                                const intrusive_ptr<ExpressionContext>& pCtx) {
     intrusive_ptr<Pipeline> pPipeline(new Pipeline(pCtx));
     vector<BSONElement> pipeline;
+    repl::ReadConcernArgs readConcernArgs;
 
     /* gather the specification for the aggregation */
     for (BSONObj::iterator cmdIterator = cmdObj.begin(); cmdIterator.more();) {
@@ -84,8 +86,8 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
             continue;
         }
 
-        // readConcern is also for the command processor.
-        if (str::equals(pFieldName, "readConcern")) {
+        if (pFieldName == repl::ReadConcernArgs::kReadConcernFieldName) {
+            uassertStatusOK(readConcernArgs.initialize(cmdElement));
             continue;
         }
 
@@ -160,6 +162,10 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
 
         if (dynamic_cast<DocumentSourceOut*>(sources.back().get())) {
             uassert(16991, "$out can only be the final stage in the pipeline", iStep == nSteps - 1);
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "$out can only be used with the 'local' read concern level",
+                    readConcernArgs.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
         }
     }
 

@@ -143,6 +143,7 @@ env.Library(
         'document_value',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/repl/read_concern_args',
     ]
 )
 

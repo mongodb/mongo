@@ -67,12 +67,12 @@ OpTime ReadConcernArgs::getOpTime() const {
     return _opTime.value_or(OpTime());
 }
 
-Status ReadConcernArgs::initialize(const BSONObj& cmdObj) {
-    auto readConcernElem = cmdObj[ReadConcernArgs::kReadConcernFieldName];
-
+Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
     if (readConcernElem.eoo()) {
         return Status::OK();
     }
+
+    dassert(readConcernElem.fieldNameStringData() == kReadConcernFieldName);
 
     if (!readConcernElem.isABSONObj()) {
         return Status(ErrorCodes::FailedToParse,

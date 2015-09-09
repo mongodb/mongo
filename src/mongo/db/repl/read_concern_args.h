@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/db/json.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/time_support.h"
 
@@ -63,7 +64,16 @@ public:
      *    }
      * }
      */
-    Status initialize(const BSONObj& cmdObj);
+    Status initialize(const BSONObj& cmdObj) {
+        return initialize(cmdObj[kReadConcernFieldName]);
+    }
+
+    /**
+     * Initializes the object from the readConcern element in a command object.
+     * Use this if you are already iterating over the fields in the command object.
+     * This method correctly handles missing BSONElements.
+     */
+    Status initialize(const BSONElement& readConcernElem);
 
     /**
      * Appends level and afterOpTime.

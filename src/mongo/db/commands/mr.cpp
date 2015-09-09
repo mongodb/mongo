@@ -1247,10 +1247,6 @@ public:
         return true;
     }
 
-    bool supportsReadConcern() const final {
-        return true;
-    }
-
     virtual void help(stringstream& help) const {
         help << "Run a map/reduce operation on the server.\n";
         help << "Note this is used for aggregation, not querying, in MongoDB.\n";
