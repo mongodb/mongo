@@ -1607,6 +1607,12 @@ void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetada
 
 void ReplicationCoordinatorImpl::signalPrimaryUnavailable() {
     auto work = [this](const CallbackArgs&) {
+        // We may have learned that the primary is down in heartbeat.
+        // TODO(siyuan) Clean up this code/comment after we only allow timer-based election.
+        if (_topCoord->getRole() != TopologyCoordinator::Role::follower) {
+            return;
+        }
+
         _topCoord->setPrimaryIndex(-1);
         if (_topCoord->checkShouldStandForElection(_replExecutor.now(), getMyLastOptime())) {
             _startElectSelfV1();
