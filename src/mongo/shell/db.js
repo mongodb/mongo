@@ -1155,7 +1155,10 @@ DB.prototype.getQueryOptions = function() {
 /* Loads any scripts contained in system.js into the client shell.
 */
 DB.prototype.loadServerScripts = function(){
-    this.system.js.find().forEach(function(u){eval(u._id + " = " + u.value);});
+    var global = Function('return this')();
+    this.system.js.find().forEach(function(u) {
+        global[u._id] = u.value;
+    });
 }
 
 
