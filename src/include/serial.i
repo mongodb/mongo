@@ -306,9 +306,10 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 			/* Check if the oldest ID can move forward and re-check. */
 			__wt_txn_update_oldest(session,0);
 		}
-		if (!__wt_txn_visible_all(session, page->modify->obsolete_check_txn))
+		if (!__wt_txn_visible_all(session, page->modify->obsolete_check_txn)) {
 			page->modify->obsolete_check_txn = WT_TXN_NONE;
 			return (0);
+		}
 	}
 	F_CAS_ATOMIC(page, WT_PAGE_RECONCILIATION, ret);
 
