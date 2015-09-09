@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/db.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -47,6 +48,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
@@ -247,15 +249,26 @@ void FSyncLockThread::doRealWork() {
         fsyncCmd.locked = false;
         return;
     }
-
     txn.lockState()->downgradeGlobalXtoSForMMAPV1();
+    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
 
     try {
-        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         storageEngine->flushAllFiles(true);
     } catch (std::exception& e) {
         error() << "error doing flushAll: " << e.what() << endl;
         fsyncCmd.err = e.what();
+        fsyncCmd._threadSync.notify_one();
+        fsyncCmd.locked = false;
+        return;
+    }
+    try {
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            uassertStatusOK(storageEngine->beginBackup(&txn));
+        }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&txn, "beginBackup", "global");
+    } catch (const DBException& e) {
+        error() << "storage engine unable to begin backup : " << e.toString() << endl;
+        fsyncCmd.err = e.toString();
         fsyncCmd._threadSync.notify_one();
         fsyncCmd.locked = false;
         return;
@@ -269,6 +282,9 @@ void FSyncLockThread::doRealWork() {
     while (!fsyncCmd.pendingUnlock) {
         fsyncCmd._unlockSync.wait(fsyncCmd.m);
     }
+
+    storageEngine->endBackup(&txn);
+
     fsyncCmd.pendingUnlock = false;
 
     fsyncCmd.locked = false;

@@ -80,6 +80,10 @@ public:
 
     virtual int flushAllFiles(bool sync);
 
+    virtual Status beginBackup(OperationContext* txn);
+
+    virtual void endBackup(OperationContext* txn);
+
     virtual bool isDurable() const;
 
     virtual Status repairRecordStore(OperationContext* txn, const std::string& ns);
@@ -120,5 +124,8 @@ private:
     typedef std::map<std::string, KVDatabaseCatalogEntry*> DBMap;
     DBMap _dbs;
     mutable stdx::mutex _dbsLock;
+
+    // Flag variable that states if the storage engine is in backup mode.
+    bool _inBackupMode = false;
 };
 }

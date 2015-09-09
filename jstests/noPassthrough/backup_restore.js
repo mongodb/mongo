@@ -283,46 +283,51 @@
     }
 
     // Main
+
+    // Add storage engines which are to be skipped entirely to this array
+    var noBackupTests = [ 'inMemoryExperiment' ];
+
+    // Add storage engines that do not support fsyncLock to this array
+    var noFsyncTests = [ 'rocksdb' ];
+
+    // Add storage engines that do not support rolling backup test to this array
+    var noRollingTests = [ 'inMemoryExperiment', 'rocksdb', 'mmapv1' ]
+
+    // Grab the storage engine, default is wiredTiger
     var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
-    if (storageEngine === "wiredTiger") {
-        // fsyncLock does not work for wiredTiger (SERVER-18899)
-        // runTest({
-        //     name: storageEngine + ' fsyncLock/fsyncUnlock',
-        //     storageEngine: storageEngine,
-        //     backup: 'fsyncLock',
-        //     clientTime: 30000
-        // });
-        runTest({
-            name: storageEngine + ' stop/start',
-            storageEngine: storageEngine,
-            backup: 'stopStart',
-            clientTime: 30000
-        });
-        // if rsync is not available on the host, then this test is skipped
-        if (!runProgram('bash', '-c', 'which rsync')) {
-            runTest({
-                name: storageEngine + ' rolling',
-                storageEngine: storageEngine,
-                backup: 'rolling',
-                clientTime: 30000
-            });
-        } else {
-            jsTestLog("Skipping test for " + storageEngine + ' rolling');
-        }
-    } else if (storageEngine === 'inMemoryExperiment') {
+    if (noBackupTests.indexOf(storageEngine) != -1 ) {
         jsTestLog("Skipping test for " + storageEngine);
-    } else {
+        return;
+    }
+
+    // Skip fsyncLock/Unlock on rocksdb
+    if (noFsyncTests.indexOf(storageEngine) != -1 ) {
         runTest({
             name: storageEngine + ' fsyncLock/fsyncUnlock',
             storageEngine: storageEngine,
             backup: 'fsyncLock'
         });
+    } else {
+        jsTestLog("Skipping test for " + storageEngine + ' fsyncLock/fsyncUnlock');
+    }
+    runTest({
+        name: storageEngine + ' stop/start',
+        storageEngine: storageEngine,
+        backup: 'stopStart',
+        clientTime: 30000
+    });
+    // if rsync is not available on the host, then this test is skipped
+    if (noRollingTests.indexOf(storageEngine) != -1 &&
+        !runProgram('bash', '-c', 'which rsync')) {
         runTest({
-            name: storageEngine + ' stop/start',
+            name: storageEngine + ' rolling',
             storageEngine: storageEngine,
-            backup: 'stopStart'
+            backup: 'rolling',
+            clientTime: 30000
         });
+    } else {
+        jsTestLog("Skipping test for " + storageEngine + ' rolling');
     }
 
 }());
