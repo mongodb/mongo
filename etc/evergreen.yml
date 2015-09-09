@@ -262,6 +262,24 @@ functions:
       script: |
         rm -f ~/.mongodb-jira.yaml
 
+  "clone kernel-tools repo":
+    command: shell.exec
+    params:
+      script: |
+        git clone git@github.com:10gen/kernel-tools.git
+
+  "setup kernel-tools virtualenv":
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        set -o verbose
+
+        cd kernel-tools/releases/release_tickets/
+        virtualenv venv-release
+        . venv-release/bin/activate
+        pip install jira-python==0.16 requests==2.7.0
+
 pre:
   - command: shell.track
   - command: shell.exec
@@ -1672,27 +1690,43 @@ tasks:
       variant: linux-64
   stepback: false
   commands:
-    - command: shell.exec
-      params:
-        script: |
-          git clone git@github.com:10gen/kernel-tools.git
+    - func: "clone kernel-tools repo"
     - func: "setup release credentials"
+    - func: "setup kernel-tools virtualenv"
     - command: shell.exec
       params:
+        working_dir: "kernel-tools/releases/release_tickets"
         script: |
           set -o errexit
           set -o verbose
 
-          cd kernel-tools/releases/release_tickets/
-          virtualenv venv-release
           . venv-release/bin/activate
-          pip install jira-python==0.16 requests==2.7.0
 
           python release_fixversion.py ${version}
           python create_fixversion.py ${version}
           python make_ticket.py --execute --version ${version} --ticket deploy
     - func: "cleanup release credentials"
 
+- name: docs_ticket
+  depends_on:
+    - name: push
+      variant: "*"
+  stepback: false
+  commands:
+    - func: "clone kernel-tools repo"
+    - func: "setup release credentials"
+    - func: "setup kernel-tools virtualenv"
+    - command: shell.exec
+      working_dir: "kernel-tools/releases/release_tickets"
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+
+          . venv-release/bin/activate
+
+          python make_ticket.py --execute --version ${version} --assignee ${release_notes_maintainer} --ticket docs
+    - func: "cleanup release credentials"
 
 #######################################
 #               Modules               #
@@ -4349,9 +4383,9 @@ buildvariants:
 
 - name: release
   display_name: ~~ Release Process
-  batchtime: 1440 # 1 day
   modules: ~
   run_on:
   - ubuntu1404-docker
   tasks:
   - name: jira_versions
+  - name: docs_ticket
