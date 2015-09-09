@@ -323,6 +323,14 @@ int MMAPV1Engine::flushAllFiles(bool sync) {
     return MongoFile::flushAll(sync);
 }
 
+Status MMAPV1Engine::beginBackup(OperationContext* txn) {
+    return Status::OK();
+}
+
+void MMAPV1Engine::endBackup(OperationContext* txn) {
+    return;
+}
+
 bool MMAPV1Engine::isDurable() const {
     return getDur().isDurable();
 }

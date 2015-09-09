@@ -156,7 +156,13 @@ function runTest(conn) {
          var testFunc = function(shouldPass) {
              var passed = true;
              try {
-                 admin.fsyncLock(); // must be locked first
+                 var ret = admin.fsyncLock(); // must be locked first
+                 // If the storage engine doesnt support fsync lock, we can't proceed
+                 if (!ret.ok) {
+                    assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
+                    assert(shouldPass); // If we get to the storage engine, we better be authorized.
+                    return;
+                 }
                  var res = db.fsyncUnlock();
                  printjson(res);
                  passed = res.ok && !res.errmsg && !res.err && !res['$err'];

@@ -192,6 +192,41 @@ public:
     virtual int flushAllFiles(bool sync) = 0;
 
     /**
+     * Transitions the storage engine into backup mode.
+     *
+     * During backup mode the storage engine must stabilize its on-disk files, and avoid
+     * any internal processing that may involve file I/O, such as online compaction, so
+     * a filesystem level backup may be performed.
+     *
+     * Storage engines that do not support this feature should use the default implementation.
+     * Storage engines that implement this must also implement endBackup().
+     *
+     * For Storage engines that implement beginBackup the _inBackupMode variable is provided
+     * to avoid multiple instance enterting/leaving backup concurrently.
+     *
+     * If this function returns an OK status, MongoDB can call endBackup to signal the storage
+     * engine that filesystem writes may continue. This function should return a non-OK status if
+     * filesystem changes cannot be stopped to allow for online backup. If the function should be
+     * retried, returns a non-OK status. This function may throw a WriteConflictException, which
+     * should trigger a retry by the caller. All other exceptions should be treated as errors.
+     */
+    virtual Status beginBackup(OperationContext* txn) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "The current storage engine doesn't support backup mode");
+    }
+
+    /**
+     * Transitions the storage engine out of backup mode.
+     *
+     * Storage engines that do not support this feature should use the default implementation.
+     *
+     * Storage engines implementing this feature should fassert when unable to leave backup mode.
+     */
+    virtual void endBackup(OperationContext* txn) {
+        return;
+    }
+
+    /**
      * Recover as much data as possible from a potentially corrupt RecordStore.
      * This only recovers the record data, not indexes or anything else.
      *

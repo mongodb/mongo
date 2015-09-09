@@ -21,7 +21,8 @@
  * 9) Soon, the secondary should be applying the oplog again, which we should
  *    witness as an increase in the count of documents stored on the secondary.
  */
-
+(function() {
+"use strict";
 // Load utility methods for replica set tests
 load("jstests/replsets/rslib.js");
 
@@ -31,6 +32,15 @@ var nodes = replTest.startSet();
 // This will wait for initiation
 replTest.initiate();
 var master = replTest.getMaster();
+
+var ret = master.getDB("admin").fsyncLock();
+if (!ret.ok) {
+    assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
+    jsTestLog("Storage Engine does not support fsyncLock, so bailing");
+    return;
+}
+master.getDB("admin").fsyncUnlock();
+
 var docNum = 100;
 for(var i=0; i<docNum; i++) {
     master.getDB("foo").bar.save({a: i});
@@ -60,3 +70,4 @@ assert.soon(function() {
         return slaves[0].getDB("foo").bar.count() > 100
     }, "count of documents stored on the secondary did not increase");
 replTest.stopSet();
+}());

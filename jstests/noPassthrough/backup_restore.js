@@ -170,8 +170,16 @@
         // Let clients run for specified time before backing up secondary
         sleep(clientTime);
 
-        // Perform fsync to create checkpoint
-        assert.commandWorked(primary.adminCommand({fsync : 1}), testName + ' failed to fsync');
+        // Perform fsync to create checkpoint. We doublecheck if the storage engine
+        // supports fsync here.
+        var ret = primary.adminCommand({fsync : 1});
+
+        if (!ret.ok) {
+            assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
+            jsTestLog("Skipping test of " + options.backup
+                + " for " + storageEngine + ' as it does not support fsync');
+            return;
+        }
 
         // Configure new hidden secondary
         var dbpathSecondary = secondary.dbpath;
@@ -192,9 +200,15 @@
 
         // Perform the data backup to new secondary
         if (options.backup == 'fsyncLock') {
-            // Lock the DB for write, get dbhash & copy DB files for hidden secondary
-            assert.commandWorked(secondary.getDB("admin").fsyncLock(), testName +
-                                 ' failed to fsyncLock');
+            // Test that the secondary supports fsyncLock
+            var ret = secondary.getDB("admin").fsyncLock();
+            if (!ret.ok) {
+                assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
+                jsTestLog("Skipping test of " + options.backup
+                    + " for " + storageEngine + ' as it does not support fsync');
+                return;
+            }
+
             dbHash = secondary.getDB(crudDb).runCommand({dbhash: 1}).md5;
             copyDbpath(dbpathSecondary, hiddenDbpath);
             removeFile(hiddenDbpath + '/mongod.lock');
@@ -284,22 +298,19 @@
     }
 
     // Main
+
+    // Add storage engines which are to be skipped entirely to this array
+    var noBackupTests = [ 'inMemoryExperiment' ];
+
+    // Grab the storage engine, default is wiredTiger
     var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
+    if (noBackupTests.indexOf(storageEngine) != -1) {
+        jsTestLog("Skipping test for " + storageEngine);
+        return;
+    }
+
     if (storageEngine === "wiredTiger") {
-        // fsyncLock does not work for wiredTiger (SERVER-18899)
-        // runTest({
-        //     name: storageEngine + ' fsyncLock/fsyncUnlock',
-        //     storageEngine: storageEngine,
-        //     backup: 'fsyncLock',
-        //     clientTime: 30000
-        // });
-        runTest({
-            name: storageEngine + ' stop/start',
-            storageEngine: storageEngine,
-            backup: 'stopStart',
-            clientTime: 30000
-        });
         // if rsync is not available on the host, then this test is skipped
         if (!runProgram('bash', '-c', 'which rsync')) {
             runTest({
@@ -311,19 +322,21 @@
         } else {
             jsTestLog("Skipping test for " + storageEngine + ' rolling');
         }
-    } else if (storageEngine === 'inMemoryExperiment') {
-        jsTestLog("Skipping test for " + storageEngine);
-    } else {
-        runTest({
-            name: storageEngine + ' fsyncLock/fsyncUnlock',
-            storageEngine: storageEngine,
-            backup: 'fsyncLock'
-        });
-        runTest({
-            name: storageEngine + ' stop/start',
-            storageEngine: storageEngine,
-            backup: 'stopStart'
-        });
     }
+
+    // Run the fsyncLock test. Will return before testing for any engine that doesn't 
+    // support fsyncLock
+    runTest({
+        name: storageEngine + ' fsyncLock/fsyncUnlock',
+        storageEngine: storageEngine,
+        backup: 'fsyncLock'
+    });
+
+    runTest({
+        name: storageEngine + ' stop/start',
+        storageEngine: storageEngine,
+        backup: 'stopStart',
+        clientTime: 30000
+    });
 
 }());

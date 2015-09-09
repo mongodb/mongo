@@ -19,8 +19,16 @@ function doTest() {
     db.fsync2.save( {x:1} );
     
     d = db.getSisterDB( "admin" );
+
+    // Don't test if the engine doesn't support fsyncLock
+    var ret = d.runCommand( {fsync:1, lock: 1 } );
+    if (!ret.ok) {
+        assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
+        jsTestLog("Skipping test as engine does not support fsyncLock");
+        return;
+    }
     
-    assert.commandWorked( d.runCommand( {fsync:1, lock: 1 } ) );
+    assert.commandWorked( ret );
 
     debug( "after lock" );
     
