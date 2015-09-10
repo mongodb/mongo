@@ -1502,7 +1502,8 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 	 * Split into the parent; if we're closing the file, we hold it
 	 * exclusively.
 	 */
-	WT_ERR(__split_parent(session, ref, ref_new, new_entries, parent_incr, closing));
+	WT_ERR(__split_parent(
+	    session, ref, ref_new, new_entries, parent_incr, closing));
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split);
