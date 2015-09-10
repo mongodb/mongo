@@ -227,17 +227,10 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
         case HeartbeatResponseAction::PriorityTakeover: {
             stdx::unique_lock<stdx::mutex> lk(_mutex);
             if (!_priorityTakeoverCbh.isValid()) {
-                Milliseconds delay = _rsConfig.getPriorityTakeoverDelay(_selfIndex);
-                auto cbh = _replExecutor.scheduleWorkAt(
-                    _replExecutor.now() + delay,
-                    stdx::bind(&ReplicationCoordinatorImpl::_priorityTakeover,
-                               this,
-                               stdx::placeholders::_1));
-                if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-                    return;
-                }
-                fassert(28806, cbh.getStatus());
-                _priorityTakeoverCbh = cbh.getValue();
+                auto when = _replExecutor.now() + _rsConfig.getPriorityTakeoverDelay(_selfIndex);
+                _priorityTakeoverCbh = _scheduleWorkAt(
+                    when,
+                    stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this));
             }
             break;
         }
@@ -646,11 +639,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleLivenessUpdate_inlock(int u
         &ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate, this, stdx::placeholders::_1));
 }
 
-void ReplicationCoordinatorImpl::_priorityTakeover(
-    const ReplicationExecutor::CallbackArgs& cbData) {
-    if (!cbData.status.isOK()) {
-        return;
-    }
+void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1() {
     if (!isV1ElectionProtocol()) {
         return;
     }

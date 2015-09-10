@@ -1043,7 +1043,7 @@ private:
     /**
      * Callback which starts an election if this node is electable and using protocolVersion 1.
      */
-    void _priorityTakeover(const ReplicationExecutor::CallbackArgs& cbData);
+    void _startElectSelfIfEligibleV1();
 
     /**
      * Reset the term of last vote to 0 to prevent any node from voting for term 0.
