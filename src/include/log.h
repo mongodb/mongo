@@ -63,21 +63,22 @@
  */
 
 /*
+ * The high bit is reserved for the special states.  If the high bit is
+ * set (WT_LOG_SLOT_RESERVED) then we are guaranteed to be in a special state.
+ */
+#define	WT_LOG_SLOT_FREE	-1	/* Not in use */
+#define	WT_LOG_SLOT_WRITTEN	-2	/* Slot data written, not processed */
+
+/*
  * We allocate the buffer size, but trigger a slot switch when we cross
  * the maximum size of half the buffer.  If a record is more than the buffer
  * maximum then we trigger a slot switch and write that record unbuffered.
  * We use a larger buffer to provide overflow space so that we can switch
  * once we cross the threshold.
  */
-#define	WT_LOG_SLOT_BUF_SIZE		(256 * 1024)
+#define	WT_LOG_SLOT_BUF_SIZE		(256 * 1024)	/* Must be power of 2 */
 #define	WT_LOG_SLOT_BUF_MAX		((uint32_t)log->slot_buf_size / 2)
-
-/*
- * The high bit is reserved for the special states.  If the high bit is
- * set (WT_LOG_SLOT_RESERVED) then we are guaranteed to be in a special state.
- */
-#define	WT_LOG_SLOT_FREE	-1	/* Not in use */
-#define	WT_LOG_SLOT_WRITTEN	-2	/* Slot data written, not processed */
+#define	WT_LOG_SLOT_UNBUFFERED		(WT_LOG_SLOT_BUF_SIZE << 1)
 
 /*
  * If new slot states are added, adjust WT_LOG_SLOT_BITS and
@@ -92,29 +93,34 @@
 #define	WT_LOG_SLOT_CLOSE	0x4000000000000000LL	/* Force slot close */
 #define	WT_LOG_SLOT_RESERVED	0x8000000000000000LL	/* Reserved states */
 
+/*
+ * Check if the unbuffered flag is set in the joined portion of
+ * the slot state.
+ */
+#define	WT_LOG_SLOT_UNBUFFERED_ISSET(state)				\
+    ((state) & ((int64_t)WT_LOG_SLOT_UNBUFFERED << 32))
+
 #define	WT_LOG_SLOT_MASK_OFF	0x3fffffffffffffffLL
 #define	WT_LOG_SLOT_MASK_ON	~(WT_LOG_SLOT_MASK_OFF)
 #define	WT_LOG_SLOT_JOIN_MASK	(WT_LOG_SLOT_MASK_OFF >> 32)
-
-/*
- * This is the maximum size we can account for in the slot state.  If
- * there is a record larger than this we fall back to a direct write.
- */
-#define	WT_LOG_SLOT_MAXIMUM		(uint32_t)			\
-    ((1 << (WT_LOG_SLOT_MAXBITS - 1)) - WT_LOG_SLOT_BUF_SIZE)
 
 /*
  * These macros manipulate the slot state and its component parts.
  */
 #define	WT_LOG_SLOT_FLAGS(state)	((state) & WT_LOG_SLOT_MASK_ON)
 #define	WT_LOG_SLOT_JOINED(state)	(((state) & WT_LOG_SLOT_MASK_OFF) >> 32)
+#define	WT_LOG_SLOT_JOINED_BUFFERED(state)				\
+    (WT_LOG_SLOT_JOINED(state) &			\
+    (WT_LOG_SLOT_UNBUFFERED - 1))
 #define	WT_LOG_SLOT_JOIN_REL(j, r, s)	(((j) << 32) + (r) + (s))
 #define	WT_LOG_SLOT_RELEASED(state)	((int64_t)(int32_t)(state))
+#define	WT_LOG_SLOT_RELEASED_BUFFERED(state)				\
+    ((int64_t)((int32_t)WT_LOG_SLOT_RELEASED(state) &			\
+    (WT_LOG_SLOT_UNBUFFERED - 1)))
 
 /* Slot is in use */
 #define	WT_LOG_SLOT_ACTIVE(state)					\
-    (WT_LOG_SLOT_JOINED(state) != WT_LOG_SLOT_JOIN_MASK &&		\
-     WT_LOG_SLOT_JOINED(state) < WT_LOG_SLOT_MAXIMUM)
+    (WT_LOG_SLOT_JOINED(state) != WT_LOG_SLOT_JOIN_MASK)
 /* Slot is in use, but closed to new joins */
 #define	WT_LOG_SLOT_CLOSED(state)					\
     (WT_LOG_SLOT_ACTIVE(state) &&					\
@@ -127,13 +133,13 @@
 /* Slot is in use, more threads may join this slot */
 #define	WT_LOG_SLOT_OPEN(state)						\
     (WT_LOG_SLOT_ACTIVE(state) &&					\
+    !WT_LOG_SLOT_UNBUFFERED_ISSET(state) &&				\
     !FLD64_ISSET((uint64_t)(state), WT_LOG_SLOT_CLOSE) &&		\
-     WT_LOG_SLOT_JOINED(state) < WT_LOG_SLOT_BUF_MAX)
+    WT_LOG_SLOT_JOINED(state) < WT_LOG_SLOT_BUF_MAX)
 
 struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_logslot {
 	volatile int64_t slot_state;	/* Slot state */
 	int64_t	 slot_unbuffered;	/* Unbuffered data in this slot */
-	int64_t	 slot_direct_size;	/* Direct write size */
 	int32_t	 slot_error;		/* Error value */
 	wt_off_t slot_start_offset;	/* Starting file offset */
 	wt_off_t slot_last_offset;	/* Last record offset */
@@ -143,14 +149,13 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_logslot {
 	WT_FH	*slot_fh;		/* File handle for this group */
 	WT_ITEM  slot_buf;		/* Buffer for grouped writes */
 
-#define	WT_SLOT_BUFFERED	0x01		/* Buffer writes */
-#define	WT_SLOT_CLOSEFH		0x02		/* Close old fh on release */
-#define	WT_SLOT_SYNC		0x04		/* Needs sync on release */
-#define	WT_SLOT_SYNC_DIR	0x08		/* Directory sync on release */
+#define	WT_SLOT_CLOSEFH		0x01		/* Close old fh on release */
+#define	WT_SLOT_SYNC		0x02		/* Needs sync on release */
+#define	WT_SLOT_SYNC_DIR	0x04		/* Directory sync on release */
 	uint32_t flags;			/* Flags */
 };
 
-#define	WT_SLOT_INIT_FLAGS	(WT_SLOT_BUFFERED)
+#define	WT_SLOT_INIT_FLAGS	0
 
 #define	WT_WITH_SLOT_LOCK(session, log, op) do {			\
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));	\
@@ -162,6 +167,8 @@ struct __wt_myslot {
 	WT_LOGSLOT	*slot;		/* Slot I'm using */
 	wt_off_t	 end_offset;	/* My end offset in buffer */
 	wt_off_t	 offset;	/* Slot buffer offset */
+#define	WT_MYSLOT_UNBUFFERED	0x01	/* Write directly */
+	uint32_t flags;			/* Flags */
 };
 
 #define	WT_LOG_FIRST_RECORD	log->allocsize
@@ -222,7 +229,7 @@ struct __wt_log {
 	WT_LOGSLOT	*active_slot;			/* Active slot */
 	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
 	size_t		 slot_buf_size;		/* Buffer size for slots */
-#ifdef ENABLE_DIRECT_LOG_WRITES
+#ifdef HAVE_DIAGNOSTIC
 	uint64_t	 write_calls;		/* Calls to log_write */
 #endif
 

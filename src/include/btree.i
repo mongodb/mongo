@@ -995,15 +995,15 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * do it without making the appending threads wait. See if it's worth
 	 * doing a split to let the threads continue before doing eviction.
 	 *
-	 * Ignore anything other than large, dirty row-store leaf pages.
+	 * Ignore anything other than large, dirty row-store leaf pages. The
+	 * split code only supports row-store pages, and we depend on the page
+	 * being dirty for correctness (the page must be reconciled again
+	 * before being evicted after the split, information from a previous
+	 * reconciliation will be wrong, so we can't evict immediately).
 	 */
 	if (page->type != WT_PAGE_ROW_LEAF ||
 	    page->memory_footprint < btree->maxmempage ||
 	    !__wt_page_is_modified(page))
-		return (false);
-
-	/* Don't split a page that is pending a multi-block split. */
-	if (F_ISSET(page->modify, WT_PM_REC_MULTIBLOCK))
 		return (false);
 
 	/*
@@ -1082,19 +1082,19 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * previous version might be referenced by an internal page already
 	 * been written in the checkpoint, leaving the checkpoint inconsistent.
 	 */
-	if (btree->checkpointing &&
-	    (__wt_page_is_modified(page) ||
-	    F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
+	if (btree->checkpointing && __wt_page_is_modified(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (false);
 	}
 
 	/*
-	 * If the page was recently split in-memory, don't force it out: we
-	 * hope an eviction thread will find it first.  The check here is
-	 * similar to __wt_txn_visible_all, but ignores the checkpoint's
-	 * transaction.
+	 * If the page was recently split in-memory, don't evict it immediately:
+	 * we want to give application threads that are appending a chance to
+	 * move to the new leaf page created by the split.
+	 *
+	 * Note the check here is similar to __wt_txn_visible_all, but ignores
+	 * the checkpoint's transaction.
 	 */
 	if (check_splits) {
 		txn_global = &S2C(session)->txn_global;
