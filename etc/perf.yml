@@ -83,6 +83,9 @@ functions:
           set -o verbose
           source ./venv/bin/activate
           python perf_regression_check.py -f history.json --rev ${revision}
+    - command: attach.results
+      params:
+        file_location: src/report.json
   "run perf tests":
     - command: shell.exec
       params:
@@ -97,7 +100,7 @@ functions:
       params:
         working_dir: src
         script: |
-          set -e 
+          set -e
           set -v
           source ./venv/bin/activate
           cd perf

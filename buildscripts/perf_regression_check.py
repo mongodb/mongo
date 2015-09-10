@@ -110,10 +110,14 @@ def main(args):
     j = get_json(args.file)
     h = History(j)
     testnames = h.testnames()
-    failed = False
+    failed = 0
 
+    results = []
     for test in testnames:
+        # The first entry is valid. The rest is dummy data to match the existing format
+        result = {'test_file' : test, 'exit_code' : 0, 'elapsed' : 5, 'start': 1441227291.962453, 'end': 1441227293.428761}
         this_one = h.seriesAtRevision(test, args.rev)
+        testFailed = False
         print "checking %s.." % (test)
         if not this_one:
             print "\tno data at this revision, skipping"
@@ -128,17 +132,39 @@ def main(args):
             continue
         if compareResults(this_one, previous[0], args.threshold, "Previous", h.noiseLevels(test),
                           args.noise, args.threadThreshold, args.threadNoise):
-            failed = True
+            testFailed = True
+            result['PreviousCompare'] = 'fail'
+        else :
+            result['PreviousCompare'] = 'pass'
+
         daysprevious = h.seriesItemsNDaysBefore(test, args.rev,args.ndays)
         reference = h.seriesAtRevision(test, args.reference)
         if compareResults(this_one, daysprevious, args.threshold, "NDays", h.noiseLevels(test),
                           args.noise, args.threadThreshold, args.threadNoise):
-            failed = True
+            testFailed = True
+            result['NDayCompare'] = 'fail'
+        else :
+            result['NDayCompare'] = 'pass'
         if compareResults(this_one, reference, args.threshold, "Reference", h.noiseLevels(test),
                           args.noise, args.threadThreshold, args.threadNoise):
-            failed = True
+            testFailed = True
+            result['BaselineCompare'] = 'fail'
+        else :
+            result['BaselineCompare'] = 'pass'
+        if testFailed :
+            result['status'] = 'fail'
+            failed += 1
+        else :
+            result['status'] = 'pass'
+        results.append(result)
+        
+    report = {}
+    report['failures'] = failed
+    report['results'] = results
 
-    if failed:
+    reportFile = open('report.json', 'w')
+    json.dump(report, reportFile, indent=4, separators=(',', ': '))
+    if failed > 0 :
         sys.exit(1)
     else:
         sys.exit(0)
