@@ -100,10 +100,11 @@ load("jstests/replsets/rslib.js");
     replTest.partition(0, 2);
     assert.soon(function () { try { return B.isMaster().ismaster; } catch(e) { return false; } });
 
-    b.bar.insert({ q: 4 });
-    b.bar.insert({ q: 5 });
-    b.bar.insert({ q: 6 });
-    assert(b.bar.count() == 6, "u.count");
+    // These 97 documents will be rolled back eventually.
+    for (var i = 4; i <= 100; i++) {
+        b.bar.insert({ q: i });
+    }
+    assert.eq(100, b.bar.count(), "u.count");
 
     // a should not have the new data as it was partitioned.
     replTest.partition(1, 2);
@@ -120,8 +121,9 @@ load("jstests/replsets/rslib.js");
     assert.writeOK(a.bar.insert({ q: 8 }));
 
     // A is 1 2 3 7 8
-    // B is 1 2 3 4 5 6
+    // B is 1 2 3 4 5 6 ... 100
 
+    var connectionsCreatedOnPrimaryBeforeRollback = a.serverStatus().connections.totalCreated;
     // bring B back online
     replTest.unPartition(0, 1);
     replTest.unPartition(1, 2);
@@ -130,6 +132,13 @@ load("jstests/replsets/rslib.js");
     replTest.awaitReplication();
     checkFinalResults(a);
     checkFinalResults(b);
+
+    var connectionsCreatedOnPrimaryAfterRollback = a.serverStatus().connections.totalCreated;
+    var connectionsCreatedOnPrimaryDuringRollback =
+        connectionsCreatedOnPrimaryAfterRollback - connectionsCreatedOnPrimaryBeforeRollback;
+    jsTest.log('connections created during rollback = ' + connectionsCreatedOnPrimaryDuringRollback);
+    assert.lt(connectionsCreatedOnPrimaryDuringRollback, 50,
+              'excessive number of connections made by secondary to primary during rollback');
 
     replTest.stopSet(15);
 }());
