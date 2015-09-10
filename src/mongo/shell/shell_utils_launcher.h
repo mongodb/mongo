@@ -72,6 +72,8 @@ private:
 /**
  * A registry of spawned programs that are identified by a bound port or else a system pid.
  * All public member functions are thread safe.
+ *
+ * TODO: Clean this up to make the semantics more consistent between pids and ports
  */
 class ProgramRegistry {
 public:
@@ -80,20 +82,20 @@ public:
     ProcessId pidForPort(int port) const;
     /** @return port (-1 if doesn't exist) for a registered pid. */
     int portForPid(ProcessId pid) const;
-    /** @return name for a registered program */
-    std::string programName(ProcessId pid) const;
-    /** Register an unregistered program. */
-    void registerProgram(ProcessId pid, int output, int port = 0, std::string name = "sh");
-    void deleteProgram(ProcessId pid);
+    /** Register an unregistered port. */
+    void registerPort(int port, ProcessId pid, int output);
+    void deletePort(int port);
+    void getRegisteredPorts(std::vector<int>& ports);
 
     bool isPidRegistered(ProcessId pid) const;
-    void getRegisteredPorts(std::vector<int>& ports);
+    /** Register an unregistered pid. */
+    void registerPid(ProcessId pid, int output);
+    void deletePid(ProcessId pid);
     void getRegisteredPids(std::vector<ProcessId>& pids);
 
 private:
-    std::unordered_map<int, ProcessId> _portToPidMap;
-    std::unordered_map<ProcessId, int> _outputs;
-    std::unordered_map<ProcessId, std::string> _programNames;
+    std::map<int, std::pair<ProcessId, int>> _ports;
+    std::map<ProcessId, int> _pids;
     mutable stdx::recursive_mutex _mutex;
 
 #ifdef _WIN32
@@ -126,7 +128,6 @@ private:
     int _port;
     int _pipe;
     ProcessId _pid;
-    std::string _name;
 };
 }
 }
