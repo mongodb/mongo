@@ -43,6 +43,12 @@ HeartbeatResponseAction HeartbeatResponseAction::makeReconfigAction() {
     return result;
 }
 
+HeartbeatResponseAction HeartbeatResponseAction::makeScheduleElectionAction() {
+    HeartbeatResponseAction result;
+    result._action = ScheduleElection;
+    return result;
+}
+
 HeartbeatResponseAction HeartbeatResponseAction::makePriorityTakeoverAction() {
     HeartbeatResponseAction result;
     result._action = PriorityTakeover;
