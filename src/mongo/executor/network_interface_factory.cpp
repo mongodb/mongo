@@ -51,7 +51,7 @@ const char kNetworkImplThreadPool[] = "threadPool";
 
 }  // namespace
 
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(outboundNetworkImpl, std::string, kNetworkImplASIO);
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(outboundNetworkImpl, std::string, kNetworkImplThreadPool);
 MONGO_INITIALIZER(outboundNetworkImpl)(InitializerContext*) {
     if (outboundNetworkImpl != kNetworkImplThreadPool && outboundNetworkImpl != kNetworkImplASIO) {
         return Status(ErrorCodes::BadValue,
