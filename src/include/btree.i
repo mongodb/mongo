@@ -995,15 +995,15 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * do it without making the appending threads wait. See if it's worth
 	 * doing a split to let the threads continue before doing eviction.
 	 *
-	 * Ignore anything other than large, dirty row-store leaf pages.
+	 * Ignore anything other than large, dirty row-store leaf pages. The
+	 * split code only supports row-store pages, and we depend on the page
+	 * being dirty for correctness (the page must be reconciled again
+	 * before being evicted after the split, information from a previous
+	 * reconciliation will be wrong, so we can't evict immediately).
 	 */
 	if (page->type != WT_PAGE_ROW_LEAF ||
 	    page->memory_footprint < btree->maxmempage ||
 	    !__wt_page_is_modified(page))
-		return (0);
-
-	/* Don't split a page that is pending a multi-block split. */
-	if (F_ISSET(page->modify, WT_PM_REC_MULTIBLOCK))
 		return (0);
 
 	/*
@@ -1082,9 +1082,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * previous version might be referenced by an internal page already
 	 * been written in the checkpoint, leaving the checkpoint inconsistent.
 	 */
-	if (btree->checkpointing &&
-	    (__wt_page_is_modified(page) ||
-	    F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
+	if (btree->checkpointing && __wt_page_is_modified(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (0);
