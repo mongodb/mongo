@@ -194,25 +194,37 @@ bool checkShardVersion(OperationContext* txn,
     const NamespaceString& nss = request.getTargetingNSS();
     dassert(txn->lockState()->isCollectionLockedForMode(nss.ns(), MODE_IX));
 
-    ChunkVersion requestShardVersion =
-        request.isMetadataSet() && request.getMetadata()->isShardVersionSet()
-        ? request.getMetadata()->getShardVersion()
-        : ChunkVersion::IGNORED();
+    if (!request.hasShardVersion()) {
+        // Request is unsharded;
+        return true;
+    }
 
+    // If sharding metadata was specified by the caller, the sharding state must have been
+    // initialized already. Otherwise we must fail the request so the query is not silently
+    // treated as unsharded.
     ShardingState* shardingState = ShardingState::get(txn);
-    if (shardingState->enabled()) {
-        CollectionMetadataPtr metadata = shardingState->getCollectionMetadata(nss.ns());
+    if (!shardingState->enabled()) {
+        // Being in this state is really a bug on the caller side (most likely mongos), unless
+        // this is a test or someone manually constructing commands with sharding fields using the
+        // shell.
+        result->setError(toWriteError({ErrorCodes::NotYetInitialized,
+                                       "Request contains sharding metadata, but the server has not "
+                                       "been made sharding aware."}));
+        return false;
+    }
 
-        if (!ChunkVersion::isIgnoredVersion(requestShardVersion)) {
-            ChunkVersion shardVersion =
-                metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
+    ChunkVersion requestShardVersion = request.getShardVersion().getVersion();
+    if (ChunkVersion::isIgnoredVersion(requestShardVersion)) {
+        return true;
+    }
 
-            if (!requestShardVersion.isWriteCompatibleWith(shardVersion)) {
-                result->setError(new WriteErrorDetail);
-                buildStaleError(requestShardVersion, shardVersion, result->getError());
-                return false;
-            }
-        }
+    CollectionMetadataPtr metadata = shardingState->getCollectionMetadata(nss.ns());
+    ChunkVersion shardVersion = metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
+
+    if (!requestShardVersion.isWriteCompatibleWith(shardVersion)) {
+        result->setError(new WriteErrorDetail);
+        buildStaleError(requestShardVersion, shardVersion, result->getError());
+        return false;
     }
 
     return true;
@@ -290,6 +302,17 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
     OwnedPointerVector<BatchedUpsertDetail> upsertedOwned;
     vector<BatchedUpsertDetail*>& upserted = upsertedOwned.mutableVector();
 
+    // If the request has a shard version, but the operation doesn't have a shard version, this
+    // means it came from an old mongos instance (pre 3.2) that set the version in the "metadata"
+    // field instead of at the top level. Set the value in order to ensure the
+    // dependent code works.
+    // TODO(spencer): Remove this after 3.2 ships.
+    OperationShardVersion& operationShardVersion = OperationShardVersion::get(_txn);
+    if (request.hasShardVersion() && !operationShardVersion.hasShardVersion()) {
+        operationShardVersion.setShardVersion(request.getTargetingNSS(),
+                                              request.getShardVersion().getVersion());
+    }
+
     //
     // Apply each batch item, possibly bulking some items together in the write lock.
     // Stops on error if batch is ordered.
@@ -329,19 +352,16 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
         !writeErrors.empty() && writeErrors.back()->getErrCode() == ErrorCodes::StaleShardVersion;
 
     if (staleBatch) {
-        const BatchedRequestMetadata* requestMetadata = request.getMetadata();
-        dassert(requestMetadata);
-
         ShardingState* shardingState = ShardingState::get(_txn);
+        const ChunkVersion& requestShardVersion =
+            operationShardVersion.getShardVersion(request.getTargetingNSS());
 
         //
         // First, we refresh metadata if we need to based on the requested version.
         //
         ChunkVersion latestShardVersion;
-        shardingState->refreshMetadataIfNeeded(_txn,
-                                               request.getTargetingNS(),
-                                               requestMetadata->getShardVersion(),
-                                               &latestShardVersion);
+        shardingState->refreshMetadataIfNeeded(
+            _txn, request.getTargetingNS(), requestShardVersion, &latestShardVersion);
 
         // Report if we're still changing our metadata
         // TODO: Better reporting per-collection
@@ -357,10 +377,6 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
             // Exposed as optional parameter to allow testing of queuing behavior with
             // different network timings.
             //
-
-            const ChunkVersion& requestShardVersion = requestMetadata->getShardVersion();
-
-            //
             // Only wait if we're an older version (in the current collection epoch) and
             // we're not write compatible, implying that the current migration is affecting
             // writes.
@@ -369,8 +385,7 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
             if (requestShardVersion.isOlderThan(latestShardVersion) &&
                 !requestShardVersion.isWriteCompatibleWith(latestShardVersion)) {
                 while (shardingState->inCriticalMigrateSection()) {
-                    log() << "write request to old shard version "
-                          << requestMetadata->getShardVersion().toString()
+                    log() << "write request to old shard version " << requestShardVersion
                           << " waiting for migration commit";
 
                     shardingState->waitTillNotInCriticalSection(10 /* secs */);
@@ -781,14 +796,6 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
     ExecInsertsState state(_txn, &request);
     normalizeInserts(request, &state.normalizedInserts);
 
-    auto& operationShardVersion = OperationShardVersion::get(_txn);
-    if (request.isMetadataSet() && request.getMetadata()->isShardVersionSet()) {
-        operationShardVersion.setShardVersion(request.getTargetingNSS(),
-                                              request.getMetadata()->getShardVersion());
-    } else {
-        operationShardVersion.setShardVersion(request.getTargetingNSS(), ChunkVersion::IGNORED());
-    }
-
     // Yield frequency is based on the same constants used by PlanYieldPolicy.
     ElapsedTracker elapsedTracker(internalQueryExecYieldIterations, internalQueryExecYieldPeriodMS);
 
@@ -833,17 +840,6 @@ void WriteBatchExecutor::execUpdate(const BatchItemRef& updateItem,
     beginCurrentOp(_txn, updateItem);
     incOpStats(updateItem);
 
-    auto& operationShardVersion = OperationShardVersion::get(_txn);
-    auto rootRequest = updateItem.getRequest();
-    if (!updateItem.getUpdate()->getMulti() && rootRequest->isMetadataSet() &&
-        rootRequest->getMetadata()->isShardVersionSet()) {
-        operationShardVersion.setShardVersion(rootRequest->getTargetingNSS(),
-                                              rootRequest->getMetadata()->getShardVersion());
-    } else {
-        operationShardVersion.setShardVersion(rootRequest->getTargetingNSS(),
-                                              ChunkVersion::IGNORED());
-    }
-
     WriteOpResult result;
     multiUpdate(_txn, updateItem, &result);
 
@@ -870,17 +866,6 @@ void WriteBatchExecutor::execRemove(const BatchItemRef& removeItem, WriteErrorDe
     CurOp currentOp(_txn);
     beginCurrentOp(_txn, removeItem);
     incOpStats(removeItem);
-
-    auto& operationShardVersion = OperationShardVersion::get(_txn);
-    auto rootRequest = removeItem.getRequest();
-    if (removeItem.getDelete()->getLimit() == 1 && rootRequest->isMetadataSet() &&
-        rootRequest->getMetadata()->isShardVersionSet()) {
-        operationShardVersion.setShardVersion(rootRequest->getTargetingNSS(),
-                                              rootRequest->getMetadata()->getShardVersion());
-    } else {
-        operationShardVersion.setShardVersion(rootRequest->getTargetingNSS(),
-                                              ChunkVersion::IGNORED());
-    }
 
     WriteOpResult result;
     multiRemove(_txn, removeItem, &result);
@@ -1129,6 +1114,12 @@ static void multiUpdate(OperationContext* txn,
     // Updates from the write commands path can yield.
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
+    boost::optional<OperationShardVersion::IgnoreVersioningBlock> maybeIgnoreVersion;
+    if (isMulti) {
+        // Multi-updates are unversioned.
+        maybeIgnoreVersion.emplace(txn, nsString);
+    }
+
     auto client = txn->getClient();
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
 
@@ -1299,6 +1290,12 @@ static void multiRemove(OperationContext* txn,
 
     // Deletes running through the write commands path can yield.
     request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+
+    boost::optional<OperationShardVersion::IgnoreVersioningBlock> maybeIgnoreVersion;
+    if (request.isMulti()) {
+        // Multi-removes are unversioned.
+        maybeIgnoreVersion.emplace(txn, nss);
+    }
 
     auto client = txn->getClient();
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();

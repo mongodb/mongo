@@ -34,7 +34,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/write_ops/batched_request_metadata.h"
 
 namespace mongo {
 
@@ -58,7 +57,6 @@ public:
     static const BSONField<std::vector<BSONObj>> documents;
     static const BSONField<BSONObj> writeConcern;
     static const BSONField<bool> ordered;
-    static const BSONField<BSONObj> metadata;
 
     //
     // construction / destruction
@@ -113,13 +111,6 @@ public:
         return _shouldBypassValidation;
     }
 
-    /*
-     * metadata ownership will be transferred to this.
-     */
-    void setMetadata(BatchedRequestMetadata* metadata);
-    bool isMetadataSet() const;
-    BatchedRequestMetadata* getMetadata() const;
-
 private:
     // Convention: (M)andatory, (O)ptional
 
@@ -138,9 +129,6 @@ private:
     // (O)  whether batch is issued in parallel or not
     bool _ordered;
     bool _isOrderedSet;
-
-    // (O)  metadata associated with this request for internal use.
-    std::unique_ptr<BatchedRequestMetadata> _metadata;
 
     // (O)  cached copied of target ns
     NamespaceString _targetNSS;

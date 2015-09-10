@@ -28,7 +28,10 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/disallow_copying.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/s/write_ops/batched_update_request.h"
 #include "mongo/s/write_ops/batched_delete_request.h"
@@ -128,9 +131,17 @@ public:
     bool isOrderedSet() const;
     bool getOrdered() const;
 
-    void setMetadata(BatchedRequestMetadata* metadata);
-    bool isMetadataSet() const;
-    BatchedRequestMetadata* getMetadata() const;
+    void setShardVersion(ChunkVersionAndOpTime shardVersion) {
+        _shardVersion = std::move(shardVersion);
+    }
+
+    bool hasShardVersion() const {
+        return _shardVersion.is_initialized();
+    }
+
+    const ChunkVersionAndOpTime& getShardVersion() const {
+        return _shardVersion.get();
+    }
 
     void setShouldBypassValidation(bool newVal);
     bool shouldBypassValidation() const;
@@ -172,6 +183,9 @@ public:
 
 private:
     BatchType _batchType;
+
+    boost::optional<ChunkVersionAndOpTime> _shardVersion;
+
     std::unique_ptr<BatchedInsertRequest> _insertReq;
     std::unique_ptr<BatchedUpdateRequest> _updateReq;
     std::unique_ptr<BatchedDeleteRequest> _deleteReq;

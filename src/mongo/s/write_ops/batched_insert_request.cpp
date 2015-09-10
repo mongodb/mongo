@@ -43,7 +43,6 @@ const BSONField<std::string> BatchedInsertRequest::collName("insert");
 const BSONField<std::vector<BSONObj>> BatchedInsertRequest::documents("documents");
 const BSONField<BSONObj> BatchedInsertRequest::writeConcern("writeConcern");
 const BSONField<bool> BatchedInsertRequest::ordered("ordered", true);
-const BSONField<BSONObj> BatchedInsertRequest::metadata("metadata");
 
 BatchedInsertRequest::BatchedInsertRequest() {
     clear();
@@ -91,9 +90,6 @@ BSONObj BatchedInsertRequest::toBSON() const {
 
     if (_isOrderedSet)
         builder.append(ordered(), _ordered);
-
-    if (_metadata)
-        builder.append(metadata(), _metadata->toBSON());
 
     if (_shouldBypassValidation)
         builder.append(bypassDocumentValidationCommandOption(), true);
@@ -145,19 +141,6 @@ bool BatchedInsertRequest::parseBSON(StringData dbName, const BSONObj& source, s
             if (fieldState == FieldParser::FIELD_INVALID)
                 return false;
             _isOrderedSet = fieldState == FieldParser::FIELD_SET;
-        } else if (metadata() == sourceEl.fieldName()) {
-            BSONObj metadataObj;
-            FieldParser::FieldState fieldState =
-                FieldParser::extract(sourceEl, metadata, &metadataObj, errMsg);
-            if (fieldState == FieldParser::FIELD_INVALID)
-                return false;
-
-            if (!metadataObj.isEmpty()) {
-                _metadata.reset(new BatchedRequestMetadata());
-                if (!_metadata->parseBSON(metadataObj, errMsg)) {
-                    return false;
-                }
-            }
         } else if (bypassDocumentValidationCommandOption() == sourceEl.fieldNameStringData()) {
             _shouldBypassValidation = sourceEl.trueValue();
         }
@@ -181,8 +164,6 @@ void BatchedInsertRequest::clear() {
     _isOrderedSet = false;
 
     _shouldBypassValidation = false;
-
-    _metadata.reset();
 }
 
 void BatchedInsertRequest::cloneTo(BatchedInsertRequest* other) const {
@@ -203,11 +184,6 @@ void BatchedInsertRequest::cloneTo(BatchedInsertRequest* other) const {
 
     other->_ordered = _ordered;
     other->_isOrderedSet = _isOrderedSet;
-
-    if (_metadata) {
-        other->_metadata.reset(new BatchedRequestMetadata());
-        _metadata->cloneTo(other->_metadata.get());
-    }
 }
 
 std::string BatchedInsertRequest::toString() const {
@@ -299,17 +275,4 @@ bool BatchedInsertRequest::getOrdered() const {
         return ordered.getDefault();
     }
 }
-
-void BatchedInsertRequest::setMetadata(BatchedRequestMetadata* metadata) {
-    _metadata.reset(metadata);
-}
-
-bool BatchedInsertRequest::isMetadataSet() const {
-    return _metadata.get();
-}
-
-BatchedRequestMetadata* BatchedInsertRequest::getMetadata() const {
-    return _metadata.get();
-}
-
 }  // namespace mongo

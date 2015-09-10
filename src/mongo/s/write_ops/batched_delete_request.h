@@ -35,7 +35,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
-#include "mongo/s/write_ops/batched_request_metadata.h"
 
 namespace mongo {
 
@@ -59,7 +58,6 @@ public:
     static const BSONField<std::vector<BatchedDeleteDocument*>> deletes;
     static const BSONField<BSONObj> writeConcern;
     static const BSONField<bool> ordered;
-    static const BSONField<BSONObj> metadata;
 
     //
     // construction / destruction
@@ -106,13 +104,6 @@ public:
     bool isOrderedSet() const;
     bool getOrdered() const;
 
-    /*
-     * metadata ownership will be transferred to this.
-     */
-    void setMetadata(BatchedRequestMetadata* metadata);
-    bool isMetadataSet() const;
-    BatchedRequestMetadata* getMetadata() const;
-
     /**
      * These are no-ops since delete never validates documents. They only exist to fulfill the
      * unified API.
@@ -140,9 +131,6 @@ private:
     // (O)  whether batch is issued in parallel or not
     bool _ordered;
     bool _isOrderedSet;
-
-    // (O)  metadata associated with this request for internal use.
-    std::unique_ptr<BatchedRequestMetadata> _metadata;
 };
 
 }  // namespace mongo

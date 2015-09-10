@@ -51,6 +51,11 @@ OperationShardVersion& OperationShardVersion::get(OperationContext* txn) {
 }
 
 void OperationShardVersion::initializeFromCommand(NamespaceString ns, const BSONObj& cmdObj) {
+    if (ns.isSystemDotIndexes()) {
+        setShardVersion(std::move(ns), ChunkVersion::IGNORED());
+        return;
+    }
+
     BSONElement versionElt;
     Status status = bsonExtractTypedField(cmdObj, kShardVersionField, BSONType::Array, &versionElt);
     if (!status.isOK()) {
@@ -65,12 +70,7 @@ void OperationShardVersion::initializeFromCommand(NamespaceString ns, const BSON
         return;
     }
 
-    // This currently supports only setting the shard version for one namespace.
-    invariant(!_hasVersion || _ns == ns);
-
-    _hasVersion = true;
-    _ns = std::move(ns);
-    _shardVersion = std::move(newVersion);
+    setShardVersion(std::move(ns), std::move(newVersion));
 }
 
 bool OperationShardVersion::hasShardVersion() const {
@@ -88,6 +88,7 @@ const ChunkVersion& OperationShardVersion::getShardVersion(const NamespaceString
 void OperationShardVersion::setShardVersion(NamespaceString ns, ChunkVersion newVersion) {
     // This currently supports only setting the shard version for one namespace.
     invariant(!_hasVersion || _ns == ns);
+    invariant(!ns.isSystemDotIndexes() || ChunkVersion::isIgnoredVersion(newVersion));
 
     _ns = std::move(ns);
     _shardVersion = std::move(newVersion);

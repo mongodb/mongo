@@ -456,12 +456,7 @@ void BatchWriteOp::buildBatchRequest(const TargetedWriteBatch& targetedBatch,
         request->setOrdered(_clientRequest->getOrdered());
     }
 
-    unique_ptr<BatchedRequestMetadata> requestMetadata(new BatchedRequestMetadata());
-    requestMetadata->setShardVersion(
-        ChunkVersionAndOpTime(targetedBatch.getEndpoint().shardVersion));
-    requestMetadata->setSession(0);
-
-    request->setMetadata(requestMetadata.release());
+    request->setShardVersion(targetedBatch.getEndpoint().shardVersion);
 }
 
 //
