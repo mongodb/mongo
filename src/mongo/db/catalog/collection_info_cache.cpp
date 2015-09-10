@@ -119,10 +119,10 @@ void CollectionInfoCache::notifyOfQuery(OperationContext* txn,
                                         const std::set<std::string>& indexesUsed) {
     // Record indexes used to fulfill query.
     for (auto it = indexesUsed.begin(); it != indexesUsed.end(); ++it) {
-        if (NULL == _collection->getIndexCatalog()->findIndexByName(txn, *it)) {
-            // Index removed since the operation started.  Nothing to report.
-            continue;
-        }
+        // This index should still exist, since the PlanExecutor would have been killed if the
+        // index was dropped (and we would not get here).
+        dassert(NULL != _collection->getIndexCatalog()->findIndexByName(txn, *it));
+
         _indexUsageTracker.recordIndexAccess(*it);
     }
 }
