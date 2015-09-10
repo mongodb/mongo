@@ -1087,7 +1087,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	    F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
-		return (true);
+		return (false);
 	}
 
 	/*
