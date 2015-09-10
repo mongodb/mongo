@@ -185,7 +185,7 @@ MongoRunner.toRealPath = function( path, pathOpts ){
     pathOpts = pathOpts || {}
     path = path.replace( /\$dataPath/g, MongoRunner.dataPath )
     path = path.replace( /\$dataDir/g, MongoRunner.dataDir )
-    for( key in pathOpts ){
+    for( var key in pathOpts ){
         path = path.replace( RegExp( "\\$" + RegExp.escape(key), "g" ), pathOpts[ key ] )
     }
     

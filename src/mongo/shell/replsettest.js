@@ -156,7 +156,7 @@ ReplSetTest.prototype.getReplSetConfig = function() {
     cfg['_id']  = this.name;
     cfg.members = [];
 
-    for (i=0; i<this.ports.length; i++) {
+    for (var i=0; i<this.ports.length; i++) {
         member = {};
         member['_id']  = i;
 
@@ -181,7 +181,7 @@ ReplSetTest.prototype.getReplSetConfig = function() {
 ReplSetTest.prototype.getURL = function(){
     var hosts = [];
     
-    for(i=0; i<this.ports.length; i++) {
+    for(var i=0; i<this.ports.length; i++) {
 
         var port;
         // Connect on the right port
@@ -265,7 +265,7 @@ ReplSetTest.prototype.startSet = function( options ) {
     var nodes = [];
     print( "ReplSetTest Starting Set" );
 
-    for( n = 0 ; n < this.ports.length; n++ ) {
+    for( var n = 0 ; n < this.ports.length; n++ ) {
         node = this.start(n, options)
         nodes.push(node);
     }
@@ -803,7 +803,7 @@ ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
     if ( forRestart ) { return; }
     if ( this._alldbpaths ){
         print("ReplSetTest stopSet deleting all dbpaths");
-        for( i=0; i<this._alldbpaths.length; i++ ){
+        for( var i=0; i<this._alldbpaths.length; i++ ){
             resetDbpath( this._alldbpaths[i] );
         }
     }

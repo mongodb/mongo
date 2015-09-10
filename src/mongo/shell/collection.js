@@ -1486,7 +1486,7 @@ DBCollection.prototype.getSplitKeysForChunks = function( chunkSize ){
               " for recent migrations." )
        sleep( 30000 )
 
-       for( shard in allSplitPoints ){
+       for( var shard in allSplitPoints ){
            for( var i = 0; i < allSplitPoints[ shard ].length; i++ ){
                var splitKey = allSplitPoints[ shard ][i]
                print( "Splitting at " + tojson( splitKey ) )
