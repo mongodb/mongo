@@ -1,11 +1,13 @@
 // Test mongod start with FIPS mode enabled
-var md = MongoRunner.runMongod({sslMode: "requireSSL",
+var port = allocatePort();
+var md = MongoRunner.runMongod({port: port,
+                                sslMode: "requireSSL",
                                 sslPEMKeyFile: "jstests/libs/server.pem",
                                 sslCAFile: "jstests/libs/ca.pem",
                                 sslFIPSMode: ""});
 
 var mongo = runMongoProgram("mongo",
-                            "--port", md.port,
+                            "--port", port,
                             "--ssl",
                             "--sslAllowInvalidCertificates",
                             "--sslPEMKeyFile", "jstests/libs/client.pem",
