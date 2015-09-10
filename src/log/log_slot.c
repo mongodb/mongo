@@ -35,8 +35,9 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
  *	Close out the slot the caller is using.  The slot may already be
  *	closed or freed by another thread.
  */
-void
-__wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *releasep)
+int
+__wt_log_slot_close(
+    WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *releasep, int forced)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
@@ -48,20 +49,29 @@ __wt_log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *releasep)
 	if (releasep != NULL)
 		*releasep = 0;
 	if (slot == NULL)
-		return;
+		return (WT_NOTFOUND);
 retry:
 	old_state = slot->slot_state;
 	/*
+	 * If this close is coming from a forced close and a thread is in
+	 * the middle of using the slot, return EBUSY.  The caller can
+	 * decide if retrying is necessary or not.
+	 */
+	if (forced && WT_LOG_SLOT_INPROGRESS(old_state))
+		return (EBUSY);
+	/*
 	 * If someone else is switching out this slot we lost.  Nothing to
-	 * do but return.
+	 * do but return.  Return WT_NOTFOUND anytime the given slot was
+	 * processed by another closing thread.  Only return 0 when we
+	 * actually closed the slot.
 	 */
 	if (WT_LOG_SLOT_CLOSED(old_state))
-		return;
+		return (WT_NOTFOUND);
 	/*
 	 * If someone completely processed this slot, we're done.
 	 */
 	if (FLD64_ISSET((uint64_t)slot->slot_state, WT_LOG_SLOT_RESERVED))
-		return;
+		return (WT_NOTFOUND);
 	new_state = (old_state | WT_LOG_SLOT_CLOSE);
 	/*
 	 * Close this slot.  If we lose the race retry.
@@ -86,6 +96,7 @@ retry:
 	 */
 	log->alloc_lsn = slot->slot_end_lsn;
 	WT_ASSERT(session, log->alloc_lsn.file >= log->write_lsn.file);
+	return (0);
 }
 
 /*
@@ -95,6 +106,7 @@ retry:
 int
 __wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
+	WT_DECL_RET;
 	WT_LOG *log;
 	int dummy;
 #ifdef HAVE_DIAGNOSTIC
@@ -110,13 +122,20 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 */
 	if (slot != log->active_slot)
 		return (0);
-	__wt_log_slot_close(session, slot, &dummy);
+	ret = __wt_log_slot_close(session, slot, &dummy, 0);
 	/*
 	 * Only mainline callers use switch.  Our size should be in join
 	 * and we have not yet released, so we should never think release
 	 * should be done now.
 	 */
+	/*
+	 * If close returns WT_NOTFOUND, it means that someone else is
+	 * processing the slot change.  We're done.
+	 */
+	if (ret == WT_NOTFOUND)
+		return (0);
 	WT_ASSERT(session, dummy == 0);
+	WT_ASSERT(session, ret == 0);
 #ifdef HAVE_DIAGNOSTIC
 	state = slot->slot_state;
 	j = WT_LOG_SLOT_JOINED(state);

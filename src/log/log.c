@@ -45,7 +45,8 @@ __wt_log_ckpt_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 
 	conn = S2C(session);
 	log = conn->log;
-	WT_RET(__wt_log_force_write(session, 1));
+	while (__wt_log_force_write(session) == EBUSY)
+		__wt_yield();
 	WT_RET(__wt_log_wrlsn(session));
 	*ckp_lsn = log->write_start_lsn;
 	return (0);
@@ -263,7 +264,7 @@ __wt_log_get_all_files(WT_SESSION_IMPL *session,
 	 * These may be files needed by backup.  Force the current slot
 	 * to get written to the file.
 	 */
-	WT_RET(__wt_log_force_write(session, 1));
+	WT_RET_BUSY_OK(__wt_log_force_write(session));
 	WT_RET(__log_get_files(session, WT_LOG_FILENAME, &files, &count));
 
 	/* Filter out any files that are below the checkpoint LSN. */
@@ -1626,8 +1627,9 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
  *	Must be called with the slot lock held.
  */
 static int
-__log_force_write_internal(WT_SESSION_IMPL *session, int new_slot)
+__log_force_write_internal(WT_SESSION_IMPL *session)
 {
+	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
 	int free_slot, release;
@@ -1636,20 +1638,22 @@ __log_force_write_internal(WT_SESSION_IMPL *session, int new_slot)
 	slot = log->active_slot;
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	/*
-	 * Direct writes need to have ownership of the slot.  There can be
-	 * no outstanding threads on the slot when a direct write happens.
-	 * If there are, yield and try again.  We need to release and retake
-	 * the slot lock in case the outstanding thread is also trying to
-	 * close the slot.
+	 * If closing the slot returns WT_NOTFOUND, it means that someone
+	 * else is processing the slot change.  We're done.  If we get
+	 * EBUSY, then return that so the caller can decide what to do.
 	 */
-	__wt_log_slot_close(session, slot, &release);
+	ret = __wt_log_slot_close(session, slot, &release, 1);
+	if (ret == WT_NOTFOUND)
+		return (0);
+	if (ret == EBUSY)
+		return (ret);
+	WT_ASSERT(session, ret == 0);
 	if (release) {
 		WT_RET(__log_release(session, slot, &free_slot));
 		if (free_slot)
 			__wt_log_slot_free(session, slot);
 	}
-	if (new_slot)
-		WT_RET(__wt_log_slot_new(session));
+	WT_RET(__wt_log_slot_new(session));
 	return (0);
 }
 
@@ -1659,12 +1663,12 @@ __log_force_write_internal(WT_SESSION_IMPL *session, int new_slot)
  *	Wrapper function that takes the lock.
  */
 int
-__wt_log_force_write(WT_SESSION_IMPL *session, int new_slot)
+__wt_log_force_write(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 
 	WT_WITH_SLOT_LOCK(session, S2C(session)->log,
-	    ret = __log_force_write_internal(session, new_slot));
+	    ret = __log_force_write_internal(session));
 	return (ret);
 }
 
@@ -1888,7 +1892,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			WT_ERR(__wt_cond_signal(session, conn->log_cond));
 			__wt_yield();
 		} else
-			WT_ERR(__wt_log_force_write(session, 1));
+			WT_ERR_BUSY_OK(__wt_log_force_write(session));
 	}
 	if (LF_ISSET(WT_LOG_FLUSH)) {
 		/* Wait for our writes to reach the OS */
