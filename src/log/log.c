@@ -681,12 +681,13 @@ __log_newfile(WT_SESSION_IMPL *session, int conn_open, int *created)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LSN end_lsn;
-	int create_log;
+	int create_log, yield_cnt;
 
 	conn = S2C(session);
 	log = conn->log;
 
 	create_log = 1;
+	yield_cnt = 0;
 	/*
 	 * Set aside the log file handle to be closed later.  Other threads
 	 * may still be using it to write to the log.  If the log file size
@@ -697,6 +698,8 @@ __log_newfile(WT_SESSION_IMPL *session, int conn_open, int *created)
 	while (log->log_close_fh != NULL) {
 		WT_STAT_FAST_CONN_INCR(session, log_close_yields);
 		WT_RET(__wt_log_wrlsn(session));
+		if (++yield_cnt > 10000)
+			return (EBUSY);
 		__wt_yield();
 	}
 	log->log_close_fh = log->log_fh;
@@ -1863,8 +1866,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	ret = 0;
 	if (myslot.end_offset >= WT_LOG_SLOT_BUF_MAX ||
 	    F_ISSET(&myslot, WT_MYSLOT_UNBUFFERED) || force)
-		WT_WITH_SLOT_LOCK(session, log,
-		    ret = __wt_log_slot_switch(session, myslot.slot));
+		ret = __wt_log_slot_switch(session, &myslot);
 	if (ret == 0)
 		ret = __log_fill(session, &myslot, 0, record, &lsn);
 	release_size = __wt_log_slot_release(

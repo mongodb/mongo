@@ -104,7 +104,7 @@ retry:
  *	Switch out the current slot and set up a new one.
  */
 int
-__wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
+__wt_log_slot_switch_internal(WT_SESSION_IMPL *session, WT_MYSLOT *myslot)
 {
 	WT_DECL_RET;
 	WT_LOG *log;
@@ -120,30 +120,68 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * If someone else raced us to closing this specific slot, we're
 	 * done here.
 	 */
-	if (slot != log->active_slot)
+	if (myslot->slot != log->active_slot)
 		return (0);
-	ret = __wt_log_slot_close(session, slot, &dummy, 0);
+	ret = 0;
+	/*
+	 * If close returns WT_NOTFOUND, it means that someone else is
+	 * processing the slot change.  However, we could have retried
+	 * from a busy time creating a new slot.  If so, we are that
+	 * someone else and we need to try setting up a new slot again.
+	 */
+	if (!F_ISSET(myslot, WT_MYSLOT_CLOSE)) {
+		ret = __wt_log_slot_close(session, myslot->slot, &dummy, 0);
+		if (ret == WT_NOTFOUND)
+			return (0);
+	}
 	/*
 	 * Only mainline callers use switch.  Our size should be in join
 	 * and we have not yet released, so we should never think release
 	 * should be done now.
 	 */
-	/*
-	 * If close returns WT_NOTFOUND, it means that someone else is
-	 * processing the slot change.  We're done.
-	 */
-	if (ret == WT_NOTFOUND)
-		return (0);
 	WT_ASSERT(session, dummy == 0);
 	WT_ASSERT(session, ret == 0);
+	/*
+	 * Set that we have closed this slot because we may call in here
+	 * multiple times if we retry creating a new slot.
+	 */
+	F_SET(myslot, WT_MYSLOT_CLOSE);
 #ifdef HAVE_DIAGNOSTIC
-	state = slot->slot_state;
+	state = myslot->slot->slot_state;
 	j = WT_LOG_SLOT_JOINED(state);
 	r = WT_LOG_SLOT_RELEASED(state);
 	WT_ASSERT(session, j > r);
 #endif
 	WT_RET(__wt_log_slot_new(session));
 	return (0);
+}
+
+/*
+ * __wt_log_slot_switch --
+ *	Switch out the current slot and set up a new one.
+ */
+int
+__wt_log_slot_switch(WT_SESSION_IMPL *session, WT_MYSLOT *myslot)
+{
+	WT_DECL_RET;
+	WT_LOG *log;
+
+	log = S2C(session)->log;
+	/*
+	 * !!! Since the WT_WITH_SLOT_LOCK macro is a do-while loop, the
+	 * compiler does not like it combined directly with the while loop
+	 * here.
+	 */
+	WT_WITH_SLOT_LOCK(session, log,
+	    ret = __wt_log_slot_switch_internal(session, myslot));
+	while (ret == EBUSY) {
+		WT_STAT_FAST_CONN_INCR(session, log_slot_switch_busy);
+		__wt_yield();
+		WT_WITH_SLOT_LOCK(session, log,
+		    ret = __wt_log_slot_switch_internal(session, myslot));
+	}
+	WT_ASSERT(session, ret == 0);
+	return (ret);
 }
 
 /*
@@ -314,7 +352,7 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
  */
 void
 __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
-    uint32_t flags, WT_MYSLOT *myslotp)
+    uint32_t flags, WT_MYSLOT *myslot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
@@ -358,8 +396,8 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		if (mysize > WT_LOG_SLOT_BUF_MAX) {
 #endif
 			new_join = join_offset + WT_LOG_SLOT_UNBUFFERED;
-			F_SET(myslotp, WT_MYSLOT_UNBUFFERED);
-			myslotp->slot = slot;
+			F_SET(myslot, WT_MYSLOT_UNBUFFERED);
+			myslot->slot = slot;
 		} else
 			new_join = join_offset + (int32_t)mysize;
 		new_state = (int64_t)WT_LOG_SLOT_JOIN_REL(
@@ -390,14 +428,14 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		F_SET(slot, WT_SLOT_SYNC_DIR);
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(slot, WT_SLOT_SYNC);
-	if (F_ISSET(myslotp, WT_MYSLOT_UNBUFFERED)) {
+	if (F_ISSET(myslot, WT_MYSLOT_UNBUFFERED)) {
 		WT_ASSERT(session, slot->slot_unbuffered == 0);
 		WT_STAT_FAST_CONN_INCR(session, log_slot_unbuffered);
 		slot->slot_unbuffered = (int64_t)mysize;
 	}
-	myslotp->slot = slot;
-	myslotp->offset = join_offset;
-	myslotp->end_offset = (wt_off_t)((uint64_t)join_offset + mysize);
+	myslot->slot = slot;
+	myslot->offset = join_offset;
+	myslot->end_offset = (wt_off_t)((uint64_t)join_offset + mysize);
 }
 
 /*

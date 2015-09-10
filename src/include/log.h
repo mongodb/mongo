@@ -169,7 +169,8 @@ struct __wt_myslot {
 	WT_LOGSLOT	*slot;		/* Slot I'm using */
 	wt_off_t	 end_offset;	/* My end offset in buffer */
 	wt_off_t	 offset;	/* Slot buffer offset */
-#define	WT_MYSLOT_UNBUFFERED	0x01	/* Write directly */
+#define	WT_MYSLOT_CLOSE		0x01	/* This thread is closing the slot */
+#define	WT_MYSLOT_UNBUFFERED	0x02	/* Write directly */
 	uint32_t flags;			/* Flags */
 };
 

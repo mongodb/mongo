@@ -367,11 +367,12 @@ extern int __wt_logop_row_truncate_print( WT_SESSION_IMPL *session, const uint8_
 extern int __wt_txn_op_printlog( WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out);
 extern void __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot);
 extern int __wt_log_slot_close( WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *releasep, int forced);
-extern int __wt_log_slot_switch(WT_SESSION_IMPL *session, WT_LOGSLOT *slot);
+extern int __wt_log_slot_switch_internal(WT_SESSION_IMPL *session, WT_MYSLOT *myslot);
+extern int __wt_log_slot_switch(WT_SESSION_IMPL *session, WT_MYSLOT *myslot);
 extern int __wt_log_slot_new(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_destroy(WT_SESSION_IMPL *session);
-extern void __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, WT_MYSLOT *myslotp);
+extern void __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, WT_MYSLOT *myslot);
 extern int64_t __wt_log_slot_release(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, int64_t size);
 extern void __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot);
 extern int __wt_clsm_request_switch(WT_CURSOR_LSM *clsm);
