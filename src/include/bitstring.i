@@ -87,7 +87,7 @@ __bit_alloc(WT_SESSION_IMPL *session, uint64_t nbits, void *retp)
 static inline bool
 __bit_test(uint8_t *bitf, uint64_t bit)
 {
-	return (bitf[__bit_byte(bit)] & __bit_mask(bit) != 0);
+	return ((bitf[__bit_byte(bit)] & __bit_mask(bit)) != 0);
 }
 
 /*
