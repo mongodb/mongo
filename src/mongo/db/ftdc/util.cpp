@@ -102,12 +102,12 @@ namespace {
 StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
                                             const BSONObj& currentDoc,
                                             std::vector<std::uint64_t>* metrics,
+                                            bool matches,
                                             size_t recursion) {
     if (recursion > kMaxRecursion) {
         return {ErrorCodes::BadValue, "Recursion limit reached."};
     }
 
-    bool matches = true;
     BSONObjIterator itCurrent(currentDoc);
     BSONObjIterator itReference(referenceDoc);
 
@@ -180,6 +180,7 @@ StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
                 auto sw = extractMetricsFromDocument(matches ? referenceElement.Obj() : BSONObj(),
                                                      currentElement.Obj(),
                                                      metrics,
+                                                     matches,
                                                      recursion + 1);
                 if (!sw.isOK()) {
                     return sw;
@@ -207,7 +208,7 @@ StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
 StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
                                             const BSONObj& currentDoc,
                                             std::vector<std::uint64_t>* metrics) {
-    return extractMetricsFromDocument(referenceDoc, currentDoc, metrics, 0);
+    return extractMetricsFromDocument(referenceDoc, currentDoc, metrics, true, 0);
 }
 
 namespace {
