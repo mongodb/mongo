@@ -22,7 +22,7 @@ __wt_map_error_to_windows_error(int error) {
 	   Also validate he do not get any COM errors
 	   (which are negative integers)
 	*/
-	WT_ASSERT(NULL, error > 0 && error > -(windows_error_offset));
+	WT_ASSERT(NULL, error < 0);
 
 	return (error + -(windows_error_offset));
 }
@@ -96,7 +96,7 @@ __wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen)
 		    snprintf(errbuf, errlen, "%s", buf) > 0)
 			return (errbuf);
 		if (lasterror != 0 && session != NULL &&
-		    __wt_buf_set(session, &session->err, buf, strlen(buf)) == 0)
+		    __wt_buf_fmt(session, &session->err, "%s", buf) == 0)
 			return (session->err.data);
 	}
 
