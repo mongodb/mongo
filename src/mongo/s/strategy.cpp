@@ -178,7 +178,11 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
     // code path.
     // TODO: Delete the spigot and always use the new code.
     if (useClusterClientCursor) {
-        ReadPreferenceSetting readPreference(ReadPreference::PrimaryOnly, TagSet::primaryOnly());
+        // Determine the default read preference mode based on the value of the slaveOk flag.
+        ReadPreference readPreferenceOption = (q.queryOptions & QueryOption_SlaveOk)
+            ? ReadPreference::SecondaryPreferred
+            : ReadPreference::PrimaryOnly;
+        ReadPreferenceSetting readPreference(readPreferenceOption, TagSet());
 
         BSONElement rpElem;
         auto readPrefExtractStatus = bsonExtractTypedField(
