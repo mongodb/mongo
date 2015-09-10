@@ -78,7 +78,7 @@
     cmdRes = db.runCommand({
         getMore: cmdRes.cursor.id,
         collection: collName,
-        batchSize: NumberInt(10)
+        batchSize: NumberInt(11)
     });
     assert.eq(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());

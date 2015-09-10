@@ -213,6 +213,13 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     params.isTailable = query.getParsed().isTailable();
     params.isSecondaryOk = (readPref.pref != ReadPreference::PrimaryOnly);
 
+    // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
+    // usually use the batchSize associated with the initial find, but as it is illegal to send a
+    // getMore with a batchSize of 0, we set it to use the default batchSize logic.
+    if (params.batchSize && *params.batchSize == 0) {
+        params.batchSize = boost::none;
+    }
+
     // $natural sort is actually a hint to use a collection scan, and shouldn't be treated like a
     // sort on mongos. Including a $natural anywhere in the sort spec results in the whole sort
     // being considered a hint to use a collection scan.
