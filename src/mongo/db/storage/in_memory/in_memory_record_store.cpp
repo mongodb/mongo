@@ -437,8 +437,8 @@ StatusWith<RecordId> InMemoryRecordStore::updateRecord(OperationContext* txn,
     int oldLen = oldRecord->size;
 
     if (_isCapped && len > oldLen) {
-        return StatusWith<RecordId>(
-            ErrorCodes::InternalError, "failing update: objects in a capped ns cannot grow", 10003);
+        return {ErrorCodes::CannotGrowDocumentInCappedNamespace,
+                "failing update: objects in a capped ns cannot grow"};
     }
 
     if (notifier) {

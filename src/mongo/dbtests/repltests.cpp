@@ -232,19 +232,7 @@ protected:
             coll = db->createCollection(&_txn, ns);
         }
 
-        vector<RecordId> toDelete;
-        {
-            auto cursor = coll->getCursor(&_txn);
-            while (auto record = cursor->next()) {
-                toDelete.push_back(record->id);
-            }
-        }
-
-        for (vector<RecordId>::iterator i = toDelete.begin(); i != toDelete.end(); ++i) {
-            _txn.setReplicatedWrites(false);
-            coll->deleteDocument(&_txn, *i, true);
-            _txn.setReplicatedWrites(true);
-        }
+        ASSERT_OK(coll->truncate(&_txn));
         wunit.commit();
     }
     void insert(const BSONObj& o) const {

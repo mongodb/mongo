@@ -1078,8 +1078,8 @@ ReplSetTest.prototype.overflow = function( secondaries ){
     var count = master.getDB("local").oplog.rs.count();
     var prevCount = -1;
     
-    // Keep inserting till we hit our capped coll limits
-    while (count != prevCount) {
+    // Insert batches of documents until we exceed the capped size for the oplog and truncate it.
+    while (count > prevCount) {
       
       print("ReplSetTest overflow inserting 10000");
       var bulk = overflowColl.initializeUnorderedBulkOp();

@@ -61,20 +61,17 @@ class WiredTigerRecordStoreThread : public BackgroundJob {
 public:
     WiredTigerRecordStoreThread(const NamespaceString& ns)
         : BackgroundJob(true /* deleteSelf */), _ns(ns) {
-        _name = std::string("WiredTigerRecordStoreThread for ") + _ns.toString();
+        _name = std::string("WT RecordStoreThread: ") + _ns.toString();
     }
 
     virtual std::string name() const {
         return _name;
     }
 
-    /**
-     * @return Number of documents deleted.
-     */
-    int64_t _deleteExcessDocuments() {
+    void _deleteExcessDocuments() {
         if (!getGlobalServiceContext()->getGlobalStorageEngine()) {
             LOG(1) << "no global storage engine yet";
-            return 0;
+            return;
         }
 
         OperationContextImpl txn;
@@ -87,24 +84,24 @@ public:
             Database* db = autoDb.getDb();
             if (!db) {
                 LOG(2) << "no local database yet";
-                return 0;
+                return;
             }
 
             Lock::CollectionLock collectionLock(txn.lockState(), _ns.ns(), MODE_IX);
             Collection* collection = db->getCollection(_ns);
             if (!collection) {
                 LOG(2) << "no collection " << _ns;
-                return 0;
+                return;
             }
 
             OldClientContext ctx(&txn, _ns.ns(), false);
             WiredTigerRecordStore* rs =
                 checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
-            WriteUnitOfWork wuow(&txn);
-            stdx::lock_guard<boost::timed_mutex> lock(rs->cappedDeleterMutex());  // NOLINT
-            int64_t removed = rs->cappedDeleteAsNeeded_inlock(&txn, RecordId::max());
-            wuow.commit();
-            return removed;
+
+            if (!rs->yieldAndAwaitOplogDeletionRequest(&txn)) {
+                return;  // Oplog went away.
+            }
+            rs->reclaimOplog(&txn);
         } catch (const std::exception& e) {
             severe() << "error in WiredTigerRecordStoreThread: " << e.what();
             fassertFailedNoTrace(!"error in WiredTigerRecordStoreThread");
@@ -117,20 +114,8 @@ public:
         Client::initThread(_name.c_str());
 
         while (!inShutdown()) {
-            int64_t removed = _deleteExcessDocuments();
-            LOG(2) << "WiredTigerRecordStoreThread deleted " << removed;
-            if (removed == 0) {
-                // If we removed 0 documents, sleep a bit in case we're on a laptop
-                // or something to be nice.
-                sleepmillis(1000);
-            } else if (removed < 1000) {
-                // 1000 is the batch size, so we didn't even do a full batch,
-                // which is the most efficient.
-                sleepmillis(10);
-            }
+            _deleteExcessDocuments();
         }
-
-        log() << "shutting down";
     }
 
 private:

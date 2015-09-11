@@ -387,9 +387,10 @@ StatusWith<RecordId> RecordStoreV1Base::updateRecord(OperationContext* txn,
         return StatusWith<RecordId>(oldLocation);
     }
 
-    if (isCapped())
-        return StatusWith<RecordId>(
-            ErrorCodes::InternalError, "failing update: objects in a capped ns cannot grow", 10003);
+    if (isCapped()) {
+        return {ErrorCodes::CannotGrowDocumentInCappedNamespace,
+                "failing update: objects in a capped ns cannot grow"};
+    }
 
     // we have to move
     if (dataSize + MmapV1RecordHeader::HeaderSize > MaxAllowedAllocation) {

@@ -75,7 +75,7 @@ print("4: overflow oplog");
 reconnect(master.getDB("local"));
 var count = master.getDB("local").oplog.rs.count();
 var prevCount = -1;
-while (count != prevCount) {
+while (count > prevCount) {
   print("inserting 1000");
   var bulk = mdb.bar.initializeUnorderedBulkOp();
   for (var i = 0; i < 1000; i++) {
