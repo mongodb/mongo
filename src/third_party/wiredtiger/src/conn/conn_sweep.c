@@ -283,6 +283,13 @@ __sweep_server(void *arg)
 		WT_STAT_FAST_CONN_INCR(session, dh_sweeps);
 
 		/*
+		 * Sweep the lookaside table. If the lookaside table hasn't yet
+		 * been written, there's no work to do.
+		 */
+		if (__wt_las_is_written(session))
+			WT_ERR(__wt_las_sweep(session));
+
+		/*
 		 * Mark handles with a time of death, and report whether any
 		 * handles are marked dead.  If sweep_idle_time is 0, handles
 		 * never become idle.
@@ -359,8 +366,14 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 	/*
 	 * Handle sweep does enough I/O it may be called upon to perform slow
 	 * operations for the block manager.
+	 *
+	 * The sweep thread sweeps the lookaside table for outdated records,
+	 * it gets its own cursor for that purpose.
+	 *
+	 * Don't tap the sweep thread for eviction.
 	 */
-	F_SET(session, WT_SESSION_CAN_WAIT);
+	F_SET(session, WT_SESSION_CAN_WAIT |
+	    WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION);
 
 	WT_RET(__wt_cond_alloc(
 	    session, "handle sweep server", 0, &conn->sweep_cond));
@@ -399,5 +412,9 @@ __wt_sweep_destroy(WT_SESSION_IMPL *session)
 
 		conn->sweep_session = NULL;
 	}
+
+	/* Discard any saved lookaside key. */
+	__wt_buf_free(session, &conn->las_sweep_key);
+
 	return (ret);
 }

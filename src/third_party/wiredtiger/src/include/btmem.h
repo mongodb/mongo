@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#define	WT_RECNO_OOB	0		/* Illegal record number */
+
 /*
  * WT_PAGE_HEADER --
  *	Blocks have a common header, a WT_PAGE_HEADER structure followed by a
@@ -43,6 +45,7 @@ struct __wt_page_header {
 #define	WT_PAGE_EMPTY_V_ALL	0x02	/* Page has all zero-length values */
 #define	WT_PAGE_EMPTY_V_NONE	0x04	/* Page has no zero-length values */
 #define	WT_PAGE_ENCRYPTED	0x08	/* Page is encrypted on disk */
+#define	WT_PAGE_LAS_UPDATE	0x10	/* Page updates in lookaside store */
 	uint8_t flags;			/* 25: flags */
 
 	/*
@@ -168,6 +171,29 @@ struct __wt_ovfl_txnc {
 };
 
 /*
+ * Lookaside table support: when a page is being reconciled for eviction and has
+ * updates that might be required by earlier readers in the system, the updates
+ * are written into a lookaside table, and restored as necessary if the page is
+ * read. The key is a unique marker for the page (a file ID plus an address),
+ * a counter (used to ensure the update records remain in the original order),
+ * the on-page item's transaction ID (so we can discard any update records from
+ * the lookaside table once the on-page item's transaction is globally visible),
+ * and the page key (byte-string for row-store, record number for column-store).
+ * The value is the WT_UPDATE structure's transaction ID, update size and value.
+ *
+ * As the key for the lookaside table is different for row- and column-store, we
+ * store both key types in a WT_ITEM, building/parsing them in the code, because
+ * otherwise we'd need two lookaside files with different key formats. We could
+ * make the lookaside table's key standard by moving the source key into the
+ * lookaside table value, but that doesn't make the coding any simpler, and it
+ * makes the lookaside table's value more likely to overflow the page size when
+ * the row-store key is relatively large.
+ */
+#define	WT_LAS_FORMAT							\
+    "key_format=" WT_UNCHECKED_STRING(IuQQu)				\
+    ",value_format=" WT_UNCHECKED_STRING(QIu)
+
+/*
  * WT_PAGE_MODIFY --
  *	When a page is modified, there's additional information to maintain.
  */
@@ -238,15 +264,17 @@ struct __wt_page_modify {
 		 * Eviction, but block wasn't written: unresolved updates and
 		 * associated disk image.
 		 *
-		 * Skipped updates are either a WT_INSERT, or a row-store leaf
-		 * page entry.
+		 * Saved updates are either a WT_INSERT, or a row-store leaf
+		 * page entry; in the case of creating lookaside records, there
+		 * is an additional value, the committed item's transaction ID.
 		 */
-		struct __wt_upd_skipped {
+		struct __wt_save_upd {
 			WT_INSERT *ins;
 			WT_ROW	  *rip;
-		} *skip;
-		uint32_t skip_entries;
-		void	*skip_dsk;
+			uint64_t   onpage_txn;
+		} *supd;
+		uint32_t supd_entries;
+		void	*supd_dsk;
 
 		/*
 		 * Block was written: address, size and checksum.
@@ -556,9 +584,8 @@ struct __wt_page {
 #define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
-#define	WT_PAGE_SCANNING	0x10	/* Obsolete updates are being scanned */
+#define	WT_PAGE_RECONCILIATION	0x10	/* Page reconciliation lock */
 #define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
-#define	WT_PAGE_SPLIT_LOCKED	0x40	/* An internal page is growing */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	/*
@@ -869,8 +896,9 @@ WT_PACKED_STRUCT_BEGIN(__wt_update)
 	 * store 4GB objects; I'd rather do that than increase the size of this
 	 * structure for a flag bit.
 	 */
-#define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
-#define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)
+#define	WT_UPDATE_DELETED_VALUE		UINT32_MAX
+#define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = WT_UPDATE_DELETED_VALUE)
+#define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == WT_UPDATE_DELETED_VALUE)
 	uint32_t size;			/* update length */
 
 	/* The untyped value immediately follows the WT_UPDATE structure. */

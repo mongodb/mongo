@@ -37,13 +37,15 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_cond_wait --
- *	Wait on a mutex, optionally timing out.
+ * __wt_cond_wait_signal --
+ *	Wait on a mutex, optionally timing out.  If we get it
+ *	before the time out period expires, let the caller know.
  */
 int
-__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
+__wt_cond_wait_signal(
+    WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, int *signalled)
 {
-	DWORD milliseconds;
+	DWORD err, milliseconds;
 	WT_DECL_RET;
 	uint64_t milliseconds64;
 	int locked;
@@ -51,6 +53,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 	locked = 0;
 
 	/* Fast path if already signalled. */
+	*signalled = 1;
 	if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
 		return (0);
 
@@ -91,17 +94,25 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 		ret = SleepConditionVariableCS(
 		    &cond->cond, &cond->mtx, INFINITE);
 
+	/*
+	 * SleepConditionVariableCS returns non-zero on success, 0 on timeout
+	 * or failure. Check for timeout, else convert to a WiredTiger error
+	 * value and fail.
+	 */
 	if (ret == 0) {
-		if (GetLastError() == ERROR_TIMEOUT) {
-			ret = 1;
-		}
-	}
+		if ((err = GetLastError()) == ERROR_TIMEOUT)
+			*signalled = 0;
+		else
+			ret = __wt_errno();
+	} else
+		ret = 0;
 
 	(void)__wt_atomic_subi32(&cond->waiters, 1);
 
 	if (locked)
 		LeaveCriticalSection(&cond->mtx);
-	if (ret != 0)
+
+	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, ret, "SleepConditionVariableCS");
 }

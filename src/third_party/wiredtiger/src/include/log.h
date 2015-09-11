@@ -12,7 +12,6 @@
 
 /* Logging subsystem declarations. */
 #define	WT_LOG_ALIGN			128
-#define	WT_LOG_SLOT_BUF_SIZE		256 * 1024
 
 #define	WT_INIT_LSN(l)	do {						\
 	(l)->file = 1;							\
@@ -48,63 +47,133 @@
     ((size) - offsetof(WT_LOG_RECORD, record))
 
 /*
- * Compare 2 LSNs, return -1 if lsn0 < lsn1, 0 if lsn0 == lsn1
- * and 1 if lsn0 > lsn1.
- */
-#define	WT_LOG_CMP(lsn1, lsn2)						\
-	((lsn1)->file != (lsn2)->file ?					\
-	((lsn1)->file < (lsn2)->file ? -1 : 1) :			\
-	((lsn1)->offset != (lsn2)->offset ?				\
-	((lsn1)->offset < (lsn2)->offset ? -1 : 1) : 0))
-
-/*
  * Possible values for the consolidation array slot states:
- * (NOTE: Any new states must be > WT_LOG_SLOT_DONE and < WT_LOG_SLOT_READY.)
  *
- * < WT_LOG_SLOT_DONE - threads are actively writing to the log.
- * WT_LOG_SLOT_DONE - all activity on this slot is complete.
+ * WT_LOG_SLOT_CLOSE - slot is in use but closed to new joins.
  * WT_LOG_SLOT_FREE - slot is available for allocation.
- * WT_LOG_SLOT_PENDING - slot is transitioning from ready to active.
  * WT_LOG_SLOT_WRITTEN - slot is written and should be processed by worker.
- * WT_LOG_SLOT_READY - slot is ready for threads to join.
- * > WT_LOG_SLOT_READY - threads are actively consolidating on this slot.
  *
  * The slot state must be volatile: threads loop checking the state and can't
  * cache the first value they see.
+ *
+ * The slot state is divided into two 32 bit sizes.  One half is the
+ * amount joined and the other is the amount released.  Since we use
+ * a few special states, reserve the top few bits for state.  That makes
+ * the maximum size less than 32 bits for both joined and released.
  */
-#define	WT_LOG_SLOT_DONE	0
-#define	WT_LOG_SLOT_FREE	1
-#define	WT_LOG_SLOT_PENDING	2
-#define	WT_LOG_SLOT_WRITTEN	3
-#define	WT_LOG_SLOT_READY	4
+
+/*
+ * The high bit is reserved for the special states.  If the high bit is
+ * set (WT_LOG_SLOT_RESERVED) then we are guaranteed to be in a special state.
+ */
+#define	WT_LOG_SLOT_FREE	-1	/* Not in use */
+#define	WT_LOG_SLOT_WRITTEN	-2	/* Slot data written, not processed */
+
+/*
+ * We allocate the buffer size, but trigger a slot switch when we cross
+ * the maximum size of half the buffer.  If a record is more than the buffer
+ * maximum then we trigger a slot switch and write that record unbuffered.
+ * We use a larger buffer to provide overflow space so that we can switch
+ * once we cross the threshold.
+ */
+#define	WT_LOG_SLOT_BUF_SIZE		(256 * 1024)	/* Must be power of 2 */
+#define	WT_LOG_SLOT_BUF_MAX		((uint32_t)log->slot_buf_size / 2)
+#define	WT_LOG_SLOT_UNBUFFERED		(WT_LOG_SLOT_BUF_SIZE << 1)
+
+/*
+ * If new slot states are added, adjust WT_LOG_SLOT_BITS and
+ * WT_LOG_SLOT_MASK_OFF accordingly for how much of the top 32
+ * bits we are using.  More slot states here will reduce the maximum
+ * size that a slot can hold unbuffered by half.  If a record is
+ * larger than the maximum we can account for in the slot state we fall
+ * back to direct writes.
+ */
+#define	WT_LOG_SLOT_BITS	2
+#define	WT_LOG_SLOT_MAXBITS	(32 - WT_LOG_SLOT_BITS)
+#define	WT_LOG_SLOT_CLOSE	0x4000000000000000LL	/* Force slot close */
+#define	WT_LOG_SLOT_RESERVED	0x8000000000000000LL	/* Reserved states */
+
+/*
+ * Check if the unbuffered flag is set in the joined portion of
+ * the slot state.
+ */
+#define	WT_LOG_SLOT_UNBUFFERED_ISSET(state)				\
+    ((state) & ((int64_t)WT_LOG_SLOT_UNBUFFERED << 32))
+
+#define	WT_LOG_SLOT_MASK_OFF	0x3fffffffffffffffLL
+#define	WT_LOG_SLOT_MASK_ON	~(WT_LOG_SLOT_MASK_OFF)
+#define	WT_LOG_SLOT_JOIN_MASK	(WT_LOG_SLOT_MASK_OFF >> 32)
+
+/*
+ * These macros manipulate the slot state and its component parts.
+ */
+#define	WT_LOG_SLOT_FLAGS(state)	((state) & WT_LOG_SLOT_MASK_ON)
+#define	WT_LOG_SLOT_JOINED(state)	(((state) & WT_LOG_SLOT_MASK_OFF) >> 32)
+#define	WT_LOG_SLOT_JOINED_BUFFERED(state)				\
+    (WT_LOG_SLOT_JOINED(state) &			\
+    (WT_LOG_SLOT_UNBUFFERED - 1))
+#define	WT_LOG_SLOT_JOIN_REL(j, r, s)	(((j) << 32) + (r) + (s))
+#define	WT_LOG_SLOT_RELEASED(state)	((int64_t)(int32_t)(state))
+#define	WT_LOG_SLOT_RELEASED_BUFFERED(state)				\
+    ((int64_t)((int32_t)WT_LOG_SLOT_RELEASED(state) &			\
+    (WT_LOG_SLOT_UNBUFFERED - 1)))
+
+/* Slot is in use */
+#define	WT_LOG_SLOT_ACTIVE(state)					\
+    (WT_LOG_SLOT_JOINED(state) != WT_LOG_SLOT_JOIN_MASK)
+/* Slot is in use, but closed to new joins */
+#define	WT_LOG_SLOT_CLOSED(state)					\
+    (WT_LOG_SLOT_ACTIVE(state) &&					\
+    (FLD64_ISSET((uint64_t)state, WT_LOG_SLOT_CLOSE) &&			\
+    !FLD64_ISSET((uint64_t)state, WT_LOG_SLOT_RESERVED)))
+/* Slot is in use, all data copied into buffer */
+#define	WT_LOG_SLOT_INPROGRESS(state)					\
+    (WT_LOG_SLOT_RELEASED(state) != WT_LOG_SLOT_JOINED(state))
+#define	WT_LOG_SLOT_DONE(state)						\
+    (WT_LOG_SLOT_CLOSED(state) &&					\
+    !WT_LOG_SLOT_INPROGRESS(state))
+/* Slot is in use, more threads may join this slot */
+#define	WT_LOG_SLOT_OPEN(state)						\
+    (WT_LOG_SLOT_ACTIVE(state) &&					\
+    !WT_LOG_SLOT_UNBUFFERED_ISSET(state) &&				\
+    !FLD64_ISSET((uint64_t)(state), WT_LOG_SLOT_CLOSE) &&		\
+    WT_LOG_SLOT_JOINED(state) < WT_LOG_SLOT_BUF_MAX)
+
 struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_logslot {
 	volatile int64_t slot_state;	/* Slot state */
-	uint64_t slot_group_size;	/* Group size */
+	int64_t	 slot_unbuffered;	/* Unbuffered data in this slot */
 	int32_t	 slot_error;		/* Error value */
-#define	WT_SLOT_INVALID_INDEX	0xffffffff
-	uint32_t slot_index;		/* Active slot index */
 	wt_off_t slot_start_offset;	/* Starting file offset */
-	WT_LSN	slot_release_lsn;	/* Slot release LSN */
-	WT_LSN	slot_start_lsn;		/* Slot starting LSN */
-	WT_LSN	slot_end_lsn;		/* Slot ending LSN */
+	wt_off_t slot_last_offset;	/* Last record offset */
+	WT_LSN	 slot_release_lsn;	/* Slot release LSN */
+	WT_LSN	 slot_start_lsn;	/* Slot starting LSN */
+	WT_LSN	 slot_end_lsn;		/* Slot ending LSN */
 	WT_FH	*slot_fh;		/* File handle for this group */
-	WT_ITEM slot_buf;		/* Buffer for grouped writes */
-	int32_t	slot_churn;		/* Active slots are scarce. */
+	WT_ITEM  slot_buf;		/* Buffer for grouped writes */
 
-#define	WT_SLOT_BUFFERED	0x01		/* Buffer writes */
-#define	WT_SLOT_CLOSEFH		0x02		/* Close old fh on release */
-#define	WT_SLOT_SYNC		0x04		/* Needs sync on release */
-#define	WT_SLOT_SYNC_DIR	0x08		/* Directory sync on release */
+#define	WT_SLOT_CLOSEFH		0x01		/* Close old fh on release */
+#define	WT_SLOT_SYNC		0x02		/* Needs sync on release */
+#define	WT_SLOT_SYNC_DIR	0x04		/* Directory sync on release */
 	uint32_t flags;			/* Flags */
 };
 
-#define	WT_SLOT_INIT_FLAGS	(WT_SLOT_BUFFERED)
+#define	WT_SLOT_INIT_FLAGS	0
+
+#define	WT_WITH_SLOT_LOCK(session, log, op) do {			\
+	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));	\
+	WT_WITH_LOCK(session,						\
+	    &log->log_slot_lock, WT_SESSION_LOCKED_SLOT, op);		\
+} while (0)
 
 struct __wt_myslot {
-	WT_LOGSLOT	*slot;
-	wt_off_t	 offset;
+	WT_LOGSLOT	*slot;		/* Slot I'm using */
+	wt_off_t	 end_offset;	/* My end offset in buffer */
+	wt_off_t	 offset;	/* Slot buffer offset */
+#define	WT_MYSLOT_CLOSE		0x01	/* This thread is closing the slot */
+#define	WT_MYSLOT_UNBUFFERED	0x02	/* Write directly */
+	uint32_t flags;			/* Flags */
 };
-					/* Offset of first record */
+
 #define	WT_LOG_FIRST_RECORD	log->allocsize
 
 struct __wt_log {
@@ -118,8 +187,9 @@ struct __wt_log {
 	uint32_t	 tmp_fileid;	/* Temporary file number */
 	uint32_t	 prep_missed;	/* Pre-allocated file misses */
 	WT_FH           *log_fh;	/* Logging file handle */
-	WT_FH           *log_close_fh;	/* Logging file handle to close */
 	WT_FH           *log_dir_fh;	/* Log directory file handle */
+	WT_FH           *log_close_fh;	/* Logging file handle to close */
+	WT_LSN		 log_close_lsn;	/* LSN needed to close */
 
 	/*
 	 * System LSNs
@@ -140,8 +210,9 @@ struct __wt_log {
 	WT_SPINLOCK      log_lock;      /* Locked: Logging fields */
 	WT_SPINLOCK      log_slot_lock; /* Locked: Consolidation array */
 	WT_SPINLOCK      log_sync_lock; /* Locked: Single-thread fsync */
+	WT_SPINLOCK      log_writelsn_lock; /* Locked: write LSN */
 
-	WT_RWLOCK	 *log_archive_lock; /* Archive and log cursors */
+	WT_RWLOCK	 *log_archive_lock;	/* Archive and log cursors */
 
 	/* Notify any waiting threads when sync_lsn is updated. */
 	WT_CONDVAR	*log_sync_cond;
@@ -150,7 +221,6 @@ struct __wt_log {
 
 	/*
 	 * Consolidation array information
-	 * WT_SLOT_ACTIVE must be less than WT_SLOT_POOL.
 	 * Our testing shows that the more consolidation we generate the
 	 * better the performance we see which equates to an active slot
 	 * slot count of one.
@@ -158,13 +228,14 @@ struct __wt_log {
 	 * Note: this can't be an array, we impose cache-line alignment and
 	 * gcc doesn't support that for arrays.
 	 */
-#define	WT_SLOT_ACTIVE	1
 #define	WT_SLOT_POOL	128
-	WT_LOGSLOT *slot_array[WT_SLOT_ACTIVE];	/* Active slots */
-	WT_LOGSLOT  slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
-	size_t	    slot_buf_size;		/* Buffer size for slots */
+	WT_LOGSLOT	*active_slot;			/* Active slot */
+	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
+	size_t		 slot_buf_size;		/* Buffer size for slots */
+#ifdef HAVE_DIAGNOSTIC
+	uint64_t	 write_calls;		/* Calls to log_write */
+#endif
 
-#define	WT_LOG_FORCE_CONSOLIDATE	0x01	/* Disable direct writes */
 	uint32_t	 flags;
 };
 

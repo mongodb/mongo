@@ -51,6 +51,7 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	WT_STAT_SET(session, stats, btree_column_deleted, 0);
 	WT_STAT_SET(session, stats, btree_column_fix, 0);
 	WT_STAT_SET(session, stats, btree_column_internal, 0);
+	WT_STAT_SET(session, stats, btree_column_rle, 0);
 	WT_STAT_SET(session, stats, btree_column_variable, 0);
 	WT_STAT_SET(session, stats, btree_entries, 0);
 	WT_STAT_SET(session, stats, btree_overflow, 0);
@@ -114,12 +115,12 @@ __stat_page_col_var(
 	WT_COL *cip;
 	WT_INSERT *ins;
 	WT_UPDATE *upd;
-	uint64_t deleted_cnt, entry_cnt, ovfl_cnt;
+	uint64_t deleted_cnt, entry_cnt, ovfl_cnt, rle_cnt;
 	uint32_t i;
 	int orig_deleted;
 
 	unpack = &_unpack;
-	deleted_cnt = entry_cnt = ovfl_cnt = 0;
+	deleted_cnt = entry_cnt = ovfl_cnt = rle_cnt = 0;
 
 	WT_STAT_INCR(session, stats, btree_column_variable);
 
@@ -140,8 +141,10 @@ __stat_page_col_var(
 			__wt_cell_unpack(cell, unpack);
 			if (unpack->type == WT_CELL_ADDR_DEL)
 				orig_deleted = 1;
-			else
+			else {
 				entry_cnt += __wt_cell_rle(unpack);
+				rle_cnt += __wt_cell_rle(unpack) - 1;
+			}
 			if (unpack->ovfl)
 				++ovfl_cnt;
 		}
@@ -173,6 +176,7 @@ __stat_page_col_var(
 			++entry_cnt;
 
 	WT_STAT_INCRV(session, stats, btree_column_deleted, deleted_cnt);
+	WT_STAT_INCRV(session, stats, btree_column_rle, rle_cnt);
 	WT_STAT_INCRV(session, stats, btree_entries, entry_cnt);
 	WT_STAT_INCRV(session, stats, btree_overflow, ovfl_cnt);
 }

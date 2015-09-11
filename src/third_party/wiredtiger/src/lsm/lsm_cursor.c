@@ -134,7 +134,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	if (have_primary) {
 		WT_ENTER_PAGE_INDEX(session);
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
-		    ovfl = __wt_btree_lsm_size(session, hard_limit ?
+		    ovfl = __wt_btree_lsm_over_size(session, hard_limit ?
 		    2 * lsm_tree->chunk_size : lsm_tree->chunk_size));
 		WT_LEAVE_PAGE_INDEX(session);
 

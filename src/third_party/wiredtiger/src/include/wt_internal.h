@@ -41,6 +41,7 @@ extern "C" {
 #else
 #include <pthread.h>
 #endif
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -245,6 +246,8 @@ struct __wt_rwlock;
     typedef struct __wt_rwlock WT_RWLOCK;
 struct __wt_salvage_cookie;
     typedef struct __wt_salvage_cookie WT_SALVAGE_COOKIE;
+struct __wt_save_upd;
+    typedef struct __wt_save_upd WT_SAVE_UPD;
 struct __wt_scratch_track;
     typedef struct __wt_scratch_track WT_SCRATCH_TRACK;
 struct __wt_session_impl;
@@ -265,8 +268,6 @@ struct __wt_txn_op;
     typedef struct __wt_txn_op WT_TXN_OP;
 struct __wt_txn_state;
     typedef struct __wt_txn_state WT_TXN_STATE;
-struct __wt_upd_skipped;
-    typedef struct __wt_upd_skipped WT_UPD_SKIPPED;
 struct __wt_update;
     typedef struct __wt_update WT_UPDATE;
 union __wt_rand_state;
@@ -335,6 +336,7 @@ union __wt_rand_state;
 #include "cache.i"			/* required by txn.i */
 #include "cell.i"			/* required by btree.i */
 
+#include "log.i"
 #include "mutex.i"			/* required by btree.i */
 #include "txn.i"			/* required by btree.i */
 

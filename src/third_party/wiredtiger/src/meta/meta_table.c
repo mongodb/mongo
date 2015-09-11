@@ -12,22 +12,22 @@
  * __metadata_turtle --
  *	Return if a key's value should be taken from the turtle file.
  */
-static int
+static bool
 __metadata_turtle(const char *key)
 {
 	switch (key[0]) {
 	case 'f':
 		if (strcmp(key, WT_METAFILE_URI) == 0)
-			return (1);
+			return (true);
 		break;
 	case 'W':
 		if (strcmp(key, "WiredTiger version") == 0)
-			return (1);
+			return (true);
 		if (strcmp(key, "WiredTiger version string") == 0)
-			return (1);
+			return (true);
 		break;
 	}
-	return (0);
+	return (false);
 }
 
 /*
@@ -37,6 +37,8 @@ __metadata_turtle(const char *key)
 int
 __wt_metadata_open(WT_SESSION_IMPL *session)
 {
+	WT_BTREE *btree;
+
 	if (session->meta_dhandle != NULL)
 		return (0);
 
@@ -45,7 +47,24 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 	session->meta_dhandle = session->dhandle;
 	WT_ASSERT(session, session->meta_dhandle != NULL);
 
-	/* The meta_dhandle doesn't need to stay locked -- release it. */
+	/* 
+	 * Set special flags for the metadata file: eviction (the metadata file
+	 * is in-memory and never evicted), logging (the metadata file is always
+	 * logged if possible).
+	 *
+	 * Test flags before setting them so updates can't race in subsequent
+	 * opens (the first update is safe because it's single-threaded from
+	 * wiredtiger_open).
+	 */
+	btree = S2BT(session);
+	if (!F_ISSET(btree, WT_BTREE_IN_MEMORY))
+		F_SET(btree, WT_BTREE_IN_MEMORY);
+	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		F_SET(btree, WT_BTREE_NO_EVICTION);
+	if (F_ISSET(btree, WT_BTREE_NO_LOGGING))
+		F_CLR(btree, WT_BTREE_NO_LOGGING);
+
+	/* The metadata handle doesn't need to stay locked -- release it. */
 	return (__wt_session_release_btree(session));
 }
 
@@ -59,9 +78,9 @@ __wt_metadata_cursor(
 {
 	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
+	int is_dead;
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_open_cursor), config, NULL };
-	int is_dead;
 
 	saved_dhandle = session->dhandle;
 	WT_ERR(__wt_metadata_open(session));

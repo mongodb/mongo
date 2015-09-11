@@ -111,13 +111,16 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	F_CLR(conn, WT_CONN_SERVER_RUN);
 	WT_TRET(__wt_async_destroy(session));
 	WT_TRET(__wt_lsm_manager_destroy(session));
+	WT_TRET(__wt_sweep_destroy(session));
 
 	F_SET(conn, WT_CONN_CLOSING);
 
 	WT_TRET(__wt_checkpoint_server_destroy(session));
 	WT_TRET(__wt_statlog_destroy(session, 1));
-	WT_TRET(__wt_sweep_destroy(session));
 	WT_TRET(__wt_evict_destroy(session));
+
+	/* Shut down the lookaside table, after all eviction is complete. */
+	WT_TRET(__wt_las_destroy(session));
 
 	/* Close open data handles. */
 	WT_TRET(__wt_conn_dhandle_discard(session));
@@ -238,9 +241,7 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Run recovery. */
 	WT_RET(__wt_txn_recover(session));
 
-	/*
-	 * Start the handle sweep thread.
-	 */
+	/* Start the handle sweep thread. */
 	WT_RET(__wt_sweep_create(session));
 
 	/* Start the optional async threads. */

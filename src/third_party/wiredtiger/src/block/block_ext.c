@@ -86,7 +86,7 @@ __block_off_srch(WT_EXT **head, wt_off_t off, WT_EXT ***stack, int skip_off)
  * __block_first_srch --
  *	Search the skiplist for the first available slot.
  */
-static inline int
+static inline bool
 __block_first_srch(WT_EXT **head, wt_off_t size, WT_EXT ***stack)
 {
 	WT_EXT *ext;
@@ -99,11 +99,11 @@ __block_first_srch(WT_EXT **head, wt_off_t size, WT_EXT ***stack)
 		if (ext->size >= size)
 			break;
 	if (ext == NULL)
-		return (0);
+		return (false);
 
 	/* Build a stack for the offset we want. */
 	__block_off_srch(head, ext->off, stack, 0);
-	return (1);
+	return (true);
 }
 
 /*
@@ -251,7 +251,7 @@ __block_off_insert(
  *	Return if any part of a specified range appears on a specified extent
  * list.
  */
-static int
+static bool
 __block_off_match(WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
 	WT_EXT *before, *after;
@@ -261,10 +261,10 @@ __block_off_match(WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 
 	/* If "before" or "after" overlaps, we have a winner. */
 	if (before != NULL && before->off + before->size > off)
-		return (1);
+		return (true);
 	if (after != NULL && off + size > after->off)
-		return (1);
-	return (0);
+		return (true);
+	return (false);
 }
 
 /*

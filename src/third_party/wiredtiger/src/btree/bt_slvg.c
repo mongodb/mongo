@@ -349,9 +349,6 @@ err:	WT_TRET(bm->salvage_end(bm, session));
 	__wt_scr_free(session, &ss->tmp1);
 	__wt_scr_free(session, &ss->tmp2);
 
-	/* Wrap up reporting. */
-	WT_TRET(__wt_progress(session, NULL, ss->fcnt));
-
 	return (ret);
 }
 
@@ -381,8 +378,9 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		if (eof)
 			break;
 
-		/* Report progress every 10 chunks. */
-		if (++ss->fcnt % 10 == 0)
+		/* Report progress occasionally. */
+#define	WT_SALVAGE_PROGRESS_INTERVAL	100
+		if (++ss->fcnt % WT_SALVAGE_PROGRESS_INTERVAL == 0)
 			WT_ERR(__wt_progress(session, NULL, ss->fcnt));
 
 		/*
@@ -1305,7 +1303,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
 	/* Write the new version of the leaf page to disk. */
 	WT_ERR(__slvg_modify_init(session, page));
-	WT_ERR(__wt_reconcile(session, ref, cookie, WT_SKIP_UPDATE_ERR));
+	WT_ERR(__wt_reconcile(session, ref, cookie, WT_VISIBILITY_ERR));
 
 	/* Reset the page. */
 	page->pg_var_d = save_col_var;
@@ -2011,7 +2009,7 @@ __slvg_row_build_leaf(
 
 	/* Write the new version of the leaf page to disk. */
 	WT_ERR(__slvg_modify_init(session, page));
-	WT_ERR(__wt_reconcile(session, ref, cookie, WT_SKIP_UPDATE_ERR));
+	WT_ERR(__wt_reconcile(session, ref, cookie, WT_VISIBILITY_ERR));
 
 	/* Reset the page. */
 	page->pg_row_entries += skip_stop;

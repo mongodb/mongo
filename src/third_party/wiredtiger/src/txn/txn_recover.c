@@ -65,7 +65,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 			    "No file found with ID %u (max %u)",
 			    id, r->nfiles));
 		r->missing = 1;
-	} else if (WT_LOG_CMP(lsnp, &r->files[id].ckpt_lsn) >= 0) {
+	} else if (__wt_log_cmp(lsnp, &r->files[id].ckpt_lsn) >= 0) {
 		/*
 		 * We're going to apply the operation.  Get the cursor, opening
 		 * one if none is cached.
@@ -144,10 +144,10 @@ __txn_op_apply(
 		GET_RECOVERY_CURSOR(session, r, lsnp, fileid, &cursor);
 
 		/* Set up the cursors. */
-		if (start_recno == 0) {
+		if (start_recno == WT_RECNO_OOB) {
 			start = NULL;
 			stop = cursor;
-		} else if (stop_recno == 0) {
+		} else if (stop_recno == WT_RECNO_OOB) {
 			start = cursor;
 			stop = NULL;
 		} else {

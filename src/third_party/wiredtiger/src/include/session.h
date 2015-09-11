@@ -76,6 +76,11 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	WT_CURSOR_BACKUP *bkp_cursor;	/* Hot backup cursor */
 	WT_COMPACT	 *compact;	/* Compact state */
 
+	/*
+	 * Lookaside table cursor, sweep and eviction worker threads only.
+	 */
+	WT_CURSOR	*las_cursor;	/* Lookaside table cursor */
+
 	WT_DATA_HANDLE *meta_dhandle;	/* Metadata file */
 	void	*meta_track;		/* Metadata operation tracking */
 	void	*meta_track_next;	/* Current position */

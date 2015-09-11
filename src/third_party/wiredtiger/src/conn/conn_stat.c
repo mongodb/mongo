@@ -50,6 +50,7 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
 
 	__wt_async_stats_update(session);
 	__wt_cache_stats_update(session);
+	__wt_las_stats_update(session);
 	__wt_txn_stats_update(session);
 
 	WT_STAT_SET(session, stats, file_open, conn->open_file_count);
