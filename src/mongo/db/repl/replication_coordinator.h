@@ -423,10 +423,14 @@ public:
     virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) = 0;
 
     /**
-     * Signals that the primary is unavailable based on liveness information received from
-     * a node upstream.
+     * Elections under protocol version 1 are triggered by a timer.
+     * When a node is informed of the primary's liveness (either through heartbeats or
+     * while reading a sync source's oplog), it calls this function to postpone the
+     * election timer by a duration of at least 'electionTimeoutMillis' (see getConfig()).
+     * If the current node is not electable (secondary with priority > 0), this function
+     * cancels the existing timer but will not schedule a new one.
      */
-    virtual void signalPrimaryUnavailable() = 0;
+    virtual void cancelAndRescheduleElectionTimeout() = 0;
 
     /**
      * Toggles maintenanceMode to the value expressed by 'activate'

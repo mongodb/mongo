@@ -194,7 +194,7 @@ public:
 
     virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) override;
 
-    virtual void signalPrimaryUnavailable() override;
+    virtual void cancelAndRescheduleElectionTimeout() override;
 
     virtual Status setMaintenanceMode(bool activate) override;
 
@@ -302,6 +302,12 @@ public:
      * Gets the replica set configuration in use by the node.
      */
     ReplicaSetConfig getReplicaSetConfig_forTest();
+
+    /**
+     * Returns scheduled time of election timeout callback.
+     * Returns Date_t() if callback is not scheduled.
+     */
+    Date_t getElectionTimeout_forTest() const;
 
     /**
      * Simple wrapper around _setLastOptime_inlock to make it easier to test.
@@ -1046,6 +1052,17 @@ private:
     void _cancelAndRescheduleLivenessUpdate_inlock(int updatedMemberId);
 
     /**
+     * Cancels all outstanding _priorityTakeover callbacks.
+     */
+    void _cancelPriorityTakeover_inlock();
+
+    /**
+     * Cancels the current _handleElectionTimeout callback and reschedules a new callback.
+     * Returns immediately otherwise.
+     */
+    void _cancelAndRescheduleElectionTimeout_inlock();
+
+    /**
      * Callback which starts an election if this node is electable and using protocolVersion 1.
      */
     void _startElectSelfIfEligibleV1();
@@ -1269,6 +1286,14 @@ private:
 
     // Callback Handle used to cancel a scheduled LivenessTimeout callback.
     ReplicationExecutor::CallbackHandle _handleLivenessTimeoutCbh;  // (M)
+
+    // Callback Handle used to cancel a scheduled ElectionTimeout callback.
+    ReplicationExecutor::CallbackHandle _handleElectionTimeoutCbh;  // (M)
+
+    // Election timeout callback will not run before this time.
+    // If this date is Date_t(), the callback is either unscheduled or canceled.
+    // Used for testing only.
+    Date_t _handleElectionTimeoutWhen;  // (M)
 
     // Callback Handle used to cancel a scheduled PriorityTakover callback.
     ReplicationExecutor::CallbackHandle _priorityTakeoverCbh;  // (M)

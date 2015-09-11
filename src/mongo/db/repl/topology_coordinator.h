@@ -384,7 +384,7 @@ public:
      * Considers whether or not this node should stand for election, and returns true
      * if the node has transitioned to candidate role as a result of the call.
      */
-    virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) = 0;
+    virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) const = 0;
 
     /**
      * Set the outgoing heartbeat message from self

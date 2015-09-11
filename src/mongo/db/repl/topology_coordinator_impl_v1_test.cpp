@@ -2667,8 +2667,8 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPrimaryDownMajorityOfVotersUp
 
     nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0", lastOpTimeApplied);
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction.getAction());
-    ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+    ASSERT_EQUALS(HeartbeatResponseAction::ScheduleElection, nextAction.getAction());
+    ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
 }
 
 TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPrimaryDownMajority) {
@@ -2697,8 +2697,8 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPrimaryDownMajority) {
 
     nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0", lastOpTimeApplied);
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction.getAction());
-    ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+    ASSERT_EQUALS(HeartbeatResponseAction::ScheduleElection, nextAction.getAction());
+    ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
 }
 
 TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPrimaryDownMajorityButIAmArbiter) {
@@ -3394,8 +3394,8 @@ TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStartElection) {
         target(),
         StatusWith<ReplSetHeartbeatResponse>(startElectionResponse),
         election);
-    ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
-    ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+    ASSERT_EQUALS(HeartbeatResponseAction::ScheduleElection, action.getAction());
+    ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     ASSERT_EQUALS(firstRequestDate() + Milliseconds(9500), action.getNextHeartbeatStartDate());
 }
 
@@ -3535,8 +3535,8 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStartElection) {
         target(),
         StatusWith<ReplSetHeartbeatResponse>(startElectionResponse),
         election);
-    ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
-    ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+    ASSERT_EQUALS(HeartbeatResponseAction::ScheduleElection, action.getAction());
+    ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     ASSERT_EQUALS(firstRequestDate() + Milliseconds(10000), action.getNextHeartbeatStartDate());
 }
 

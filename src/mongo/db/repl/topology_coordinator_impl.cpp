@@ -1156,7 +1156,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBDataV1(
     if (!checkShouldStandForElection(now, lastOpApplied)) {
         return HeartbeatResponseAction::makeNoAction();
     }
-    return HeartbeatResponseAction::makeElectAction();
+    return HeartbeatResponseAction::makeScheduleElectionAction();
 }
 
 HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(
@@ -1345,10 +1345,12 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(
     if (!checkShouldStandForElection(now, lastOpApplied)) {
         return HeartbeatResponseAction::makeNoAction();
     }
+    fassert(28816, becomeCandidateIfElectable(now, lastOpApplied));
     return HeartbeatResponseAction::makeElectAction();
 }
 
-bool TopologyCoordinatorImpl::checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) {
+bool TopologyCoordinatorImpl::checkShouldStandForElection(Date_t now,
+                                                          const OpTime& lastOpApplied) const {
     if (_currentPrimaryIndex != -1) {
         return false;
     }
@@ -1382,8 +1384,7 @@ bool TopologyCoordinatorImpl::checkShouldStandForElection(Date_t now, const OpTi
         }
         return false;
     }
-    // All checks passed, become a candidate and start election proceedings.
-    _role = Role::candidate;
+    // All checks passed. Start election proceedings.
     return true;
 }
 

@@ -439,8 +439,8 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
         }
         const auto& metadata = metadataResult.getValue();
         _replCoord->processReplSetMetadata(metadata);
-        if (metadata.getPrimaryIndex() == rpc::ReplSetMetadata::kNoPrimary) {
-            _replCoord->signalPrimaryUnavailable();
+        if (metadata.getPrimaryIndex() != rpc::ReplSetMetadata::kNoPrimary) {
+            _replCoord->cancelAndRescheduleElectionTimeout();
         }
     }
 

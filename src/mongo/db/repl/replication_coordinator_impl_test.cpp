@@ -2616,7 +2616,7 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
     ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
 }
 
-TEST_F(ReplCoordTest, SignalPrimaryUnavailable) {
+TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeout) {
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "protocolVersion" << 1 << "version" << 2 << "members"
@@ -2628,38 +2628,241 @@ TEST_F(ReplCoordTest, SignalPrimaryUnavailable) {
                                                   << "_id" << 1))),
                        HostAndPort("node1", 12345));
 
-    ReplSetHeartbeatResponse hbResp;
-    hbResp.setSetName("mySet");
-    hbResp.setState(MemberState::RS_PRIMARY);
-    hbResp.setConfigVersion(2);
-    BSONObjBuilder respObj;
-    respObj << "ok" << 1;
-    hbResp.addToBSON(&respObj, false);
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+    ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    getReplCoord()->cancelAndRescheduleElectionTimeout();
+
 
     auto net = getNet();
     net->enterNetwork();
-    net->scheduleResponse(
-        net->getNextReadyRequest(), net->now(), makeResponseStatus(respObj.obj()));
+
+    // Black hole heartbeat request scheduled after transitioning to SECONDARY.
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto noi = net->getNextReadyRequest();
+    const auto& request = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort("node2", 12345), request.target);
+    ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+    log() << "black holing " << noi->getRequest().cmdObj;
+    net->blackHole(noi);
+
+    // Advance simulator clock to some time before the first scheduled election.
+    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    log() << "Election initially scheduled at " << electionTimeoutWhen << " (simulator time)";
+    ASSERT_GREATER_THAN(electionTimeoutWhen, net->now());
+    auto until = net->now() + (electionTimeoutWhen - net->now()) / 2;
+    net->runUntil(until);
+    ASSERT_EQUALS(until, net->now());
+    net->exitNetwork();
+
+    getReplCoord()->cancelAndRescheduleElectionTimeout();
+
+    ASSERT_EQUALS(until + replCoord->getConfig().getElectionTimeoutPeriod(),
+                  replCoord->getElectionTimeout_forTest());
+}
+
+TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutWhenNotProtocolVersion1) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
+                                                                              << "node1:12345"
+                                                                              << "_id" << 0)
+                                                                         << BSON("host"
+                                                                                 << "node2:12345"
+                                                                                 << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+    ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    getReplCoord()->cancelAndRescheduleElectionTimeout();
+
+    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    ASSERT_EQUALS(Date_t(), electionTimeoutWhen);
+}
+
+TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutWhenNotSecondary) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "protocolVersion" << 1 << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+    ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_ROLLBACK));
+
+    getReplCoord()->cancelAndRescheduleElectionTimeout();
+
+    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    ASSERT_EQUALS(Date_t(), electionTimeoutWhen);
+}
+
+TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutWhenNotElectable) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "protocolVersion" << 1 << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0 << "priority" << 0 << "hidden" << true)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+    ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    getReplCoord()->cancelAndRescheduleElectionTimeout();
+
+    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    ASSERT_EQUALS(Date_t(), electionTimeoutWhen);
+}
+
+TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutWhenRemovedDueToReconfig) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "protocolVersion" << 1 << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+    ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    getReplCoord()->cancelAndRescheduleElectionTimeout();
+
+    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+
+    auto net = getNet();
+    net->enterNetwork();
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto noi = net->getNextReadyRequest();
+    auto&& request = noi->getRequest();
+    log() << "processing " << request.cmdObj;
+    ASSERT_EQUALS(HostAndPort("node2", 12345), request.target);
+    ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+    // Respond to node1's heartbeat command with a config that excludes node1.
+    ReplSetHeartbeatResponse hbResp;
+    ReplicaSetConfig config;
+    config.initialize(BSON("_id"
+                           << "mySet"
+                           << "protocolVersion" << 1 << "version" << 3 << "members"
+                           << BSON_ARRAY(BSON("host"
+                                              << "node2:12345"
+                                              << "_id" << 1))));
+    hbResp.setConfig(config);
+    hbResp.setConfigVersion(3);
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_SECONDARY);
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true)));
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
-    ASSERT_EQUALS(1, getTopoCoord().getCurrentPrimaryIndex());
+    getReplCoord()->waitForMemberState_forTest(MemberState::RS_REMOVED);
+    ASSERT_EQUALS(config.getConfigVersion(), getReplCoord()->getConfig().getConfigVersion());
 
-    // Reset primary index but do not stand for election.
-    getReplCoord()->signalPrimaryUnavailable();
-    ASSERT_EQUALS(rpc::ReplSetMetadata::kNoPrimary, getTopoCoord().getCurrentPrimaryIndex());
-    ASSERT_EQUALS(TopologyCoordinator::Role::follower, getTopoCoord().getRole());
+    getReplCoord()->cancelAndRescheduleElectionTimeout();
 
-    // Update our optime and follower mode to secondary so that we stand for election when
-    // primary becomes unavailable.
-    getTopoCoord().setPrimaryIndex(1);
-    auto opTime = OpTime(Timestamp(1, 0), 0);
-    getReplCoord()->setMyLastOptime(opTime);
-    ASSERT_EQUALS(opTime, getReplCoord()->getMyLastOptime());
-    ASSERT_TRUE(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-    getReplCoord()->signalPrimaryUnavailable();
-    ASSERT_EQUALS(rpc::ReplSetMetadata::kNoPrimary, getTopoCoord().getCurrentPrimaryIndex());
-    ASSERT_EQUALS(TopologyCoordinator::Role::candidate, getTopoCoord().getRole());
+    ASSERT_EQUALS(Date_t(), replCoord->getElectionTimeout_forTest());
+}
+
+TEST_F(ReplCoordTest,
+       CancelAndRescheduleElectionTimeoutWhenProcessingHeartbeatResponseFromPrimary) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "protocolVersion" << 1 << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+    ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+
+    auto net = getNet();
+    net->enterNetwork();
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto noi = net->getNextReadyRequest();
+    auto&& request = noi->getRequest();
+    log() << "processing " << request.cmdObj;
+    ASSERT_EQUALS(HostAndPort("node2", 12345), request.target);
+
+    ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+    // Respond to node1's heartbeat command to indicate that node2 is PRIMARY.
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    hbResp.setState(MemberState::RS_PRIMARY);
+    // Heartbeat response is scheduled with a delay so that we can be sure that
+    // the election was rescheduled due to the heartbeat response.
+    auto heartbeatWhen = net->now() + Seconds(1);
+    net->scheduleResponse(noi, heartbeatWhen, makeResponseStatus(hbResp.toBSON(true)));
+    net->runUntil(heartbeatWhen);
+    ASSERT_EQUALS(heartbeatWhen, net->now());
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+
+    ASSERT_EQUALS(heartbeatWhen + replCoord->getConfig().getElectionTimeoutPeriod(),
+                  replCoord->getElectionTimeout_forTest());
+}
+
+TEST_F(ReplCoordTest,
+       CancelAndRescheduleElectionTimeoutWhenProcessingHeartbeatResponseWithoutState) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "protocolVersion" << 1 << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))),
+                       HostAndPort("node1", 12345));
+
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+    ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+
+    auto net = getNet();
+    net->enterNetwork();
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto noi = net->getNextReadyRequest();
+    auto&& request = noi->getRequest();
+    log() << "processing " << request.cmdObj;
+    ASSERT_EQUALS(HostAndPort("node2", 12345), request.target);
+
+    ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+    // Respond to node1's heartbeat command to indicate that node2 is PRIMARY.
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setSetName("mySet");
+    // Heartbeat response is scheduled with a delay so that we can be sure that
+    // the election was rescheduled due to the heartbeat response.
+    auto heartbeatWhen = net->now() + Seconds(1);
+    net->scheduleResponse(noi, heartbeatWhen, makeResponseStatus(hbResp.toBSON(true)));
+    net->runUntil(heartbeatWhen);
+    ASSERT_EQUALS(heartbeatWhen, net->now());
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+
+    // Election timeout should remain unchanged.
+    ASSERT_EQUALS(electionTimeoutWhen, replCoord->getElectionTimeout_forTest());
 }
 
 TEST_F(ReplCoordTest, SnapshotCommitting) {

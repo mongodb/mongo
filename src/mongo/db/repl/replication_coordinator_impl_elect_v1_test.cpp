@@ -40,6 +40,7 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
+#include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
@@ -55,6 +56,8 @@ using executor::RemoteCommandResponse;
 class ReplCoordElectV1Test : public ReplCoordTest {
 protected:
     void simulateEnoughHeartbeatsForElectability();
+    void simulateSuccessfulDryRun(
+        stdx::function<void(const RemoteCommandRequest& request)> onDryRunRequest);
     void simulateSuccessfulDryRun();
 };
 
@@ -85,16 +88,31 @@ void ReplCoordElectV1Test::simulateEnoughHeartbeatsForElectability() {
     net->exitNetwork();
 }
 
-void ReplCoordElectV1Test::simulateSuccessfulDryRun() {
+void ReplCoordElectV1Test::simulateSuccessfulDryRun(
+    stdx::function<void(const RemoteCommandRequest& request)> onDryRunRequest) {
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
     NetworkInterfaceMock* net = getNet();
+
+    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+    log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+
+    int voteRequests = 0;
+    int votesExpected = rsConfig.getNumMembers() / 2;
+    log() << "Simulating dry run responses - expecting " << votesExpected
+          << " replSetRequestVotes requests";
     net->enterNetwork();
-    for (int i = 0; i < rsConfig.getNumMembers() / 2; ++i) {
+    while (voteRequests < votesExpected) {
+        if (net->now() < electionTimeoutWhen) {
+            net->runUntil(electionTimeoutWhen);
+        }
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
         log() << request.target.toString() << " processing " << request.cmdObj;
         if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
+            ASSERT_TRUE(request.cmdObj.getBoolField("dryRun"));
+            onDryRunRequest(request);
             net->scheduleResponse(
                 noi,
                 net->now(),
@@ -102,6 +120,7 @@ void ReplCoordElectV1Test::simulateSuccessfulDryRun() {
                                              << ""
                                              << "term" << request.cmdObj["term"].Long()
                                              << "voteGranted" << true)));
+            voteRequests++;
         } else {
             error() << "Black holing unexpected request to " << request.target << ": "
                     << request.cmdObj;
@@ -110,7 +129,15 @@ void ReplCoordElectV1Test::simulateSuccessfulDryRun() {
         net->runReadyNetworkOperations();
     }
     net->exitNetwork();
+    log() << "Simulating dry run responses - scheduled " << voteRequests
+          << " replSetRequestVotes responses";
     getReplCoord()->waitForElectionDryRunFinish_forTest();
+    log() << "Simulating dry run responses - dry run completed";
+}
+
+void ReplCoordElectV1Test::simulateSuccessfulDryRun() {
+    auto onDryRunRequest = [](const RemoteCommandRequest& request) {};
+    simulateSuccessfulDryRun(onDryRunRequest);
 }
 
 TEST_F(ReplCoordElectV1Test, ElectTooSoon) {
@@ -154,14 +181,26 @@ TEST_F(ReplCoordElectV1Test, ElectTwoNodesWithOneZeroVoter) {
 
     getReplCoord()->setMyLastOptime(OpTime(Timestamp(10, 0), 0));
 
+    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+    log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
-    const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-    net->scheduleResponse(noi, net->now(), ResponseStatus(ErrorCodes::OperationFailed, "timeout"));
-    net->runReadyNetworkOperations();
+    while (net->now() < electionTimeoutWhen) {
+        net->runUntil(electionTimeoutWhen);
+        if (!net->hasReadyRequests()) {
+            continue;
+        }
+        auto noi = net->getNextReadyRequest();
+        const auto& request = noi->getRequest();
+        error() << "Black holing irrelevant request to " << request.target << ": "
+                << request.cmdObj;
+        net->blackHole(noi);
+    }
     net->exitNetwork();
 
-    // _startElectSelfV1 is called synchronously in the processing of HB response, so election
+    // _startElectSelfV1 is called when election timeout expires, so election
     // finished event has been set.
     getReplCoord()->waitForElectionFinish_forTest();
 
@@ -259,9 +298,18 @@ TEST_F(ReplCoordElectV1Test, ElectNotEnoughVotesInDryRun) {
 
     simulateEnoughHeartbeatsForElectability();
 
+    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+    log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+
+    int voteRequests = 0;
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
-    while (net->hasReadyRequests()) {
+    while (voteRequests < 2) {
+        if (net->now() < electionTimeoutWhen) {
+            net->runUntil(electionTimeoutWhen);
+        }
+        ASSERT_TRUE(net->hasReadyRequests());
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
         log() << request.target.toString() << " processing " << request.cmdObj;
@@ -273,6 +321,7 @@ TEST_F(ReplCoordElectV1Test, ElectNotEnoughVotesInDryRun) {
                                   makeResponseStatus(BSON("ok" << 1 << "term" << 0 << "voteGranted"
                                                                << false << "reason"
                                                                << "don't like him much")));
+            voteRequests++;
         }
         net->runReadyNetworkOperations();
     }
@@ -304,9 +353,18 @@ TEST_F(ReplCoordElectV1Test, ElectStaleTermInDryRun) {
 
     simulateEnoughHeartbeatsForElectability();
 
+    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+    log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+
+    int voteRequests = 0;
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
-    while (net->hasReadyRequests()) {
+    while (voteRequests < 1) {
+        if (net->now() < electionTimeoutWhen) {
+            net->runUntil(electionTimeoutWhen);
+        }
+        ASSERT_TRUE(net->hasReadyRequests());
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
         log() << request.target.toString() << " processing " << request.cmdObj;
@@ -319,6 +377,7 @@ TEST_F(ReplCoordElectV1Test, ElectStaleTermInDryRun) {
                 makeResponseStatus(BSON("ok" << 1 << "term" << request.cmdObj["term"].Long() + 1
                                              << "voteGranted" << false << "reason"
                                              << "quit living in the past")));
+            voteRequests++;
         }
         net->runReadyNetworkOperations();
     }
@@ -387,7 +446,7 @@ TEST_F(ReplCoordElectV1Test, ElectionDuringHBReconfigFails) {
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(2));
     startCapturingLogMessages();
 
-    // receive sufficient heartbeats to trigger an election
+    // receive sufficient heartbeats to allow the node to see a majority.
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
     net->enterNetwork();
@@ -409,6 +468,21 @@ TEST_F(ReplCoordElectV1Test, ElectionDuringHBReconfigFails) {
             net->blackHole(noi);
         }
         net->runReadyNetworkOperations();
+    }
+    net->exitNetwork();
+
+    // Advance the simulator clock sufficiently to trigger an election.
+    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+    log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+
+    net->enterNetwork();
+    while (net->now() < electionTimeoutWhen) {
+        net->runUntil(electionTimeoutWhen);
+        if (!net->hasReadyRequests()) {
+            continue;
+        }
+        net->blackHole(net->getNextReadyRequest());
     }
     net->exitNetwork();
 
@@ -633,10 +707,14 @@ TEST_F(ReplCoordElectV1Test, ElectTermChangeDuringDryRun) {
     ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
     simulateEnoughHeartbeatsForElectability();
-    // update to a future term before dry run completes
-    getReplCoord()->updateTerm(1000);
-    simulateSuccessfulDryRun();
-    getReplCoord()->waitForElectionFinish_forTest();
+
+    auto onDryRunRequest = [this](const RemoteCommandRequest& request) {
+        // Update to a future term before dry run completes.
+        ASSERT_EQUALS(1, request.cmdObj.getIntField("candidateId"));
+        ASSERT_TRUE(getTopoCoord().updateTerm(1000, getNet()->now()));
+    };
+    simulateSuccessfulDryRun(onDryRunRequest);
+
     stopCapturingLogMessages();
     ASSERT_EQUALS(
         1, countLogLinesContaining("not running for primary, we have been superceded already"));
@@ -722,22 +800,6 @@ TEST_F(ReplCoordElectV1Test, LearningAboutNewTermDelaysElection) {
     ASSERT_EQ(
         2, countLogLinesContaining("because I stood up or learned about a new term too recently"));
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
-
-    auto net = getNet();
-    auto startingTime = net->now();
-
-    // Wait until the node is able to run election again by replying received heartbeats.
-    // Updating the term will delay a new election for the duration of the election timeout,
-    // while the heartbeat interval is half of that, so we wait for two more rounds.
-    net->enterNetwork();
-    net->runUntil(startingTime + config.getElectionTimeoutPeriod() / 2);
-    net->exitNetwork();
-    simulateEnoughHeartbeatsForElectability();
-
-    net->enterNetwork();
-    net->runUntil(startingTime + config.getElectionTimeoutPeriod());
-    net->exitNetwork();
-    simulateEnoughHeartbeatsForElectability();
 
     simulateSuccessfulV1Election();
     ASSERT(getReplCoord()->getMemberState().primary())

@@ -251,6 +251,14 @@ ReplicaSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
     return _rsConfig;
 }
 
+Date_t ReplicationCoordinatorImpl::getElectionTimeout_forTest() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (!_handleElectionTimeoutCbh.isValid()) {
+        return Date_t();
+    }
+    return _handleElectionTimeoutWhen;
+}
+
 OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_currentCommittedSnapshot) {
@@ -1605,20 +1613,9 @@ void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetada
         &ReplicationCoordinatorImpl::_processReplSetMetadata_incallback, this, replMetadata));
 }
 
-void ReplicationCoordinatorImpl::signalPrimaryUnavailable() {
-    auto work = [this](const CallbackArgs&) {
-        // We may have learned that the primary is down in heartbeat.
-        // TODO(siyuan) Clean up this code/comment after we only allow timer-based election.
-        if (_topCoord->getRole() != TopologyCoordinator::Role::follower) {
-            return;
-        }
-
-        _topCoord->setPrimaryIndex(-1);
-        if (_topCoord->checkShouldStandForElection(_replExecutor.now(), getMyLastOptime())) {
-            _startElectSelfV1();
-        }
-    };
-    _scheduleWorkAndWaitForCompletion(work);
+void ReplicationCoordinatorImpl::cancelAndRescheduleElectionTimeout() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _cancelAndRescheduleElectionTimeout_inlock();
 }
 
 void ReplicationCoordinatorImpl::_processReplSetMetadata_incallback(
@@ -2187,6 +2184,8 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
     _memberState = newState;
     log() << "transition to " << newState.toString() << rsLog;
 
+    _cancelAndRescheduleElectionTimeout_inlock();
+
     // Notifies waiters blocked in waitForMemberState_forTest().
     // For testing only.
     _memberStateChange.notify_all();
@@ -2331,10 +2330,9 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
         log() << "This node is not a member of the config";
     }
 
-    if (_priorityTakeoverCbh.isValid()) {
-        _replExecutor.cancel(_priorityTakeoverCbh);
-        _priorityTakeoverCbh = CallbackHandle();
-    }
+    _cancelPriorityTakeover_inlock();
+    _cancelAndRescheduleElectionTimeout_inlock();
+
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
     _updateSlaveInfoFromConfig_inlock();
     if (_selfIndex >= 0) {
@@ -2973,9 +2971,9 @@ bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term) {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _cachedTerm = _topCoord->getTerm();
 
-        if (updated && _priorityTakeoverCbh.isValid()) {
-            _replExecutor.cancel(_priorityTakeoverCbh);
-            _priorityTakeoverCbh = CallbackHandle();
+        if (updated) {
+            _cancelPriorityTakeover_inlock();
+            _cancelAndRescheduleElectionTimeout_inlock();
         }
     }
 

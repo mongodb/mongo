@@ -168,11 +168,19 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
     OperationContextReplMock txn;
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
     NetworkInterfaceMock* net = getNet();
+
+    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+    log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+
     ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
     ASSERT(replCoord->getMemberState().secondary()) << replCoord->getMemberState().toString();
     while (!replCoord->getMemberState().primary()) {
         log() << "Waiting on network in state " << replCoord->getMemberState();
         getNet()->enterNetwork();
+        if (net->now() < electionTimeoutWhen) {
+            net->runUntil(electionTimeoutWhen);
+        }
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
         log() << request.target.toString() << " processing " << request.cmdObj;

@@ -212,7 +212,7 @@ public:
     virtual bool voteForMyself(Date_t now);
     virtual void processWinElection(OID electionId, Timestamp electionOpTime);
     virtual void processLoseElection();
-    virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied);
+    virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) const;
     virtual void setMyHeartbeatMessage(const Date_t now, const std::string& message);
     virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied);
     virtual bool stepDownIfPending();
