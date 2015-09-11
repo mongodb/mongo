@@ -239,10 +239,8 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
     }
 
     if (!conn->getStatus().isOK()) {
-        // If the connection failed cascade to all callers.
-        //
         // TODO: alert via some callback if the host is bad
-        return processFailure(conn->getStatus(), std::move(lk));
+        return;
     }
 
     auto now = _parent->_factory->now();
