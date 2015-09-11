@@ -187,6 +187,11 @@ var st;
         csrsStatus = csrs[0].adminCommand({replSetGetStatus: 1});
         var i;
         for (i = 0; i < csrsStatus.members.length; ++i) {
+            if (csrsStatus.members[i].stateStr == "STARTUP" ||
+                csrsStatus.members[i].stateStr == "STARTUP2" ||
+                csrsStatus.members[i].stateStr == "RECOVERING") {
+                return false;
+            }
             if (TestData.storageEngine != "wiredTiger" && TestData.storageEngine != "") {
                 // NOTE: "" means default storage engine, which is WiredTiger.
                 if (csrsStatus.members[i].name == csrs[0].name &&
