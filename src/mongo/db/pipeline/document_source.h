@@ -1149,30 +1149,34 @@ public:
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
     /**
-      Create a new projection DocumentSource from BSON.
-
-      This is a convenience for directly handling BSON, and relies on the
-      above methods.
-
-      @param pBsonElement the BSONElement with an object named $project
-      @param pExpCtx the expression context for the pipeline
-      @returns the created projection
+     * Creates a new $unwind DocumentSource from a BSON specification.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    std::string getUnwindPath() {
-        return _unwindPath->getPath(false);
+    static boost::intrusive_ptr<DocumentSourceUnwind> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const std::string& path,
+        bool includeNullIfEmptyOrMissing);
+
+    std::string getUnwindPath() const {
+        return _unwindPath.getPath(false);
+    }
+
+    bool preserveNullAndEmptyArrays() const {
+        return _preserveNullAndEmptyArrays;
     }
 
 private:
-    explicit DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    /** Specify the field to unwind. */
-    void unwindPath(const FieldPath& fieldPath);
+    DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                         const FieldPath& fieldPath,
+                         bool includeNullIfEmptyOrMissing);
 
     // Configuration state.
-    std::unique_ptr<FieldPath> _unwindPath;
+    const FieldPath _unwindPath;
+    // Documents that have a nullish value, or an empty array for the field '_unwindPath', will pass
+    // through the $unwind stage unmodified if '_preserveNullAndEmptyArrays' is true.
+    const bool _preserveNullAndEmptyArrays;
 
     // Iteration state.
     class Unwinder;
