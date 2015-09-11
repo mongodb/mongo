@@ -365,21 +365,25 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfigNo
         status = Status::OK();
     };
 
+    BSONObj readConcernObj;
+    if (readConcern) {
+        BSONObjBuilder bob;
+        readConcern->appendInfo(&bob);
+        readConcernObj =
+            bob.done().getObjectField(repl::ReadConcernArgs::kReadConcernFieldName).getOwned();
+    }
+
     auto lpq = LiteParsedQuery::makeAsFindCmd(nss,
                                               query,
                                               BSONObj(),  // projection
                                               sort,
-                                              BSONObj(),    // hint
+                                              BSONObj(),  // hint
+                                              readConcernObj,
                                               boost::none,  // skip
                                               limit);
 
     BSONObjBuilder findCmdBuilder;
     lpq->asFindCommand(&findCmdBuilder);
-
-    if (readConcern) {
-        BSONObjBuilder builder;
-        readConcern->appendInfo(&findCmdBuilder);
-    }
 
     QueryFetcher fetcher(
         _executor.get(), host, nss, findCmdBuilder.done(), fetcherCallback, kReplMetadata);

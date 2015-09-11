@@ -161,6 +161,14 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_hint = hintObj;
+        } else if (str::equals(fieldName, repl::ReadConcernArgs::kReadConcernFieldName.c_str())) {
+            // Read concern parsing is handled elsewhere, but we store a copy here.
+            Status status = checkFieldType(el, Object);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            pq->_readConcern = el.Obj().getOwned();
         } else if (str::equals(fieldName, kSkipField)) {
             if (!el.isNumber()) {
                 str::stream ss;
@@ -351,9 +359,6 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
                               str::stream() << "Failed to parse options: " << optionsObj.toString()
                                             << ". You may need to update your shell or driver.");
             }
-        } else if (str::equals(fieldName, repl::ReadConcernArgs::kReadConcernFieldName.c_str())) {
-            // read concern parsing is handled elsewhere.
-            continue;
         } else if (str::equals(fieldName, kShardVersionField)) {
             // Shard version parsing is handled elsewhere.
         } else if (str::equals(fieldName, kConfigOpTimeField)) {
@@ -417,6 +422,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     const BSONObj& projection,
     const BSONObj& sort,
     const BSONObj& hint,
+    const BSONObj& readConcern,
     boost::optional<long long> skip,
     boost::optional<long long> limit,
     boost::optional<long long> batchSize,
@@ -448,6 +454,7 @@ std::unique_ptr<LiteParsedQuery> LiteParsedQuery::makeAsFindCmd(
     pq->_proj = projection;
     pq->_sort = sort;
     pq->_hint = hint;
+    pq->_readConcern = readConcern;
 
     pq->_skip = skip;
     pq->_limit = limit;
@@ -500,6 +507,10 @@ void LiteParsedQuery::asFindCommand(BSONObjBuilder* cmdBuilder) const {
 
     if (!_hint.isEmpty()) {
         cmdBuilder->append(kHintField, _hint);
+    }
+
+    if (!_readConcern.isEmpty()) {
+        cmdBuilder->append(repl::ReadConcernArgs::kReadConcernFieldName, _readConcern);
     }
 
     if (_skip) {

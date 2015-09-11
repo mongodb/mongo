@@ -103,6 +103,7 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
                                           newProjection,
                                           lpq.getSort(),
                                           lpq.getHint(),
+                                          lpq.getReadConcern(),
                                           boost::none,  // Don't forward skip.
                                           newLimit,
                                           lpq.getBatchSize(),

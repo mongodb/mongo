@@ -89,6 +89,7 @@ public:
         const BSONObj& projection = BSONObj(),
         const BSONObj& sort = BSONObj(),
         const BSONObj& hint = BSONObj(),
+        const BSONObj& readConcern = BSONObj(),
         boost::optional<long long> skip = boost::none,
         boost::optional<long long> limit = boost::none,
         boost::optional<long long> batchSize = boost::none,
@@ -189,6 +190,9 @@ public:
     }
     const BSONObj& getHint() const {
         return _hint;
+    }
+    const BSONObj& getReadConcern() const {
+        return _readConcern;
     }
 
     static const long long kDefaultBatchSize;
@@ -349,6 +353,8 @@ private:
     // the key pattern hinted.  If the hint was by index name, the value of '_hint' is
     // {$hint: <String>}, where <String> is the index name hinted.
     BSONObj _hint;
+    // The read concern is parsed elsewhere.
+    BSONObj _readConcern;
 
     bool _wantMore = true;
 

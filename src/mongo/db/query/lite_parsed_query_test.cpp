@@ -288,6 +288,7 @@ TEST(LiteParsedQueryTest, MakeAsFindCmdDefaultArgs) {
     ASSERT_EQUALS(BSONObj(), lpq->getProj());
     ASSERT_EQUALS(BSONObj(), lpq->getSort());
     ASSERT_EQUALS(BSONObj(), lpq->getHint());
+    ASSERT_EQUALS(BSONObj(), lpq->getReadConcern());
 
     ASSERT_FALSE(lpq->getSkip());
     ASSERT_FALSE(lpq->getLimit());
@@ -321,6 +322,7 @@ TEST(LiteParsedQueryTest, MakeFindCmdAllArgs) {
                                               BSON("b" << 1),
                                               BSON("c" << 1),
                                               BSON("d" << 1),
+                                              BSON("e" << 1),
                                               4,
                                               5,
                                               6,
@@ -349,6 +351,7 @@ TEST(LiteParsedQueryTest, MakeFindCmdAllArgs) {
     ASSERT_EQUALS(BSON("b" << 1), lpq->getProj());
     ASSERT_EQUALS(BSON("c" << 1), lpq->getSort());
     ASSERT_EQUALS(BSON("d" << 1), lpq->getHint());
+    ASSERT_EQUALS(BSON("e" << 1), lpq->getReadConcern());
 
     ASSERT_EQ(4, *lpq->getSkip());
     ASSERT_EQ(5, *lpq->getLimit());
@@ -383,6 +386,7 @@ TEST(LiteParsedQueryTest, MakeAsFindCmdNToReturn) {
                                               BSON("b" << 1),
                                               BSON("c" << 1),
                                               BSON("d" << 1),
+                                              BSON("e" << 1),
                                               4,
                                               boost::none,
                                               boost::none,
@@ -411,6 +415,7 @@ TEST(LiteParsedQueryTest, MakeAsFindCmdNToReturn) {
     ASSERT_EQUALS(BSON("b" << 1), lpq->getProj());
     ASSERT_EQUALS(BSON("c" << 1), lpq->getSort());
     ASSERT_EQUALS(BSON("d" << 1), lpq->getHint());
+    ASSERT_EQUALS(BSON("e" << 1), lpq->getReadConcern());
 
     ASSERT_EQ(4, *lpq->getSkip());
     ASSERT_FALSE(lpq->getLimit());
@@ -619,6 +624,7 @@ TEST(LiteParsedQueryTest, ParseFromCommandAllNonOptionFields) {
         "sort: {b: 1},"
         "projection: {c: 1},"
         "hint: {d: 1},"
+        "readConcern: {e: 1},"
         "limit: 3,"
         "skip: 5,"
         "batchSize: 90,"
@@ -637,6 +643,8 @@ TEST(LiteParsedQueryTest, ParseFromCommandAllNonOptionFields) {
     ASSERT_EQUALS(0, expectedProj.woCompare(lpq->getProj()));
     BSONObj expectedHint = BSON("d" << 1);
     ASSERT_EQUALS(0, expectedHint.woCompare(lpq->getHint()));
+    BSONObj expectedReadConcern = BSON("e" << 1);
+    ASSERT_EQUALS(0, expectedReadConcern.woCompare(lpq->getReadConcern()));
     ASSERT_EQUALS(3, *lpq->getLimit());
     ASSERT_EQUALS(5, *lpq->getSkip());
     ASSERT_EQUALS(90, *lpq->getBatchSize());
@@ -922,6 +930,16 @@ TEST(LiteParsedQueryTest, ParseFromCommandPartialWrongType) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+TEST(LiteParsedQueryTest, ParseFromCommandReadConcernWrongType) {
+    BSONObj cmdObj = fromjson(
+        "{find: 'testns',"
+        "filter:  {a: 1},"
+        "readConcern: 'foo'}");
+    const NamespaceString nss("test.testns");
+    bool isExplain = false;
+    auto result = LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain);
+    ASSERT_NOT_OK(result.getStatus());
+}
 //
 // Parsing errors where a field has the right type but a bad value.
 //
