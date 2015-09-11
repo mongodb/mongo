@@ -438,9 +438,10 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	WT_DECL_RET;
 	WT_PAGE *page;
 	u_int sleep_cnt, wait_cnt;
-	int busy, cache_work, force_attempts, oldgen;
+	int busy, cache_work, force_attempts, oldgen, stalled;
 
 	btree = S2BT(session);
+	stalled = 0;
 
 	for (force_attempts = oldgen = 0, sleep_cnt = wait_cnt = 0;;) {
 		switch (ref->state) {
@@ -469,6 +470,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
 			/* Waiting on another thread's read, stall. */
 			WT_STAT_FAST_CONN_INCR(session, page_read_blocked);
+			stalled = 1;
 			break;
 		case WT_REF_LOCKED:
 			if (LF_ISSET(WT_READ_NO_WAIT))
@@ -476,6 +478,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
 			/* Waiting on eviction, stall. */
 			WT_STAT_FAST_CONN_INCR(session, page_locked_blocked);
+			stalled = 1;
 			break;
 		case WT_REF_SPLIT:
 			return (WT_RESTART);
@@ -530,6 +533,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 					ret = 0;
 					WT_STAT_FAST_CONN_INCR(session,
 					    page_forcible_evict_blocked);
+					stalled = 1;
 					break;
 				}
 				WT_RET(ret);
@@ -574,7 +578,9 @@ skip_evict:
 		 * we've yielded enough times, start sleeping so we don't burn
 		 * CPU to no purpose.
 		 */
-		if (++wait_cnt < 1000) {
+		if (stalled)
+			wait_cnt += 1000;
+		else if (++wait_cnt < 1000) {
 			__wt_yield();
 			continue;
 		}
