@@ -108,21 +108,24 @@ __wt_log_slot_switch_internal(WT_SESSION_IMPL *session, WT_MYSLOT *myslot)
 {
 	WT_DECL_RET;
 	WT_LOG *log;
-	int dummy;
+	int release;
 #ifdef HAVE_DIAGNOSTIC
 	int64_t r, state;
 	int32_t j;
 #endif
 
 	log = S2C(session)->log;
+	release = 0;
+
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+
 	/*
 	 * If someone else raced us to closing this specific slot, we're
 	 * done here.
 	 */
 	if (myslot->slot != log->active_slot)
 		return (0);
-	ret = 0;
+
 	/*
 	 * If close returns WT_NOTFOUND, it means that someone else is
 	 * processing the slot change.  However, we could have retried
@@ -130,17 +133,19 @@ __wt_log_slot_switch_internal(WT_SESSION_IMPL *session, WT_MYSLOT *myslot)
 	 * someone else and we need to try setting up a new slot again.
 	 */
 	if (!F_ISSET(myslot, WT_MYSLOT_CLOSE)) {
-		ret = __wt_log_slot_close(session, myslot->slot, &dummy, 0);
+		ret = __wt_log_slot_close(session, myslot->slot, &release, 0);
 		if (ret == WT_NOTFOUND)
 			return (0);
 	}
+
 	/*
 	 * Only mainline callers use switch.  Our size should be in join
 	 * and we have not yet released, so we should never think release
 	 * should be done now.
 	 */
-	WT_ASSERT(session, dummy == 0);
+	WT_ASSERT(session, release == 0);
 	WT_ASSERT(session, ret == 0);
+
 	/*
 	 * Set that we have closed this slot because we may call in here
 	 * multiple times if we retry creating a new slot.
