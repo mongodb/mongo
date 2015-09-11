@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	VersionStr = "3.1.7"
+	VersionStr = "3.1.8"
 )
 
 // Gitspec that the tool was built with. Needs to be set using -ldflags
