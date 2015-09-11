@@ -125,6 +125,11 @@ void CappedInsertNotifier::notifyOfInsert(int count) {
     _cappedNewDataNotifier.notify_all();
 }
 
+void CappedInsertNotifier::notifyAll() {
+    stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
+    _cappedNewDataNotifier.notify_all();
+}
+
 uint64_t CappedInsertNotifier::getCount() const {
     stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
     return _cappedInsertCount;
@@ -136,6 +141,13 @@ void CappedInsertNotifier::waitForInsert(uint64_t referenceCount, Microseconds t
         if (stdx::cv_status::timeout == _cappedNewDataNotifier.wait_for(lk, timeout)) {
             return;
         }
+    }
+}
+
+void CappedInsertNotifier::waitForInsert(uint64_t referenceCount) const {
+    stdx::unique_lock<stdx::mutex> lk(_cappedNewDataMutex);
+    while (!_dead && referenceCount == _cappedInsertCount) {
+        _cappedNewDataNotifier.wait(lk);
     }
 }
 

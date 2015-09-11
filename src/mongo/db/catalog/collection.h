@@ -114,6 +114,11 @@ public:
     void notifyOfInsert(int count);
 
     /**
+     * Wakes up all threads waiting but doesn't increment the count.
+     */
+    void notifyAll();
+
+    /**
      * Get a counter value which is incremented on every insert into a capped collection.
      * The return value should be used as a reference value to pass into waitForCappedInsert().
      */
@@ -122,11 +127,18 @@ public:
     /**
      * Waits for 'timeout' microseconds, or until notifyAll() is called to indicate that new
      * data is available in the capped collection.
+     *
+     * NOTE: Waiting threads can be signaled by calling kill or notify* methods.
      */
     void waitForInsert(uint64_t referenceCount, Microseconds timeout) const;
 
     /**
-     * Cancels the notifier if the collection is dropped/invalidated.
+     * Same as above but without a timeout.
+     */
+    void waitForInsert(uint64_t referenceCount) const;
+
+    /**
+     * Cancels the notifier if the collection is dropped/invalidated, and wakes all waiting.
      */
     void kill();
 
