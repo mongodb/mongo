@@ -435,7 +435,7 @@ Status addMongodOptions(moe::OptionSection* options) {
                                        "Controls what config server protocol is in use. When set to"
                                        " \"sccc\" keeps server in legacy SyncClusterConnection mode"
                                        " even when the service is running as a replSet")
-        .setSources(moe::SourceAllLegacy);
+        .setSources(moe::SourceAll);
 
     sharding_options.addOptionChaining(
                          "shardsvr",
