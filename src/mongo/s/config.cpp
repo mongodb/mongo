@@ -797,8 +797,12 @@ void ConfigServer::replicaSetChangeShardRegistryUpdateHook(const string& setName
     auto shard = grid.shardRegistry()->lookupRSName(setName);
     if (shard) {
         // Inform the ShardRegsitry of the new connection string for the shard.
-        grid.shardRegistry()->updateLookupMapsForShard(
-            std::move(shard), fassertStatusOK(28805, ConnectionString::parse(newConnectionString)));
+        auto connString = fassertStatusOK(28805, ConnectionString::parse(newConnectionString));
+        if (shard->isConfig()) {
+            grid.shardRegistry()->updateConfigServerConnectionString(connString);
+        } else {
+            grid.shardRegistry()->updateLookupMapsForShard(std::move(shard), connString);
+        }
     }
 }
 
