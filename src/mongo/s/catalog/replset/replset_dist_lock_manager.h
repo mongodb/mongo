@@ -94,7 +94,8 @@ private:
      * Returns true if the current process that owns the lock has no fresh pings since
      * the lock expiration threshold.
      */
-    StatusWith<bool> canOvertakeLock(const LocksType lockDoc);
+    StatusWith<bool> canOvertakeLock(const LocksType lockDoc,
+                                     const stdx::chrono::milliseconds& lockExpiration);
 
     //
     // All member variables are labeled with one of the following codes indicating the

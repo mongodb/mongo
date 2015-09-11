@@ -38,10 +38,13 @@
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+MONGO_FP_DECLARE(setSCCCDistLockTimeout);
 
 using std::endl;
 using std::list;
@@ -334,8 +337,13 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
     // This should always be true, if not, we are using the lock incorrectly.
     verify(_name != "");
 
+    auto lockTimeout = _lockTimeout;
+    MONGO_FAIL_POINT_BLOCK(setSCCCDistLockTimeout, customTimeout) {
+        const BSONObj& data = customTimeout.getData();
+        lockTimeout = data["timeoutMs"].numberInt();
+    }
     LOG(logLvl) << "trying to acquire new distributed lock for " << _name << " on " << _conn
-                << " ( lock timeout : " << _lockTimeout << ", ping interval : " << _lockPing
+                << " ( lock timeout : " << lockTimeout << ", ping interval : " << _lockPing
                 << ", process : " << _processId << " )" << endl;
 
     // write to dummy if 'other' is null
@@ -384,7 +392,8 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
             }
 
             unsigned long long elapsed = 0;
-            unsigned long long takeover = _lockTimeout;
+            unsigned long long takeover = lockTimeout;
+
             DistLockPingInfo lastPingEntry = getLastPing();
 
             LOG(logLvl) << "checking last ping for lock '" << lockName << "' against process "

@@ -11,7 +11,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/s/catalog/catalog_types',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_interface',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager'
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
+        '$BUILD_DIR/mongo/util/fail_point'
     ],
 )
 
