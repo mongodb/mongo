@@ -127,9 +127,11 @@
     (FLD64_ISSET((uint64_t)state, WT_LOG_SLOT_CLOSE) &&			\
     !FLD64_ISSET((uint64_t)state, WT_LOG_SLOT_RESERVED)))
 /* Slot is in use, all data copied into buffer */
+#define	WT_LOG_SLOT_INPROGRESS(state)					\
+    (WT_LOG_SLOT_RELEASED(state) != WT_LOG_SLOT_JOINED(state))
 #define	WT_LOG_SLOT_DONE(state)						\
     (WT_LOG_SLOT_CLOSED(state) &&					\
-    (WT_LOG_SLOT_RELEASED(state) == WT_LOG_SLOT_JOINED(state)))
+    !WT_LOG_SLOT_INPROGRESS(state))
 /* Slot is in use, more threads may join this slot */
 #define	WT_LOG_SLOT_OPEN(state)						\
     (WT_LOG_SLOT_ACTIVE(state) &&					\
@@ -167,7 +169,8 @@ struct __wt_myslot {
 	WT_LOGSLOT	*slot;		/* Slot I'm using */
 	wt_off_t	 end_offset;	/* My end offset in buffer */
 	wt_off_t	 offset;	/* Slot buffer offset */
-#define	WT_MYSLOT_UNBUFFERED	0x01	/* Write directly */
+#define	WT_MYSLOT_CLOSE		0x01	/* This thread is closing the slot */
+#define	WT_MYSLOT_UNBUFFERED	0x02	/* Write directly */
 	uint32_t flags;			/* Flags */
 };
 
