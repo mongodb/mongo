@@ -91,7 +91,7 @@ struct __wt_cache {
 	/*
 	 * LRU eviction list information.
 	 */
-	WT_EVICT_ENTRY *evict;		/* LRU pages being tracked */
+	WT_EVICT_ENTRY *evict_queue;	/* LRU pages being tracked */
 	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
 	uint32_t evict_candidates;	/* LRU list pages to evict */
 	uint32_t evict_entries;		/* LRU entries in the queue */
