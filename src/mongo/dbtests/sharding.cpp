@@ -132,6 +132,8 @@ public:
     virtual ~ChunkManagerTest() {
         // Reset the redirection
         ConnectionString::setConnectionHook(NULL);
+        ScopedDbConnection::clearPool();
+        ShardConnection::clearPool();
     }
 
     string collName() {
