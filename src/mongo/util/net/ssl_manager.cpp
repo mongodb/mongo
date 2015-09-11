@@ -906,11 +906,11 @@ StatusWith<boost::optional<std::string>> SSLManager::parseAndValidatePeerCertifi
 
     if (result != X509_V_OK) {
         if (_allowInvalidCertificates) {
-            warning() << "SSL peer certificate validation failed:"
+            warning() << "SSL peer certificate validation failed: "
                       << X509_verify_cert_error_string(result);
         } else {
             str::stream msg;
-            msg << "SSL peer certificate validation failed:"
+            msg << "SSL peer certificate validation failed: "
                 << X509_verify_cert_error_string(result);
             error() << msg.ss.str();
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
