@@ -65,6 +65,15 @@ TEST_F(QueryPlannerTest, EqualityIndexScanWithTrailingFields) {
     assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {x: 1, y: 1}}}}}");
 }
 
+// $eq can use a hashed index because it looks for values of type regex;
+// it doesn't evaluate the regex itself.
+TEST_F(QueryPlannerTest, EqCanUseHashedIndexWithRegex) {
+    addIndex(BSON("a"
+                  << "hashed"));
+    runQuery(fromjson("{a: {$eq: /abc/}}"));
+    ASSERT_EQUALS(getNumSolutions(), 2U);
+}
+
 //
 // indexFilterApplied
 // Check that index filter flag is passed from planner params
@@ -1981,6 +1990,13 @@ TEST_F(QueryPlannerTest, InWithSortAndLimitTrailingField) {
         "{limit: {n: 1, node: {fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a:1,b:-1,c:1}}}, "
         " {ixscan: {pattern: {a:1,b:-1,c:1}}}]}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, InCantUseHashedIndexWithRegex) {
+    addIndex(BSON("a"
+                  << "hashed"));
+    runQuery(fromjson("{a: {$in: [/abc/]}}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
 }
 
 //

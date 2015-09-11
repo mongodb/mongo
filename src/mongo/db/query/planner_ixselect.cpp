@@ -236,7 +236,14 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
         invariant(0);
         return true;
     } else if (IndexNames::HASHED == indexedFieldType) {
-        return exprtype == MatchExpression::MATCH_IN || exprtype == MatchExpression::EQ;
+        if (exprtype == MatchExpression::EQ) {
+            return true;
+        }
+        if (exprtype == MatchExpression::MATCH_IN) {
+            const InMatchExpression* expr = static_cast<const InMatchExpression*>(node);
+            return expr->getData().numRegexes() == 0;
+        }
+        return false;
     } else if (IndexNames::GEO_2DSPHERE == indexedFieldType) {
         if (exprtype == MatchExpression::GEO) {
             // within or intersect.
