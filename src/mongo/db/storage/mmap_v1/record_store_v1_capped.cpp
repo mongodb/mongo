@@ -68,12 +68,12 @@ using std::hex;
 using std::vector;
 
 CappedRecordStoreV1::CappedRecordStoreV1(OperationContext* txn,
-                                         CappedDocumentDeleteCallback* collection,
+                                         CappedCallback* collection,
                                          StringData ns,
                                          RecordStoreV1MetaData* details,
                                          ExtentManager* em,
                                          bool isSystemIndexes)
-    : RecordStoreV1Base(ns, details, em, isSystemIndexes), _deleteCallback(collection) {
+    : RecordStoreV1Base(ns, details, em, isSystemIndexes), _cappedCallback(collection) {
     DiskLoc extentLoc = details->firstExtent(txn);
     while (!extentLoc.isNull()) {
         _extentAdvice.push_back(_extentManager->cacheHint(extentLoc, ExtentManager::Sequential));
@@ -168,7 +168,7 @@ StatusWith<DiskLoc> CappedRecordStoreV1::allocRecord(OperationContext* txn,
             }
 
             const RecordId fr = theCapExtent()->firstRecord.toRecordId();
-            Status status = _deleteCallback->aboutToDeleteCapped(txn, fr, dataFor(txn, fr));
+            Status status = _cappedCallback->aboutToDeleteCapped(txn, fr, dataFor(txn, fr));
             if (!status.isOK())
                 return StatusWith<DiskLoc>(status);
             deleteRecord(txn, fr);
@@ -477,7 +477,7 @@ void CappedRecordStoreV1::cappedTruncateAfter(OperationContext* txn,
         WriteUnitOfWork wunit(txn);
         // Delete the newest record, and coalesce the new deleted
         // record with existing deleted records.
-        Status status = _deleteCallback->aboutToDeleteCapped(txn, currId, dataFor(txn, currId));
+        Status status = _cappedCallback->aboutToDeleteCapped(txn, currId, dataFor(txn, currId));
         uassertStatusOK(status);
         deleteRecord(txn, currId);
         _compact(txn);

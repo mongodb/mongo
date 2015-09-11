@@ -88,8 +88,8 @@ public:
                           bool isCapped = false,
                           int64_t cappedMaxSize = -1,
                           int64_t cappedMaxDocs = -1,
-                          CappedDocumentDeleteCallback* cappedDeleteCallback = NULL,
-                          WiredTigerSizeStorer* sizeStorer = NULL);
+                          CappedCallback* cappedCallback = nullptr,
+                          WiredTigerSizeStorer* sizeStorer = nullptr);
 
     virtual ~WiredTigerRecordStore();
 
@@ -187,8 +187,8 @@ public:
         return _useOplogHack;
     }
 
-    void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
-        _cappedDeleteCallback = cb;
+    void setCappedCallback(CappedCallback* cb) {
+        _cappedCallback = cb;
     }
     int64_t cappedMaxDocs() const;
     int64_t cappedMaxSize() const;
@@ -204,7 +204,6 @@ public:
         _sizeStorer = ss;
     }
 
-    void dealtWithCappedLoc(const RecordId& loc);
     bool isCappedHidden(const RecordId& loc) const;
     RecordId lowestCappedHiddenRecord() const;
 
@@ -243,6 +242,7 @@ private:
     static int64_t _makeKey(const RecordId& loc);
     static RecordId _fromKey(int64_t k);
 
+    void _dealtWithCappedLoc(const RecordId& loc);
     void _addUncommitedDiskLoc_inlock(OperationContext* txn, const RecordId& loc);
 
     RecordId _nextId();
@@ -266,7 +266,7 @@ private:
     const int64_t _cappedMaxDocs;
     AtomicInt64 _cappedSleep;
     AtomicInt64 _cappedSleepMS;
-    CappedDocumentDeleteCallback* _cappedDeleteCallback;
+    CappedCallback* _cappedCallback;
 
     // See comment in ::cappedDeleteAsNeeded
     int _cappedDeleteCheckCount;

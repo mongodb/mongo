@@ -878,6 +878,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorYieldFirst) {
     cursorCtx->recoveryUnit()->abandonSnapshot();
     ASSERT_TRUE(cursor->restore());
     auto record = cursor->next();
+    ASSERT(record);
     ASSERT_EQ(loc1, record->id);
     ASSERT(!cursor->next());
 }

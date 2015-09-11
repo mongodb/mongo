@@ -257,12 +257,12 @@ InMemoryRecordStore::InMemoryRecordStore(StringData ns,
                                          bool isCapped,
                                          int64_t cappedMaxSize,
                                          int64_t cappedMaxDocs,
-                                         CappedDocumentDeleteCallback* cappedDeleteCallback)
+                                         CappedCallback* cappedCallback)
     : RecordStore(ns),
       _isCapped(isCapped),
       _cappedMaxSize(cappedMaxSize),
       _cappedMaxDocs(cappedMaxDocs),
-      _cappedDeleteCallback(cappedDeleteCallback),
+      _cappedCallback(cappedCallback),
       _data(*dataInOut ? static_cast<Data*>(dataInOut->get())
                        : new Data(NamespaceString::oplog(ns))) {
     if (!*dataInOut) {
@@ -344,8 +344,8 @@ void InMemoryRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
         RecordId id = oldest->first;
         RecordData data = oldest->second.toRecordData();
 
-        if (_cappedDeleteCallback)
-            uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, id, data));
+        if (_cappedCallback)
+            uassertStatusOK(_cappedCallback->aboutToDeleteCapped(txn, id, data));
 
         deleteRecord(txn, id);
     }

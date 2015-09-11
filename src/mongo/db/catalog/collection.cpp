@@ -66,6 +66,7 @@ namespace {
 const auto bannedExpressionsInValidators = std::set<StringData>{
     "$geoNear", "$near", "$nearSphere", "$text", "$where",
 };
+
 Status checkValidatorForBannedExpressions(const BSONObj& validator) {
     for (auto field : validator) {
         const auto name = field.fieldNameStringData();
@@ -127,6 +128,7 @@ void CappedInsertNotifier::notifyOfInsert(int count) {
 
 void CappedInsertNotifier::notifyAll() {
     stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
+    ++_cappedInsertCount;
     _cappedNewDataNotifier.notify_all();
 }
 
@@ -187,7 +189,7 @@ Collection::Collection(OperationContext* txn,
     _magic = 1357924;
     _indexCatalog.init(txn);
     if (isCapped())
-        _recordStore->setCappedDeleteCallback(this);
+        _recordStore->setCappedCallback(this);
 
     _infoCache.init(txn);
 }
@@ -323,11 +325,7 @@ Status Collection::insertDocument(OperationContext* txn, const DocWriter* doc, b
     // we cannot call into the OpObserver here because the document being written is not present
     // fortunately, this is currently only used for adding entries to the oplog.
 
-    // If there is a notifier object and another thread is waiting on it, then we notify waiters
-    // of this document insert. Waiters keep a shared_ptr to '_cappedNotifier', so there are
-    // waiters if this Collection's shared_ptr is not unique.
-    if (_cappedNotifier && !_cappedNotifier.unique())
-        _cappedNotifier->notifyOfInsert(1);
+    txn->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
     return loc.getStatus();
 }
@@ -369,11 +367,7 @@ Status Collection::insertDocuments(OperationContext* txn,
         inserted++;
     }
 
-    // If there is a notifier object and another thread is waiting on it, then we notify
-    // waiters of this document insert. Waiters keep a shared_ptr to '_cappedNotifier', so
-    // there are waiters if this Collection's shared_ptr is not unique.
-    if (_cappedNotifier && !_cappedNotifier.unique())
-        _cappedNotifier->notifyOfInsert(inserted);
+    txn->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
     return Status::OK();
 }
@@ -414,12 +408,7 @@ Status Collection::insertDocument(OperationContext* txn,
 
     getGlobalServiceContext()->getOpObserver()->onInsert(txn, ns(), doc);
 
-    // If there is a notifier object and another thread is waiting on it, then we notify waiters
-    // of this document insert. Waiters keep a shared_ptr to '_cappedNotifier', so there are
-    // waiters if this Collection's shared_ptr is not unique.
-    if (_cappedNotifier && !_cappedNotifier.unique()) {
-        _cappedNotifier->notifyOfInsert(1);
-    }
+    txn->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
     return loc.getStatus();
 }
@@ -449,6 +438,14 @@ Status Collection::_insertDocuments(OperationContext* txn,
     }
 
     return _indexCatalog.indexRecords(txn, bsonRecords);
+}
+
+void Collection::notifyCappedWaitersIfNeeded() {
+    // If there is a notifier object and another thread is waiting on it, then we notify
+    // waiters of this document insert. Waiters keep a shared_ptr to '_cappedNotifier', so
+    // there are waiters if this Collection's shared_ptr is not unique (use_count > 1).
+    if (_cappedNotifier && !_cappedNotifier.unique())
+        _cappedNotifier->notifyAll();
 }
 
 Status Collection::aboutToDeleteCapped(OperationContext* txn,

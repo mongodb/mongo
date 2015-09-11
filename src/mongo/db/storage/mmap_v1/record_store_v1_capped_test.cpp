@@ -49,12 +49,15 @@ using std::vector;
 // Should be in BSS so unused portions should be free.
 char zeros[20 * 1024 * 1024] = {};
 
-class DummyCappedDocumentDeleteCallback : public CappedDocumentDeleteCallback {
+class DummyCappedCallback : public CappedCallback {
 public:
     Status aboutToDeleteCapped(OperationContext* txn, const RecordId& loc, RecordData data) {
         deleted.push_back(DiskLoc::fromRecordId(loc));
         return Status::OK();
     }
+
+    void notifyCappedWaitersIfNeeded() {}
+
     vector<DiskLoc> deleted;
 };
 
@@ -62,7 +65,7 @@ void simpleInsertTest(const char* buf, int size) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
 
     string myns = "test.simple1";
     CappedRecordStoreV1 rs(&txn, &cb, myns, md, &em, false);
@@ -105,7 +108,7 @@ TEST(CappedRecordStoreV1, EmptySingleExtent) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
 
     {
@@ -131,7 +134,7 @@ TEST(CappedRecordStoreV1, FirstLoopWithSingleExtentExactSize) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
 
     {
@@ -169,7 +172,7 @@ TEST(CappedRecordStoreV1, NonFirstLoopWithSingleExtentExactSize) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
 
     {
@@ -210,7 +213,7 @@ TEST(CappedRecordStoreV1, WillLoopWithout24SpareBytes) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
 
     {
@@ -247,7 +250,7 @@ TEST(CappedRecordStoreV1, WontLoopWith24SpareBytes) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
 
     {
@@ -285,7 +288,7 @@ TEST(CappedRecordStoreV1, MoveToSecondExtentUnLooped) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
 
     {
@@ -318,7 +321,7 @@ TEST(CappedRecordStoreV1, MoveToSecondExtentLooped) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
 
     {
@@ -358,7 +361,7 @@ TEST(CappedRecordStoreV1, OversizedRecordHuge) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
 
     {
@@ -379,7 +382,7 @@ TEST(CappedRecordStoreV1, OversizedRecordMedium) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
 
     {
@@ -409,7 +412,7 @@ TEST(CappedRecordStoreV1Scrambler, Minimal) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
 
     {
@@ -450,7 +453,7 @@ TEST(CappedRecordStoreV1Scrambler, FourDeletedRecordsInSingleExtent) {
     OperationContextNoop txn;
     DummyExtentManager em;
     DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs(&txn, &cb, "test.foo", md, &em, false);
 
     {
@@ -606,7 +609,7 @@ public:
     DummyExtentManager em;
 
 private:
-    DummyCappedDocumentDeleteCallback cb;
+    DummyCappedCallback cb;
     CappedRecordStoreV1 rs;
 };
 

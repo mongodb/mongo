@@ -580,6 +580,8 @@ void SyncTail::oplogApplication() {
         // For pausing replication in tests
         while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
             sleepmillis(0);
+            if (inShutdown())
+                return;
         }
 
         if (ops.empty()) {

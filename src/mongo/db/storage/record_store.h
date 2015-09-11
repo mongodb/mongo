@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-class CappedDocumentDeleteCallback;
+class CappedCallback;
 class Collection;
 struct CompactOptions;
 struct CompactStats;
@@ -305,7 +305,7 @@ public:
 
     virtual bool isCapped() const = 0;
 
-    virtual void setCappedDeleteCallback(CappedDocumentDeleteCallback*) {
+    virtual void setCappedCallback(CappedCallback*) {
         invariant(false);
     }
 

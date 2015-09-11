@@ -168,7 +168,7 @@ private:
  * this is NOT safe through a yield right now
  * not sure if it will be, or what yet
  */
-class Collection : CappedDocumentDeleteCallback, UpdateNotifier {
+class Collection final : CappedCallback, UpdateNotifier {
 public:
     Collection(OperationContext* txn,
                StringData fullNS,
@@ -420,6 +420,11 @@ private:
     Status recordStoreGoingToUpdateInPlace(OperationContext* txn, const RecordId& loc);
 
     Status aboutToDeleteCapped(OperationContext* txn, const RecordId& loc, RecordData data);
+
+    /**
+     * Notify (capped collection) waiters of data changes, like an insert.
+     */
+    void notifyCappedWaitersIfNeeded();
 
     /**
      * same semantics as insertDocument, but doesn't do:

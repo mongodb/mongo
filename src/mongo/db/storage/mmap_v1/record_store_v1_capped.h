@@ -41,7 +41,7 @@ namespace mongo {
 class CappedRecordStoreV1 final : public RecordStoreV1Base {
 public:
     CappedRecordStoreV1(OperationContext* txn,
-                        CappedDocumentDeleteCallback* collection,
+                        CappedCallback* collection,
                         StringData ns,
                         RecordStoreV1MetaData* details,
                         ExtentManager* em,
@@ -82,8 +82,8 @@ protected:
         return false;
     }
 
-    void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) final {
-        _deleteCallback = cb;
+    void setCappedCallback(CappedCallback* cb) final {
+        _cappedCallback = cb;
     }
 
     StatusWith<DiskLoc> allocRecord(OperationContext* txn,
@@ -121,7 +121,7 @@ private:
 
     // -- end copy from cap.cpp --
 
-    CappedDocumentDeleteCallback* _deleteCallback;
+    CappedCallback* _cappedCallback;
 
     OwnedPointerVector<ExtentManager::CacheHint> _extentAdvice;
 

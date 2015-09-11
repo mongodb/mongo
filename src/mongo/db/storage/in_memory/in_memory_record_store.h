@@ -50,7 +50,7 @@ public:
                                  bool isCapped = false,
                                  int64_t cappedMaxSize = -1,
                                  int64_t cappedMaxDocs = -1,
-                                 CappedDocumentDeleteCallback* cappedDeleteCallback = NULL);
+                                 CappedCallback* cappedCallback = nullptr);
 
     virtual const char* name() const;
 
@@ -154,8 +154,8 @@ public:
     bool isCapped() const {
         return _isCapped;
     }
-    void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
-        _cappedDeleteCallback = cb;
+    void setCappedCallback(CappedCallback* cb) {
+        _cappedCallback = cb;
     }
     bool cappedMaxDocs() const {
         invariant(_isCapped);
@@ -184,7 +184,7 @@ private:
     const bool _isCapped;
     const int64_t _cappedMaxSize;
     const int64_t _cappedMaxDocs;
-    CappedDocumentDeleteCallback* _cappedDeleteCallback;
+    CappedCallback* _cappedCallback;
 
     // This is the "persistent" data.
     struct Data {

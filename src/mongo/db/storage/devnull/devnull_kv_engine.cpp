@@ -66,7 +66,7 @@ public:
         return "devnull";
     }
 
-    virtual void setCappedDeleteCallback(CappedDocumentDeleteCallback*) {}
+    virtual void setCappedCallback(CappedCallback*) {}
 
     virtual long long dataSize(OperationContext* txn) const {
         return 0;

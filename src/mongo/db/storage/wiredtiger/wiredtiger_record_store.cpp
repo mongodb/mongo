@@ -712,7 +712,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
                                              bool isCapped,
                                              int64_t cappedMaxSize,
                                              int64_t cappedMaxDocs,
-                                             CappedDocumentDeleteCallback* cappedDeleteCallback,
+                                             CappedCallback* cappedCallback,
                                              WiredTigerSizeStorer* sizeStorer)
     : RecordStore(ns),
       _uri(uri.toString()),
@@ -724,7 +724,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
       _cappedMaxDocs(cappedMaxDocs),
       _cappedSleep(0),
       _cappedSleepMS(0),
-      _cappedDeleteCallback(cappedDeleteCallback),
+      _cappedCallback(cappedCallback),
       _cappedDeleteCheckCount(0),
       _useOplogHack(shouldUseOplogHack(ctx, _uri)),
       _sizeStorer(sizeStorer),
@@ -1019,8 +1019,8 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* txn
             ++docsRemoved;
             sizeSaved += old_value.size;
 
-            if (_cappedDeleteCallback) {
-                uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(
+            if (_cappedCallback) {
+                uassertStatusOK(_cappedCallback->aboutToDeleteCapped(
                     txn,
                     newestOld,
                     RecordData(static_cast<const char*>(old_value.data), old_value.size)));
@@ -1197,7 +1197,7 @@ StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
     return StatusWith<RecordId>(loc);
 }
 
-void WiredTigerRecordStore::dealtWithCappedLoc(const RecordId& loc) {
+void WiredTigerRecordStore::_dealtWithCappedLoc(const RecordId& loc) {
     stdx::lock_guard<stdx::mutex> lk(_uncommittedDiskLocsMutex);
     SortedDiskLocs::iterator it =
         std::find(_uncommittedDiskLocs.begin(), _uncommittedDiskLocs.end(), loc);
@@ -1482,11 +1482,15 @@ public:
     CappedInsertChange(WiredTigerRecordStore* rs, const RecordId& loc) : _rs(rs), _loc(loc) {}
 
     virtual void commit() {
-        _rs->dealtWithCappedLoc(_loc);
+        // Do not notify here because all committed inserts notify, always.
+        _rs->_dealtWithCappedLoc(_loc);
     }
 
     virtual void rollback() {
-        _rs->dealtWithCappedLoc(_loc);
+        // Notify on rollback since it might make later commits visible.
+        _rs->_dealtWithCappedLoc(_loc);
+        if (_rs->_cappedCallback)
+            _rs->_cappedCallback->notifyCappedWaitersIfNeeded();
     }
 
 private:
@@ -1628,9 +1632,8 @@ void WiredTigerRecordStore::temp_cappedTruncateAfter(OperationContext* txn,
 
     // Compute the number and associated sizes of the records to delete.
     do {
-        if (_cappedDeleteCallback) {
-            uassertStatusOK(
-                _cappedDeleteCallback->aboutToDeleteCapped(txn, record->id, record->data));
+        if (_cappedCallback) {
+            uassertStatusOK(_cappedCallback->aboutToDeleteCapped(txn, record->id, record->data));
         }
         recordsRemoved++;
         bytesRemoved += record->data.size();
