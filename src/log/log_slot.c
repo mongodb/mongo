@@ -100,7 +100,7 @@ retry:
 }
 
 /*
- * __wt_log_slot_switch --
+ * __wt_log_slot_switch_internal --
  *	Switch out the current slot and set up a new one.
  */
 int

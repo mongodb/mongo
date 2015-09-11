@@ -45,8 +45,7 @@ __wt_log_ckpt_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 
 	conn = S2C(session);
 	log = conn->log;
-	while (__wt_log_force_write(session) == EBUSY)
-		__wt_yield();
+	WT_RET(__wt_log_force_write(session, 1));
 	WT_RET(__wt_log_wrlsn(session));
 	*ckp_lsn = log->write_start_lsn;
 	return (0);
@@ -264,7 +263,7 @@ __wt_log_get_all_files(WT_SESSION_IMPL *session,
 	 * These may be files needed by backup.  Force the current slot
 	 * to get written to the file.
 	 */
-	WT_RET_BUSY_OK(__wt_log_force_write(session));
+	WT_RET(__wt_log_force_write(session, 1));
 	WT_RET(__log_get_files(session, WT_LOG_FILENAME, &files, &count));
 
 	/* Filter out any files that are below the checkpoint LSN. */
@@ -1641,16 +1640,14 @@ __log_force_write_internal(WT_SESSION_IMPL *session)
 	slot = log->active_slot;
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	/*
-	 * If closing the slot returns WT_NOTFOUND, it means that someone
-	 * else is processing the slot change.  We're done.  If we get
-	 * EBUSY, then return that so the caller can decide what to do.
+	 * If closing the slot returns WT_NOTFOUND, it means that someone else
+	 * is processing the slot change: we're done.  If we get EBUSY (or any
+	 * other error), return that so the caller can decide what to do.
 	 */
 	ret = __wt_log_slot_close(session, slot, &release, 1);
 	if (ret == WT_NOTFOUND)
 		return (0);
-	if (ret == EBUSY)
-		return (ret);
-	WT_ASSERT(session, ret == 0);
+	WT_RET(ret);
 	if (release) {
 		WT_RET(__log_release(session, slot, &free_slot));
 		if (free_slot)
@@ -1666,12 +1663,15 @@ __log_force_write_internal(WT_SESSION_IMPL *session)
  *	Wrapper function that takes the lock.
  */
 int
-__wt_log_force_write(WT_SESSION_IMPL *session)
+__wt_log_force_write(WT_SESSION_IMPL *session, int retry)
 {
 	WT_DECL_RET;
 
-	WT_WITH_SLOT_LOCK(session, S2C(session)->log,
-	    ret = __log_force_write_internal(session));
+	do {
+		WT_WITH_SLOT_LOCK(session, S2C(session)->log,
+		    ret = __log_force_write_internal(session));
+	} while (retry && ret == EBUSY);
+
 	return (ret);
 }
 
@@ -1894,7 +1894,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 			WT_ERR(__wt_cond_signal(session, conn->log_cond));
 			__wt_yield();
 		} else
-			WT_ERR_BUSY_OK(__wt_log_force_write(session));
+			WT_ERR(__wt_log_force_write(session, 1));
 	}
 	if (LF_ISSET(WT_LOG_FLUSH)) {
 		/* Wait for our writes to reach the OS */

@@ -339,7 +339,7 @@ extern int __wt_log_remove(WT_SESSION_IMPL *session, const char *file_prefix, ui
 extern int __wt_log_open(WT_SESSION_IMPL *session);
 extern int __wt_log_close(WT_SESSION_IMPL *session);
 extern int __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags, int (*func)(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, WT_LSN *next_lsnp, void *cookie, int firstrecord), void *cookie);
-extern int __wt_log_force_write(WT_SESSION_IMPL *session);
+extern int __wt_log_force_write(WT_SESSION_IMPL *session, int retry);
 extern int __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, uint32_t flags);
 extern int __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap);
 extern int __wt_logrec_alloc(WT_SESSION_IMPL *session, size_t size, WT_ITEM **logrecp);

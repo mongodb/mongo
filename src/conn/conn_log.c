@@ -591,8 +591,7 @@ __log_wrlsn_server(void *arg)
 	 * On close we need to do this one more time because there could
 	 * be straggling log writes that need to be written.
 	 */
-	while (__wt_log_force_write(session) == EBUSY)
-		__wt_yield();
+	WT_ERR(__wt_log_force_write(session, 1));
 	WT_ERR(__wt_log_wrlsn(session));
 	if (0) {
 err:		__wt_err(session, ret, "log wrlsn server error");
@@ -644,7 +643,7 @@ __log_server(void *arg)
 		 * and a buffer may need to wait for the write_lsn to advance
 		 * in the case of a synchronous buffer.  We end up with a hang.
 		 */
-		WT_ERR_BUSY_OK(__wt_log_force_write(session));
+		WT_ERR_BUSY_OK(__wt_log_force_write(session, 0));
 
 		/*
 		 * We don't want to archive or pre-allocate files as often as
