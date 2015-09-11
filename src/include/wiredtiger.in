@@ -1216,7 +1216,12 @@ struct __wt_session {
 	 * Flush the log.
 	 *
 	 * @param session the session handle
-	 * @configstart{WT_SESSION.log_flush, see dist/api_data.py}
+	 * @configstart{session.log_flush, see dist/api_data.py}
+	 * @config{sync, forcibly flush the log and wait for it to synchronize.
+	 * If using \c off\, then wait for the log to be written to the file
+	 * system.  If using \c on\, wait for the log to be synchronized to the
+	 * backing store., a string\, chosen from the following options: \c
+	 * "off"\, \c "on"; default \c on.}
 	 * @configend
 	 * @errors
 	 */

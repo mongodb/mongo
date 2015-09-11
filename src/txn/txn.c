@@ -20,7 +20,7 @@ __wt_txnid_cmp(const void *v1, const void *v2)
 	id1 = *(uint64_t *)v1;
 	id2 = *(uint64_t *)v2;
 
-	return ((id1 == id2) ? 0 : TXNID_LT(id1, id2) ? -1 : 1);
+	return ((id1 == id2) ? 0 : WT_TXNID_LT(id1, id2) ? -1 : 1);
 }
 
 /*
@@ -38,9 +38,9 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
 		qsort(txn->snapshot, n, sizeof(uint64_t), __wt_txnid_cmp);
 	txn->snapshot_count = n;
 	txn->snap_max = snap_max;
-	txn->snap_min = (n > 0 && TXNID_LE(txn->snapshot[0], snap_max)) ?
+	txn->snap_min = (n > 0 && WT_TXNID_LE(txn->snapshot[0], snap_max)) ?
 	    txn->snapshot[0] : snap_max;
-	F_SET(txn, TXN_HAS_SNAPSHOT);
+	F_SET(txn, WT_TXN_HAS_SNAPSHOT);
 	WT_ASSERT(session, n == 0 || txn->snap_min != WT_TXN_NONE);
 }
 
@@ -63,7 +63,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 	    !__wt_txn_visible_all(session, txn_state->snap_min));
 
 	txn_state->snap_min = WT_TXN_NONE;
-	F_CLR(txn, TXN_HAS_SNAPSHOT);
+	F_CLR(txn, WT_TXN_HAS_SNAPSHOT);
 }
 
 /*
@@ -129,9 +129,9 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 		 */
 		if (s != txn_state &&
 		    (id = s->id) != WT_TXN_NONE &&
-		    TXNID_LE(prev_oldest_id, id)) {
+		    WT_TXNID_LE(prev_oldest_id, id)) {
 			txn->snapshot[n++] = id;
-			if (TXNID_LT(id, snap_min))
+			if (WT_TXNID_LT(id, snap_min))
 				snap_min = id;
 		}
 	}
@@ -140,7 +140,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	 * If we got a new snapshot, update the published snap_min for this
 	 * session.
 	 */
-	WT_ASSERT(session, TXNID_LE(prev_oldest_id, snap_min));
+	WT_ASSERT(session, WT_TXNID_LE(prev_oldest_id, snap_min));
 	WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
 	txn_state->snap_min = snap_min;
 
@@ -191,7 +191,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	 * oldest ID isn't too far behind, avoid scanning.
 	 */
 	if (prev_oldest_id == current_id ||
-	    (!force && TXNID_LT(current_id, prev_oldest_id + 100)))
+	    (!force && WT_TXNID_LT(current_id, prev_oldest_id + 100)))
 		return;
 
 	/*
@@ -221,7 +221,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		 * it gets a valid one.
 		 */
 		if ((id = s->id) != WT_TXN_NONE &&
-		    TXNID_LE(prev_oldest_id, id) && TXNID_LT(id, snap_min))
+		    WT_TXNID_LE(prev_oldest_id, id) &&
+		    WT_TXNID_LT(id, snap_min))
 			snap_min = id;
 
 		/*
@@ -233,35 +234,35 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 		 * more details.
 		 */
 		if ((id = s->snap_min) != WT_TXN_NONE &&
-		    TXNID_LT(id, oldest_id)) {
+		    WT_TXNID_LT(id, oldest_id)) {
 			oldest_id = id;
 			oldest_session = &conn->sessions[i];
 		}
 	}
 
-	if (TXNID_LT(snap_min, oldest_id))
+	if (WT_TXNID_LT(snap_min, oldest_id))
 		oldest_id = snap_min;
 
 	/* Update the last running ID. */
-	if (TXNID_LT(txn_global->last_running, snap_min)) {
+	if (WT_TXNID_LT(txn_global->last_running, snap_min)) {
 		txn_global->last_running = snap_min;
 		last_running_moved = 1;
 	} else
 		last_running_moved = 0;
 
 	/* Update the oldest ID. */
-	if (TXNID_LT(prev_oldest_id, oldest_id) &&
+	if (WT_TXNID_LT(prev_oldest_id, oldest_id) &&
 	    __wt_atomic_casiv32(&txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 			if ((id = s->id) != WT_TXN_NONE &&
-			    TXNID_LT(id, oldest_id))
+			    WT_TXNID_LT(id, oldest_id))
 				oldest_id = id;
 			if ((id = s->snap_min) != WT_TXN_NONE &&
-			    TXNID_LT(id, oldest_id))
+			    WT_TXNID_LT(id, oldest_id))
 				oldest_id = id;
 		}
-		if (TXNID_LT(txn_global->oldest_id, oldest_id))
+		if (WT_TXNID_LT(txn_global->oldest_id, oldest_id))
 			txn_global->oldest_id = oldest_id;
 		txn_global->scan_count = 0;
 	} else {
@@ -349,7 +350,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		/* Clear the global checkpoint transaction IDs. */
 		txn_global->checkpoint_id = 0;
 		txn_global->checkpoint_pinned = WT_TXN_NONE;
-	} else if (F_ISSET(txn, TXN_HAS_ID)) {
+	} else if (F_ISSET(txn, WT_TXN_HAS_ID)) {
 		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 		    txn->id != WT_TXN_NONE);
 		WT_PUBLISH(txn_state->id, WT_TXN_NONE);
@@ -397,9 +398,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	u_int i;
 
 	txn = &session->txn;
-	WT_ASSERT(session, !F_ISSET(txn, TXN_ERROR));
+	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR));
 
-	if (!F_ISSET(txn, TXN_RUNNING))
+	if (!F_ISSET(txn, WT_TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	/* Commit notification. */
@@ -464,7 +465,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	txn = &session->txn;
-	if (!F_ISSET(txn, TXN_RUNNING))
+	if (!F_ISSET(txn, WT_TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	/* Rollback notification. */

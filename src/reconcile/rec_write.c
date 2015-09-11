@@ -372,7 +372,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	 * reconciliation will need.
 	 */
 	uint64_t oldest_id = __wt_txn_oldest_id(session);
-	WT_ASSERT(session, TXNID_LE(mod->last_oldest_id, oldest_id));
+	WT_ASSERT(session, WT_TXNID_LE(mod->last_oldest_id, oldest_id));
 	mod->last_oldest_id = oldest_id;
 	}
 #endif
@@ -578,7 +578,7 @@ err:	__wt_page_out(session, &next);
  * __rec_raw_compression_config --
  *	Configure raw compression.
  */
-static inline int
+static inline bool
 __rec_raw_compression_config(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
@@ -589,11 +589,11 @@ __rec_raw_compression_config(
 	/* Check if raw compression configured. */
 	if (btree->compressor == NULL ||
 	    btree->compressor->compress_raw == NULL)
-		return (0);
+		return (false);
 
 	/* Only for row-store and variable-length column-store objects. */
 	if (page->type == WT_PAGE_COL_FIX)
-		return (0);
+		return (false);
 
 	/*
 	 * Raw compression cannot support dictionary compression. (Technically,
@@ -603,11 +603,11 @@ __rec_raw_compression_config(
 	 * that seems an unlikely use case.)
 	 */
 	if (btree->dictionary != 0)
-		return (0);
+		return (false);
 
 	/* Raw compression cannot support prefix compression. */
 	if (btree->prefix_compression != 0)
-		return (0);
+		return (false);
 
 	/*
 	 * Raw compression is also turned off during salvage: we can't allow
@@ -615,9 +615,9 @@ __rec_raw_compression_config(
 	 * can't manipulate the page size.
 	 */
 	if (salvage != NULL)
-		return (0);
+		return (false);
 
-	return (1);
+	return (true);
 }
 
 /*
@@ -896,11 +896,11 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			continue;
 
 		/* Track the largest/smallest transaction IDs on the list. */
-		if (TXNID_LT(max_txn, txnid))
+		if (WT_TXNID_LT(max_txn, txnid))
 			max_txn = txnid;
-		if (TXNID_LT(txnid, min_txn))
+		if (WT_TXNID_LT(txnid, min_txn))
 			min_txn = txnid;
-		if (TXNID_LT(txnid, r->skipped_txn) &&
+		if (WT_TXNID_LT(txnid, r->skipped_txn) &&
 		    !__wt_txn_visible_all(session, txnid))
 			r->skipped_txn = txnid;
 
@@ -928,7 +928,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * used to avoid evicting clean pages from memory with changes required
 	 * to satisfy a snapshot read.
 	 */
-	if (TXNID_LT(r->max_txn, max_txn))
+	if (WT_TXNID_LT(r->max_txn, max_txn))
 		r->max_txn = max_txn;
 
 	/*
@@ -1792,9 +1792,9 @@ __rec_is_checkpoint(WT_RECONCILE *r, WT_BOUNDARY *bnd)
 		bnd->addr.addr = NULL;
 		bnd->addr.size = 0;
 		bnd->addr.type = 0;
-		return (1);
+		return (true);
 	}
-	return (0);
+	return (false);
 }
 
 /*
@@ -5066,7 +5066,7 @@ err:			__wt_scr_free(session, &tkey);
 	} else {
 		mod->rec_max_txn = r->max_txn;
 		if (!F_ISSET(r, WT_EVICTING) &&
-		    TXNID_LT(btree->rec_max_txn, r->max_txn))
+		    WT_TXNID_LT(btree->rec_max_txn, r->max_txn))
 			btree->rec_max_txn = r->max_txn;
 
 		if (__wt_atomic_cas32(&mod->write_gen, r->orig_write_gen, 0))

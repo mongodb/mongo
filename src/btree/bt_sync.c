@@ -117,7 +117,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			 */
 			if (walk != NULL && walk->page != NULL &&
 			    (mod = walk->page->modify) != NULL &&
-			    TXNID_LT(btree->rec_max_txn, mod->rec_max_txn))
+			    WT_TXNID_LT(btree->rec_max_txn, mod->rec_max_txn))
 				btree->rec_max_txn = mod->rec_max_txn;
 
 			WT_ERR(__wt_tree_walk(session, &walk, NULL, flags));
@@ -149,8 +149,8 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			 * is written.
 			 */
 			if (!WT_PAGE_IS_INTERNAL(page) &&
-			    F_ISSET(txn, TXN_HAS_SNAPSHOT) &&
-			    TXNID_LT(txn->snap_max, mod->first_dirty_txn) &&
+			    F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) &&
+			    WT_TXNID_LT(txn->snap_max, mod->first_dirty_txn) &&
 			    !F_ISSET(mod, WT_PM_REC_REWRITE)) {
 				__wt_page_modify_set(session, page);
 				continue;

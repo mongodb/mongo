@@ -70,7 +70,7 @@ __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
  * __cursor_valid --
  *	Return if the cursor references an valid key/value pair.
  */
-static inline int
+static inline bool
 __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 {
 	WT_BTREE *btree;
@@ -133,10 +133,10 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 	if (cbt->ins != NULL &&
 	    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
 		if (WT_UPDATE_DELETED_ISSET(upd))
-			return (0);
+			return (false);
 		if (updp != NULL)
 			*updp = upd;
-		return (1);
+		return (true);
 	}
 
 	/*
@@ -155,7 +155,7 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 * keys, check for retrieval past the end of the page.
 		 */
 		if (cbt->recno >= page->pg_fix_recno + page->pg_fix_entries)
-			return (0);
+			return (false);
 
 		/*
 		 * Updates aren't stored on the page, an update would have
@@ -170,7 +170,7 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 * "slots", check if search returned a valid slot.
 		 */
 		if (cbt->slot >= page->pg_var_entries)
-			return (0);
+			return (false);
 
 		/*
 		 * Updates aren't stored on the page, an update would have
@@ -181,7 +181,7 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		cip = &page->pg_var_d[cbt->slot];
 		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
 		    __wt_cell_type(cell) == WT_CELL_DEL)
-			return (0);
+			return (false);
 		break;
 	case BTREE_ROW:
 		/*
@@ -189,7 +189,7 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 * key as an on-page object, we're done.
 		 */
 		if (cbt->ins != NULL)
-			return (0);
+			return (false);
 
 		/*
 		 * Check if searched returned a valid slot (the failure mode is
@@ -198,19 +198,19 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 * mirrors the column-store test).
 		 */
 		if (cbt->slot >= page->pg_row_entries)
-			return (0);
+			return (false);
 
 		/* Updates are stored on the page, check for a delete. */
 		if (page->pg_row_upd != NULL && (upd = __wt_txn_read(
 		    session, page->pg_row_upd[cbt->slot])) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
-				return (0);
+				return (false);
 			if (updp != NULL)
 				*updp = upd;
 		}
 		break;
 	}
-	return (1);
+	return (true);
 }
 
 /*
@@ -842,7 +842,7 @@ __wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
  * __cursor_equals --
  *	Return if two cursors reference the same row.
  */
-static inline int
+static inline bool
 __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 {
 	switch (a->btree->type) {
@@ -854,21 +854,21 @@ __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 		 * one being returned to the application.
 		 */
 		if (((WT_CURSOR *)a)->recno == ((WT_CURSOR *)b)->recno)
-			return (1);
+			return (true);
 		break;
 	case BTREE_ROW:
 		if (a->ref != b->ref)
-			return (0);
+			return (false);
 		if (a->ins != NULL || b->ins != NULL) {
 			if (a->ins == b->ins)
-				return (1);
+				return (true);
 			break;
 		}
 		if (a->slot == b->slot)
-			return (1);
+			return (true);
 		break;
 	}
-	return (0);
+	return (false);
 }
 
 /*

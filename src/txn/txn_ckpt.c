@@ -481,8 +481,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * cleared our entry.
 	 */
 	WT_ASSERT(session,
-	    TXNID_LE(txn_global->oldest_id, txn_state->id) &&
-	    TXNID_LE(txn_global->oldest_id, txn_state->snap_min));
+	    WT_TXNID_LE(txn_global->oldest_id, txn_state->id) &&
+	    WT_TXNID_LE(txn_global->oldest_id, txn_state->snap_min));
 
 	/*
 	 * Clear our entry from the global transaction session table. Any
@@ -578,7 +578,7 @@ err:	/*
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, 0, ret != 0));
 
-	if (F_ISSET(txn, TXN_RUNNING)) {
+	if (F_ISSET(txn, WT_TXN_RUNNING)) {
 		/*
 		 * Clear the dhandle so the visibility check doesn't get
 		 * confused about the snap min. Don't bother restoring the
@@ -1069,7 +1069,7 @@ fake:	/*
 	 */
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC) &&
 	    (WT_IS_METADATA(dhandle) ||
-	    !F_ISSET(&session->txn, TXN_RUNNING)))
+	    !F_ISSET(&session->txn, WT_TXN_RUNNING)))
 		WT_ERR(__wt_checkpoint_sync(session, NULL));
 
 	WT_ERR(__wt_meta_ckptlist_set(

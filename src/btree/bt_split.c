@@ -166,7 +166,7 @@ __split_safe_free(WT_SESSION_IMPL *session,
  * __split_should_deepen --
  *	Return if we should deepen the tree.
  */
-static int
+static bool
 __split_should_deepen(
     WT_SESSION_IMPL *session, WT_REF *ref, uint32_t *childrenp)
 {
@@ -186,7 +186,7 @@ __split_should_deepen(
 	 * pressure on the cache).
 	 */
 	if (page->memory_footprint < btree->maxmempage)
-		return (0);
+		return (false);
 
 	/*
 	 * Ensure the page has enough entries to make it worth splitting and
@@ -195,7 +195,7 @@ __split_should_deepen(
 	 */
 	if (pindex->entries > btree->split_deepen_min_child) {
 		*childrenp = pindex->entries / btree->split_deepen_per_child;
-		return (1);
+		return (true);
 	}
 
 	/*
@@ -209,10 +209,10 @@ __split_should_deepen(
 	    (__wt_ref_is_root(ref) ||
 	    page->memory_footprint >= S2C(session)->cache_size / 4)) {
 		*childrenp = pindex->entries / 10;
-		return (1);
+		return (true);
 	}
 
-	return (0);
+	return (false);
 }
 
 /*
@@ -1068,7 +1068,6 @@ err:	if (!complete)
 int
 __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_DECL_ITEM(key);
 	WT_INSERT *ins, **insp, *moved_ins, *prev_ins;
@@ -1080,59 +1079,26 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 
 	*splitp = 0;
 
-	btree = S2BT(session);
 	page = ref->page;
 	right = NULL;
 	page_decr = parent_incr = right_incr = 0;
 
-	/*
-	 * Check for pages with append-only workloads. A common application
-	 * pattern is to have multiple threads frantically appending to the
-	 * tree. We want to reconcile and evict this page, but we'd like to
-	 * do it without making the appending threads wait. If we're not
-	 * discarding the tree, check and see if it's worth doing a split to
-	 * let the threads continue before doing eviction.
-	 *
-	 * Ignore anything other than large, dirty row-store leaf pages.
-	 *
-	 * XXX KEITH
-	 * Need a better test for append-only workloads.
-	 */
-	if (page->type != WT_PAGE_ROW_LEAF ||
-	    page->memory_footprint < btree->maxmempage ||
-	    !__wt_page_is_modified(page))
-		return (0);
+        /*
+         * Assert splitting makes sense; specifically assert the page is dirty,
+         * we depend on that, otherwise the page might be evicted based on its
+         * last reconciliation which no longer matches reality after the split.
+         *
+         * Note this page has already been through an in-memory split.
+         */
+        WT_ASSERT(session, __wt_page_can_split(session, page));
+        WT_ASSERT(session, __wt_page_is_modified(page));
+        F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
-	/*
-	 * There is no point splitting if the list is small, no deep items is
-	 * our heuristic for that. (A 1/4 probability of adding a new skiplist
-	 * level means there will be a new 6th level for roughly each 4KB of
-	 * entries in the list. If we have at least two 6th level entries, the
-	 * list is at least large enough to work with.)
-	 *
-	 * The following code requires at least two items on the insert list,
-	 * this test serves the additional purpose of confirming that.
-	 */
-#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(6, WT_SKIP_MAXDEPTH - 1)
+	/* Find the last item in the insert list. */
 	ins_head = page->pg_row_entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
 	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
-	if (ins_head == NULL ||
-	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL ||
-	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] ==
-	    ins_head->tail[WT_MIN_SPLIT_SKIPLIST_DEPTH])
-		return (0);
-
-	/* Find the last item in the insert list. */
 	moved_ins = WT_SKIP_LAST(ins_head);
-
-	/*
-	 * Only split a page once, otherwise workloads that update in the middle
-	 * of the page could continually split without benefit.
-	 */
-	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
-		return (0);
-	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
 	/*
 	 * The first page in the split is the current page, but we still have

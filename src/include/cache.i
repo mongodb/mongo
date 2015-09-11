@@ -169,7 +169,7 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
 
 /*
  * __wt_cache_full_check --
- *	Wait for there to be space in the cache before a read or update.
+ *	Evict pages if the cache crosses its boundaries.
  */
 static inline int
 __wt_cache_full_check(WT_SESSION_IMPL *session)

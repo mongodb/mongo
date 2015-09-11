@@ -41,9 +41,7 @@ extern "C" {
 #else
 #include <pthread.h>
 #endif
-#ifdef HAVE_PTHREAD_NP_H
-#include <pthread_np.h>
-#endif
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>

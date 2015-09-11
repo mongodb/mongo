@@ -115,7 +115,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 		WT_ASSERT(session, F_ISSET(&session->txn, TXN_HAS_ID));
 		have_primary = (primary != NULL && primary_chunk != NULL &&
 		    (primary_chunk->switch_txn == WT_TXN_NONE ||
-		    TXNID_LT(session->txn.id, primary_chunk->switch_txn)));
+		    WT_TXNID_LT(session->txn.id, primary_chunk->switch_txn)));
 	}
 
 	/*
@@ -134,7 +134,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	if (have_primary) {
 		WT_ENTER_PAGE_INDEX(session);
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)primary)->btree,
-		    ovfl = __wt_btree_lsm_size(session, hard_limit ?
+		    ovfl = __wt_btree_lsm_over_size(session, hard_limit ?
 		    2 * lsm_tree->chunk_size : lsm_tree->chunk_size));
 		WT_LEAVE_PAGE_INDEX(session);
 
@@ -229,7 +229,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 				    &clsm->switch_txn[clsm->nchunks - 2];
 				    clsm->nupdates < clsm->nchunks;
 				    clsm->nupdates++, switch_txnp--) {
-					if (TXNID_LT(*switch_txnp, snap_min))
+					if (WT_TXNID_LT(*switch_txnp, snap_min))
 						break;
 					WT_ASSERT(session,
 					    !__wt_txn_visible_all(
@@ -1289,7 +1289,7 @@ __clsm_put(WT_SESSION_IMPL *session,
 	    F_ISSET(&session->txn, TXN_HAS_ID) &&
 	    clsm->primary_chunk != NULL &&
 	    (clsm->primary_chunk->switch_txn == WT_TXN_NONE ||
-	    TXNID_LE(session->txn.id, clsm->primary_chunk->switch_txn)));
+	    WT_TXNID_LE(session->txn.id, clsm->primary_chunk->switch_txn)));
 
 	/*
 	 * Clear the existing cursor position.  Don't clear the primary cursor:

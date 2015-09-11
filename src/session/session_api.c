@@ -95,7 +95,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_UNUSED(cfg);
 
 	/* Rollback any active transaction. */
-	if (F_ISSET(&session->txn, TXN_RUNNING))
+	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_TRET(__session_rollback_transaction(wt_session, NULL));
 
 	/*
@@ -193,7 +193,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, reconfigure, config, cfg);
 
-	if (F_ISSET(&session->txn, TXN_RUNNING))
+	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
 	WT_TRET(__wt_session_reset_cursors(session));
@@ -798,7 +798,7 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, begin_transaction, config, cfg);
 	WT_STAT_FAST_CONN_INCR(session, txn_begin);
 
-	if (F_ISSET(&session->txn, TXN_RUNNING))
+	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "Transaction already running");
 
 	ret = __wt_txn_begin(session, cfg);
@@ -822,7 +822,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	WT_STAT_FAST_CONN_INCR(session, txn_commit);
 
 	txn = &session->txn;
-	if (F_ISSET(txn, TXN_ERROR)) {
+	if (F_ISSET(txn, WT_TXN_ERROR)) {
 		__wt_errx(session, "failed transaction requires rollback");
 		ret = EINVAL;
 	}
@@ -877,7 +877,7 @@ __session_transaction_pinned_range(WT_SESSION *wt_session, uint64_t *prange)
 
 	/* Assign pinned to the lesser of id or snap_min */
 	if (txn_state->id != WT_TXN_NONE &&
-	    TXNID_LT(txn_state->id, txn_state->snap_min))
+	    WT_TXNID_LT(txn_state->id, txn_state->snap_min))
 		pinned = txn_state->id;
 	else
 		pinned = txn_state->snap_min;
@@ -921,7 +921,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * from evicting anything newer than this because we track the oldest
 	 * transaction ID in the system that is not visible to all readers.
 	 */
-	if (F_ISSET(txn, TXN_RUNNING))
+	if (F_ISSET(txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL,
 		    "Checkpoint not permitted in a transaction");
 
