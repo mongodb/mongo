@@ -158,7 +158,7 @@ __wt_eviction_dirty_target(WT_SESSION_IMPL *session)
  *	Return if an application thread should do eviction, and the cache full
  * percentage as a side-effect.
  */
-static inline int
+static inline bool
 __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -184,13 +184,13 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 	if (pct_fullp != NULL)
 		*pct_fullp = pct_full;
 	if (pct_full > cache->eviction_trigger)
-		return (1);
+		return (true);
 
 	/* Return if there are too many dirty bytes in cache. */
 	if (__wt_cache_dirty_inuse(cache) >
 	    (cache->eviction_dirty_trigger * bytes_max) / 100)
-		return (1);
-	return (0);
+		return (true);
+	return (false);
 }
 
 /*

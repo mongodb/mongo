@@ -100,7 +100,7 @@ __wt_log2_int(uint32_t n)
  * __wt_ispo2 --
  *	Return if a number is a power-of-two.
  */
-int
+bool
 __wt_ispo2(uint32_t v)
 {
 	/*

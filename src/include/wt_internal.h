@@ -41,6 +41,7 @@ extern "C" {
 #else
 #include <pthread.h>
 #endif
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>

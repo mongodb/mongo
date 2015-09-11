@@ -485,7 +485,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
  * __rec_las_checkpoint_test --
  *	Return if the lookaside table is going to collide with a checkpoint.
  */
-static inline int
+static inline bool
 __rec_las_checkpoint_test(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -508,14 +508,14 @@ __rec_las_checkpoint_test(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * most workloads.
 	 */
 	if (!F_ISSET(r, WT_EVICT_LOOKASIDE))
-		return (0);
+		return (false);
 	if (F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
-		return (0);
+		return (false);
 	if (r->orig_btree_checkpoint_gen == btree->checkpoint_gen &&
 	    r->orig_txn_checkpoint_gen == conn->txn_global.checkpoint_gen &&
 	    r->orig_btree_checkpoint_gen == r->orig_txn_checkpoint_gen)
-		return (0);
-	return (1);
+		return (false);
+	return (true);
 }
 
 /*
@@ -689,7 +689,7 @@ err:	__wt_page_out(session, &next);
  * __rec_raw_compression_config --
  *	Configure raw compression.
  */
-static inline int
+static inline bool
 __rec_raw_compression_config(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
@@ -700,11 +700,11 @@ __rec_raw_compression_config(
 	/* Check if raw compression configured. */
 	if (btree->compressor == NULL ||
 	    btree->compressor->compress_raw == NULL)
-		return (0);
+		return (false);
 
 	/* Only for row-store and variable-length column-store objects. */
 	if (page->type == WT_PAGE_COL_FIX)
-		return (0);
+		return (false);
 
 	/*
 	 * Raw compression cannot support dictionary compression. (Technically,
@@ -714,11 +714,11 @@ __rec_raw_compression_config(
 	 * that seems an unlikely use case.)
 	 */
 	if (btree->dictionary != 0)
-		return (0);
+		return (false);
 
 	/* Raw compression cannot support prefix compression. */
 	if (btree->prefix_compression != 0)
-		return (0);
+		return (false);
 
 	/*
 	 * Raw compression is also turned off during salvage: we can't allow
@@ -726,9 +726,9 @@ __rec_raw_compression_config(
 	 * can't manipulate the page size.
 	 */
 	if (salvage != NULL)
-		return (0);
+		return (false);
 
-	return (1);
+	return (true);
 }
 
 /*
@@ -2054,7 +2054,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
  * __rec_is_checkpoint --
  *	Return if we're writing a checkpoint.
  */
-static int
+static bool
 __rec_is_checkpoint(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 {
 	WT_BTREE *btree;
@@ -2080,9 +2080,9 @@ __rec_is_checkpoint(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_BOUNDARY *bnd)
 		bnd->addr.addr = NULL;
 		bnd->addr.size = 0;
 		bnd->addr.type = 0;
-		return (1);
+		return (true);
 	}
-	return (0);
+	return (false);
 }
 
 /*

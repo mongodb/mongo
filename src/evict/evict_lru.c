@@ -418,7 +418,7 @@ err:		WT_PANIC_MSG(session, ret, "cache eviction worker error");
  * __evict_update_work --
  *	Configure eviction work state.
  */
-static int
+static bool
 __evict_update_work(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
@@ -432,7 +432,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	cache->state = 0;
 
 	if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
-		return (0);
+		return (false);
 
 	/*
 	 * Page eviction overrides the dirty target and other types of eviction,
@@ -466,11 +466,11 @@ __evict_update_work(WT_SESSION_IMPL *session)
 		F_CLR(cache, WT_CACHE_WOULD_BLOCK);
 		goto done;
 	}
-	return (0);
+	return (false);
 
 done:	if (F_ISSET(cache, WT_CACHE_STUCK))
 		FLD_SET(cache->state, WT_EVICT_PASS_AGGRESSIVE);
-	return (1);
+	return (true);
 }
 
 /*

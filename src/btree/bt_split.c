@@ -173,7 +173,7 @@ __split_safe_free(WT_SESSION_IMPL *session,
  * __split_should_deepen --
  *	Return if we should deepen the tree.
  */
-static int
+static bool
 __split_should_deepen(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_BTREE *btree;
@@ -196,7 +196,7 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * pressure on the cache).
 	 */
 	if (page->memory_footprint < btree->maxmempage)
-		return (0);
+		return (false);
 
 	/*
 	 * Ensure the page has enough entries to make it worth splitting and
@@ -204,7 +204,7 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * splitting won't help).
 	 */
 	if (pindex->entries > btree->split_deepen_min_child)
-		return (1);
+		return (true);
 
 	/*
 	 * Don't allow a single page to put pressure on cache usage. The root
@@ -216,9 +216,9 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (pindex->entries >= 100 &&
 	    (__wt_ref_is_root(ref) ||
 	    page->memory_footprint >= S2C(session)->cache_size / 4))
-		return (1);
+		return (true);
 
-	return (0);
+	return (false);
 }
 
 /*
