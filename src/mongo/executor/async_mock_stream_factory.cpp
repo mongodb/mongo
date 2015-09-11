@@ -90,13 +90,12 @@ AsyncMockStreamFactory::MockStream::~MockStream() {
 
 void AsyncMockStreamFactory::MockStream::connect(asio::ip::tcp::resolver::iterator endpoints,
                                                  ConnectHandler&& connectHandler) {
-    {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-        // Block before returning from connect.
-        _block_inlock(kBlockedBeforeConnect, &lk);
-    }
-    _io_service->post([connectHandler, endpoints] { connectHandler(std::error_code()); });
+    // Suspend execution after "connecting"
+    _defer(kBlockedBeforeConnect,
+           [this, connectHandler, endpoints]() {
+               _io_service->post(
+                   [connectHandler, endpoints] { connectHandler(std::error_code()); });
+           });
 }
 
 void AsyncMockStreamFactory::MockStream::write(asio::const_buffer buf,
@@ -107,43 +106,47 @@ void AsyncMockStreamFactory::MockStream::write(asio::const_buffer buf,
     auto size = asio::buffer_size(buf);
     _writeQueue.push({begin, begin + size});
 
-    // Block after data is written.
-    _block_inlock(kBlockedAfterWrite, &lk);
-
-    lk.unlock();
-    _io_service->post([writeHandler, size] { writeHandler(std::error_code(), size); });
+    // Suspend execution after data is written.
+    _defer_inlock(kBlockedAfterWrite,
+                  [this, writeHandler, size]() {
+                      _io_service->post(
+                          [writeHandler, size] { writeHandler(std::error_code(), size); });
+                  });
 }
 
 void AsyncMockStreamFactory::MockStream::cancel() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     log() << "cancel() for: " << _target;
 
-    // TODO: do we actually need to mock cancel?
+    // TODO: We will need to mock cancel() to test SERVER-20190
     // We may want a cancel queue the same way we have read and write queues
 }
 
 void AsyncMockStreamFactory::MockStream::read(asio::mutable_buffer buf,
                                               StreamHandler&& readHandler) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    // Block before data is read.
-    _block_inlock(kBlockedBeforeRead, &lk);
+    // Suspend execution before data is read.
+    _defer(kBlockedBeforeRead,
+           [this, buf, readHandler]() {
+               stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-    auto nextRead = std::move(_readQueue.front());
-    _readQueue.pop();
+               auto nextRead = std::move(_readQueue.front());
+               _readQueue.pop();
 
-    auto beginDst = asio::buffer_cast<uint8_t*>(buf);
-    auto nToCopy = std::min(nextRead.size(), asio::buffer_size(buf));
+               auto beginDst = asio::buffer_cast<uint8_t*>(buf);
+               auto nToCopy = std::min(nextRead.size(), asio::buffer_size(buf));
 
-    auto endSrc = std::begin(nextRead);
-    std::advance(endSrc, nToCopy);
+               auto endSrc = std::begin(nextRead);
+               std::advance(endSrc, nToCopy);
 
-    auto endDst = std::copy(std::begin(nextRead), endSrc, beginDst);
-    invariant((endDst - beginDst) == static_cast<std::ptrdiff_t>(nToCopy));
-    log() << "read " << nToCopy << " bytes, " << (nextRead.size() - nToCopy)
-          << " remaining in buffer";
+               auto endDst = std::copy(std::begin(nextRead), endSrc, beginDst);
+               invariant((endDst - beginDst) == static_cast<std::ptrdiff_t>(nToCopy));
+               log() << "read " << nToCopy << " bytes, " << (nextRead.size() - nToCopy)
+                     << " remaining in buffer";
 
-    lk.unlock();
-    _io_service->post([readHandler, nToCopy] { readHandler(std::error_code(), nToCopy); });
+               lk.unlock();
+               _io_service->post(
+                   [readHandler, nToCopy] { readHandler(std::error_code(), nToCopy); });
+           });
 }
 
 void AsyncMockStreamFactory::MockStream::pushRead(std::vector<uint8_t> toRead) {
@@ -160,12 +163,18 @@ std::vector<uint8_t> AsyncMockStreamFactory::MockStream::popWrite() {
     return nextWrite;
 }
 
-void AsyncMockStreamFactory::MockStream::_block_inlock(StreamState state,
-                                                       stdx::unique_lock<stdx::mutex>* lk) {
+void AsyncMockStreamFactory::MockStream::_defer(StreamState state, Action&& handler) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _defer_inlock(state, std::move(handler));
+}
+
+void AsyncMockStreamFactory::MockStream::_defer_inlock(StreamState state, Action&& handler) {
     invariant(_state == kRunning);
     _state = state;
-    _cv.notify_one();
-    _cv.wait(*lk, [this]() { return _state == kRunning; });
+
+    invariant(!_deferredAction);
+    _deferredAction = std::move(handler);
+    _deferredCV.notify_one();
 }
 
 void AsyncMockStreamFactory::MockStream::unblock() {
@@ -176,12 +185,16 @@ void AsyncMockStreamFactory::MockStream::unblock() {
 void AsyncMockStreamFactory::MockStream::_unblock_inlock() {
     invariant(_state != kRunning);
     _state = kRunning;
-    _cv.notify_one();
+
+    // Post our deferred action to resume state machine execution
+    invariant(_deferredAction);
+    _io_service->post(std::move(_deferredAction));
+    _deferredAction = nullptr;
 }
 
 auto AsyncMockStreamFactory::MockStream::waitUntilBlocked() -> StreamState {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _cv.wait(lk, [this]() { return _state != kRunning; });
+    _deferredCV.wait(lk, [this]() { return _state != kRunning; });
     return _state;
 }
 

@@ -94,8 +94,11 @@ public:
             const stdx::function<RemoteCommandResponse(RemoteCommandRequest)> replyFunc);
 
     private:
+        using Action = stdx::function<void()>;
+
+        void _defer(StreamState state, Action&& handler);
+        void _defer_inlock(StreamState state, Action&& handler);
         void _unblock_inlock();
-        void _block_inlock(StreamState state, stdx::unique_lock<stdx::mutex>* lk);
 
         asio::io_service* _io_service;
 
@@ -104,11 +107,13 @@ public:
 
         stdx::mutex _mutex;
 
-        stdx::condition_variable _cv;
+        stdx::condition_variable _deferredCV;
         StreamState _state{kRunning};
 
         std::queue<std::vector<uint8_t>> _readQueue;
         std::queue<std::vector<uint8_t>> _writeQueue;
+
+        Action _deferredAction;
     };
 
     MockStream* blockUntilStreamExists(const HostAndPort& host);
