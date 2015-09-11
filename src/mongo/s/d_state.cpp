@@ -258,10 +258,6 @@ bool shardVersionOk(OperationContext* txn,
             return true;
         }
 
-        if (info->inForceVersionOkMode()) {
-            return true;
-        }
-
         received = info->getVersion(ns);
     }
 
@@ -316,17 +312,6 @@ bool shardVersionOk(OperationContext* txn,
 }
 
 }  // namespace
-
-ShardForceVersionOkModeBlock::ShardForceVersionOkModeBlock(Client* client) {
-    info = ShardedConnectionInfo::get(client, false);
-    if (info)
-        info->enterForceVersionOkMode();
-}
-
-ShardForceVersionOkModeBlock::~ShardForceVersionOkModeBlock() {
-    if (info)
-        info->leaveForceVersionOkMode();
-}
 
 bool haveLocalShardingInfo(Client* client, const string& ns) {
     if (!ShardingState::get(client->getServiceContext())->enabled())

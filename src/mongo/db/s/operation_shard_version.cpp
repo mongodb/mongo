@@ -94,4 +94,31 @@ void OperationShardVersion::setShardVersion(NamespaceString ns, ChunkVersion new
     _hasVersion = true;
 }
 
+void OperationShardVersion::_clear() {
+    _hasVersion = false;
+    _shardVersion.clear();
+    _ns = NamespaceString();
+}
+
+OperationShardVersion::IgnoreVersioningBlock::IgnoreVersioningBlock(OperationContext* txn,
+                                                                    const NamespaceString& ns)
+    : _txn(txn), _ns(ns) {
+    auto& operationVersion = OperationShardVersion::get(txn);
+    _hadOriginalVersion = operationVersion._hasVersion;
+    if (_hadOriginalVersion) {
+        _originalVersion = operationVersion.getShardVersion(ns);
+    }
+    operationVersion.setShardVersion(ns, ChunkVersion::IGNORED());
+}
+
+OperationShardVersion::IgnoreVersioningBlock::~IgnoreVersioningBlock() {
+    auto& operationVersion = OperationShardVersion::get(_txn);
+    invariant(ChunkVersion::isIgnoredVersion(operationVersion.getShardVersion(_ns)));
+    if (_hadOriginalVersion) {
+        operationVersion.setShardVersion(_ns, _originalVersion);
+    } else {
+        operationVersion._clear();
+    }
+}
+
 }  // namespace mongo

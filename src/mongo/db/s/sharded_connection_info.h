@@ -56,17 +56,6 @@ public:
     static void reset(Client* client);
     static void addHook();
 
-    bool inForceVersionOkMode() const {
-        return _forceVersionOk;
-    }
-
-    void enterForceVersionOkMode() {
-        _forceVersionOk = true;
-    }
-    void leaveForceVersionOkMode() {
-        _forceVersionOk = false;
-    }
-
 private:
     typedef std::map<std::string, ChunkVersion> NSVersionMap;
 

@@ -57,6 +57,7 @@
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/catalog_cache.h"
@@ -567,7 +568,7 @@ long long State::postProcessCollection(OperationContext* txn, CurOp* op, Progres
  *
  * TODO: make count work with versioning
  */
-unsigned long long _safeCount(Client* client,
+unsigned long long _safeCount(OperationContext* txn,
                               // Can't be const b/c count isn't
                               /* const */ DBDirectClient& db,
                               const string& ns,
@@ -575,7 +576,7 @@ unsigned long long _safeCount(Client* client,
                               int options = 0,
                               int limit = 0,
                               int skip = 0) {
-    ShardForceVersionOkModeBlock ignoreVersion(client);  // ignore versioning here
+    OperationShardVersion::IgnoreVersioningBlock ignoreVersion(txn, NamespaceString(ns));
     return db.count(ns, query, options, limit, skip);
 }
 
@@ -586,13 +587,11 @@ unsigned long long _safeCount(Client* client,
 long long State::postProcessCollectionNonAtomic(OperationContext* txn,
                                                 CurOp* op,
                                                 ProgressMeterHolder& pm) {
-    auto client = txn->getClient();
-
     if (_config.outputOptions.finalNamespace == _config.tempNamespace)
-        return _safeCount(client, _db, _config.outputOptions.finalNamespace);
+        return _safeCount(txn, _db, _config.outputOptions.finalNamespace);
 
     if (_config.outputOptions.outType == Config::REPLACE ||
-        _safeCount(client, _db, _config.outputOptions.finalNamespace) == 0) {
+        _safeCount(txn, _db, _config.outputOptions.finalNamespace) == 0) {
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lock(txn->lockState());  // TODO(erh): why global???
         // replace: just rename from temp to final collection name, dropping previous collection
@@ -611,7 +610,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
     } else if (_config.outputOptions.outType == Config::MERGE) {
         // merge: upsert new docs into old collection
         {
-            const auto count = _safeCount(client, _db, _config.tempNamespace, BSONObj());
+            const auto count = _safeCount(txn, _db, _config.tempNamespace, BSONObj());
             stdx::lock_guard<Client> lk(*txn->getClient());
             op->setMessage_inlock(
                 "m/r: merge post processing", "M/R Merge Post Processing Progress", count);
@@ -633,7 +632,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
         BSONList values;
 
         {
-            const auto count = _safeCount(client, _db, _config.tempNamespace, BSONObj());
+            const auto count = _safeCount(txn, _db, _config.tempNamespace, BSONObj());
             stdx::lock_guard<Client> lk(*txn->getClient());
             op->setMessage_inlock(
                 "m/r: reduce post processing", "M/R Reduce Post Processing Progress", count);
@@ -669,7 +668,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
         pm.finished();
     }
 
-    return _safeCount(txn->getClient(), _db, _config.outputOptions.finalNamespace);
+    return _safeCount(txn, _db, _config.outputOptions.finalNamespace);
 }
 
 /**
@@ -730,12 +729,8 @@ bool State::sourceExists() {
 }
 
 long long State::incomingDocuments() {
-    return _safeCount(_txn->getClient(),
-                      _db,
-                      _config.ns,
-                      _config.filter,
-                      QueryOption_SlaveOk,
-                      (unsigned)_config.limit);
+    return _safeCount(
+        _txn, _db, _config.ns, _config.filter, QueryOption_SlaveOk, (unsigned)_config.limit);
 }
 
 State::~State() {

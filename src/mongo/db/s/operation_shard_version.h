@@ -49,6 +49,8 @@ class OperationShardVersion {
     MONGO_DISALLOW_COPYING(OperationShardVersion);
 
 public:
+    class IgnoreVersioningBlock;
+
     OperationShardVersion();
 
     /**
@@ -86,9 +88,36 @@ public:
     void setShardVersion(NamespaceString ns, ChunkVersion newVersion);
 
 private:
+    /**
+     * Resets this object back as if it was default constructed (ie _hasVersion is false,
+     * _shardVersion is UNSHARDED, _ns is empty).
+     */
+    void _clear();
+
     bool _hasVersion = false;
     ChunkVersion _shardVersion;
     NamespaceString _ns;
+};
+
+/**
+ * RAII type that sets the shard version for the current operation to IGNORED in its constructor,
+ * then restores the original version in its destructor.  Used for temporarily disabling shard
+ * version checking for certain operations, such as multi-updates, that need to be unversioned
+ * but may be part of a larger group of operations with a single OperationContext where the other
+ * sub-operations might still require versioning.
+ */
+class OperationShardVersion::IgnoreVersioningBlock {
+    MONGO_DISALLOW_COPYING(IgnoreVersioningBlock);
+
+public:
+    IgnoreVersioningBlock(OperationContext* txn, const NamespaceString& ns);
+    ~IgnoreVersioningBlock();
+
+private:
+    OperationContext* _txn;
+    NamespaceString _ns;
+    ChunkVersion _originalVersion;
+    bool _hadOriginalVersion;
 };
 
 }  // namespace mongo
