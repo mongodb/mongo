@@ -514,17 +514,23 @@ static int
 __backup_list_all_append(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CURSOR_BACKUP *cb;
+	const char *name;
 
 	WT_UNUSED(cfg);
 
 	cb = session->bkp_cursor;
+	name = session->dhandle->name;
 
 	/* Ignore files in the process of being bulk-loaded. */
 	if (F_ISSET(S2BT(session), WT_BTREE_BULK))
 		return (0);
 
+	/* Ignore the lookaside table. */
+	if (strcmp(name, WT_LAS_URI) == 0)
+		return (0);
+
 	/* Add the file to the list of files to be copied. */
-	return (__backup_list_append(session, cb, session->dhandle->name));
+	return (__backup_list_append(session, cb, name));
 }
 
 /*

@@ -33,18 +33,7 @@ __txn_op_log(WT_SESSION_IMPL *session,
 	 * 3) row store remove; or
 	 * 4) row store insert/update.
 	 */
-	if (cbt->btree->type != BTREE_ROW) {
-		WT_ASSERT(session, cbt->ins != NULL);
-		recno = WT_INSERT_RECNO(cbt->ins);
-		WT_ASSERT(session, recno != 0);
-
-		if (WT_UPDATE_DELETED_ISSET(upd))
-			WT_ERR(__wt_logop_col_remove_pack(session, logrec,
-			    op->fileid, recno));
-		else
-			WT_ERR(__wt_logop_col_put_pack(session, logrec,
-			    op->fileid, recno, &value));
-	} else {
+	if (cbt->btree->type == BTREE_ROW) {
 		WT_ERR(__wt_cursor_row_leaf_key(cbt, &key));
 
 		if (WT_UPDATE_DELETED_ISSET(upd))
@@ -53,6 +42,16 @@ __txn_op_log(WT_SESSION_IMPL *session,
 		else
 			WT_ERR(__wt_logop_row_put_pack(session, logrec,
 			    op->fileid, &key, &value));
+	} else {
+		recno = WT_INSERT_RECNO(cbt->ins);
+		WT_ASSERT(session, recno != WT_RECNO_OOB);
+
+		if (WT_UPDATE_DELETED_ISSET(upd))
+			WT_ERR(__wt_logop_col_remove_pack(session, logrec,
+			    op->fileid, recno));
+		else
+			WT_ERR(__wt_logop_col_put_pack(session, logrec,
+			    op->fileid, recno, &value));
 	}
 
 err:	__wt_buf_free(session, &key);
@@ -308,7 +307,7 @@ __wt_txn_checkpoint_log(
 	switch (flags) {
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = 1;
-		*ckpt_lsn = S2C(session)->log->write_start_lsn;
+		WT_ERR(__wt_log_ckpt_lsn(session, ckpt_lsn));
 		/*
 		 * We need to make sure that the log records in the checkpoint
 		 * LSN are on disk.  In particular to make sure that the
@@ -337,7 +336,7 @@ __wt_txn_checkpoint_log(
 			txn->ckpt_nsnapshot = 0;
 			WT_CLEAR(empty);
 			ckpt_snapshot = &empty;
-			*ckpt_lsn = S2C(session)->log->write_start_lsn;
+			WT_ERR(__wt_log_ckpt_lsn(session, ckpt_lsn));
 		} else
 			ckpt_snapshot = txn->ckpt_snapshot;
 
@@ -419,9 +418,9 @@ __wt_txn_truncate_log(
 	} else {
 		op->type = WT_TXN_OP_TRUNCATE_COL;
 		op->u.truncate_col.start =
-		    (start == NULL) ? 0 : start->recno;
+		    (start == NULL) ? WT_RECNO_OOB : start->recno;
 		op->u.truncate_col.stop =
-		    (stop == NULL) ? 0 : stop->recno;
+		    (stop == NULL) ? WT_RECNO_OOB : stop->recno;
 	}
 
 	/* Write that operation into the in-memory log. */

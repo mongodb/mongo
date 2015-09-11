@@ -182,7 +182,7 @@ __wt_cell_pack_addr(WT_CELL *cell, u_int cell_type, uint64_t recno, size_t size)
 
 	p = cell->__chunk + 1;
 
-	if (recno == 0)
+	if (recno == WT_RECNO_OOB)
 		cell->__chunk[0] = cell_type;		/* Type */
 	else {
 		cell->__chunk[0] = cell_type | WT_CELL_64V;

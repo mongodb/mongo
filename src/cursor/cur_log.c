@@ -74,7 +74,7 @@ __curlog_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	acl = (WT_CURSOR_LOG *)a;
 	bcl = (WT_CURSOR_LOG *)b;
 	WT_ASSERT(session, cmpp != NULL);
-	*cmpp = WT_LOG_CMP(acl->cur_lsn, bcl->cur_lsn);
+	*cmpp = __wt_log_cmp(acl->cur_lsn, bcl->cur_lsn);
 	/*
 	 * If both are on the same LSN, compare step counter.
 	 */
@@ -391,6 +391,12 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	WT_INIT_LSN(cl->next_lsn);
 
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
+
+	/*
+	 * The user may be trying to read a log record they just wrote.
+	 * Log records may be buffered, so force out any now.
+	 */
+	WT_ERR(__wt_log_force_write(session, 1));
 
 	/* Log cursors block archiving. */
 	WT_ERR(__wt_readlock(session, log->log_archive_lock));

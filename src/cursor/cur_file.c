@@ -369,15 +369,20 @@ __curfile_close(WT_CURSOR *cursor)
 		__wt_buf_free(session, &cbulk->last);
 	}
 
-	WT_TRET(__wt_btcur_close(cbt));
-	if (cbt->btree != NULL) {
+	WT_TRET(__wt_btcur_close(cbt, 0));
+	/* The URI is owned by the btree handle. */
+	cursor->internal_uri = NULL;
+	WT_TRET(__wt_cursor_close(cursor));
+
+	/*
+	 * Note: release the data handle last so that cursor statistics are
+	 * updated correctly.
+	 */
+	if (session->dhandle != NULL) {
 		/* Increment the data-source's in-use counter. */
 		__wt_cursor_dhandle_decr_use(session);
 		WT_TRET(__wt_session_release_btree(session));
 	}
-	/* The URI is owned by the btree handle. */
-	cursor->internal_uri = NULL;
-	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);
 }

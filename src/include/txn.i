@@ -140,12 +140,22 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_committed --
+ *	Return if a transaction has been committed.
+ */
+static inline bool
+__wt_txn_committed(WT_SESSION_IMPL *session, uint64_t id)
+{
+	return (WT_TXNID_LT(id, S2C(session)->txn_global.last_running));
+}
+
+/*
  * __wt_txn_visible_all --
  *	Check if a given transaction ID is "globally visible".	This is, if
  *	all sessions in the system will see the transaction ID including the
  *	ID that belongs to a running checkpoint.
  */
-static inline int
+static inline bool
 __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
 {
 	uint64_t oldest_id;
@@ -159,28 +169,21 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id)
  * __wt_txn_visible --
  *	Can the current transaction see the given ID?
  */
-static inline int
+static inline bool
 __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 {
 	WT_TXN *txn;
-	int found;
+	bool found;
 
 	txn = &session->txn;
 
 	/* Changes with no associated transaction are always visible. */
 	if (id == WT_TXN_NONE)
-		return (1);
+		return (true);
 
 	/* Nobody sees the results of aborted transactions. */
 	if (id == WT_TXN_ABORTED)
-		return (0);
-
-	/*
-	 * Eviction only sees globally visible updates, or if there is a
-	 * checkpoint transaction running, use its transaction.
-	 */
-	if (txn->isolation == WT_ISO_EVICTION)
-		return (__wt_txn_visible_all(session, id));
+		return (false);
 
 	/*
 	 * Read-uncommitted transactions see all other changes.
@@ -194,11 +197,11 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 */
 	if (txn->isolation == WT_ISO_READ_UNCOMMITTED ||
 	    session->dhandle == session->meta_dhandle)
-		return (1);
+		return (true);
 
 	/* Transactions see their own changes. */
 	if (id == txn->id)
-		return (1);
+		return (true);
 
 	/*
 	 * WT_ISO_SNAPSHOT, WT_ISO_READ_COMMITTED: the ID is visible if it is
@@ -210,9 +213,9 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 * snapshot is empty.
 	 */
 	if (WT_TXNID_LE(txn->snap_max, id))
-		return (0);
+		return (false);
 	if (txn->snapshot_count == 0 || WT_TXNID_LT(id, txn->snap_min))
-		return (1);
+		return (true);
 
 	WT_BINARY_SEARCH(id, txn->snapshot, txn->snapshot_count, found);
 	return (!found);
@@ -266,7 +269,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	F_SET(txn, WT_TXN_RUNNING);
-	return (0);
+	return (false);
 }
 
 /*
@@ -477,7 +480,7 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
  * __wt_txn_am_oldest --
  *	Am I the oldest transaction in the system?
  */
-static inline int
+static inline bool
 __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -492,12 +495,12 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 	txn_global = &conn->txn_global;
 
 	if (txn->id == WT_TXN_NONE)
-		return (0);
+		return (false);
 
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0, s = txn_global->states; i < session_cnt; i++, s++)
 		if ((id = s->id) != WT_TXN_NONE && WT_TXNID_LT(id, txn->id))
-			return (0);
+			return (false);
 
-	return (1);
+	return (true);
 }

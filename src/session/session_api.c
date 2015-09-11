@@ -383,6 +383,22 @@ err:		if (cursor != NULL)
 }
 
 /*
+ * __wt_session_create --
+ *	Internal version of WT_SESSION::create.
+ */
+int
+__wt_session_create(
+    WT_SESSION_IMPL *session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+
+	WT_WITH_SCHEMA_LOCK(session,
+	    WT_WITH_TABLE_LOCK(session,
+		ret = __wt_schema_create(session, uri, config)));
+	return (ret);
+}
+
+/*
  * __session_create --
  *	WT_SESSION->create method.
  */
@@ -423,9 +439,7 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 		WT_ERR_NOTFOUND_OK(ret);
 	}
 
-	WT_WITH_SCHEMA_LOCK(session,
-	    WT_WITH_TABLE_LOCK(session,
-		ret = __wt_schema_create(session, uri, config)));
+	ret = __wt_session_create(session, uri, config);
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -529,6 +543,21 @@ __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 }
 
 /*
+ * __wt_session_drop --
+ *	Internal version of WT_SESSION::drop.
+ */
+int
+__wt_session_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+{
+	WT_DECL_RET;
+
+	WT_WITH_SCHEMA_LOCK(session,
+	    WT_WITH_TABLE_LOCK(session,
+		ret = __wt_schema_drop(session, uri, cfg)));
+	return (ret);
+}
+
+/*
  * __session_drop --
  *	WT_SESSION->drop method.
  */
@@ -544,9 +573,7 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 	/* Disallow objects in the WiredTiger name space. */
 	WT_ERR(__wt_str_name_check(session, uri));
 
-	WT_WITH_SCHEMA_LOCK(session,
-	    WT_WITH_TABLE_LOCK(session,
-		ret = __wt_schema_drop(session, uri, cfg)));
+	ret = __wt_session_drop(session, uri, cfg);
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
 	API_END_RET_NOTFOUND_MAP(session, ret);
@@ -915,7 +942,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	 * If our LSN is smaller than the current sync LSN then our
 	 * transaction is stable.  We're done.
 	 */
-	if (WT_LOG_CMP(&session->bg_sync_lsn, &log->sync_lsn) <= 0)
+	if (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) <= 0)
 		goto err;
 
 	/*
@@ -937,7 +964,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	 * Keep checking the LSNs until we find it is stable or we reach
 	 * our timeout.
 	 */
-	while (WT_LOG_CMP(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
+	while (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
 		WT_ERR(__wt_cond_signal(session, conn->log_file_cond));
 		WT_ERR(__wt_epoch(session, &now));
 		waited_ms = WT_TIMEDIFF(now, start) / WT_MILLION;
@@ -1001,7 +1028,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * operations, but checkpoint does enough I/O it may be called upon to
 	 * perform slow operations for the block manager.
 	 */
-	F_SET(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
+	F_SET(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
 
 	/*
 	 * Only one checkpoint can be active at a time, and checkpoints must run
@@ -1016,7 +1043,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
 
-err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_CACHE_CHECK);
+err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
 
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }

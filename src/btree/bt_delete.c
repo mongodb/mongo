@@ -77,7 +77,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 		}
 
 		(void)__wt_atomic_addv32(&S2BT(session)->evict_busy, 1);
-		ret = __wt_evict_page(session, ref);
+		ret = __wt_evict(session, ref, 0);
 		(void)__wt_atomic_subv32(&S2BT(session)->evict_busy, 1);
 		WT_RET_BUSY_OK(ret);
 	}
@@ -216,10 +216,10 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
  * __wt_delete_page_skip --
  *	If iterating a cursor, skip deleted pages that are visible to us.
  */
-int
+bool
 __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	int skip;
+	bool skip;
 
 	/*
 	 * Deleted pages come from two sources: either it's a fast-delete as
@@ -240,10 +240,10 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * the structure, just to be safe.
 	 */
 	if (ref->page_del == NULL)
-		return (1);
+		return (true);
 
 	if (!__wt_atomic_casv32(&ref->state, WT_REF_DELETED, WT_REF_LOCKED))
-		return (0);
+		return (false);
 
 	skip = (ref->page_del == NULL ||
 	    __wt_txn_visible(session, ref->page_del->txnid));

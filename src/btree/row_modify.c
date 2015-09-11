@@ -112,6 +112,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			 * there should only be one update list per key.
 			 */
 			WT_ASSERT(session, *upd_entry == NULL);
+
 			/*
 			 * Set the "old" entry to the second update in the list
 			 * so that the serialization function succeeds in

@@ -123,7 +123,7 @@ __col_append_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 	 * If the application didn't specify a record number, allocate a new one
 	 * and set up for an append.
 	 */
-	if ((recno = WT_INSERT_RECNO(new_ins)) == 0) {
+	if ((recno = WT_INSERT_RECNO(new_ins)) == WT_RECNO_OOB) {
 		recno = WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
 		WT_ASSERT(session, WT_SKIP_LAST(ins_head) == NULL ||
 		    recno > WT_INSERT_RECNO(WT_SKIP_LAST(ins_head)));
@@ -292,24 +292,36 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	__wt_page_modify_set(session, page);
 
 	/*
-	 * If there are subsequent WT_UPDATE structures, we're evicting pages
-	 * and the page-scanning mutex isn't held, discard obsolete WT_UPDATE
-	 * structures.  Serialization is needed so only one thread does the
-	 * obsolete check at a time, and to protect updates from disappearing
-	 * under reconciliation.
+	 * If there are no subsequent WT_UPDATE structures we are done here.
 	 */
-	if (upd->next != NULL &&
-	    __wt_txn_visible_all(session, page->modify->obsolete_check_txn)) {
-		F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
-		/* If we can't lock it, don't scan, that's okay. */
-		if (ret != 0)
-			return (0);
-		obsolete = __wt_update_obsolete_check(session, page, upd->next);
-		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
-		if (obsolete != NULL) {
-			page->modify->obsolete_check_txn = WT_TXN_NONE;
-			__wt_update_obsolete_free(session, page, obsolete);
+	if (upd->next == NULL)
+		return (0);
+	/*
+	 * We would like to call __wt_txn_update_oldest only in the event that
+	 * there are further updates to this page, the check against WT_TXN_NONE
+	 * is used as an indicator of there being further updates on this page.
+	 */
+	if (page->modify->obsolete_check_txn != WT_TXN_NONE) {
+		if (!__wt_txn_visible_all(session,
+		    page->modify->obsolete_check_txn)) {
+			/* Try to move the oldest ID forward and re-check */
+			__wt_txn_update_oldest(session,0);
 		}
+		if (!__wt_txn_visible_all(session,
+		    page->modify->obsolete_check_txn)) {
+			page->modify->obsolete_check_txn = WT_TXN_NONE;
+			return (0);
+		}
+	}
+	F_CAS_ATOMIC(page, WT_PAGE_RECONCILIATION, ret);
+
+	/* If we can't lock it, don't scan, that's okay. */
+	if (ret != 0)
+		return (0);
+	obsolete = __wt_update_obsolete_check(session, page, upd->next);
+	F_CLR_ATOMIC(page, WT_PAGE_RECONCILIATION);
+	if (obsolete != NULL) {
+		__wt_update_obsolete_free(session, page, obsolete);
 	}
 
 	return (0);

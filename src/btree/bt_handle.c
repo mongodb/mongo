@@ -255,27 +255,17 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	/* Page sizes */
 	WT_RET(__btree_page_sizes(session));
 
-	/* 
-	 * Set special flags for the metadata file.
-	 * Eviction; the metadata file is never evicted.
-	 * Logging; the metadata file is always logged if possible.
-	 */
-	if (WT_IS_METADATA(btree->dhandle)) {
+	WT_RET(__wt_config_gets(session, cfg, "cache_resident", &cval));
+	if (cval.val)
 		F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
-		F_CLR(btree, WT_BTREE_NO_LOGGING);
-	} else {
-		WT_RET(__wt_config_gets(session, cfg, "cache_resident", &cval));
-		if (cval.val)
-			F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
-		else
-			F_CLR(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
+	else
+		F_CLR(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 
-		WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
-		if (cval.val)
-			F_CLR(btree, WT_BTREE_NO_LOGGING);
-		else
-			F_SET(btree, WT_BTREE_NO_LOGGING);
-	}
+	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
+	if (cval.val)
+		F_CLR(btree, WT_BTREE_NO_LOGGING);
+	else
+		F_SET(btree, WT_BTREE_NO_LOGGING);
 
 	/* Checksums */
 	WT_RET(__wt_config_gets(session, cfg, "checksum", &cval));
@@ -370,7 +360,7 @@ __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, int is_recno)
 	root_ref->page = root;
 	root_ref->state = WT_REF_MEM;
 
-	root_ref->key.recno = is_recno ? 1 : 0;
+	root_ref->key.recno = is_recno ? 1 : WT_RECNO_OOB;
 
 	root->pg_intl_parent_ref = root_ref;
 }
@@ -697,9 +687,11 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
 	btree->maxmempage =
 	    WT_MAX((uint64_t)cval.val, 50 * (uint64_t)btree->maxleafpage);
-	cache_size = S2C(session)->cache_size;
-	if (cache_size > 0)
-		btree->maxmempage = WT_MIN(btree->maxmempage, cache_size / 4);
+	if (!F_ISSET(S2C(session), WT_CONN_CACHE_POOL)) {
+		if ((cache_size = S2C(session)->cache_size) > 0)
+			btree->maxmempage =
+			    WT_MIN(btree->maxmempage, cache_size / 4);
+	}
 
 	/*
 	 * Get the split percentage (reconciliation splits pages into smaller

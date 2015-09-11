@@ -270,7 +270,9 @@ struct __wt_connection_impl {
 	uint32_t   hazard_max;		/* Hazard array size */
 
 	WT_CACHE  *cache;		/* Page cache */
-	uint64_t   cache_size;		/* Configured cache size */
+	volatile uint64_t cache_size;	/* Cache size (either statically
+					   configured or the current size
+					   within a cache pool). */
 
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
 
@@ -291,8 +293,6 @@ struct __wt_connection_impl {
 	uint64_t  ckpt_time_min;
 	uint64_t  ckpt_time_recent;	/* Checkpoint time recent/total */
 	uint64_t  ckpt_time_total;
-
-	int compact_in_memory_pass;	/* Compaction serialization */
 
 #define	WT_CONN_STAT_ALL	0x01	/* "all" statistics configured */
 #define	WT_CONN_STAT_CLEAR	0x02	/* clear after gathering */
@@ -369,6 +369,20 @@ struct __wt_connection_impl {
 	time_t		 sweep_idle_time;/* Handle sweep idle time */
 	time_t		 sweep_interval;/* Handle sweep interval */
 	u_int		 sweep_handles_min;/* Handle sweep minimum open */
+
+	/*
+	 * Shared lookaside lock, session and cursor, used by threads accessing
+	 * the lookaside table (other than eviction server and worker threads
+	 * and the sweep thread, all of which have their own lookaside cursors).
+	 */
+	WT_SPINLOCK	 las_lock;	/* Lookaside table spinlock */
+	WT_SESSION_IMPL *las_session;	/* Lookaside table session */
+	WT_CURSOR	*las_cursor;	/* Lookaside table cursor */
+	bool		 las_written;	/* Lookaside table has been written */
+
+	WT_ITEM		 las_sweep_key;	/* Sweep server's saved key */
+	int		 las_sweep_call;/* Sweep server's call count */
+	uint64_t	 las_sweep_cnt;	/* Sweep server's per-call row count */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;

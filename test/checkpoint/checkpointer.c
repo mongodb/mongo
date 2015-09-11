@@ -134,8 +134,7 @@ done:	if ((ret = session->close(session, NULL)) != 0)
 /*
  * verify_checkpoint --
  *     Open a cursor on each table at the last checkpoint and walk through
- *     the tables in parallel. The key/values should match across all
- *     tables.
+ *     the tables in parallel. The key/values should match across all tables.
  */
 static int
 verify_checkpoint(WT_SESSION *session)
@@ -245,41 +244,36 @@ compare_cursors(
     WT_CURSOR *cursor2, const char *type2)
 {
 	uint64_t key1, key2;
-	char *val1, *val2;
-	char buf[128];
+	char *val1, *val2, buf[128];
+	int ret;
 
+	ret = 0;
 	memset(buf, 0, 128);
 
 	if (cursor1->get_key(cursor1, &key1) != 0 ||
 	    cursor2->get_key(cursor2, &key2) != 0)
 		return (log_print_err("Error getting keys", EINVAL, 1));
 
-	if (key1 != key2) {
-		printf("Key mismatch %" PRIu64 " from a %s table "
-		    "is not %" PRIu64 " from a %s table\n",
-		    key1, type1, key2, type2);
-
-		return (ERR_KEY_MISMATCH);
-	}
-
-	/* Now check the values. */
 	if (cursor1->get_value(cursor1, &val1) != 0 ||
 	    cursor2->get_value(cursor2, &val2) != 0)
 		return (log_print_err("Error getting values", EINVAL, 1));
 
 	if (g.logfp != NULL)
 		fprintf(g.logfp, "k1: %" PRIu64 " k2: %" PRIu64
-		    " val1: %s val2: %s \n",
-		    key1, key2, val1, val2);
-	if (strlen(val1) != strlen(val2) ||
-	    strcmp(val1, val2) != 0) {
-		printf("Value mismatch for key %" PRIu64
-		    ", %s from a %s table is not %s from a %s table\n",
-		    key1, val1, type1, val2, type2);
-		return (ERR_DATA_MISMATCH);
-	}
+		    " val1: %s val2: %s \n", key1, key2, val1, val2);
 
-	return (0);
+	if (key1 != key2)
+		ret = ERR_KEY_MISMATCH;
+	else if (strlen(val1) != strlen(val2) || strcmp(val1, val2) != 0)
+		ret = ERR_DATA_MISMATCH;
+	else
+		return (0);
+
+	printf("Key/value mismatch: %" PRIu64 "/%s from a %s table is not %"
+	    PRIu64 "/%s from a %s table\n",
+	    key1, val1, type1, key2, val2, type2);
+
+	return (ret);
 }
 
 /*
@@ -349,10 +343,10 @@ diagnose_key_error(
 		return (1);
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("1st cursor didn't find 1st key\n", ret, 0);
+		(void)log_print_err("1st cursor didn't find 1st key", ret, 0);
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("1st cursor didn't find 2nd key\n", ret, 0);
+		(void)log_print_err("1st cursor didn't find 2nd key", ret, 0);
 	if (c->close(c) != 0)
 		return (1);
 
@@ -361,10 +355,10 @@ diagnose_key_error(
 		return (1);
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("2nd cursor didn't find 1st key\n", ret, 0);
+		(void)log_print_err("2nd cursor didn't find 1st key", ret, 0);
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
+		(void)log_print_err("2nd cursor didn't find 2nd key", ret, 0);
 	if (c->close(c) != 0)
 		return (1);
 
@@ -378,7 +372,7 @@ live_check:
 		return (1);
 	c->set_key(c, key1_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("1st cursor didn't find 1st key\n", ret, 0);
+		(void)log_print_err("1st cursor didn't find 1st key", ret, 0);
 	if (c->close(c) != 0)
 		return (1);
 
@@ -387,7 +381,7 @@ live_check:
 		return (1);
 	c->set_key(c, key2_orig);
 	if ((ret = c->search(c)) != 0)
-		(void)log_print_err("2nd cursor didn't find 2nd key\n", ret, 0);
+		(void)log_print_err("2nd cursor didn't find 2nd key", ret, 0);
 	if (c->close(c) != 0)
 		return (1);
 
