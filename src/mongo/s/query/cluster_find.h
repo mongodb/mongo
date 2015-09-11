@@ -76,21 +76,6 @@ public:
                                                  const GetMoreRequest& request);
 
     /**
-     * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of
-     * the of the explain command on success. On failure, returns a non-OK status and does not
-     * modify 'out'.
-     *
-     * Used both if mongos receives an explain command and if it receives an OP_QUERY find with the
-     * $explain modifier.
-     */
-    static Status runExplain(OperationContext* txn,
-                             const BSONObj& findCommand,
-                             const LiteParsedQuery& lpq,
-                             ExplainCommon::Verbosity verbosity,
-                             const rpc::ServerSelectionMetadata& serverSelectionMetadata,
-                             BSONObjBuilder* out);
-
-    /**
      * Extracts the read preference from 'cmdObj', or determines the read pref based on 'isSlaveOk'
      * if 'cmdObj' does not contain a read preference.
      *

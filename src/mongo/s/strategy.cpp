@@ -53,6 +53,7 @@
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_explain.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
@@ -212,8 +213,8 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
             rpc::ServerSelectionMetadata metadata(secondaryOk, readPreference);
 
             BSONObjBuilder explainBuilder;
-            uassertStatusOK(ClusterFind::runExplain(
-                txn, findCommand, lpq, verbosity, metadata, &explainBuilder));
+            uassertStatusOK(
+                Strategy::explainFind(txn, findCommand, lpq, verbosity, metadata, &explainBuilder));
 
             BSONObj explainObj = explainBuilder.done();
             replyToQuery(0,  // query result flags
@@ -798,5 +799,36 @@ void Strategy::writeOp(OperationContext* txn, int op, Request& request) {
         if (commandRequest->getOrdered() && hadError)
             break;
     }
+}
+
+Status Strategy::explainFind(OperationContext* txn,
+                             const BSONObj& findCommand,
+                             const LiteParsedQuery& lpq,
+                             ExplainCommon::Verbosity verbosity,
+                             const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                             BSONObjBuilder* out) {
+    BSONObjBuilder explainCmdBob;
+    int options = 0;
+    ClusterExplain::wrapAsExplain(
+        findCommand, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
+
+    // We will time how long it takes to run the commands on the shards.
+    Timer timer;
+
+    std::vector<Strategy::CommandResult> shardResults;
+    Strategy::commandOp(txn,
+                        lpq.nss().db().toString(),
+                        explainCmdBob.obj(),
+                        options,
+                        lpq.nss().toString(),
+                        lpq.getFilter(),
+                        &shardResults);
+
+    long long millisElapsed = timer.millis();
+
+    const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, findCommand);
+
+    return ClusterExplain::buildExplainResult(
+        txn, shardResults, mongosStageName, millisElapsed, out);
 }
 }

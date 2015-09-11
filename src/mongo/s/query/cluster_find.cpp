@@ -428,37 +428,6 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
     return CursorResponse(request.nss, idToReturn, std::move(batch), startingFrom);
 }
 
-Status ClusterFind::runExplain(OperationContext* txn,
-                               const BSONObj& findCommand,
-                               const LiteParsedQuery& lpq,
-                               ExplainCommon::Verbosity verbosity,
-                               const rpc::ServerSelectionMetadata& serverSelectionMetadata,
-                               BSONObjBuilder* out) {
-    BSONObjBuilder explainCmdBob;
-    int options = 0;
-    ClusterExplain::wrapAsExplain(
-        findCommand, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
-
-    // We will time how long it takes to run the commands on the shards.
-    Timer timer;
-
-    std::vector<Strategy::CommandResult> shardResults;
-    Strategy::commandOp(txn,
-                        lpq.nss().db().toString(),
-                        explainCmdBob.obj(),
-                        options,
-                        lpq.nss().toString(),
-                        lpq.getFilter(),
-                        &shardResults);
-
-    long long millisElapsed = timer.millis();
-
-    const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, findCommand);
-
-    return ClusterExplain::buildExplainResult(
-        txn, shardResults, mongosStageName, millisElapsed, out);
-}
-
 StatusWith<ReadPreferenceSetting> ClusterFind::extractUnwrappedReadPref(const BSONObj& cmdObj,
                                                                         const bool isSlaveOk) {
     BSONElement queryOptionsElt;

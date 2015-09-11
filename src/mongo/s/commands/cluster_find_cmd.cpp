@@ -36,6 +36,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/query/cluster_find.h"
+#include "mongo/s/strategy.h"
 
 namespace mongo {
 namespace {
@@ -115,7 +116,7 @@ public:
             return lpq.getStatus();
         }
 
-        return ClusterFind::runExplain(
+        return Strategy::explainFind(
             txn, cmdObj, *lpq.getValue(), verbosity, serverSelectionMetadata, out);
     }
 

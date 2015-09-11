@@ -28,13 +28,19 @@
 
 #pragma once
 
+#include "mongo/db/query/explain_common.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/request.h"
 
 namespace mongo {
 
+class LiteParsedQuery;
 class OperationContext;
+
+namespace rpc {
+class ServerSelectionMetadata;
+}  // namespace rpc
 
 // A spigot to enable the ClusterClientCursor codepath.
 extern bool useClusterClientCursor;
@@ -51,6 +57,21 @@ public:
     static void killCursors(OperationContext* txn, Request& request);
 
     static void writeOp(OperationContext* txn, int op, Request& request);
+
+    /**
+     * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of
+     * the of the explain command on success. On failure, returns a non-OK status and does not
+     * modify 'out'.
+     *
+     * Used both if mongos receives an explain command and if it receives an OP_QUERY find with the
+     * $explain modifier.
+     */
+    static Status explainFind(OperationContext* txn,
+                              const BSONObj& findCommand,
+                              const LiteParsedQuery& lpq,
+                              ExplainCommon::Verbosity verbosity,
+                              const rpc::ServerSelectionMetadata& serverSelectionMetadata,
+                              BSONObjBuilder* out);
 
     struct CommandResult {
         ShardId shardTargetId;
