@@ -74,7 +74,7 @@ class TCMallocServerStatusSection : public ServerStatusSection {
 public:
     TCMallocServerStatusSection() : ServerStatusSection("tcmalloc") {}
     virtual bool includeByDefault() const {
-        return false;
+        return true;
     }
 
     virtual BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const {
