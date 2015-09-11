@@ -55,6 +55,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/record_fetcher.h"
+#include "mongo/db/storage/record_store.h"
 
 #include "mongo/db/auth/user_document_parser.h"  // XXX-ANDY
 #include "mongo/util/log.h"
@@ -116,10 +117,10 @@ std::string CompactOptions::toString() const {
 
 CappedInsertNotifier::CappedInsertNotifier() : _cappedInsertCount(0), _dead(false) {}
 
-void CappedInsertNotifier::notifyOfInsert() {
+void CappedInsertNotifier::notifyOfInsert(int count) {
     stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
     if (!_dead) {
-        _cappedInsertCount++;
+        _cappedInsertCount += count;
     }
     _cappedNewDataNotifier.notify_all();
 }
@@ -313,50 +314,65 @@ Status Collection::insertDocument(OperationContext* txn, const DocWriter* doc, b
     // If there is a notifier object and another thread is waiting on it, then we notify waiters
     // of this document insert. Waiters keep a shared_ptr to '_cappedNotifier', so there are
     // waiters if this Collection's shared_ptr is not unique.
-    if (_cappedNotifier && !_cappedNotifier.unique()) {
-        _cappedNotifier->notifyOfInsert();
-    }
+    if (_cappedNotifier && !_cappedNotifier.unique())
+        _cappedNotifier->notifyOfInsert(1);
 
     return loc.getStatus();
 }
 
-Status Collection::insertDocument(OperationContext* txn,
-                                  const BSONObj& docToInsert,
-                                  bool enforceQuota,
-                                  bool fromMigrate) {
-    {
-        auto status = checkValidation(txn, docToInsert);
+
+Status Collection::insertDocuments(OperationContext* txn,
+                                   vector<BSONObj>::iterator begin,
+                                   vector<BSONObj>::iterator end,
+                                   bool enforceQuota,
+                                   bool fromMigrate) {
+    // Should really be done in the collection object at creation and updated on index create.
+    const bool hasIdIndex = _indexCatalog.findIdIndex(txn);
+
+    for (vector<BSONObj>::iterator it = begin; it != end; it++) {
+        if (hasIdIndex && (*it)["_id"].eoo()) {
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Collection::insertDocument got "
+                                           "document without _id for ns:" << _ns.ns());
+        }
+
+        auto status = checkValidation(txn, *it);
         if (!status.isOK())
             return status;
     }
 
     const SnapshotId sid = txn->recoveryUnit()->getSnapshotId();
 
-    if (_indexCatalog.findIdIndex(txn)) {
-        if (docToInsert["_id"].eoo()) {
-            return Status(ErrorCodes::InternalError,
-                          str::stream() << "Collection::insertDocument got "
-                                           "document without _id for ns:" << _ns.ns());
-        }
-    }
-
     if (_mustTakeCappedLockOnInsert)
         synchronizeOnCappedInFlightResource(txn->lockState(), _ns);
 
-    Status status = _insertDocument(txn, docToInsert, enforceQuota);
+    Status status = _insertDocuments(txn, begin, end, enforceQuota);
+    if (!status.isOK())
+        return status;
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
-    if (status.isOK()) {
-        getGlobalServiceContext()->getOpObserver()->onInsert(txn, ns(), docToInsert, fromMigrate);
 
-        // If there is a notifier object and another thread is waiting on it, then we notify
-        // waiters of this document insert. Waiters keep a shared_ptr to '_cappedNotifier', so
-        // there are waiters if this Collection's shared_ptr is not unique.
-        if (_cappedNotifier && !_cappedNotifier.unique()) {
-            _cappedNotifier->notifyOfInsert();
-        }
+    int inserted = 0;
+    for (vector<BSONObj>::iterator it = begin; it != end; it++) {  // TODO: vectorize
+        getGlobalServiceContext()->getOpObserver()->onInsert(txn, ns(), *it, fromMigrate);
+        inserted++;
     }
 
-    return status;
+    // If there is a notifier object and another thread is waiting on it, then we notify
+    // waiters of this document insert. Waiters keep a shared_ptr to '_cappedNotifier', so
+    // there are waiters if this Collection's shared_ptr is not unique.
+    if (_cappedNotifier && !_cappedNotifier.unique())
+        _cappedNotifier->notifyOfInsert(inserted);
+
+    return Status::OK();
+}
+
+Status Collection::insertDocument(OperationContext* txn,
+                                  const BSONObj& docToInsert,
+                                  bool enforceQuota,
+                                  bool fromMigrate) {
+    vector<BSONObj> docs;
+    docs.push_back(docToInsert);
+    return insertDocuments(txn, docs.begin(), docs.end(), enforceQuota, fromMigrate);
 }
 
 Status Collection::insertDocument(OperationContext* txn,
@@ -390,33 +406,35 @@ Status Collection::insertDocument(OperationContext* txn,
     // of this document insert. Waiters keep a shared_ptr to '_cappedNotifier', so there are
     // waiters if this Collection's shared_ptr is not unique.
     if (_cappedNotifier && !_cappedNotifier.unique()) {
-        _cappedNotifier->notifyOfInsert();
+        _cappedNotifier->notifyOfInsert(1);
     }
 
     return loc.getStatus();
 }
 
-Status Collection::_insertDocument(OperationContext* txn,
-                                   const BSONObj& docToInsert,
-                                   bool enforceQuota) {
+Status Collection::_insertDocuments(OperationContext* txn,
+                                    vector<BSONObj>::iterator begin,
+                                    vector<BSONObj>::iterator end,
+                                    bool enforceQuota) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
     // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
     //       under the RecordStore, this feels broken since that should be a
     //       collection access method probably
 
-    StatusWith<RecordId> loc = _recordStore->insertRecord(
-        txn, docToInsert.objdata(), docToInsert.objsize(), _enforceQuota(enforceQuota));
-    if (!loc.isOK())
-        return loc.getStatus();
+    // These will be vectorized (insertRecords, indexRecords) in a future patch
+    for (vector<BSONObj>::iterator it = begin; it != end; it++) {
+        StatusWith<RecordId> loc = _recordStore->insertRecord(
+            txn, it->objdata(), it->objsize(), _enforceQuota(enforceQuota));
+        if (!loc.isOK())
+            return loc.getStatus();
+        invariant(RecordId::min() < loc.getValue());
+        invariant(loc.getValue() < RecordId::max());
 
-    invariant(RecordId::min() < loc.getValue());
-    invariant(loc.getValue() < RecordId::max());
-
-    Status s = _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
-    if (!s.isOK())
-        return s;
-
+        Status status = _indexCatalog.indexRecord(txn, *it, loc.getValue());
+        if (!status.isOK())
+            return status;
+    }
     return Status::OK();
 }
 

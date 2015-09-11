@@ -17,7 +17,7 @@ var opCounters;
 // - mongod, single insert:
 //     counted as 1 op if successful, else 0
 // - mongod, bulk insert of N with continueOnError=true:
-//     counted as N ops, regardless of errors
+//     counted as K ops, where K is number of docs successfully inserted
 // - mongod, bulk insert of N with continueOnError=false:
 //     counted as K ops, where K is number of docs successfully inserted
 //
@@ -57,7 +57,7 @@ var continueOnErrorFlag = 1;
 opCounters = db.serverStatus().opcounters;
 t.insert([{_id:5},{_id:5},{_id:6}], continueOnErrorFlag)
 assert(db.getLastError());
-assert.eq(opCounters.insert + 3, db.serverStatus().opcounters.insert);
+assert.eq(opCounters.insert + 2, db.serverStatus().opcounters.insert);
 
 //
 // 2. Update.

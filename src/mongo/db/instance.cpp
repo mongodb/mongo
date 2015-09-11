@@ -151,6 +151,8 @@ MONGO_FP_DECLARE(rsStopGetMore);
 
 namespace {
 
+const int64_t maxInsertGroupSize = 256 * 1024;
+
 unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongod() {
     return stdx::make_unique<AuthzManagerExternalStateMongod>();
 }
@@ -912,33 +914,75 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
     return true;
 }
 
-void checkAndInsert(OperationContext* txn,
-                    OldClientContext& ctx,
-                    const char* ns,
-                    /*modifies*/ BSONObj& js) {
-    StatusWith<BSONObj> fixed = fixDocumentForInsert(js);
-    uassertStatusOK(fixed.getStatus());
-    if (!fixed.getValue().isEmpty())
-        js = fixed.getValue();
-
-    int attempt = 0;
-    while (true) {
+void insertMultiSingletons(OperationContext* txn,
+                           OldClientContext& ctx,
+                           bool keepGoing,
+                           const char* ns,
+                           CurOp& op,
+                           vector<BSONObj>::iterator begin,
+                           vector<BSONObj>::iterator end) {
+    for (vector<BSONObj>::iterator it = begin; it != end; it++) {
         try {
-            WriteUnitOfWork wunit(txn);
-            Collection* collection = ctx.db()->getCollection(ns);
-            if (!collection) {
-                collection = ctx.db()->createCollection(txn, ns);
-                verify(collection);
-            }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                WriteUnitOfWork wouw(txn);
+                Collection* collection = ctx.db()->getCollection(ns);
+                if (!collection) {
+                    collection = ctx.db()->createCollection(txn, ns);
+                    invariant(collection);
+                }
 
-            uassertStatusOK(collection->insertDocument(txn, js, true));
-            wunit.commit();
-            break;
-        } catch (const WriteConflictException& e) {
-            CurOp::get(txn)->debug().writeConflicts++;
-            txn->recoveryUnit()->abandonSnapshot();
-            WriteConflictException::logAndBackoff(attempt++, "insert", ns);
+                uassertStatusOK(collection->insertDocument(txn, *it, true));
+                wouw.commit();
+            }
+            MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "insert", ns);
+
+            globalOpCounters.incInsertInWriteLock(1);
+            op.debug().ninserted++;
+
+        } catch (const UserException& ex) {
+            if (!keepGoing)
+                throw;
+            LastError::get(txn->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
         }
+    }
+}
+
+void insertMultiVector(OperationContext* txn,
+                       OldClientContext& ctx,
+                       bool keepGoing,
+                       const char* ns,
+                       CurOp& op,
+                       vector<BSONObj>::iterator begin,
+                       vector<BSONObj>::iterator end) {
+    for (vector<BSONObj>::iterator it = begin; it != end; it++) {
+        StatusWith<BSONObj> fixed = fixDocumentForInsert(*it);
+        uassertStatusOK(fixed.getStatus());
+        if (!fixed.getValue().isEmpty())
+            *it = fixed.getValue();
+    }
+
+    try {
+        WriteUnitOfWork wunit(txn);
+        Collection* collection = ctx.db()->getCollection(ns);
+        if (!collection) {
+            collection = ctx.db()->createCollection(txn, ns);
+            invariant(collection);
+        }
+
+        uassertStatusOK(collection->insertDocuments(txn, begin, end, true, false));
+        wunit.commit();
+
+        int inserted = end - begin;
+        globalOpCounters.incInsertInWriteLock(inserted);
+        op.debug().ninserted = inserted;
+    } catch (UserException&) {
+        txn->recoveryUnit()->abandonSnapshot();
+        insertMultiSingletons(txn, ctx, keepGoing, ns, op, begin, end);
+    } catch (WriteConflictException&) {
+        CurOp::get(txn)->debug().writeConflicts++;
+        txn->recoveryUnit()->abandonSnapshot();
+        WriteConflictException::logAndBackoff(0, "insert", ns);
+        insertMultiSingletons(txn, ctx, keepGoing, ns, op, begin, end);
     }
 }
 
@@ -946,24 +990,26 @@ NOINLINE_DECL void insertMulti(OperationContext* txn,
                                OldClientContext& ctx,
                                bool keepGoing,
                                const char* ns,
-                               vector<BSONObj>& objs,
+                               vector<BSONObj>& docs,
                                CurOp& op) {
-    size_t i;
-    for (i = 0; i < objs.size(); i++) {
-        try {
-            checkAndInsert(txn, ctx, ns, objs[i]);
-        } catch (const UserException& ex) {
-            if (!keepGoing || i == objs.size() - 1) {
-                globalOpCounters.incInsertInWriteLock(i);
-                throw;
-            }
-            LastError::get(txn->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);
-            // otherwise ignore and keep going
+    vector<BSONObj>::iterator chunkBegin = docs.begin();
+    int64_t chunkCount = 0;
+    int64_t chunkSize = 0;
+
+    for (vector<BSONObj>::iterator it = docs.begin(); it != docs.end(); it++) {
+        chunkSize += (*it).objsize();
+        // Limit chunk size, actual size chosen is a tradeoff: larger sizes are more efficient,
+        // but smaller chunk sizes allow yielding to other threads and lower chance of WCEs
+        if ((++chunkCount >= internalQueryExecYieldIterations / 2) ||
+            (chunkSize >= maxInsertGroupSize)) {
+            insertMultiVector(txn, ctx, keepGoing, ns, op, chunkBegin, it + 1);
+            chunkBegin = it + 1;
+            chunkCount = 0;
+            chunkSize = 0;
         }
     }
-
-    globalOpCounters.incInsertInWriteLock(i);
-    op.debug().ninserted = i;
+    if (chunkBegin != docs.end())
+        insertMultiVector(txn, ctx, keepGoing, ns, op, chunkBegin, docs.end());
 }
 
 static void convertSystemIndexInsertsToCommands(DbMessage& d, BSONArrayBuilder* allCmdsBuilder) {

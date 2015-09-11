@@ -1140,7 +1140,7 @@ private:
 void WiredTigerRecordStore::_addUncommitedDiskLoc_inlock(OperationContext* txn,
                                                          const RecordId& loc) {
     // todo: make this a dassert at some point
-    invariant(_uncommittedDiskLocs.empty() || _uncommittedDiskLocs.back() < loc);
+    // invariant(_uncommittedDiskLocs.empty() || _uncommittedDiskLocs.back() < loc);
     _uncommittedDiskLocs.push_back(loc);
     txn->recoveryUnit()->registerChange(new CappedInsertChange(this, loc));
     _oplog_highestSeen = loc;

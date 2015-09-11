@@ -111,7 +111,7 @@ public:
     /**
      * Wakes up threads waiting on this object for the arrival of new data.
      */
-    void notifyOfInsert();
+    void notifyOfInsert(int count);
 
     /**
      * Get a counter value which is incremented on every insert into a capped collection.
@@ -230,6 +230,17 @@ public:
                         bool cappedOK = false,
                         bool noWarn = false,
                         BSONObj* deletedId = 0);
+
+    /*
+     * Inserts all documents inside one WUOW.
+     * Caller should ensure vector is appropriately sized for this.
+     * If errors occor (including WCE), caller should retry documents individually.
+     */
+    Status insertDocuments(OperationContext* txn,
+                           std::vector<BSONObj>::iterator begin,
+                           std::vector<BSONObj>::iterator end,
+                           bool enforceQuota,
+                           bool fromMigrate = false);
 
     /**
      * this does NOT modify the doc before inserting
@@ -404,6 +415,11 @@ private:
      *  - adjust padding
      */
     Status _insertDocument(OperationContext* txn, const BSONObj& doc, bool enforceQuota);
+
+    Status _insertDocuments(OperationContext* txn,
+                            std::vector<BSONObj>::iterator begin,
+                            std::vector<BSONObj>::iterator end,
+                            bool enforceQuota);
 
     bool _enforceQuota(bool userEnforeQuota) const;
 
