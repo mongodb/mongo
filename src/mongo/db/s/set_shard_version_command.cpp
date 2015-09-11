@@ -98,6 +98,8 @@ public:
         Client* client = txn->getClient();
         LastError::get(client).disable();
 
+        ShardingState* shardingState = ShardingState::get(txn);
+
         const bool authoritative = cmdObj.getBoolField("authoritative");
         const bool noConnectionVersioning = cmdObj.getBoolField("noConnectionVersioning");
 
@@ -119,7 +121,7 @@ public:
         if (cmdObj["shard"].type() == String) {
             // The shard host is also sent when using setShardVersion, report this host if there is
             // an error
-            ShardingState::get(txn)->setShardName(cmdObj["shard"].String());
+            shardingState->setShardName(cmdObj["shard"].String());
         }
 
         // Handle initial shard connection
@@ -153,9 +155,11 @@ public:
             uassertStatusOK(ChunkVersionAndOpTime::parseFromBSONForSetShardVersion(cmdObj));
         const auto& version = verAndOpTime.getVersion();
 
+        shardingState->advanceConfigOpTime(txn, verAndOpTime.getOpTime());
+
         // step 3
         const ChunkVersion oldVersion = info->getVersion(ns);
-        const ChunkVersion globalVersion = ShardingState::get(txn)->getVersion(ns);
+        const ChunkVersion globalVersion = shardingState->getVersion(ns);
 
         oldVersion.addToBSON(result, "oldVersion");
 
@@ -207,9 +211,9 @@ public:
 
             // TODO: Refactor all of this
             if (version < globalVersion && version.hasEqualEpoch(globalVersion)) {
-                while (ShardingState::get(txn)->inCriticalMigrateSection()) {
+                while (shardingState->inCriticalMigrateSection()) {
                     log() << "waiting till out of critical section";
-                    ShardingState::get(txn)->waitTillNotInCriticalSection(10);
+                    shardingState->waitTillNotInCriticalSection(10);
                 }
                 errmsg = str::stream() << "shard global version for collection is higher "
                                        << "than trying to set to '" << ns << "'";
@@ -223,9 +227,9 @@ public:
             if (!globalVersion.isSet() && !authoritative) {
                 // Needed b/c when the last chunk is moved off a shard,
                 // the version gets reset to zero, which should require a reload.
-                while (ShardingState::get(txn)->inCriticalMigrateSection()) {
+                while (shardingState->inCriticalMigrateSection()) {
                     log() << "waiting till out of critical section";
-                    ShardingState::get(txn)->waitTillNotInCriticalSection(10);
+                    shardingState->waitTillNotInCriticalSection(10);
                 }
 
                 // need authoritative for first look
@@ -239,8 +243,7 @@ public:
         }
 
         ChunkVersion currVersion;
-        Status status =
-            ShardingState::get(txn)->refreshMetadataIfNeeded(txn, ns, version, &currVersion);
+        Status status = shardingState->refreshMetadataIfNeeded(txn, ns, version, &currVersion);
 
         if (!status.isOK()) {
             // The reload itself was interrupted or confused here

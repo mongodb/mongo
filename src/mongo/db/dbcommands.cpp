@@ -1251,10 +1251,45 @@ void Command::execCommand(OperationContext* txn,
 
         CurOp::get(txn)->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS) * 1000);
 
-        // Handle shard version that may have been sent along with the command.
-        OperationShardVersion::get(txn).initializeFromCommand(
-            NamespaceString(command->parseNs(dbname, request.getCommandArgs())),
-            request.getCommandArgs());
+        {
+            // Handle shard version and config optime information that may have been sent along with
+            // the command.
+            auto& operationShardVersion = OperationShardVersion::get(txn);
+            invariant(!operationShardVersion.hasShardVersion());
+
+            auto commandNS = NamespaceString(command->parseNs(dbname, request.getCommandArgs()));
+            operationShardVersion.initializeFromCommand(commandNS, request.getCommandArgs());
+
+            auto optimeStatus = repl::OpTime::parseFromBSON(request.getCommandArgs());
+            if (optimeStatus.isOK()) {
+                auto shardingState = ShardingState::get(txn);
+                if (shardingState->enabled()) {
+                    // TODO(spencer): Do this unconditionally once all nodes are sharding aware
+                    // by default.
+                    shardingState->advanceConfigOpTime(txn, optimeStatus.getValue());
+                } else {
+                    massert(
+                        28807,
+                        "Received a command with sharding chunk information but this node is not "
+                        "sharding aware",
+                        command->name == "setShardVersion");
+                }
+            } else if (optimeStatus != ErrorCodes::NoSuchKey) {
+                uassertStatusOK(optimeStatus.getStatus());
+            } else {
+                // If there was top-level shard version information then there must have been
+                // config optime information as well.  a 3.0 mongos won't have shard version info
+                // at the top level (they have it in a nested "metadata" field) so it won't cause
+                // a problem here.
+                massert(28813,
+                        str::stream()
+                            << "Received command with chunk version information but no config "
+                               "server optime: " << request.getCommandArgs().jsonString(),
+                        !operationShardVersion.hasShardVersion() ||
+                            ChunkVersion::isIgnoredVersion(
+                                operationShardVersion.getShardVersion(commandNS)));
+            }
+        }
 
         // Can throw
         txn->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.

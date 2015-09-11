@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/metadata_loader.h"
 #include "mongo/db/s/operation_shard_version.h"
@@ -188,6 +189,10 @@ void ShardingState::setShardName(const string& name) {
         warning() << message;
         uassertStatusOK({ErrorCodes::AlreadyInitialized, message});
     }
+}
+
+void ShardingState::advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) {
+    grid.catalogManager(txn)->advanceConfigOpTime(txn, opTime);
 }
 
 void ShardingState::clearCollectionMetadata() {

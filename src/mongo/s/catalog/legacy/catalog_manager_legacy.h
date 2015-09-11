@@ -62,6 +62,8 @@ public:
 
     void shutDown(OperationContext* txn, bool allowNetworking) override;
 
+    void advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) override;
+
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
                            const ShardKeyPattern& fieldsAndOrder,

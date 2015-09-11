@@ -105,6 +105,15 @@ public:
     virtual void shutDown(OperationContext* txn, bool allowNetworking = true) = 0;
 
     /**
+     * If the newly specified optime is newer than the one the catalog manager already knows, the
+     * one in the catalog manager will be advanced. Otherwise, it remains the same.
+     *
+     * This method is only applicable to catalog managers, which support the OpTime concept (such as
+     * the replica set-based implementation) and is a no-op otherwise.
+     */
+    virtual void advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) = 0;
+
+    /**
      * Returns what type of catalog manager this is - CSRS for the CatalogManagerReplicaSet and
      * SCCC for the CatalogManagerLegacy.
      */

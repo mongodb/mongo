@@ -96,7 +96,7 @@ const char kAwaitDataField[] = "awaitData";
 const char kPartialResultsField[] = "allowPartialResults";
 const char kTermField[] = "term";
 const char kOptionsField[] = "options";
-const char kShardVersionField[] = "shardVersion";
+const char kConfigOpTimeField[] = "ts";
 
 }  // namespace
 
@@ -356,6 +356,8 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             continue;
         } else if (str::equals(fieldName, kShardVersionField)) {
             // Shard version parsing is handled elsewhere.
+        } else if (str::equals(fieldName, kConfigOpTimeField)) {
+            // Config server optime parsing is handled along with shard versioning elsewhere.
         } else if (str::equals(fieldName, kTermField)) {
             Status status = checkFieldType(el, NumberLong);
             if (!status.isOK()) {

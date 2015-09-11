@@ -261,6 +261,10 @@ void CatalogManagerLegacy::shutDown(OperationContext* txn, bool allowNetworking)
     _distLockManager->shutDown(allowNetworking);
 }
 
+void CatalogManagerLegacy::advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) {
+    invariant(opTime.isNull());
+}
+
 Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
                                              const string& ns,
                                              const ShardKeyPattern& fieldsAndOrder,

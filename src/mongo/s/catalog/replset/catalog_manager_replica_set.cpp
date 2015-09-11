@@ -131,6 +131,10 @@ void CatalogManagerReplicaSet::shutDown(OperationContext* txn, bool allowNetwork
     _distLockManager->shutDown(allowNetworking);
 }
 
+void CatalogManagerReplicaSet::advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) {
+    _updateLastSeenConfigOpTime(opTime);
+}
+
 Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
                                                  const string& ns,
                                                  const ShardKeyPattern& fieldsAndOrder,

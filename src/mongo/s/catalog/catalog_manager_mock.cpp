@@ -51,6 +51,8 @@ Status CatalogManagerMock::startup(OperationContext* txn, bool allowNetworking) 
 
 void CatalogManagerMock::shutDown(OperationContext* txn, bool allowNetworking) {}
 
+void CatalogManagerMock::advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) {}
+
 Status CatalogManagerMock::shardCollection(OperationContext* txn,
                                            const string& ns,
                                            const ShardKeyPattern& fieldsAndOrder,

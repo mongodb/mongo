@@ -255,6 +255,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         if (chunkManager) {
             auto shardVersion = chunkManager->getVersion(shard->getId());
             cmdBuilder.appendArray(LiteParsedQuery::kShardVersionField, shardVersion.toBSON());
+            chunkManager->getConfigOpTime().append(&cmdBuilder);
         }
 
         params.remotes.emplace_back(std::move(hostAndPort.getValue()), cmdBuilder.obj());

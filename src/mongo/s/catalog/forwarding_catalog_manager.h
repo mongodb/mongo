@@ -119,6 +119,8 @@ private:
 
     void shutDown(OperationContext* txn, bool allowNetworking = true) override;
 
+    void advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) override;
+
     Status enableSharding(OperationContext* txn, const std::string& dbName) override;
 
     Status shardCollection(OperationContext* txn,
