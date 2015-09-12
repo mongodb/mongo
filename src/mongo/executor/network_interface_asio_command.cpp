@@ -224,7 +224,7 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
         return _completeOperation(op, beginStatus);
     }
 
-    _asyncRunCommand(op->command(),
+    _asyncRunCommand(op,
                      [this, op](std::error_code ec, size_t bytes) {
                          _validateAndRun(op, ec, [this, op]() { _completedOpCallback(op); });
                      });
@@ -283,45 +283,58 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
     signalWorkAvailable();
 }
 
-void NetworkInterfaceASIO::_asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler handler) {
+void NetworkInterfaceASIO::_asyncRunCommand(AsyncOp* op, NetworkOpHandler handler) {
     // We invert the following steps below to run a command:
     // 1 - send the given command
     // 2 - receive a header for the response
     // 3 - validate and receive response body
     // 4 - advance the state machine by calling handler()
+    auto cmd = op->command();
 
     // Step 4
-    auto recvMessageCallback =
-        [this, cmd, handler](std::error_code ec, size_t bytes) { handler(ec, bytes); };
+    auto recvMessageCallback = [this, cmd, handler, op](std::error_code ec, size_t bytes) {
+        // We don't call _validateAndRun here as we assume the caller will.
+        handler(ec, bytes);
+    };
 
     // Step 3
-    auto recvHeaderCallback = [this, cmd, handler, recvMessageCallback](std::error_code ec,
-                                                                        size_t bytes) {
-        if (ec)
-            return handler(ec, bytes);
+    auto recvHeaderCallback = [this, cmd, handler, recvMessageCallback, op](std::error_code ec,
+                                                                            size_t bytes) {
+        // The operation could have been canceled after starting the command, but before receiving
+        // the header
+        _validateAndRun(op,
+                        ec,
+                        [this, op, recvMessageCallback, ec, bytes, cmd, handler] {
+                            // validate response id
+                            uint32_t expectedId = cmd->toSend().header().getId();
+                            uint32_t actualId = cmd->header().constView().getResponseTo();
+                            if (actualId != expectedId) {
+                                LOG(3) << "got wrong response:"
+                                       << " expected response id: " << expectedId
+                                       << ", got response id: " << actualId;
+                                return handler(make_error_code(ErrorCodes::ProtocolError), bytes);
+                            }
 
-        // validate response id
-        uint32_t expectedId = cmd->toSend().header().getId();
-        uint32_t actualId = cmd->header().constView().getResponseTo();
-        if (actualId != expectedId) {
-            LOG(3) << "got wrong response:"
-                   << " expected response id: " << expectedId << ", got response id: " << actualId;
-            // TODO: This error code should be more meaningful.
-            return handler(ec, bytes);
-        }
-
-        asyncRecvMessageBody(
-            cmd->conn().stream(), &cmd->header(), &cmd->toRecv(), std::move(recvMessageCallback));
+                            asyncRecvMessageBody(cmd->conn().stream(),
+                                                 &cmd->header(),
+                                                 &cmd->toRecv(),
+                                                 std::move(recvMessageCallback));
+                        });
     };
 
     // Step 2
-    auto sendMessageCallback = [this, cmd, handler, recvHeaderCallback](std::error_code ec,
-                                                                        size_t bytes) {
-        if (ec)
-            return handler(ec, bytes);
+    auto sendMessageCallback =
+        [this, cmd, handler, recvHeaderCallback, op](std::error_code ec, size_t bytes) {
+            _validateAndRun(op,
+                            ec,
+                            [this, cmd, op, recvHeaderCallback] {
+                                asyncRecvMessageHeader(cmd->conn().stream(),
+                                                       &cmd->header(),
+                                                       std::move(recvHeaderCallback));
+                            });
 
-        asyncRecvMessageHeader(cmd->conn().stream(), &cmd->header(), std::move(recvHeaderCallback));
-    };
+
+        };
 
     // Step 1
     asyncSendMessage(cmd->conn().stream(), &cmd->toSend(), std::move(sendMessageCallback));
@@ -369,7 +382,7 @@ void NetworkInterfaceASIO::_runConnectionHook(AsyncOp* op) {
         return _beginCommunication(op);
     };
 
-    return _asyncRunCommand(op->command(),
+    return _asyncRunCommand(op,
                             [this, op, finishHook](std::error_code ec, std::size_t bytes) {
                                 _validateAndRun(op, ec, finishHook);
                             });

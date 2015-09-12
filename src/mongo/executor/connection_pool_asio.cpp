@@ -165,7 +165,7 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
     }
 
     _global->_impl->_asyncRunCommand(
-        op->command(),
+        op,
         [this, op](std::error_code ec, size_t bytes) {
             cancelTimeout();
 

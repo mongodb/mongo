@@ -70,6 +70,10 @@ AsyncStreamInterface& NetworkInterfaceASIO::AsyncConnection::stream() {
     return *_stream;
 }
 
+void NetworkInterfaceASIO::AsyncConnection::cancel() {
+    _stream->cancel();
+}
+
 rpc::ProtocolSet NetworkInterfaceASIO::AsyncConnection::serverProtocols() const {
     return _serverProtocols;
 }

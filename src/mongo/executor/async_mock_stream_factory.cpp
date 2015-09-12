@@ -36,6 +36,7 @@
 #include <iterator>
 #include <system_error>
 
+#include "mongo/base/system_error.h"
 #include "mongo/rpc/command_reply_builder.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/legacy_reply_builder.h"
@@ -47,6 +48,40 @@
 
 namespace mongo {
 namespace executor {
+
+namespace {
+StringData stateToString(AsyncMockStreamFactory::MockStream::StreamState state) {
+    switch (state) {
+        case AsyncMockStreamFactory::MockStream::StreamState::kRunning:
+            return "Running";
+        case AsyncMockStreamFactory::MockStream::StreamState::kBlockedBeforeConnect:
+            return "Blocked before connect";
+        case AsyncMockStreamFactory::MockStream::StreamState::kBlockedAfterWrite:
+            return "Blocked after write";
+        case AsyncMockStreamFactory::MockStream::StreamState::kBlockedBeforeRead:
+            return "Blocked before read";
+        case AsyncMockStreamFactory::MockStream::StreamState::kCanceled:
+            return "Canceled";
+    }
+    MONGO_UNREACHABLE;
+}
+
+template <typename Handler, typename... Args>
+void checkCanceled(asio::io_service* io_service,
+                   AsyncMockStreamFactory::MockStream::StreamState* state,
+                   Handler&& handler,
+                   std::size_t bytes) {
+    auto wasCancelled = (*state == AsyncMockStreamFactory::MockStream::StreamState::kCanceled);
+    *state = AsyncMockStreamFactory::MockStream::StreamState::kRunning;
+    asio::post(*io_service,
+               [handler, wasCancelled, bytes] {
+                   handler(wasCancelled ? make_error_code(asio::error::operation_aborted)
+                                        : std::error_code(),
+                           bytes);
+               });
+}
+
+}  // namespace
 
 std::unique_ptr<AsyncStreamInterface> AsyncMockStreamFactory::makeStream(
     asio::io_service* io_service, const HostAndPort& target) {
@@ -93,8 +128,15 @@ void AsyncMockStreamFactory::MockStream::connect(asio::ip::tcp::resolver::iterat
     // Suspend execution after "connecting"
     _defer(kBlockedBeforeConnect,
            [this, connectHandler, endpoints]() {
-               _io_service->post(
-                   [connectHandler, endpoints] { connectHandler(std::error_code()); });
+               stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+               // We shim a lambda to give connectHandler the right signature since it doesn't take
+               // a size_t param.
+               checkCanceled(
+                   _io_service,
+                   &_state,
+                   [connectHandler](std::error_code ec, std::size_t) { return connectHandler(ec); },
+                   0);
            });
 }
 
@@ -109,8 +151,8 @@ void AsyncMockStreamFactory::MockStream::write(asio::const_buffer buf,
     // Suspend execution after data is written.
     _defer_inlock(kBlockedAfterWrite,
                   [this, writeHandler, size]() {
-                      _io_service->post(
-                          [writeHandler, size] { writeHandler(std::error_code(), size); });
+                      stdx::unique_lock<stdx::mutex> lk(_mutex);
+                      checkCanceled(_io_service, &_state, std::move(writeHandler), size);
                   });
 }
 
@@ -118,8 +160,12 @@ void AsyncMockStreamFactory::MockStream::cancel() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     log() << "cancel() for: " << _target;
 
-    // TODO: We will need to mock cancel() to test SERVER-20190
-    // We may want a cancel queue the same way we have read and write queues
+    // If _state is kRunning then we don't have a deferred operation to cancel.
+    if (_state == kRunning) {
+        return;
+    }
+
+    _state = kCanceled;
 }
 
 void AsyncMockStreamFactory::MockStream::read(asio::mutable_buffer buf,
@@ -143,21 +189,19 @@ void AsyncMockStreamFactory::MockStream::read(asio::mutable_buffer buf,
                log() << "read " << nToCopy << " bytes, " << (nextRead.size() - nToCopy)
                      << " remaining in buffer";
 
-               lk.unlock();
-               _io_service->post(
-                   [readHandler, nToCopy] { readHandler(std::error_code(), nToCopy); });
+               checkCanceled(_io_service, &_state, std::move(readHandler), nToCopy);
            });
 }
 
 void AsyncMockStreamFactory::MockStream::pushRead(std::vector<uint8_t> toRead) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    invariant(_state != kRunning);
+    invariant(_state != kRunning && _state != kCanceled);
     _readQueue.emplace(std::move(toRead));
 }
 
 std::vector<uint8_t> AsyncMockStreamFactory::MockStream::popWrite() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    invariant(_state != kRunning);
+    invariant(_state != kRunning && _state != kCanceled);
     auto nextWrite = std::move(_writeQueue.front());
     _writeQueue.pop();
     return nextWrite;
@@ -183,9 +227,13 @@ void AsyncMockStreamFactory::MockStream::unblock() {
 }
 
 void AsyncMockStreamFactory::MockStream::_unblock_inlock() {
+    // Can be canceled here at which point we will call the handler with the CallbackCanceled
+    // status when we invoke the _deferredAction.
     invariant(_state != kRunning);
-    _state = kRunning;
 
+    if (_state != kCanceled) {
+        _state = kRunning;
+    }
     // Post our deferred action to resume state machine execution
     invariant(_deferredAction);
     _io_service->post(std::move(_deferredAction));
@@ -195,6 +243,7 @@ void AsyncMockStreamFactory::MockStream::_unblock_inlock() {
 auto AsyncMockStreamFactory::MockStream::waitUntilBlocked() -> StreamState {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _deferredCV.wait(lk, [this]() { return _state != kRunning; });
+    log() << "returning from waitUntilBlocked, state: " << stateToString(_state);
     return _state;
 }
 

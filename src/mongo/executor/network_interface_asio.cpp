@@ -158,8 +158,7 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
         auto conn = static_cast<connection_pool_asio::ASIOConnection*>(swConn.getValue().get());
 
-        auto ownedOp = conn->releaseAsyncOp();
-        AsyncOp* op = ownedOp.get();
+        AsyncOp* op = nullptr;
 
         {
             stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
@@ -167,16 +166,22 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
             auto iter = std::find(_inGetConnection.begin(), _inGetConnection.end(), cbHandle);
 
             // If we didn't find the request, we've been canceled
-            if (iter == _inGetConnection.end())
+            if (iter == _inGetConnection.end()) {
+                onFinish({ErrorCodes::CallbackCanceled, "Callback canceled"});
                 return;
+            }
+
+            // We can't release the AsyncOp until we know we were not canceled.
+            auto ownedOp = conn->releaseAsyncOp();
+            op = ownedOp.get();
 
             _inGetConnection.erase(iter);
             _inProgress.emplace(op, std::move(ownedOp));
         }
 
-        op->_cbHandle = cbHandle;
-        op->_request = request;
-        op->_onFinish = onFinish;
+        op->_cbHandle = std::move(cbHandle);
+        op->_request = std::move(request);
+        op->_onFinish = std::move(onFinish);
         op->_connectionPoolHandle = std::move(swConn.getValue());
         op->_start = startTime;
 
@@ -192,6 +197,13 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
 void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {
     stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+
+    auto iter = std::find(_inGetConnection.begin(), _inGetConnection.end(), cbHandle);
+    if (iter != _inGetConnection.end()) {
+        _inGetConnection.erase(iter);
+        return;
+    }
+
     for (auto iter = _inProgress.begin(); iter != _inProgress.end(); ++iter) {
         if (iter->first->cbHandle() == cbHandle) {
             iter->first->cancel();
@@ -202,6 +214,7 @@ void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbH
 
 void NetworkInterfaceASIO::cancelAllCommands() {
     stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+    _inGetConnection.clear();
     for (auto iter = _inProgress.begin(); iter != _inProgress.end(); ++iter) {
         iter->first->cancel();
     }

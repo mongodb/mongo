@@ -118,6 +118,8 @@ private:
 
         AsyncStreamInterface& stream();
 
+        void cancel();
+
         rpc::ProtocolSet serverProtocols() const;
         rpc::ProtocolSet clientProtocols() const;
         void setServerProtocols(rpc::ProtocolSet protocols);
@@ -304,7 +306,7 @@ private:
 
     void _signalWorkAvailable_inlock();
 
-    void _asyncRunCommand(AsyncCommand* cmd, NetworkOpHandler handler);
+    void _asyncRunCommand(AsyncOp* op, NetworkOpHandler handler);
 
     Options _options;
 

@@ -69,6 +69,7 @@ public:
             kBlockedBeforeConnect,
             kBlockedBeforeRead,
             kBlockedAfterWrite,
+            kCanceled,
         };
 
         ~MockStream();

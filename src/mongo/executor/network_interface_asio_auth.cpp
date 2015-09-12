@@ -102,7 +102,7 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
 
     };
 
-    _asyncRunCommand(op->command(),
+    _asyncRunCommand(op,
                      [this, op, parseIsMaster](std::error_code ec, size_t bytes) {
                          _validateAndRun(op, ec, std::move(parseIsMaster));
                      });
@@ -141,7 +141,7 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
             handler(authResponse);
         };
 
-        _asyncRunCommand(op->command(),
+        _asyncRunCommand(op,
                          [this, op, callAuthCompletionHandler](std::error_code ec, size_t bytes) {
                              _validateAndRun(op, ec, callAuthCompletionHandler);
                          });
