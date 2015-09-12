@@ -6,13 +6,13 @@ env.Library(
     target="cluster_query",
     source=[
         "cluster_find.cpp",
-        "store_possible_cursor.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_common',
         "$BUILD_DIR/mongo/s/coreshard",
         "cluster_client_cursor",
         "cluster_cursor_cleanup_job",
+        "store_possible_cursor",
     ],
 )
 
@@ -83,6 +83,24 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/query/lite_parsed_query",
         "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
         "async_results_merger",
+    ],
+)
+
+env.Library(
+    target="store_possible_cursor",
+    source=[
+        "store_possible_cursor.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/query/command_request_response",
+        "cluster_client_cursor",
+        "cluster_cursor_manager",
+    ],
+    LIBDEPS_TAGS=[
+        # Circular with libmongoscore.  TODO: This tag should be removed as part of the work for
+        # SERVER-20194.
+        'incomplete',
     ],
 )
 
