@@ -85,8 +85,8 @@ __wt_cache_decr_check_size(
 	first = 0;
 	}
 #else
-        WT_UNUSED(fld);
-        WT_UNUSED(session);
+	WT_UNUSED(fld);
+	WT_UNUSED(session);
 #endif
 }
 
@@ -113,8 +113,8 @@ __wt_cache_decr_check_uint64(
 	first = 0;
 	}
 #else
-        WT_UNUSED(fld);
-        WT_UNUSED(session);
+	WT_UNUSED(fld);
+	WT_UNUSED(session);
 #endif
 }
 
