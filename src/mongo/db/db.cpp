@@ -311,6 +311,36 @@ static void checkForIdIndexes(OperationContext* txn, Database* db) {
     }
 }
 
+static void checkForPartialIndexes(OperationContext* txn, Database* db) {
+    list<string> collections;
+    db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collections);
+
+    for (auto&& collectionName : collections) {
+        Collection* coll = db->getCollection(collectionName);
+        invariant(coll);
+
+        const bool includeUnfinishedIndexes = true;
+        IndexCatalog::IndexIterator ii =
+            coll->getIndexCatalog()->getIndexIterator(txn, includeUnfinishedIndexes);
+
+        while (ii.more()) {
+            IndexDescriptor* descriptor = ii.next();
+            BSONElement filterElement = descriptor->getInfoElement("partialFilterExpression");
+            if (!filterElement.eoo()) {
+                warning() << "Detected a potential partial index " << descriptor->keyPattern()
+                          << " on the " << collectionName << " collection. The index specifies "
+                          << filterElement.wrap()
+                          << ", but this version of MongoDB does not support partial indexes. If"
+                             " the index was created on a newer version of MongoDB, then it may not"
+                             " contain index entries for all documents in the collection. The index"
+                             " may need to be dropped and recreated to avoid missing documents when"
+                             " it is used to answer queries." << startupWarningsLog;
+            }
+        }
+    }
+}
+
+
 /**
  * Checks if this server was started without --replset but has a config in local.system.replset
  * (meaning that this is probably a replica set member started in stand-alone mode).
@@ -418,6 +448,8 @@ static void repairDatabasesAndCheckVersion() {
             // We only care about the _id index if we are in a replset
             checkForIdIndexes(&txn, db);
         }
+
+        checkForPartialIndexes(&txn, db);
 
         if (shouldClearNonLocalTmpCollections || dbName == "local") {
             db->clearTmpCollections(&txn);

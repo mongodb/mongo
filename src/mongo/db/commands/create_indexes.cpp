@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include <string>
@@ -48,6 +50,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -291,6 +294,21 @@ public:
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
 
         result.append("numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(txn));
+
+        for (size_t i = 0; i < specs.size(); i++) {
+            BSONObj spec = specs[i];
+
+            BSONElement filterElement = spec["partialFilterExpression"];
+            if (!filterElement.eoo()) {
+                warning() << "The index " << spec.getObjectField("key") << " specifies "
+                          << filterElement.wrap()
+                          << ", but this version of MongoDB does not support partial indexes. The"
+                             " index will contain index entries for all documents in the "
+                          << ns.ns()
+                          << " collection. It must be dropped and recreated after upgrading to"
+                             " function as a partial index." << startupWarningsLog;
+            }
+        }
 
         return true;
     }
