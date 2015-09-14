@@ -452,31 +452,6 @@ TEST(MultiHostQueryOp, SingleHostHang) {
     ASSERT_EQUALS(result.getStatus().code(), ErrorCodes::NetworkTimeout);
 }
 
-TEST(MultiHostQueryOp, TwoHostResponses) {
-    HostThreadPools threadPool(1, true);
-    MockSystemEnv mockSystem(&threadPool);
-
-    ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
-    ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
-    vector<ConnectionString> hosts;
-    hosts.push_back(hostA);
-    hosts.push_back(hostB);
-
-    // Make sure we return the first response, from hostB at time 1000
-    mockSystem.addMockHostResultAt(hostA, 2000);
-    mockSystem.addMockHostResultAt(hostB, 1000);
-
-    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
-
-    QuerySpec query;
-    StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
-
-    ASSERT_OK(result.getStatus());
-    ASSERT(NULL != result.getValue());
-    ASSERT_EQUALS(result.getValue()->originalHost(), hostB.toString());
-    delete result.getValue();
-}
-
 TEST(MultiHostQueryOp, TwoHostsOneErrorResponse) {
     HostThreadPools threadPool(1, true);
     MockSystemEnv mockSystem(&threadPool);
@@ -694,8 +669,8 @@ TEST(MultiHostQueryOp, TwoHostsOneHangUnscoped) {
     Notification unhangNotify;
 
     // Create a thread pool which detaches itself from outstanding work on cleanup
-    unique_ptr<HostThreadPools> threadPool(new HostThreadPools(1, false));
-    MockSystemEnv mockSystem(threadPool.get());
+    HostThreadPools threadPool(1, false);
+    MockSystemEnv mockSystem(&threadPool);
 
     ConnectionString hostA = uassertStatusOK(ConnectionString::parse("$hostA:1000"));
     ConnectionString hostB = uassertStatusOK(ConnectionString::parse("$hostB:1000"));
@@ -707,14 +682,13 @@ TEST(MultiHostQueryOp, TwoHostsOneHangUnscoped) {
     mockSystem.addMockHungHostAt(hostA, 1000, &unhangNotify);
     mockSystem.addMockHostResultAt(hostB, 2000);
 
-    MultiHostQueryOp queryOp(&mockSystem, threadPool.get());
+    MultiHostQueryOp queryOp(&mockSystem, &threadPool);
 
     QuerySpec query;
     StatusWith<DBClientCursor*> result = queryOp.queryAny(hosts, query, 3000);
 
     // Clean up the thread pool
     mockSystem.setHostThreadPools(NULL);
-    threadPool.reset();
 
     // Unhang before checking status, in case it throws
     unhangNotify.notifyOne();
