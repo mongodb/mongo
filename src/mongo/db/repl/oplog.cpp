@@ -381,21 +381,11 @@ OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
         OldClientContext ctx(txn, rsOplogName, _localDB);
         WriteUnitOfWork wunit(txn);
 
-        for (std::deque<BSONObj>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
-            const BSONObj& op = *it;
-            const OpTime optime = fassertStatusOK(28779, OpTime::parseFromBSON(op));
-
-            checkOplogInsert(_localOplogCollection->insertDocument(txn, op, false));
-
-            // lastOptime and optime are successive in the log, so it's safe to compare them.
-            if (!(lastOptime < optime)) {
-                severe() << "replication oplog stream went back in time. "
-                            "previous timestamp: " << lastOptime << " newest timestamp: " << optime
-                         << ". Op being applied: " << op;
-                fassertFailedNoTrace(18905);
-            }
-            lastOptime = optime;
-        }
+        std::vector<BSONObj> opsVect(ops.begin(), ops.end());
+        checkOplogInsert(
+            _localOplogCollection->insertDocuments(txn, opsVect.begin(), opsVect.end(), false));
+        lastOptime =
+            fassertStatusOK(ErrorCodes::InvalidBSON, OpTime::parseFromBSON(opsVect.back()));
         wunit.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeOps", _localOplogCollection->ns().ns());
