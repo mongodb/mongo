@@ -169,27 +169,6 @@ public:
     }
 };
 
-void start(const MessageServer::Options& opts) {
-    balancer.go();
-    cursorCache.startTimeoutThread();
-    clusterCursorCleanupJob.go();
-
-    UserCacheInvalidator cacheInvalidatorThread(getGlobalAuthorizationManager());
-    {
-        auto txn = cc().makeOperationContext();
-        cacheInvalidatorThread.initialize(txn.get());
-        cacheInvalidatorThread.go();
-    }
-
-    PeriodicTask::startRunningPeriodicTasks();
-
-    ShardedMessageHandler handler;
-    MessageServer* server = createServer(opts, &handler);
-    server->setAsTimeTracker();
-    server->setupSockets();
-    server->run();
-}
-
 DBClientBase* createDirectClient(OperationContext* txn) {
     uassert(10197, "createDirectClient not implemented for sharding yet", 0);
     return 0;
@@ -265,13 +244,31 @@ static ExitCode runMongosServer() {
         return EXIT_SHARDING_ERROR;
     }
 
+    balancer.go();
+    cursorCache.startTimeoutThread();
+    clusterCursorCleanupJob.go();
+
+    UserCacheInvalidator cacheInvalidatorThread(getGlobalAuthorizationManager());
+    {
+        auto txn = cc().makeOperationContext();
+        cacheInvalidatorThread.initialize(txn.get());
+        cacheInvalidatorThread.go();
+    }
+
+    PeriodicTask::startRunningPeriodicTasks();
+
     MessageServer::Options opts;
     opts.port = serverGlobalParams.port;
     opts.ipList = serverGlobalParams.bind_ip;
-    start(opts);
 
-    // listen() will return when exit code closes its socket.
-    return EXIT_NET_ERROR;
+    ShardedMessageHandler handler;
+    MessageServer* server = createServer(opts, &handler);
+    server->setAsTimeTracker();
+    server->setupSockets();
+    server->run();
+
+    // MessageServer::run will return when exit code closes its socket
+    return inShutdown() ? EXIT_CLEAN : EXIT_NET_ERROR;
 }
 
 MONGO_INITIALIZER_GENERAL(ForkServer,
@@ -326,15 +323,7 @@ static int _main() {
     }
 #endif
 
-    ExitCode exitCode = runMongosServer();
-
-    // To maintain backwards compatibility, we exit with EXIT_NET_ERROR if the listener loop
-    // returns.
-    if (exitCode == EXIT_NET_ERROR) {
-        dbexit(EXIT_NET_ERROR);
-    }
-
-    return (exitCode == EXIT_CLEAN) ? 0 : 1;
+    return runMongosServer();
 }
 
 #if defined(_WIN32)
@@ -343,11 +332,7 @@ static ExitCode initService() {
     ntservice::reportStatus(SERVICE_RUNNING);
     log() << "Service running";
 
-    ExitCode exitCode = runMongosServer();
-
-    // ignore EXIT_NET_ERROR on clean shutdown since we return this when the listening socket
-    // is closed
-    return (exitCode == EXIT_NET_ERROR && inShutdown()) ? EXIT_CLEAN : exitCode;
+    return runMongosServer();
 }
 }  // namespace mongo
 #endif
