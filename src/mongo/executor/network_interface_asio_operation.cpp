@@ -41,6 +41,7 @@
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/request_builder_interface.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace executor {
@@ -79,6 +80,7 @@ NetworkInterfaceASIO::AsyncOp::AsyncOp(NetworkInterfaceASIO* const owner,
       _onFinish(onFinish),
       _start(now),
       _canceled(0),
+      _timedOut(0),
       _inSetup(true) {}
 
 void NetworkInterfaceASIO::AsyncOp::cancel() {
@@ -95,6 +97,10 @@ void NetworkInterfaceASIO::AsyncOp::cancel() {
 
 bool NetworkInterfaceASIO::AsyncOp::canceled() const {
     return (_canceled.load() == 1);
+}
+
+bool NetworkInterfaceASIO::AsyncOp::timedOut() const {
+    return (_timedOut.load() == 1);
 }
 
 const TaskExecutor::CallbackHandle& NetworkInterfaceASIO::AsyncOp::cbHandle() const {

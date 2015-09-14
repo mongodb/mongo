@@ -36,6 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/async_mock_stream_factory.h"
+#include "mongo/executor/async_timer_mock.h"
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/executor/test_network_connection_hook.h"
 #include "mongo/rpc/legacy_reply_builder.h"
@@ -73,9 +74,11 @@ public:
         options.timerFactory = std::move(timerFactory);
 
         // keep unowned pointer, but pass ownership to NIA
-        auto factory = stdx::make_unique<AsyncMockStreamFactory>();
-        _streamFactory = factory.get();
-        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
+        auto streamFactory = stdx::make_unique<AsyncMockStreamFactory>();
+        _streamFactory = streamFactory.get();
+        _net =
+            stdx::make_unique<NetworkInterfaceASIO>(std::move(streamFactory), std::move(options));
+
         _net->startup();
     }
 
@@ -85,7 +88,7 @@ public:
         }
     }
 
-    NetworkInterface& net() {
+    NetworkInterfaceASIO& net() {
         return *_net;
     }
 
@@ -93,11 +96,12 @@ public:
         return *_streamFactory;
     }
 
-    void simulateServerReply(AsyncMockStreamFactory::MockStream* stream,
-                             rpc::Protocol proto,
-                             const stdx::function<RemoteCommandResponse(RemoteCommandRequest)>) {}
+    AsyncTimerFactoryMock& timerFactory() {
+        return *_timerFactory;
+    }
 
 protected:
+    AsyncTimerFactoryMock* _timerFactory;
     AsyncMockStreamFactory* _streamFactory;
     std::unique_ptr<NetworkInterfaceASIO> _net;
 };
@@ -139,7 +143,6 @@ TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
                            [](RemoteCommandRequest request)
                                -> RemoteCommandResponse { return simulateIsMaster(request); });
 
-
     {
         // Cancel operation while blocked in the write for determinism. By calling cancel here we
         // ensure that it is not a no-op and that the asio::operation_aborted error will always
@@ -151,6 +154,45 @@ TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
     // Wait for op to complete, assert that it was canceled.
     auto canceledFuture = canceled.get_future();
     ASSERT(canceledFuture.get());
+}
+
+TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
+    std::promise<bool> timedOut;
+    auto timedOutFuture = timedOut.get_future();
+
+    // Kick off operation
+    TaskExecutor::CallbackHandle cb{};
+    Milliseconds timeout(1000);
+    net().startCommand(cb,
+                       {testHost, "testDB", BSON("a" << 1), BSONObj(), timeout},
+                       [&timedOut](StatusWith<RemoteCommandResponse> response) {
+                           timedOut.set_value(response == ErrorCodes::ExceededTimeLimit);
+                       });
+
+    // Create and initialize a stream so operation can begin
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // Simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    {
+        // Wait for the operation to block on write so we know it's been added.
+        WriteEvent write{stream};
+
+        // Get the timer factory
+        auto& factory = timerFactory();
+
+        // Advance clock but not enough to force a timeout, assert still active
+        factory.fastForward(Milliseconds(500));
+        ASSERT(timedOutFuture.wait_for(Milliseconds(1)) == stdx::future_status::timeout);
+
+        // Advance clock and force timeout
+        factory.fastForward(Milliseconds(800));
+    }
+    ASSERT(timedOutFuture.get());
 }
 
 TEST_F(NetworkInterfaceASIOTest, StartCommand) {

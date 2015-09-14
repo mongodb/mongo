@@ -217,6 +217,7 @@ private:
 
         void cancel();
         bool canceled() const;
+        bool timedOut() const;
 
         const TaskExecutor::CallbackHandle& cbHandle() const;
 
@@ -268,8 +269,10 @@ private:
         boost::optional<rpc::Protocol> _operationProtocol;
 
         Date_t _start;
+        std::unique_ptr<AsyncTimerInterface> _timeoutAlarm;
 
         AtomicUInt64 _canceled;
+        AtomicUInt64 _timedOut;
 
         /**
          * An AsyncOp may run 0, 1, or multiple commands over its lifetime.
@@ -295,6 +298,9 @@ private:
         if (op->canceled())
             return _completeOperation(op,
                                       Status(ErrorCodes::CallbackCanceled, "Callback canceled"));
+        if (op->timedOut())
+            return _completeOperation(op,
+                                      Status(ErrorCodes::ExceededTimeLimit, "Operation timed out"));
         if (ec)
             return _networkErrorCallback(op, ec);
 

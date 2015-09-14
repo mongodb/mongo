@@ -203,6 +203,25 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         op->_connectionPoolHandle = std::move(swConn.getValue());
         op->_start = startTime;
 
+        // Set timeout now that we have the correct request object
+        if (op->_request.timeout != RemoteCommandRequest::kNoTimeout) {
+            op->_timeoutAlarm = op->_owner->_timerFactory->make(&_io_service, op->_request.timeout);
+            op->_timeoutAlarm->asyncWait([this, op](std::error_code ec) {
+                if (!ec) {
+                    // An operation may be in mid-flight when it times out, so we cancel any
+                    // in-progress async calls but do not complete the operation now.
+                    if (op->_connection) {
+                        op->_connection->cancel();
+                    }
+                    // Once this flag is set, op may no longer be a valid pointer, as another
+                    // thread may have removed it from _inProgress.
+                    op->_timedOut.store(1);
+                } else {
+                    warning() << "failed to time operation out: " << ec.message();
+                }
+            });
+        }
+
         _beginCommunication(op);
     };
 
