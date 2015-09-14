@@ -296,17 +296,18 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 */
 	if (upd->next == NULL)
 		return (0);
+
 	/*
 	 * We would like to call __wt_txn_update_oldest only in the event that
 	 * there are further updates to this page, the check against WT_TXN_NONE
 	 * is used as an indicator of there being further updates on this page.
 	 */
-	if (page->modify->obsolete_check_txn != WT_TXN_NONE) {
-		if (!__wt_txn_visible_all(session,
-		    page->modify->obsolete_check_txn)) {
-			/* Try to move the oldest ID forward and re-check */
-			__wt_txn_update_oldest(session, 0);
-		}
+	if (page->modify->obsolete_check_txn != WT_TXN_NONE &&
+	    !__wt_txn_visible_all(session, page->modify->obsolete_check_txn)) {
+
+		/* Try to move the oldest ID forward and re-check. */
+		__wt_txn_update_oldest(session, 0);
+
 		if (!__wt_txn_visible_all(session,
 		    page->modify->obsolete_check_txn)) {
 			page->modify->obsolete_check_txn = WT_TXN_NONE;
