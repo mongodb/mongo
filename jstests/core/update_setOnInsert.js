@@ -2,14 +2,6 @@
 t = db.update_setOnInsert;
 var res;
 
-db.setProfilingLevel( 2 );
-
-function getLastOp() {
-    var cursor = db.system.profile.find( { ns : t.getFullName() , op : "update" } );
-    cursor = cursor.sort( { $natural : -1 } ).limit(1);
-    return cursor[0];
-}
-
 function dotest( useIndex ) {
     t.drop();
     if ( useIndex ) {
@@ -23,13 +15,10 @@ function dotest( useIndex ) {
 
     t.update( { _id: 5 }, { $inc : { x: 2 }, $setOnInsert : { a : 3 } }, true );
     assert.docEq( { _id : 5, a: 4, x : 4 }, t.findOne() );
-
-    op = getLastOp();
 }
 
 dotest( false );
 dotest( true );
-
 
 // Cases for SERVER-9958 -- Allow _id $setOnInsert during insert (if upsert:true, and not doc found)
 t.drop();
@@ -42,4 +31,3 @@ assert.writeError(res, "$setOnInsert _id.a/b worked" );
 
 res = t.update( {"_id.a": 4} , { $setOnInsert: { "_id": {a:4, b:1} } } , true );
 assert.writeError(res, "$setOnInsert _id.a/a+b worked" );
-db.setProfilingLevel( 0 );
