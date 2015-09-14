@@ -542,7 +542,7 @@ __log_file_header(
 	/*
 	 * We may recursively call __wt_log_acquire to allocate log space for
 	 * the log descriptor record.  Call __log_fill to write it, but we
-	 * do not need to call __log_release because we're not waiting for
+	 * do not need to call __wt_log_release because we're not waiting for
 	 * any earlier operations to complete.
 	 */
 	if (prealloc) {
@@ -1170,11 +1170,11 @@ err:
 }
 
 /*
- * __log_release --
+ * __wt_log_release --
  *	Release a log slot.
  */
-static int
-__log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
+int
+__wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *freep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -1624,40 +1624,6 @@ err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 }
 
 /*
- * __log_force_write_internal --
- *	Force a switch and release and write of the current slot.
- *	Must be called with the slot lock held.
- */
-static int
-__log_force_write_internal(WT_SESSION_IMPL *session)
-{
-	WT_DECL_RET;
-	WT_LOG *log;
-	WT_LOGSLOT *slot;
-	int free_slot, release;
-
-	log = S2C(session)->log;
-	slot = log->active_slot;
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
-	/*
-	 * If closing the slot returns WT_NOTFOUND, it means that someone else
-	 * is processing the slot change: we're done.  If we get EBUSY (or any
-	 * other error), return that so the caller can decide what to do.
-	 */
-	ret = __wt_log_slot_close(session, slot, &release, 1);
-	if (ret == WT_NOTFOUND)
-		return (0);
-	WT_RET(ret);
-	if (release) {
-		WT_RET(__log_release(session, slot, &free_slot));
-		if (free_slot)
-			__wt_log_slot_free(session, slot);
-	}
-	WT_RET(__wt_log_slot_new(session));
-	return (0);
-}
-
-/*
  * __wt_log_force_write --
  *	Force a switch and release and write of the current slot.
  *	Wrapper function that takes the lock.
@@ -1665,14 +1631,13 @@ __log_force_write_internal(WT_SESSION_IMPL *session)
 int
 __wt_log_force_write(WT_SESSION_IMPL *session, int retry)
 {
-	WT_DECL_RET;
+	WT_LOG *log;
+	WT_MYSLOT myslot;
 
-	do {
-		WT_WITH_SLOT_LOCK(session, S2C(session)->log,
-		    ret = __log_force_write_internal(session));
-	} while (retry && ret == EBUSY);
-
-	return (ret);
+	log = S2C(session)->log;
+	memset(&myslot, 0, sizeof(myslot));
+	myslot.slot = log->active_slot;
+	return (__wt_log_slot_switch(session, &myslot, retry, 1));
 }
 
 /*
@@ -1866,7 +1831,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	ret = 0;
 	if (myslot.end_offset >= WT_LOG_SLOT_BUF_MAX ||
 	    F_ISSET(&myslot, WT_MYSLOT_UNBUFFERED) || force)
-		ret = __wt_log_slot_switch(session, &myslot);
+		ret = __wt_log_slot_switch(session, &myslot, 1, 0);
 	if (ret == 0)
 		ret = __log_fill(session, &myslot, 0, record, &lsn);
 	release_size = __wt_log_slot_release(
@@ -1880,7 +1845,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		myslot.slot->slot_error = ret;
 	WT_ASSERT(session, ret == 0);
 	if (WT_LOG_SLOT_DONE(release_size)) {
-		WT_ERR(__log_release(session, myslot.slot, &free_slot));
+		WT_ERR(__wt_log_release(session, myslot.slot, &free_slot));
 		if (free_slot)
 			__wt_log_slot_free(session, myslot.slot);
 	} else if (force) {
