@@ -173,7 +173,7 @@ class test_schema02(wttest.WiredTigerTestCase):
             cursor[(i, 'key' + str(i))] = \
                 ('val' + str(square), square, 'val' + str(cube), cube)
         cursor.close()
-        
+
     def check_entries(self):
         cursor = self.session.open_cursor('table:main', None, None)
         # spot check via search

@@ -40,7 +40,7 @@ int
 main(int argc, char *argv[])
 {
 	time_t start;
-	int ch, reps, ret;
+	int ch, i, onerun, reps, ret;
 	const char *config, *home;
 
 	config = NULL;
@@ -64,11 +64,12 @@ main(int argc, char *argv[])
 
 	/* Set values from the command line. */
 	home = NULL;
+	onerun = 0;
 	while ((ch = __wt_getopt(
 	    g.progname, argc, argv, "1C:c:H:h:Llqrt:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
-			g.c_runs = 1;
+			onerun = 1;
 			break;
 		case 'C':			/* wiredtiger_open config */
 			g.config_open = __wt_optarg;
@@ -105,8 +106,14 @@ main(int argc, char *argv[])
 	argc -= __wt_optind;
 	argv += __wt_optind;
 
-	/* Initialize the global random number generator. */
+	/*
+	 * Initialize the global RNG. Start with the standard seeds, and then
+	 * use seconds since the Epoch modulo a prime to run the RNG for some
+	 * number of steps, so we don't start with the same values every time.
+	 */
 	__wt_random_init(&g.rnd);
+	for (i = (int)time(NULL) % 10007; i > 0; --i)
+		(void)__wt_random(&g.rnd);
 
 	/* Set up paths. */
 	path_setup(home);
@@ -152,6 +159,13 @@ main(int argc, char *argv[])
 	 * makes sense when you're debugging, leave that semantic in place.
 	 */
 	if (g.replay && SINGLETHREADED)
+		g.c_runs = 1;
+
+	/*
+	 * Let the command line -1 flag override runs configured from other
+	 * sources.
+	 */
+	if (onerun)
 		g.c_runs = 1;
 
 	/*
@@ -298,6 +312,11 @@ die(int e, const char *fmt, ...)
 	/* Single-thread error handling. */
 	(void)pthread_rwlock_wrlock(&g.death_lock);
 
+	/* Try and turn off tracking so it doesn't obscure the error message. */
+	if (g.track) {
+		g.track = 0;
+		fprintf(stderr, "\n");
+	}
 	if (fmt != NULL) {				/* Death message. */
 		fprintf(stderr, "%s: ", g.progname);
 		va_start(ap, fmt);

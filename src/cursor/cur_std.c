@@ -258,9 +258,9 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			    item->data, item->size, "q", &cursor->recno));
 		} else
 			cursor->recno = va_arg(ap, uint64_t);
-		if (cursor->recno == 0)
+		if (cursor->recno == WT_RECNO_OOB)
 			WT_ERR_MSG(session, EINVAL,
-			    "Record numbers must be greater than zero");
+			    "%d is an invalid record number", WT_RECNO_OOB);
 		buf->data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else {
@@ -463,15 +463,16 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
-	__wt_buf_free(session, &cursor->key);
-	__wt_buf_free(session, &cursor->value);
 
 	if (F_ISSET(cursor, WT_CURSTD_OPEN)) {
 		TAILQ_REMOVE(&session->cursors, cursor, q);
 
+		(void)__wt_atomic_sub32(&S2C(session)->open_cursor_count, 1);
 		WT_STAT_FAST_DATA_DECR(session, session_cursor_open);
-		WT_STAT_FAST_CONN_ATOMIC_DECR(session, session_cursor_open);
 	}
+
+	__wt_buf_free(session, &cursor->key);
+	__wt_buf_free(session, &cursor->value);
 
 	__wt_free(session, cursor->internal_uri);
 	__wt_free(session, cursor->uri);
@@ -683,8 +684,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
 
 	F_SET(cursor, WT_CURSTD_OPEN);
+	(void)__wt_atomic_add32(&S2C(session)->open_cursor_count, 1);
 	WT_STAT_FAST_DATA_INCR(session, session_cursor_open);
-	WT_STAT_FAST_CONN_ATOMIC_INCR(session, session_cursor_open);
 
 	*cursorp = (cdump != NULL) ? cdump : cursor;
 	return (0);

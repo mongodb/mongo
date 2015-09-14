@@ -128,20 +128,22 @@ print_record(WT_LSN *lsn, uint32_t opcount,
  *	A simple walk of the log.
  */
 static int
-simple_walk_log(WT_SESSION *session)
+simple_walk_log(WT_SESSION *session, int count_min)
 {
 	WT_CURSOR *cursor;
 	WT_LSN lsn;
 	WT_ITEM logrec_key, logrec_value;
 	uint64_t txnid;
 	uint32_t fileid, opcount, optype, rectype;
-	int ret;
+	int count, ret;
 
 	/*! [log cursor open] */
 	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
 	/*! [log cursor open] */
 
+	count = 0;
 	while ((ret = cursor->next(cursor)) == 0) {
+		count++;
 		/*! [log cursor get_key] */
 		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset, &opcount);
 		/*! [log cursor get_key] */
@@ -156,6 +158,12 @@ simple_walk_log(WT_SESSION *session)
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 	ret = cursor->close(cursor);
+	if (count < count_min) {
+		fprintf(stderr,
+		    "Expected minimum %d records, found %d\n",
+		    count_min, count);
+		abort();
+	}
 	return (ret);
 }
 /*! [log cursor walk] */
@@ -206,11 +214,13 @@ walk_log(WT_SESSION *session)
 
 		/*
 		 * If the operation is a put, replay it here on the backup
-		 * connection.  Note, we cheat by looking only for fileid 1
-		 * in this example.  The metadata is fileid 0.
+		 * connection.
+		 *
+		 * !!!
+		 * Minor cheat: the metadata is fileid 0, skip its records.
 		 */
-		if (fileid == 1 && rectype == WT_LOGREC_COMMIT &&
-		    optype == WT_LOGOP_ROW_PUT) {
+		if (fileid != 0 &&
+		    rectype == WT_LOGREC_COMMIT && optype == WT_LOGOP_ROW_PUT) {
 			if (!in_txn) {
 				ret = session2->begin_transaction(session2,
 				    NULL);
@@ -276,9 +286,10 @@ main(void)
 	WT_CONNECTION *wt_conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	int i, record_count, ret;
+	int count_min, i, record_count, ret;
 	char cmd_buf[256], k[16], v[16];
 
+	count_min = 0;
 	snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s %s && mkdir %s %s",
 	    home1, home2, home1, home2);
 	if ((ret = system(cmd_buf)) != 0) {
@@ -293,6 +304,7 @@ main(void)
 
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
 	ret = session->create(session, uri, "key_format=S,value_format=S");
+	count_min++;
 
 	ret = session->open_cursor(session, uri, NULL, NULL, &cursor);
 	/*
@@ -304,6 +316,7 @@ main(void)
 		cursor->set_key(cursor, k);
 		cursor->set_value(cursor, v);
 		ret = cursor->insert(cursor);
+		count_min++;
 	}
 	ret = session->begin_transaction(session, NULL);
 	/*
@@ -317,10 +330,12 @@ main(void)
 		ret = cursor->insert(cursor);
 	}
 	ret = session->commit_transaction(session, NULL);
+	count_min++;
 	ret = cursor->close(cursor);
 
 	/*! [log cursor printf] */
 	ret = session->log_printf(session, "Wrote %d records", record_count);
+	count_min++;
 	/*! [log cursor printf] */
 
 	/*
@@ -336,7 +351,7 @@ main(void)
 	}
 
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
-	ret = simple_walk_log(session);
+	ret = simple_walk_log(session, count_min);
 	ret = walk_log(session);
 	ret = wt_conn->close(wt_conn, NULL);
 	return (ret);

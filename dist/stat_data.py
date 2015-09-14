@@ -7,14 +7,21 @@
 # currently open'.
 # NOTE: All statistics descriptions must have a prefix string followed by ':'.
 #
-# Optional configuration flags:
-#       no_clear        Value not cleared when statistics cleared
-#       no_scale        Don't scale value per second in the logging tool script
-#
 # Data-source statistics are normally aggregated across the set of underlying
 # objects. Additional optionaly configuration flags are available:
 #       no_aggregate    Ignore the value when aggregating statistics
 #       max_aggregate   Take the maximum value when aggregating statistics
+#
+# Optional configuration flags:
+#       no_clear        Value not cleared when statistics cleared
+#       no_scale        Don't scale value per second in the logging tool script
+#
+# The no_clear flag is a little complicated: it means we don't clear the values
+# when resetting statistics after each run (necessary when the WiredTiger engine
+# is updating values that persist over multiple runs, for example the count of
+# cursors), but it also causes the underlying display routines to not treat the
+# change between displays as relative to the number of seconds, that is, it's an
+# absolute value. The no_clear flag should be set in either case.
 
 from operator import attrgetter
 import sys
@@ -120,9 +127,9 @@ connection_stats = [
     AsyncStat('async_alloc_race', 'number of allocation state races'),
     AsyncStat('async_alloc_view',
         'number of operation slots viewed for allocation'),
+    AsyncStat('async_cur_queue', 'current work queue length'),
     AsyncStat('async_flush', 'number of flush calls'),
     AsyncStat('async_full', 'number of times operation allocation failed'),
-    AsyncStat('async_cur_queue', 'current work queue length'),
     AsyncStat('async_max_queue',
         'maximum work queue length', 'no_clear,no_scale'),
     AsyncStat('async_nowork', 'number of times worker found no work'),
@@ -149,11 +156,11 @@ connection_stats = [
     ##########################################
     CacheStat('cache_bytes_dirty',
         'tracked dirty bytes in the cache', 'no_clear,no_scale'),
-    CacheStat('cache_bytes_inuse',
-        'bytes currently in the cache', 'no_clear,no_scale'),
     CacheStat('cache_bytes_internal',
         'tracked bytes belonging to internal pages in the cache',
         'no_clear,no_scale'),
+    CacheStat('cache_bytes_inuse',
+        'bytes currently in the cache', 'no_clear,no_scale'),
     CacheStat('cache_bytes_leaf',
         'tracked bytes belonging to leaf pages in the cache',
         'no_clear,no_scale'),
@@ -165,11 +172,11 @@ connection_stats = [
     CacheStat('cache_bytes_read', 'bytes read into cache'),
     CacheStat('cache_bytes_write', 'bytes written from cache'),
     CacheStat('cache_eviction_app', 'pages evicted by application threads'),
+    CacheStat('cache_eviction_checkpoint', 'checkpoint blocked page eviction'),
     CacheStat('cache_eviction_clean', 'unmodified pages evicted'),
     CacheStat('cache_eviction_deepen',
         'page split during eviction deepened the tree'),
     CacheStat('cache_eviction_dirty', 'modified pages evicted'),
-    CacheStat('cache_eviction_checkpoint', 'checkpoint blocked page eviction'),
     CacheStat('cache_eviction_fail',
         'pages selected for eviction unable to be evicted'),
     CacheStat('cache_eviction_force',
@@ -197,21 +204,35 @@ connection_stats = [
     CacheStat('cache_eviction_worker_evicting',
         'eviction worker thread evicting pages'),
     CacheStat('cache_inmem_split', 'in-memory page splits'),
+    CacheStat('cache_inmem_splittable',
+        'in-memory page passed criteria to be split'),
+    CacheStat('cache_lookaside_insert', 'lookaside table insert calls'),
+    CacheStat('cache_lookaside_remove', 'lookaside table remove calls'),
     CacheStat('cache_overhead', 'percentage overhead', 'no_clear,no_scale'),
     CacheStat('cache_pages_dirty',
         'tracked dirty pages in the cache', 'no_clear,no_scale'),
     CacheStat('cache_pages_inuse',
         'pages currently held in the cache', 'no_clear,no_scale'),
     CacheStat('cache_read', 'pages read into cache'),
+    CacheStat('cache_read_lookaside',
+        'pages read into cache requiring lookaside entries'),
     CacheStat('cache_write', 'pages written from cache'),
+    CacheStat('cache_write_lookaside',
+        'page written requiring lookaside records'),
+    CacheStat('cache_write_restore',
+        'pages written requiring in-memory restoration'),
 
     ##########################################
     # Dhandle statistics
     ##########################################
-    DhandleStat('dh_conn_handles', 'connection dhandles swept'),
-    DhandleStat('dh_conn_ref', 'connection candidate referenced'),
-    DhandleStat('dh_conn_sweeps', 'connection sweeps'),
-    DhandleStat('dh_conn_tod', 'connection time-of-death sets'),
+    DhandleStat('dh_conn_handle_count',
+        'connection data handles currently active', 'no_clear,no_scale'),
+    DhandleStat('dh_sweep_close', 'connection sweep dhandles closed'),
+    DhandleStat('dh_sweep_remove',
+        'connection sweep dhandles removed from hash list'),
+    DhandleStat('dh_sweep_ref', 'connection sweep candidate became referenced'),
+    DhandleStat('dh_sweep_tod', 'connection sweep time-of-death sets'),
+    DhandleStat('dh_sweeps', 'connection sweeps'),
     DhandleStat('dh_session_handles', 'session dhandles swept'),
     DhandleStat('dh_session_sweeps', 'session sweep attempts'),
 
@@ -225,8 +246,8 @@ connection_stats = [
     LogStat('log_compress_len', 'total size of compressed records'),
     LogStat('log_compress_mem', 'total in-memory size of compressed records'),
     LogStat('log_compress_small', 'log records too small to compress'),
-    LogStat('log_compress_writes', 'log records compressed'),
     LogStat('log_compress_write_fails', 'log records not compressed'),
+    LogStat('log_compress_writes', 'log records compressed'),
     LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale'),
     LogStat('log_prealloc_files', 'pre-allocated log files prepared'),
     LogStat('log_prealloc_max',
@@ -236,20 +257,18 @@ connection_stats = [
     LogStat('log_scan_records', 'records processed by log scan'),
     LogStat('log_scan_rereads', 'log scan records requiring two reads'),
     LogStat('log_scans', 'log scan operations'),
-    LogStat('log_sync', 'log sync operations'),
-    LogStat('log_sync_dir', 'log sync_dir operations'),
-    LogStat('log_writes', 'log write operations'),
-    LogStat('log_write_lsn', 'log server thread advances write LSN'),
-
+    LogStat('log_slot_closes', 'consolidated slot closures'),
     LogStat('log_slot_coalesced', 'written slots coalesced'),
     LogStat('log_slot_consolidated', 'logging bytes consolidated'),
-    LogStat('log_slot_closes', 'consolidated slot closures'),
     LogStat('log_slot_joins', 'consolidated slot joins'),
     LogStat('log_slot_races', 'consolidated slot join races'),
-    LogStat('log_slot_toobig', 'record size exceeded maximum'),
-    LogStat('log_slot_toosmall',
-        'failed to find a slot large enough for record'),
+    LogStat('log_slot_switch_busy', 'busy returns attempting to switch slots'),
     LogStat('log_slot_transitions', 'consolidated slot join transitions'),
+    LogStat('log_slot_unbuffered', 'consolidated slot unbuffered writes'),
+    LogStat('log_sync', 'log sync operations'),
+    LogStat('log_sync_dir', 'log sync_dir operations'),
+    LogStat('log_write_lsn', 'log server thread advances write LSN'),
+    LogStat('log_writes', 'log write operations'),
 
     ##########################################
     # Reconciliation statistics
@@ -268,6 +287,8 @@ connection_stats = [
     TxnStat('txn_checkpoint', 'transaction checkpoints'),
     TxnStat('txn_checkpoint_generation',
         'transaction checkpoint generation', 'no_clear,no_scale'),
+    TxnStat('txn_checkpoint_running',
+        'transaction checkpoint currently running', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_max',
         'transaction checkpoint max time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_min',
@@ -276,17 +297,16 @@ connection_stats = [
         'transaction checkpoint most recent time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_total',
         'transaction checkpoint total time (msecs)', 'no_clear,no_scale'),
-    TxnStat('txn_checkpoint_running',
-        'transaction checkpoint currently running', 'no_clear,no_scale'),
+    TxnStat('txn_commit', 'transactions committed'),
+    TxnStat('txn_fail_cache',
+        'transaction failures due to cache overflow'),
     TxnStat('txn_pinned_checkpoint_range',
         'transaction range of IDs currently pinned by a checkpoint',
-        'no_clear,no_scale'),
+            'no_clear,no_scale'),
     TxnStat('txn_pinned_range',
         'transaction range of IDs currently pinned', 'no_clear,no_scale'),
-    TxnStat('txn_sync', 'transaction sync calls'),
-    TxnStat('txn_commit', 'transactions committed'),
-    TxnStat('txn_fail_cache', 'transaction failures due to cache overflow'),
     TxnStat('txn_rollback', 'transactions rolled back'),
+    TxnStat('txn_sync', 'transaction sync calls'),
 
     ##########################################
     # LSM statistics
@@ -322,6 +342,7 @@ connection_stats = [
     CursorStat('cursor_prev', 'cursor prev calls'),
     CursorStat('cursor_remove', 'cursor remove calls'),
     CursorStat('cursor_reset', 'cursor reset calls'),
+    CursorStat('cursor_restart', 'cursor restarted searches'),
     CursorStat('cursor_search', 'cursor search calls'),
     CursorStat('cursor_search_near', 'cursor search near calls'),
     CursorStat('cursor_update', 'cursor update calls'),
@@ -362,6 +383,7 @@ dsrc_stats = [
     CursorStat('cursor_remove', 'remove calls'),
     CursorStat('cursor_remove_bytes', 'cursor-remove key bytes removed'),
     CursorStat('cursor_reset', 'reset calls'),
+    CursorStat('cursor_restart', 'restarted searches'),
     CursorStat('cursor_search', 'search calls'),
     CursorStat('cursor_search_near', 'search near calls'),
     CursorStat('cursor_update', 'update calls'),
@@ -378,6 +400,8 @@ dsrc_stats = [
         'column-store fixed-size leaf pages', 'no_scale'),
     BtreeStat('btree_column_internal',
         'column-store internal pages', 'no_scale'),
+    BtreeStat('btree_column_rle',
+        'column-store variable-size RLE encoded values', 'no_scale'),
     BtreeStat('btree_column_variable',
         'column-store variable-size leaf pages', 'no_scale'),
     BtreeStat('btree_compact_rewrite', 'pages rewritten by compaction'),
@@ -421,9 +445,9 @@ dsrc_stats = [
     ##########################################
     # Block manager statistics
     ##########################################
-    BlockStat('block_alloc', 'blocks allocated'),
     BlockStat('allocation_size',
         'file allocation unit size', 'no_aggregate,no_scale'),
+    BlockStat('block_alloc', 'blocks allocated'),
     BlockStat('block_checkpoint_size', 'checkpoint size', 'no_scale'),
     BlockStat('block_extension', 'allocations requiring file extension'),
     BlockStat('block_free', 'blocks freed'),
@@ -450,20 +474,28 @@ dsrc_stats = [
     CacheStat('cache_eviction_internal', 'internal pages evicted'),
     CacheStat('cache_eviction_split', 'pages split during eviction'),
     CacheStat('cache_inmem_split', 'in-memory page splits'),
+    CacheStat('cache_inmem_splittable',
+        'in-memory page passed criteria to be split'),
     CacheStat('cache_overflow_value',
         'overflow values cached in memory', 'no_scale'),
     CacheStat('cache_read', 'pages read into cache'),
+    CacheStat('cache_read_lookaside',
+        'pages read into cache requiring lookaside entries'),
     CacheStat('cache_read_overflow', 'overflow pages read into cache'),
     CacheStat('cache_write', 'pages written from cache'),
+    CacheStat('cache_write_lookaside',
+        'page written requiring lookaside records'),
+    CacheStat('cache_write_restore',
+        'pages written requiring in-memory restoration'),
 
     ##########################################
     # Compression statistics
     ##########################################
-    CompressStat('compress_raw_ok', 'raw compression call succeeded'),
     CompressStat('compress_raw_fail',
         'raw compression call failed, no additional data available'),
     CompressStat('compress_raw_fail_temporary',
         'raw compression call failed, additional data available'),
+    CompressStat('compress_raw_ok', 'raw compression call succeeded'),
     CompressStat('compress_read', 'compressed pages read'),
     CompressStat('compress_write', 'compressed pages written'),
     CompressStat('compress_write_fail', 'page written failed to compress'),
@@ -474,21 +506,21 @@ dsrc_stats = [
     # Reconciliation statistics
     ##########################################
     RecStat('rec_dictionary', 'dictionary matches'),
+    RecStat('rec_multiblock_internal', 'internal page multi-block writes'),
+    RecStat('rec_multiblock_leaf', 'leaf page multi-block writes'),
+    RecStat('rec_multiblock_max',
+        'maximum blocks required for a page', 'max_aggregate,no_scale'),
     RecStat('rec_overflow_key_internal', 'internal-page overflow keys'),
     RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
     RecStat('rec_overflow_value', 'overflow values written'),
-    RecStat('rec_page_match', 'page checksum matches'),
     RecStat('rec_page_delete', 'pages deleted'),
+    RecStat('rec_page_match', 'page checksum matches'),
     RecStat('rec_pages', 'page reconciliation calls'),
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
     RecStat('rec_prefix_compression',
         'leaf page key bytes discarded using prefix compression'),
     RecStat('rec_suffix_compression',
         'internal page key bytes discarded using suffix compression'),
-    RecStat('rec_multiblock_internal', 'internal page multi-block writes'),
-    RecStat('rec_multiblock_leaf', 'leaf page multi-block writes'),
-    RecStat('rec_multiblock_max',
-        'maximum blocks required for a page', 'max_aggregate,no_scale'),
 
     ##########################################
     # Transaction statistics

@@ -398,7 +398,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	locked = 0;
 
 	/* Allocate an ID for the merge. */
-	dest_id = WT_ATOMIC_ADD4(lsm_tree->last, 1);
+	dest_id = __wt_atomic_add32(&lsm_tree->last, 1);
 
 	/*
 	 * We only want to do the chunk loop if we're running with verbose,
@@ -493,7 +493,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	 * merge_syncing field so that compact knows it is still in
 	 * progress.
 	 */
-	(void)WT_ATOMIC_ADD4(lsm_tree->merge_syncing, 1);
+	(void)__wt_atomic_add32(&lsm_tree->merge_syncing, 1);
 	in_sync = 1;
 	/*
 	 * We've successfully created the new chunk.  Now install it.  We need
@@ -512,7 +512,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	 * Don't block if the cache is full: our next unit of work may be to
 	 * discard some trees to free space.
 	 */
-	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
+	F_SET(session, WT_SESSION_NO_EVICTION);
 
 	if (create_bloom) {
 		if (ret == 0)
@@ -544,7 +544,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	WT_TRET(dest->close(dest));
 	dest = NULL;
 	++lsm_tree->merge_progressing;
-	(void)WT_ATOMIC_SUB4(lsm_tree->merge_syncing, 1);
+	(void)__wt_atomic_sub32(&lsm_tree->merge_syncing, 1);
 	in_sync = 0;
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -600,7 +600,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	if (in_sync)
-		(void)WT_ATOMIC_SUB4(lsm_tree->merge_syncing, 1);
+		(void)__wt_atomic_sub32(&lsm_tree->merge_syncing, 1);
 	if (src != NULL)
 		WT_TRET(src->close(src));
 	if (dest != NULL)
@@ -632,6 +632,6 @@ err:	if (locked)
 			    "Merge failed with %s",
 			   __wt_strerror(session, ret, NULL, 0)));
 	}
-	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
+	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 	return (ret);
 }

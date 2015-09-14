@@ -21,14 +21,14 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	session = conn->default_session;
 
 	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++) {
-		SLIST_INIT(&conn->dhhash[i]);	/* Data handle hash lists */
-		SLIST_INIT(&conn->fhhash[i]);	/* File handle hash lists */
+		TAILQ_INIT(&conn->dhhash[i]);	/* Data handle hash lists */
+		TAILQ_INIT(&conn->fhhash[i]);	/* File handle hash lists */
 	}
 
-	SLIST_INIT(&conn->dhlh);		/* Data handle list */
+	TAILQ_INIT(&conn->dhqh);		/* Data handle list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */
 	TAILQ_INIT(&conn->dsrcqh);		/* Data source list */
-	SLIST_INIT(&conn->fhlh);		/* File list */
+	TAILQ_INIT(&conn->fhqh);		/* File list */
 	TAILQ_INIT(&conn->collqh);		/* Collator list */
 	TAILQ_INIT(&conn->compqh);		/* Compressor list */
 	TAILQ_INIT(&conn->encryptqh);		/* Encryptor list */
@@ -45,7 +45,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_conn_config_init(session));
 
 	/* Statistics. */
-	__wt_stat_init_connection_stats(&conn->stats);
+	__wt_stat_connection_init(conn);
 
 	/* Locks. */
 	WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
@@ -55,11 +55,14 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
 	WT_RET(__wt_rwlock_alloc(session,
 	    &conn->hot_backup_lock, "hot backup"));
+	WT_RET(__wt_spin_init(session, &conn->las_lock, "lookaside table"));
 	WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
 	WT_RET(__wt_spin_init(session, &conn->schema_lock, "schema"));
 	WT_RET(__wt_spin_init(session, &conn->table_lock, "table creation"));
-	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS(conn), &conn->page_lock));
-	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i)
+
+	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS, &conn->page_lock));
+	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, conn->page_lock);
+	for (i = 0; i < WT_PAGE_LOCKS; ++i)
 		WT_RET(
 		    __wt_spin_init(session, &conn->page_lock[i], "btree page"));
 
@@ -91,8 +94,8 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	 */
 	WT_RET(__wt_spin_init(session, &conn->block_lock, "block manager"));
 	for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
-		SLIST_INIT(&conn->blockhash[i]);/* Block handle hash lists */
-	SLIST_INIT(&conn->blocklh);		/* Block manager list */
+		TAILQ_INIT(&conn->blockhash[i]);/* Block handle hash lists */
+	TAILQ_INIT(&conn->blockqh);		/* Block manager list */
 
 	return (0);
 }
@@ -138,10 +141,11 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->encryptor_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);
 	WT_TRET(__wt_rwlock_destroy(session, &conn->hot_backup_lock));
+	__wt_spin_destroy(session, &conn->las_lock);
 	__wt_spin_destroy(session, &conn->reconfig_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_spin_destroy(session, &conn->table_lock);
-	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i)
+	for (i = 0; i < WT_PAGE_LOCKS; ++i)
 		__wt_spin_destroy(session, &conn->page_lock[i]);
 	__wt_free(session, conn->page_lock);
 

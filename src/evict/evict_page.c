@@ -150,17 +150,12 @@ done:	if (((inmem_split && ret == 0) || (forced_eviction && ret == EBUSY)) &&
 int
 __wt_evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 {
-	int evict;
-
 	/*
 	 * If doing normal system eviction, but only in the service of reducing
 	 * the number of dirty pages, leave the clean page in cache.
 	 */
-	if (!closing) {
-		__wt_cache_status(session, &evict, NULL);
-		if (!evict)
-			return (EBUSY);
-	}
+	if (!closing && __wt_eviction_dirty_target(session))
+		return (EBUSY);
 
 	/*
 	 * Discard the page and update the reference structure; if the page has
@@ -184,7 +179,6 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 	WT_ADDR *addr;
 	WT_PAGE *parent;
 	WT_PAGE_MODIFY *mod;
-	int evict;
 
 	parent = ref->home;
 	mod = ref->page->modify;
@@ -229,11 +223,8 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 		 * push it out of cache (and read it back in, when needed), we
 		 * would rather have more, smaller pages than fewer large pages.
 		 */
-		if (!closing) {
-			__wt_cache_status(session, &evict, NULL);
-			if (!evict)
-				return (EBUSY);
-		}
+		if (!closing && __wt_eviction_dirty_target(session))
+			return (EBUSY);
 
 		/* Discard the parent's address. */
 		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
@@ -309,8 +300,7 @@ __evict_review(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_PAGE_MODIFY *mod;
-	uint32_t reconcile_flags;
+	uint32_t flags;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -331,7 +321,6 @@ __evict_review(
 
 	/* Now that we have exclusive access, review the page. */
 	page = ref->page;
-	mod = page->modify;
 
 	/*
 	 * Fail if an internal has active children, the children must be evicted
@@ -347,6 +336,13 @@ __evict_review(
 
 	/* Check if the page can be evicted. */
 	if (!closing) {
+		/*
+		 * Update the oldest ID to avoid wasted effort should it have
+		 * fallen behind current.
+		 */
+		if (__wt_page_is_modified(page))
+			__wt_txn_update_oldest(session, 1);
+
 		if (!__wt_page_can_evict(session, page, 0, inmem_splitp))
 			return (EBUSY);
 
@@ -361,9 +357,12 @@ __evict_review(
 			return (__wt_split_insert(session, ref));
 	}
 
+	/* If the page is clean, we're done and we can evict. */
+	if (!__wt_page_is_modified(page))
+		return (0);
+
 	/*
-	 * If the page is dirty and can possibly change state, reconcile it to
-	 * determine the final state.
+	 * If the page is dirty, reconcile it to decide if we can evict it.
 	 *
 	 * If we have an exclusive lock (we're discarding the tree), assert
 	 * there are no updates we cannot read.
@@ -377,30 +376,38 @@ __evict_review(
 	 * in-memory pages, (restoring the updates that stopped us from writing
 	 * the block), and inserting the whole mess into the page's parent.
 	 *
-	 * Don't set the update-restore flag for internal pages, they don't have
-	 * updates that can be saved and restored.
+	 * Otherwise, if eviction is getting pressed, configure reconciliation
+	 * to write not-yet-globally-visible updates to the lookaside table,
+	 * allowing the eviction of pages we'd otherwise have to retain in cache
+	 * to support older readers.
+	 *
+	 * Don't set the update-restore or lookaside table flags for internal
+	 * pages, they don't have update lists that can be saved and restored.
 	 */
-	reconcile_flags = WT_EVICTING;
-	if (__wt_page_is_modified(page)) {
-		if (closing)
-			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_ERR);
-		else if (!WT_PAGE_IS_INTERNAL(page) &&
-		    page->read_gen == WT_READGEN_OLDEST)
-			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_RESTORE);
-		WT_RET(__wt_reconcile(session, ref, NULL, reconcile_flags));
-		WT_ASSERT(session,
-		    !__wt_page_is_modified(page) ||
-		    FLD_ISSET(reconcile_flags, WT_SKIP_UPDATE_RESTORE));
+	flags = WT_EVICTING;
+	if (closing)
+		LF_SET(WT_VISIBILITY_ERR);
+	else if (!WT_PAGE_IS_INTERNAL(page)) {
+		if (page->read_gen == WT_READGEN_OLDEST)
+			LF_SET(WT_EVICT_UPDATE_RESTORE);
+		else if (__wt_eviction_aggressive(session))
+			LF_SET(WT_EVICT_LOOKASIDE);
 	}
 
+	WT_RET(__wt_reconcile(session, ref, NULL, flags));
+
 	/*
-	 * If the page was ever modified, make sure all of the updates
-	 * on the page are old enough they can be discarded from cache.
+	 * Success: assert the page is clean or reconciliation was configured
+	 * for an update/restore split, and if the page is clean, reconciliation
+	 * was configured for a lookaside table or all updates on the page are
+	 * globally visible.
 	 */
-	if (!closing && mod != NULL &&
-	    !__wt_txn_visible_all(session, mod->rec_max_txn) &&
-	    !FLD_ISSET(reconcile_flags, WT_SKIP_UPDATE_RESTORE))
-		return (EBUSY);
+	WT_ASSERT(session,
+	    LF_ISSET(WT_EVICT_UPDATE_RESTORE) || !__wt_page_is_modified(page));
+	WT_ASSERT(session,
+	    LF_SET(WT_EVICT_LOOKASIDE) ||
+	    __wt_page_is_modified(page) ||
+	    __wt_txn_visible_all(session, page->modify->rec_max_txn));
 
 	return (0);
 }

@@ -78,8 +78,7 @@ key_gen_setup(uint8_t **keyp)
 	*keyp = NULL;
 
 	len = MAX(KILOBYTE(100), g.c_key_max);
-	if ((key = malloc(len)) == NULL)
-		die(errno, "malloc");
+	key = dmalloc(len);
 	for (i = 0; i < len; ++i)
 		key[i] = (uint8_t)("abcdefghijklmnopqrstuvwxyz"[i % 26]);
 	*keyp = key;
@@ -139,8 +138,7 @@ val_gen_setup(WT_RAND_STATE *rnd, uint8_t **valp)
 	 * data for column-store run-length encoded files.
 	 */
 	len = MAX(KILOBYTE(100), g.c_value_max) + 20;
-	if ((val = malloc(len)) == NULL)
-		die(errno, "malloc");
+	val = dmalloc(len);
 	for (i = 0; i < len; ++i)
 		val[i] = (uint8_t)("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26]);
 
@@ -257,43 +255,36 @@ path_setup(const char *home)
 	size_t len;
 
 	/* Home directory. */
-	if ((g.home = strdup(home == NULL ? "RUNDIR" : home)) == NULL)
-		die(errno, "malloc");
+	g.home = dstrdup(home == NULL ? "RUNDIR" : home);
 
 	/* Log file. */
 	len = strlen(g.home) + strlen("log") + 2;
-	if ((g.home_log = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_log = dmalloc(len);
 	snprintf(g.home_log, len, "%s/%s", g.home, "log");
 
 	/* RNG log file. */
 	len = strlen(g.home) + strlen("rand") + 2;
-	if ((g.home_rand = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_rand = dmalloc(len);
 	snprintf(g.home_rand, len, "%s/%s", g.home, "rand");
 
 	/* Run file. */
 	len = strlen(g.home) + strlen("CONFIG") + 2;
-	if ((g.home_config = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_config = dmalloc(len);
 	snprintf(g.home_config, len, "%s/%s", g.home, "CONFIG");
 
 	/* Statistics file. */
 	len = strlen(g.home) + strlen("stats") + 2;
-	if ((g.home_stats = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_stats = dmalloc(len);
 	snprintf(g.home_stats, len, "%s/%s", g.home, "stats");
 
 	/* Backup directory. */
 	len = strlen(g.home) + strlen("BACKUP") + 2;
-	if ((g.home_backup = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_backup = dmalloc(len);
 	snprintf(g.home_backup, len, "%s/%s", g.home, "BACKUP");
 
 	/* BDB directory. */
 	len = strlen(g.home) + strlen("bdb") + 2;
-	if ((g.home_bdb = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_bdb = dmalloc(len);
 	snprintf(g.home_bdb, len, "%s/%s", g.home, "bdb");
 
 	/*
@@ -315,8 +306,7 @@ path_setup(const char *home)
 		"mkdir KVS"
 #endif
 	len = strlen(g.home) * 3 + strlen(CMD) + 1;
-	if ((g.home_init = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_init = dmalloc(len);
 	snprintf(g.home_init, len, CMD, g.home, g.home, g.home);
 
 	/* Backup directory initialize command, remove and re-create it. */
@@ -327,8 +317,7 @@ path_setup(const char *home)
 #define	CMD	"rm -rf %s && mkdir %s"
 #endif
 	len = strlen(g.home_backup) * 2 + strlen(CMD) + 1;
-	if ((g.home_backup_init = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_backup_init = dmalloc(len);
 	snprintf(g.home_backup_init, len, CMD, g.home_backup, g.home_backup);
 
 	/*
@@ -351,8 +340,7 @@ path_setup(const char *home)
 	"cp WiredTiger* wt* slvg.copy/"
 #endif
 	len = strlen(g.home) + strlen(CMD) + 1;
-	if ((g.home_salvage_copy = malloc(len)) == NULL)
-		die(errno, "malloc");
+	g.home_salvage_copy = dmalloc(len);
 	snprintf(g.home_salvage_copy, len, CMD, g.home);
 }
 
@@ -421,4 +409,32 @@ fclose_and_clear(FILE **fpp)
 	if (fclose(fp) != 0)
 		die(errno, "fclose");
 	return;
+}
+
+/*
+ * dmalloc --
+ *	Call malloc, dying on failure.
+ */
+void *
+dmalloc(size_t len)
+{
+	void *p;
+
+	if ((p = malloc(len)) == NULL)
+		die(errno, "malloc");
+	return (p);
+}
+
+/*
+ * dstrdup --
+ *	Call strdup, dying on failure.
+ */
+char *
+dstrdup(const char *str)
+{
+	char *p;
+
+	if ((p = strdup(str)) == NULL)
+		die(errno, "strdup");
+	return (p);
 }

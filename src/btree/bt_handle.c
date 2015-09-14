@@ -255,27 +255,17 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	/* Page sizes */
 	WT_RET(__btree_page_sizes(session));
 
-	/* 
-	 * Set special flags for the metadata file.
-	 * Eviction; the metadata file is never evicted.
-	 * Logging; the metadata file is always logged if possible.
-	 */
-	if (WT_IS_METADATA(btree->dhandle)) {
+	WT_RET(__wt_config_gets(session, cfg, "cache_resident", &cval));
+	if (cval.val)
 		F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
-		F_CLR(btree, WT_BTREE_NO_LOGGING);
-	} else {
-		WT_RET(__wt_config_gets(session, cfg, "cache_resident", &cval));
-		if (cval.val)
-			F_SET(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
-		else
-			F_CLR(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
+	else
+		F_CLR(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 
-		WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
-		if (cval.val)
-			F_CLR(btree, WT_BTREE_NO_LOGGING);
-		else
-			F_SET(btree, WT_BTREE_NO_LOGGING);
-	}
+	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
+	if (cval.val)
+		F_CLR(btree, WT_BTREE_NO_LOGGING);
+	else
+		F_SET(btree, WT_BTREE_NO_LOGGING);
 
 	/* Checksums */
 	WT_RET(__wt_config_gets(session, cfg, "checksum", &cval));
@@ -352,8 +342,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	    session, &btree->ovfl_lock, "btree overflow lock"));
 	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush lock"));
 
-	__wt_stat_init_dsrc_stats(&btree->dhandle->stats);
-
 	btree->write_gen = ckpt->write_gen;		/* Write generation */
 	btree->modified = 0;				/* Clean */
 
@@ -372,7 +360,7 @@ __wt_root_ref_init(WT_REF *root_ref, WT_PAGE *root, int is_recno)
 	root_ref->page = root;
 	root_ref->state = WT_REF_MEM;
 
-	root_ref->key.recno = is_recno ? 1 : 0;
+	root_ref->key.recno = is_recno ? 1 : WT_RECNO_OOB;
 
 	root->pg_intl_parent_ref = root_ref;
 }
@@ -385,12 +373,15 @@ int
 __wt_btree_tree_open(
     WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_ITEM dsk;
 	WT_PAGE *page;
 
 	btree = S2BT(session);
+	bm = btree->bm;
 
 	/*
 	 * A buffer into which we read a root page; don't use a scratch buffer,
@@ -399,12 +390,43 @@ __wt_btree_tree_open(
 	WT_CLEAR(dsk);
 
 	/*
-	 * Read the page, then build the in-memory version of the page. Clear
-	 * any local reference to an allocated copy of the disk image on return,
-	 * the page steals it.
+	 * Read and verify the page (verify to catch encrypted objects we can't
+	 * decrypt, where we read the object successfully but we can't decrypt
+	 * it, and we want to fail gracefully).
+	 *
+	 * Create a printable version of the address to pass to verify.
 	 */
-	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
-	WT_ERR(__wt_verify_dsk(session, (const char *)addr, &dsk));
+	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(bm->addr_string(bm, session, tmp, addr, addr_size));
+
+	F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
+	if ((ret = __wt_bt_read(session, &dsk, addr, addr_size)) == 0)
+		ret = __wt_verify_dsk(session, tmp->data, &dsk);
+	F_CLR(session, WT_SESSION_QUIET_CORRUPT_FILE);
+	if (ret != 0)
+		__wt_err(session, ret,
+		    "unable to read root page from %s", session->dhandle->name);
+	/*
+	 * Failure to open metadata means that the database is unavailable.
+	 * Try to provide a helpful failure message.
+	 */
+	if (ret != 0 && WT_IS_METADATA(session->dhandle)) {
+		__wt_errx(session,
+		    "WiredTiger has failed to open its metadata");
+		__wt_errx(session, "This may be due to the database"
+		    " files being encrypted, being from an older"
+		    " version or due to corruption on disk");
+		__wt_errx(session, "You should confirm that you have"
+		    " opened the database with the correct options including"
+		    " all encryption and compression options");
+	}
+	WT_ERR(ret);
+
+	/*
+	 * Build the in-memory version of the page. Clear our local reference to
+	 * the allocated copy of the disk image on return, the in-memory object
+	 * steals it.
+	 */
 	WT_ERR(__wt_page_inmem(session, NULL, dsk.data, dsk.memsize,
 	    WT_DATA_IN_ITEM(&dsk) ?
 	    WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page));
@@ -414,6 +436,8 @@ __wt_btree_tree_open(
 	__wt_root_ref_init(&btree->root, page, btree->type != BTREE_ROW);
 
 err:	__wt_buf_free(session, &dsk);
+	__wt_scr_free(session, &tmp);
+
 	return (ret);
 }
 
@@ -663,9 +687,11 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	WT_RET(__wt_config_gets(session, cfg, "memory_page_max", &cval));
 	btree->maxmempage =
 	    WT_MAX((uint64_t)cval.val, 50 * (uint64_t)btree->maxleafpage);
-	cache_size = S2C(session)->cache_size;
-	if (cache_size > 0)
-		btree->maxmempage = WT_MIN(btree->maxmempage, cache_size / 4);
+	if (!F_ISSET(S2C(session), WT_CONN_CACHE_POOL)) {
+		if ((cache_size = S2C(session)->cache_size) > 0)
+			btree->maxmempage =
+			    WT_MIN(btree->maxmempage, cache_size / 4);
+	}
 
 	/*
 	 * Get the split percentage (reconciliation splits pages into smaller

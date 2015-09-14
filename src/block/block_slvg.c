@@ -73,19 +73,19 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
  * __wt_block_offset_invalid --
  *	Return if the block offset is insane.
  */
-int
+bool
 __wt_block_offset_invalid(WT_BLOCK *block, wt_off_t offset, uint32_t size)
 {
 	if (size == 0)				/* < minimum page size */
-		return (1);
+		return (true);
 	if (size % block->allocsize != 0)	/* not allocation-size units */
-		return (1);
+		return (true);
 	if (size > WT_BTREE_PAGE_SIZE_MAX)	/* > maximum page size */
-		return (1);
+		return (true);
 						/* past end-of-file */
 	if (offset + (wt_off_t)size > block->fh->size)
-		return (1);
-	return (0);
+		return (true);
+	return (false);
 }
 
 /*

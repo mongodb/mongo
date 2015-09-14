@@ -31,7 +31,7 @@
 struct __wt_named_snapshot {
 	const char *name;
 
-	STAILQ_ENTRY(__wt_named_snapshot) q;
+	TAILQ_ENTRY(__wt_named_snapshot) q;
 
 	uint64_t snap_min, snap_max;
 	uint64_t *snapshot;
@@ -72,15 +72,14 @@ struct __wt_txn_global {
 	/* Named snapshot state. */
 	WT_RWLOCK *nsnap_rwlock;
 	volatile uint64_t nsnap_oldest_id;
-	STAILQ_HEAD(__wt_nsnap_qh, __wt_named_snapshot) nsnaph;
+	TAILQ_HEAD(__wt_nsnap_qh, __wt_named_snapshot) nsnaph;
 
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };
 
 typedef enum __wt_txn_isolation {
-	WT_ISO_EVICTION,		/* Internal: eviction context */
-	WT_ISO_READ_UNCOMMITTED,
 	WT_ISO_READ_COMMITTED,
+	WT_ISO_READ_UNCOMMITTED,
 	WT_ISO_SNAPSHOT
 } WT_TXN_ISOLATION;
 

@@ -95,7 +95,7 @@ typedef struct {
 	int64_t ops_per_txn;
 	int64_t truncate;		/* Truncate ratio */
 	uint64_t truncate_pct;		/* Truncate Percent */
-	uint64_t truncate_count;	/* Truncate Percent */
+	uint64_t truncate_count;	/* Truncate Count */
 
 #define	WORKER_INSERT		1	/* Insert */
 #define	WORKER_INSERT_RMW	2	/* Insert with read-modify-write */
@@ -108,7 +108,6 @@ typedef struct {
 /* Steering items for the truncate workload */
 typedef struct __truncate_struct TRUNCATE_CONFIG;
 struct __truncate_struct {
-	double truncation_percentage;
 	uint64_t stone_gap;
 	uint64_t needed_stones;
 	uint64_t final_stone_gap;
@@ -122,8 +121,8 @@ struct __truncate_struct {
 /* Queue entry for use with the Truncate Logic */
 struct __truncate_queue_entry {
 	char *key;			/* Truncation point */
-	u_int diff;			/* Number of items to be truncated*/
-	STAILQ_ENTRY(__truncate_queue_entry) q;
+	uint64_t diff;			/* Number of items to be truncated*/
+	TAILQ_ENTRY(__truncate_queue_entry) q;
 };
 typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 
@@ -179,7 +178,7 @@ struct __config {			/* Configuration structure */
 	u_int		 has_truncate;  /* if there is a truncate workload */
 
 	/* Queue head for use with the Truncate Logic */
-	STAILQ_HEAD(__truncate_qh, __truncate_queue_entry) stone_head;
+	TAILQ_HEAD(__truncate_qh, __truncate_queue_entry) stone_head;
 
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define	OPT_DECLARE_STRUCT
@@ -273,7 +272,6 @@ int	 config_opt_line(CONFIG *, const char *);
 int	 config_opt_str(CONFIG *, const char *, const char *);
 void	 config_print(CONFIG *);
 int	 config_sanity(CONFIG *);
-uint64_t decode_key(char *);
 void	 latency_insert(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_read(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);

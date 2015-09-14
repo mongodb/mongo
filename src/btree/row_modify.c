@@ -26,7 +26,7 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Select a spinlock for the page; let the barrier immediately below
 	 * keep things from racing too badly.
 	 */
-	modify->page_lock = ++conn->page_lock_cnt % WT_PAGE_LOCKS(conn);
+	modify->page_lock = ++conn->page_lock_cnt % WT_PAGE_LOCKS;
 
 	/*
 	 * Multiple threads of control may be searching and deciding to modify
@@ -34,7 +34,7 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * footprint, else discard the modify structure, another thread did the
 	 * work.
 	 */
-	if (WT_ATOMIC_CAS8(page->modify, NULL, modify))
+	if (__wt_atomic_cas_ptr(&page->modify, NULL, modify))
 		__wt_cache_page_inmem_incr(session, page, sizeof(*modify));
 	else
 		__wt_free(session, modify);
@@ -112,6 +112,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			 * there should only be one update list per key.
 			 */
 			WT_ASSERT(session, *upd_entry == NULL);
+
 			/*
 			 * Set the "old" entry to the second update in the list
 			 * so that the serialization function succeeds in
@@ -192,7 +193,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		 * The serial mutex acts as our memory barrier to flush these
 		 * writes before inserting them into the list.
 		 */
-		if (WT_SKIP_FIRST(ins_head) == NULL)
+		if (cbt->ins_stack[0] == NULL)
 			for (i = 0; i < skipdepth; i++) {
 				cbt->ins_stack[i] = &ins_head->head[i];
 				ins->next[i] = cbt->next_stack[i] = NULL;
@@ -316,7 +317,7 @@ __wt_update_obsolete_check(
 	 */
 	if (first != NULL &&
 	    (next = first->next) != NULL &&
-	    WT_ATOMIC_CAS8(first->next, next, NULL))
+	    __wt_atomic_cas_ptr(&first->next, next, NULL))
 		return (next);
 
 	/*

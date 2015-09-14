@@ -64,7 +64,7 @@ class test_bug011(wttest.WiredTigerTestCase):
         # Make sure we have a cursor for the table so it stays in cache.
         for i in range(0, self.ntables):
             this_uri = 'table:%s-%03d' % (self.table_name, i)
-            cursors.append(self.session.open_cursor(this_uri, None)) 
+            cursors.append(self.session.open_cursor(this_uri, None))
 
         # Make use of the cache.
         for i in range(0, self.nops):

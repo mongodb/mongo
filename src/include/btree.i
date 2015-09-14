@@ -10,17 +10,17 @@
  * __wt_ref_is_root --
  *	Return if the page reference is for the root page.
  */
-static inline int
+static inline bool
 __wt_ref_is_root(WT_REF *ref)
 {
-	return (ref->home == NULL ? 1 : 0);
+	return (ref->home == NULL);
 }
 
 /*
  * __wt_page_is_empty --
  *	Return if the page is empty.
  */
-static inline int
+static inline bool
 __wt_page_is_empty(WT_PAGE *page)
 {
 	return (page->modify != NULL &&
@@ -31,10 +31,10 @@ __wt_page_is_empty(WT_PAGE *page)
  * __wt_page_is_modified --
  *	Return if the page is dirty.
  */
-static inline int
+static inline bool
 __wt_page_is_modified(WT_PAGE *page)
 {
-	return (page->modify != NULL && page->modify->write_gen != 0 ? 1 : 0);
+	return (page->modify != NULL && page->modify->write_gen != 0);
 }
 
 /*
@@ -49,46 +49,74 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	WT_ASSERT(session, size < WT_EXABYTE);
 
 	cache = S2C(session)->cache;
-	(void)WT_ATOMIC_ADD8(cache->bytes_inmem, size);
-	(void)WT_ATOMIC_ADD8(page->memory_footprint, size);
+	(void)__wt_atomic_add64(&cache->bytes_inmem, size);
+	(void)__wt_atomic_addsize(&page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
-		(void)WT_ATOMIC_ADD8(cache->bytes_dirty, size);
-		(void)WT_ATOMIC_ADD8(page->modify->bytes_dirty, size);
+		(void)__wt_atomic_add64(&cache->bytes_dirty, size);
+		(void)__wt_atomic_addsize(&page->modify->bytes_dirty, size);
 	}
 	/* Track internal and overflow size in cache. */
 	if (WT_PAGE_IS_INTERNAL(page))
-		(void)WT_ATOMIC_ADD8(cache->bytes_internal, size);
+		(void)__wt_atomic_add64(&cache->bytes_internal, size);
 	else if (page->type == WT_PAGE_OVFL)
-		(void)WT_ATOMIC_ADD8(cache->bytes_overflow, size);
+		(void)__wt_atomic_add64(&cache->bytes_overflow, size);
 }
 
-/* 
- * WT_CACHE_DECR --
- *	Macro to decrement a field by a size.
- *
- * Be defensive and don't underflow: a band-aid on a gaping wound, but underflow
- * won't make things better no matter the problem (specifically, underflow makes
- * eviction crazy trying to evict non-existent memory).
+/*
+ * __wt_cache_decr_check_size --
+ *	Decrement a size_t cache value and check for underflow.
  */
+static inline void
+__wt_cache_decr_check_size(
+    WT_SESSION_IMPL *session, size_t *vp, size_t v, const char *fld)
+{
+	if (__wt_atomic_subsize(vp, v) < WT_EXABYTE)
+		return;
+
 #ifdef HAVE_DIAGNOSTIC
-#define	WT_CACHE_DECR(session, f, sz) do {				\
-	static int __first = 1;						\
-	if (WT_ATOMIC_SUB8(f, sz) > WT_EXABYTE) {			\
-		(void)WT_ATOMIC_ADD8(f, sz);				\
-		if (__first) {						\
-			__wt_errx(session,				\
-			    "%s underflow: decrementing %" WT_SIZET_FMT,\
-			    #f, sz);					\
-			__first = 0;					\
-		}							\
-	}								\
-} while (0)
+	(void)__wt_atomic_addsize(vp, v);
+
+	{
+	static int first = 1;
+
+	if (!first)
+		return;
+	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
+	first = 0;
+	}
 #else
-#define	WT_CACHE_DECR(s, f, sz) do {					\
-	if (WT_ATOMIC_SUB8(f, sz) > WT_EXABYTE)				\
-		(void)WT_ATOMIC_ADD8(f, sz);				\
-} while (0)
+	WT_UNUSED(fld);
+	WT_UNUSED(session);
 #endif
+}
+
+/*
+ * __wt_cache_decr_check_uint64 --
+ *	Decrement a uint64_t cache value and check for underflow.
+ */
+static inline void
+__wt_cache_decr_check_uint64(
+    WT_SESSION_IMPL *session, uint64_t *vp, size_t v, const char *fld)
+{
+	if (__wt_atomic_sub64(vp, v) < WT_EXABYTE)
+		return;
+
+#ifdef HAVE_DIAGNOSTIC
+	(void)__wt_atomic_add64(vp, v);
+
+	{
+	static int first = 1;
+
+	if (!first)
+		return;
+	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
+	first = 0;
+	}
+#else
+	WT_UNUSED(fld);
+	WT_UNUSED(session);
+#endif
+}
 
 /*
  * __wt_cache_page_byte_dirty_decr --
@@ -128,9 +156,10 @@ __wt_cache_page_byte_dirty_decr(
 		 */
 		orig = page->modify->bytes_dirty;
 		decr = WT_MIN(size, orig);
-		if (WT_ATOMIC_CAS8(
-		    page->modify->bytes_dirty, orig, orig - decr)) {
-			WT_CACHE_DECR(session, cache->bytes_dirty, decr);
+		if (__wt_atomic_cassize(
+		    &page->modify->bytes_dirty, orig, orig - decr)) {
+			__wt_cache_decr_check_uint64(session,
+			    &cache->bytes_dirty, decr, "WT_CACHE.bytes_dirty");
 			break;
 		}
 	}
@@ -149,15 +178,19 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	WT_ASSERT(session, size < WT_EXABYTE);
 
-	WT_CACHE_DECR(session, cache->bytes_inmem, size);
-	WT_CACHE_DECR(session, page->memory_footprint, size);
+	__wt_cache_decr_check_uint64(
+	    session, &cache->bytes_inmem, size, "WT_CACHE.bytes_inmem");
+	__wt_cache_decr_check_size(
+	    session, &page->memory_footprint, size, "WT_PAGE.memory_footprint");
 	if (__wt_page_is_modified(page))
 		__wt_cache_page_byte_dirty_decr(session, page, size);
 	/* Track internal and overflow size in cache. */
 	if (WT_PAGE_IS_INTERNAL(page))
-		WT_CACHE_DECR(session, cache->bytes_internal, size);
+		__wt_cache_decr_check_uint64(session,
+		    &cache->bytes_internal, size, "WT_CACHE.bytes_internal");
 	else if (page->type == WT_PAGE_OVFL)
-		WT_CACHE_DECR(session, cache->bytes_overflow, size);
+		__wt_cache_decr_check_uint64(session,
+		    &cache->bytes_overflow, size, "WT_CACHE.bytes_overflow");
 }
 
 /*
@@ -172,15 +205,15 @@ __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 	size_t size;
 
 	cache = S2C(session)->cache;
-	(void)WT_ATOMIC_ADD8(cache->pages_dirty, 1);
+	(void)__wt_atomic_add64(&cache->pages_dirty, 1);
 
 	/*
 	 * Take care to read the memory_footprint once in case we are racing
 	 * with updates.
 	 */
 	size = page->memory_footprint;
-	(void)WT_ATOMIC_ADD8(cache->bytes_dirty, size);
-	(void)WT_ATOMIC_ADD8(page->modify->bytes_dirty, size);
+	(void)__wt_atomic_add64(&cache->bytes_dirty, size);
+	(void)__wt_atomic_addsize(&page->modify->bytes_dirty, size);
 }
 
 /*
@@ -202,7 +235,7 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 		   "count went negative");
 		cache->pages_dirty = 0;
 	} else
-		(void)WT_ATOMIC_SUB8(cache->pages_dirty, 1);
+		(void)__wt_atomic_sub64(&cache->pages_dirty, 1);
 
 	modify = page->modify;
 	if (modify != NULL && modify->bytes_dirty != 0)
@@ -224,12 +257,15 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	modify = page->modify;
 
 	/* Update the bytes in-memory to reflect the eviction. */
-	WT_CACHE_DECR(session, cache->bytes_inmem, page->memory_footprint);
+	__wt_cache_decr_check_uint64(session,
+	    &cache->bytes_inmem,
+	    page->memory_footprint, "WT_CACHE.bytes_inmem");
 
 	/* Update the bytes_internal value to reflect the eviction */
 	if (WT_PAGE_IS_INTERNAL(page))
-		WT_CACHE_DECR(session,
-		    cache->bytes_internal, page->memory_footprint);
+		__wt_cache_decr_check_uint64(session,
+		    &cache->bytes_internal,
+		    page->memory_footprint, "WT_CACHE.bytes_internal");
 
 	/* Update the cache's dirty-byte count. */
 	if (modify != NULL && modify->bytes_dirty != 0) {
@@ -239,13 +275,14 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 			   "dirty byte count went negative");
 			cache->bytes_dirty = 0;
 		} else
-			WT_CACHE_DECR(
-			    session, cache->bytes_dirty, modify->bytes_dirty);
+			__wt_cache_decr_check_uint64(session,
+			    &cache->bytes_dirty,
+			    modify->bytes_dirty, "WT_CACHE.bytes_dirty");
 	}
 
 	/* Update pages and bytes evicted. */
-	(void)WT_ATOMIC_ADD8(cache->bytes_evict, page->memory_footprint);
-	(void)WT_ATOMIC_ADD8(cache->pages_evict, 1);
+	(void)__wt_atomic_add64(&cache->bytes_evict, page->memory_footprint);
+	(void)__wt_atomic_add64(&cache->pages_evict, 1);
 }
 
 /*
@@ -306,7 +343,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Every time the page transitions from clean to dirty, update the cache
 	 * and transactional information.
 	 */
-	if (WT_ATOMIC_ADD4(page->modify->write_gen, 1) == 1) {
+	if (__wt_atomic_add32(&page->modify->write_gen, 1) == 1) {
 		__wt_cache_dirty_incr(session, page);
 
 		/*
@@ -321,9 +358,13 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * have committed in the meantime, and the last_running field
 		 * been updated past it.  That is all very unlikely, but not
 		 * impossible, so we take care to read the global state before
-		 * the atomic increment.  If we raced with reconciliation, just
-		 * leave the previous value here: at worst, we will write a
-		 * page in a checkpoint when not absolutely necessary.
+		 * the atomic increment.
+		 *
+		 * If the page was dirty on entry, then last_running == 0. The
+		 * page could have become clean since then, if reconciliation
+		 * completed. In that case, we leave the previous value for
+		 * first_dirty_txn rather than potentially racing to update it,
+		 * at worst, we'll unnecessarily write a page in a checkpoint.
 		 */
 		if (last_running != 0)
 			page->modify->first_dirty_txn = last_running;
@@ -332,6 +373,25 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Check if this is the largest transaction ID to update the page. */
 	if (WT_TXNID_LT(page->modify->update_txn, session->txn.id))
 		page->modify->update_txn = session->txn.id;
+}
+
+/*
+ * __wt_page_modify_clear --
+ *	Clean a modified page.
+ */
+static inline void
+__wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	/*
+	 * The page must be held exclusive when this call is made, this call
+	 * can only be used when the page is owned by a single thread.
+	 *
+	 * Allow the call to be made on clean pages.
+	 */
+	if (__wt_page_is_modified(page)) {
+		page->modify->write_gen = 0;
+		__wt_cache_dirty_decr(session, page);
+	}
 }
 
 /*
@@ -354,6 +414,9 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * shouldn't cause problems; regardless, let's play it safe.)
 	 */
 	if (S2BT(session)->modified == 0) {
+		/* Assert we never dirty a checkpoint handle. */
+		WT_ASSERT(session, session->dhandle->checkpoint == NULL);
+
 		S2BT(session)->modified = 1;
 		WT_FULL_BARRIER();
 	}
@@ -395,7 +458,7 @@ __wt_page_parent_modify_set(
  * __wt_off_page --
  *	Return if a pointer references off-page data.
  */
-static inline int
+static inline bool
 __wt_off_page(WT_PAGE *page, const void *p)
 {
 	/*
@@ -496,7 +559,12 @@ __wt_ref_key_instantiated(WT_REF *ref)
 static inline void
 __wt_ref_key_clear(WT_REF *ref)
 {
-	/* The key union has 2 fields, both of which are 8B. */
+	/*
+	 * The key union has 2 8B fields; this is equivalent to:
+	 *
+	 *	ref->key.recno = WT_RECNO_OOB;
+	 *	ref->key.ikey = NULL;
+	 */
 	ref->key.recno = 0;
 }
 
@@ -506,7 +574,7 @@ __wt_ref_key_clear(WT_REF *ref)
  * had without unpacking a cell, and information about the cell, if the key
  * isn't cheaply available.
  */
-static inline int
+static inline bool
 __wt_row_leaf_key_info(WT_PAGE *page, void *copy,
     WT_IKEY **ikeyp, WT_CELL **cellp, void *datap, size_t *sizep)
 {
@@ -597,7 +665,7 @@ __wt_row_leaf_key_info(WT_PAGE *page, void *copy,
 		if (cellp != NULL)
 			*cellp =
 			    WT_PAGE_REF_OFFSET(page, WT_CELL_DECODE_OFFSET(v));
-		return (0);
+		return (false);
 	case WT_K_FLAG:
 		/* Encoded key: no instantiated key, no cell. */
 		if (cellp != NULL)
@@ -608,9 +676,9 @@ __wt_row_leaf_key_info(WT_PAGE *page, void *copy,
 			*(void **)datap =
 			    WT_PAGE_REF_OFFSET(page, WT_K_DECODE_KEY_OFFSET(v));
 			*sizep = WT_K_DECODE_KEY_LEN(v);
-			return (1);
+			return (true);
 		}
-		return (0);
+		return (false);
 	case WT_KV_FLAG:
 		/* Encoded key/value pair: no instantiated key, no cell. */
 		if (cellp != NULL)
@@ -621,9 +689,9 @@ __wt_row_leaf_key_info(WT_PAGE *page, void *copy,
 			*(void **)datap = WT_PAGE_REF_OFFSET(
 			    page, WT_KV_DECODE_KEY_OFFSET(v));
 			*sizep = WT_KV_DECODE_KEY_LEN(v);
-			return (1);
+			return (true);
 		}
-		return (0);
+		return (false);
 
 	}
 
@@ -636,9 +704,9 @@ __wt_row_leaf_key_info(WT_PAGE *page, void *copy,
 	if (datap != NULL) {
 		*(void **)datap = WT_IKEY_DATA(ikey);
 		*sizep = ikey->size;
-		return (1);
+		return (true);
 	}
-	return (0);
+	return (false);
 }
 
 /*
@@ -826,7 +894,7 @@ __wt_row_leaf_value_cell(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *kpack)
  * __wt_row_leaf_value --
  *	Return the value for a row-store leaf page encoded key/value pair.
  */
-static inline int
+static inline bool
 __wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip, WT_ITEM *value)
 {
 	uintptr_t v;
@@ -842,9 +910,9 @@ __wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip, WT_ITEM *value)
 		value->data =
 		    WT_PAGE_REF_OFFSET(page, WT_KV_DECODE_VALUE_OFFSET(v));
 		value->size = WT_KV_DECODE_VALUE_LEN(v);
-		return (1);
+		return (true);
 	}
-	return (0);
+	return (false);
 }
 
 /*
@@ -903,11 +971,13 @@ __wt_ref_info(WT_SESSION_IMPL *session,
  * __wt_page_can_split --
  *	Check whether a page can be split in memory.
  */
-static inline int
+static inline bool
 __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_INSERT_HEAD *ins_head;
+	WT_INSERT *ins;
+	int i;
 
 	btree = S2BT(session);
 
@@ -916,58 +986,54 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * of the page could continually split without benefit.
 	 */
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
-		return (0);
+		return (false);
 
 	/*
 	 * Check for pages with append-only workloads. A common application
 	 * pattern is to have multiple threads frantically appending to the
 	 * tree. We want to reconcile and evict this page, but we'd like to
-	 * do it without making the appending threads wait. If we're not
-	 * discarding the tree, check and see if it's worth doing a split to
-	 * let the threads continue before doing eviction.
+	 * do it without making the appending threads wait. See if it's worth
+	 * doing a split to let the threads continue before doing eviction.
 	 *
-	 * Ignore anything other than large, dirty row-store leaf pages.
-	 *
-	 * XXX KEITH
-	 * Need a better test for append-only workloads.
+	 * Ignore anything other than large, dirty row-store leaf pages. The
+	 * split code only supports row-store pages, and we depend on the page
+	 * being dirty for correctness (the page must be reconciled again
+	 * before being evicted after the split, information from a previous
+	 * reconciliation will be wrong, so we can't evict immediately).
 	 */
 	if (page->type != WT_PAGE_ROW_LEAF ||
 	    page->memory_footprint < btree->maxmempage ||
 	    !__wt_page_is_modified(page))
-		return (0);
-
-	/* Don't split a page that is pending a multi-block split. */
-	if (F_ISSET(page->modify, WT_PM_REC_MULTIBLOCK))
-		return (0);
+		return (false);
 
 	/*
 	 * There is no point splitting if the list is small, no deep items is
-	 * our heuristic for that. (A 1/4 probability of adding a new skiplist
-	 * level means there will be a new 6th level for roughly each 4KB of
-	 * entries in the list. If we have at least two 6th level entries, the
-	 * list is at least large enough to work with.)
-	 *
-	 * The following code requires at least two items on the insert list,
-	 * this test serves the additional purpose of confirming that.
+	 * our heuristic for that. A 1/4 probability of adding a new skiplist
+	 * level, with level-0 always created, means there will be a 5th level
+	 * entry for roughly every 1024 entries in the list. If there are at
+	 * least 4 5th level entries (4K items), the list is large enough.
 	 */
-#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(6, WT_SKIP_MAXDEPTH - 1)
+#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(5, WT_SKIP_MAXDEPTH - 1)
 	ins_head = page->pg_row_entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
 	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
-	if (ins_head == NULL ||
-	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL ||
-	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] ==
-	    ins_head->tail[WT_MIN_SPLIT_SKIPLIST_DEPTH])
-		return (0);
-
-	return (1);
+	if (ins_head == NULL)
+		return (false);
+	for (i = 0, ins = ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH];
+	    ins != NULL; ins = ins->next[WT_MIN_SPLIT_SKIPLIST_DEPTH])
+		if (++i == 4) {
+			WT_STAT_FAST_CONN_INCR(session, cache_inmem_splittable);
+			WT_STAT_FAST_DATA_INCR(session, cache_inmem_splittable);
+			return (true);
+		}
+	return (false);
 }
 
 /*
  * __wt_page_can_evict --
  *	Check whether a page can be evicted.
  */
-static inline int
+static inline bool
 __wt_page_can_evict(WT_SESSION_IMPL *session,
     WT_PAGE *page, int check_splits, int *inmem_splitp)
 {
@@ -980,11 +1046,22 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 
 	btree = S2BT(session);
 	mod = page->modify;
-	txn_global = &S2C(session)->txn_global;
 
 	/* Pages that have never been modified can always be evicted. */
 	if (mod == NULL)
-		return (1);
+		return (true);
+
+	/*
+	 * Check for in-memory splits before other eviction tests. If the page
+	 * should split in-memory, return success immediately and skip more
+	 * detailed eviction tests. We don't need further tests since the page
+	 * won't be written or discarded from the cache.
+	 */
+	if (__wt_page_can_split(session, page)) {
+		if (inmem_splitp != NULL)
+			*inmem_splitp = 1;
+		return (true);
+	}
 
 	/*
 	 * If the tree was deepened, there's a requirement that newly created
@@ -997,20 +1074,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 */
 	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
-		return (0);
-
-	/*
-	 * Allow for the splitting of pages when a checkpoint is underway only
-	 * if the allow_splits flag has been passed, we know we are performing
-	 * a checkpoint, the page is larger than the stated maximum and there
-	 * has not already been a split on this page as the WT_PM_REC_MULTIBLOCK
-	 * flag is unset.
-	 */
-	if (__wt_page_can_split(session, page)) {
-		if (inmem_splitp != NULL)
-			*inmem_splitp = 1;
-		return (1);
-	}
+		return (false);
 
 	/*
 	 * If the file is being checkpointed, we can't evict dirty pages:
@@ -1018,48 +1082,27 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * previous version might be referenced by an internal page already
 	 * been written in the checkpoint, leaving the checkpoint inconsistent.
 	 */
-	if (btree->checkpointing &&
-	    (__wt_page_is_modified(page) ||
-	    F_ISSET(mod, WT_PM_REC_MULTIBLOCK))) {
+	if (btree->checkpointing && __wt_page_is_modified(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
-		return (0);
+		return (false);
 	}
 
 	/*
-	 * If we aren't (potentially) doing eviction that can restore updates
-	 * and the updates on this page are too recent, give up.
+	 * If the page was recently split in-memory, don't evict it immediately:
+	 * we want to give application threads that are appending a chance to
+	 * move to the new leaf page created by the split.
 	 *
-	 * Don't rely on new updates being skipped by the transaction used
-	 * for transaction reads: (1) there are paths that dirty pages for
-	 * artificial reasons; (2) internal pages aren't transactional; and
-	 * (3) if an update was skipped during the checkpoint (leaving the page
-	 * dirty), then rolled back, we could still successfully overwrite a
-	 * page and corrupt the checkpoint.
-	 *
-	 * Further, we can't race with the checkpoint's reconciliation of
-	 * an internal page as we evict a clean child from the page's subtree.
-	 * This works in the usual way: eviction locks the page and then checks
-	 * for existing hazard pointers, the checkpoint thread reconciling an
-	 * internal page acquires hazard pointers on child pages it reads, and
-	 * is blocked by the exclusive lock.
+	 * Note the check here is similar to __wt_txn_visible_all, but ignores
+	 * the checkpoint's transaction.
 	 */
-	if (page->read_gen != WT_READGEN_OLDEST &&
-	    !__wt_txn_visible_all(session, __wt_page_is_modified(page) ?
-	    mod->update_txn : mod->rec_max_txn))
-		return (0);
+	if (check_splits) {
+		txn_global = &S2C(session)->txn_global;
+		if (WT_TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
+			return (false);
+	}
 
-	/*
-	 * If the page was recently split in-memory, don't force it out: we
-	 * hope an eviction thread will find it first.  The check here is
-	 * similar to __wt_txn_visible_all, but ignores the checkpoint's
-	 * transaction.
-	 */
-	if (check_splits &&
-	    WT_TXNID_LE(txn_global->oldest_id, mod->inmem_split_txn))
-		return (0);
-
-	return (1);
+	return (true);
 }
 
 /*
@@ -1082,17 +1125,17 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * reference without first locking the page, it could be evicted in
 	 * between.
 	 */
-	locked = WT_ATOMIC_CAS4(ref->state, WT_REF_MEM, WT_REF_LOCKED);
+	locked = __wt_atomic_casv32(&ref->state, WT_REF_MEM, WT_REF_LOCKED);
 	if ((ret = __wt_hazard_clear(session, page)) != 0 || !locked) {
 		if (locked)
 			ref->state = WT_REF_MEM;
 		return (ret == 0 ? EBUSY : ret);
 	}
 
-	(void)WT_ATOMIC_ADD4(btree->evict_busy, 1);
+	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
 
 	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
-	if ((ret = __wt_evict_page(session, ref)) == 0) {
+	if ((ret = __wt_evict(session, ref, 0)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
 		else
@@ -1106,7 +1149,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	} else
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_force_fail);
 
-	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
+	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
 	return (ret);
 }
@@ -1143,12 +1186,13 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * memory_page_max setting, when we see many deleted items, and when we
 	 * are attempting to scan without trashing the cache.
 	 *
-	 * Fast checks if eviction is disabled for this operation or this tree,
-	 * then perform a general check if eviction will be possible.
+	 * Fast checks if eviction is disabled for this handle, operation or
+	 * tree, then perform a general check if eviction will be possible.
 	 */
 	page = ref->page;
 	if (page->read_gen != WT_READGEN_OLDEST ||
 	    LF_ISSET(WT_READ_NO_EVICT) ||
+	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    !__wt_page_can_evict(session, page, 1, NULL))
 		return (__wt_hazard_clear(session, page));
@@ -1264,13 +1308,13 @@ __wt_skip_choose_depth(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_btree_lsm_size --
+ * __wt_btree_lsm_over_size --
  *	Return if the size of an in-memory tree with a single leaf page is over
  * a specified maximum.  If called on anything other than a simple tree with a
  * single leaf page, returns true so our LSM caller will switch to a new tree.
  */
-static inline int
-__wt_btree_lsm_size(WT_SESSION_IMPL *session, uint64_t maxsize)
+static inline bool
+__wt_btree_lsm_over_size(WT_SESSION_IMPL *session, uint64_t maxsize)
 {
 	WT_BTREE *btree;
 	WT_PAGE *child, *root;
@@ -1282,20 +1326,20 @@ __wt_btree_lsm_size(WT_SESSION_IMPL *session, uint64_t maxsize)
 
 	/* Check for a non-existent tree. */
 	if (root == NULL)
-		return (0);
+		return (false);
 
 	/* A tree that can be evicted always requires a switch. */
 	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
-		return (1);
+		return (true);
 
 	/* Check for a tree with a single leaf page. */
 	WT_INTL_INDEX_GET(session, root, pindex);
 	if (pindex->entries != 1)		/* > 1 child page, switch */
-		return (1);
+		return (true);
 
 	first = pindex->index[0];
 	if (first->state != WT_REF_MEM)		/* no child page, ignore */
-		return (0);
+		return (false);
 
 	/*
 	 * We're reaching down into the page without a hazard pointer, but
@@ -1304,7 +1348,7 @@ __wt_btree_lsm_size(WT_SESSION_IMPL *session, uint64_t maxsize)
 	 */
 	child = first->page;
 	if (child->type != WT_PAGE_ROW_LEAF)	/* not a single leaf page */
-		return (1);
+		return (true);
 
 	return (child->memory_footprint > maxsize);
 }

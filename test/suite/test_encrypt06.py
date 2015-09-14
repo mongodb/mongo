@@ -211,7 +211,7 @@ class test_encrypt06(wttest.WiredTigerTestCase):
 
         c0.close()
         c1.close()
-            
+
         # Force everything to disk so we can examine it
         self.close_conn()
 
@@ -222,7 +222,7 @@ class test_encrypt06(wttest.WiredTigerTestCase):
                          not self.match_string_in_rundir(txt0))
         self.assertEqual(self.expected_encryption(self.encrypt1),
                          not self.match_string_in_rundir(txt1))
-        
+
 
 if __name__ == '__main__':
     wttest.run()

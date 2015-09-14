@@ -167,7 +167,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
     def backward_iter(self, cursor):
         cursor.reset()
         self.assertCursorHasNoKeyValue(cursor)
-        
+
         i = self.nentries - 1
         while True:
             prevret = cursor.prev()
@@ -188,7 +188,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
     def backward_iter_with_dup(self, cursor):
         cursor.reset()
         self.assertCursorHasNoKeyValue(cursor)
-        
+
         i = self.nentries - 1
         while True:
             prevret = cursor.prev()

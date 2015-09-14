@@ -38,8 +38,8 @@ struct __wt_keyed_encryptor {
 	size_t size_const;		/* The result of the sizing callback */
 	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
 					/* Linked list of encryptors */
-	SLIST_ENTRY(__wt_keyed_encryptor) hashl;
-	SLIST_ENTRY(__wt_keyed_encryptor) l;
+	TAILQ_ENTRY(__wt_keyed_encryptor) hashq;
+	TAILQ_ENTRY(__wt_keyed_encryptor) q;
 };
 
 /*
@@ -82,9 +82,9 @@ struct __wt_named_encryptor {
 	const char *name;		/* Name of encryptor */
 	WT_ENCRYPTOR *encryptor;	/* User supplied callbacks */
 					/* Locked: list of encryptors by key */
-	SLIST_HEAD(__wt_keyedhash, __wt_keyed_encryptor)
-				keyedhashlh[WT_HASH_ARRAY_SIZE];
-	SLIST_HEAD(__wt_keyed_lh, __wt_keyed_encryptor) keyedlh;
+	TAILQ_HEAD(__wt_keyedhash, __wt_keyed_encryptor)
+				keyedhashqh[WT_HASH_ARRAY_SIZE];
+	TAILQ_HEAD(__wt_keyed_qh, __wt_keyed_encryptor) keyedqh;
 					/* Linked list of encryptors */
 	TAILQ_ENTRY(__wt_named_encryptor) q;
 };
@@ -100,10 +100,10 @@ struct __wt_named_extractor {
 };
 
 /*
- * Allocate some additional slots for internal sessions.  There is a default
- * session for each connection, plus a session for each server thread.
+ * Allocate some additional slots for internal sessions so the user cannot
+ * configure too few sessions for us to run.
  */
-#define	WT_NUM_INTERNAL_SESSIONS	10
+#define	WT_EXTRA_INTERNAL_SESSIONS	10
 
 /*
  * WT_CONN_CHECK_PANIC --
@@ -119,14 +119,15 @@ struct __wt_named_extractor {
  * main queue and the hashed queue.
  */
 #define	WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket) do {		\
-	SLIST_INSERT_HEAD(&(conn)->dhlh, dhandle, l);			\
-	SLIST_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashl);	\
+	TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);			\
+	TAILQ_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashq);	\
+	++conn->dhandle_count;						\
 } while (0)
 
 #define	WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket) do {		\
-	SLIST_REMOVE(&(conn)->dhlh, dhandle, __wt_data_handle, l);	\
-	SLIST_REMOVE(&(conn)->dhhash[bucket],				\
-	    dhandle, __wt_data_handle, hashl);				\
+	TAILQ_REMOVE(&(conn)->dhqh, dhandle, q);			\
+	TAILQ_REMOVE(&(conn)->dhhash[bucket], dhandle, hashq);		\
+	--conn->dhandle_count;						\
 } while (0)
 
 /*
@@ -134,14 +135,13 @@ struct __wt_named_extractor {
  * main queue and the hashed queue.
  */
 #define	WT_CONN_BLOCK_INSERT(conn, block, bucket) do {			\
-	SLIST_INSERT_HEAD(&(conn)->blocklh, block, l);			\
-	SLIST_INSERT_HEAD(&(conn)->blockhash[bucket], block, hashl);	\
+	TAILQ_INSERT_HEAD(&(conn)->blockqh, block, q);			\
+	TAILQ_INSERT_HEAD(&(conn)->blockhash[bucket], block, hashq);	\
 } while (0)
 
 #define	WT_CONN_BLOCK_REMOVE(conn, block, bucket) do {			\
-	SLIST_REMOVE(&(conn)->blocklh, block, __wt_block, l);		\
-	SLIST_REMOVE(							\
-	    &(conn)->blockhash[bucket], block, __wt_block, hashl);	\
+	TAILQ_REMOVE(&(conn)->blockqh, block, q);			\
+	TAILQ_REMOVE(&(conn)->blockhash[bucket], block, hashq);		\
 } while (0)
 
 /*
@@ -149,13 +149,13 @@ struct __wt_named_extractor {
  * main queue and the hashed queue.
  */
 #define	WT_CONN_FILE_INSERT(conn, fh, bucket) do {			\
-	SLIST_INSERT_HEAD(&(conn)->fhlh, fh, l);			\
-	SLIST_INSERT_HEAD(&(conn)->fhhash[bucket], fh, hashl);		\
+	TAILQ_INSERT_HEAD(&(conn)->fhqh, fh, q);			\
+	TAILQ_INSERT_HEAD(&(conn)->fhhash[bucket], fh, hashq);		\
 } while (0)
 
 #define	WT_CONN_FILE_REMOVE(conn, fh, bucket) do {			\
-	SLIST_REMOVE(&(conn)->fhlh, fh, __wt_fh, l);			\
-	SLIST_REMOVE(&(conn)->fhhash[bucket], fh, __wt_fh, hashl);	\
+	TAILQ_REMOVE(&(conn)->fhqh, fh, q);				\
+	TAILQ_REMOVE(&(conn)->fhhash[bucket], fh, hashq);		\
 } while (0)
 
 /*
@@ -180,13 +180,17 @@ struct __wt_connection_impl {
 	WT_SPINLOCK table_lock;		/* Table creation spinlock */
 
 	/*
-	 * We distribute the btree page locks across a set of spin locks; it
-	 * can't be an array, we impose cache-line alignment and gcc doesn't
-	 * support that for arrays.  Don't use too many: they are only held for
-	 * very short operations, each one is 64 bytes, so 256 will fill the L1
-	 * cache on most CPUs.
+	 * We distribute the btree page locks across a set of spin locks. Don't
+	 * use too many: they are only held for very short operations, each one
+	 * is 64 bytes, so 256 will fill the L1 cache on most CPUs.
+	 *
+	 * Use a prime number of buckets rather than assuming a good hash
+	 * (Reference Sedgewick, Algorithms in C, "Hash Functions").
+	 *
+	 * Note: this can't be an array, we impose cache-line alignment and gcc
+	 * doesn't support that for arrays smaller than the alignment.
 	 */
-#define	WT_PAGE_LOCKS(conn)	16
+#define	WT_PAGE_LOCKS		17
 	WT_SPINLOCK *page_lock;	        /* Btree page spinlocks */
 	u_int	     page_lock_cnt;	/* Next spinlock to use */
 
@@ -211,6 +215,8 @@ struct __wt_connection_impl {
 	WT_FH *lock_fh;			/* Lock file handle */
 
 	volatile uint64_t  split_gen;	/* Generation number for splits */
+	uint64_t split_stashed_bytes;	/* Atomic: split statistics */
+	uint64_t split_stashed_objects;
 
 	/*
 	 * The connection keeps a cache of data handles. The set of handles
@@ -219,24 +225,26 @@ struct __wt_connection_impl {
 	 * URI.
 	 */
 					/* Locked: data handle hash array */
-	SLIST_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
+	TAILQ_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
 					/* Locked: data handle list */
-	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;
+	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) dhqh;
 					/* Locked: LSM handle list. */
 	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 					/* Locked: file list */
-	SLIST_HEAD(__wt_fhhash, __wt_fh) fhhash[WT_HASH_ARRAY_SIZE];
-	SLIST_HEAD(__wt_fh_lh, __wt_fh) fhlh;
+	TAILQ_HEAD(__wt_fhhash, __wt_fh) fhhash[WT_HASH_ARRAY_SIZE];
+	TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
 					/* Locked: library list */
 	TAILQ_HEAD(__wt_dlh_qh, __wt_dlh) dlhqh;
 
 	WT_SPINLOCK block_lock;		/* Locked: block manager list */
-	SLIST_HEAD(__wt_blockhash, __wt_block) blockhash[WT_HASH_ARRAY_SIZE];
-	SLIST_HEAD(__wt_block_lh, __wt_block) blocklh;
+	TAILQ_HEAD(__wt_blockhash, __wt_block) blockhash[WT_HASH_ARRAY_SIZE];
+	TAILQ_HEAD(__wt_block_qh, __wt_block) blockqh;
 
+	u_int dhandle_count;		/* Locked: handles in the queue */
 	u_int open_btree_count;		/* Locked: open writable btree count */
 	uint32_t next_file_id;		/* Locked: file ID counter */
 	uint32_t open_file_count;	/* Atomic: open file handle count */
+	uint32_t open_cursor_count;	/* Atomic: open cursor handle count */
 
 	/*
 	 * WiredTiger allocates space for 50 simultaneous sessions (threads of
@@ -262,7 +270,9 @@ struct __wt_connection_impl {
 	uint32_t   hazard_max;		/* Hazard array size */
 
 	WT_CACHE  *cache;		/* Page cache */
-	uint64_t   cache_size;		/* Configured cache size */
+	volatile uint64_t cache_size;	/* Cache size (either statically
+					   configured or the current size
+					   within a cache pool). */
 
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
 
@@ -277,9 +287,12 @@ struct __wt_connection_impl {
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
 	wt_off_t	 ckpt_logsize;	/* Checkpoint log size period */
 	uint32_t	 ckpt_signalled;/* Checkpoint signalled */
-	uint64_t	 ckpt_usecs;	/* Checkpoint period */
 
-	int compact_in_memory_pass;	/* Compaction serialization */
+	uint64_t  ckpt_usecs;		/* Checkpoint timer */
+	uint64_t  ckpt_time_max;	/* Checkpoint time min/max */
+	uint64_t  ckpt_time_min;
+	uint64_t  ckpt_time_recent;	/* Checkpoint time recent/total */
+	uint64_t  ckpt_time_total;
 
 #define	WT_CONN_STAT_ALL	0x01	/* "all" statistics configured */
 #define	WT_CONN_STAT_CLEAR	0x02	/* clear after gathering */
@@ -289,7 +302,9 @@ struct __wt_connection_impl {
 #define	WT_CONN_STAT_SIZE	0x20	/* "size" statistics configured */
 	uint32_t stat_flags;
 
-	WT_CONNECTION_STATS stats;	/* Connection statistics */
+					/* Connection statistics */
+	WT_CONNECTION_STATS *stats[WT_COUNTER_SLOTS];
+	WT_CONNECTION_STATS  stat_array[WT_COUNTER_SLOTS];
 
 	WT_ASYNC	*async;		/* Async structure */
 	int		 async_cfg;	/* Global async configuration */
@@ -325,7 +340,8 @@ struct __wt_connection_impl {
 #define	WT_CONN_LOG_ENABLED	0x02	/* Logging is enabled */
 #define	WT_CONN_LOG_EXISTED	0x04	/* Log files found */
 #define	WT_CONN_LOG_PREALLOC	0x08	/* Pre-allocation is enabled */
-#define	WT_CONN_LOG_RECOVER_ERR	0x10	/* Error if recovery required */
+#define	WT_CONN_LOG_RECOVER_DONE	0x10	/* Recovery completed */
+#define	WT_CONN_LOG_RECOVER_ERR	0x20	/* Error if recovery required */
 	uint32_t	 log_flags;	/* Global logging configuration */
 	WT_CONDVAR	*log_cond;	/* Log server wait mutex */
 	WT_SESSION_IMPL *log_session;	/* Log server session */
@@ -353,6 +369,20 @@ struct __wt_connection_impl {
 	time_t		 sweep_idle_time;/* Handle sweep idle time */
 	time_t		 sweep_interval;/* Handle sweep interval */
 	u_int		 sweep_handles_min;/* Handle sweep minimum open */
+
+	/*
+	 * Shared lookaside lock, session and cursor, used by threads accessing
+	 * the lookaside table (other than eviction server and worker threads
+	 * and the sweep thread, all of which have their own lookaside cursors).
+	 */
+	WT_SPINLOCK	 las_lock;	/* Lookaside table spinlock */
+	WT_SESSION_IMPL *las_session;	/* Lookaside table session */
+	WT_CURSOR	*las_cursor;	/* Lookaside table cursor */
+	bool		 las_written;	/* Lookaside table has been written */
+
+	WT_ITEM		 las_sweep_key;	/* Sweep server's saved key */
+	int		 las_sweep_call;/* Sweep server's call count */
+	uint64_t	 las_sweep_cnt;	/* Sweep server's per-call row count */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;

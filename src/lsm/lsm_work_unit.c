@@ -53,7 +53,7 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
 	 * it's safe.
 	 */
 	for (i = 0; i < nchunks; i++)
-		(void)WT_ATOMIC_ADD4(cookie->chunk_array[i]->refcnt, 1);
+		(void)__wt_atomic_add32(&cookie->chunk_array[i]->refcnt, 1);
 
 err:	WT_TRET(__wt_lsm_tree_readunlock(session, lsm_tree));
 
@@ -122,7 +122,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 		    force ? " w/ force" : "",
 		    i, lsm_tree->nchunks, chunk->uri));
 
-		(void)WT_ATOMIC_ADD4(chunk->refcnt, 1);
+		(void)__wt_atomic_add32(&chunk->refcnt, 1);
 	}
 
 err:	WT_RET(__wt_lsm_tree_readunlock(session, lsm_tree));
@@ -145,7 +145,7 @@ __lsm_unpin_chunks(WT_SESSION_IMPL *session, WT_LSM_WORKER_COOKIE *cookie)
 		if (cookie->chunk_array[i] == NULL)
 			continue;
 		WT_ASSERT(session, cookie->chunk_array[i]->refcnt > 0);
-		(void)WT_ATOMIC_SUB4(cookie->chunk_array[i]->refcnt, 1);
+		(void)__wt_atomic_sub32(&cookie->chunk_array[i]->refcnt, 1);
 	}
 	/* Ensure subsequent calls don't double decrement. */
 	cookie->nchunks = 0;
@@ -223,7 +223,7 @@ __wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * See if we win the race to switch on the "busy" flag and
 		 * recheck that the chunk still needs a Bloom filter.
 		 */
-		if (WT_ATOMIC_CAS4(chunk->bloom_busy, 0, 1)) {
+		if (__wt_atomic_cas32(&chunk->bloom_busy, 0, 1)) {
 			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 				ret = __lsm_bloom_create(
 				    session, lsm_tree, chunk, (u_int)i);
@@ -301,17 +301,19 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * Flush the file before checkpointing: this is the expensive part in
 	 * terms of I/O.
 	 *
-	 * Use the special eviction isolation level to avoid interfering with
-	 * an application checkpoint: we have already checked that all of the
-	 * updates in this chunk are globally visible.
-	 *
-	 * !!! We can wait here for checkpoints and fsyncs to complete, which
-	 * can be a long time.
+	 * !!!
+	 * We can wait here for checkpoints and fsyncs to complete, which can
+	 * take a long time.
 	 */
 	if ((ret = __wt_session_get_btree(
 	    session, chunk->uri, NULL, NULL, 0)) == 0) {
+		/*
+		 * Set read-uncommitted: we have already checked that all of the
+		 * updates in this chunk are globally visible, use the cheapest
+		 * possible check in reconciliation.
+		 */
 		saved_isolation = session->txn.isolation;
-		session->txn.isolation = WT_ISO_EVICTION;
+		session->txn.isolation = WT_ISO_READ_UNCOMMITTED;
 		ret = __wt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES);
 		session->txn.isolation = saved_isolation;
 		WT_TRET(__wt_session_release_btree(session));
@@ -412,7 +414,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	 * ourselves to get stuck creating bloom filters, the entire tree
 	 * can stall since there may be no worker threads available to flush.
 	 */
-	F_SET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
+	F_SET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		WT_ERR(src->get_key(src, &key));
 		WT_ERR(__wt_bloom_insert(bloom, &key));
@@ -446,7 +448,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 err:	if (bloom != NULL)
 		WT_TRET(__wt_bloom_close(bloom));
-	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
+	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
 	return (ret);
 }
 
@@ -528,7 +530,7 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * Make sure only a single thread is freeing the old chunk array
 	 * at any time.
 	 */
-	if (!WT_ATOMIC_CAS4(lsm_tree->freeing_old_chunks, 0, 1))
+	if (!__wt_atomic_cas32(&lsm_tree->freeing_old_chunks, 0, 1))
 		return (0);
 	/*
 	 * Take a copy of the current state of the LSM tree and look for chunks

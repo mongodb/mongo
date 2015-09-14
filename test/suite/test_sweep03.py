@@ -93,13 +93,13 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         time.sleep(5)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        close1 = stat_cursor[stat.conn.dh_conn_handles][2]
-        sweep1 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        close1 = stat_cursor[stat.conn.dh_sweep_close][2]
+        sweep1 = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
         # The sweep server should have run, or the test isn't working.
         self.assertGreater(sweep1, 0)
-        # We expect nothing to have been closed, so dh_conn_handles should be 0
+        # We expect nothing to have been closed.
         self.assertEqual(close1, 0)
 
     def test_disable_idle_timeout_drop_force(self):
@@ -116,7 +116,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # We just filled the table, now check what the stats are
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache1 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        sweep1 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        sweep1 = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
         # We force the drop in this case to confirm that the handle is closed
@@ -127,8 +127,8 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # Grab the stats post table drop to see things have decremented
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache2 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        close2 = stat_cursor[stat.conn.dh_conn_handles][2]
-        sweep2 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        close2 = stat_cursor[stat.conn.dh_sweep_close][2]
+        sweep2 = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
         # Make sure the sweep server is still working.
@@ -151,8 +151,8 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # We just filled the table, now check what the stats are
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache1 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        close1 = stat_cursor[stat.conn.dh_conn_handles][2]
-        sweep1 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        close1 = stat_cursor[stat.conn.dh_sweep_close][2]
+        sweep1 = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
         self.session.drop(drop_uri, None)
@@ -162,8 +162,8 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # Grab the stats post table drop to see things have decremented
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache2 = stat_cursor[stat.conn.cache_bytes_inuse][2]
-        close2 = stat_cursor[stat.conn.dh_conn_handles][2]
-        sweep2 = stat_cursor[stat.conn.dh_conn_sweeps][2]
+        close2 = stat_cursor[stat.conn.dh_sweep_close][2]
+        sweep2 = stat_cursor[stat.conn.dh_sweeps][2]
         stat_cursor.close()
 
         self.assertGreater(sweep2, sweep1)

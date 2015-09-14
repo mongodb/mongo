@@ -46,6 +46,11 @@ else
 		cat $t
 	fi
 
+	if ! expr "$f" : 'src/include/queue\.h' > /dev/null &&
+	    egrep 'STAILQ_|SLIST_|\bLIST_' $f ; then
+		echo "$f: use TAILQ for all lists"
+	fi
+
 	if ! expr "$f" : 'src/os_posix/.*' > /dev/null &&
 	   ! expr "$f" : 'src/os_win/.*' > /dev/null &&
 	   ! expr "$f" : 'src/include/extern.h' > /dev/null &&
@@ -66,6 +71,13 @@ else
 	egrep -w 'off_t' $f > $t
 	test -s $t && {
 		echo "$f: off_t type declaration, use wt_off_t"
+		cat $t
+	}
+
+	# Alignment directive before "struct".
+	egrep 'WT_COMPILER_TYPE_ALIGN.*struct' $f > $t
+	test -s $t && {
+		echo "$f: compiler alignment direction must precede \"struct\""
 		cat $t
 	}
 

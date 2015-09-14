@@ -50,6 +50,6 @@ cursor.insert()
 # Iterate through the records
 cursor.reset()
 for key, value in cursor:
-    print('Got record: ' + key + ' : ' + value)
+    print('Got record: %s : %s' % (key, value))
 
 conn.close()

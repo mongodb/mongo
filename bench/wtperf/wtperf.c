@@ -96,17 +96,11 @@ static uint64_t	 wtperf_value_range(CONFIG *);
 #define	HELIUM_CONFIG	",type=helium"
 #define	INDEX_COL_NAMES	",columns=(key,val)"
 
-inline uint64_t
-decode_key(char *key_buf)
-{
-	return (strtoull(key_buf, NULL, 10));
-}
-
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
 get_next_incr(CONFIG *cfg)
 {
-	return (WT_ATOMIC_ADD8(cfg->insert_key, 1));
+	return (__wt_atomic_add64(&cfg->insert_key, 1));
 }
 
 static void
@@ -157,7 +151,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	switch (type) {
 	case WT_AOP_COMPACT:
 		tables = (uint32_t *)op->app_private;
-		WT_ATOMIC_ADD4(*tables, (uint32_t)-1);
+		(void)__wt_atomic_add32(tables, (uint32_t)-1);
 		break;
 	case WT_AOP_INSERT:
 		trk = &thread->insert;
@@ -192,7 +186,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		return (0);
 	if (ret == 0 || (ret == WT_NOTFOUND && type != WT_AOP_INSERT)) {
 		if (!cfg->in_warmup)
-			(void)WT_ATOMIC_ADD8(trk->ops, 1);
+			(void)__wt_atomic_add64(&trk->ops, 1);
 		return (0);
 	}
 err:
@@ -513,10 +507,9 @@ worker(void *arg)
 		 * is 0, to avoid first time latency spikes.
 		 */
 		measure_latency =
-		    cfg->sample_interval != 0 && trk->ops != 0 && (
-		    trk->ops % cfg->sample_rate == 0);
-		if (measure_latency &&
-		    (ret = __wt_epoch(NULL, &start)) != 0) {
+		    cfg->sample_interval != 0 && trk != NULL &&
+		    trk->ops != 0 && (trk->ops % cfg->sample_rate == 0);
+		if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
@@ -880,10 +873,9 @@ populate_thread(void *arg)
 		cursor = cursors[op % cfg->table_count];
 		generate_key(cfg, key_buf, op);
 		measure_latency =
-		    cfg->sample_interval != 0 && trk->ops != 0 && (
-		    trk->ops % cfg->sample_rate == 0);
-		if (measure_latency &&
-		    (ret = __wt_epoch(NULL, &start)) != 0) {
+		    cfg->sample_interval != 0 &&
+		    trk->ops != 0 && (trk->ops % cfg->sample_rate == 0);
+		if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
 			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
@@ -1001,10 +993,9 @@ populate_async(void *arg)
 	 * the time to process by workers.
 	 */
 	measure_latency =
-	    cfg->sample_interval != 0 && trk->ops != 0 && (
-	    trk->ops % cfg->sample_rate == 0);
-	if (measure_latency &&
-	    (ret = __wt_epoch(NULL, &start)) != 0) {
+	    cfg->sample_interval != 0 &&
+	    trk->ops != 0 && (trk->ops % cfg->sample_rate == 0);
+	if (measure_latency && (ret = __wt_epoch(NULL, &start)) != 0) {
 		lprintf(cfg, ret, 0, "Get time call failed");
 		goto err;
 	}
@@ -1046,8 +1037,7 @@ populate_async(void *arg)
 		goto err;
 	if (measure_latency) {
 		if ((ret = __wt_epoch(NULL, &stop)) != 0) {
-			lprintf(cfg, ret, 0,
-			    "Get time call failed");
+			lprintf(cfg, ret, 0, "Get time call failed");
 			goto err;
 		}
 		++trk->latency_ops;

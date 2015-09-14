@@ -96,7 +96,7 @@ config_assign(CONFIG *dest, const CONFIG *src)
 			}
 		}
 
-	STAILQ_INIT(&dest->stone_head);
+	TAILQ_INIT(&dest->stone_head);
 	return (0);
 }
 
@@ -257,13 +257,15 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				continue;
 			}
 			if (STRING_MATCH("truncate_pct", k.str, k.len)) {
-				if ((workp->truncate_pct = v.val) <= 0)
+				if (v.val <= 0)
 					goto err;
+				workp->truncate_pct = (uint64_t)v.val;
 				continue;
 			}
 			if (STRING_MATCH("truncate_count", k.str, k.len)) {
-				if ((workp->truncate_count = v.val) <= 0)
+				if (v.val <= 0)
 					goto err;
+				workp->truncate_count = (uint64_t)v.val;
 				continue;
 			}
 			goto err;

@@ -32,6 +32,7 @@ BIGENDIAN
 BOOL
 BSR
 BTREE
+BUF
 BZ
 Barack
 Bitfield
@@ -156,11 +157,13 @@ KVS
 Kanowski's
 Kounavis
 LANGID
+LAS
 LF
 LLLLLL
 LLLLLLL
 LOGREC
 LOGSCAN
+LOOKASIDE
 LRU
 LRVv
 LSB
@@ -176,6 +179,7 @@ Levyx
 Llqr
 Llqrt
 LockFile
+Lookaside
 Lookup
 MALLOC
 MEM
@@ -210,6 +214,7 @@ NetBSD
 NoAddr
 Noll
 Nul
+OOB
 OPTYPE
 OUTBUFF
 OVFL
@@ -231,6 +236,7 @@ Preload
 Prepend
 Qsort
 RCS
+RECNO
 REF's
 REFs
 RET
@@ -291,6 +297,7 @@ ULINE
 URI
 URIs
 UTF
+Unbuffered
 UnixLib
 Unmap
 UnmapViewOfFile
@@ -320,6 +327,7 @@ WiredTiger's
 WiredTigerCheckpoint
 WiredTigerException
 WiredTigerInit
+WiredTigerLAS
 WiredTigerLog
 WiredTigerPreplog
 WiredTigerTmplog
@@ -396,6 +404,7 @@ bzalloc
 bzfree
 bzip
 calloc
+cas
 catfmt
 cd
 centric
@@ -494,6 +503,7 @@ desc
 dest
 destSize
 dev
+dh
 dhandle
 dhandles
 dir
@@ -503,6 +513,7 @@ dlh
 dll
 dlopen
 dlsym
+dmalloc
 dmsg
 doxgen
 doxygen
@@ -512,6 +523,7 @@ dsk
 dsrc
 dst
 dstlen
+dstrdup
 dsync
 dumpcmp
 dumpfile
@@ -648,6 +660,7 @@ kvraw
 kvs
 kvsbdb
 lang
+las
 latencies
 lbrace
 lbracket
@@ -675,6 +688,7 @@ logread
 logrec
 logsize
 logtest
+lookaside
 lookup
 lookups
 lossy
@@ -745,6 +759,7 @@ nop
 noraw
 notfound
 notsup
+notused
 nset
 nsnap
 nul
@@ -797,6 +812,7 @@ progname
 ps
 psp
 pthread
+ptr
 pushms
 putK
 putV
@@ -937,6 +953,7 @@ uS
 uint
 uintmax
 unbare
+unbuffered
 uncompressing
 uncompresssed
 undef
@@ -945,6 +962,7 @@ unesc
 unescaped
 uninstantiated
 unistd
+unlinked
 unmap
 unmarshall
 unmarshalled

@@ -237,7 +237,7 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
 	asyncop->c.set_key = __wt_cursor_set_key;
 	asyncop->c.get_value = __wt_cursor_get_value;
 	asyncop->c.set_value = __wt_cursor_set_value;
-	asyncop->c.recno = 0;
+	asyncop->c.recno = WT_RECNO_OOB;
 	memset(asyncop->c.raw_recno_buf, 0, sizeof(asyncop->c.raw_recno_buf));
 	memset(&asyncop->c.key, 0, sizeof(asyncop->c.key));
 	memset(&asyncop->c.value, 0, sizeof(asyncop->c.value));
@@ -280,7 +280,7 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 	 * Enqueue op at the tail of the work queue.
 	 * We get our slot in the ring buffer to use.
 	 */
-	my_alloc = WT_ATOMIC_ADD8(async->alloc_head, 1);
+	my_alloc = __wt_atomic_add64(&async->alloc_head, 1);
 	my_slot = my_alloc % async->async_qsize;
 
 	/*
@@ -300,7 +300,7 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 #endif
 	WT_PUBLISH(async->async_queue[my_slot], op);
 	op->state = WT_ASYNCOP_ENQUEUED;
-	if (WT_ATOMIC_ADD4(async->cur_queue, 1) > async->max_queue)
+	if (__wt_atomic_add32(&async->cur_queue, 1) > async->max_queue)
 		WT_PUBLISH(async->max_queue, async->cur_queue);
 	/*
 	 * Multiple threads may be adding ops to the queue.  We need to wait

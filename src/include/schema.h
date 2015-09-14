@@ -62,8 +62,8 @@ struct __wt_table {
 	WT_INDEX **indices;
 	size_t idx_alloc;
 
-	SLIST_ENTRY(__wt_table) l;
-	SLIST_ENTRY(__wt_table) hashl;
+	TAILQ_ENTRY(__wt_table) q;
+	TAILQ_ENTRY(__wt_table) hashq;
 
 	int cg_complete, idx_complete, is_simple;
 	u_int ncolgroups, nindices, nkey_columns;

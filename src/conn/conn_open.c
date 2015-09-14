@@ -30,6 +30,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	/* WT_SESSION_IMPL array. */
 	WT_RET(__wt_calloc(session,
 	    conn->session_size, sizeof(WT_SESSION_IMPL), &conn->sessions));
+	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, conn->sessions);
 
 	/*
 	 * Open the default session.  We open this before starting service
@@ -110,13 +111,16 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	F_CLR(conn, WT_CONN_SERVER_RUN);
 	WT_TRET(__wt_async_destroy(session));
 	WT_TRET(__wt_lsm_manager_destroy(session));
+	WT_TRET(__wt_sweep_destroy(session));
 
 	F_SET(conn, WT_CONN_CLOSING);
 
 	WT_TRET(__wt_checkpoint_server_destroy(session));
 	WT_TRET(__wt_statlog_destroy(session, 1));
-	WT_TRET(__wt_sweep_destroy(session));
 	WT_TRET(__wt_evict_destroy(session));
+
+	/* Shut down the lookaside table, after all eviction is complete. */
+	WT_TRET(__wt_las_destroy(session));
 
 	/* Close open data handles. */
 	WT_TRET(__wt_conn_dhandle_discard(session));
@@ -128,7 +132,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * conditional because we allocate the log path so that printlog can
 	 * run without running logging or recovery.
 	 */
-	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE))
 		WT_TRET(__wt_txn_checkpoint_log(
 		    session, 1, WT_TXN_LOG_CKPT_STOP, NULL));
 	F_CLR(conn, WT_CONN_LOG_SERVER_RUN);
@@ -145,14 +150,14 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * Complain if files weren't closed, ignoring the lock file, we'll
 	 * close it in a minute.
 	 */
-	SLIST_FOREACH(fh, &conn->fhlh, l) {
+	TAILQ_FOREACH(fh, &conn->fhqh, q) {
 		if (fh == conn->lock_fh)
 			continue;
 
 		__wt_errx(session,
 		    "Connection has open file handles: %s", fh->name);
 		WT_TRET(__wt_close(session, &fh));
-		fh = SLIST_FIRST(&conn->fhlh);
+		fh = TAILQ_FIRST(&conn->fhqh);
 	}
 
 	/* Disconnect from shared cache - must be before cache destroy. */
@@ -236,9 +241,7 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Run recovery. */
 	WT_RET(__wt_txn_recover(session));
 
-	/*
-	 * Start the handle sweep thread.
-	 */
+	/* Start the handle sweep thread. */
 	WT_RET(__wt_sweep_create(session));
 
 	/* Start the optional async threads. */

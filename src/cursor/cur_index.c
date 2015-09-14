@@ -130,7 +130,8 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 			(*cp)->recno = first->recno;
 		}
 		F_SET(*cp, WT_CURSTD_KEY_EXT);
-		WT_RET((*cp)->search(*cp));
+		if (cindex->cg_needvalue[i])
+			WT_RET((*cp)->search(*cp));
 	}
 
 	F_SET(&cindex->iface, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
@@ -320,6 +321,7 @@ __curindex_close(WT_CURSOR *cursor)
 				*cp = NULL;
 			}
 
+	__wt_free(session, cindex->cg_needvalue);
 	__wt_free(session, cindex->cg_cursors);
 	if (cindex->key_plan != idx->key_plan)
 		__wt_free(session, cindex->key_plan);
@@ -353,14 +355,19 @@ __curindex_open_colgroups(
 	/* Child cursors are opened with dump disabled. */
 	const char *cfg[] = { cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL };
 	char *proj;
+	size_t cgcnt;
 
 	table = cindex->table;
-	WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &cp));
+	cgcnt = WT_COLGROUPS(table);
+	WT_RET(__wt_calloc_def(session, cgcnt, &cindex->cg_needvalue));
+	WT_RET(__wt_calloc_def(session, cgcnt, &cp));
 	cindex->cg_cursors = cp;
 
 	/* Work out which column groups we need. */
 	for (proj = (char *)cindex->value_plan; *proj != '\0'; proj++) {
 		arg = strtoul(proj, &proj, 10);
+		if (*proj == WT_PROJ_VALUE)
+			cindex->cg_needvalue[arg] = 1;
 		if ((*proj != WT_PROJ_KEY && *proj != WT_PROJ_VALUE) ||
 		    cp[arg] != NULL)
 			continue;

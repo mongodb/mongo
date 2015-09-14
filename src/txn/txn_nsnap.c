@@ -34,7 +34,7 @@ __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 
 	txn_global = &S2C(session)->txn_global;
 
-	STAILQ_FOREACH(found, &txn_global->nsnaph, q)
+	TAILQ_FOREACH(found, &txn_global->nsnaph, q)
 		if (WT_STRING_MATCH(found->name, name->str, name->len))
 			break;
 
@@ -42,10 +42,10 @@ __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 		return (WT_NOTFOUND);
 
 	/* Bump the global ID if we are removing the first entry */
-	if (found == STAILQ_FIRST(&txn_global->nsnaph))
-		txn_global->nsnap_oldest_id = (STAILQ_NEXT(found, q) != NULL) ?
-		    STAILQ_NEXT(found, q)->snap_min : WT_TXN_NONE;
-	STAILQ_REMOVE(&txn_global->nsnaph, found, __wt_named_snapshot, q);
+	if (found == TAILQ_FIRST(&txn_global->nsnaph))
+		txn_global->nsnap_oldest_id = (TAILQ_NEXT(found, q) != NULL) ?
+		    TAILQ_NEXT(found, q)->snap_min : WT_TXN_NONE;
+	TAILQ_REMOVE(&txn_global->nsnaph, found, q);
 	__nsnap_destroy(session, found);
 
 	return (ret);
@@ -67,7 +67,7 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
 	last = nsnap = prev = NULL;
 	txn_global = &S2C(session)->txn_global;
 
-	if (STAILQ_EMPTY(&txn_global->nsnaph)) {
+	if (TAILQ_EMPTY(&txn_global->nsnaph)) {
 		if (name == NULL)
 			return (0);
 		/*
@@ -85,7 +85,7 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
 	 */
 	new_nsnap_oldest = WT_TXN_NONE;
 	if (name != NULL) {
-		STAILQ_FOREACH(last, &txn_global->nsnaph, q) {
+		TAILQ_FOREACH(last, &txn_global->nsnaph, q) {
 			if (WT_STRING_MATCH(last->name, name->str, name->len))
 				break;
 			prev = last;
@@ -102,17 +102,17 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, int inclusive)
 			last = prev;
 		}
 
-		if (STAILQ_NEXT(last, q) != NULL)
-			new_nsnap_oldest = STAILQ_NEXT(last, q)->snap_min;
+		if (TAILQ_NEXT(last, q) != NULL)
+			new_nsnap_oldest = TAILQ_NEXT(last, q)->snap_min;
 	}
 
 	do {
-		nsnap = STAILQ_FIRST(&txn_global->nsnaph);
+		nsnap = TAILQ_FIRST(&txn_global->nsnaph);
 		WT_ASSERT(session, nsnap != NULL);
-		STAILQ_REMOVE_HEAD(&txn_global->nsnaph, q);
+		TAILQ_REMOVE(&txn_global->nsnaph, nsnap, q);
 		__nsnap_destroy(session, nsnap);
 	/* Last will be NULL in the all case so it will never match */
-	} while (nsnap != last && !STAILQ_EMPTY(&txn_global->nsnaph));
+	} while (nsnap != last && !TAILQ_EMPTY(&txn_global->nsnaph));
 
 	/* Now that the queue of named snapshots is updated, update the ID */
 	txn_global->nsnap_oldest_id = new_nsnap_oldest;
@@ -173,9 +173,9 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_ERR_NOTFOUND_OK(__nsnap_drop_one(session, &cval));
 
-	if (STAILQ_EMPTY(&txn_global->nsnaph))
+	if (TAILQ_EMPTY(&txn_global->nsnaph))
 		txn_global->nsnap_oldest_id = nsnap_new->snap_min;
-	STAILQ_INSERT_TAIL(&txn_global->nsnaph, nsnap_new, q);
+	TAILQ_INSERT_TAIL(&txn_global->nsnaph, nsnap_new, q);
 	nsnap_new = NULL;
 
 err:	if (started_txn)
@@ -254,7 +254,7 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 		WT_RET(__wt_session_copy_values(session));
 
 	WT_RET(__wt_readlock(session, txn_global->nsnap_rwlock));
-	STAILQ_FOREACH(nsnap, &txn_global->nsnaph, q)
+	TAILQ_FOREACH(nsnap, &txn_global->nsnaph, q)
 		if (WT_STRING_MATCH(nsnap->name, nameval->str, nameval->len)) {
 			txn->snap_min = txn_state->snap_min = nsnap->snap_min;
 			txn->snap_max = nsnap->snap_max;
@@ -358,10 +358,8 @@ __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session)
 	txn_global = &S2C(session)->txn_global;
 	txn_global->nsnap_oldest_id = WT_TXN_NONE;
 
-	while (!STAILQ_EMPTY(&txn_global->nsnaph)) {
-		nsnap = STAILQ_FIRST(&txn_global->nsnaph);
-		WT_ASSERT(session, nsnap != NULL);
-		STAILQ_REMOVE_HEAD(&txn_global->nsnaph, q);
+	while ((nsnap = TAILQ_FIRST(&txn_global->nsnaph)) != NULL) {
+		TAILQ_REMOVE(&txn_global->nsnaph, nsnap, q);
 		__nsnap_destroy(session, nsnap);
 	}
 

@@ -32,7 +32,7 @@ __cursor_pos_clear(WT_CURSOR_BTREE *cbt)
 	 * and it's a minimal set of things we need to clear. It would be a
 	 * lot simpler to clear everything, but we call this function a lot.
 	 */
-	cbt->recno = 0;
+	cbt->recno = WT_RECNO_OOB;
 
 	cbt->ins = NULL;
 	cbt->ins_head = NULL;
@@ -150,7 +150,7 @@ __wt_cursor_dhandle_incr_use(WT_SESSION_IMPL *session)
 	dhandle = session->dhandle;
 
 	/* If we open a handle with a time of death set, clear it. */
-	if (WT_ATOMIC_ADD4(dhandle->session_inuse, 1) == 1 &&
+	if (__wt_atomic_addi32(&dhandle->session_inuse, 1) == 1 &&
 	    dhandle->timeofdeath != 0)
 		dhandle->timeofdeath = 0;
 }
@@ -168,7 +168,7 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
 
 	/* If we close a handle with a time of death set, clear it. */
 	WT_ASSERT(session, dhandle->session_inuse > 0);
-	if (WT_ATOMIC_SUB4(dhandle->session_inuse, 1) == 0 &&
+	if (__wt_atomic_subi32(&dhandle->session_inuse, 1) == 0 &&
 	    dhandle->timeofdeath != 0)
 		dhandle->timeofdeath = 0;
 }
@@ -186,6 +186,12 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 
 	if (reenter)
 		WT_RET(__curfile_leave(cbt));
+
+	/*
+	 * Any old insert position is now invalid.  We rely on this being
+	 * cleared to detect if a new skiplist is installed after a search.
+	 */
+	cbt->ins_stack[0] = NULL;
 
 	/* If the transaction is idle, check that the cache isn't full. */
 	WT_RET(__wt_txn_idle_cache_check(session));

@@ -37,7 +37,7 @@ from helper import key_populate, value_populate
 class test_bug005(wttest.WiredTigerTestCase):
     # This is a btree layer test, test files, ignore tables.
     uri = 'file:test_bug005'
-    
+
     def test_bug005(self):
         # Create the object.
         self.session.create(self.uri, 'value_format=S,key_format=S')

@@ -44,8 +44,7 @@ create_table(WT_SESSION *session, COOKIE *cookie)
 	p = config;
 	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
-	    "key_format=%s,value_format=S",
-	    cookie->type == COL ? "r" : "q");
+	    "key_format=%s,value_format=S", cookie->type == COL ? "r" : "q");
 	if (cookie->type == LSM)
 		(void)snprintf(p, (size_t)(end - p), ",type=lsm");
 
@@ -133,8 +132,7 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
 	char valuebuf[64];
 
 	cursor->set_key(cursor, keyno);
-	(void)snprintf(
-	    valuebuf, sizeof(valuebuf), "%037u", new_val);
+	(void)snprintf(valuebuf, sizeof(valuebuf), "%037u", new_val);
 	cursor->set_value(cursor, valuebuf);
 	if ((ret = cursor->insert(cursor)) != 0) {
 		if (ret == WT_ROLLBACK)

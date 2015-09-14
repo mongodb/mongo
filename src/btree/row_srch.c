@@ -471,6 +471,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *current, *descent;
+	uint32_t cnt;
 
 	btree = S2BT(session);
 
@@ -528,18 +529,22 @@ restart:
 
 	/*
 	 * If the tree is new (and not empty), it might have a large insert
-	 * list, pick the key in the middle of that insert list.
+	 * list. Count how many records are in the list.
 	 */
 	F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
 	if ((cbt->ins_head = WT_ROW_INSERT_SMALLEST(page)) == NULL)
 		WT_ERR(WT_NOTFOUND);
-	for (p = t = WT_SKIP_FIRST(cbt->ins_head);;) {
+	for (cnt = 1, p = WT_SKIP_FIRST(cbt->ins_head);; ++cnt)
 		if ((p = WT_SKIP_NEXT(p)) == NULL)
 			break;
-		if ((p = WT_SKIP_NEXT(p)) == NULL)
+
+	/*
+	 * Select a random number from 0 to (N - 1), return that record.
+	 */
+	cnt = __wt_random(&session->rnd) % cnt;
+	for (p = t = WT_SKIP_FIRST(cbt->ins_head);; t = p)
+		if (cnt-- == 0 || (p = WT_SKIP_NEXT(p)) == NULL)
 			break;
-		t = WT_SKIP_NEXT(t);
-	}
 	cbt->ref = current;
 	cbt->compare = 0;
 	cbt->ins = t;
