@@ -96,10 +96,6 @@ public:
 
     virtual int flushAllFiles(bool sync);
 
-    virtual Status beginBackup(OperationContext* txn);
-
-    virtual void endBackup(OperationContext* txn);
-
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident);
 
     virtual Status repairIdent(OperationContext* opCtx, StringData ident);
@@ -161,7 +157,5 @@ private:
     mutable ElapsedTracker _sizeStorerSyncTracker;
 
     mutable Date_t _previousCheckedDropsQueued;
-
-    std::unique_ptr<WiredTigerSession> _backupSession;
 };
 }

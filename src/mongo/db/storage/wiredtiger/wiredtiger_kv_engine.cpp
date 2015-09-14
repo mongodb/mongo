@@ -250,25 +250,6 @@ int WiredTigerKVEngine::flushAllFiles(bool sync) {
     return 1;
 }
 
-Status WiredTigerKVEngine::beginBackup(OperationContext* txn) {
-    invariant(!_backupSession);
-
-    // This cursor will be freed by the backupSession being closed as the session is uncached
-    auto session = stdx::make_unique<WiredTigerSession>(_conn);
-    WT_CURSOR* c = NULL;
-    WT_SESSION* s = session->getSession();
-    int ret = WT_OP_CHECK(s->open_cursor(s, "backup:", NULL, NULL, &c));
-    if (ret != 0) {
-        return wtRCToStatus(ret);
-    }
-    _backupSession = std::move(session);
-    return Status::OK();
-}
-
-void WiredTigerKVEngine::endBackup(OperationContext* txn) {
-    _backupSession.reset();
-}
-
 void WiredTigerKVEngine::syncSizeInfo(bool sync) const {
     if (!_sizeStorer)
         return;

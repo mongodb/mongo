@@ -247,23 +247,6 @@ int KVStorageEngine::flushAllFiles(bool sync) {
     return _engine->flushAllFiles(sync);
 }
 
-Status KVStorageEngine::beginBackup(OperationContext* txn) {
-    // We should not proceed if we are already in backup mode
-    if (_inBackupMode)
-        return Status(ErrorCodes::BadValue, "Already in Backup Mode");
-    Status status = _engine->beginBackup(txn);
-    if (status.isOK())
-        _inBackupMode = true;
-    return status;
-}
-
-void KVStorageEngine::endBackup(OperationContext* txn) {
-    // We should never reach here if we aren't already in backup mode
-    invariant(_inBackupMode);
-    _engine->endBackup(txn);
-    _inBackupMode = false;
-}
-
 bool KVStorageEngine::isDurable() const {
     return _engine->isDurable();
 }

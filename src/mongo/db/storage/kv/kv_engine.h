@@ -94,21 +94,6 @@ public:
         return 0;
     }
 
-    /**
-     * See StorageEngine::beginBackup for details
-     */
-    virtual Status beginBackup(OperationContext* txn) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "The current storage engine doesn't support backup mode");
-    }
-
-    /**
-     * See StorageEngine::endBackup for details
-     */
-    virtual void endBackup(OperationContext* txn) {
-        MONGO_UNREACHABLE;
-    }
-
     virtual bool isDurable() const = 0;
 
     /**
