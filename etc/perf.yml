@@ -5,6 +5,9 @@ pre:
     - command: shell.track
 
 post:
+    - command: attach.results
+      params:
+        file_location: src/report.json
     - command: shell.cleanup
 
 functions:
@@ -83,9 +86,6 @@ functions:
           set -o verbose
           source ./venv/bin/activate
           python perf_regression_check.py -f history.json --rev ${revision}
-    - command: attach.results
-      params:
-        file_location: src/report.json
   "run perf tests":
     - command: shell.exec
       params:
