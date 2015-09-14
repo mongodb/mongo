@@ -28,14 +28,13 @@
 
 #pragma once
 
-#include <string>
-
 namespace mongo {
 
 class BSONObj;
 class ClusterCursorManager;
 template <typename T>
 class StatusWith;
+struct HostAndPort;
 
 namespace executor {
 class TaskExecutor;
@@ -53,7 +52,7 @@ class TaskExecutor;
  * BSONObj response document describing the newly-created cursor, which is suitable for returning to
  * the client.
  */
-StatusWith<BSONObj> storePossibleCursor(const std::string& server,
+StatusWith<BSONObj> storePossibleCursor(const HostAndPort& server,
                                         const BSONObj& cmdResult,
                                         executor::TaskExecutor* executor,
                                         ClusterCursorManager* cursorManager);

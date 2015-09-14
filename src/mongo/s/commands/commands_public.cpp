@@ -79,6 +79,48 @@ using std::vector;
 
 namespace dbgrid_pub_cmds {
 
+namespace {
+bool cursorCommandPassthrough(OperationContext* txn,
+                              shared_ptr<DBConfig> conf,
+                              const BSONObj& cmdObj,
+                              int options,
+                              BSONObjBuilder* out) {
+    const auto shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
+    ScopedDbConnection conn(shard->getConnString());
+    auto cursor = conn->query(str::stream() << conf->name() << ".$cmd",
+                              cmdObj,
+                              -1,    // nToReturn
+                              0,     // nToSkip
+                              NULL,  // fieldsToReturn
+                              options);
+    if (!cursor || !cursor->more()) {
+        return Command::appendCommandStatus(
+            *out, {ErrorCodes::OperationFailed, "failed to read command response from shard"});
+    }
+    BSONObj response = cursor->nextSafe().getOwned();
+    conn.done();
+    Status status = Command::getStatusFromCommandResult(response);
+    if (ErrorCodes::SendStaleConfig == status || ErrorCodes::RecvStaleConfig == status) {
+        throw RecvStaleConfigException("command failed because of stale config", response);
+    }
+    if (!status.isOK()) {
+        return Command::appendCommandStatus(*out, status);
+    }
+
+    StatusWith<BSONObj> transformedResponse =
+        storePossibleCursor(HostAndPort(cursor->originalHost()),
+                            response,
+                            grid.shardRegistry()->getExecutor(),
+                            grid.getCursorManager());
+    if (!transformedResponse.isOK()) {
+        return Command::appendCommandStatus(*out, transformedResponse.getStatus());
+    }
+    out->appendElements(transformedResponse.getValue());
+
+    return true;
+}
+}  // namespace
+
 class PublicGridCommand : public Command {
 public:
     PublicGridCommand(const char* n, const char* oldname = NULL) : Command(n, false, oldname) {}
@@ -1365,13 +1407,13 @@ public:
     }
 } evalCmd;
 
-class CmdListCollections : public PublicGridCommand {
+class CmdListCollections final : public PublicGridCommand {
 public:
     CmdListCollections() : PublicGridCommand("listCollections") {}
 
-    virtual Status checkAuthForCommand(ClientBasic* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+    Status checkAuthForCommand(ClientBasic* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
         // Check for the listCollections ActionType on the database
@@ -1391,39 +1433,24 @@ public:
     bool run(OperationContext* txn,
              const string& dbName,
              BSONObj& cmdObj,
-             int,
+             int options,
              string& errmsg,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) final {
         auto conf = grid.catalogCache()->getDatabase(txn, dbName);
         if (!conf.isOK()) {
             return appendEmptyResultSet(result, conf.getStatus(), dbName + ".$cmd.listCollections");
         }
 
-        BSONObjBuilder shardResponseBuilder;
-        bool retval = passthrough(txn, conf.getValue(), cmdObj, shardResponseBuilder);
-        BSONObj shardResponse = shardResponseBuilder.obj();
-
-        const auto shard = grid.shardRegistry()->getShard(txn, conf.getValue()->getPrimaryId());
-        StatusWith<BSONObj> transformedResponse =
-            storePossibleCursor(shard->getConnString().toString(),
-                                shardResponse,
-                                grid.shardRegistry()->getExecutor(),
-                                grid.getCursorManager());
-        if (!transformedResponse.isOK()) {
-            return appendCommandStatus(result, transformedResponse.getStatus());
-        }
-        result.appendElements(transformedResponse.getValue());
-
-        return retval;
+        return cursorCommandPassthrough(txn, conf.getValue(), cmdObj, options, &result);
     }
 } cmdListCollections;
 
-class CmdListIndexes : public PublicGridCommand {
+class CmdListIndexes final : public PublicGridCommand {
 public:
     CmdListIndexes() : PublicGridCommand("listIndexes") {}
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) final {
         string ns = parseNs(dbname, cmdObj);
         ActionSet actions;
         actions.addAction(ActionType::listIndexes);
@@ -1435,28 +1462,13 @@ public:
              BSONObj& cmdObj,
              int options,
              string& errmsg,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) final {
         auto conf = grid.catalogCache()->getDatabase(txn, dbName);
         if (!conf.isOK()) {
             return appendCommandStatus(result, conf.getStatus());
         }
 
-        BSONObjBuilder shardResponseBuilder;
-        bool retval = passthrough(txn, conf.getValue(), cmdObj, shardResponseBuilder);
-        BSONObj shardResponse = shardResponseBuilder.obj();
-
-        const auto shard = grid.shardRegistry()->getShard(txn, conf.getValue()->getPrimaryId());
-        StatusWith<BSONObj> transformedResponse =
-            storePossibleCursor(shard->getConnString().toString(),
-                                shardResponse,
-                                grid.shardRegistry()->getExecutor(),
-                                grid.getCursorManager());
-        if (!transformedResponse.isOK()) {
-            return appendCommandStatus(result, transformedResponse.getStatus());
-        }
-        result.appendElements(transformedResponse.getValue());
-
-        return retval;
+        return cursorCommandPassthrough(txn, conf.getValue(), cmdObj, options, &result);
     }
 
 } cmdListIndexes;

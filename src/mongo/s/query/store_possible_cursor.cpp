@@ -43,7 +43,7 @@
 namespace mongo {
 
 namespace {
-Status storePossibleCursorLegacy(const std::string& server, const BSONObj& cmdResult) {
+Status storePossibleCursorLegacy(const HostAndPort& server, const BSONObj& cmdResult) {
     if (cmdResult["ok"].trueValue() && cmdResult.hasField("cursor")) {
         BSONElement cursorIdElt = cmdResult.getFieldDotted("cursor.id");
 
@@ -65,7 +65,7 @@ Status storePossibleCursorLegacy(const std::string& server, const BSONObj& cmdRe
             }
 
             const std::string cursorNs = cursorNsElt.String();
-            cursorCache.storeRef(server, cursorId, cursorNs);
+            cursorCache.storeRef(server.toString(), cursorId, cursorNs);
         }
     }
 
@@ -73,7 +73,7 @@ Status storePossibleCursorLegacy(const std::string& server, const BSONObj& cmdRe
 }
 }  // namespace
 
-StatusWith<BSONObj> storePossibleCursor(const std::string& server,
+StatusWith<BSONObj> storePossibleCursor(const HostAndPort& server,
                                         const BSONObj& cmdResult,
                                         executor::TaskExecutor* executor,
                                         ClusterCursorManager* cursorManager) {
@@ -96,7 +96,7 @@ StatusWith<BSONObj> storePossibleCursor(const std::string& server,
     }
 
     ClusterClientCursorParams params(incomingCursorResponse.getValue().nss);
-    params.remotes.emplace_back(HostAndPort(server), incomingCursorResponse.getValue().cursorId);
+    params.remotes.emplace_back(server, incomingCursorResponse.getValue().cursorId);
 
     auto ccc = stdx::make_unique<ClusterClientCursorImpl>(executor, std::move(params));
     auto pinnedCursor =

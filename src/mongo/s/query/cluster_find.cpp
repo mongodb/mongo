@@ -167,7 +167,7 @@ StatusWith<CursorId> runConfigServerQuerySCCC(const CanonicalQuery& query,
         throw RecvStaleConfigException("find command failed because of stale config", result);
     }
 
-    auto transformedResult = storePossibleCursor(cursor->originalHost(),
+    auto transformedResult = storePossibleCursor(HostAndPort(cursor->originalHost()),
                                                  result,
                                                  grid.shardRegistry()->getExecutor(),
                                                  grid.getCursorManager());

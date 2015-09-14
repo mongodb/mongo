@@ -137,7 +137,7 @@ private:
     // - a positive integer representing milliseconds of remaining time
     MapShardedInt _cursorsMaxTimeMS;
 
-    // Maps passthrough cursor ID to shard name.
+    // Maps passthrough cursor ID to stringified HostAndPort.
     MapNormal _refs;
 
     // Maps passthrough cursor ID to namespace.
