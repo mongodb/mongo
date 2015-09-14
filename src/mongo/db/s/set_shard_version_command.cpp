@@ -308,15 +308,39 @@ private:
         }
 
         if (ShardingState::get(txn)->enabled()) {
-            if (configdb == ShardingState::get(txn)->getConfigServer(txn))
+            auto givenConnStrStatus = ConnectionString::parse(configdb);
+            if (!givenConnStrStatus.isOK()) {
+                errmsg = str::stream() << "error parsing given config string: " << configdb
+                                       << causedBy(givenConnStrStatus.getStatus());
+                return false;
+            }
+
+            const auto& givenConnStr = givenConnStrStatus.getValue();
+            auto storedConnStr = ShardingState::get(txn)->getConfigServer(txn);
+
+            if (givenConnStr.type() == ConnectionString::SET &&
+                storedConnStr.type() == ConnectionString::SET) {
+                if (givenConnStr.getSetName() != storedConnStr.getSetName()) {
+                    errmsg = str::stream()
+                        << "given config server set name: " << givenConnStr.getSetName()
+                        << " differs from known set name: " << storedConnStr.getSetName();
+
+                    return false;
+                }
+
                 return true;
+            }
+
+            const auto& storedRawConfigString = storedConnStr.toString();
+            if (storedRawConfigString == configdb) {
+                return true;
+            }
 
             result.append("configdb",
-                          BSON("stored" << ShardingState::get(txn)->getConfigServer(txn) << "given"
-                                        << configdb));
+                          BSON("stored" << storedRawConfigString << "given" << configdb));
 
             errmsg = str::stream() << "mongos specified a different config database string : "
-                                   << "stored : " << ShardingState::get(txn)->getConfigServer(txn)
+                                   << "stored : " << storedRawConfigString
                                    << " vs given : " << configdb;
             return false;
         }

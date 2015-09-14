@@ -603,7 +603,8 @@ public:
             recvChunkStartBuilder.append("min", min);
             recvChunkStartBuilder.append("max", max);
             recvChunkStartBuilder.append("shardKeyPattern", shardKeyPattern);
-            recvChunkStartBuilder.append("configServer", shardingState->getConfigServer(txn));
+            recvChunkStartBuilder.append("configServer",
+                                         shardingState->getConfigServer(txn).toString());
             recvChunkStartBuilder.append("secondaryThrottle", isSecondaryThrottle);
 
             // Follow the same convention in moveChunk.
@@ -969,7 +970,7 @@ public:
 
                 if (MONGO_FAIL_POINT(failMigrationApplyOps)) {
                     throw SocketException(SocketException::RECV_ERROR,
-                                          shardingState->getConfigServer(txn));
+                                          shardingState->getConfigServer(txn).toString());
                 }
             } catch (const DBException& ex) {
                 warning() << ex << migrateLog;

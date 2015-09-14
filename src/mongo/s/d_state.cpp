@@ -150,7 +150,7 @@ public:
         ShardingState* shardingState = ShardingState::get(txn);
 
         if (shardingState->enabled()) {
-            result.append("configServer", shardingState->getConfigServer(txn));
+            result.append("configServer", shardingState->getConfigServer(txn).toString());
         } else {
             result.append("configServer", "");
         }

@@ -32,6 +32,7 @@
 
 #include "mongo/db/s/sharding_state.h"
 
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
@@ -129,11 +130,11 @@ bool ShardingState::enabled() {
     return _enabled;
 }
 
-string ShardingState::getConfigServer(OperationContext* txn) {
+ConnectionString ShardingState::getConfigServer(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_enabled);
 
-    return grid.shardRegistry()->getConfigServerConnectionString().toString();
+    return grid.shardRegistry()->getConfigServerConnectionString();
 }
 
 string ShardingState::getShardName() {

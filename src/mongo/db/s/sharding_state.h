@@ -47,6 +47,7 @@ class BSONObjBuilder;
 struct ChunkVersion;
 class Client;
 class CollectionMetadata;
+class ConnectionString;
 class OperationContext;
 class ServiceContext;
 class Status;
@@ -74,7 +75,7 @@ public:
 
     bool enabled();
 
-    std::string getConfigServer(OperationContext* txn);
+    ConnectionString getConfigServer(OperationContext* txn);
     std::string getShardName();
 
     MigrationSourceManager* migrationSourceManager() {
