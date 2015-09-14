@@ -40,6 +40,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/system_error.h"
 #include "mongo/executor/connection_pool.h"
+#include "mongo/executor/async_timer_interface.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
@@ -75,7 +76,19 @@ class NetworkInterfaceASIO final : public NetworkInterface {
 
 public:
     struct Options {
+        Options() = default;
+
+// Explicit move construction and assignment to support MSVC
+#if defined(_MSC_VER) && _MSC_VER < 1900
+        Options(Options&&);
+        Options& operator=(Options&&);
+#else
+        Options(Options&&) = default;
+        Options& operator=(Options&&) = default;
+#endif
+
         ConnectionPool::Options connectionPoolOptions;
+        std::unique_ptr<AsyncTimerFactoryInterface> timerFactory;
     };
 
     NetworkInterfaceASIO(std::unique_ptr<AsyncStreamFactoryInterface> streamFactory,
@@ -318,6 +331,8 @@ private:
     asio::ip::tcp::resolver _resolver;
 
     std::atomic<State> _state;
+
+    std::unique_ptr<AsyncTimerFactoryInterface> _timerFactory;
 
     std::unique_ptr<AsyncStreamFactoryInterface> _streamFactory;
 

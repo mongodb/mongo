@@ -26,57 +26,54 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include <exception>
+#include <system_error>
 
-#include "mongo/client/connection_string.h"
-#include "mongo/executor/async_stream_factory.h"
-#include "mongo/executor/async_stream_interface.h"
-#include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/integration_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
+#include <asio.hpp>
+
+#include "mongo/base/disallow_copying.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace executor {
-namespace {
 
-TEST(NetworkInterfaceASIO, TestPing) {
-    auto fixture = unittest::getFixtureConnectionString();
+/**
+ * An asynchronous waitable timer interface.
+ */
+class AsyncTimerInterface {
+    MONGO_DISALLOW_COPYING(AsyncTimerInterface);
 
-    NetworkInterfaceASIO net{stdx::make_unique<AsyncStreamFactory>(),
-                             NetworkInterfaceASIO::Options()};
+public:
+    virtual ~AsyncTimerInterface() = default;
 
-    net.startup();
-    auto guard = MakeGuard([&] { net.shutdown(); });
+    using Handler = stdx::function<void(std::error_code)>;
 
-    TaskExecutor::CallbackHandle cb{};
+    /**
+     * Perform an asynchronous wait on this timer.
+     */
+    virtual void asyncWait(Handler handler) = 0;
 
-    stdx::promise<RemoteCommandResponse> result;
+protected:
+    AsyncTimerInterface() = default;
+};
 
-    net.startCommand(
-        cb,
-        RemoteCommandRequest{fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj()},
-        [&result](StatusWith<RemoteCommandResponse> resp) {
-            try {
-                result.set_value(uassertStatusOK(resp));
-            } catch (...) {
-                result.set_exception(std::current_exception());
-            }
-        });
+/**
+ * A factory for AsyncTimers.
+ */
+class AsyncTimerFactoryInterface {
+    MONGO_DISALLOW_COPYING(AsyncTimerFactoryInterface);
 
-    auto fut = result.get_future();
-    auto commandReply = fut.get();
+public:
+    virtual ~AsyncTimerFactoryInterface() = default;
 
-    ASSERT_OK(getStatusFromCommandResult(commandReply.data));
-}
+    virtual std::unique_ptr<AsyncTimerInterface> make(asio::io_service* io_service,
+                                                      Milliseconds expiration) = 0;
 
-}  // namespace
+protected:
+    AsyncTimerFactoryInterface() = default;
+};
+
 }  // namespace executor
 }  // namespace mongo

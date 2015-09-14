@@ -26,57 +26,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/executor/async_timer_asio.h"
 
-#include <exception>
-
-#include "mongo/client/connection_string.h"
-#include "mongo/executor/async_stream_factory.h"
-#include "mongo/executor/async_stream_interface.h"
-#include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/unittest/integration_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace executor {
-namespace {
 
-TEST(NetworkInterfaceASIO, TestPing) {
-    auto fixture = unittest::getFixtureConnectionString();
+AsyncTimerASIO::AsyncTimerASIO(asio::io_service* service, Milliseconds expiration)
+    : _timer(*service, expiration) {}
 
-    NetworkInterfaceASIO net{stdx::make_unique<AsyncStreamFactory>(),
-                             NetworkInterfaceASIO::Options()};
-
-    net.startup();
-    auto guard = MakeGuard([&] { net.shutdown(); });
-
-    TaskExecutor::CallbackHandle cb{};
-
-    stdx::promise<RemoteCommandResponse> result;
-
-    net.startCommand(
-        cb,
-        RemoteCommandRequest{fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj()},
-        [&result](StatusWith<RemoteCommandResponse> resp) {
-            try {
-                result.set_value(uassertStatusOK(resp));
-            } catch (...) {
-                result.set_exception(std::current_exception());
-            }
-        });
-
-    auto fut = result.get_future();
-    auto commandReply = fut.get();
-
-    ASSERT_OK(getStatusFromCommandResult(commandReply.data));
+void AsyncTimerASIO::asyncWait(AsyncTimerInterface::Handler handler) {
+    _timer.async_wait(std::move(handler));
 }
 
-}  // namespace
+std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryASIO::make(asio::io_service* service,
+                                                                 Milliseconds expiration) {
+    return stdx::make_unique<AsyncTimerASIO>(service, expiration);
+}
+
 }  // namespace executor
 }  // namespace mongo

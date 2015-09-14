@@ -26,57 +26,52 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
-#include <exception>
-
-#include "mongo/client/connection_string.h"
-#include "mongo/executor/async_stream_factory.h"
-#include "mongo/executor/async_stream_interface.h"
-#include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/executor/async_timer_mock.h"
 #include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace executor {
-namespace {
 
-TEST(NetworkInterfaceASIO, TestPing) {
-    auto fixture = unittest::getFixtureConnectionString();
+TEST(AsyncTimerMock, BasicTest) {
+    AsyncTimerFactoryMock factory;
 
-    NetworkInterfaceASIO net{stdx::make_unique<AsyncStreamFactory>(),
-                             NetworkInterfaceASIO::Options()};
+    // Set an early timer
+    bool timer1Fired = false;
+    auto timer1 = factory.make(Milliseconds(1000));
+    timer1->asyncWait([&timer1Fired](std::error_code ec) {
+        ASSERT(!ec);
+        timer1Fired = true;
+    });
 
-    net.startup();
-    auto guard = MakeGuard([&] { net.shutdown(); });
+    // Set a later timer
+    bool timer2Fired = false;
+    auto timer2 = factory.make(Milliseconds(2000));
+    timer2->asyncWait([&timer2Fired](std::error_code ec) {
+        ASSERT(!ec);
+        timer2Fired = true;
+    });
 
-    TaskExecutor::CallbackHandle cb{};
+    // Advance clock a little, nothing should fire
+    factory.fastForward(Milliseconds(500));
+    ASSERT(!timer1Fired);
+    ASSERT(!timer2Fired);
 
-    stdx::promise<RemoteCommandResponse> result;
+    // Advance clock so early timer fires
+    factory.fastForward(Milliseconds(600));
+    ASSERT(timer1Fired);
 
-    net.startCommand(
-        cb,
-        RemoteCommandRequest{fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj()},
-        [&result](StatusWith<RemoteCommandResponse> resp) {
-            try {
-                result.set_value(uassertStatusOK(resp));
-            } catch (...) {
-                result.set_exception(std::current_exception());
-            }
-        });
+    // Second timer should still be waiting
+    ASSERT(!timer2Fired);
 
-    auto fut = result.get_future();
-    auto commandReply = fut.get();
-
-    ASSERT_OK(getStatusFromCommandResult(commandReply.data));
+    // Advance clock so second timer fires
+    factory.fastForward(Milliseconds(1000));
+    ASSERT(timer2Fired);
 }
 
-}  // namespace
 }  // namespace executor
 }  // namespace mongo

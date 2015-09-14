@@ -86,7 +86,7 @@ TEST(ConnectionPoolASIO, TestPing) {
 
     NetworkInterfaceASIO net{stdx::make_unique<AsyncStreamFactory>(),
                              stdx::make_unique<MyNetworkConnectionHook>(),
-                             options};
+                             std::move(options)};
 
     net.startup();
     auto guard = MakeGuard([&] { net.shutdown(); });

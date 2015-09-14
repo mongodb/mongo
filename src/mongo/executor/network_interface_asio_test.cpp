@@ -65,8 +65,15 @@ RemoteCommandResponse simulateIsMaster(RemoteCommandRequest request) {
 class NetworkInterfaceASIOTest : public mongo::unittest::Test {
 public:
     void setUp() override {
-        auto factory = stdx::make_unique<AsyncMockStreamFactory>();
+        NetworkInterfaceASIO::Options options;
+
+        // Use mock timer factory
+        auto timerFactory = stdx::make_unique<AsyncTimerFactoryMock>();
+        _timerFactory = timerFactory.get();
+        options.timerFactory = std::move(timerFactory);
+
         // keep unowned pointer, but pass ownership to NIA
+        auto factory = stdx::make_unique<AsyncMockStreamFactory>();
         _streamFactory = factory.get();
         _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(factory));
         _net->startup();
@@ -213,7 +220,8 @@ public:
         auto factory = stdx::make_unique<AsyncMockStreamFactory>();
         // keep unowned pointer, but pass ownership to NIA
         _streamFactory = factory.get();
-        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(factory), std::move(hook));
+        _net = stdx::make_unique<NetworkInterfaceASIO>(
+            std::move(factory), std::move(hook), NetworkInterfaceASIO::Options());
         _net->startup();
     }
 };

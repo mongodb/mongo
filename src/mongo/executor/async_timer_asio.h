@@ -26,57 +26,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include <exception>
+#include <asio.hpp>
 
-#include "mongo/client/connection_string.h"
-#include "mongo/executor/async_stream_factory.h"
-#include "mongo/executor/async_stream_interface.h"
-#include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/future.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/integration_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/executor/async_timer_interface.h"
 
 namespace mongo {
 namespace executor {
-namespace {
 
-TEST(NetworkInterfaceASIO, TestPing) {
-    auto fixture = unittest::getFixtureConnectionString();
+class AsyncTimerASIO final : public AsyncTimerInterface {
+public:
+    AsyncTimerASIO(asio::io_service* service, Milliseconds expiration);
 
-    NetworkInterfaceASIO net{stdx::make_unique<AsyncStreamFactory>(),
-                             NetworkInterfaceASIO::Options()};
+    void asyncWait(AsyncTimerInterface::Handler handler) override;
 
-    net.startup();
-    auto guard = MakeGuard([&] { net.shutdown(); });
+private:
+    asio::steady_timer _timer;
+};
 
-    TaskExecutor::CallbackHandle cb{};
+class AsyncTimerFactoryASIO final : public AsyncTimerFactoryInterface {
+public:
+    AsyncTimerFactoryASIO() = default;
 
-    stdx::promise<RemoteCommandResponse> result;
+    std::unique_ptr<AsyncTimerInterface> make(asio::io_service* service,
+                                              Milliseconds expiration) override;
+};
 
-    net.startCommand(
-        cb,
-        RemoteCommandRequest{fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj()},
-        [&result](StatusWith<RemoteCommandResponse> resp) {
-            try {
-                result.set_value(uassertStatusOK(resp));
-            } catch (...) {
-                result.set_exception(std::current_exception());
-            }
-        });
-
-    auto fut = result.get_future();
-    auto commandReply = fut.get();
-
-    ASSERT_OK(getStatusFromCommandResult(commandReply.data));
-}
-
-}  // namespace
 }  // namespace executor
 }  // namespace mongo

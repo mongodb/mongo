@@ -36,6 +36,9 @@
 
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/async_stream_factory.h"
+#include "mongo/executor/async_timer_asio.h"
+#include "mongo/executor/async_timer_interface.h"
+#include "mongo/executor/async_timer_mock.h"
 #include "mongo/executor/connection_pool_asio.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
@@ -46,6 +49,18 @@
 
 namespace mongo {
 namespace executor {
+
+#if defined(_MSC_VER) && _MSC_VER < 1900
+NetworkInterfaceASIO::Options::Options(Options&& other)
+    : connectionPoolOptions(std::move(other.connectionPoolOptions)),
+      timerFactory(std::move(other.timerFactory)) {}
+
+NetworkInterfaceASIO::Options& NetworkInterfaceASIO::Options::operator=(Options&& other) {
+    connectionPoolOptions = std::move(other.connectionPoolOptions);
+    timerFactory = std::move(other.timerFactory);
+    return *this;
+}
+#endif
 
 NetworkInterfaceASIO::NetworkInterfaceASIO(
     std::unique_ptr<AsyncStreamFactoryInterface> streamFactory, Options options)
@@ -60,6 +75,7 @@ NetworkInterfaceASIO::NetworkInterfaceASIO(
       _hook(std::move(networkConnectionHook)),
       _resolver(_io_service),
       _state(State::kReady),
+      _timerFactory(std::move(_options.timerFactory)),
       _streamFactory(std::move(streamFactory)),
       _connectionPool(stdx::make_unique<connection_pool_asio::ASIOImpl>(this),
                       _options.connectionPoolOptions),
