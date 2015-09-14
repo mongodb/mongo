@@ -245,8 +245,8 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (!__wt_atomic_casv32(&ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		return (false);
 
-	skip = (ref->page_del == NULL ||
-	    __wt_txn_visible(session, ref->page_del->txnid));
+	skip = ref->page_del == NULL ||
+	    __wt_txn_visible(session, ref->page_del->txnid);
 
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	return (skip);
