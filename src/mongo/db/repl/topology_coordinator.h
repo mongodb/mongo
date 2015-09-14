@@ -446,11 +446,9 @@ public:
     virtual Milliseconds getTimeoutDelayForMember(int memberId) = 0;
 
     /**
-     * Returns true if the node is able to take over the primary because of a higher priority and
-     * the node has transitioned to the candidate role as a result of the call.
+     * Transitions to the candidate role if the node is electable.
      */
-    virtual bool stagePriorityTakeoverIfElectable(const Date_t now,
-                                                  const OpTime& lastOpApplied) = 0;
+    virtual bool becomeCandidateIfElectable(const Date_t now, const OpTime& lastOpApplied) = 0;
 
 protected:
     TopologyCoordinator() {}

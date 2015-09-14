@@ -234,7 +234,7 @@ public:
                                                     const int memberIndex,
                                                     const OpTime& myLastOpApplied);
     virtual Milliseconds getTimeoutDelayForMember(int memberId);
-    virtual bool stagePriorityTakeoverIfElectable(const Date_t now, const OpTime& lastOpApplied);
+    virtual bool becomeCandidateIfElectable(const Date_t now, const OpTime& lastOpApplied);
 
     ////////////////////////////////////////////////////////////
     //

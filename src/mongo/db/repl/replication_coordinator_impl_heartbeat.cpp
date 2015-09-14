@@ -654,7 +654,7 @@ void ReplicationCoordinatorImpl::_priorityTakeover(
     if (!isV1ElectionProtocol()) {
         return;
     }
-    if (!_topCoord->stagePriorityTakeoverIfElectable(_replExecutor.now(), getMyLastOptime())) {
+    if (!_topCoord->becomeCandidateIfElectable(_replExecutor.now(), getMyLastOptime())) {
         return;
     }
     _startElectSelfV1();

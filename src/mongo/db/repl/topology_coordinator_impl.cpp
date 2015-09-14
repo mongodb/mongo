@@ -2439,8 +2439,8 @@ void TopologyCoordinatorImpl::setPrimaryIndex(long long primaryIndex) {
     _currentPrimaryIndex = primaryIndex;
 }
 
-bool TopologyCoordinatorImpl::stagePriorityTakeoverIfElectable(const Date_t now,
-                                                               const OpTime& lastOpApplied) {
+bool TopologyCoordinatorImpl::becomeCandidateIfElectable(const Date_t now,
+                                                         const OpTime& lastOpApplied) {
     if (_role == Role::leader) {
         LOG(2) << "Not standing for election again; already primary";
         return false;
