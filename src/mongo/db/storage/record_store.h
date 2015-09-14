@@ -91,11 +91,6 @@ struct Record {
     RecordData data;
 };
 
-struct BsonRecord {
-    RecordId id;
-    const BSONObj* docPtr;
-};
-
 /**
  * Retrieves Records from a RecordStore.
  *

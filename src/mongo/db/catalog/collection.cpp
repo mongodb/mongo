@@ -434,21 +434,20 @@ Status Collection::_insertDocuments(OperationContext* txn,
     //       under the RecordStore, this feels broken since that should be a
     //       collection access method probably
 
-    // insertRecord(s) will be vectorized in a future patch
-    std::vector<BsonRecord> bsonRecords;
+    // These will be vectorized (insertRecords, indexRecords) in a future patch
     for (vector<BSONObj>::iterator it = begin; it != end; it++) {
         StatusWith<RecordId> loc = _recordStore->insertRecord(
             txn, it->objdata(), it->objsize(), _enforceQuota(enforceQuota));
         if (!loc.isOK())
             return loc.getStatus();
-        BsonRecord bsonRecord = {loc.getValue(), &(*it)};
-        bsonRecords.push_back(bsonRecord);
-
         invariant(RecordId::min() < loc.getValue());
         invariant(loc.getValue() < RecordId::max());
-    }
 
-    return _indexCatalog.indexRecords(txn, bsonRecords);
+        Status status = _indexCatalog.indexRecord(txn, *it, loc.getValue());
+        if (!status.isOK())
+            return status;
+    }
+    return Status::OK();
 }
 
 Status Collection::aboutToDeleteCapped(OperationContext* txn,
@@ -581,10 +580,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
                 debug->nmoved += 1;
         }
 
-        std::vector<BsonRecord> bsonRecords;
-        BsonRecord bsonRecord = {newLocation.getValue(), &newDoc};
-        bsonRecords.push_back(bsonRecord);
-        Status s = _indexCatalog.indexRecords(txn, bsonRecords);
+        Status s = _indexCatalog.indexRecord(txn, newDoc, newLocation.getValue());
         if (!s.isOK())
             return StatusWith<RecordId>(s);
         invariant(sid == txn->recoveryUnit()->getSnapshotId());
