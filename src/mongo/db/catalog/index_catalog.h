@@ -36,6 +36,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
@@ -263,7 +264,7 @@ public:
     // ----- data modifiers ------
 
     // this throws for now
-    Status indexRecord(OperationContext* txn, const BSONObj& obj, const RecordId& loc);
+    Status indexRecords(OperationContext* txn, const std::vector<BsonRecord>& bsonRecords);
 
     void unindexRecord(OperationContext* txn, const BSONObj& obj, const RecordId& loc, bool noWarn);
 
@@ -294,10 +295,13 @@ private:
 
     void _checkMagic() const;
 
-    Status _indexRecord(OperationContext* txn,
-                        IndexCatalogEntry* index,
-                        const BSONObj& obj,
-                        const RecordId& loc);
+    Status _indexFilteredRecords(OperationContext* txn,
+                                 IndexCatalogEntry* index,
+                                 const std::vector<BsonRecord>& bsonRecords);
+
+    Status _indexRecords(OperationContext* txn,
+                         IndexCatalogEntry* index,
+                         const std::vector<BsonRecord>& bsonRecords);
 
     Status _unindexRecord(OperationContext* txn,
                           IndexCatalogEntry* index,
