@@ -1109,21 +1109,38 @@ bool isDupsAllowed(IndexDescriptor* desc) {
 }
 }
 
-Status IndexCatalog::_indexRecord(OperationContext* txn,
-                                  IndexCatalogEntry* index,
-                                  const BSONObj& obj,
-                                  const RecordId& loc) {
-    const MatchExpression* filter = index->getFilterExpression();
-    if (filter && !filter->matchesBSON(obj)) {
-        return Status::OK();
-    }
-
+Status IndexCatalog::_indexFilteredRecords(OperationContext* txn,
+                                           IndexCatalogEntry* index,
+                                           const std::vector<BsonRecord>& bsonRecords) {
     InsertDeleteOptions options;
     options.logIfError = false;
     options.dupsAllowed = isDupsAllowed(index->descriptor());
 
-    int64_t inserted;
-    return index->accessMethod()->insert(txn, obj, loc, options, &inserted);
+    for (auto bsonRecord : bsonRecords) {
+        int64_t inserted;
+        invariant(bsonRecord.id != RecordId());
+        Status status = index->accessMethod()->insert(
+            txn, *bsonRecord.docPtr, bsonRecord.id, options, &inserted);
+        if (!status.isOK())
+            return status;
+    }
+    return Status::OK();
+}
+
+Status IndexCatalog::_indexRecords(OperationContext* txn,
+                                   IndexCatalogEntry* index,
+                                   const std::vector<BsonRecord>& bsonRecords) {
+    const MatchExpression* filter = index->getFilterExpression();
+    if (!filter)
+        return _indexFilteredRecords(txn, index, bsonRecords);
+
+    std::vector<BsonRecord> filteredBsonRecords;
+    for (auto bsonRecord : bsonRecords) {
+        if (filter->matchesBSON(*(bsonRecord.docPtr)))
+            filteredBsonRecords.push_back(bsonRecord);
+    }
+
+    return _indexFilteredRecords(txn, index, filteredBsonRecords);
 }
 
 Status IndexCatalog::_unindexRecord(OperationContext* txn,
@@ -1152,10 +1169,11 @@ Status IndexCatalog::_unindexRecord(OperationContext* txn,
 }
 
 
-Status IndexCatalog::indexRecord(OperationContext* txn, const BSONObj& obj, const RecordId& loc) {
+Status IndexCatalog::indexRecords(OperationContext* txn,
+                                  const std::vector<BsonRecord>& bsonRecords) {
     for (IndexCatalogEntryContainer::const_iterator i = _entries.begin(); i != _entries.end();
          ++i) {
-        Status s = _indexRecord(txn, *i, obj, loc);
+        Status s = _indexRecords(txn, *i, bsonRecords);
         if (!s.isOK())
             return s;
     }
