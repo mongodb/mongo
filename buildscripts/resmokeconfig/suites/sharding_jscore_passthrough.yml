@@ -40,8 +40,6 @@ selector:
     - jstests/core/storageDetailsCommand.js
     - jstests/core/stages*.js
     - jstests/core/top.js
-    - jstests/core/dbcase.js  # SERVER-11735
-    - jstests/core/dbcase2.js  # SERVER-11735
     # TODO: SERVER-17284 remove once find cmd is implemented in mongos
     - jstests/core/read_after_optime.js
     # TODO: SERVER-18292 remove once OP_COMMAND is implemented in mongos
