@@ -185,13 +185,16 @@ var st;
     var csrsStatus;
     assert.soon(function () {
         csrsStatus = csrs[0].adminCommand({replSetGetStatus: 1});
+        if (csrsStatus.members[0].stateStr == "STARTUP" ||
+            csrsStatus.members[0].stateStr == "STARTUP2" ||
+            csrsStatus.members[0].stateStr == "RECOVERING") {
+            // Make sure first node is fully online or else mongoses still in SCCC mode might not
+            // find any node online to talk to.
+            return false;
+        }
+
         var i;
         for (i = 0; i < csrsStatus.members.length; ++i) {
-            if (csrsStatus.members[i].stateStr == "STARTUP" ||
-                csrsStatus.members[i].stateStr == "STARTUP2" ||
-                csrsStatus.members[i].stateStr == "RECOVERING") {
-                return false;
-            }
             if (TestData.storageEngine != "wiredTiger" && TestData.storageEngine != "") {
                 // NOTE: "" means default storage engine, which is WiredTiger.
                 if (csrsStatus.members[i].name == csrs[0].name &&
