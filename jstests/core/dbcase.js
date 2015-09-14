@@ -10,7 +10,6 @@ assert.writeOK( a.foo.save( { x : 1 } ));
 
 res = b.foo.save( { x : 1 } );
 assert.writeError( res );
-assert.eq( 13297, res.getWriteError().code, res.toString() );
 
 assert.neq( -1, db.getMongo().getDBNames().indexOf( a.getName() ) );
 assert.eq( -1, db.getMongo().getDBNames().indexOf( b.getName() ) );
