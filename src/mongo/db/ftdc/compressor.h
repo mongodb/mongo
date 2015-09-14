@@ -110,7 +110,7 @@ public:
      * the reference document is reset.
      */
     bool hasDataToFlush() const {
-        return !_referenceDoc.isEmpty() || _chunkBuffer.len() > 0;
+        return !_referenceDoc.isEmpty() || _compressedChunkBuffer.len() > 0;
     }
 
     /**
@@ -166,8 +166,11 @@ private:
     // _deltas[Metrics][Samples]
     std::vector<std::uint64_t> _deltas;
 
-    // Buffer for metric chunk = header + zlib compressed array
-    BufBuilder _chunkBuffer;
+    // Buffer for metric chunk compressed = uncompressed length + compressed data
+    BufBuilder _compressedChunkBuffer;
+
+    // Buffer for uncompressed metric chunk
+    BufBuilder _uncompressedChunkBuffer;
 
     // Buffer to hold metrics
     std::vector<std::uint64_t> _metrics;

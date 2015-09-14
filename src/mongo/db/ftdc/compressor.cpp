@@ -108,50 +108,70 @@ FTDCCompressor::addSample(const BSONObj& sample) {
 }
 
 StatusWith<ConstDataRange> FTDCCompressor::getCompressedSamples() {
-    _chunkBuffer.setlen(0);
+    _uncompressedChunkBuffer.setlen(0);
 
     // Append reference document - BSON Object
-    _chunkBuffer.appendBuf(_referenceDoc.objdata(), _referenceDoc.objsize());
+    _uncompressedChunkBuffer.appendBuf(_referenceDoc.objdata(), _referenceDoc.objsize());
 
     // Append count of metrics - uint32 little endian
-    _chunkBuffer.appendNum(static_cast<std::uint32_t>(_metricsCount));
+    _uncompressedChunkBuffer.appendNum(static_cast<std::uint32_t>(_metricsCount));
 
     // Append count of samples - uint32 little endian
-    _chunkBuffer.appendNum(static_cast<std::uint32_t>(_sampleCount));
+    _uncompressedChunkBuffer.appendNum(static_cast<std::uint32_t>(_sampleCount));
 
-    if (_metricsCount == 0 || _sampleCount == 0) {
-        return ConstDataRange(_chunkBuffer.buf(), static_cast<size_t>(_chunkBuffer.len()));
-    }
+    if (_metricsCount != 0 && _sampleCount != 0) {
+        // On average, we do not need all 10 bytes for every sample, worst case, we grow the buffer
+        DataBuilder db(_metricsCount * _sampleCount * FTDCVarInt::kMaxSizeBytes64 / 2);
 
-    // On average, we do not need all 10 bytes for every sample, worst case, we grow the buffer
-    DataBuilder db(_metricsCount * _sampleCount * FTDCVarInt::kMaxSizeBytes64 / 2);
+        std::uint32_t zeroesCount = 0;
 
-    std::uint32_t zeroesCount = 0;
+        // For each set of samples for a particular metric,
+        // we think of it is simple array of 64-bit integers we try to compress into a byte array.
+        // This is done in three steps for each metric
+        // 1. Delta Compression
+        //   - i.e., we store the difference between pairs of samples, not their absolute values
+        //   - this is done in addSamples
+        // 2. Run Length Encoding of zeros
+        //   - We find consecutive sets of zeros and represent them as a tuple of (0, count - 1).
+        //   - Each memeber is stored as VarInt packed integer
+        // 3. Finally, for non-zero members, we store these as VarInt packed
+        //
+        // These byte arrays are added to a buffer which is then concatenated with other chunks and
+        // compressed with ZLIB.
+        for (std::uint32_t i = 0; i < _metricsCount; i++) {
+            for (std::uint32_t j = 0; j < _sampleCount; j++) {
+                std::uint64_t delta = _deltas[getArrayOffset(_maxSamples, j, i)];
 
-    // For each set of samples for a particular metric,
-    // we think of it is simple array of 64-bit integers we try to compress into a byte array.
-    // This is done in three steps for each metric
-    // 1. Delta Compression
-    //   - i.e., we store the difference between pairs of samples, not their absolute values
-    //   - this is done in addSamples
-    // 2. Run Length Encoding of zeros
-    //   - We find consecutive sets of zeros and represent them as a tuple of (0, count - 1).
-    //   - Each memeber is stored as VarInt packed integer
-    // 3. Finally, for non-zero members, we store these as VarInt packed
-    //
-    // These byte arrays are added to a buffer which is then concatenated with other chunks and
-    // compressed with ZLIB.
-    for (std::uint32_t i = 0; i < _metricsCount; i++) {
-        for (std::uint32_t j = 0; j < _sampleCount; j++) {
-            std::uint64_t delta = _deltas[getArrayOffset(_maxSamples, j, i)];
+                if (delta == 0) {
+                    ++zeroesCount;
+                    continue;
+                }
 
-            if (delta == 0) {
-                ++zeroesCount;
-                continue;
+                // If we have a non-zero sample, then write out all the accumulated zero samples.
+                if (zeroesCount > 0) {
+                    auto s1 = db.writeAndAdvance(FTDCVarInt(0));
+                    if (!s1.isOK()) {
+                        return s1;
+                    }
+
+                    auto s2 = db.writeAndAdvance(FTDCVarInt(zeroesCount - 1));
+                    if (!s2.isOK()) {
+                        return s2;
+                    }
+
+                    zeroesCount = 0;
+                }
+
+                auto s3 = db.writeAndAdvance(FTDCVarInt(delta));
+                if (!s3.isOK()) {
+                    return s3;
+                }
             }
 
-            // If we have a non-zero sample, then write out all the accumulated zero samples.
-            if (zeroesCount > 0) {
+            // If we are on the last metric, and the previous loop ended in a zero, write out the
+            // RLE
+            // pair of zero information.
+            if ((i == (_metricsCount - 1)) && zeroesCount) {
                 auto s1 = db.writeAndAdvance(FTDCVarInt(0));
                 if (!s1.isOK()) {
                     return s1;
@@ -161,41 +181,30 @@ StatusWith<ConstDataRange> FTDCCompressor::getCompressedSamples() {
                 if (!s2.isOK()) {
                     return s2;
                 }
-
-                zeroesCount = 0;
-            }
-
-            auto s3 = db.writeAndAdvance(FTDCVarInt(delta));
-            if (!s3.isOK()) {
-                return s3;
             }
         }
 
-        // If we are on the last metric, and the previous loop ended in a zero, write out the RLE
-        // pair of zero information.
-        if ((i == (_metricsCount - 1)) && zeroesCount) {
-            auto s1 = db.writeAndAdvance(FTDCVarInt(0));
-            if (!s1.isOK()) {
-                return s1;
-            }
-
-            auto s2 = db.writeAndAdvance(FTDCVarInt(zeroesCount - 1));
-            if (!s2.isOK()) {
-                return s2;
-            }
-        }
+        // Append the entire compacted metric chunk into the uncompressed buffer
+        ConstDataRange cdr = db.getCursor();
+        _uncompressedChunkBuffer.appendBuf(cdr.data(), cdr.length());
     }
 
-    auto swDest = _compressor.compress(db.getCursor());
+    auto swDest = _compressor.compress(
+        ConstDataRange(_uncompressedChunkBuffer.buf(), _uncompressedChunkBuffer.len()));
 
     // The only way for compression to fail is if the buffer size calculations are wrong
     if (!swDest.isOK()) {
         return swDest.getStatus();
     }
 
-    _chunkBuffer.appendBuf(swDest.getValue().data(), swDest.getValue().length());
+    _compressedChunkBuffer.setlen(0);
 
-    return ConstDataRange(_chunkBuffer.buf(), static_cast<size_t>(_chunkBuffer.len()));
+    _compressedChunkBuffer.appendNum(static_cast<std::uint32_t>(_uncompressedChunkBuffer.len()));
+
+    _compressedChunkBuffer.appendBuf(swDest.getValue().data(), swDest.getValue().length());
+
+    return ConstDataRange(_compressedChunkBuffer.buf(),
+                          static_cast<size_t>(_compressedChunkBuffer.len()));
 }
 
 void FTDCCompressor::reset() {

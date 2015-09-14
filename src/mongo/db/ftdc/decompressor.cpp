@@ -41,7 +41,29 @@
 namespace mongo {
 
 StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf) {
-    ConstDataRangeCursor cdc(buf);
+    ConstDataRangeCursor compressedDataRange(buf);
+
+    // Read the length of the uncompressed buffer
+    auto swUncompressedLength = compressedDataRange.readAndAdvance<LittleEndian<std::uint32_t>>();
+    if (!swUncompressedLength.isOK()) {
+        return {swUncompressedLength.getStatus()};
+    }
+
+    // Now uncompress the data
+    // Limit size of the buffer we need zlib
+    auto uncompressedLength = swUncompressedLength.getValue();
+
+    if (uncompressedLength > 10000000) {
+        return Status(ErrorCodes::InvalidLength, "Metrics chunk has exceeded the allowable size.");
+    }
+
+    auto statusUncompress = _compressor.uncompress(compressedDataRange, uncompressedLength);
+
+    if (!statusUncompress.isOK()) {
+        return {statusUncompress.getStatus()};
+    }
+
+    ConstDataRangeCursor cdc = statusUncompress.getValue();
 
     // The document is not part of any checksum so we must validate it is correct
     auto swRef = cdc.readAndAdvance<Validated<BSONObj>>();
@@ -91,20 +113,11 @@ StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf
     // Allocate space for the reference document + samples
     docs.reserve(1 + sampleCount);
 
-    docs.emplace_back(ref);
+    docs.emplace_back(ref.getOwned());
 
     // We must always return the reference document
     if (sampleCount == 0) {
         return {docs};
-    }
-
-    // Decompress the zlib compressed buffer
-    size_t expectedDestLength = metricsCount * sampleCount * FTDCVarInt::kMaxSizeBytes64;
-
-    auto statusUncompress = _compressor.uncompress(cdc, expectedDestLength);
-
-    if (!statusUncompress.isOK()) {
-        return {statusUncompress.getStatus()};
     }
 
     // Read the samples
@@ -113,7 +126,7 @@ StatusWith<std::vector<BSONObj>> FTDCDecompressor::uncompress(ConstDataRange buf
     // decompress the deltas
     std::uint64_t zeroesCount = 0;
 
-    auto cdrc = ConstDataRangeCursor(statusUncompress.getValue());
+    auto cdrc = ConstDataRangeCursor(cdc);
 
     for (std::uint32_t i = 0; i < metricsCount; i++) {
         for (std::uint32_t j = 0; j < sampleCount; j++) {
