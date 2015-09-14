@@ -266,7 +266,7 @@ class test_schema02(wttest.WiredTigerTestCase):
             count += 1
         cursor.close()
         self.assertEqual(count, n)
-        
+
     def test_colgroups(self):
         self.session.create("table:main", "key_format=iS,value_format=SiSi,"
                             "columns=(ikey,Skey,S1,i2,S3,i4),colgroups=(c1,c2)")

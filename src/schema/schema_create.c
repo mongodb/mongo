@@ -347,25 +347,18 @@ __fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, const char *name)
 	if (!table->cg_complete)
 		return (0);
 
+	WT_ERR(sess->open_cursor(sess, name, NULL, "bulk=unordered", &icur));
 	WT_ERR(sess->open_cursor(sess, table->name, NULL, "readonly", &tcur));
-	WT_ERR(sess->open_cursor(sess, name, NULL, NULL, &icur));
 
 	ctable = (WT_CURSOR_TABLE *)tcur;
 	cindex = (WT_CURSOR_INDEX *)icur;
 	child = cindex->child;
 	idx = cindex->index;
 
-	while ((ret = tcur->next(tcur)) == 0) {
-		/*
-		 * For LSM indices, we must drop locks so that the
-		 * LSM worker thread can grab the schema lock during
-		 * a switch.
-		 */
-		WT_WITHOUT_LOCKS(session,
-		    ret = __wt_apply_single_idx(session, idx,
+	while ((ret = tcur->next(tcur)) == 0)
+		WT_ERR(__wt_apply_single_idx(session, idx,
 		    child, ctable, child->insert));
-		WT_ERR(ret);
-	}
+
 	WT_ERR_NOTFOUND_OK(ret);
 err:
 	if (icur)
