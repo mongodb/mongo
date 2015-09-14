@@ -45,10 +45,10 @@ struct CursorInfo : public BaseInfo {
     static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(hasNext);
-        MONGO_DEFINE_JS_FUNCTION(next);
-        MONGO_DEFINE_JS_FUNCTION(objsLeftInBatch);
-        MONGO_DEFINE_JS_FUNCTION(readOnly);
+        MONGO_DECLARE_JS_FUNCTION(hasNext);
+        MONGO_DECLARE_JS_FUNCTION(next);
+        MONGO_DECLARE_JS_FUNCTION(objsLeftInBatch);
+        MONGO_DECLARE_JS_FUNCTION(readOnly);
     };
 
     static const JSFunctionSpec methods[5];

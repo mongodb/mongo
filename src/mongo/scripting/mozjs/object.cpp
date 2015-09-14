@@ -44,7 +44,7 @@ const JSFunctionSpec ObjectInfo::methods[3] = {
 
 const char* const ObjectInfo::className = "Object";
 
-void ObjectInfo::Functions::bsonsize(JSContext* cx, JS::CallArgs args) {
+void ObjectInfo::Functions::bsonsize::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1)
         uasserted(ErrorCodes::BadValue, "bsonsize needs 1 argument");
 
@@ -59,7 +59,7 @@ void ObjectInfo::Functions::bsonsize(JSContext* cx, JS::CallArgs args) {
     args.rval().setInt32(ValueWriter(cx, args.get(0)).toBSON().objsize());
 }
 
-void ObjectInfo::Functions::invalidForStorage(JSContext* cx, JS::CallArgs args) {
+void ObjectInfo::Functions::invalidForStorage::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1)
         uasserted(ErrorCodes::BadValue, "invalidForStorage needs 1 argument");
 

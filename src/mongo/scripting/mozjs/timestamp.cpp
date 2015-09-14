@@ -45,7 +45,7 @@ void TimestampInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     JS::RootedObject thisv(cx);
-    scope->getTimestampProto().newObject(&thisv);
+    scope->getProto<TimestampInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     if (args.length() == 0) {

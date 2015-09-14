@@ -57,7 +57,7 @@ std::string parseJSFunctionOrExpression(JSContext* cx, const StringData input) {
     JS::RootedValue jsStrIn(cx);
 
     ValueReader(cx, &jsStrIn).fromStringData(input);
-    ObjectWrapper helpersWrapper(cx, getScope(cx)->getMongoHelpersProto().getProto());
+    ObjectWrapper helpersWrapper(cx, getScope(cx)->getProto<MongoHelpersInfo>().getProto());
 
     helpersWrapper.callMethod("functionExpressionParser", JS::HandleValueArray(jsStrIn), &jsStrOut);
 

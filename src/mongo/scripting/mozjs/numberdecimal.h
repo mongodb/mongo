@@ -45,7 +45,7 @@ struct NumberDecimalInfo : public BaseInfo {
     static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(toString);
+        MONGO_DECLARE_JS_FUNCTION(toString);
     };
 
     static const JSFunctionSpec methods[2];

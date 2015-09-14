@@ -43,10 +43,10 @@ namespace mozjs {
  */
 struct CountDownLatchInfo : public BaseInfo {
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(_new);
-        MONGO_DEFINE_JS_FUNCTION(_await);
-        MONGO_DEFINE_JS_FUNCTION(_countDown);
-        MONGO_DEFINE_JS_FUNCTION(_getCount);
+        MONGO_DECLARE_JS_FUNCTION(_new);
+        MONGO_DECLARE_JS_FUNCTION(_await);
+        MONGO_DECLARE_JS_FUNCTION(_countDown);
+        MONGO_DECLARE_JS_FUNCTION(_getCount);
     };
 
     static const JSFunctionSpec methods[5];

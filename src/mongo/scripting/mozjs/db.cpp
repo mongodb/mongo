@@ -100,7 +100,7 @@ void DBInfo::getProperty(JSContext* cx,
 
     uassert(16861,
             "getCollection returned something other than a collection",
-            scope->getDbCollectionProto().instanceOf(coll));
+            scope->getProto<DBCollectionInfo>().instanceOf(coll));
 
     // cache collection for reuse, don't enumerate
     ObjectWrapper(cx, obj).defineProperty(sname.c_str(), coll, 0);
@@ -121,7 +121,7 @@ void DBInfo::construct(JSContext* cx, JS::CallArgs args) {
     }
 
     JS::RootedObject thisv(cx);
-    scope->getDbProto().newObject(&thisv);
+    scope->getProto<DBInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     o.setValue("_mongo", args.get(0));

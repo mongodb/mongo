@@ -343,7 +343,7 @@ void ObjectWrapper::writeThis(BSONObjBuilder* b) {
     auto scope = getScope(_context);
 
     BSONObj* originalBSON = nullptr;
-    if (scope->getBsonProto().instanceOf(_object)) {
+    if (scope->getProto<BSONInfo>().instanceOf(_object)) {
         bool altered;
 
         std::tie(originalBSON, altered) = BSONInfo::originalBSON(_context, _object);
@@ -387,6 +387,18 @@ void ObjectWrapper::_writeField(BSONObjBuilder* b, Key key, BSONObj* originalPar
     x.setOriginalBSON(originalParent);
 
     x.writeThis(b, key.toString(_context));
+}
+
+std::string ObjectWrapper::getClassName() {
+    auto jsclass = JS_GetClass(_object);
+
+    if (jsclass)
+        return jsclass->name;
+
+    JS::RootedValue ctor(_context);
+    getValue("constructor", &ctor);
+
+    return ObjectWrapper(_context, ctor).getString("name");
 }
 
 }  // namespace mozjs

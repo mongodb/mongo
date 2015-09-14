@@ -64,7 +64,7 @@ void DBCollectionInfo::construct(JSContext* cx, JS::CallArgs args) {
     }
 
     JS::RootedObject thisv(cx);
-    scope->getDbCollectionProto().newObject(&thisv);
+    scope->getProto<DBCollectionInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     o.setValue("_mongo", args.get(0));

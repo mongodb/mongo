@@ -48,7 +48,7 @@ void DBRefInfo::construct(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::BadValue, "DBRef 1st parameter must be a string");
 
     JS::RootedObject thisv(cx);
-    scope->getDbRefProto().newObject(&thisv);
+    scope->getProto<DBRefInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     o.setValue("$ref", args.get(0));

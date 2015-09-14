@@ -42,7 +42,7 @@ struct OIDInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(toString);
+        MONGO_DECLARE_JS_FUNCTION(toString);
     };
 
     static const JSFunctionSpec methods[2];

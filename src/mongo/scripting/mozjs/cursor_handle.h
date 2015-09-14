@@ -45,7 +45,7 @@ struct CursorHandleInfo : public BaseInfo {
     static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(zeroCursorId);
+        MONGO_DECLARE_JS_FUNCTION(zeroCursorId);
     };
 
     static const JSFunctionSpec methods[2];

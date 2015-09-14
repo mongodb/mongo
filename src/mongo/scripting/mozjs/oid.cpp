@@ -34,6 +34,7 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -41,12 +42,12 @@ namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec OIDInfo::methods[2] = {
-    MONGO_ATTACH_JS_FUNCTION(toString), JS_FS_END,
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, OIDInfo), JS_FS_END,
 };
 
 const char* const OIDInfo::className = "ObjectId";
 
-void OIDInfo::Functions::toString(JSContext* cx, JS::CallArgs args) {
+void OIDInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
     ObjectWrapper o(cx, args.thisv());
 
     if (!o.hasField("str"))
@@ -75,7 +76,7 @@ void OIDInfo::construct(JSContext* cx, JS::CallArgs args) {
     }
 
     JS::RootedObject thisv(cx);
-    scope->getOidProto().newObject(&thisv);
+    scope->getProto<OIDInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     o.setString("str", oid->toString());

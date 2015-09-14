@@ -160,6 +160,8 @@ public:
         return _object;
     }
 
+    std::string getClassName();
+
 private:
     /**
      * writes the field "key" into the associated builder

@@ -63,6 +63,11 @@ public:
     bool toBoolean();
 
     /**
+     * Provides the type of the value. For objects, it fetches the class name if possible.
+     */
+    std::string typeAsString();
+
+    /**
      * Writes the value into a bsonobjbuilder under the name in sd.
      */
     void writeThis(BSONObjBuilder* b, StringData sd);

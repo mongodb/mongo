@@ -51,10 +51,10 @@ struct NumberLongInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(toNumber);
-        MONGO_DEFINE_JS_FUNCTION(toString);
-        MONGO_DEFINE_JS_FUNCTION(valueOf);
-        MONGO_DEFINE_JS_FUNCTION(compare);
+        MONGO_DECLARE_JS_FUNCTION(toNumber);
+        MONGO_DECLARE_JS_FUNCTION(toString);
+        MONGO_DECLARE_JS_FUNCTION(valueOf);
+        MONGO_DECLARE_JS_FUNCTION(compare);
     };
 
     static const JSFunctionSpec methods[5];

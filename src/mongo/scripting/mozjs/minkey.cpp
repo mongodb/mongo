@@ -33,12 +33,13 @@
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 
 namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec MinKeyInfo::methods[2] = {
-    MONGO_ATTACH_JS_FUNCTION(tojson), JS_FS_END,
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(tojson, MinKeyInfo), JS_FS_END,
 };
 
 const char* const MinKeyInfo::className = "MinKey";
@@ -59,13 +60,13 @@ void MinKeyInfo::construct(JSContext* cx, JS::CallArgs args) {
 void MinKeyInfo::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
-    ObjectWrapper o(cx, scope->getMinKeyProto().getProto());
+    ObjectWrapper o(cx, scope->getProto<MinKeyInfo>().getProto());
 
     JS::RootedValue val(cx);
 
     if (!o.hasField(kSingleton)) {
         JS::RootedObject thisv(cx);
-        scope->getMinKeyProto().newObject(&thisv);
+        scope->getProto<MinKeyInfo>().newObject(&thisv);
 
         val.setObjectOrNull(thisv);
         o.setValue(kSingleton, val);
@@ -76,7 +77,7 @@ void MinKeyInfo::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setObjectOrNull(val.toObjectOrNull());
 }
 
-void MinKeyInfo::Functions::tojson(JSContext* cx, JS::CallArgs args) {
+void MinKeyInfo::Functions::tojson::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromStringData("{ \"$minKey\" : 1 }");
 }
 
@@ -84,7 +85,7 @@ void MinKeyInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleO
     ObjectWrapper protoWrapper(cx, proto);
 
     JS::RootedValue value(cx);
-    getScope(cx)->getMinKeyProto().newObject(&value);
+    getScope(cx)->getProto<MinKeyInfo>().newObject(&value);
 
     ObjectWrapper(cx, global).setValue("MinKey", value);
     protoWrapper.setValue(kSingleton, value);

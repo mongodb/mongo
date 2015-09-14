@@ -147,103 +147,135 @@ public:
 
     BSONObj callThreadArgs(const BSONObj& obj);
 
-    WrapType<BinDataInfo>& getBinDataProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, BinDataInfo>::value, WrapType<T>&>::type getProto() {
         return _binDataProto;
     }
 
-    WrapType<BSONInfo>& getBsonProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, BSONInfo>::value, WrapType<T>&>::type getProto() {
         return _bsonProto;
     }
 
-    WrapType<CountDownLatchInfo>& getCountDownLatchProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, CountDownLatchInfo>::value, WrapType<T>&>::type
+    getProto() {
         return _countDownLatchProto;
     }
 
-    WrapType<CursorInfo>& getCursorProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, CursorInfo>::value, WrapType<T>&>::type getProto() {
         return _cursorProto;
     }
 
-    WrapType<CursorHandleInfo>& getCursorHandleProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, CursorHandleInfo>::value, WrapType<T>&>::type
+    getProto() {
         return _cursorHandleProto;
     }
 
-    WrapType<DBCollectionInfo>& getDbCollectionProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, DBCollectionInfo>::value, WrapType<T>&>::type
+    getProto() {
         return _dbCollectionProto;
     }
 
-    WrapType<DBPointerInfo>& getDbPointerProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, DBPointerInfo>::value, WrapType<T>&>::type getProto() {
         return _dbPointerProto;
     }
 
-    WrapType<DBQueryInfo>& getDbQueryProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, DBQueryInfo>::value, WrapType<T>&>::type getProto() {
         return _dbQueryProto;
     }
 
-    WrapType<DBInfo>& getDbProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, DBInfo>::value, WrapType<T>&>::type getProto() {
         return _dbProto;
     }
 
-    WrapType<DBRefInfo>& getDbRefProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, DBRefInfo>::value, WrapType<T>&>::type getProto() {
         return _dbRefProto;
     }
 
-    WrapType<ErrorInfo>& getErrorProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, ErrorInfo>::value, WrapType<T>&>::type getProto() {
         return _errorProto;
     }
 
-    WrapType<JSThreadInfo>& getJSThreadProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, JSThreadInfo>::value, WrapType<T>&>::type getProto() {
         return _jsThreadProto;
     }
 
-    WrapType<MaxKeyInfo>& getMaxKeyProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, MaxKeyInfo>::value, WrapType<T>&>::type getProto() {
         return _maxKeyProto;
     }
 
-    WrapType<MinKeyInfo>& getMinKeyProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, MinKeyInfo>::value, WrapType<T>&>::type getProto() {
         return _minKeyProto;
     }
 
-    WrapType<MongoExternalInfo>& getMongoExternalProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, MongoExternalInfo>::value, WrapType<T>&>::type
+    getProto() {
         return _mongoExternalProto;
     }
 
-    WrapType<MongoHelpersInfo>& getMongoHelpersProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, MongoHelpersInfo>::value, WrapType<T>&>::type
+    getProto() {
         return _mongoHelpersProto;
     }
 
-    WrapType<MongoLocalInfo>& getMongoLocalProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, MongoLocalInfo>::value, WrapType<T>&>::type getProto() {
         return _mongoLocalProto;
     }
 
-    WrapType<NativeFunctionInfo>& getNativeFunctionProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, NativeFunctionInfo>::value, WrapType<T>&>::type
+    getProto() {
         return _nativeFunctionProto;
     }
 
-    WrapType<NumberIntInfo>& getNumberIntProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, NumberIntInfo>::value, WrapType<T>&>::type getProto() {
         return _numberIntProto;
     }
 
-    WrapType<NumberLongInfo>& getNumberLongProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, NumberLongInfo>::value, WrapType<T>&>::type getProto() {
         return _numberLongProto;
     }
 
-    WrapType<NumberDecimalInfo>& getNumberDecimalProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, NumberDecimalInfo>::value, WrapType<T>&>::type
+    getProto() {
         return _numberDecimalProto;
     }
 
-    WrapType<ObjectInfo>& getObjectProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, ObjectInfo>::value, WrapType<T>&>::type getProto() {
         return _objectProto;
     }
 
-    WrapType<OIDInfo>& getOidProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, OIDInfo>::value, WrapType<T>&>::type getProto() {
         return _oidProto;
     }
 
-    WrapType<RegExpInfo>& getRegExpProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, RegExpInfo>::value, WrapType<T>&>::type getProto() {
         return _regExpProto;
     }
 
-    WrapType<TimestampInfo>& getTimestampProto() {
+    template <typename T>
+    typename std::enable_if<std::is_same<T, TimestampInfo>::value, WrapType<T>&>::type getProto() {
         return _timestampProto;
     }
 

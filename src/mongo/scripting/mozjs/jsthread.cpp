@@ -48,6 +48,8 @@
 namespace mongo {
 namespace mozjs {
 
+// These are all executed on some object that owns a js thread, rather than a
+// jsthread itself, so CONSTRAINED_METHOD doesn't do the job here.
 const JSFunctionSpec JSThreadInfo::threadMethods[6] = {
     MONGO_ATTACH_JS_FUNCTION(init),
     MONGO_ATTACH_JS_FUNCTION(start),
@@ -211,7 +213,10 @@ JSThreadConfig* getConfig(JSContext* cx, JS::CallArgs args) {
     ObjectWrapper(cx, args.thisv()).getValue("_JSThreadConfig", &value);
 
     if (!value.isObject())
-        uasserted(ErrorCodes::InternalError, "_JSThreadConfig not an object");
+        uasserted(ErrorCodes::BadValue, "_JSThreadConfig not an object");
+
+    if (!getScope(cx)->getProto<JSThreadInfo>().instanceOf(value))
+        uasserted(ErrorCodes::BadValue, "_JSThreadConfig is not a JSThread");
 
     return static_cast<JSThreadConfig*>(JS_GetPrivate(value.toObjectOrNull()));
 }
@@ -227,11 +232,11 @@ void JSThreadInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     delete config;
 }
 
-void JSThreadInfo::Functions::init(JSContext* cx, JS::CallArgs args) {
+void JSThreadInfo::Functions::init::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     JS::RootedObject obj(cx);
-    scope->getJSThreadProto().newObject(&obj);
+    scope->getProto<JSThreadInfo>().newObject(&obj);
     JSThreadConfig* config = new JSThreadConfig(cx, args);
     JS_SetPrivate(obj, config);
 
@@ -240,28 +245,28 @@ void JSThreadInfo::Functions::init(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void JSThreadInfo::Functions::start(JSContext* cx, JS::CallArgs args) {
+void JSThreadInfo::Functions::start::call(JSContext* cx, JS::CallArgs args) {
     getConfig(cx, args)->start();
 
     args.rval().setUndefined();
 }
 
-void JSThreadInfo::Functions::join(JSContext* cx, JS::CallArgs args) {
+void JSThreadInfo::Functions::join::call(JSContext* cx, JS::CallArgs args) {
     getConfig(cx, args)->join();
 
     args.rval().setUndefined();
 }
 
-void JSThreadInfo::Functions::hasFailed(JSContext* cx, JS::CallArgs args) {
+void JSThreadInfo::Functions::hasFailed::call(JSContext* cx, JS::CallArgs args) {
     args.rval().setBoolean(getConfig(cx, args)->hasFailed());
 }
 
-void JSThreadInfo::Functions::returnData(JSContext* cx, JS::CallArgs args) {
+void JSThreadInfo::Functions::returnData::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval())
         .fromBSONElement(getConfig(cx, args)->returnData().firstElement(), true);
 }
 
-void JSThreadInfo::Functions::_threadInject(JSContext* cx, JS::CallArgs args) {
+void JSThreadInfo::Functions::_threadInject::call(JSContext* cx, JS::CallArgs args) {
     uassert(ErrorCodes::JSInterpreterFailure,
             "threadInject takes exactly 1 argument",
             args.length() == 1);
@@ -277,8 +282,8 @@ void JSThreadInfo::Functions::_threadInject(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void JSThreadInfo::Functions::_scopedThreadInject(JSContext* cx, JS::CallArgs args) {
-    _threadInject(cx, args);
+void JSThreadInfo::Functions::_scopedThreadInject::call(JSContext* cx, JS::CallArgs args) {
+    _threadInject::call(cx, args);
 }
 
 }  // namespace mozjs

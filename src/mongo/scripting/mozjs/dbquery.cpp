@@ -46,7 +46,7 @@ void DBQueryInfo::construct(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::BadValue, "dbQuery constructor requires at least 4 arguments");
 
     JS::RootedObject thisv(cx);
-    scope->getDbQueryProto().newObject(&thisv);
+    scope->getProto<DBQueryInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     o.setValue("_mongo", args.get(0));

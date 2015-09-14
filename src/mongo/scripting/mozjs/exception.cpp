@@ -79,7 +79,7 @@ std::string currentJSStackToString(JSContext* cx) {
     auto scope = getScope(cx);
 
     JS::RootedValue error(cx);
-    scope->getErrorProto().newInstance(&error);
+    scope->getProto<ErrorInfo>().newInstance(&error);
 
     return ObjectWrapper(cx, error).getString("stack");
 }

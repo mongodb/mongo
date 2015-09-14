@@ -82,13 +82,42 @@ int ValueWriter::type() {
     uasserted(ErrorCodes::BadValue, "unable to get type");
 }
 
+std::string ValueWriter::typeAsString() {
+    if (_value.isNull())
+        return "null";
+    if (_value.isUndefined())
+        return "undefined";
+    if (_value.isString())
+        return "string";
+    if (JS_IsArrayObject(_context, _value))
+        return "array";
+    if (_value.isBoolean())
+        return "boolean";
+    if (_value.isNumber())
+        return "number";
+
+    if (_value.isObject()) {
+        JS::RootedObject obj(_context, _value.toObjectOrNull());
+        if (JS_IsArrayObject(_context, obj))
+            return "array";
+        if (JS_ObjectIsDate(_context, obj))
+            return "date";
+        if (JS_ObjectIsFunction(_context, obj))
+            return "function";
+
+        return ObjectWrapper(_context, _value).getClassName();
+    }
+
+    uasserted(ErrorCodes::BadValue, "unable to get type");
+}
+
 BSONObj ValueWriter::toBSON() {
     if (!_value.isObject())
         return BSONObj();
 
     JS::RootedObject obj(_context, _value.toObjectOrNull());
 
-    if (getScope(_context)->getBsonProto().instanceOf(obj)) {
+    if (getScope(_context)->getProto<BSONInfo>().instanceOf(obj)) {
         BSONObj* originalBSON;
         bool altered;
 
@@ -130,7 +159,7 @@ int32_t ValueWriter::toInt32() {
 
 int64_t ValueWriter::toInt64() {
     int64_t out;
-    if (getScope(_context)->getNumberLongProto().instanceOf(_value))
+    if (getScope(_context)->getProto<NumberLongInfo>().instanceOf(_value))
         return NumberLongInfo::ToNumberLong(_context, _value);
 
     if (JS::ToInt64(_context, _value, &out))
@@ -144,13 +173,13 @@ Decimal128 ValueWriter::toDecimal128() {
         return Decimal128(toNumber());
     }
 
-    if (getScope(_context)->getNumberIntProto().instanceOf(_value))
+    if (getScope(_context)->getProto<NumberIntInfo>().instanceOf(_value))
         return Decimal128(NumberIntInfo::ToNumberInt(_context, _value));
 
-    if (getScope(_context)->getNumberLongProto().instanceOf(_value))
+    if (getScope(_context)->getProto<NumberLongInfo>().instanceOf(_value))
         return Decimal128(NumberLongInfo::ToNumberLong(_context, _value));
 
-    if (getScope(_context)->getNumberDecimalProto().instanceOf(_value))
+    if (getScope(_context)->getProto<NumberDecimalInfo>().instanceOf(_value))
         return NumberDecimalInfo::ToNumberDecimal(_context, _value);
 
     if (_value.isString()) {
@@ -214,7 +243,7 @@ void ValueWriter::_writeObject(BSONObjBuilder* b, StringData sd, JS::HandleObjec
     if (JS_ObjectIsFunction(_context, _value.toObjectOrNull())) {
         uassert(16716,
                 "cannot convert native function to BSON",
-                !scope->getNativeFunctionProto().instanceOf(obj));
+                !scope->getProto<NativeFunctionInfo>().instanceOf(obj));
         b->appendCode(sd, ValueWriter(_context, _value).toString());
     } else if (JS_ObjectIsRegExp(_context, obj)) {
         JS::RootedValue v(_context);
@@ -232,21 +261,21 @@ void ValueWriter::_writeObject(BSONObjBuilder* b, StringData sd, JS::HandleObjec
 
         auto d = Date_t::fromMillisSinceEpoch(ValueWriter(_context, dateval).toNumber());
         b->appendDate(sd, d);
-    } else if (scope->getOidProto().instanceOf(obj)) {
+    } else if (scope->getProto<OIDInfo>().instanceOf(obj)) {
         b->append(sd, OID(o.getString("str")));
-    } else if (scope->getNumberLongProto().instanceOf(obj)) {
+    } else if (scope->getProto<NumberLongInfo>().instanceOf(obj)) {
         long long out = NumberLongInfo::ToNumberLong(_context, obj);
         b->append(sd, out);
-    } else if (scope->getNumberIntProto().instanceOf(obj)) {
+    } else if (scope->getProto<NumberIntInfo>().instanceOf(obj)) {
         b->append(sd, NumberIntInfo::ToNumberInt(_context, obj));
-    } else if (scope->getNumberDecimalProto().instanceOf(obj)) {
+    } else if (scope->getProto<NumberDecimalInfo>().instanceOf(obj)) {
         b->append(sd, NumberDecimalInfo::ToNumberDecimal(_context, obj));
-    } else if (scope->getDbPointerProto().instanceOf(obj)) {
+    } else if (scope->getProto<DBPointerInfo>().instanceOf(obj)) {
         JS::RootedValue id(_context);
         o.getValue("id", &id);
 
         b->appendDBRef(sd, o.getString("ns"), OID(ObjectWrapper(_context, id).getString("str")));
-    } else if (scope->getBinDataProto().instanceOf(obj)) {
+    } else if (scope->getProto<BinDataInfo>().instanceOf(obj)) {
         auto str = static_cast<std::string*>(JS_GetPrivate(obj));
 
         auto binData = base64::decode(*str);
@@ -255,12 +284,12 @@ void ValueWriter::_writeObject(BSONObjBuilder* b, StringData sd, JS::HandleObjec
                          binData.size(),
                          static_cast<mongo::BinDataType>(static_cast<int>(o.getNumber("type"))),
                          binData.c_str());
-    } else if (scope->getTimestampProto().instanceOf(obj)) {
+    } else if (scope->getProto<TimestampInfo>().instanceOf(obj)) {
         Timestamp ot(o.getNumber("t"), o.getNumber("i"));
         b->append(sd, ot);
-    } else if (scope->getMinKeyProto().instanceOf(obj)) {
+    } else if (scope->getProto<MinKeyInfo>().instanceOf(obj)) {
         b->appendMinKey(sd);
-    } else if (scope->getMaxKeyProto().instanceOf(obj)) {
+    } else if (scope->getProto<MaxKeyInfo>().instanceOf(obj)) {
         b->appendMaxKey(sd);
     } else {
         // nested object or array

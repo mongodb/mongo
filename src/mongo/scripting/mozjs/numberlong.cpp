@@ -36,6 +36,7 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/text.h"
 
@@ -43,10 +44,10 @@ namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec NumberLongInfo::methods[5] = {
-    MONGO_ATTACH_JS_FUNCTION(toNumber),
-    MONGO_ATTACH_JS_FUNCTION(toString),
-    MONGO_ATTACH_JS_FUNCTION(valueOf),
-    MONGO_ATTACH_JS_FUNCTION(compare),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toNumber, NumberLongInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberLongInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(valueOf, NumberLongInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(compare, NumberLongInfo),
     JS_FS_END,
 };
 
@@ -80,17 +81,17 @@ long long NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleObject thisv) {
             (unsigned)(o.getNumber(kBottom)));
 }
 
-void NumberLongInfo::Functions::valueOf(JSContext* cx, JS::CallArgs args) {
+void NumberLongInfo::Functions::valueOf::call(JSContext* cx, JS::CallArgs args) {
     long long out = NumberLongInfo::ToNumberLong(cx, args.thisv());
 
     args.rval().setDouble(out);
 }
 
-void NumberLongInfo::Functions::toNumber(JSContext* cx, JS::CallArgs args) {
-    valueOf(cx, args);
+void NumberLongInfo::Functions::toNumber::call(JSContext* cx, JS::CallArgs args) {
+    valueOf::call(cx, args);
 }
 
-void NumberLongInfo::Functions::toString(JSContext* cx, JS::CallArgs args) {
+void NumberLongInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
     str::stream ss;
 
     long long val = NumberLongInfo::ToNumberLong(cx, args.thisv());
@@ -105,7 +106,7 @@ void NumberLongInfo::Functions::toString(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
 }
 
-void NumberLongInfo::Functions::compare(JSContext* cx, JS::CallArgs args) {
+void NumberLongInfo::Functions::compare::call(JSContext* cx, JS::CallArgs args) {
     uassert(ErrorCodes::BadValue, "NumberLong.compare() needs 1 argument", args.length() == 1);
     uassert(ErrorCodes::BadValue,
             "NumberLong.compare() argument must be an object",
@@ -133,7 +134,7 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     JS::RootedObject thisv(cx);
 
-    scope->getNumberLongProto().newObject(&thisv);
+    scope->getProto<NumberLongInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     JS::RootedValue floatApprox(cx);

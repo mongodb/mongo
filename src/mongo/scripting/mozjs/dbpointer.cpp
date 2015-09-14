@@ -49,11 +49,11 @@ void DBPointerInfo::construct(JSContext* cx, JS::CallArgs args) {
     if (!args.get(0).isString())
         uasserted(ErrorCodes::BadValue, "DBPointer 1st parameter must be a string");
 
-    if (!scope->getOidProto().instanceOf(args.get(1)))
+    if (!scope->getProto<OIDInfo>().instanceOf(args.get(1)))
         uasserted(ErrorCodes::BadValue, "DBPointer 2nd parameter must be an ObjectId");
 
     JS::RootedObject thisv(cx);
-    scope->getDbPointerProto().newObject(&thisv);
+    scope->getProto<DBPointerInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     o.setValue("ns", args.get(0));

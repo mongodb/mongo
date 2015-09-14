@@ -45,7 +45,7 @@ struct MinKeyInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(tojson);
+        MONGO_DECLARE_JS_FUNCTION(tojson);
     };
 
     static const JSFunctionSpec methods[2];

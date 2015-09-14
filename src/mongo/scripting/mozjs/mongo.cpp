@@ -41,26 +41,33 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec MongoBase::methods[] = {
-    MONGO_ATTACH_JS_FUNCTION(auth),
-    MONGO_ATTACH_JS_FUNCTION(copyDatabaseWithSCRAM),
-    MONGO_ATTACH_JS_FUNCTION(cursorFromId),
-    MONGO_ATTACH_JS_FUNCTION(cursorHandleFromId),
-    MONGO_ATTACH_JS_FUNCTION(find),
-    MONGO_ATTACH_JS_FUNCTION(getClientRPCProtocols),
-    MONGO_ATTACH_JS_FUNCTION(getServerRPCProtocols),
-    MONGO_ATTACH_JS_FUNCTION(insert),
-    MONGO_ATTACH_JS_FUNCTION(logout),
-    MONGO_ATTACH_JS_FUNCTION(remove),
-    MONGO_ATTACH_JS_FUNCTION(runCommand),
-    MONGO_ATTACH_JS_FUNCTION(runCommandWithMetadata),
-    MONGO_ATTACH_JS_FUNCTION(setClientRPCProtocols),
-    MONGO_ATTACH_JS_FUNCTION(update),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(auth, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        copyDatabaseWithSCRAM, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorFromId, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        cursorHandleFromId, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(find, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        getClientRPCProtocols, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        getServerRPCProtocols, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(insert, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(logout, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(remove, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(runCommand, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        runCommandWithMetadata, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        setClientRPCProtocols, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(update, MongoLocalInfo, MongoExternalInfo),
     JS_FS_END,
 };
 
@@ -106,7 +113,7 @@ void MongoBase::finalize(JSFreeOp* fop, JSObject* obj) {
     }
 }
 
-void MongoBase::Functions::runCommand(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 3)
         uasserted(ErrorCodes::BadValue, "runCommand needs 3 args");
 
@@ -133,7 +140,7 @@ void MongoBase::Functions::runCommand(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromBSON(cmdRes, false /* read only */);
 }
 
-void MongoBase::Functions::runCommandWithMetadata(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 4)
         uasserted(ErrorCodes::BadValue, "runCommandWithMetadata needs 4 args");
 
@@ -169,7 +176,7 @@ void MongoBase::Functions::runCommandWithMetadata(JSContext* cx, JS::CallArgs ar
     ValueReader(cx, args.rval()).fromBSON(mergedResult, false);
 }
 
-void MongoBase::Functions::find(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (args.length() != 7)
@@ -213,14 +220,14 @@ void MongoBase::Functions::find(JSContext* cx, JS::CallArgs args) {
     }
 
     JS::RootedObject c(cx);
-    scope->getCursorProto().newObject(&c);
+    scope->getProto<CursorInfo>().newObject(&c);
 
     setCursor(c, std::move(cursor), args);
 
     args.rval().setObjectOrNull(c);
 }
 
-void MongoBase::Functions::insert(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (args.length() != 3)
@@ -250,7 +257,7 @@ void MongoBase::Functions::insert(JSContext* cx, JS::CallArgs args) {
 
         if (!ele.hasField("_id")) {
             JS::RootedValue value(cx);
-            scope->getOidProto().newInstance(&value);
+            scope->getProto<OIDInfo>().newInstance(&value);
             ele.setValue("_id", value);
         }
 
@@ -285,7 +292,7 @@ void MongoBase::Functions::insert(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::remove(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::remove::call(JSContext* cx, JS::CallArgs args) {
     if (!(args.length() == 2 || args.length() == 3))
         uasserted(ErrorCodes::BadValue, "remove needs 2 or 3 args");
 
@@ -311,7 +318,7 @@ void MongoBase::Functions::remove(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::update(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::update::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() < 3)
         uasserted(ErrorCodes::BadValue, "update needs at least 3 args");
 
@@ -339,7 +346,7 @@ void MongoBase::Functions::update(JSContext* cx, JS::CallArgs args) {
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::auth(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::auth::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
     if (!conn)
         uasserted(ErrorCodes::BadValue, "no connection");
@@ -365,7 +372,7 @@ void MongoBase::Functions::auth(JSContext* cx, JS::CallArgs args) {
     args.rval().setBoolean(true);
 }
 
-void MongoBase::Functions::logout(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::logout::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1)
         uasserted(ErrorCodes::BadValue, "logout needs 1 arg");
 
@@ -381,13 +388,13 @@ void MongoBase::Functions::logout(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromBSON(ret, false);
 }
 
-void MongoBase::Functions::cursorFromId(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::cursorFromId::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (!(args.length() == 2 || args.length() == 3))
         uasserted(ErrorCodes::BadValue, "cursorFromId needs 2 or 3 args");
 
-    if (!scope->getNumberLongProto().instanceOf(args.get(1)))
+    if (!scope->getProto<NumberLongInfo>().instanceOf(args.get(1)))
         uasserted(ErrorCodes::BadValue, "2nd arg must be a NumberLong");
 
     if (!(args.get(2).isNumber() || args.get(2).isUndefined()))
@@ -405,34 +412,34 @@ void MongoBase::Functions::cursorFromId(JSContext* cx, JS::CallArgs args) {
         cursor->setBatchSize(ValueWriter(cx, args.get(2)).toInt32());
 
     JS::RootedObject c(cx);
-    scope->getCursorProto().newObject(&c);
+    scope->getProto<CursorInfo>().newObject(&c);
 
     setCursor(c, std::move(cursor), args);
 
     args.rval().setObjectOrNull(c);
 }
 
-void MongoBase::Functions::cursorHandleFromId(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     if (args.length() != 1) {
         uasserted(ErrorCodes::BadValue, "cursorHandleFromId needs 1 arg");
     }
-    if (!scope->getNumberLongProto().instanceOf(args.get(0))) {
+    if (!scope->getProto<NumberLongInfo>().instanceOf(args.get(0))) {
         uasserted(ErrorCodes::BadValue, "1st arg must be a NumberLong");
     }
 
     long long cursorId = NumberLongInfo::ToNumberLong(cx, args.get(0));
 
     JS::RootedObject c(cx);
-    scope->getCursorHandleProto().newObject(&c);
+    scope->getProto<CursorHandleInfo>().newObject(&c);
 
     setCursorHandle(c, cursorId, args);
 
     args.rval().setObjectOrNull(c);
 }
 
-void MongoBase::Functions::copyDatabaseWithSCRAM(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (!conn)
@@ -516,7 +523,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM(JSContext* cx, JS::CallArgs arg
     ValueReader(cx, args.rval()).fromBSON(inputObj, true);
 }
 
-void MongoBase::Functions::getClientRPCProtocols(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::getClientRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (args.length() != 0)
@@ -530,7 +537,7 @@ void MongoBase::Functions::getClientRPCProtocols(JSContext* cx, JS::CallArgs arg
     ValueReader(cx, args.rval()).fromStringData(protoStr);
 }
 
-void MongoBase::Functions::setClientRPCProtocols(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::setClientRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (args.length() != 1)
@@ -548,7 +555,7 @@ void MongoBase::Functions::setClientRPCProtocols(JSContext* cx, JS::CallArgs arg
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::getServerRPCProtocols(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::getServerRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     if (args.length() != 0)
@@ -573,7 +580,7 @@ void MongoLocalInfo::construct(JSContext* cx, JS::CallArgs args) {
     conn.reset(createDirectClient(scope->getOpContext()));
 
     JS::RootedObject thisv(cx);
-    scope->getMongoLocalProto().newObject(&thisv);
+    scope->getProto<MongoLocalInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     JS_SetPrivate(thisv, new std::shared_ptr<DBClientBase>(conn.release()));
@@ -606,7 +613,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     }
 
     JS::RootedObject thisv(cx);
-    scope->getMongoExternalProto().newObject(&thisv);
+    scope->getProto<MongoExternalInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
     JS_SetPrivate(thisv, new std::shared_ptr<DBClientBase>(conn.release()));
@@ -617,7 +624,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     args.rval().setObjectOrNull(thisv);
 }
 
-void MongoExternalInfo::Functions::load(JSContext* cx, JS::CallArgs args) {
+void MongoExternalInfo::Functions::load::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     for (unsigned i = 0; i < args.length(); ++i) {
@@ -631,7 +638,7 @@ void MongoExternalInfo::Functions::load(JSContext* cx, JS::CallArgs args) {
     args.rval().setBoolean(true);
 }
 
-void MongoExternalInfo::Functions::quit(JSContext* cx, JS::CallArgs args) {
+void MongoExternalInfo::Functions::quit::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     scope->setQuickExit(args.get(0).isNumber() ? args.get(0).toNumber() : 0);
@@ -639,7 +646,7 @@ void MongoExternalInfo::Functions::quit(JSContext* cx, JS::CallArgs args) {
     uasserted(ErrorCodes::JSUncatchableError, "Calling Quit");
 }
 
-void MongoExternalInfo::Functions::_forgetReplSet(JSContext* cx, JS::CallArgs args) {
+void MongoExternalInfo::Functions::_forgetReplSet::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1) {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "_forgetReplSet takes exactly 1 argument, but was given "

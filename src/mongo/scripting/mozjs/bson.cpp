@@ -75,7 +75,7 @@ BSONHolder* getHolder(JSObject* obj) {
 void BSONInfo::make(JSContext* cx, JS::MutableHandleObject obj, BSONObj bson, bool ro) {
     auto scope = getScope(cx);
 
-    scope->getBsonProto().newObject(obj);
+    scope->getProto<BSONInfo>().newObject(obj);
     JS_SetPrivate(obj, new BSONHolder(bson, ro));
 }
 
@@ -202,7 +202,7 @@ std::tuple<BSONObj*, bool> BSONInfo::originalBSON(JSContext* cx, JS::HandleObjec
     return out;
 }
 
-void BSONInfo::Functions::bsonWoCompare(JSContext* cx, JS::CallArgs args) {
+void BSONInfo::Functions::bsonWoCompare::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 2)
         uasserted(ErrorCodes::BadValue, "bsonWoCompare needs 2 argument");
 

@@ -43,9 +43,9 @@ struct NumberIntInfo : public BaseInfo {
     static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {
-        MONGO_DEFINE_JS_FUNCTION(toNumber);
-        MONGO_DEFINE_JS_FUNCTION(toString);
-        MONGO_DEFINE_JS_FUNCTION(valueOf);
+        MONGO_DECLARE_JS_FUNCTION(toNumber);
+        MONGO_DECLARE_JS_FUNCTION(toString);
+        MONGO_DECLARE_JS_FUNCTION(valueOf);
     };
 
     static const JSFunctionSpec methods[4];
