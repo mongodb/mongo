@@ -48,7 +48,6 @@ namespace mozjs {
  * in JS via ::make() from C++.
  */
 struct NativeFunctionInfo : public BaseInfo {
-    static void construct(JSContext* cx, JS::CallArgs args);
     static void call(JSContext* cx, JS::CallArgs args);
     static void finalize(JSFreeOp* fop, JSObject* obj);
 

@@ -47,7 +47,6 @@ namespace mozjs {
  * ::make() from C++.
  */
 struct BSONInfo : public BaseInfo {
-    static void construct(JSContext* cx, JS::CallArgs args);
     static void delProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* succeeded);
     static void enumerate(JSContext* cx, JS::HandleObject obj, JS::AutoIdVector& properties);
     static void finalize(JSFreeOp* fop, JSObject* obj);

@@ -75,7 +75,7 @@ BSONHolder* getHolder(JSObject* obj) {
 void BSONInfo::make(JSContext* cx, JS::MutableHandleObject obj, BSONObj bson, bool ro) {
     auto scope = getScope(cx);
 
-    scope->getBsonProto().newInstance(obj);
+    scope->getBsonProto().newObject(obj);
     JS_SetPrivate(obj, new BSONHolder(bson, ro));
 }
 
@@ -191,12 +191,6 @@ void BSONInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, boo
 
         *resolvedp = true;
     }
-}
-
-void BSONInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
-
-    scope->getBsonProto().newObject(args.rval());
 }
 
 std::tuple<BSONObj*, bool> BSONInfo::originalBSON(JSContext* cx, JS::HandleObject obj) {

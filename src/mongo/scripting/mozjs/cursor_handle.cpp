@@ -84,12 +84,6 @@ void CursorHandleInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     }
 }
 
-void CursorHandleInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
-
-    scope->getCursorHandleProto().newObject(args.rval());
-}
-
 void CursorHandleInfo::Functions::zeroCursorId(JSContext* cx, JS::CallArgs args) {
     long long* cursorId = getCursorId(args);
     if (cursorId) {

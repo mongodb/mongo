@@ -213,7 +213,7 @@ void MongoBase::Functions::find(JSContext* cx, JS::CallArgs args) {
     }
 
     JS::RootedObject c(cx);
-    scope->getCursorProto().newInstance(&c);
+    scope->getCursorProto().newObject(&c);
 
     setCursor(c, std::move(cursor), args);
 
@@ -405,7 +405,7 @@ void MongoBase::Functions::cursorFromId(JSContext* cx, JS::CallArgs args) {
         cursor->setBatchSize(ValueWriter(cx, args.get(2)).toInt32());
 
     JS::RootedObject c(cx);
-    scope->getCursorProto().newInstance(&c);
+    scope->getCursorProto().newObject(&c);
 
     setCursor(c, std::move(cursor), args);
 
@@ -425,7 +425,7 @@ void MongoBase::Functions::cursorHandleFromId(JSContext* cx, JS::CallArgs args) 
     long long cursorId = NumberLongInfo::ToNumberLong(cx, args.get(0));
 
     JS::RootedObject c(cx);
-    scope->getCursorHandleProto().newInstance(&c);
+    scope->getCursorHandleProto().newObject(&c);
 
     setCursorHandle(c, cursorId, args);
 

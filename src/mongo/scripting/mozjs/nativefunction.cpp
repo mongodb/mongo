@@ -67,14 +67,14 @@ NativeHolder* getHolder(JS::CallArgs args) {
 
 }  // namespace
 
-void NativeFunctionInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
-
-    scope->getNativeFunctionProto().newObject(args.rval());
-}
-
 void NativeFunctionInfo::call(JSContext* cx, JS::CallArgs args) {
     auto holder = getHolder(args);
+
+    if (! holder) {
+        // Calling the prototype
+        args.rval().setUndefined();
+        return;
+    }
 
     BSONObjBuilder bob;
 
@@ -115,7 +115,7 @@ void NativeFunctionInfo::make(JSContext* cx,
                               void* data) {
     auto scope = getScope(cx);
 
-    scope->getNativeFunctionProto().newInstance(obj);
+    scope->getNativeFunctionProto().newObject(obj);
 
     JS_SetPrivate(obj, new NativeHolder(function, data));
 }

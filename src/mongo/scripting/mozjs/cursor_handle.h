@@ -42,7 +42,6 @@ namespace mozjs {
  * callers are all via the Mongo object.
  */
 struct CursorHandleInfo : public BaseInfo {
-    static void construct(JSContext* cx, JS::CallArgs args);
     static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {

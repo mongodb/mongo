@@ -280,22 +280,30 @@ public:
      * newInstance calls the constructor, a la new Type() in js
      */
     void newInstance(JS::MutableHandleObject out) {
+        dassert(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
+
         JS::AutoValueVector args(_context);
 
         newInstance(args, out);
     }
 
     void newInstance(const JS::HandleValueArray& args, JS::MutableHandleObject out) {
+        dassert(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
+
         out.set(_assertPtr(JS_New(_context, _proto, args)));
     }
 
     void newInstance(JS::MutableHandleValue out) {
+        dassert(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
+
         JS::AutoValueVector args(_context);
 
         newInstance(args, out);
     }
 
     void newInstance(const JS::HandleValueArray& args, JS::MutableHandleValue out) {
+        dassert(T::installType == InstallType::OverNative || T::construct != BaseInfo::construct);
+
         out.setObjectOrNull(_assertPtr(JS_New(_context, _proto, args)));
     }
 
@@ -349,6 +357,8 @@ private:
     // Use this if you want your types installed, but not visible in the
     // global scope
     void _installPrivate(JS::HandleObject global) {
+        dassert(T::construct == BaseInfo::construct);
+
         JS::RootedObject parent(_context);
         _inheritFrom(T::inheritFrom, global, &parent);
 
@@ -370,6 +380,18 @@ private:
     // Use this to attach things to types that we don't provide like
     // Object, or Array
     void _installOverNative(JS::HandleObject global) {
+        dassert(T::addProperty == BaseInfo::addProperty);
+        dassert(T::call == BaseInfo::call);
+        dassert(T::construct == BaseInfo::construct);
+        dassert(T::convert == BaseInfo::convert);
+        dassert(T::delProperty == BaseInfo::delProperty);
+        dassert(T::enumerate == BaseInfo::enumerate);
+        dassert(T::finalize == BaseInfo::finalize);
+        dassert(T::getProperty == BaseInfo::getProperty);
+        dassert(T::hasInstance == BaseInfo::hasInstance);
+        dassert(T::resolve == BaseInfo::resolve);
+        dassert(T::setProperty == BaseInfo::setProperty);
+
         JS::RootedValue value(_context);
         if (!JS_GetProperty(_context, global, T::className, &value))
             throwCurrentJSException(

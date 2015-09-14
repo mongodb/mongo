@@ -68,12 +68,6 @@ void CursorInfo::finalize(JSFreeOp* fop, JSObject* obj) {
     }
 }
 
-void CursorInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
-
-    scope->getCursorProto().newObject(args.rval());
-}
-
 void CursorInfo::Functions::next(JSContext* cx, JS::CallArgs args) {
     auto cursor = getCursor(args);
 
