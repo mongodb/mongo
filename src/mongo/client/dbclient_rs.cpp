@@ -229,7 +229,7 @@ bool _isSecondaryCommand(StringData commandName, const BSONObj& commandArgs) {
         }
 
         BSONElement outElem(commandArgs["out"]);
-        if (outElem.isABSONObj() && outElem["inline"].trueValue()) {
+        if (outElem.isABSONObj() && outElem["inline"].ok()) {
             return true;
         }
     }
