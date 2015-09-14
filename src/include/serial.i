@@ -256,6 +256,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 {
 	WT_DECL_RET;
 	WT_UPDATE *obsolete, *upd = *updp;
+	uint64_t txn;
 
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
@@ -302,16 +303,15 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * there are further updates to this page, the check against WT_TXN_NONE
 	 * is used as an indicator of there being further updates on this page.
 	 */
-	if (page->modify->obsolete_check_txn != WT_TXN_NONE &&
-	    !__wt_txn_visible_all(session, page->modify->obsolete_check_txn)) {
+	if ((txn = page->modify->obsolete_check_txn) != WT_TXN_NONE) {
+		page->modify->obsolete_check_txn = WT_TXN_NONE;
 
-		/* Try to move the oldest ID forward and re-check. */
-		__wt_txn_update_oldest(session, 0);
+		if (!__wt_txn_visible_all(session, txn)) {
+			/* Try to move the oldest ID forward and re-check. */
+			__wt_txn_update_oldest(session, 0);
 
-		if (!__wt_txn_visible_all(session,
-		    page->modify->obsolete_check_txn)) {
-			page->modify->obsolete_check_txn = WT_TXN_NONE;
-			return (0);
+			if (!__wt_txn_visible_all(session, txn))
+				return (0);
 		}
 	}
 	F_CAS_ATOMIC(page, WT_PAGE_RECONCILIATION, ret);
