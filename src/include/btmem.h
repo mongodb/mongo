@@ -390,10 +390,8 @@ struct __wt_page_modify {
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: no replacement */
 #define	WT_PM_REC_MULTIBLOCK	0x02	/* Reconciliation: multiple blocks */
 #define	WT_PM_REC_REPLACE	0x04	/* Reconciliation: single block */
-#define	WT_PM_REC_REWRITE	0x08	/* Reconciliation: rewrite in place */
 #define	WT_PM_REC_MASK							\
-	(WT_PM_REC_EMPTY | WT_PM_REC_MULTIBLOCK |			\
-	 WT_PM_REC_REPLACE | WT_PM_REC_REWRITE)
+	(WT_PM_REC_EMPTY | WT_PM_REC_MULTIBLOCK | WT_PM_REC_REPLACE)
 	uint8_t flags;			/* Page flags */
 };
 

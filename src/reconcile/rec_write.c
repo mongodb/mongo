@@ -627,7 +627,6 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 	case WT_PM_REC_REPLACE:				/* 1-for-1 page swap */
-	case WT_PM_REC_REWRITE:				/* Rewrite */
 		return (0);
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
 		break;
@@ -3776,8 +3775,6 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			case WT_PM_REC_REPLACE:
 				addr = &child->modify->mod_replace;
 				break;
-			case WT_PM_REC_REWRITE:
-				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
 		} else
@@ -5341,7 +5338,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	case WT_PM_REC_EMPTY:				/* Page deleted */
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
-	case WT_PM_REC_REWRITE:				/* Rewrite */
 		/*
 		 * Discard the multiple replacement blocks.
 		 */
@@ -5420,7 +5416,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			bnd->dsk = NULL;
 			mod->mod_multi_entries = 1;
 
-			F_SET(mod, WT_PM_REC_REWRITE);
+			F_SET(mod, WT_PM_REC_MULTIBLOCK);
 			break;
 		}
 
@@ -5538,13 +5534,10 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * information (otherwise we might think the backing block is being
 	 * reused on a subsequent reconciliation where we want to free it).
 	 */
-	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
-	case WT_PM_REC_MULTIBLOCK:
-	case WT_PM_REC_REWRITE:
+	if (F_ISSET(mod, WT_PM_REC_MULTIBLOCK)) {
 		for (multi = mod->mod_multi,
 		    i = 0; i < mod->mod_multi_entries; ++multi, ++i)
 			multi->addr.reuse = 0;
-		break;
 	}
 
 	/*
