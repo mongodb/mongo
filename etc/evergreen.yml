@@ -276,7 +276,7 @@ functions:
         set -o verbose
 
         cd kernel-tools/releases/release_tickets/
-        virtualenv venv-release
+        virtualenv --system-site-packages venv-release
         . venv-release/bin/activate
         pip install jira==0.16 requests==2.7.0
 
