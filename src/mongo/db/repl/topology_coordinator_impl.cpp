@@ -859,14 +859,21 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinatorImpl::prepare
         alreadyElapsed = Milliseconds(0);
     }
     ReplSetHeartbeatArgsV1 hbArgs;
-    hbArgs.setSetName(_rsConfig.getReplSetName());
-    hbArgs.setConfigVersion(_rsConfig.getConfigVersion());
-    if (_selfIndex >= 0) {
-        const MemberConfig& me = _selfConfig();
-        hbArgs.setSenderId(me.getId());
-        hbArgs.setSenderHost(me.getHostAndPort());
+    if (_rsConfig.isInitialized()) {
+        hbArgs.setSetName(_rsConfig.getReplSetName());
+        hbArgs.setConfigVersion(_rsConfig.getConfigVersion());
+        if (_selfIndex >= 0) {
+            const MemberConfig& me = _selfConfig();
+            hbArgs.setSenderId(me.getId());
+            hbArgs.setSenderHost(me.getHostAndPort());
+        }
+        hbArgs.setTerm(_term);
+    } else {
+        hbArgs.setSetName(ourSetName);
+        // Config version -2 is for uninitialized config.
+        hbArgs.setConfigVersion(-2);
+        hbArgs.setTerm(OpTime::kInitialTerm);
     }
-    hbArgs.setTerm(_term);
 
     const Milliseconds timeoutPeriod(_rsConfig.isInitialized()
                                          ? _rsConfig.getHeartbeatTimeoutPeriodMillis()
@@ -1089,13 +1096,10 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBDataV1(
             }
 
             if (it->getState().primary() && it->up()) {
-                if (remotePrimaryIndex != -1) {
-                    // Two other nodes think they are primary (asynchronously polled)
-                    // -- wait for things to settle down.
-                    warning() << "two remote primaries (transiently)";
-                    return HeartbeatResponseAction::makeNoAction();
+                if (remotePrimaryIndex == -1 ||
+                    _hbdata[remotePrimaryIndex].getTerm() < it->getTerm()) {
+                    remotePrimaryIndex = itIndex;
                 }
-                remotePrimaryIndex = itIndex;
             }
         }
 

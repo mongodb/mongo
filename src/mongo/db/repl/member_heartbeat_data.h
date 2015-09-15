@@ -82,6 +82,10 @@ public:
         return _lastResponse.getElectionTime();
     }
 
+    long long getTerm() const {
+        return _lastResponse.getTerm();
+    }
+
     // Returns true if the last heartbeat data explicilty stated that the node
     // is not electable.
     bool isUnelectable() const {

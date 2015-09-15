@@ -77,7 +77,7 @@ const std::string kGetLastErrorModesFieldName = "getLastErrorModes";
 
 }  // namespace
 
-Status ReplicaSetConfig::initialize(const BSONObj& cfg) {
+Status ReplicaSetConfig::initialize(const BSONObj& cfg, bool usePV1ByDefault) {
     _isInitialized = false;
     _members.clear();
     Status status =
@@ -135,8 +135,14 @@ Status ReplicaSetConfig::initialize(const BSONObj& cfg) {
     // Parse protocol version
     //
     status = bsonExtractIntegerField(cfg, kProtocolVersionFieldName, &_protocolVersion);
-    if (!status.isOK() && status != ErrorCodes::NoSuchKey) {
-        return status;
+    if (!status.isOK()) {
+        if (status != ErrorCodes::NoSuchKey) {
+            return status;
+        }
+
+        if (usePV1ByDefault) {
+            _protocolVersion = 1;
+        }
     }
 
     //
