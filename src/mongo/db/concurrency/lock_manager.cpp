@@ -614,6 +614,8 @@ bool LockManager::unlock(LockRequest* request) {
 
         lock->conflictList.remove(request);
         lock->decConflictModeCount(request->mode);
+
+        _onLockModeChanged(lock, true);
     } else if (request->status == LockRequest::STATUS_CONVERTING) {
         // This cancels a pending convert request
         invariant(request->recursiveCount > 0);
