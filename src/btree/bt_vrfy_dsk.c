@@ -285,7 +285,7 @@ __verify_dsk_row(
 			break;
 		}
 
-		/* Check if any referenced item has a valid address. */
+		/* Check if any referenced item has an invalid address. */
 		switch (cell_type) {
 		case WT_CELL_ADDR_DEL:
 		case WT_CELL_ADDR_INT:
@@ -293,8 +293,10 @@ __verify_dsk_row(
 		case WT_CELL_ADDR_LEAF_NO:
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:
-			if (bm->addr_invalid(bm,
-			    session, unpack->data, unpack->size))
+			ret = bm->addr_invalid(
+			    bm, session, unpack->data, unpack->size);
+			WT_RET_ERROR_OK(ret, EINVAL);
+			if (ret == EINVAL)
 				goto eof;
 			break;
 		}
@@ -477,6 +479,7 @@ __verify_dsk_col_int(
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	uint32_t cell_num, i;
 	uint8_t *end;
 
@@ -500,7 +503,9 @@ __verify_dsk_col_int(
 		    session, cell_num, tag, unpack->type, dsk->type));
 
 		/* Check if any referenced item is entirely in the file. */
-		if (bm->addr_invalid(bm, session, unpack->data, unpack->size))
+		ret = bm->addr_invalid(bm, session, unpack->data, unpack->size);
+		WT_RET_ERROR_OK(ret, EINVAL);
+		if (ret == EINVAL)
 			return (__err_eof(session, cell_num, tag));
 	}
 	WT_RET(__verify_dsk_memsize(session, tag, dsk, cell));
@@ -537,6 +542,7 @@ __verify_dsk_col_var(
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	size_t last_size;
 	uint32_t cell_num, cell_type, i;
 	int last_deleted;
@@ -568,9 +574,13 @@ __verify_dsk_col_var(
 		cell_type = unpack->type;
 
 		/* Check if any referenced item is entirely in the file. */
-		if (cell_type == WT_CELL_VALUE_OVFL &&
-		    bm->addr_invalid(bm, session, unpack->data, unpack->size))
-			return (__err_eof(session, cell_num, tag));
+		if (cell_type == WT_CELL_VALUE_OVFL) {
+			ret = bm->addr_invalid(
+			    bm, session, unpack->data, unpack->size);
+			WT_RET_ERROR_OK(ret, EINVAL);
+			if (ret == EINVAL)
+				return (__err_eof(session, cell_num, tag));
+		}
 
 		/*
 		 * Compare the last two items and see if reconciliation missed
