@@ -38,12 +38,11 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec CursorInfo::methods[6] = {
+const JSFunctionSpec CursorInfo::methods[5] = {
     MONGO_ATTACH_JS_FUNCTION(hasNext),
     MONGO_ATTACH_JS_FUNCTION(next),
     MONGO_ATTACH_JS_FUNCTION(objsLeftInBatch),
     MONGO_ATTACH_JS_FUNCTION(readOnly),
-    MONGO_ATTACH_JS_FUNCTION(kill),
     JS_FS_END,
 };
 
@@ -117,15 +116,6 @@ void CursorInfo::Functions::readOnly(JSContext* cx, JS::CallArgs args) {
     ObjectWrapper(cx, args.thisv()).setBoolean("_ro", true);
 
     args.rval().set(args.thisv());
-}
-
-void CursorInfo::Functions::kill(JSContext* cx, JS::CallArgs args) {
-    auto cursor = getCursor(args);
-
-    if (cursor)
-        cursor->kill();
-
-    args.rval().setUndefined();
 }
 
 }  // namespace mozjs
