@@ -445,6 +445,44 @@ err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __session_log_flush --
+ *	WT_SESSION->log_flush method.
+ */
+static int
+__session_log_flush(WT_SESSION *wt_session, const char *config)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+	WT_SESSION_IMPL *session;
+	uint32_t flags;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, log_flush, config, cfg);
+	WT_STAT_FAST_CONN_INCR(session, log_flush);
+
+	conn = S2C(session);
+	/*
+	 * If logging is not enabled there is nothing to do.
+	 */
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+		WT_ERR_MSG(session, EINVAL, "logging not enabled");
+
+	log = conn->log;
+	WT_ERR(__wt_config_gets_def(session, cfg, "sync", 0, &cval));
+	if (WT_STRING_MATCH("background", cval.str, cval.len))
+		flags = WT_LOG_BACKGROUND;
+	else if (WT_STRING_MATCH("sync", cval.str, cval.len))
+		flags = WT_LOG_FSYNC;
+	else if (WT_STRING_MATCH("write", cval.str, cval.len))
+		flags = WT_LOG_FLUSH;
+	ret = __wt_log_flush(session, flags);
+
+err:	API_END_RET(session, ret);
+}
+
+/*
  * __session_log_printf --
  *	WT_SESSION->log_printf method.
  */
@@ -1152,6 +1190,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		__session_create,
 		__session_compact,
 		__session_drop,
+		__session_log_flush,
 		__session_log_printf,
 		__session_rename,
 		__session_reset,

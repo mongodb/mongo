@@ -325,7 +325,7 @@ extern int __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile);
 extern int __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int closing);
 extern int __wt_evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, int closing);
 extern int __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn);
-extern int __wt_log_ckpt_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn);
+extern int __wt_log_flush_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int start);
 extern int __wt_log_background(WT_SESSION_IMPL *session, WT_LSN *lsn);
 extern int __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn);
 extern int __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec);
@@ -343,6 +343,7 @@ extern int __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 extern int __wt_log_force_write(WT_SESSION_IMPL *session, int retry);
 extern int __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, uint32_t flags);
 extern int __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap);
+extern int __wt_log_flush(WT_SESSION_IMPL *session, uint32_t flags);
 extern int __wt_logrec_alloc(WT_SESSION_IMPL *session, size_t size, WT_ITEM **logrecp);
 extern void __wt_logrec_free(WT_SESSION_IMPL *session, WT_ITEM **logrecp);
 extern int __wt_logrec_read(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, uint32_t *rectypep);

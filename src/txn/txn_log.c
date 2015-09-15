@@ -307,7 +307,7 @@ __wt_txn_checkpoint_log(
 	switch (flags) {
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = 1;
-		WT_ERR(__wt_log_ckpt_lsn(session, ckpt_lsn));
+		WT_ERR(__wt_log_flush_lsn(session, ckpt_lsn, 1));
 		/*
 		 * We need to make sure that the log records in the checkpoint
 		 * LSN are on disk.  In particular to make sure that the
@@ -336,7 +336,7 @@ __wt_txn_checkpoint_log(
 			txn->ckpt_nsnapshot = 0;
 			WT_CLEAR(empty);
 			ckpt_snapshot = &empty;
-			WT_ERR(__wt_log_ckpt_lsn(session, ckpt_lsn));
+			WT_ERR(__wt_log_flush_lsn(session, ckpt_lsn, 1));
 		} else
 			ckpt_snapshot = txn->ckpt_snapshot;
 

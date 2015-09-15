@@ -34,11 +34,12 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 }
 
 /*
- * __wt_log_ckpt_lsn --
- *	Force out buffered records and return an LSN for checkpoint.
+ * __wt_log_flush_lsn --
+ *	Force out buffered records and return the LSN, either the
+ *	write_start_lsn or write_lsn depending on the argument.
  */
 int
-__wt_log_ckpt_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
+__wt_log_flush_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int start)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
@@ -47,7 +48,10 @@ __wt_log_ckpt_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 	log = conn->log;
 	WT_RET(__wt_log_force_write(session, 1));
 	WT_RET(__wt_log_wrlsn(session));
-	*ckp_lsn = log->write_start_lsn;
+	if (start)
+		*ckp_lsn = log->write_start_lsn;
+	else
+		*ckp_lsn = log->write_lsn;
 	return (0);
 }
 
@@ -64,6 +68,11 @@ __wt_log_background(WT_SESSION_IMPL *session, WT_LSN *lsn)
 
 	conn = S2C(session);
 	log = conn->log;
+	/*
+	 * If a thread already set the LSN to a bigger LSN, we're done.
+	 */
+	if (__wt_log_cmp(&session->bg_sync_lsn, lsn) > 0)
+		return (0);
 	session->bg_sync_lsn = *lsn;
 
 	/*
@@ -1878,8 +1887,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	/*
 	 * Advance the background sync LSN if needed.
 	 */
-	if (LF_ISSET(WT_LOG_BACKGROUND) &&
-	    __wt_log_cmp(&session->bg_sync_lsn, &lsn) <= 0)
+	if (LF_ISSET(WT_LOG_BACKGROUND))
 		WT_ERR(__wt_log_background(session, &lsn));
 
 err:
@@ -1946,5 +1954,49 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	logrec->size += len;
 	WT_ERR(__wt_log_write(session, logrec, NULL, 0));
 err:	__wt_scr_free(session, &logrec);
+	return (ret);
+}
+
+/*
+ * __wt_log_flush --
+ *	Forcibly flush the log to the synchronization level specified.
+ *	Wait until it has been completed.
+ */
+int
+__wt_log_flush(WT_SESSION_IMPL *session, uint32_t flags)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_LOG *log;
+	WT_LSN last_lsn, lsn;
+
+	conn = S2C(session);
+	WT_ASSERT(session, FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED));
+	log = conn->log;
+	last_lsn = log->alloc_lsn;
+	lsn = log->write_lsn;
+	/*
+	 * Wait until all current outstanding writes have been written
+	 * to the file system.
+	 */
+	while (__wt_log_cmp(&last_lsn, &lsn) > 0)
+		WT_RET(__wt_log_flush_lsn(session, &lsn, 0));
+
+	/*
+	 * If the user wants only write-no-sync, then we're done.
+	 */
+	if (LF_ISSET(WT_LOG_FLUSH))
+		return (0);
+	/*
+	 * If the user wants background sync, set the LSN and we're done.
+	 */
+	if (LF_ISSET(WT_LOG_BACKGROUND))
+		return (__wt_log_background(session, &lsn));
+
+	/*
+	 * If the user wants sync, force it now.
+	 */
+	WT_ASSERT(session, LF_ISSET(WT_LOG_FSYNC));
+	WT_RET(__wt_log_force_sync(session, &lsn));
 	return (ret);
 }

@@ -725,6 +725,13 @@ methods = {
         type='boolean'),
 ]),
 
+'WT_SESSION.log_flush' : Method([
+    Config('sync', '', r'''
+        forcibly flush the log and wait for it to achieve the synchronization
+        level specified''',
+        choices=['background', 'sync', 'write']),
+]),
+
 'WT_SESSION.log_printf' : Method([]),
 
 'WT_SESSION.open_cursor' : Method(cursor_runtime_config + [
