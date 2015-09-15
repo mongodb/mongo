@@ -3741,7 +3741,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_COMPRESS_WRITE_FAILS		1087
 /*! log: log records compressed */
 #define	WT_STAT_CONN_LOG_COMPRESS_WRITES		1088
-/*! log: log flush calls */
+/*! log: log flush operations */
 #define	WT_STAT_CONN_LOG_FLUSH				1089
 /*! log: maximum log file size */
 #define	WT_STAT_CONN_LOG_MAX_FILESIZE			1090

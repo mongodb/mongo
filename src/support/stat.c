@@ -573,7 +573,7 @@ static const char * const __stats_connection_desc[] = {
 	"log: log records too small to compress",
 	"log: log records not compressed",
 	"log: log records compressed",
-	"log: log flush calls",
+	"log: log flush operations",
 	"log: maximum log file size",
 	"log: pre-allocated log files prepared",
 	"log: number of pre-allocated log files to create",
