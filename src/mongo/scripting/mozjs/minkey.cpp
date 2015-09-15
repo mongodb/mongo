@@ -72,9 +72,12 @@ void MinKeyInfo::call(JSContext* cx, JS::CallArgs args) {
         o.setValue(kSingleton, val);
     } else {
         o.getValue(kSingleton, &val);
+
+        if (!getScope(cx)->getProto<MinKeyInfo>().instanceOf(val))
+            uasserted(ErrorCodes::BadValue, "MinKey singleton not of type MinKey");
     }
 
-    args.rval().setObjectOrNull(val.toObjectOrNull());
+    args.rval().set(val);
 }
 
 void MinKeyInfo::Functions::tojson::call(JSContext* cx, JS::CallArgs args) {

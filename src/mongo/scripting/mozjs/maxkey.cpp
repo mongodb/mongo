@@ -72,9 +72,12 @@ void MaxKeyInfo::call(JSContext* cx, JS::CallArgs args) {
         o.setValue(kSingleton, val);
     } else {
         o.getValue(kSingleton, &val);
+
+        if (!getScope(cx)->getProto<MaxKeyInfo>().instanceOf(val))
+            uasserted(ErrorCodes::BadValue, "MaxKey singleton not of type MaxKey");
     }
 
-    args.rval().setObjectOrNull(val.toObjectOrNull());
+    args.rval().set(val);
 }
 
 void MaxKeyInfo::Functions::tojson::call(JSContext* cx, JS::CallArgs args) {
