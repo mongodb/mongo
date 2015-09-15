@@ -20,10 +20,6 @@ var runTest = function(writeFunc) {
     var testDB2 = st.s1.getDB('test');
     testDB2.user.insert({ x: 123456 });
 
-    // Force ssv initialization of 'test.user' ns for this mongos.
-    var doc = testDB2.user.findOne({ x: 123456 });
-    assert.neq(null, doc);
-
     // Move chunk to bump version on a different mongos.
     testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0000' });
 

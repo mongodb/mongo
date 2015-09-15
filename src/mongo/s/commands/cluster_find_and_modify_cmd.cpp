@@ -87,13 +87,13 @@ public:
         uassertStatusOK(status);
 
         shared_ptr<DBConfig> conf = status.getValue();
-
+        shared_ptr<ChunkManager> chunkMgr;
         shared_ptr<Shard> shard;
 
         if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
             shard = grid.shardRegistry()->getShard(txn, conf->getPrimaryId());
         } else {
-            shared_ptr<ChunkManager> chunkMgr = _getChunkManager(txn, conf, ns);
+            chunkMgr = _getChunkManager(txn, conf, ns);
 
             const BSONObj query = cmdObj.getObjectField("query");
 
@@ -117,7 +117,7 @@ public:
         Timer timer;
 
         BSONObjBuilder result;
-        bool ok = _runCommand(txn, conf, shard->getId(), ns, explainCmd.obj(), result);
+        bool ok = _runCommand(txn, conf, chunkMgr, shard->getId(), ns, explainCmd.obj(), result);
         long long millisElapsed = timer.millis();
 
         if (!ok) {
@@ -146,11 +146,11 @@ public:
                      BSONObjBuilder& result) {
         const string ns = parseNsCollectionRequired(dbName, cmdObj);
 
-        // findAndModify should only be creating database if upsert is true, but this would
-        // require that the parsing be pulled into this function.
+        // findAndModify should only be creating database if upsert is true, but this would require
+        // that the parsing be pulled into this function.
         auto conf = uassertStatusOK(grid.implicitCreateDb(txn, dbName));
         if (!conf->isShardingEnabled() || !conf->isSharded(ns)) {
-            return _runCommand(txn, conf, conf->getPrimaryId(), ns, cmdObj, result);
+            return _runCommand(txn, conf, nullptr, conf->getPrimaryId(), ns, cmdObj, result);
         }
 
         shared_ptr<ChunkManager> chunkMgr = _getChunkManager(txn, conf, ns);
@@ -166,7 +166,7 @@ public:
         BSONObj shardKey = status.getValue();
         ChunkPtr chunk = chunkMgr->findIntersectingChunk(txn, shardKey);
 
-        bool ok = _runCommand(txn, conf, chunk->getShardId(), ns, cmdObj, result);
+        bool ok = _runCommand(txn, conf, chunkMgr, chunk->getShardId(), ns, cmdObj, result);
         if (ok) {
             // check whether split is necessary (using update object for size heuristic)
             if (Chunk::ShouldAutoSplit) {
@@ -208,6 +208,7 @@ private:
 
     bool _runCommand(OperationContext* txn,
                      shared_ptr<DBConfig> conf,
+                     shared_ptr<ChunkManager> chunkManager,
                      const ShardId& shardId,
                      const string& ns,
                      const BSONObj& cmdObj,
@@ -215,7 +216,7 @@ private:
         BSONObj res;
 
         const auto shard = grid.shardRegistry()->getShard(txn, shardId);
-        ShardConnection conn(shard->getConnString(), ns);
+        ShardConnection conn(shard->getConnString(), ns, chunkManager);
         bool ok = conn->runCommand(conf->name(), cmdObj, res);
         conn.done();
 
