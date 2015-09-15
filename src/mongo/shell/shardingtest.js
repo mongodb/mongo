@@ -735,6 +735,54 @@ printShardingStatus = function( configDB , verbose ){
         }
     );
 
+    // (most recently) active mongoses
+    var mongosActiveThresholdMs = 60000;
+    var mostRecentMongos = configDB.mongos.find().sort( { ping : -1 } ).limit(1);
+    var mostRecentMongosTime = null;
+    var mongosAdjective = "most recently active";
+    if (mostRecentMongos.hasNext()) {
+        mostRecentMongosTime = mostRecentMongos.next().ping;
+        // Mongoses older than the threshold are the most recent, but cannot be
+        // considered "active" mongoses. (This is more likely to be an old(er)
+        // configdb dump, or all the mongoses have been stopped.)
+        if (mostRecentMongosTime.getTime() >= Date.now() - mongosActiveThresholdMs) {
+            mongosAdjective = "active";
+        }
+    }
+
+    output( "  " + mongosAdjective + " mongoses:" );
+    if (mostRecentMongosTime === null) {
+        output( "\tnone" );
+    } else {
+        var recentMongosQuery = {
+            ping: {
+                $gt: (function () {
+                    var d = mostRecentMongosTime;
+                    d.setTime(d.getTime() - mongosActiveThresholdMs);
+                    return d;
+                } )()
+            }
+        };
+
+        if ( verbose ) {
+            configDB.mongos.find( recentMongosQuery ).sort( { ping : -1 } ).forEach(
+                function (z) {
+                    output( "\t" + tojsononeline( z ) );
+                }
+            );
+        } else {
+            configDB.mongos.aggregate( [
+                        { $match: recentMongosQuery },
+                        { $group: { _id: "$mongoVersion", num: { $sum: 1 } } },
+                        { $sort: { num: -1 } }
+                    ] ).forEach(
+                function (z) {
+                    output( "\t" + tojson( z._id ) + " : " + z.num );
+                }
+            );
+        }
+    }
+
     output( "  balancer:" );
 
     //Is the balancer currently enabled
