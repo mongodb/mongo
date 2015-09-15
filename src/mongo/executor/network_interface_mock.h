@@ -170,10 +170,11 @@ public:
 
     /**
      * Runs the simulator forward until now() == until or hasReadyRequests() is true.
+     * Returns now().
      *
      * Will not return until the executor thread is blocked in waitForWorkUntil or waitForWork.
      */
-    void runUntil(Date_t until);
+    Date_t runUntil(Date_t until);
 
     /**
      * Processes all ready, scheduled network operations.

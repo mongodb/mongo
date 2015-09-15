@@ -270,7 +270,7 @@ void NetworkInterfaceMock::requeueAt(NetworkOperationIterator noi, Date_t dontAs
     _unscheduled.splice(insertBefore, _processing, noi);
 }
 
-void NetworkInterfaceMock::runUntil(Date_t until) {
+Date_t NetworkInterfaceMock::runUntil(Date_t until) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     invariant(until > _now_inlock());
@@ -294,6 +294,7 @@ void NetworkInterfaceMock::runUntil(Date_t until) {
         _waitingToRunMask |= kExecutorThread;
     }
     _runReadyNetworkOperations_inlock(&lk);
+    return _now_inlock();
 }
 
 void NetworkInterfaceMock::runReadyNetworkOperations() {
