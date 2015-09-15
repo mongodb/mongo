@@ -1982,20 +1982,13 @@ __wt_log_flush(WT_SESSION_IMPL *session, uint32_t flags)
 		WT_RET(__wt_log_flush_lsn(session, &lsn, 0));
 
 	/*
-	 * If the user wants only write-no-sync, then we're done.
-	 */
-	if (LF_ISSET(WT_LOG_FLUSH))
-		return (0);
-	/*
+	 * If the user wants write-no-sync, there is nothing more to do.
 	 * If the user wants background sync, set the LSN and we're done.
-	 */
-	if (LF_ISSET(WT_LOG_BACKGROUND))
-		return (__wt_log_background(session, &lsn));
-
-	/*
 	 * If the user wants sync, force it now.
 	 */
-	WT_ASSERT(session, LF_ISSET(WT_LOG_FSYNC));
-	WT_RET(__wt_log_force_sync(session, &lsn));
+	if (LF_ISSET(WT_LOG_BACKGROUND))
+		WT_RET(__wt_log_background(session, &lsn));
+	else if (LF_ISSET(WT_LOG_FSYNC))
+		WT_RET(__wt_log_force_sync(session, &lsn));
 	return (0);
 }
