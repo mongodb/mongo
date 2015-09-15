@@ -117,6 +117,14 @@ assertNoReadMajoritySnapshotAvailable();
 assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot6}));
 assert.eq(getReadMajorityCursor().itcount(), 10);
 
+// Reindex bumps the min snapshot.
+t.reIndex();
+assertNoReadMajoritySnapshotAvailable();
+var snapshot7 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
+assertNoReadMajoritySnapshotAvailable();
+assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot7}));
+assert.eq(getReadMajorityCursor().itcount(), 10);
+
 // Dropping the collection is visible in the committed snapshot, even though it hasn't been marked
 // committed yet. This is allowed by the current specification even though it violates strict
 // read-committed semantics since we don't guarantee them on metadata operations.
@@ -125,11 +133,11 @@ assert.eq(getReadMajorityCursor().itcount(), 0);
 
 // Creating a new collection with the same name hides the collection until that operation is in the
 // committed view.
-t.insert({_id:0, version: 7});
+t.insert({_id:0, version: 8});
 assertNoReadMajoritySnapshotAvailable();
-var snapshot7 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
+var snapshot8 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
 assertNoReadMajoritySnapshotAvailable();
-assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot7}));
+assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot8}));
 assert.eq(getReadMajorityCursor().itcount(), 1);
 
 MongoRunner.stopMongod(testServer);
