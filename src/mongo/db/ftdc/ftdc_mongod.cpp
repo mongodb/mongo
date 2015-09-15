@@ -61,16 +61,16 @@ FTDCController* getGlobalFTDCController() {
     return getFTDCController(getGlobalServiceContext()).get();
 }
 
-bool localEnabledFlag = FTDCConfig::kEnabledDefault;
+std::atomic<bool> localEnabledFlag(FTDCConfig::kEnabledDefault);
 
-class ExportedFTDCEnabledParameter : public ExportedServerParameter<bool> {
+class ExportedFTDCEnabledParameter
+    : public ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> {
 public:
     ExportedFTDCEnabledParameter()
-        : ExportedServerParameter<bool>(ServerParameterSet::getGlobal(),
-                                        "diagnosticDataCollectionEnabled",
-                                        &localEnabledFlag,
-                                        true,
-                                        true) {}
+        : ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "diagnosticDataCollectionEnabled",
+              &localEnabledFlag) {}
 
     virtual Status validate(const bool& potentialNewValue) {
         auto controller = getGlobalFTDCController();
@@ -83,16 +83,16 @@ public:
 
 } exportedFTDCEnabledParameter;
 
-std::int32_t localPeriodMillis = FTDCConfig::kPeriodMillisDefault;
+std::atomic<std::int32_t> localPeriodMillis(FTDCConfig::kPeriodMillisDefault);
 
-class ExportedFTDCPeriodParameter : public ExportedServerParameter<std::int32_t> {
+class ExportedFTDCPeriodParameter
+    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
 public:
     ExportedFTDCPeriodParameter()
-        : ExportedServerParameter<std::int32_t>(ServerParameterSet::getGlobal(),
-                                                "diagnosticDataCollectionPeriodMillis",
-                                                &localPeriodMillis,
-                                                true,
-                                                true) {}
+        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "diagnosticDataCollectionPeriodMillis",
+              &localPeriodMillis) {}
 
     virtual Status validate(const std::int32_t& potentialNewValue) {
         if (potentialNewValue < 100) {
@@ -112,18 +112,19 @@ public:
 } exportedFTDCPeriodParameter;
 
 // Scale the values down since are defaults are in bytes, but the user interface is MB
-std::int32_t localMaxDirectorySizeMB = FTDCConfig::kMaxDirectorySizeBytesDefault / (1024 * 1024);
+std::atomic<std::int32_t> localMaxDirectorySizeMB(FTDCConfig::kMaxDirectorySizeBytesDefault /
+                                                  (1024 * 1024));
 
-std::int32_t localMaxFileSizeMB = FTDCConfig::kMaxFileSizeBytesDefault / (1024 * 1024);
+std::atomic<std::int32_t> localMaxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault / (1024 * 1024));
 
-class ExportedFTDCDirectorySizeParameter : public ExportedServerParameter<std::int32_t> {
+class ExportedFTDCDirectorySizeParameter
+    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
 public:
     ExportedFTDCDirectorySizeParameter()
-        : ExportedServerParameter<std::int32_t>(ServerParameterSet::getGlobal(),
-                                                "diagnosticDataCollectionDirectorySizeMb",
-                                                &localMaxDirectorySizeMB,
-                                                true,
-                                                true) {}
+        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "diagnosticDataCollectionDirectorySizeMb",
+              &localMaxDirectorySizeMB) {}
 
     virtual Status validate(const std::int32_t& potentialNewValue) {
         if (potentialNewValue < 10) {
@@ -151,14 +152,14 @@ public:
 
 } exportedFTDCDirectorySizeParameter;
 
-class ExportedFTDCFileSizeParameter : public ExportedServerParameter<std::int32_t> {
+class ExportedFTDCFileSizeParameter
+    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
 public:
     ExportedFTDCFileSizeParameter()
-        : ExportedServerParameter<std::int32_t>(ServerParameterSet::getGlobal(),
-                                                "diagnosticDataCollectionFileSizeMb",
-                                                &localMaxFileSizeMB,
-                                                true,
-                                                true) {}
+        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "diagnosticDataCollectionFileSizeMb",
+              &localMaxFileSizeMB) {}
 
     virtual Status validate(const std::int32_t& potentialNewValue) {
         if (potentialNewValue < 1) {
@@ -185,17 +186,17 @@ public:
 
 } exportedFTDCFileSizeParameter;
 
-std::int32_t localMaxSamplesPerArchiveMetricChunk =
-    FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault;
+std::atomic<std::int32_t> localMaxSamplesPerArchiveMetricChunk(
+    FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault);
 
-class ExportedFTDCArchiveChunkSizeParameter : public ExportedServerParameter<std::int32_t> {
+class ExportedFTDCArchiveChunkSizeParameter
+    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
 public:
     ExportedFTDCArchiveChunkSizeParameter()
-        : ExportedServerParameter<std::int32_t>(ServerParameterSet::getGlobal(),
-                                                "diagnosticDataCollectionSamplesPerChunk",
-                                                &localMaxSamplesPerArchiveMetricChunk,
-                                                true,
-                                                true) {}
+        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "diagnosticDataCollectionSamplesPerChunk",
+              &localMaxSamplesPerArchiveMetricChunk) {}
 
     virtual Status validate(const std::int32_t& potentialNewValue) {
         if (potentialNewValue < 1) {
@@ -214,17 +215,17 @@ public:
 
 } exportedFTDCArchiveChunkSizeParameter;
 
-std::int32_t localMaxSamplesPerInterimMetricChunk =
-    FTDCConfig::kMaxSamplesPerInterimMetricChunkDefault;
+std::atomic<std::int32_t> localMaxSamplesPerInterimMetricChunk(
+    FTDCConfig::kMaxSamplesPerInterimMetricChunkDefault);
 
-class ExportedFTDCInterimChunkSizeParameter : public ExportedServerParameter<std::int32_t> {
+class ExportedFTDCInterimChunkSizeParameter
+    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
 public:
     ExportedFTDCInterimChunkSizeParameter()
-        : ExportedServerParameter<std::int32_t>(ServerParameterSet::getGlobal(),
-                                                "diagnosticDataCollectionSamplesPerInterimUpdate",
-                                                &localMaxSamplesPerInterimMetricChunk,
-                                                true,
-                                                true) {}
+        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "diagnosticDataCollectionSamplesPerInterimUpdate",
+              &localMaxSamplesPerInterimMetricChunk) {}
 
     virtual Status validate(const std::int32_t& potentialNewValue) {
         if (potentialNewValue < 1) {

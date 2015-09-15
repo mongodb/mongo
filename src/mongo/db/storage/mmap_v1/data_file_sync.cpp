@@ -60,7 +60,7 @@ void DataFileSync::run() {
     } else if (storageGlobalParams.syncdelay == 1) {
         log() << "--syncdelay 1" << endl;
     } else if (storageGlobalParams.syncdelay != 60) {
-        LOG(1) << "--syncdelay " << storageGlobalParams.syncdelay << endl;
+        LOG(1) << "--syncdelay " << storageGlobalParams.syncdelay.load() << endl;
     }
     int time_flushing = 0;
     while (!inShutdown()) {

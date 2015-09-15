@@ -810,48 +810,33 @@ void ReplSource::syncToTailOfRemoteLog() {
     }
 }
 
-class ReplApplyBatchSize : public ServerParameter {
+std::atomic<int> replApplyBatchSize(1);
+
+class ReplApplyBatchSize
+    : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
 public:
     ReplApplyBatchSize()
-        : ServerParameter(ServerParameterSet::getGlobal(), "replApplyBatchSize"), _value(1) {}
+        : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(), "replApplyBatchSize", &replApplyBatchSize) {}
 
-    int get() const {
-        return _value;
-    }
-
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const string& name) {
-        b.append(name, _value);
-    }
-
-    virtual Status set(const BSONElement& newValuElement) {
-        return set(newValuElement.numberInt());
-    }
-
-    virtual Status set(int b) {
-        if (b < 1 || b > 1024) {
-            return Status(ErrorCodes::BadValue, "replApplyBatchSize has to be >= 1 and < 1024");
+    virtual Status validate(const int& potentialNewValue) {
+        if (potentialNewValue < 1 || potentialNewValue > 1024) {
+            return Status(ErrorCodes::BadValue, "replApplyBatchSize has to be >= 1 and <= 1024");
         }
 
         const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
-        if (replSettings.slavedelay != 0 && b > 1) {
+        if (replSettings.slavedelay != 0 && potentialNewValue > 1) {
             return Status(ErrorCodes::BadValue, "can't use a batch size > 1 with slavedelay");
         }
+
         if (!replSettings.slave) {
             return Status(ErrorCodes::BadValue,
                           "can't set replApplyBatchSize on a non-slave machine");
         }
 
-        _value = b;
         return Status::OK();
     }
-
-    virtual Status setFromString(const string& str) {
-        return set(atoi(str.c_str()));
-    }
-
-    int _value;
-
-} replApplyBatchSize;
+} replApplyBatchSizeServerParameter;
 
 /* slave: pull some data from the master's oplog
    note: not yet in db mutex at this point.
@@ -1039,7 +1024,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
 
             BSONObj op = oplogReader.next();
 
-            int b = replApplyBatchSize.get();
+            int b = replApplyBatchSize;
             bool justOne = b == 1;
             unique_ptr<Lock::GlobalWrite> lk(justOne ? 0 : new Lock::GlobalWrite(txn->lockState()));
             while (1) {

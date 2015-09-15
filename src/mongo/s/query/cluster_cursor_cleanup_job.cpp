@@ -39,15 +39,13 @@
 
 namespace mongo {
 
-long long ClusterCursorCleanupJob::cursorTimeoutMillis =
-    durationCount<stdx::chrono::milliseconds>(stdx::chrono::minutes(10));
+std::atomic<long long> ClusterCursorCleanupJob::cursorTimeoutMillis(
+    durationCount<stdx::chrono::milliseconds>(stdx::chrono::minutes(10)));
 
-ExportedServerParameter<long long> cursorTimeoutMillisConfig(
-    ServerParameterSet::getGlobal(),
-    "cursorTimeoutMillis",
-    &ClusterCursorCleanupJob::cursorTimeoutMillis,
-    true,   // allowedToChangeAtStartup
-    true);  // allowedToChangeAtRuntime
+ExportedServerParameter<long long, ServerParameterType::kStartupAndRuntime>
+    cursorTimeoutMillisConfig(ServerParameterSet::getGlobal(),
+                              "cursorTimeoutMillis",
+                              &ClusterCursorCleanupJob::cursorTimeoutMillis);
 
 ClusterCursorCleanupJob clusterCursorCleanupJob;
 

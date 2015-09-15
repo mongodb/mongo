@@ -18,6 +18,7 @@ env.Library(target='platform',
             LIBDEPS=lib_deps
 )
 
+env.CppUnitTest('atomic_proxy_test', 'atomic_proxy_test.cpp')
 env.CppUnitTest('atomic_word_test', 'atomic_word_test.cpp')
 env.CppUnitTest('bits_test', 'bits_test.cpp')
 env.CppUnitTest('endian_test', 'endian_test.cpp')

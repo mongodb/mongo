@@ -79,11 +79,8 @@ static ServerStatusMetricField<Counter64> displayUnknownCommands("commands.<UNKN
                                                                  &Command::unknownCommands);
 
 namespace {
-ExportedServerParameter<int> testCommandsParameter(ServerParameterSet::getGlobal(),
-                                                   "enableTestCommands",
-                                                   &Command::testCommandsEnabled,
-                                                   true,
-                                                   false);
+ExportedServerParameter<int, ServerParameterType::kStartupOnly> testCommandsParameter(
+    ServerParameterSet::getGlobal(), "enableTestCommands", &Command::testCommandsEnabled);
 }
 
 string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const {

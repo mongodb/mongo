@@ -50,7 +50,7 @@
 namespace mongo {
 
 // How we access the external setParameter testing bool.
-extern bool internalQueryForceIntersectionPlans;
+extern std::atomic<bool> internalQueryForceIntersectionPlans;
 
 }  // namespace mongo
 

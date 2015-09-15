@@ -80,20 +80,20 @@ const int replPrefetcherThreadCount = 2;
 #error need to include something that defines MONGO_PLATFORM_XX
 #endif
 
-class ExportedWriterThreadCountParameter : public ExportedServerParameter<int> {
+class ExportedWriterThreadCountParameter
+    : public ExportedServerParameter<int, ServerParameterType::kStartupOnly> {
 public:
     ExportedWriterThreadCountParameter()
-        : ExportedServerParameter<int>(ServerParameterSet::getGlobal(),
-                                       "replWriterThreadCount",
-                                       &SyncTail::replWriterThreadCount,
-                                       true,   // allowedToChangeAtStartup
-                                       false)  // allowedToChangeAtRuntime
-    {}
+        : ExportedServerParameter<int, ServerParameterType::kStartupOnly>(
+              ServerParameterSet::getGlobal(),
+              "replWriterThreadCount",
+              &SyncTail::replWriterThreadCount) {}
 
     virtual Status validate(const int& potentialNewValue) {
         if (potentialNewValue < 1 || potentialNewValue > 256) {
             return Status(ErrorCodes::BadValue, "replWriterThreadCount must be between 1 and 256");
         }
+
         return Status::OK();
     }
 

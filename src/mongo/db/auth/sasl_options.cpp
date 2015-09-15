@@ -148,40 +148,29 @@ MONGO_STARTUP_OPTIONS_STORE(SASLOptions)(InitializerContext* context) {
 
 // SASL Startup Parameters, making them settable via setParameter on the command line or in the
 // legacy INI config file.  None of these parameters are modifiable at runtime.
-ExportedServerParameter<std::vector<std::string>> SASLAuthenticationMechanismsSetting(
-    ServerParameterSet::getGlobal(),
-    "authenticationMechanisms",
-    &saslGlobalParams.authenticationMechanisms,
-    true,    // Change at startup
-    false);  // Change at runtime
+ExportedServerParameter<std::vector<std::string>, ServerParameterType::kStartupOnly>
+    SASLAuthenticationMechanismsSetting(ServerParameterSet::getGlobal(),
+                                        "authenticationMechanisms",
+                                        &saslGlobalParams.authenticationMechanisms);
 
-ExportedServerParameter<std::string> SASLHostNameSetting(ServerParameterSet::getGlobal(),
-                                                         "saslHostName",
-                                                         &saslGlobalParams.hostName,
-                                                         true,    // Change at startup
-                                                         false);  // Change at runtime
+ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> SASLHostNameSetting(
+    ServerParameterSet::getGlobal(), "saslHostName", &saslGlobalParams.hostName);
 
-ExportedServerParameter<std::string> SASLServiceNameSetting(ServerParameterSet::getGlobal(),
-                                                            "saslServiceName",
-                                                            &saslGlobalParams.serviceName,
-                                                            true,    // Change at startup
-                                                            false);  // Change at runtime
+ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> SASLServiceNameSetting(
+    ServerParameterSet::getGlobal(), "saslServiceName", &saslGlobalParams.serviceName);
 
-ExportedServerParameter<std::string> SASLAuthdPathSetting(ServerParameterSet::getGlobal(),
-                                                          "saslauthdPath",
-                                                          &saslGlobalParams.authdPath,
-                                                          true,    // Change at startup
-                                                          false);  // Change at runtime
+ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> SASLAuthdPathSetting(
+    ServerParameterSet::getGlobal(), "saslauthdPath", &saslGlobalParams.authdPath);
 
 const std::string scramIterationCountServerParameter = "scramIterationCount";
-class ExportedScramIterationCountParameter : public ExportedServerParameter<int> {
+class ExportedScramIterationCountParameter
+    : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
 public:
     ExportedScramIterationCountParameter()
-        : ExportedServerParameter<int>(ServerParameterSet::getGlobal(),
-                                       scramIterationCountServerParameter,
-                                       &saslGlobalParams.scramIterationCount,
-                                       true,     // Change at startup
-                                       true) {}  // Change at runtime
+        : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              scramIterationCountServerParameter,
+              &saslGlobalParams.scramIterationCount) {}
 
     virtual Status validate(const int& newValue) {
         if (newValue < minimumScramIterationCount) {
@@ -191,6 +180,7 @@ public:
                               << " is less than the minimum SCRAM iteration count, "
                               << minimumScramIterationCount);
         }
+
         return Status::OK();
     }
 } scramIterationCountParam;

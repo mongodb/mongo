@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <atomic>
+
 #include "mongo/db/query/explain_common.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/s/client/shard.h"
@@ -43,7 +45,7 @@ class ServerSelectionMetadata;
 }  // namespace rpc
 
 // A spigot to enable the ClusterClientCursor codepath.
-extern bool useClusterClientCursor;
+extern std::atomic<bool> useClusterClientCursor;
 
 /**
  * Legacy interface for processing client read/write/cmd requests.

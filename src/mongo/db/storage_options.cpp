@@ -52,15 +52,15 @@ const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
  * If 1, MongoDB will not execute queries that require a table scan and will return an error.
  * NOT recommended for production use.
  */
-ExportedServerParameter<bool> NoTableScanSetting(
-    ServerParameterSet::getGlobal(), "notablescan", &storageGlobalParams.noTableScan, true, true);
+ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> NoTableScanSetting(
+    ServerParameterSet::getGlobal(), "notablescan", &storageGlobalParams.noTableScan);
 
 /**
  * Specify the interval in seconds between fsync operations where mongod flushes its
  * working memory to disk. By default, mongod flushes memory to disk every 60 seconds.
  * In almost every situation you should not set this value and use the default setting.
  */
-ExportedServerParameter<double> SyncdelaySetting(
-    ServerParameterSet::getGlobal(), "syncdelay", &storageGlobalParams.syncdelay, true, true);
+ExportedServerParameter<double, ServerParameterType::kStartupAndRuntime> SyncdelaySetting(
+    ServerParameterSet::getGlobal(), "syncdelay", &storageGlobalParams.syncdelay);
 
 }  // namespace mongo

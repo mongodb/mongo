@@ -142,7 +142,7 @@ private:
     static void traceIfNeeded(const DBException& e);
 
 public:
-    static bool traceExceptions;
+    static std::atomic<bool> traceExceptions;
 
 protected:
     ExceptionInfo _ei;

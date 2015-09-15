@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <string>
 
 /*
@@ -59,7 +60,8 @@ struct MMAPV1Options {
     // The maximum amount of time the mongod process allows between journal operations.
     // Values can range from 2 to 300 milliseconds. Lower values increase the durability
     // of the journal, at the expense of disk performance.
-    unsigned journalCommitInterval;  // group/batch commit interval ms
+
+    std::atomic<unsigned> journalCommitInterval;  // group/batch commit interval ms
 
     // --journalOptions 7            dump journal and terminate without doing anything further
     // --journalOptions 4            recover and terminate without listening

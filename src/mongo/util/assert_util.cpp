@@ -74,7 +74,7 @@ void AssertionCount::condrollover(int newvalue) {
         rollover();
 }
 
-bool DBException::traceExceptions = false;
+std::atomic<bool> DBException::traceExceptions(false);
 
 string DBException::toString() const {
     stringstream ss;

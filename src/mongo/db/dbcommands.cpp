@@ -115,12 +115,10 @@ using std::unique_ptr;
 // This is a special flag that allows for testing of snapshot behavior by skipping the replication
 // related checks and isolating the storage/query side of snapshotting.
 bool testingSnapshotBehaviorInIsolation = false;
-ExportedServerParameter<bool> TestingSnapshotBehaviorInIsolation(
+ExportedServerParameter<bool, ServerParameterType::kStartupOnly> TestingSnapshotBehaviorInIsolation(
     ServerParameterSet::getGlobal(),
     "testingSnapshotBehaviorInIsolation",
-    &testingSnapshotBehaviorInIsolation,
-    true,
-    false);
+    &testingSnapshotBehaviorInIsolation);
 
 
 class CmdShutdownMongoD : public CmdShutdown {

@@ -32,8 +32,8 @@
 
 namespace mongo {
 
-template <typename T>
-inline Status ExportedServerParameter<T>::set(const BSONElement& newValueElement) {
+template <typename T, ServerParameterType paramType>
+inline Status ExportedServerParameter<T, paramType>::set(const BSONElement& newValueElement) {
     T newValue;
 
     if (!newValueElement.coerce(&newValue))
@@ -42,8 +42,8 @@ inline Status ExportedServerParameter<T>::set(const BSONElement& newValueElement
     return set(newValue);
 }
 
-template <typename T>
-inline Status ExportedServerParameter<T>::set(const T& newValue) {
+template <typename T, ServerParameterType paramType>
+inline Status ExportedServerParameter<T, paramType>::set(const T& newValue) {
     Status v = validate(newValue);
     if (!v.isOK())
         return v;

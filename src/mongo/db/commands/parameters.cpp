@@ -581,20 +581,15 @@ public:
     }
 } clusterAuthModeSetting;
 
-ExportedServerParameter<bool> QuietSetting(
-    ServerParameterSet::getGlobal(), "quiet", &serverGlobalParams.quiet, true, true);
+ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> QuietSetting(
+    ServerParameterSet::getGlobal(), "quiet", &serverGlobalParams.quiet);
 
-ExportedServerParameter<int> MaxConsecutiveFailedChecksSetting(
+ExportedServerParameter<int, ServerParameterType::kRuntimeOnly> MaxConsecutiveFailedChecksSetting(
     ServerParameterSet::getGlobal(),
     "replMonitorMaxFailedChecks",
-    &ReplicaSetMonitor::maxConsecutiveFailedChecks,
-    false,  // allowedToChangeAtStartup
-    true);  // allowedToChangeAtRuntime
+    &ReplicaSetMonitor::maxConsecutiveFailedChecks);
 
-ExportedServerParameter<bool> TraceExceptionsSetting(ServerParameterSet::getGlobal(),
-                                                     "traceExceptions",
-                                                     &DBException::traceExceptions,
-                                                     false,  // allowedToChangeAtStartup
-                                                     true);  // allowedToChangeAtRuntime
+ExportedServerParameter<bool, ServerParameterType::kRuntimeOnly> TraceExceptionsSetting(
+    ServerParameterSet::getGlobal(), "traceExceptions", &DBException::traceExceptions);
 }
 }

@@ -38,7 +38,7 @@ namespace mongo {
 namespace fts {
 namespace {
 
-bool dummyEnabledFlag = true;  // Unused, needed for server parameter.
+std::atomic<bool> dummyEnabledFlag(true);  // Unused, needed for server parameter.
 
 /**
  * Declaration for the "textSearchEnabled" server parameter, which is now deprecated.
@@ -46,12 +46,12 @@ bool dummyEnabledFlag = true;  // Unused, needed for server parameter.
  * - setting to true performs a no-op and logs a deprecation message.
  * - setting to false will fail.
  */
-class ExportedTextSearchEnabledParameter : public ExportedServerParameter<bool> {
+class ExportedTextSearchEnabledParameter
+    : public ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> {
 public:
     ExportedTextSearchEnabledParameter()
-        : ExportedServerParameter<bool>(
-              ServerParameterSet::getGlobal(), "textSearchEnabled", &dummyEnabledFlag, true, true) {
-    }
+        : ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(), "textSearchEnabled", &dummyEnabledFlag) {}
 
     virtual Status validate(const bool& potentialNewValue) {
         if (!potentialNewValue) {

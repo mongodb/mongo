@@ -486,7 +486,7 @@ void Stats::S::_asObj(BSONObjBuilder* builder) const {
                    << (unsigned)(_commitsInWriteLockMicros / 1000));
 
     if (mmapv1GlobalOptions.journalCommitInterval != 0) {
-        b << "journalCommitIntervalMs" << mmapv1GlobalOptions.journalCommitInterval;
+        b << "journalCommitIntervalMs" << mmapv1GlobalOptions.journalCommitInterval.load();
     }
 }
 

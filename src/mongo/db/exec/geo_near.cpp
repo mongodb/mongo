@@ -801,7 +801,7 @@ public:
           _currentLevel(0) {
         // cellId.AppendVertexNeighbors(level, output) requires level < finest,
         // so we use the minimum of max_level - 1 and the user specified finest
-        int level = std::min(S2::kMaxCellLevel - 1, internalQueryS2GeoFinestLevel);
+        int level = std::min(S2::kMaxCellLevel - 1, internalQueryS2GeoFinestLevel.load());
         _currentLevel = std::max(0, level);
     }
 

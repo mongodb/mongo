@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <atomic>
+
 #include "mongo/util/background.h"
 
 namespace mongo {
@@ -49,7 +51,7 @@ public:
      * TODO: Move declaration to cpp file once CursorCache class is deleted. See SERVER-20194 for
      * more details.
      */
-    static long long cursorTimeoutMillis;
+    static std::atomic<long long> cursorTimeoutMillis;
 
     std::string name() const final;
     void run() final;

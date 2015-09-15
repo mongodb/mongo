@@ -68,15 +68,17 @@ namespace {
  * - setting to true performs a no-op.
  * - setting to false will fail.
  */
-class NewCollectionsUsePowerOf2SizesParameter : public ExportedServerParameter<bool> {
+// Unused, needed for server parameter.
+std::atomic<bool> newCollectionsUsePowerOf2SizesFlag(true);
+
+class NewCollectionsUsePowerOf2SizesParameter
+    : public ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> {
 public:
     NewCollectionsUsePowerOf2SizesParameter()
-        : ExportedServerParameter<bool>(ServerParameterSet::getGlobal(),
-                                        "newCollectionsUsePowerOf2Sizes",
-                                        &newCollectionsUsePowerOf2SizesFlag,
-                                        true,
-                                        true),
-          newCollectionsUsePowerOf2SizesFlag(true) {}
+        : ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "newCollectionsUsePowerOf2Sizes",
+              &newCollectionsUsePowerOf2SizesFlag) {}
 
     virtual Status validate(const bool& potentialNewValue) {
         if (!potentialNewValue) {
@@ -89,9 +91,6 @@ public:
     }
 
 private:
-    // Unused, needed for server parameter.
-    bool newCollectionsUsePowerOf2SizesFlag;
-
 } exportedNewCollectionsUsePowerOf2SizesParameter;
 
 

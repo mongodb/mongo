@@ -51,7 +51,7 @@ public:
                           ) {}
 
     virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-        b << name << mmapv1GlobalOptions.journalCommitInterval;
+        b << name << mmapv1GlobalOptions.journalCommitInterval.load();
     }
 
     virtual Status set(const BSONElement& newValueElement) {

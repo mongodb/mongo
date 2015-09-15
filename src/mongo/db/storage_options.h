@@ -28,7 +28,10 @@
 
 #pragma once
 
+#include <atomic>
 #include <string>
+
+#include "mongo/platform/atomic_proxy.h"
 
 /*
  * This file defines the storage for options that come from the command line related to data file
@@ -91,7 +94,7 @@ struct StorageGlobalParams {
 
     // --notablescan
     // no table scans allowed
-    bool noTableScan;
+    std::atomic<bool> noTableScan;
 
     // --directoryperdb
     // Stores each database’s files in its own folder in the data directory.
@@ -104,7 +107,7 @@ struct StorageGlobalParams {
     // via an fsync operation.
     // Do not set this value on production systems.
     // In almost every situation, you should use the default setting.
-    double syncdelay;  // seconds between fsyncs
+    AtomicDouble syncdelay;  // seconds between fsyncs
 };
 
 extern StorageGlobalParams storageGlobalParams;

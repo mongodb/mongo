@@ -252,7 +252,7 @@ struct HostNotIn {
 }  // namespace
 
 // At 1 check every 10 seconds, 30 checks takes 5 minutes
-int ReplicaSetMonitor::maxConsecutiveFailedChecks = 30;
+std::atomic<int> ReplicaSetMonitor::maxConsecutiveFailedChecks(30);
 
 // Defaults to random selection as required by the spec
 bool ReplicaSetMonitor::useDeterministicHostSelection = false;
