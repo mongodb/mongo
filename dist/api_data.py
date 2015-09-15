@@ -726,7 +726,7 @@ methods = {
 ]),
 
 'WT_SESSION.log_flush' : Method([
-    Config('sync', '', r'''
+    Config('sync', 'sync', r'''
         forcibly flush the log and wait for it to achieve the synchronization
         level specified''',
         choices=['background', 'sync', 'write']),

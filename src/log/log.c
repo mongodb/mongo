@@ -1966,7 +1966,6 @@ int
 __wt_log_flush(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LSN last_lsn, lsn;
 
@@ -1998,5 +1997,5 @@ __wt_log_flush(WT_SESSION_IMPL *session, uint32_t flags)
 	 */
 	WT_ASSERT(session, LF_ISSET(WT_LOG_FSYNC));
 	WT_RET(__wt_log_force_sync(session, &lsn));
-	return (ret);
+	return (0);
 }
