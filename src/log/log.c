@@ -39,7 +39,7 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
  *	write_start_lsn or write_lsn depending on the argument.
  */
 int
-__wt_log_flush_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int start)
+__wt_log_flush_lsn(WT_SESSION_IMPL *session, WT_LSN *lsn, int start)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
@@ -49,9 +49,9 @@ __wt_log_flush_lsn(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int start)
 	WT_RET(__wt_log_force_write(session, 1));
 	WT_RET(__wt_log_wrlsn(session));
 	if (start)
-		*ckp_lsn = log->write_start_lsn;
+		*lsn = log->write_start_lsn;
 	else
-		*ckp_lsn = log->write_lsn;
+		*lsn = log->write_lsn;
 	return (0);
 }
 
