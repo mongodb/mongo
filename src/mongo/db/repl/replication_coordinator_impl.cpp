@@ -2328,6 +2328,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
 
     if (_priorityTakeoverCbh.isValid()) {
         _replExecutor.cancel(_priorityTakeoverCbh);
+        _priorityTakeoverCbh = CallbackHandle();
     }
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
     _updateSlaveInfoFromConfig_inlock();
@@ -2969,6 +2970,7 @@ bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term) {
 
         if (updated && _priorityTakeoverCbh.isValid()) {
             _replExecutor.cancel(_priorityTakeoverCbh);
+            _priorityTakeoverCbh = CallbackHandle();
         }
     }
 
