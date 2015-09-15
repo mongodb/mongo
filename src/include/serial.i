@@ -304,8 +304,6 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * is used as an indicator of there being further updates on this page.
 	 */
 	if ((txn = page->modify->obsolete_check_txn) != WT_TXN_NONE) {
-		page->modify->obsolete_check_txn = WT_TXN_NONE;
-
 		if (!__wt_txn_visible_all(session, txn)) {
 			/* Try to move the oldest ID forward and re-check. */
 			__wt_txn_update_oldest(session, 0);
@@ -313,6 +311,8 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 			if (!__wt_txn_visible_all(session, txn))
 				return (0);
 		}
+
+		page->modify->obsolete_check_txn = WT_TXN_NONE;
 	}
 	F_CAS_ATOMIC(page, WT_PAGE_RECONCILIATION, ret);
 
