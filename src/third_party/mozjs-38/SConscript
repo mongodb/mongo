@@ -24,7 +24,7 @@ env.Prepend(CPPDEFINES=[
         'IMPL_MFBT',
         'JS_USE_CUSTOM_ALLOCATOR',
         'NO_NSPR_10_SUPPORT',
-	'STATIC_JS_API=1',
+        'STATIC_JS_API=1',
         'U_NO_DEFAULT_INCLUDE_UTF_HEADERS=1',
         ])
 
@@ -38,7 +38,25 @@ if debugBuild:
 # js-confdefs.h has to get in front on windows or wherever
 if env.TargetOSIs('windows'):
     env.Prepend(CCFLAGS=[
-            '/FI', 'js-confdefs.h'
+            '/FI', 'js-confdefs.h',
+
+            #  'declaration' : no matching operator delete found; memory will not be freed if
+            #  initialization throws an exception
+            '/wd4291',
+
+            # name" : the inline specifier cannot be used when a friend declaration refers to a
+            # specialization of a function template
+            '/wd4396',
+
+            # nonstandard extension used : zero-sized array in struct/union
+            '/wd4200',
+
+            # 'identifier' : no suitable definition provided for explicit template instantiation
+            # request
+            '/wd4661',
+
+            # 'operation' : unsafe mix of type 'type' and type 'type' in operation
+            '/wd4805',
             ])
 else:
     if env.TargetOSIs('solaris'):

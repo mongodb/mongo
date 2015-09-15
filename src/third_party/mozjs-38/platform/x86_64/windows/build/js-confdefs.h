@@ -9,10 +9,17 @@
 #define CPP_THROW_NEW throw()
 #define D_INO d_ino
 #define HAVE_64BIT_BUILD 1
+#define HAVE_ACOSH 1
+#define HAVE_ASINH 1
+#define HAVE_ATANH 1
+#define HAVE_CBRT 1
+#define HAVE_EXPM1 1
 #define HAVE_FORCEINLINE 1
 #define HAVE_HYPOT 1
 #define HAVE_LOCALECONV 1
 #define HAVE_LOCALECONV 1
+#define HAVE_LOG1P 1
+#define HAVE_LOG2 1
 #define HAVE_SNPRINTF 1
 #define HAVE_TRUNC 1
 #define HAVE__GETC_NOLOCK 1
