@@ -161,13 +161,15 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         AsyncOp* op = nullptr;
 
         {
-            stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+            stdx::unique_lock<stdx::mutex> lk(_inProgressMutex);
 
             auto iter = std::find(_inGetConnection.begin(), _inGetConnection.end(), cbHandle);
 
             // If we didn't find the request, we've been canceled
             if (iter == _inGetConnection.end()) {
+                lk.unlock();
                 onFinish({ErrorCodes::CallbackCanceled, "Callback canceled"});
+                signalWorkAvailable();
                 return;
             }
 

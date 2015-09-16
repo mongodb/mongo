@@ -259,10 +259,8 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
 
         auto iter = _inProgress.find(op);
 
-        // We're in connection start
-        if (iter == _inProgress.end()) {
-            return;
-        }
+        // If we're here, we should not have been canceled.
+        invariant(iter != _inProgress.end());
 
         ownedOp = std::move(iter->second);
         _inProgress.erase(iter);
