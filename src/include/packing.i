@@ -318,12 +318,12 @@ __pack_write(
 
 	switch (pv->type) {
 	case 'x':
-		WT_SIZE_CHECK(pv->size, maxlen);
+		WT_SIZE_CHECK_PACK(pv->size, maxlen);
 		memset(*pp, 0, pv->size);
 		*pp += pv->size;
 		break;
 	case 's':
-		WT_SIZE_CHECK(pv->size, maxlen);
+		WT_SIZE_CHECK_PACK(pv->size, maxlen);
 		memcpy(*pp, pv->u.s, pv->size);
 		*pp += pv->size;
 		break;
@@ -337,7 +337,7 @@ __pack_write(
 				pad = pv->size - s;
 		} else
 			pad = 1;
-		WT_SIZE_CHECK(s + pad, maxlen);
+		WT_SIZE_CHECK_PACK(s + pad, maxlen);
 		if (s > 0)
 			memcpy(*pp, pv->u.s, s);
 		*pp += s;
@@ -363,7 +363,7 @@ __pack_write(
 			maxlen -= (size_t)(*pp - oldp);
 		}
 		if (pad > 0) {
-			WT_SIZE_CHECK(pad, maxlen);
+			WT_SIZE_CHECK_PACK(pad, maxlen);
 			memset(*pp, 0, pad);
 			*pp += pad;
 		}
@@ -382,11 +382,11 @@ __pack_write(
 			 * Check that there is at least one byte available: the
 			 * low-level routines treat zero length as unchecked.
 			 */
-			WT_SIZE_CHECK(1, maxlen);
+			WT_SIZE_CHECK_PACK(1, maxlen);
 			WT_RET(__wt_vpack_uint(pp, maxlen, s + pad));
 			maxlen -= (size_t)(*pp - oldp);
 		}
-		WT_SIZE_CHECK(s + pad, maxlen);
+		WT_SIZE_CHECK_PACK(s + pad, maxlen);
 		if (s > 0)
 			memcpy(*pp, pv->u.item.data, s);
 		*pp += s;
@@ -397,13 +397,13 @@ __pack_write(
 		break;
 	case 'b':
 		/* Translate to maintain ordering with the sign bit. */
-		WT_SIZE_CHECK(1, maxlen);
+		WT_SIZE_CHECK_PACK(1, maxlen);
 		**pp = (uint8_t)(pv->u.i + 0x80);
 		*pp += 1;
 		break;
 	case 'B':
 	case 't':
-		WT_SIZE_CHECK(1, maxlen);
+		WT_SIZE_CHECK_PACK(1, maxlen);
 		**pp = (uint8_t)pv->u.u;
 		*pp += 1;
 		break;
@@ -415,7 +415,7 @@ __pack_write(
 		 * Check that there is at least one byte available: the
 		 * low-level routines treat zero length as unchecked.
 		 */
-		WT_SIZE_CHECK(1, maxlen);
+		WT_SIZE_CHECK_PACK(1, maxlen);
 		WT_RET(__wt_vpack_int(pp, maxlen, pv->u.i));
 		break;
 	case 'H':
@@ -427,11 +427,11 @@ __pack_write(
 		 * Check that there is at least one byte available: the
 		 * low-level routines treat zero length as unchecked.
 		 */
-		WT_SIZE_CHECK(1, maxlen);
+		WT_SIZE_CHECK_PACK(1, maxlen);
 		WT_RET(__wt_vpack_uint(pp, maxlen, pv->u.u));
 		break;
 	case 'R':
-		WT_SIZE_CHECK(sizeof(uint64_t), maxlen);
+		WT_SIZE_CHECK_PACK(sizeof(uint64_t), maxlen);
 		*(uint64_t *)*pp = pv->u.u;
 		*pp += sizeof(uint64_t);
 		break;
@@ -455,7 +455,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 
 	switch (pv->type) {
 	case 'x':
-		WT_SIZE_CHECK(pv->size, maxlen);
+		WT_SIZE_CHECK_UNPACK(pv->size, maxlen);
 		*pp += pv->size;
 		break;
 	case 's':
@@ -466,7 +466,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 			s = strlen((const char *)*pp) + 1;
 		if (s > 0)
 			pv->u.s = (const char *)*pp;
-		WT_SIZE_CHECK(s, maxlen);
+		WT_SIZE_CHECK_UNPACK(s, maxlen);
 		*pp += s;
 		break;
 	case 'U':
@@ -474,7 +474,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 		 * Check that there is at least one byte available: the
 		 * low-level routines treat zero length as unchecked.
 		 */
-		WT_SIZE_CHECK(1, maxlen);
+		WT_SIZE_CHECK_UNPACK(1, maxlen);
 		WT_RET(__wt_vunpack_uint(pp, maxlen, &pv->u.u));
 		/* FALLTHROUGH */
 	case 'u':
@@ -484,19 +484,19 @@ __unpack_read(WT_SESSION_IMPL *session,
 			s = (size_t)pv->u.u;
 		else
 			s = maxlen;
-		WT_SIZE_CHECK(s, maxlen);
+		WT_SIZE_CHECK_UNPACK(s, maxlen);
 		pv->u.item.data = *pp;
 		pv->u.item.size = s;
 		*pp += s;
 		break;
 	case 'b':
 		/* Translate to maintain ordering with the sign bit. */
-		WT_SIZE_CHECK(1, maxlen);
+		WT_SIZE_CHECK_UNPACK(1, maxlen);
 		pv->u.i = (int8_t)(*(*pp)++ - 0x80);
 		break;
 	case 'B':
 	case 't':
-		WT_SIZE_CHECK(1, maxlen);
+		WT_SIZE_CHECK_UNPACK(1, maxlen);
 		pv->u.u = *(*pp)++;
 		break;
 	case 'h':
@@ -507,7 +507,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 		 * Check that there is at least one byte available: the
 		 * low-level routines treat zero length as unchecked.
 		 */
-		WT_SIZE_CHECK(1, maxlen);
+		WT_SIZE_CHECK_UNPACK(1, maxlen);
 		WT_RET(__wt_vunpack_int(pp, maxlen, &pv->u.i));
 		break;
 	case 'H':
@@ -519,11 +519,11 @@ __unpack_read(WT_SESSION_IMPL *session,
 		 * Check that there is at least one byte available: the
 		 * low-level routines treat zero length as unchecked.
 		 */
-		WT_SIZE_CHECK(1, maxlen);
+		WT_SIZE_CHECK_UNPACK(1, maxlen);
 		WT_RET(__wt_vunpack_uint(pp, maxlen, &pv->u.u));
 		break;
 	case 'R':
-		WT_SIZE_CHECK(sizeof(uint64_t), maxlen);
+		WT_SIZE_CHECK_UNPACK(sizeof(uint64_t), maxlen);
 		pv->u.u = *(uint64_t *)*pp;
 		*pp += sizeof(uint64_t);
 		break;

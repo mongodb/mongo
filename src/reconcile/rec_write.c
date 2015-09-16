@@ -5907,10 +5907,11 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 
 	/*
 	 * See if this overflow record has already been written and reuse it if
-	 * possible.  Else, write a new overflow record.
+	 * possible, otherwise write a new overflow record.
 	 */
-	if (!__wt_ovfl_reuse_search(session, page,
-	    &addr, &size, kv->buf.data, kv->buf.size)) {
+	WT_RET(__wt_ovfl_reuse_search(
+	    session, page, &addr, &size, kv->buf.data, kv->buf.size));
+	if (addr == NULL) {
 		/* Allocate a buffer big enough to write the overflow record. */
 		size = kv->buf.size;
 		WT_RET(bm->write_size(bm, session, &size));

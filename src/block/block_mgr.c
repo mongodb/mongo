@@ -23,6 +23,18 @@ __bm_readonly(WT_BM *bm, WT_SESSION_IMPL *session)
 }
 
 /*
+ * __bm_addr_invalid --
+ *	Return an error code if an address cookie is invalid.
+ */
+static int
+__bm_addr_invalid(WT_BM *bm,
+    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
+{
+	return (__wt_block_addr_invalid(
+	    session, bm->block, addr, addr_size, bm->is_live));
+}
+
+/*
  * __bm_addr_string --
  *	Return a printable string representation of an address cookie.
  */
@@ -32,18 +44,6 @@ __bm_addr_string(WT_BM *bm, WT_SESSION_IMPL *session,
 {
 	return (
 	    __wt_block_addr_string(session, bm->block, buf, addr, addr_size));
-}
-
-/*
- * __bm_addr_valid --
- *	Return if an address cookie is valid.
- */
-static int
-__bm_addr_valid(WT_BM *bm,
-    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
-{
-	return (__wt_block_addr_valid(
-	    session, bm->block, addr, addr_size, bm->is_live));
 }
 
 /*
@@ -337,8 +337,8 @@ static void
 __bm_method_set(WT_BM *bm, int readonly)
 {
 	if (readonly) {
+		bm->addr_invalid = __bm_addr_invalid;
 		bm->addr_string = __bm_addr_string;
-		bm->addr_valid = __bm_addr_valid;
 		bm->block_header = __bm_block_header;
 		bm->checkpoint = (int (*)(WT_BM *,
 		    WT_SESSION_IMPL *, WT_ITEM *, WT_CKPT *, int))__bm_readonly;
@@ -378,8 +378,8 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->write_size = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *, size_t *))__bm_readonly;
 	} else {
+		bm->addr_invalid = __bm_addr_invalid;
 		bm->addr_string = __bm_addr_string;
-		bm->addr_valid = __bm_addr_valid;
 		bm->block_header = __bm_block_header;
 		bm->checkpoint = __bm_checkpoint;
 		bm->checkpoint_load = __bm_checkpoint_load;
