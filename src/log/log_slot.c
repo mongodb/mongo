@@ -132,8 +132,7 @@ __log_slot_switch_internal(
 	 * someone else and we need to try setting up a new slot again.
 	 */
 	if (!F_ISSET(myslot, WT_MYSLOT_CLOSE)) {
-		ret = __wt_log_slot_close(
-		    session, slot, &release, forced);
+		ret = __wt_log_slot_close(session, slot, &release, forced);
 		if (ret == WT_NOTFOUND)
 			return (0);
 		WT_RET(ret);
@@ -172,8 +171,7 @@ __wt_log_slot_switch(
 	 */
 	do {
 		WT_WITH_SLOT_LOCK(session, log,
-		    ret = __log_slot_switch_internal(
-		    session, myslot, forced));
+		    ret = __log_slot_switch_internal(session, myslot, forced));
 		if (ret == EBUSY) {
 			WT_STAT_FAST_CONN_INCR(session, log_slot_switch_busy);
 			__wt_yield();
