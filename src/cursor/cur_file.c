@@ -503,16 +503,14 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		bulk = (cval.val != 0);
 	} else if (WT_STRING_MATCH("bitmap", cval.str, cval.len))
 		bitmap = bulk = 1;
-	else if (WT_STRING_MATCH("unordered", cval.str, cval.len))
 		/*
 		 * Unordered bulk insert is a special case used internally by
-		 * index creation on existing tables. It requires exclusive
-		 * access, but not the other bulk semantics. It primarily
+		 * index creation on existing tables. It doesn't enforce
+		 * any special semantics at the file level. It primarily
 		 * exists to avoid some locking problems with LSM trees and
 		 * index creation.
 		 */
-		LF_SET(WT_DHANDLE_EXCLUSIVE);
-	else
+	else if (!WT_STRING_MATCH("unordered", cval.str, cval.len))
 		WT_RET_MSG(session, EINVAL,
 		    "Value for 'bulk' must be a boolean or 'bitmap'");
 
