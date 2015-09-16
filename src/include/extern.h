@@ -11,7 +11,7 @@ extern int __wt_async_op_init(WT_SESSION_IMPL *session);
 extern WT_THREAD_RET __wt_async_worker(void *arg);
 extern int __wt_block_addr_to_buffer(WT_BLOCK *block, uint8_t **pp, wt_off_t offset, uint32_t size, uint32_t cksum);
 extern int __wt_block_buffer_to_addr(WT_BLOCK *block, const uint8_t *p, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump);
-extern int __wt_block_addr_valid(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, size_t addr_size, int live);
+extern int __wt_block_addr_invalid(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, size_t addr_size, int live);
 extern int __wt_block_addr_string(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, const uint8_t *addr, size_t addr_size);
 extern int __wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *p, WT_BLOCK_CKPT *ci);
 extern int __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session, WT_BLOCK *block, uint8_t **pp, WT_BLOCK_CKPT *ci);
