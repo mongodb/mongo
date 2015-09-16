@@ -3119,6 +3119,7 @@ buildvariants:
   - name: audit_WT
   - name: dbtest
   - name: dbtest_WT
+  - name: ese_WT
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
