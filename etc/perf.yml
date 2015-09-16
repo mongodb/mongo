@@ -63,6 +63,13 @@ functions:
         remote_file: perf/${build_variant}/${revision}/perf_regression_check.py-${build_id}
         bucket: mciuploads
         local_file: src/perf_regression_check.py
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: perf/${build_variant}/${revision}/override.json-${build_id}
+        bucket: mciuploads
+        local_file: src/override.json
     - command: shell.exec
       params:
         working_dir: src
@@ -91,7 +98,7 @@ functions:
           set -o errexit
           set -o verbose
           source ./venv/bin/activate
-          python perf_regression_check.py -f history.json --rev ${revision} -t tags.json --refTag 3.0.6-Baseline
+          python perf_regression_check.py -f history.json --rev ${revision} -t tags.json --refTag 3.0.6-Baseline --overrideFile override.json --variant ${build_variant}
   "run perf tests":
     - command: shell.exec
       params:
@@ -165,6 +172,16 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
         display_name: perf_regression_check.py
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/etc/override.json
+        remote_file: perf/${build_variant}/${revision}/override.json-${build_id}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/octet-stream}
+        display_name: override.json
 
 - name: query
   depends_on:
