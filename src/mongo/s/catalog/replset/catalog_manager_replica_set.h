@@ -144,6 +144,8 @@ public:
 
     Status initConfigVersion(OperationContext* txn) override;
 
+    repl::OpTime getConfigOpTime(OperationContext* txn) override;
+
 private:
     Status _checkDbDoesNotExist(OperationContext* txn,
                                 const std::string& dbName,

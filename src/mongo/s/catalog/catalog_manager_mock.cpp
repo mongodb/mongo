@@ -31,6 +31,7 @@
 #include "mongo/s/catalog/catalog_manager_mock.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_settings.h"
@@ -199,6 +200,10 @@ StatusWith<std::string> CatalogManagerMock::_generateNewShardName(OperationConte
 
 Status CatalogManagerMock::initConfigVersion(OperationContext* txn) {
     return Status::OK();
+}
+
+repl::OpTime CatalogManagerMock::getConfigOpTime(OperationContext* txn) {
+    return repl::OpTime();
 }
 
 }  // namespace mongo

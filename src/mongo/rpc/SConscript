@@ -139,6 +139,7 @@ env.Library(
     source=[
         'metadata.cpp',
         'metadata/audit_metadata.cpp',
+        'metadata/config_server_response_metadata.cpp',
         'metadata/server_selection_metadata.cpp',
         'metadata/sharding_metadata.cpp',
         'metadata/repl_set_metadata.cpp',
@@ -188,6 +189,14 @@ env.CppUnitTest(
     target='repl_set_metadata_test',
     source=[
         'metadata/repl_set_metadata_test.cpp',
+    ],
+    LIBDEPS=['metadata']
+)
+
+env.CppUnitTest(
+    target='config_server_response_metadata_test',
+    source=[
+        'metadata/config_server_response_metadata_test.cpp',
     ],
     LIBDEPS=['metadata']
 )

@@ -43,6 +43,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -1341,6 +1342,10 @@ void CatalogManagerLegacy::_consistencyChecker() {
 bool CatalogManagerLegacy::_isConsistentFromLastCheck() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _consistentFromLastCheck;
+}
+
+repl::OpTime CatalogManagerLegacy::getConfigOpTime(OperationContext* txn) {
+    return repl::OpTime();
 }
 
 }  // namespace mongo

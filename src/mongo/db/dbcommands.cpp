@@ -90,8 +90,10 @@
 #include "mongo/rpc/request_interface.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/config_server_response_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
 #include "mongo/util/fail_point_service.h"
@@ -1391,6 +1393,7 @@ bool Command::run(OperationContext* txn,
 
     BSONObjBuilder metadataBob;
 
+    const bool isShardingAware = ShardingState::get(txn)->enabled();
     bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
     if (isReplSet) {
         repl::OpTime lastOpTimeFromClient =
@@ -1400,10 +1403,15 @@ bool Command::run(OperationContext* txn,
 
         // For commands from mongos, append some info to help getLastError(w) work.
         // TODO: refactor out of here as part of SERVER-18326
-        if (ShardingState::get(txn)->enabled()) {
+        if (isShardingAware) {
             rpc::ShardingMetadata(lastOpTimeFromClient.getTimestamp(), replCoord->getElectionId())
                 .writeToMetadata(&metadataBob);
         }
+    }
+
+    if (isShardingAware) {
+        auto opTime = grid.catalogManager(txn)->getConfigOpTime(txn);
+        rpc::ConfigServerResponseMetadata(opTime).writeToMetadata(&metadataBob);
     }
 
     auto cmdResponse = replyBuilderBob.done();

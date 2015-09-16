@@ -219,6 +219,8 @@ private:
 
     Status initConfigVersion(OperationContext* txn) override;
 
+    repl::OpTime getConfigOpTime(OperationContext* txn) override;
+
     template <typename Callable>
     auto retry(OperationContext* txn, Callable&& c) -> decltype(std::forward<Callable>(c)());
 

@@ -114,6 +114,12 @@ public:
     virtual void advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) = 0;
 
     /**
+     * Returns the last known OpTime of the config server that supports replica sets.
+     * Returns the smallest possible OpTime if the catalog does not support it.
+     */
+    virtual repl::OpTime getConfigOpTime(OperationContext* txn) = 0;
+
+    /**
      * Returns what type of catalog manager this is - CSRS for the CatalogManagerReplicaSet and
      * SCCC for the CatalogManagerLegacy.
      */

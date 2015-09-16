@@ -587,4 +587,8 @@ Status ForwardingCatalogManager::initConfigVersion(OperationContext* txn) {
     return retry(txn, [&] { return _actual->initConfigVersion(txn); });
 }
 
+repl::OpTime ForwardingCatalogManager::getConfigOpTime(OperationContext* txn) {
+    return retry(txn, [&] { return _actual->getConfigOpTime(txn); });
+}
+
 }  // namespace mongo

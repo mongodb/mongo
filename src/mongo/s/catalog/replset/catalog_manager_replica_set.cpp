@@ -1309,4 +1309,9 @@ bool CatalogManagerReplicaSet::_runReadCommand(OperationContext* txn,
     return Command::getStatusFromCommandResult(resultStatus.getValue()).isOK();
 }
 
+repl::OpTime CatalogManagerReplicaSet::getConfigOpTime(OperationContext* txn) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _configOpTime;
+}
+
 }  // namespace mongo
