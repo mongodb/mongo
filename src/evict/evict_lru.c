@@ -1500,19 +1500,6 @@ __wt_cache_wait(WT_SESSION_IMPL *session, int full)
 		else if (ret == 0)
 			continue;
 
-		/*
-		 * The cache is still full and no pages were found in the queue
-		 * to evict.  If this transaction is the one holding back the
-		 * oldest ID, we can't wait forever.  We'll block next time we
-		 * are not busy.
-		 */
-		if (busy) {
-			__wt_txn_update_oldest(session, 0);
-			if (txn_state->id == txn_global->oldest_id ||
-			    txn_state->snap_min == txn_global->oldest_id)
-				return (0);
-		}
-
 		/* Wait for the queue to re-populate before trying again. */
 		WT_RET(__wt_cond_wait(session,
 		    S2C(session)->cache->evict_waiter_cond, 100000));
