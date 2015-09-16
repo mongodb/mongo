@@ -318,6 +318,11 @@ public:
                                                                  bool* success);
 
     /**
+     * Waits until _memberState becomes 'expectedState'.
+     */
+    void waitForMemberState_forTest(const MemberState& expectedState);
+
+    /**
      * If called after _startElectSelfV1(), blocks until all asynchronous
      * activities associated with election complete.
      */
@@ -1167,6 +1172,9 @@ private:
     // will be in the same order as the members in the replica set config, thus
     // the entry for ourself will be at _thisMemberConfigIndex.
     SlaveInfoVector _slaveInfo;  // (M)
+
+    // Used to signal threads waiting for changes to _memberState.
+    stdx::condition_variable _memberStateChange;  // (M)
 
     // Current ReplicaSet state.
     MemberState _memberState;  // (MX)

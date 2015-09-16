@@ -2186,6 +2186,11 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
 
     _memberState = newState;
     log() << "transition to " << newState.toString() << rsLog;
+
+    // Notifies waiters blocked in waitForMemberState_forTest().
+    // For testing only.
+    _memberStateChange.notify_all();
+
     return result;
 }
 
@@ -3054,6 +3059,13 @@ void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {
     _uncommittedSnapshots.clear();
     _currentCommittedSnapshot = boost::none;
     _externalState->dropAllSnapshots();
+}
+
+void ReplicationCoordinatorImpl::waitForMemberState_forTest(const MemberState& expectedState) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    while (_memberState != expectedState) {
+        _memberStateChange.wait(lk);
+    }
 }
 
 void ReplicationCoordinatorImpl::waitForElectionFinish_forTest() {
