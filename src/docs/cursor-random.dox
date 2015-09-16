@@ -3,10 +3,5 @@
 The \c next_random configuration to the WT_SESSION::open_cursor method
 configures the cursor to return a pseudo-random record from a row-store
 object (the configuration is not supported on other types of objects).
-The configuration has somewhat unusual semantics: first, the returned
-record may not be very random in the case of objects with only a few
-rows. Additionally, even in larger objects, the WT_CURSOR::next method
-generally returns the first record from a random page in the underlying
-file, not a random record from a random page.
 
  */
