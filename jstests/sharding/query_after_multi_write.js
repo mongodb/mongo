@@ -23,11 +23,25 @@ var runTest = function(writeFunc) {
     // Move chunk to bump version on a different mongos.
     testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0000' });
 
+    // Issue a query and make sure it gets routed to the right shard.
+    assert.neq(null, testDB2.user.findOne({ x: 123456 }));
+
+    // At this point, s1 thinks the version of 'test.user' is 2, bounce it again so it gets
+    // incremented to 3
+    testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0001' });
+
+    // Issue a query and make sure it gets routed to the right shard again.
+    assert.neq(null, testDB2.user.findOne({ x: 123456 }));
+
+    // At this point, s0 thinks the version of 'test.user' is 3, bounce it again so it gets
+    // incremented to 4
+    testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0000' });
+
+    // Ensure that write commands with multi version do not reset the connection shard version to
+    // ignored.
     writeFunc(testDB2);
 
-    // Issue a query and make sure it gets routed to the right shard.
-    var doc = testDB2.user.findOne({ x: 123456 });
-    assert.neq(null, doc);
+    assert.neq(null, testDB2.user.findOne({ x: 123456 }));
 
     st.stop();
 };

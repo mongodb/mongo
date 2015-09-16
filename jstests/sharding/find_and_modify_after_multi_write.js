@@ -23,20 +23,48 @@ var runTest = function(writeFunc) {
     // Move chunk to bump version on a different mongos.
     testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0000' });
 
-    writeFunc(testDB2);
-
     // Issue a targetted findAndModify and check that it was upserted to the right shard.
-    var res = testDB2.runCommand({
+    assert.commandWorked(testDB2.runCommand({
         findAndModify: 'user',
         query: { x: 100 },
         update: { $set: { y: 1 }},
         upsert: true
-    });
-
-    assert.commandWorked(res);
+    }));
 
     assert.neq(null, st.d0.getDB('test').user.findOne({ x: 100 }));
     assert.eq(null, st.d1.getDB('test').user.findOne({ x: 100 }));
+
+    // At this point, s1 thinks the version of 'test.user' is 2, bounce it again so it gets
+    // incremented to 3
+    testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0001' });
+
+    assert.commandWorked(testDB2.runCommand({
+        findAndModify: 'user',
+        query: { x: 200 },
+        update: { $set: { y: 1 }},
+        upsert: true
+    }));
+
+    assert.eq(null, st.d0.getDB('test').user.findOne({ x: 200 }));
+    assert.neq(null, st.d1.getDB('test').user.findOne({ x: 200 }));
+
+    // At this point, s0 thinks the version of 'test.user' is 3, bounce it again so it gets
+    // incremented to 4
+    testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0000' });
+
+    // Ensure that write commands with multi version do not reset the connection shard version to
+    // ignored.
+    writeFunc(testDB2);
+
+    assert.commandWorked(testDB2.runCommand({
+        findAndModify: 'user',
+        query: { x: 300 },
+        update: { $set: { y: 1 }},
+        upsert: true
+    }));
+
+    assert.neq(null, st.d0.getDB('test').user.findOne({ x: 300 }));
+    assert.eq(null, st.d1.getDB('test').user.findOne({ x: 300 }));
 
     st.stop();
 };
