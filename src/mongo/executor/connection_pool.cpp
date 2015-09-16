@@ -447,6 +447,9 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
 void ConnectionPool::SpecificPool::shutdown() {
     stdx::unique_lock<stdx::mutex> lk(_parent->_mutex);
 
+    if (_state == State::kRunning)
+        return;
+
     _state = State::kInShutdown;
 
     // If we have processing connections, wait for them to finish or timeout
