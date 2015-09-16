@@ -143,13 +143,6 @@ Status addSSLClientOptions(moe::OptionSection* options) {
         .requires("ssl")
         .requires("ssl.CAFile");
 
-    options->addOptionChaining(
-                 "net.ssl.disabledProtocols",
-                 "sslDisabledProtocols",
-                 moe::String,
-                 "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2]")
-        .requires("ssl");
-
     options->addOptionChaining("net.ssl.allowInvalidHostnames",
                                "sslAllowInvalidHostnames",
                                moe::Switch,
