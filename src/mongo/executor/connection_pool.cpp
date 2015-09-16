@@ -384,12 +384,12 @@ void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex
         auto cb = std::move(_requests.top().second);
         _requests.pop();
 
-        updateStateInLock();
-
         auto connPtr = conn.get();
 
         // check out the connection
         _checkedOutPool[connPtr] = std::move(conn);
+
+        updateStateInLock();
 
         // pass it to the user
         lk.unlock();
@@ -446,9 +446,6 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
 // Called every second after hostTimeout until all processing connections reap
 void ConnectionPool::SpecificPool::shutdown() {
     stdx::unique_lock<stdx::mutex> lk(_parent->_mutex);
-
-    if (_state == State::kRunning)
-        return;
 
     _state = State::kInShutdown;
 
@@ -518,6 +515,8 @@ void ConnectionPool::SpecificPool::updateStateInLock() {
                     if (x.first <= now) {
                         auto cb = std::move(x.second);
                         _requests.pop();
+
+                        updateStateInLock();
 
                         lk.unlock();
                         cb(Status(ErrorCodes::ExceededTimeLimit,
