@@ -32,22 +32,23 @@
 
 #include "mongo/db/repair_database.h"
 
-
-#include "mongo/db/background.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -207,18 +208,31 @@ Status repairDatabase(OperationContext* txn,
 
     // Close the db to invalidate all current users and caches.
     dbHolder().close(txn, dbName);
-    // Open the db after everything finishes
-    class OpenDbInDestructor {
-    public:
-        OpenDbInDestructor(OperationContext* txn, const std::string& db) : _dbName(db), _txn(txn) {}
-        ~OpenDbInDestructor() {
-            dbHolder().openDb(_txn, _dbName);
-        }
+    ON_BLOCK_EXIT([&dbName, &txn] {
+        try {
+            // Open the db after everything finishes.
+            auto db = dbHolder().openDb(txn, dbName);
 
-    private:
-        const std::string& _dbName;
-        OperationContext* _txn;
-    } dbOpener(txn, dbName);
+            // Set the minimum snapshot for all Collections in this db. This ensures that readers
+            // using majority readConcern level can only use the collections after their repaired
+            // versions are in the committed view.
+            auto replCoord = repl::ReplicationCoordinator::get(txn);
+            auto snapshotName = replCoord->reserveSnapshotName(txn);
+            replCoord->forceSnapshotCreation();  // Ensure a newer snapshot is created even if idle.
+
+            auto dbce = db->getDatabaseCatalogEntry();
+            std::list<std::string> collections;
+            dbce->getCollectionNamespaces(&collections);
+            for (auto&& collectionName : collections) {
+                auto collection = db->getCollection(collectionName);
+                collection->setMinimumVisibleSnapshot(snapshotName);
+            }
+        } catch (...) {
+            severe() << "Unexpected exception encountered while reopening database after repair.";
+            std::terminate(); // Logs additional info about the specific error.
+        }
+    });
+
     DatabaseCatalogEntry* dbce = engine->getDatabaseCatalogEntry(txn, dbName);
 
     std::list<std::string> colls;

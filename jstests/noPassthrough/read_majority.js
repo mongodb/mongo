@@ -108,7 +108,7 @@ if (false) {
 }
 
 // To use the index, a snapshot created after the index was completed must be marked committed.
-var snapshot5 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
+var newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
 if (false) {
     // disabled until SERVER-20439 is implemented.
     assert(!isIxscan(getReadMajorityExplainPlan({version: 1})));
@@ -116,7 +116,7 @@ if (false) {
     // stopgap solution implemented for SERVER-20260.
     assertNoReadMajoritySnapshotAvailable();
 }
-assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot5}));
+assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
 assert(isIxscan(getReadMajorityExplainPlan({version: 1})));
 
 // Dropping an index does bump the min snapshot.
@@ -124,17 +124,25 @@ t.dropIndex({version: 1});
 assertNoReadMajoritySnapshotAvailable();
 
 // To use the collection again, a snapshot created after the dropIndex must be marked committed.
-var snapshot6 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
+newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
 assertNoReadMajoritySnapshotAvailable();
-assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot6}));
+assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
 assert.eq(getReadMajorityCursor().itcount(), 10);
 
 // Reindex bumps the min snapshot.
 t.reIndex();
 assertNoReadMajoritySnapshotAvailable();
-var snapshot7 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
+newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
 assertNoReadMajoritySnapshotAvailable();
-assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot7}));
+assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
+assert.eq(getReadMajorityCursor().itcount(), 10);
+
+// Repair bumps the min snapshot.
+db.repairDatabase();
+assertNoReadMajoritySnapshotAvailable();
+newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
+assertNoReadMajoritySnapshotAvailable();
+assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
 assert.eq(getReadMajorityCursor().itcount(), 10);
 
 // Dropping the collection is visible in the committed snapshot, even though it hasn't been marked
@@ -147,9 +155,9 @@ assert.eq(getReadMajorityCursor().itcount(), 0);
 // committed view.
 t.insert({_id:0, version: 8});
 assertNoReadMajoritySnapshotAvailable();
-var snapshot8 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
+newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
 assertNoReadMajoritySnapshotAvailable();
-assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot8}));
+assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
 assert.eq(getReadMajorityCursor().itcount(), 1);
 
 MongoRunner.stopMongod(testServer);
