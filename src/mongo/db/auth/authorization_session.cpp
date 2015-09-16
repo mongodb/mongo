@@ -278,21 +278,25 @@ Status AuthorizationSession::checkAuthForKillCursors(const NamespaceString& ns,
                                                      long long cursorID) {
     // See implementation comments in checkAuthForGetMore().  This method looks very similar.
     if (ns.isListCollectionsGetMore()) {
-        if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
-                                              ActionType::killCursors)) {
+        if (!(isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
+                                               ActionType::killCursors) ||
+              isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
+                                               ActionType::listCollections))) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized to kill listCollections cursor on "
                                         << ns.ns());
         }
     } else if (ns.isListIndexesGetMore()) {
         NamespaceString targetNS = ns.getTargetNSForListIndexesGetMore();
-        if (!isAuthorizedForActionsOnNamespace(targetNS, ActionType::killCursors)) {
+        if (!(isAuthorizedForActionsOnNamespace(targetNS, ActionType::killCursors) ||
+              isAuthorizedForActionsOnNamespace(targetNS, ActionType::listIndexes))) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized to kill listIndexes cursor on "
                                         << ns.ns());
         }
     } else {
-        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::killCursors)) {
+        if (!(isAuthorizedForActionsOnNamespace(ns, ActionType::killCursors) ||
+              isAuthorizedForActionsOnNamespace(ns, ActionType::find))) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized to kill cursor on " << ns.ns());
         }
