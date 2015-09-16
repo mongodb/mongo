@@ -462,6 +462,7 @@ __session_log_flush(WT_SESSION *wt_session, const char *config)
 	WT_STAT_FAST_CONN_INCR(session, log_flush);
 
 	conn = S2C(session);
+	flags = 0;
 	/*
 	 * If logging is not enabled there is nothing to do.
 	 */
