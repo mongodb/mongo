@@ -454,7 +454,6 @@ __session_log_flush(WT_SESSION *wt_session, const char *config)
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_LOG *log;
 	WT_SESSION_IMPL *session;
 	uint32_t flags;
 
@@ -469,7 +468,6 @@ __session_log_flush(WT_SESSION *wt_session, const char *config)
 	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		WT_ERR_MSG(session, EINVAL, "logging not enabled");
 
-	log = conn->log;
 	WT_ERR(__wt_config_gets_def(session, cfg, "sync", 0, &cval));
 	if (WT_STRING_MATCH("background", cval.str, cval.len))
 		flags = WT_LOG_BACKGROUND;
