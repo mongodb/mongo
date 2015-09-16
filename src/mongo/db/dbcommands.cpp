@@ -1260,13 +1260,15 @@ void Command::execCommand(OperationContext* txn,
             auto commandNS = NamespaceString(command->parseNs(dbname, request.getCommandArgs()));
             operationShardVersion.initializeFromCommand(commandNS, request.getCommandArgs());
 
-            auto optimeStatus = repl::OpTime::parseFromBSON(request.getCommandArgs());
-            if (optimeStatus.isOK()) {
+            auto optimeStatus = rpc::ShardingRequestMetadata::extractConfigServerOpTimeIfPresent(
+                request.getCommandArgs());
+            auto optime = uassertStatusOK(optimeStatus);
+            if (optime.is_initialized()) {
                 auto shardingState = ShardingState::get(txn);
                 if (shardingState->enabled()) {
                     // TODO(spencer): Do this unconditionally once all nodes are sharding aware
                     // by default.
-                    shardingState->advanceConfigOpTime(txn, optimeStatus.getValue());
+                    shardingState->advanceConfigOpTime(txn, optime.get());
                 } else {
                     massert(
                         28807,
@@ -1274,14 +1276,12 @@ void Command::execCommand(OperationContext* txn,
                         "sharding aware",
                         command->name == "setShardVersion");
                 }
-            } else if (optimeStatus != ErrorCodes::NoSuchKey) {
-                uassertStatusOK(optimeStatus.getStatus());
             } else {
                 // If there was top-level shard version information then there must have been
                 // config optime information as well.  a 3.0 mongos won't have shard version info
                 // at the top level (they have it in a nested "metadata" field) so it won't cause
                 // a problem here.
-                massert(28813,
+                massert(28818,
                         str::stream()
                             << "Received command with chunk version information but no config "
                                "server optime: " << request.getCommandArgs().jsonString(),

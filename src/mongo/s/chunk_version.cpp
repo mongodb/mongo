@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -111,14 +112,16 @@ StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForCommand
 
     const ChunkVersion& chunkVersion = chunkVersionStatus.getValue();
 
-    const auto opTimeStatus = repl::OpTime::parseFromOplogEntry(obj);
-    if (opTimeStatus.isOK()) {
-        return ChunkVersionAndOpTime(chunkVersion, opTimeStatus.getValue());
-    } else if (opTimeStatus == ErrorCodes::NoSuchKey) {
+    const auto opTimeStatus = rpc::ShardingRequestMetadata::extractConfigServerOpTimeIfPresent(obj);
+    if (!opTimeStatus.isOK()) {
+        return opTimeStatus.getStatus();
+    }
+    auto opTime = opTimeStatus.getValue();
+    if (opTime.is_initialized()) {
+        return ChunkVersionAndOpTime(chunkVersion, opTime.get());
+    } else {
         return ChunkVersionAndOpTime(chunkVersion);
     }
-
-    return opTimeStatus.getStatus();
 }
 
 StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForSetShardVersion(
@@ -129,26 +132,26 @@ StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForSetShar
 
     const ChunkVersion& chunkVersion = chunkVersionStatus.getValue();
 
-    const auto opTimeStatus = repl::OpTime::parseFromOplogEntry(obj);
-    if (opTimeStatus.isOK()) {
-        return ChunkVersionAndOpTime(chunkVersion, opTimeStatus.getValue());
-    } else if (opTimeStatus == ErrorCodes::NoSuchKey) {
+    const auto opTimeStatus = rpc::ShardingRequestMetadata::extractConfigServerOpTimeIfPresent(obj);
+    if (!opTimeStatus.isOK()) {
+        return opTimeStatus.getStatus();
+    }
+    auto opTime = opTimeStatus.getValue();
+    if (opTime.is_initialized()) {
+        return ChunkVersionAndOpTime(chunkVersion, opTime.get());
+    } else {
         return ChunkVersionAndOpTime(chunkVersion);
     }
-
-    return opTimeStatus.getStatus();
 }
 
 void ChunkVersionAndOpTime::appendForSetShardVersion(BSONObjBuilder* builder) const {
     _verAndOpT.value.addToBSON(*builder, kVersion);
-    builder->append("ts", _verAndOpT.opTime.getTimestamp());
-    builder->append("t", _verAndOpT.opTime.getTerm());
+    _verAndOpT.opTime.append(builder, rpc::ShardingRequestMetadata::kConfigsvrOpTimeFieldName);
 }
 
 void ChunkVersionAndOpTime::appendForCommands(BSONObjBuilder* builder) const {
     builder->appendArray(kShardVersion, _verAndOpT.value.toBSON());
-    builder->append("ts", _verAndOpT.opTime.getTimestamp());
-    builder->append("t", _verAndOpT.opTime.getTerm());
+    _verAndOpT.opTime.append(builder, rpc::ShardingRequestMetadata::kConfigsvrOpTimeFieldName);
 }
 
 }  // namespace mongo

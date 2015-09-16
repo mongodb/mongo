@@ -277,7 +277,8 @@ TEST(SetShardVersionRequest, ToSSVCommandFull) {
                    << "TestShard"
                    << "shardHost" << shardCS.toString() << "version"
                    << Timestamp(chunkVersion.getVersion().toLong()) << "versionEpoch"
-                   << chunkVersion.getVersion().epoch() << "ts" << Timestamp(10) << "t" << 20LL));
+                   << chunkVersion.getVersion().epoch() << "configsvrOpTime"
+                   << BSON("ts" << Timestamp(10) << "t" << 20LL)));
 }
 
 TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
@@ -305,7 +306,8 @@ TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
                    << "TestShard"
                    << "shardHost" << shardCS.toString() << "version"
                    << Timestamp(chunkVersion.getVersion().toLong()) << "versionEpoch"
-                   << chunkVersion.getVersion().epoch() << "ts" << Timestamp(10) << "t" << 20LL));
+                   << chunkVersion.getVersion().epoch() << "configsvrOpTime"
+                   << BSON("ts" << Timestamp(10) << "t" << 20LL)));
 }
 
 TEST(SetShardVersionRequest, ToSSVCommandFullNoConnectionVersioning) {
@@ -333,8 +335,9 @@ TEST(SetShardVersionRequest, ToSSVCommandFullNoConnectionVersioning) {
                    << "TestShard"
                    << "shardHost" << shardCS.toString() << "version"
                    << Timestamp(chunkVersion.getVersion().toLong()) << "versionEpoch"
-                   << chunkVersion.getVersion().epoch() << "ts" << Timestamp(10) << "t" << 20LL
-                   << "noConnectionVersioning" << true));
+                   << chunkVersion.getVersion().epoch() << "configsvrOpTime"
+                   << BSON("ts" << Timestamp(10) << "t" << 20LL) << "noConnectionVersioning"
+                   << true));
 }
 
 }  // namespace

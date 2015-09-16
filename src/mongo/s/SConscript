@@ -39,6 +39,7 @@ env.Library(
         'catalog/catalog_types',
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/db/repl/optime',
+        '$BUILD_DIR/mongo/rpc/metadata',
     ]
 )
 

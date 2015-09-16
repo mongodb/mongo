@@ -61,8 +61,8 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
                                         << "test"
                                         << "documents" << insertArray << "writeConcern"
                                         << BSON("w" << 1) << "ordered" << true << "shardVersion"
-                                        << BSON_ARRAY(Timestamp(1, 2) << epoch) << "ts"
-                                        << Timestamp(3, 4) << "t" << 5);
+                                        << BSON_ARRAY(Timestamp(1, 2) << epoch) << "configsvrOpTime"
+                                        << BSON("ts" << Timestamp(3, 4) << "t" << 5));
 
     std::string errMsg;
     BatchedCommandRequest insertRequest(BatchedCommandRequest::BatchType_Insert);
@@ -85,9 +85,10 @@ TEST(BatchedCommandRequest, InsertWithShardVersionInLegacyMetadata) {
                                         << "documents" << insertArray << "writeConcern"
                                         << BSON("w" << 1) << "ordered" << true << "metadata"
                                         << BSON("shardVersion"
-                                                << BSON_ARRAY(Timestamp(1, 2) << epoch) << "ts"
-                                                << Timestamp(3, 4) << "t" << 5 << "session"
-                                                << 0LL));
+                                                << BSON_ARRAY(Timestamp(1, 2) << epoch)
+                                                << "configsvrOpTime"
+                                                << BSON("ts" << Timestamp(3, 4) << "t" << 5)
+                                                << "session" << 0LL));
 
     std::string errMsg;
     BatchedCommandRequest insertRequest(BatchedCommandRequest::BatchType_Insert);

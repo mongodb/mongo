@@ -96,7 +96,7 @@ const char kAwaitDataField[] = "awaitData";
 const char kPartialResultsField[] = "allowPartialResults";
 const char kTermField[] = "term";
 const char kOptionsField[] = "options";
-const char kConfigOpTimeField[] = "ts";
+const char kConfigOpTimeField[] = "configsvrOpTime";
 
 }  // namespace
 

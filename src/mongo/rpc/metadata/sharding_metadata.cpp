@@ -34,10 +34,13 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace rpc {
+
+const char ShardingRequestMetadata::kConfigsvrOpTimeFieldName[] = "configsvrOpTime";
 
 namespace {
 
@@ -139,6 +142,19 @@ const Timestamp& ShardingMetadata::getLastOpTime() const {
 
 const OID& ShardingMetadata::getLastElectionId() const {
     return _lastElectionId;
+}
+
+StatusWith<boost::optional<repl::OpTime>>
+ShardingRequestMetadata::extractConfigServerOpTimeIfPresent(const BSONObj& cmdObj) {
+    repl::OpTime opTime;
+    Status status = bsonExtractOpTimeField(cmdObj, kConfigsvrOpTimeFieldName, &opTime);
+    if (status == ErrorCodes::NoSuchKey) {
+        return {boost::none};
+    } else if (!status.isOK()) {
+        return status;
+    }
+
+    return {opTime};
 }
 
 }  // namespace rpc
