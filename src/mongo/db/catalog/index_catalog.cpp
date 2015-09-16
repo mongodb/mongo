@@ -385,43 +385,36 @@ void IndexCatalog::IndexBuildBlock::fail() {
     }
 }
 
-namespace {
-class IndexCompletionChange final : public RecoveryUnit::Change {
-public:
-    IndexCompletionChange(OperationContext* txn, IndexCatalogEntry* entry)
-        : _txn(txn), _entry(entry) {}
-
-    void rollback() final {}  // Handled elsewhere by retrying or deleting the index.
-    void commit() final {
-        // Note: this runs after the WUOW commits but before we release our X lock on the
-        // collection. This means that any snapshot created after this must include the full index,
-        // and no one can try to read this index before we set the visibility.
-        auto replCoord = repl::ReplicationCoordinator::get(_txn);
-        auto snapshotName = replCoord->reserveSnapshotName(_txn);
-        replCoord->forceSnapshotCreation();  // Ensures a newer snapshot gets created even if idle.
-        _entry->setMinimumVisibleSnapshot(snapshotName);
-    }
-
-private:
-    OperationContext* const _txn;
-    IndexCatalogEntry* const _entry;
-};
-}
-
 void IndexCatalog::IndexBuildBlock::success() {
-    fassert(17207, _catalog->_collection->ok());
+    Collection* collection = _catalog->_collection;
+    fassert(17207, collection->ok());
 
-    _catalog->_collection->getCatalogEntry()->indexBuildSuccess(_txn, _indexName);
+    collection->getCatalogEntry()->indexBuildSuccess(_txn, _indexName);
 
     IndexDescriptor* desc = _catalog->findIndexByName(_txn, _indexName, true);
     fassert(17330, desc);
     IndexCatalogEntry* entry = _catalog->_entries.find(desc);
     fassert(17331, entry && entry == _entry);
 
-    _txn->recoveryUnit()->registerChange(new IndexCompletionChange(_txn, entry));
+    OperationContext* txn = _txn;
+    _txn->recoveryUnit()->onCommit([txn, entry, collection] {
+        // Note: this runs after the WUOW commits but before we release our X lock on the
+        // collection. This means that any snapshot created after this must include the full index,
+        // and no one can try to read this index before we set the visibility.
+        auto replCoord = repl::ReplicationCoordinator::get(txn);
+        auto snapshotName = replCoord->reserveSnapshotName(txn);
+        replCoord->forceSnapshotCreation();  // Ensures a newer snapshot gets created even if idle.
+        entry->setMinimumVisibleSnapshot(snapshotName);
+
+        // TODO remove this once SERVER-20439 is implemented. It is a stopgap solution for
+        // SERVER-20260 to make sure that reads with majority readConcern level can see indexes that
+        // are created with w:majority by making the readers block.
+        collection->setMinimumVisibleSnapshot(snapshotName);
+    });
+
     entry->setIsReady(true);
 
-    _catalog->_collection->infoCache()->addedIndex(_txn, _indexName);
+    collection->infoCache()->addedIndex(_txn, _indexName);
 }
 
 namespace {

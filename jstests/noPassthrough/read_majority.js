@@ -98,12 +98,24 @@ assert.eq(cursor.next().version, 4);
 // Adding an index doesn't bump the min snapshot for a collection, but it can't be used for queries
 // yet.
 t.ensureIndex({version: 1});
-assert.eq(getReadMajorityCursor().itcount(), 10);
-assert(!isIxscan(getReadMajorityExplainPlan({version: 1})));
+if (false) {
+    // disabled until SERVER-20439 is implemented.
+    assert.eq(getReadMajorityCursor().itcount(), 10);
+    assert(!isIxscan(getReadMajorityExplainPlan({version: 1})));
+} else {
+    // stopgap solution implemented for SERVER-20260.
+    assertNoReadMajoritySnapshotAvailable();
+}
 
 // To use the index, a snapshot created after the index was completed must be marked committed.
 var snapshot5 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
-assert(!isIxscan(getReadMajorityExplainPlan({version: 1})));
+if (false) {
+    // disabled until SERVER-20439 is implemented.
+    assert(!isIxscan(getReadMajorityExplainPlan({version: 1})));
+} else {
+    // stopgap solution implemented for SERVER-20260.
+    assertNoReadMajoritySnapshotAvailable();
+}
 assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot5}));
 assert(isIxscan(getReadMajorityExplainPlan({version: 1})));
 
