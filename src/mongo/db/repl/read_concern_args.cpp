@@ -50,9 +50,7 @@ const char kLinearizableReadConcernStr[] = "linearizable";
 }  // unnamed namespace
 
 const string ReadConcernArgs::kReadConcernFieldName("readConcern");
-const string ReadConcernArgs::kOpTimeFieldName("afterOpTime");
-const string ReadConcernArgs::kOpTimestampFieldName("ts");
-const string ReadConcernArgs::kOpTermFieldName("term");
+const string ReadConcernArgs::kAfterOpTimeFieldName("afterOpTime");
 const string ReadConcernArgs::kLevelFieldName("level");
 
 ReadConcernArgs::ReadConcernArgs() = default;
@@ -83,9 +81,9 @@ Status ReadConcernArgs::initialize(const BSONObj& cmdObj) {
 
     BSONObj readConcernObj = readConcernElem.Obj();
 
-    if (readConcernObj.hasField(kOpTimeFieldName)) {
+    if (readConcernObj.hasField(kAfterOpTimeFieldName)) {
         OpTime opTime;
-        auto opTimeStatus = bsonExtractOpTimeField(readConcernObj, kOpTimeFieldName, &opTime);
+        auto opTimeStatus = bsonExtractOpTimeField(readConcernObj, kAfterOpTimeFieldName, &opTime);
         if (!opTimeStatus.isOK()) {
             return opTimeStatus;
         }
@@ -138,10 +136,7 @@ void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) {
     }
 
     if (_opTime) {
-        BSONObjBuilder afterBuilder(rcBuilder.subobjStart(kOpTimeFieldName));
-        afterBuilder.append(kOpTimestampFieldName, _opTime->getTimestamp());
-        afterBuilder.append(kOpTermFieldName, _opTime->getTerm());
-        afterBuilder.done();
+        _opTime->append(&rcBuilder, kAfterOpTimeFieldName);
     }
 
     rcBuilder.done();

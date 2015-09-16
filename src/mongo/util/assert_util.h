@@ -270,6 +270,12 @@ inline T fassertStatusOK(int msgid, StatusWith<T> sw) {
     return std::move(sw.getValue());
 }
 
+inline void fassertStatusOK(int msgid, const Status& s) {
+    if (MONGO_unlikely(!s.isOK())) {
+        fassertFailedWithStatus(msgid, s);
+    }
+}
+
 /* warning only - keeps going */
 #define MONGO_wassert(_Expression)                                \
     do {                                                          \

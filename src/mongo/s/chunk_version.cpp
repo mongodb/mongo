@@ -111,7 +111,7 @@ StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForCommand
 
     const ChunkVersion& chunkVersion = chunkVersionStatus.getValue();
 
-    const auto opTimeStatus = repl::OpTime::parseFromBSON(obj);
+    const auto opTimeStatus = repl::OpTime::parseFromOplogEntry(obj);
     if (opTimeStatus.isOK()) {
         return ChunkVersionAndOpTime(chunkVersion, opTimeStatus.getValue());
     } else if (opTimeStatus == ErrorCodes::NoSuchKey) {
@@ -129,7 +129,7 @@ StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForSetShar
 
     const ChunkVersion& chunkVersion = chunkVersionStatus.getValue();
 
-    const auto opTimeStatus = repl::OpTime::parseFromBSON(obj);
+    const auto opTimeStatus = repl::OpTime::parseFromOplogEntry(obj);
     if (opTimeStatus.isOK()) {
         return ChunkVersionAndOpTime(chunkVersion, opTimeStatus.getValue());
     } else if (opTimeStatus == ErrorCodes::NoSuchKey) {
@@ -141,12 +141,14 @@ StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForSetShar
 
 void ChunkVersionAndOpTime::appendForSetShardVersion(BSONObjBuilder* builder) const {
     _verAndOpT.value.addToBSON(*builder, kVersion);
-    _verAndOpT.opTime.append(builder);
+    builder->append("ts", _verAndOpT.opTime.getTimestamp());
+    builder->append("t", _verAndOpT.opTime.getTerm());
 }
 
 void ChunkVersionAndOpTime::appendForCommands(BSONObjBuilder* builder) const {
     builder->appendArray(kShardVersion, _verAndOpT.value.toBSON());
-    _verAndOpT.opTime.append(builder);
+    builder->append("ts", _verAndOpT.opTime.getTimestamp());
+    builder->append("t", _verAndOpT.opTime.getTerm());
 }
 
 }  // namespace mongo

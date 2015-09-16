@@ -22,7 +22,7 @@ var runTest = function(testDB, primaryConn) {
         find: 'user',
         filter: { x: 1 },
         readConcern: {
-            afterOpTime: { ts: twoSecTS, term: 0 }
+            afterOpTime: { ts: twoSecTS, t: 0 }
         },
         maxTimeMS: 1000
     }));
@@ -40,7 +40,7 @@ var runTest = function(testDB, primaryConn) {
         find: 'user',
         filter: { x: 1 },
         readConcern: {
-            afterOpTime: { ts: twoSecTS, term: 0 },
+            afterOpTime: { ts: twoSecTS, t: 0 },
             maxTimeMS: 10 * 1000
         }
     }));

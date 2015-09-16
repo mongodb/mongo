@@ -46,7 +46,6 @@ const char kLastOpCommittedFieldName[] = "lastOpCommitted";
 const char kLastOpVisibleFieldName[] = "lastOpVisible";
 const char kConfigVersionFieldName[] = "configVersion";
 const char kPrimaryIndexFieldName[] = "primaryIndex";
-const char kTimestampFieldName[] = "ts";
 const char kTermFieldName[] = "term";
 
 }  // unnamed namespace
@@ -106,18 +105,8 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
 Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     BSONObjBuilder replMetadataBuilder(builder->subobjStart(kReplSetMetadataFieldName));
     replMetadataBuilder.append(kTermFieldName, _currentTerm);
-
-    BSONObjBuilder lastOpCommittedBuilder(
-        replMetadataBuilder.subobjStart(kLastOpCommittedFieldName));
-    lastOpCommittedBuilder.append(kTimestampFieldName, _lastOpCommitted.getTimestamp());
-    lastOpCommittedBuilder.append(kTermFieldName, _lastOpCommitted.getTerm());
-    lastOpCommittedBuilder.doneFast();
-
-    BSONObjBuilder lastOpVisibleBuilder(replMetadataBuilder.subobjStart(kLastOpVisibleFieldName));
-    lastOpVisibleBuilder.append(kTimestampFieldName, _lastOpVisible.getTimestamp());
-    lastOpVisibleBuilder.append(kTermFieldName, _lastOpVisible.getTerm());
-    lastOpVisibleBuilder.doneFast();
-
+    _lastOpCommitted.append(&replMetadataBuilder, kLastOpCommittedFieldName);
+    _lastOpVisible.append(&replMetadataBuilder, kLastOpVisibleFieldName);
     replMetadataBuilder.append(kConfigVersionFieldName, _configVersion);
     replMetadataBuilder.append(kPrimaryIndexFieldName, _currentPrimaryIndex);
     replMetadataBuilder.doneFast();

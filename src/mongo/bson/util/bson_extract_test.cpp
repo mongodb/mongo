@@ -86,7 +86,7 @@ TEST(ExtractBSON, ExtractStringFieldWithDefault) {
 
 TEST(ExtractBSON, ExtractOpTimeField) {
     // Outer object cases.
-    BSONObj obj = BSON("a" << BSON("ts" << Timestamp(10, 0) << "term" << 2) << "b"
+    BSONObj obj = BSON("a" << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "b"
                            << "notAnObj");
     repl::OpTime opTime;
     ASSERT_OK(bsonExtractOpTimeField(obj, "a", &opTime));
@@ -97,13 +97,13 @@ TEST(ExtractBSON, ExtractOpTimeField) {
     // Missing timestamp field.
     obj = BSON("a" << BSON("ts"
                            << "notATimestamp"
-                           << "term" << 2));
+                           << "t" << 2));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractOpTimeField(obj, "a", &opTime));
     // Wrong typed timestamp field.
-    obj = BSON("a" << BSON("term" << 2));
+    obj = BSON("a" << BSON("t" << 2));
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractOpTimeField(obj, "a", &opTime));
     // Missing term field.
-    obj = BSON("a" << BSON("ts" << Timestamp(10, 0) << "term"
+    obj = BSON("a" << BSON("ts" << Timestamp(10, 0) << "t"
                                 << "notANumber"));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractOpTimeField(obj, "a", &opTime));
     // Wrong typed term field.

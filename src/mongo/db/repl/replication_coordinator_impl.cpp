@@ -1507,8 +1507,7 @@ bool ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(BSONObjBuil
         BSONObjBuilder entry(arrayBuilder.subobjStart());
         entry.append("_id", itr->rid);
         if (isV1ElectionProtocol()) {
-            BSONObjBuilder opTimeBuilder(entry.subobjStart("optime"));
-            itr->opTime.append(&opTimeBuilder);
+            itr->opTime.append(&entry, "optime");
         } else {
             entry.append("optime", itr->opTime.getTimestamp());
         }

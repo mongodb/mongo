@@ -46,9 +46,7 @@ enum class ReadConcernLevel { kLocalReadConcern, kMajorityReadConcern, kLineariz
 class ReadConcernArgs {
 public:
     static const std::string kReadConcernFieldName;
-    static const std::string kOpTermFieldName;
-    static const std::string kOpTimeFieldName;
-    static const std::string kOpTimestampFieldName;
+    static const std::string kAfterOpTimeFieldName;
     static const std::string kLevelFieldName;
 
     ReadConcernArgs();

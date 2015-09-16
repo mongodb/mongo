@@ -119,10 +119,7 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder, bool isProtoco
     }
     if (_opTimeSet) {
         if (isProtocolVersionV1) {
-            BSONObjBuilder opTime(builder->subobjStart(kOpTimeFieldName));
-            opTime.append(kTimestampFieldName, _opTime.getTimestamp());
-            opTime.append(kTermFieldName, _opTime.getTerm());
-            opTime.done();
+            _opTime.append(builder, kOpTimeFieldName);
         } else {
             builder->appendDate(kOpTimeFieldName,
                                 Date_t::fromMillisSinceEpoch(_opTime.getTimestamp().asLL()));

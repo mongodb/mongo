@@ -50,9 +50,9 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
     BSONObj expectedObj(
         BSON(kReplSetMetadataFieldName
              << BSON("term" << 3 << "lastOpCommitted"
-                            << BSON("ts" << opTime.getTimestamp() << "term" << opTime.getTerm())
+                            << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm())
                             << "lastOpVisible"
-                            << BSON("ts" << opTime2.getTimestamp() << "term" << opTime2.getTerm())
+                            << BSON("ts" << opTime2.getTimestamp() << "t" << opTime2.getTerm())
                             << "configVersion" << 6 << "primaryIndex" << 12)));
 
     BSONObj serializedObj = builder.obj();

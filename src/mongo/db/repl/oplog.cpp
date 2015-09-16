@@ -314,7 +314,10 @@ void _logOp(OperationContext* txn,
 
     BSONObjBuilder b(256);
 
-    slot.first.append(&b);
+    b.append("ts", slot.first.getTimestamp());
+    if (slot.first.getTerm() != -1) {
+        b.append("t", slot.first.getTerm());
+    }
     b.append("h", slot.second);
     b.append("v", OPLOG_VERSION);
     b.append("op", opstr);
@@ -385,7 +388,7 @@ OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
         checkOplogInsert(
             _localOplogCollection->insertDocuments(txn, opsVect.begin(), opsVect.end(), false));
         lastOptime =
-            fassertStatusOK(ErrorCodes::InvalidBSON, OpTime::parseFromBSON(opsVect.back()));
+            fassertStatusOK(ErrorCodes::InvalidBSON, OpTime::parseFromOplogEntry(opsVect.back()));
         wunit.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeOps", _localOplogCollection->ns().ns());
@@ -896,7 +899,7 @@ void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS) {
 
     if (!lastOp.isEmpty()) {
         LOG(1) << "replSet setting last Timestamp";
-        const OpTime opTime = fassertStatusOK(28696, OpTime::parseFromBSON(lastOp));
+        const OpTime opTime = fassertStatusOK(28696, OpTime::parseFromOplogEntry(lastOp));
         setNewTimestamp(opTime.getTimestamp());
     }
 }
@@ -996,7 +999,7 @@ void SnapshotThread::run() {
                     continue;  // oplog is completely empty.
 
                 const auto op = record->data.releaseToBson();
-                opTimeOfSnapshot = fassertStatusOK(28780, OpTime::parseFromBSON(op));
+                opTimeOfSnapshot = fassertStatusOK(28780, OpTime::parseFromOplogEntry(op));
                 invariant(!opTimeOfSnapshot.isNull());
             }
 

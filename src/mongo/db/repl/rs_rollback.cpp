@@ -323,7 +323,7 @@ void syncFixUp(OperationContext* txn,
 
     // we have items we are writing that aren't from a point-in-time.  thus best not to come
     // online until we get to that point in freshness.
-    OpTime minValid = fassertStatusOK(28774, OpTime::parseFromBSON(newMinValid));
+    OpTime minValid = fassertStatusOK(28774, OpTime::parseFromOplogEntry(newMinValid));
     log() << "minvalid=" << minValid;
     setMinValid(txn, minValid);
 
@@ -426,7 +426,7 @@ void syncFixUp(OperationContext* txn,
             if (newMinValid.isEmpty()) {
                 err = "can't get minvalid from sync source";
             } else {
-                OpTime minValid = fassertStatusOK(28775, OpTime::parseFromBSON(newMinValid));
+                OpTime minValid = fassertStatusOK(28775, OpTime::parseFromOplogEntry(newMinValid));
                 log() << "minvalid=" << minValid;
                 setMinValid(txn, minValid);
             }

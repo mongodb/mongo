@@ -35,6 +35,7 @@
 #include <set>
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
@@ -2501,19 +2502,19 @@ TEST_F(ReplCoordTest, MetadataWrongConfigVersion) {
 
     // lower configVersion
     StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
-        rpc::kReplSetMetadataFieldName << BSON(
-            "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "term" << 2) << "lastOpVisible"
-                              << BSON("ts" << Timestamp(10, 0) << "term" << 2) << "configVersion"
-                              << 1 << "primaryIndex" << 2 << "term" << 2)));
+        rpc::kReplSetMetadataFieldName
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "lastOpVisible"
+                                  << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "configVersion"
+                                  << 1 << "primaryIndex" << 2 << "term" << 2)));
     getReplCoord()->processReplSetMetadata(metadata.getValue());
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 
     // higher configVersion
     StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(BSON(
-        rpc::kReplSetMetadataFieldName << BSON(
-            "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "term" << 2) << "lastOpVisible"
-                              << BSON("ts" << Timestamp(10, 0) << "term" << 2) << "configVersion"
-                              << 100 << "primaryIndex" << 2 << "term" << 2)));
+        rpc::kReplSetMetadataFieldName
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "lastOpVisible"
+                                  << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "configVersion"
+                                  << 100 << "primaryIndex" << 2 << "term" << 2)));
     getReplCoord()->processReplSetMetadata(metadata2.getValue());
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 }
@@ -2544,10 +2545,10 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
 
     // higher OpTime, should change
     StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
-        rpc::kReplSetMetadataFieldName << BSON(
-            "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "term" << 1) << "lastOpVisible"
-                              << BSON("ts" << Timestamp(10, 0) << "term" << 1) << "configVersion"
-                              << 2 << "primaryIndex" << 2 << "term" << 1)));
+        rpc::kReplSetMetadataFieldName
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 1) << "lastOpVisible"
+                                  << BSON("ts" << Timestamp(10, 0) << "t" << 1) << "configVersion"
+                                  << 2 << "primaryIndex" << 2 << "term" << 1)));
     getReplCoord()->processReplSetMetadata(metadata.getValue());
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getCurrentCommittedSnapshotOpTime());
@@ -2555,8 +2556,8 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
     // lower OpTime, should not change
     StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName
-        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(9, 0) << "term" << 1) << "lastOpVisible"
-                                  << BSON("ts" << Timestamp(9, 0) << "term" << 1) << "configVersion"
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(9, 0) << "t" << 1) << "lastOpVisible"
+                                  << BSON("ts" << Timestamp(9, 0) << "t" << 1) << "configVersion"
                                   << 2 << "primaryIndex" << 2 << "term" << 1)));
     getReplCoord()->processReplSetMetadata(metadata2.getValue());
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getLastCommittedOpTime());
@@ -2584,10 +2585,10 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
 
     // higher term, should change
     StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
-        rpc::kReplSetMetadataFieldName << BSON(
-            "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "term" << 3) << "lastOpVisible"
-                              << BSON("ts" << Timestamp(10, 0) << "term" << 3) << "configVersion"
-                              << 2 << "primaryIndex" << 2 << "term" << 3)));
+        rpc::kReplSetMetadataFieldName
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 3) << "lastOpVisible"
+                                  << BSON("ts" << Timestamp(10, 0) << "t" << 3) << "configVersion"
+                                  << 2 << "primaryIndex" << 2 << "term" << 3)));
     getReplCoord()->processReplSetMetadata(metadata.getValue());
     ASSERT_EQUALS(OpTime(Timestamp(10, 0), 3), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
@@ -2595,10 +2596,10 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
 
     // lower term, should not change
     StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(BSON(
-        rpc::kReplSetMetadataFieldName << BSON(
-            "lastOpCommitted" << BSON("ts" << Timestamp(11, 0) << "term" << 3) << "lastOpVisible"
-                              << BSON("ts" << Timestamp(11, 0) << "term" << 3) << "configVersion"
-                              << 2 << "primaryIndex" << 1 << "term" << 2)));
+        rpc::kReplSetMetadataFieldName
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(11, 0) << "t" << 3) << "lastOpVisible"
+                                  << BSON("ts" << Timestamp(11, 0) << "t" << 3) << "configVersion"
+                                  << 2 << "primaryIndex" << 1 << "term" << 2)));
     getReplCoord()->processReplSetMetadata(metadata2.getValue());
     ASSERT_EQUALS(OpTime(Timestamp(11, 0), 3), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
@@ -2606,10 +2607,10 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
 
     // same term, should not change
     StatusWith<rpc::ReplSetMetadata> metadata3 = rpc::ReplSetMetadata::readFromMetadata(BSON(
-        rpc::kReplSetMetadataFieldName << BSON(
-            "lastOpCommitted" << BSON("ts" << Timestamp(11, 0) << "term" << 3) << "lastOpVisible"
-                              << BSON("ts" << Timestamp(11, 0) << "term" << 3) << "configVersion"
-                              << 2 << "primaryIndex" << 1 << "term" << 3)));
+        rpc::kReplSetMetadataFieldName
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(11, 0) << "t" << 3) << "lastOpVisible"
+                                  << BSON("ts" << Timestamp(11, 0) << "t" << 3) << "configVersion"
+                                  << 2 << "primaryIndex" << 1 << "term" << 3)));
     getReplCoord()->processReplSetMetadata(metadata3.getValue());
     ASSERT_EQUALS(OpTime(Timestamp(11, 0), 3), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
@@ -2954,7 +2955,8 @@ TEST_F(ReplCoordTest, LivenessForwardingForChainedMember) {
         BSONObj entry = entryElement.Obj();
         long long memberId = entry["memberId"].Number();
         memberIds.insert(memberId);
-        OpTime entryOpTime = OpTime::parseFromBSON(entry["optime"].Obj()).getValue();
+        OpTime entryOpTime;
+        bsonExtractOpTimeField(entry, "optime", &entryOpTime);
         ASSERT_EQUALS(optime, entryOpTime);
     }
     ASSERT_EQUALS(2U, memberIds.size());
@@ -2980,7 +2982,8 @@ TEST_F(ReplCoordTest, LivenessForwardingForChainedMember) {
         BSONObj entry = entryElement.Obj();
         long long memberId = entry["memberId"].Number();
         memberIds2.insert(memberId);
-        OpTime entryOpTime = OpTime::parseFromBSON(entry["optime"].Obj()).getValue();
+        OpTime entryOpTime;
+        bsonExtractOpTimeField(entry, "optime", &entryOpTime);
         ASSERT_EQUALS(optime, entryOpTime);
     }
     ASSERT_EQUALS(1U, memberIds2.size());

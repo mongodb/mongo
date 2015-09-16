@@ -75,7 +75,7 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
 
     BSONObjBuilder lastCommittedOp(requestVotesCmdBuilder.subobjStart("lastCommittedOp"));
     lastCommittedOp.append("ts", _lastOplogEntry.getTimestamp());
-    lastCommittedOp.append("term", _lastOplogEntry.getTerm());
+    lastCommittedOp.append("t", _lastOplogEntry.getTerm());
     lastCommittedOp.done();
 
     const BSONObj requestVotesCmd = requestVotesCmdBuilder.obj();

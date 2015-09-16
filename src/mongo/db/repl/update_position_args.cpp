@@ -94,10 +94,9 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
         OpTime opTime;
         if (entry[kOpTimeFieldName].isABSONObj()) {
             // In protocol version 1, { ts: <timestamp>, t: term }
-            StatusWith<OpTime> opTimeStatus = OpTime::parseFromBSON(entry[kOpTimeFieldName].Obj());
-            if (!opTimeStatus.isOK())
-                return opTimeStatus.getStatus();
-            opTime = opTimeStatus.getValue();
+            Status status = bsonExtractOpTimeField(entry, kOpTimeFieldName, &opTime);
+            if (!status.isOK())
+                return status;
         } else {
             Timestamp ts;
             status = bsonExtractTimestampField(entry, kOpTimeFieldName, &ts);

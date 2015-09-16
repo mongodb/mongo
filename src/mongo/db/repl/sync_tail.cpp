@@ -431,7 +431,8 @@ void SyncTail::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTime) 
 
             // Check if we reached the end
             const BSONObj currentOp = ops.back();
-            const OpTime currentOpTime = fassertStatusOK(28772, OpTime::parseFromBSON(currentOp));
+            const OpTime currentOpTime =
+                fassertStatusOK(28772, OpTime::parseFromOplogEntry(currentOp));
 
             // When we reach the end return this batch
             if (currentOpTime == endOpTime) {
@@ -591,7 +592,7 @@ void SyncTail::oplogApplication() {
         // Set minValid to the last op to be applied in this next batch.
         // This will cause this node to go into RECOVERING state
         // if we should crash and restart before updating the oplog
-        setMinValid(&txn, fassertStatusOK(28773, OpTime::parseFromBSON(lastOp)));
+        setMinValid(&txn, fassertStatusOK(28773, OpTime::parseFromOplogEntry(lastOp)));
         multiApply(&txn,
                    ops,
                    &_prefetcherPool,

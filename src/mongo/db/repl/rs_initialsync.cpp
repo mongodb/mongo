@@ -253,7 +253,7 @@ bool _initialSyncApplyOplog(OperationContext* ctx, repl::SyncTail& syncer, Oplog
         return false;
     }
 
-    OpTime stopOpTime = fassertStatusOK(28777, OpTime::parseFromBSON(lastOp));
+    OpTime stopOpTime = fassertStatusOK(28777, OpTime::parseFromOplogEntry(lastOp));
 
     // If we already have what we need then return.
     if (stopOpTime == startOpTime)

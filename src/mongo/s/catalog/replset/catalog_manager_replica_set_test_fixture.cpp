@@ -429,15 +429,15 @@ void CatalogManagerReplSetTestFixture::checkReadConcern(const BSONObj& cmdObj,
     auto readConcernObj = readConcernElem.Obj();
     ASSERT_EQ("majority", readConcernObj[repl::ReadConcernArgs::kLevelFieldName].str());
 
-    auto afterElem = readConcernObj[repl::ReadConcernArgs::kOpTimeFieldName];
+    auto afterElem = readConcernObj[repl::ReadConcernArgs::kAfterOpTimeFieldName];
     ASSERT_EQ(Object, afterElem.type());
 
     auto afterObj = afterElem.Obj();
 
-    ASSERT_TRUE(afterObj.hasField(repl::ReadConcernArgs::kOpTimestampFieldName));
-    ASSERT_EQ(expectedTS, afterObj[repl::ReadConcernArgs::kOpTimestampFieldName].timestamp());
-    ASSERT_TRUE(afterObj.hasField(repl::ReadConcernArgs::kOpTermFieldName));
-    ASSERT_EQ(expectedTerm, afterObj[repl::ReadConcernArgs::kOpTermFieldName].numberLong());
+    ASSERT_TRUE(afterObj.hasField(repl::OpTime::kTimestampFieldName));
+    ASSERT_EQ(expectedTS, afterObj[repl::OpTime::kTimestampFieldName].timestamp());
+    ASSERT_TRUE(afterObj.hasField(repl::OpTime::kTermFieldName));
+    ASSERT_EQ(expectedTerm, afterObj[repl::OpTime::kTermFieldName].numberLong());
 }
 
 }  // namespace mongo
