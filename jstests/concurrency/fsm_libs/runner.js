@@ -281,13 +281,9 @@ var runner = (function() {
 
         if (workerErrs.length > 0) {
             var stackTraces = workerErrs.map(function(e) {
-                if (e.err && e.stack) {
-                    // Prepend the error message to the stack trace because it
-                    // isn't automatically included in SpiderMonkey stack traces
-                    // (see: SERVER-18781).
-                    return e.err + '\n\n' + e.stack;
-                }
-                return e.stack || e.err;
+                // Prepend the error message to the stack trace because it
+                // isn't automatically included in SpiderMonkey stack traces.
+                return e.err + '\n\n' + e.stack;
             });
 
             var err = new Error(prepareMsg(stackTraces) + '\n');
@@ -296,8 +292,9 @@ var runner = (function() {
             var maxLogLine = 10 * 1024; // 10KB
 
             // Check if the combined length of the error message and the stack traces
-            // exceeds the maximum line-length the shell will log
-            if (err.stack.length >= maxLogLine) {
+            // exceeds the maximum line-length the shell will log.
+            if ((err.message.length + err.stack.length) >= maxLogLine) {
+                print(err.message);
                 print(err.stack);
                 throw new Error('stack traces would have been snipped, see logs');
             }
@@ -430,7 +427,11 @@ var runner = (function() {
                         try {
                             teardownWorkload(workload, context, cluster);
                         } catch (err) {
-                            print('Workload teardown function threw an exception:\n' + err.stack);
+                            // Prepend the error message to the stack trace because it
+                            // isn't automatically included in SpiderMonkey stack traces.
+                            var message = err.message + '\n\n' + err.stack;
+
+                            print('Workload teardown function threw an exception:\n' + message);
                             teardownFailed = true;
                         }
                     });
