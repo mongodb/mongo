@@ -58,8 +58,7 @@ namespace mongo {
                                    .hidden();
 
         options->addOptionChaining("net.ssl.disabledProtocols", "sslDisabledProtocols", moe::String,
-                "Comma separated list of disabled protocols")
-                                    .hidden();
+                "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2]");
 
         options->addOptionChaining("net.ssl.weakCertificateValidation",
                 "sslWeakCertificateValidation", moe::Switch, "allow client to connect without "
@@ -96,11 +95,6 @@ namespace mongo {
                 "Certificate Revocation List file for SSL")
                                   .requires("ssl")
                                   .requires("ssl.CAFile");
-
-        options->addOptionChaining("net.ssl.disabledProtocols", "sslDisabledProtocols", moe::String,
-                "Comma separated list of disabled protocols")
-                                  .requires("ssl")
-                                  .hidden();
 
         options->addOptionChaining("net.ssl.allowInvalidHostnames", "sslAllowInvalidHostnames",
                     moe::Switch, "allow connections to servers with non-matching hostnames")
@@ -189,13 +183,22 @@ namespace mongo {
         }
 
         if (params.count("net.ssl.disabledProtocols")) {
+            // The disabledProtocols field is composed of a comma separated list of protocols to
+            // disable. First, tokenize the field.
             std::vector<std::string> tokens = StringSplitter::split(
                     params["net.ssl.disabledProtocols"].as<string>(), ",");
 
+            // All accepted tokens, and their corresponding enum representation. The noTLS* tokens
+            // exist for backwards compatibility.
             std::map<std::string, SSLGlobalParams::Protocols> validConfigs;
+            validConfigs["TLS1_0"] = SSLGlobalParams::TLS1_0;
             validConfigs["noTLS1_0"] = SSLGlobalParams::TLS1_0;
+            validConfigs["TLS1_1"] = SSLGlobalParams::TLS1_1;
             validConfigs["noTLS1_1"] = SSLGlobalParams::TLS1_1;
+            validConfigs["TLS1_2"] = SSLGlobalParams::TLS1_2;
             validConfigs["noTLS1_2"] = SSLGlobalParams::TLS1_2;
+
+            // Map the tokens to their enum values, and push them onto the list of disabled protocols.
             for (std::vector<std::string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
                 std::map<std::string, SSLGlobalParams::Protocols>::iterator mappedToken =
                     validConfigs.find(*it);
