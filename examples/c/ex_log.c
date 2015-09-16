@@ -322,6 +322,7 @@ main(void)
 	/*! [log cursor printf] */
 	ret = session->log_printf(session, "Wrote %d records", record_count);
 	/*! [log cursor printf] */
+	ret = session->log_flush(session, "sync=on");
 
 	/*
 	 * Close and reopen the connection so that the log ends up with

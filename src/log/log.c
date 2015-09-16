@@ -1920,3 +1920,36 @@ __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 err:	__wt_scr_free(session, &logrec);
 	return (ret);
 }
+
+/*
+ * __wt_log_flush --
+ *	Forcibly flush the log to the synchronization level specified.
+ *	Wait until it has been completed.
+ */
+int
+__wt_log_flush(WT_SESSION_IMPL *session, uint32_t flags)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+	WT_LSN last_lsn, lsn;
+
+	conn = S2C(session);
+	WT_ASSERT(session, FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED));
+	log = conn->log;
+	last_lsn = log->alloc_lsn;
+	lsn = log->write_lsn;
+	/*
+	 * Wait until all current outstanding writes have been written
+	 * to the file system.
+	 */
+	while (LOG_CMP(&last_lsn, &lsn) > 0) {
+		__wt_yield();
+		lsn = log->write_lsn;
+	}
+	/*
+	 * If the user wants sync, force it now.
+	 */
+	if (LF_ISSET(WT_LOG_FSYNC))
+		WT_RET(__wt_log_force_sync(session, &lsn));
+	return (0);
+}

@@ -662,6 +662,15 @@ methods = {
         type='boolean'),
 ]),
 
+'session.log_flush' : Method([
+    Config('sync', 'on', r'''
+        forcibly flush the log and wait for it to synchronize.  If
+        using \c off, then wait for the log to be written to the file
+        system.  If using \c on, wait for the log to be synchronized
+        to the backing store.''',
+        choices=['off', 'on']),
+]),
+
 'session.log_printf' : Method([]),
 
 'session.open_cursor' : Method(cursor_runtime_config + [
