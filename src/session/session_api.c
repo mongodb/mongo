@@ -473,10 +473,10 @@ __session_log_flush(WT_SESSION *wt_session, const char *config)
 	WT_ERR(__wt_config_gets_def(session, cfg, "sync", 0, &cval));
 	if (WT_STRING_MATCH("background", cval.str, cval.len))
 		flags = WT_LOG_BACKGROUND;
-	else if (WT_STRING_MATCH("sync", cval.str, cval.len))
-		flags = WT_LOG_FSYNC;
-	else if (WT_STRING_MATCH("write", cval.str, cval.len))
+	else if (WT_STRING_MATCH("off", cval.str, cval.len))
 		flags = WT_LOG_FLUSH;
+	else if (WT_STRING_MATCH("on", cval.str, cval.len))
+		flags = WT_LOG_FSYNC;
 	ret = __wt_log_flush(session, flags);
 
 err:	API_END_RET(session, ret);

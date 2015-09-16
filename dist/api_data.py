@@ -726,10 +726,14 @@ methods = {
 ]),
 
 'WT_SESSION.log_flush' : Method([
-    Config('sync', 'sync', r'''
+    Config('sync', 'on', r'''
         forcibly flush the log and wait for it to achieve the synchronization
-        level specified''',
-        choices=['background', 'sync', 'write']),
+        level specified.  The \c background setting initiates a background
+        synchronization intended to be used with a later call to
+        WT_SESSION::transaction_sync.  The \c off setting forces any
+        buffered log records to be written to the file system.  The
+        \c on setting forces log records to be written to the storage device''',
+        choices=['background', 'off', 'on']),
 ]),
 
 'WT_SESSION.log_printf' : Method([]),

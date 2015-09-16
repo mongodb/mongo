@@ -279,7 +279,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_drop[] = {
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_log_flush[] = {
 	{ "sync", "string",
-	    NULL, "choices=[\"background\",\"sync\",\"write\"]",
+	    NULL, "choices=[\"background\",\"off\",\"on\"]",
 	    NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -872,7 +872,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_SESSION_drop, 2
 	},
 	{ "WT_SESSION.log_flush",
-	  "sync=sync",
+	  "sync=on",
 	  confchk_WT_SESSION_log_flush, 1
 	},
 	{ "WT_SESSION.log_printf",

@@ -1241,9 +1241,13 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @configstart{WT_SESSION.log_flush, see dist/api_data.py}
 	 * @config{sync, forcibly flush the log and wait for it to achieve the
-	 * synchronization level specified., a string\, chosen from the
-	 * following options: \c "background"\, \c "sync"\, \c "write"; default
-	 * \c sync.}
+	 * synchronization level specified.  The \c background setting initiates
+	 * a background synchronization intended to be used with a later call to
+	 * WT_SESSION::transaction_sync.  The \c off setting forces any buffered
+	 * log records to be written to the file system.  The \c on setting
+	 * forces log records to be written to the storage device., a string\,
+	 * chosen from the following options: \c "background"\, \c "off"\, \c
+	 * "on"; default \c on.}
 	 * @configend
 	 * @errors
 	 */
