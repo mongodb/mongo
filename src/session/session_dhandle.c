@@ -392,7 +392,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * shared handle list and cache any handle we find.
 		 */
 		WT_WITH_DHANDLE_LOCK(session, ret =
-		    __session_find_shared_dhandle(session, uri, checkpoint, flags));
+		    __session_find_shared_dhandle(
+		    session, uri, checkpoint, flags));
 		dhandle = (ret == 0) ? session->dhandle : NULL;
 		WT_RET_NOTFOUND_OK(ret);
 	}
