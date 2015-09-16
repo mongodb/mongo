@@ -41,11 +41,14 @@
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
+
+MONGO_FP_DECLARE(setDistLockTimeout);
 
 using std::string;
 using std::unique_ptr;
@@ -149,7 +152,8 @@ void ReplSetDistLockManager::doTask() {
     }
 }
 
-StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc) {
+StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc,
+                                                         const milliseconds& lockExpiration) {
     const auto& processID = lockDoc.getProcess();
     auto pingStatus = _catalog->getPing(processID);
 
@@ -228,15 +232,15 @@ StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc) {
     }
 
     milliseconds elapsedSinceLastPing(configServerLocalTime - pingInfo->configLocalTime);
-    if (elapsedSinceLastPing >= _lockExpiration) {
+    if (elapsedSinceLastPing >= lockExpiration) {
         LOG(0) << "forcing lock '" << lockDoc.getName() << "' because elapsed time "
-               << elapsedSinceLastPing << " >= takeover time " << _lockExpiration;
+               << elapsedSinceLastPing << " >= takeover time " << lockExpiration;
         return true;
     }
 
     LOG(1) << "could not force lock '" << lockDoc.getName() << "' because elapsed time "
            << durationCount<Milliseconds>(elapsedSinceLastPing) << " < takeover time "
-           << durationCount<Milliseconds>(_lockExpiration) << " ms";
+           << durationCount<Milliseconds>(lockExpiration) << " ms";
     return false;
 }
 
@@ -249,8 +253,13 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
         OID lockSessionID = OID::gen();
         string who = str::stream() << _processID << ":" << getThreadName();
 
+        auto lockExpiration = _lockExpiration;
+        MONGO_FAIL_POINT_BLOCK(setDistLockTimeout, customTimeout) {
+            const BSONObj& data = customTimeout.getData();
+            lockExpiration = stdx::chrono::milliseconds(data["timeoutMs"].numberInt());
+        }
         LOG(1) << "trying to acquire new distributed lock for " << name
-               << " ( lock timeout : " << durationCount<Milliseconds>(_lockExpiration)
+               << " ( lock timeout : " << durationCount<Milliseconds>(lockExpiration)
                << " ms, ping interval : " << durationCount<Milliseconds>(_pingInterval)
                << " ms, process : " << _processID << " )"
                << " with lockSessionID: " << lockSessionID << ", why: " << whyMessage;
@@ -286,7 +295,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
         // found, use the normal grab lock path to acquire it.
         if (getLockStatusResult.isOK()) {
             auto currentLock = getLockStatusResult.getValue();
-            auto canOvertakeResult = canOvertakeLock(currentLock);
+            auto canOvertakeResult = canOvertakeLock(currentLock, lockExpiration);
 
             if (!canOvertakeResult.isOK()) {
                 return canOvertakeResult.getStatus();
