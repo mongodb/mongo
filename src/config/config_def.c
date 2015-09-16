@@ -299,6 +299,11 @@ static const WT_CONFIG_CHECK confchk_session_drop[] = {
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
+static const WT_CONFIG_CHECK confchk_session_log_flush[] = {
+	{ "sync", "string", NULL, "choices=[\"off\",\"on\"]", NULL },
+	{ NULL, NULL, NULL, NULL, NULL }
+};
+
 static const WT_CONFIG_CHECK confchk_session_open_cursor[] = {
 	{ "append", "boolean", NULL, NULL, NULL },
 	{ "bulk", "string", NULL, NULL, NULL },
@@ -741,6 +746,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "session.drop",
 	  "force=0,remove_files=",
 	  confchk_session_drop
+	},
+	{ "session.log_flush",
+	  "sync=on",
+	  confchk_session_log_flush
 	},
 	{ "session.log_printf",
 	  "",
