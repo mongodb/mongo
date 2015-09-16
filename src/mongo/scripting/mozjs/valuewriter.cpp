@@ -43,8 +43,8 @@
 namespace mongo {
 namespace mozjs {
 
-ValueWriter::ValueWriter(JSContext* cx, JS::HandleValue value, int depth)
-    : _context(cx), _value(value), _depth(depth), _originalParent(nullptr) {}
+ValueWriter::ValueWriter(JSContext* cx, JS::HandleValue value)
+    : _context(cx), _value(value), _originalParent(nullptr) {}
 
 void ValueWriter::setOriginalBSON(BSONObj* obj) {
     _originalParent = obj;
@@ -117,20 +117,7 @@ BSONObj ValueWriter::toBSON() {
 
     JS::RootedObject obj(_context, _value.toObjectOrNull());
 
-    if (getScope(_context)->getProto<BSONInfo>().instanceOf(obj)) {
-        BSONObj* originalBSON;
-        bool altered;
-
-        std::tie(originalBSON, altered) = BSONInfo::originalBSON(_context, obj);
-
-        if (originalBSON && !altered)
-            return *originalBSON;
-    }
-
-    BSONObjBuilder bob;
-    ObjectWrapper(_context, obj, _depth).writeThis(&bob);
-
-    return bob.obj();
+    return ObjectWrapper(_context, obj).toBSON();
 }
 
 std::string ValueWriter::toString() {
@@ -189,11 +176,13 @@ Decimal128 ValueWriter::toDecimal128() {
     uasserted(ErrorCodes::BadValue, str::stream() << "Unable to write Decimal128 value.");
 }
 
-void ValueWriter::writeThis(BSONObjBuilder* b, StringData sd) {
+void ValueWriter::writeThis(BSONObjBuilder* b,
+                            StringData sd,
+                            ObjectWrapper::WriteFieldRecursionFrames* frames) {
     uassert(17279,
-            str::stream() << "Exceeded depth limit of " << 150
+            str::stream() << "Exceeded depth limit of " << ObjectWrapper::kMaxWriteFieldDepth
                           << " when converting js object to BSON. Do you have a cycle?",
-            _depth < 149);
+            frames->size() < ObjectWrapper::kMaxWriteFieldDepth);
 
     // Null char should be at the end, not in the string
     uassert(16985,
@@ -221,8 +210,7 @@ void ValueWriter::writeThis(BSONObjBuilder* b, StringData sd) {
 
         b->append(sd, val);
     } else if (_value.isObject()) {
-        JS::RootedObject childObj(_context, _value.toObjectOrNull());
-        _writeObject(b, sd, childObj);
+        _writeObject(b, sd, frames);
     } else if (_value.isBoolean()) {
         b->appendBool(sd, _value.toBoolean());
     } else if (_value.isUndefined()) {
@@ -235,72 +223,126 @@ void ValueWriter::writeThis(BSONObjBuilder* b, StringData sd) {
     }
 }
 
-void ValueWriter::_writeObject(BSONObjBuilder* b, StringData sd, JS::HandleObject obj) {
+void ValueWriter::_writeObject(BSONObjBuilder* b,
+                               StringData sd,
+                               ObjectWrapper::WriteFieldRecursionFrames* frames) {
     auto scope = getScope(_context);
 
-    ObjectWrapper o(_context, obj, _depth);
+    // We open a block here because it's important that the two rooting types
+    // we need (obj and o) go out of scope before we actually open a
+    // new WriteFieldFrame (in the emplace at the bottom of the function). If
+    // we don't do this, we'll destroy the local roots in this function body
+    // before the frame we added, which will break the gc rooting list.
+    {
+        JS::RootedObject obj(_context, _value.toObjectOrNull());
+        ObjectWrapper o(_context, obj);
 
-    if (JS_ObjectIsFunction(_context, _value.toObjectOrNull())) {
-        uassert(16716,
-                "cannot convert native function to BSON",
-                !scope->getProto<NativeFunctionInfo>().instanceOf(obj));
-        b->appendCode(sd, ValueWriter(_context, _value).toString());
-    } else if (JS_ObjectIsRegExp(_context, obj)) {
-        JS::RootedValue v(_context);
-        v.setObjectOrNull(obj);
+        if (JS_ObjectIsFunction(_context, _value.toObjectOrNull())) {
+            uassert(16716,
+                    "cannot convert native function to BSON",
+                    !scope->getProto<NativeFunctionInfo>().instanceOf(obj));
+            b->appendCode(sd, ValueWriter(_context, _value).toString());
+            return;
+        }
 
-        std::string regex = ValueWriter(_context, v).toString();
-        regex = regex.substr(1);
-        std::string r = regex.substr(0, regex.rfind('/'));
-        std::string o = regex.substr(regex.rfind('/') + 1);
+        if (JS_ObjectIsRegExp(_context, obj)) {
+            JS::RootedValue v(_context);
+            v.setObjectOrNull(obj);
 
-        b->appendRegex(sd, r, o);
-    } else if (JS_ObjectIsDate(_context, obj)) {
-        JS::RootedValue dateval(_context);
-        o.callMethod("getTime", &dateval);
+            std::string regex = ValueWriter(_context, v).toString();
+            regex = regex.substr(1);
+            std::string r = regex.substr(0, regex.rfind('/'));
+            std::string o = regex.substr(regex.rfind('/') + 1);
 
-        auto d = Date_t::fromMillisSinceEpoch(ValueWriter(_context, dateval).toNumber());
-        b->appendDate(sd, d);
-    } else if (scope->getProto<OIDInfo>().instanceOf(obj)) {
-        b->append(sd, OID(o.getString("str")));
-    } else if (scope->getProto<NumberLongInfo>().instanceOf(obj)) {
-        long long out = NumberLongInfo::ToNumberLong(_context, obj);
-        b->append(sd, out);
-    } else if (scope->getProto<NumberIntInfo>().instanceOf(obj)) {
-        b->append(sd, NumberIntInfo::ToNumberInt(_context, obj));
-    } else if (scope->getProto<NumberDecimalInfo>().instanceOf(obj)) {
-        b->append(sd, NumberDecimalInfo::ToNumberDecimal(_context, obj));
-    } else if (scope->getProto<DBPointerInfo>().instanceOf(obj)) {
-        JS::RootedValue id(_context);
-        o.getValue("id", &id);
+            b->appendRegex(sd, r, o);
 
-        b->appendDBRef(sd, o.getString("ns"), OID(ObjectWrapper(_context, id).getString("str")));
-    } else if (scope->getProto<BinDataInfo>().instanceOf(obj)) {
-        auto str = static_cast<std::string*>(JS_GetPrivate(obj));
+            return;
+        }
 
-        auto binData = base64::decode(*str);
+        if (JS_ObjectIsDate(_context, obj)) {
+            JS::RootedValue dateval(_context);
+            o.callMethod("getTime", &dateval);
 
-        b->appendBinData(sd,
-                         binData.size(),
-                         static_cast<mongo::BinDataType>(static_cast<int>(o.getNumber("type"))),
-                         binData.c_str());
-    } else if (scope->getProto<TimestampInfo>().instanceOf(obj)) {
-        Timestamp ot(o.getNumber("t"), o.getNumber("i"));
-        b->append(sd, ot);
-    } else if (scope->getProto<MinKeyInfo>().instanceOf(obj)) {
-        b->appendMinKey(sd);
-    } else if (scope->getProto<MaxKeyInfo>().instanceOf(obj)) {
-        b->appendMaxKey(sd);
-    } else {
-        // nested object or array
+            auto d = Date_t::fromMillisSinceEpoch(ValueWriter(_context, dateval).toNumber());
+            b->appendDate(sd, d);
 
-        BSONObjBuilder subbob(JS_IsArrayObject(_context, obj) ? b->subarrayStart(sd)
-                                                              : b->subobjStart(sd));
+            return;
+        }
 
-        ObjectWrapper child(_context, obj, _depth + 1);
+        if (scope->getProto<OIDInfo>().instanceOf(obj)) {
+            b->append(sd, OID(o.getString("str")));
 
-        child.writeThis(b);
+            return;
+        }
+
+        if (scope->getProto<NumberLongInfo>().instanceOf(obj)) {
+            long long out = NumberLongInfo::ToNumberLong(_context, obj);
+            b->append(sd, out);
+
+            return;
+        }
+
+        if (scope->getProto<NumberIntInfo>().instanceOf(obj)) {
+            b->append(sd, NumberIntInfo::ToNumberInt(_context, obj));
+
+            return;
+        }
+
+        if (scope->getProto<NumberDecimalInfo>().instanceOf(obj)) {
+            b->append(sd, NumberDecimalInfo::ToNumberDecimal(_context, obj));
+
+            return;
+        }
+
+        if (scope->getProto<DBPointerInfo>().instanceOf(obj)) {
+            JS::RootedValue id(_context);
+            o.getValue("id", &id);
+
+            b->appendDBRef(
+                sd, o.getString("ns"), OID(ObjectWrapper(_context, id).getString("str")));
+
+            return;
+        }
+
+        if (scope->getProto<BinDataInfo>().instanceOf(obj)) {
+            auto str = static_cast<std::string*>(JS_GetPrivate(obj));
+
+            auto binData = base64::decode(*str);
+
+            b->appendBinData(sd,
+                             binData.size(),
+                             static_cast<mongo::BinDataType>(static_cast<int>(o.getNumber("type"))),
+                             binData.c_str());
+
+            return;
+        }
+
+        if (scope->getProto<TimestampInfo>().instanceOf(obj)) {
+            Timestamp ot(o.getNumber("t"), o.getNumber("i"));
+            b->append(sd, ot);
+
+            return;
+        }
+
+        if (scope->getProto<MinKeyInfo>().instanceOf(obj)) {
+            b->appendMinKey(sd);
+
+            return;
+        }
+
+        if (scope->getProto<MaxKeyInfo>().instanceOf(obj)) {
+            b->appendMaxKey(sd);
+
+            return;
+        }
     }
+
+    // nested object or array
+
+    // This emplace is effectively a recursive function call, as this code path
+    // unwinds back to ObjectWrapper::toBSON. In that function we'll actually
+    // write the child we've just pushed onto the frames stack.
+    frames->emplace(_context, _value.toObjectOrNull(), b, sd);
 }
 
 }  // namespace mozjs

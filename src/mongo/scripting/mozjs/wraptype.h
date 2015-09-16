@@ -240,7 +240,11 @@ public:
         // before the other types are installed.  Might as well just do it
         // in the constructor.
         if (T::classFlags & JSCLASS_GLOBAL_FLAGS) {
+            _jsclass.trace = JS_GlobalObjectTraceHook;
+
             JS::RootedObject proto(_context);
+
+            JSAutoRequest ar(_context);
 
             _proto.init(_context,
                         _assertPtr(JS_NewGlobalObject(

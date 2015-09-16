@@ -31,8 +31,10 @@
 #include <jsapi.h>
 #include <string>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/exception.h"
+#include "mongo/scripting/mozjs/lifetimestack.h"
 
 namespace mongo {
 
@@ -43,6 +45,7 @@ class BSONElement;
 namespace mozjs {
 
 class MozJSImplScope;
+class ValueWriter;
 
 /**
  * Wraps JSObject's with helpers for accessing their properties
@@ -51,6 +54,8 @@ class MozJSImplScope;
  * not movable or copyable
  */
 class ObjectWrapper {
+    friend class ValueWriter;
+
 public:
     /**
      * Helper subclass that provides some easy boilerplate for accessing
@@ -86,12 +91,8 @@ public:
         Type _type;
     };
 
-    /**
-     * The depth parameter here allows us to detect overly nested or circular
-     * objects and bail without blowing the stack.
-     */
-    ObjectWrapper(JSContext* cx, JS::HandleObject obj, int depth = 0);
-    ObjectWrapper(JSContext* cx, JS::HandleValue value, int depth = 0);
+    ObjectWrapper(JSContext* cx, JS::HandleObject obj);
+    ObjectWrapper(JSContext* cx, JS::HandleValue value);
 
     double getNumber(Key key);
     int getNumberInt(Key key);
@@ -152,9 +153,9 @@ public:
     }
 
     /**
-     * concatenates all of the fields in the object into the associated builder
+     * Writes a bson object reflecting the contents of the object
      */
-    void writeThis(BSONObjBuilder* b);
+    BSONObj toBSON();
 
     JS::HandleObject thisv() {
         return _object;
@@ -164,21 +165,61 @@ public:
 
 private:
     /**
+     * The maximum depth of recursion for writeField
+     */
+    static const int kMaxWriteFieldDepth = 150;
+
+    /**
+     * The state needed to write a single level of a nested javascript object as a
+     * bson object.
+     *
+     * We use this between ObjectWrapper and ValueWriter to avoid recursion in
+     * translating js to bson.
+     */
+    struct WriteFieldRecursionFrame {
+        WriteFieldRecursionFrame(JSContext* cx,
+                                 JSObject* obj,
+                                 BSONObjBuilder* parent,
+                                 StringData sd);
+
+        BSONObjBuilder* subbob_or(BSONObjBuilder* option) {
+            return subbob ? &subbob.get() : option;
+        }
+
+        JS::RootedObject thisv;
+
+        // ids for the keys of thisv
+        JS::AutoIdArray ids;
+
+        // Current index of the current key we're working on
+        std::size_t idx = 0;
+
+        boost::optional<BSONObjBuilder> subbob;
+        BSONObj* originalBSON = nullptr;
+        bool altered;
+    };
+
+    /**
+     * Synthetic stack of variables for writeThis
+     *
+     * We use a LifetimeStack here because we have SpiderMonkey Rooting types which
+     * are non-copyable and non-movable and have to be on the stack.
+     */
+    using WriteFieldRecursionFrames = LifetimeStack<WriteFieldRecursionFrame, kMaxWriteFieldDepth>;
+
+    /**
      * writes the field "key" into the associated builder
      *
      * optional originalBSON is used to track updates to types (NumberInt
      * overwritten by a float, but coercible to the original type, etc.)
      */
-    void _writeField(BSONObjBuilder* b, Key key, BSONObj* originalBSON);
+    void _writeField(BSONObjBuilder* b,
+                     Key key,
+                     WriteFieldRecursionFrames* frames,
+                     BSONObj* originalBSON);
 
     JSContext* _context;
     JS::RootedObject _object;
-
-    /**
-     * The depth of an object wrapper has to do with how many parents it has.
-     * Used to avoid circular object graphs and associate stack smashing.
-     */
-    int _depth;
 };
 
 }  // namespace mozjs

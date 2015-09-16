@@ -47,7 +47,17 @@ MozJSProxyScope::MozJSProxyScope(MozJSScriptEngine* engine)
       _state(State::Idle),
       _status(Status::OK()),
       _condvar(),
-      _thread(&MozJSProxyScope::implThread, this) {
+      // Despite calling PR_CreateThread, we're actually using our own
+      // implementation of PosixNSPR.cpp in this directory. So these threads
+      // are actually hosted on top of stdx::threads and most of the flags
+      // don't matter.
+      _thread(PR_CreateThread(PR_USER_THREAD,
+                              implThread,
+                              this,
+                              PR_PRIORITY_NORMAL,
+                              PR_LOCAL_THREAD,
+                              PR_JOINABLE_THREAD,
+                              0)) {
     // Test the child on startup to make sure it's awake and that the
     // implementation scope sucessfully constructed.
     try {
@@ -249,7 +259,7 @@ void MozJSProxyScope::runOnImplThread(std::function<void()> f) {
     // methods on it from there. If we're on the same thread, it's safe to
     // simply call back in, so let's do that.
 
-    if (_thread.get_id() == std::this_thread::get_id()) {
+    if (_thread == PR_GetCurrentThread()) {
         return f();
     }
 
@@ -281,7 +291,7 @@ void MozJSProxyScope::shutdownThread() {
 
     _condvar.notify_one();
 
-    _thread.join();
+    PR_JoinThread(_thread);
 }
 
 /**
@@ -296,7 +306,9 @@ void MozJSProxyScope::shutdownThread() {
  * Shutdown: Shutdown -> _
  *   break out of the loop and return.
  */
-void MozJSProxyScope::implThread() {
+void MozJSProxyScope::implThread(void* arg) {
+    auto proxy = static_cast<MozJSProxyScope*>(arg);
+
     if (hasGlobalServiceContext())
         Client::initThread("js");
 
@@ -305,35 +317,38 @@ void MozJSProxyScope::implThread() {
     // This will leave _status set for the first noop runOnImplThread(), which
     // captures the startup exception that way
     try {
-        scope.reset(new MozJSImplScope(_engine));
-        _implScope = scope.get();
+        scope.reset(new MozJSImplScope(proxy->_engine));
+        proxy->_implScope = scope.get();
     } catch (...) {
-        _status = exceptionToStatus();
+        proxy->_status = exceptionToStatus();
     }
 
     while (true) {
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
-        _condvar.wait(
-            lk, [this] { return _state == State::ProxyRequest || _state == State::Shutdown; });
+        stdx::unique_lock<stdx::mutex> lk(proxy->_mutex);
+        proxy->_condvar.wait(lk,
+                             [proxy] {
+                                 return proxy->_state == State::ProxyRequest ||
+                                     proxy->_state == State::Shutdown;
+                             });
 
-        if (_state == State::Shutdown)
+        if (proxy->_state == State::Shutdown)
             break;
 
         try {
-            _function();
+            proxy->_function();
         } catch (...) {
-            _status = exceptionToStatus();
+            proxy->_status = exceptionToStatus();
         }
 
         int exitCode;
-        if (_implScope && _implScope->getQuickExit(&exitCode)) {
+        if (proxy->_implScope && proxy->_implScope->getQuickExit(&exitCode)) {
             scope.reset();
             quickExit(exitCode);
         }
 
-        _state = State::ImplResponse;
+        proxy->_state = State::ImplResponse;
 
-        _condvar.notify_one();
+        proxy->_condvar.notify_one();
     }
 }
 

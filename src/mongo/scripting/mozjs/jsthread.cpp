@@ -87,16 +87,17 @@ public:
                 "first argument must be a function",
                 args.get(0).isObject() && JS_ObjectIsFunction(cx, args.get(0).toObjectOrNull()));
 
-        BSONObjBuilder b;
+        JS::RootedObject robj(cx, JS_NewPlainObject(cx));
+        ObjectWrapper wobj(cx, robj);
         for (unsigned i = 0; i < args.length(); ++i) {
             // 10 decimal digits for a 32 bit unsigned, then 1 for the null
             char buf[11];
             std::sprintf(buf, "%i", i);
 
-            ValueWriter(cx, args.get(i)).writeThis(&b, buf);
+            wobj.setValue(buf, args.get(i));
         }
 
-        _sharedData->_args = b.obj();
+        _sharedData->_args = wobj.toBSON();
 
         _sharedData->_stack = currentJSStackToString(cx);
 

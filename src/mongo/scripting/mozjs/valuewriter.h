@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/scripting/mozjs/objectwrapper.h"
 
 namespace mongo {
 namespace mozjs {
@@ -39,14 +40,12 @@ namespace mozjs {
 /**
  * Writes C++ values out of JS Values
  *
- * depth is used to trap circular objects in js and prevent stack smashing
- *
  * originalBSON is a hack to keep integer types in their original type when
  * they're read out, manipulated in js and saved back.
  */
 class ValueWriter {
 public:
-    ValueWriter(JSContext* cx, JS::HandleValue value, int depth = 0);
+    ValueWriter(JSContext* cx, JS::HandleValue value);
 
     BSONObj toBSON();
 
@@ -69,8 +68,15 @@ public:
 
     /**
      * Writes the value into a bsonobjbuilder under the name in sd.
+     *
+     * We take WriteFieldRecursionFrames so we can push a new object on if the underlying
+     * value is an object. This allows us to recurse without C++ stack frames.
+     *
+     * Look in toBSON on ObjectWrapper for the top of that loop.
      */
-    void writeThis(BSONObjBuilder* b, StringData sd);
+    void writeThis(BSONObjBuilder* b,
+                   StringData sd,
+                   ObjectWrapper::WriteFieldRecursionFrames* frames);
 
     void setOriginalBSON(BSONObj* obj);
 
@@ -78,11 +84,12 @@ private:
     /**
      * Writes the object into a bsonobjbuilder under the name in sd.
      */
-    void _writeObject(BSONObjBuilder* b, StringData sd, JS::HandleObject obj);
+    void _writeObject(BSONObjBuilder* b,
+                      StringData sd,
+                      ObjectWrapper::WriteFieldRecursionFrames* frames);
 
     JSContext* _context;
     JS::HandleValue _value;
-    int _depth;
     BSONObj* _originalParent;
 };
 

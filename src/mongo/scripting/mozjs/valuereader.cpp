@@ -45,8 +45,8 @@
 namespace mongo {
 namespace mozjs {
 
-ValueReader::ValueReader(JSContext* cx, JS::MutableHandleValue value, int depth)
-    : _context(cx), _value(value), _depth(depth) {}
+ValueReader::ValueReader(JSContext* cx, JS::MutableHandleValue value)
+    : _context(cx), _value(value) {}
 
 void ValueReader::fromBSONElement(const BSONElement& elem, bool readOnly) {
     auto scope = getScope(_context);
@@ -92,8 +92,8 @@ void ValueReader::fromBSONElement(const BSONElement& elem, bool readOnly) {
                 sprintf(str, "%i", i++);
                 JS::RootedValue member(_context);
 
-                ValueReader(_context, &member, _depth + 1).fromBSONElement(subElem, readOnly);
-                ObjectWrapper(_context, array, _depth + 1).setValue(str, member);
+                ValueReader(_context, &member).fromBSONElement(subElem, readOnly);
+                ObjectWrapper(_context, array).setValue(str, member);
             }
             _value.setObjectOrNull(array);
             return;
@@ -225,7 +225,7 @@ void ValueReader::fromBSON(const BSONObj& obj, bool readOnly) {
             ValueReader(_context, args[0]).fromBSONElement(ref, readOnly);
 
             // id can be a subobject
-            ValueReader(_context, args[1], _depth + 1).fromBSONElement(id, readOnly);
+            ValueReader(_context, args[1]).fromBSONElement(id, readOnly);
 
             JS::RootedObject obj(_context);
 

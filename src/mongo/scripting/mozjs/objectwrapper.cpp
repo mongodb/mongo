@@ -41,6 +41,10 @@
 namespace mongo {
 namespace mozjs {
 
+#ifndef _MSC_EXTENSIONS
+const int ObjectWrapper::kMaxWriteFieldDepth;
+#endif  // _MSC_EXTENSIONS
+
 void ObjectWrapper::Key::get(JSContext* cx, JS::HandleObject o, JS::MutableHandleValue value) {
     switch (_type) {
         case Type::Field:
@@ -173,11 +177,11 @@ std::string ObjectWrapper::Key::toString(JSContext* cx) {
         cx, ErrorCodes::InternalError, "Failed to toString a ObjectWrapper::Key");
 }
 
-ObjectWrapper::ObjectWrapper(JSContext* cx, JS::HandleObject obj, int depth)
-    : _context(cx), _object(cx, obj), _depth(depth) {}
+ObjectWrapper::ObjectWrapper(JSContext* cx, JS::HandleObject obj)
+    : _context(cx), _object(cx, obj) {}
 
-ObjectWrapper::ObjectWrapper(JSContext* cx, JS::HandleValue value, int depth)
-    : _context(cx), _object(cx, value.toObjectOrNull()), _depth(depth) {}
+ObjectWrapper::ObjectWrapper(JSContext* cx, JS::HandleValue value)
+    : _context(cx), _object(cx, value.toObjectOrNull()) {}
 
 double ObjectWrapper::getNumber(Key key) {
     JS::RootedValue x(_context);
@@ -225,7 +229,7 @@ BSONObj ObjectWrapper::getObject(Key key) {
     JS::RootedValue x(_context);
     getValue(key, &x);
 
-    return ValueWriter(_context, x, _depth).toBSON();
+    return ValueWriter(_context, x).toBSON();
 }
 
 void ObjectWrapper::getValue(Key key, JS::MutableHandleValue value) {
@@ -255,14 +259,14 @@ void ObjectWrapper::setBoolean(Key key, bool val) {
 
 void ObjectWrapper::setBSONElement(Key key, const BSONElement& elem, bool readOnly) {
     JS::RootedValue value(_context);
-    ValueReader(_context, &value, _depth).fromBSONElement(elem, readOnly);
+    ValueReader(_context, &value).fromBSONElement(elem, readOnly);
 
     setValue(key, value);
 }
 
 void ObjectWrapper::setBSON(Key key, const BSONObj& obj, bool readOnly) {
     JS::RootedValue value(_context);
-    ValueReader(_context, &value, _depth).fromBSON(obj, readOnly);
+    ValueReader(_context, &value).fromBSON(obj, readOnly);
 
     setValue(key, value);
 }
@@ -339,54 +343,121 @@ void ObjectWrapper::callMethod(JS::HandleValue fun, JS::MutableHandleValue out) 
     callMethod(fun, args, out);
 }
 
-void ObjectWrapper::writeThis(BSONObjBuilder* b) {
-    auto scope = getScope(_context);
-
-    BSONObj* originalBSON = nullptr;
-    if (scope->getProto<BSONInfo>().instanceOf(_object)) {
+BSONObj ObjectWrapper::toBSON() {
+    if (getScope(_context)->getProto<BSONInfo>().instanceOf(_object)) {
+        BSONObj* originalBSON = nullptr;
         bool altered;
 
         std::tie(originalBSON, altered) = BSONInfo::originalBSON(_context, _object);
 
-        if (originalBSON && !altered) {
-            b->appendElements(*originalBSON);
-            return;
-        }
+        if (originalBSON && !altered)
+            return *originalBSON;
     }
+
+    JS::RootedId id(_context);
+
+    // INCREDIBLY SUBTLE BEHAVIOR:
+    //
+    // (jcarey): Be very careful about how the Rooting API is used in
+    // relationship to WriteFieldRecursionFrames. Mozilla'a API more or less
+    // demands that the rooting types are on the stack and only manipulated as
+    // regular objects, which we aren't doing here. The reason they do this is
+    // because the rooting types must be global created and destroyed in an
+    // entirely linear order. This is impossible to screw up in regular use,
+    // but our unwinding of the recursion frames makes it easy to do here.
+    //
+    // The roots above need to be before the first frame is emplaced (so
+    // they'll be destroyed after it) and none of the roots in the below code
+    // (or in ValueWriter::writeThis) can live longer than until the call to
+    // emplace() inside ValueWriter. The runtime asserts enabled by MozJS's
+    // debug mode will catch runtime errors, but be aware of how difficult this
+    // is to get right and what to look for if one of them bites you.
+    WriteFieldRecursionFrames frames;
+    frames.emplace(_context, _object, nullptr, StringData{});
+
+    BSONObjBuilder b;
 
     // We special case the _id field in top-level objects and move it to the front.
     // This matches other drivers behavior and makes finding the _id field quicker in BSON.
-    if (_depth == 0 && hasField("_id")) {
-        _writeField(b, "_id", originalBSON);
+    if (hasField("_id")) {
+        _writeField(&b, "_id", &frames, frames.top().originalBSON);
     }
 
-    enumerate([&](JS::HandleId id) {
-        JS::RootedValue x(_context);
+    while (frames.size()) {
+        auto& frame = frames.top();
 
-        IdWrapper idw(_context, id);
+        // If the index is the same as length, we've seen all the keys at this
+        // level and should go up a level
+        if (frame.idx == frame.ids.length()) {
+            frames.pop();
+            continue;
+        }
 
-        if (_depth == 0 && idw.isString() && idw.equals("_id"))
-            return;
+        if (frame.idx == 0 && frame.originalBSON && !frame.altered) {
+            // If this is our first look at the object and it has an unaltered
+            // bson behind it, move idx to the end so we'll roll up on the next
+            // pass through the loop.
+            frame.subbob_or(&b)->appendElements(*frame.originalBSON);
+            frame.idx = frame.ids.length();
+            continue;
+        }
 
-        _writeField(b, id, originalBSON);
-    });
+        id.set(frame.ids[frame.idx++]);
 
-    const int sizeWithEOO = b->len() + 1 /*EOO*/ - 4 /*BSONObj::Holder ref count*/;
+        if (frames.size() == 1) {
+            IdWrapper idw(_context, id);
+
+            if (idw.isString() && idw.equals("_id")) {
+                continue;
+            }
+        }
+
+        // writeField invokes ValueWriter with the frame stack, which will push
+        // onto frames for subobjects, which will effectively recurse the loop.
+        _writeField(frame.subbob_or(&b), JS::HandleId(id), &frames, frame.originalBSON);
+    }
+
+    const int sizeWithEOO = b.len() + 1 /*EOO*/ - 4 /*BSONObj::Holder ref count*/;
     uassert(17260,
             str::stream() << "Converting from JavaScript to BSON failed: "
                           << "Object size " << sizeWithEOO << " exceeds limit of "
                           << BSONObjMaxInternalSize << " bytes.",
             sizeWithEOO <= BSONObjMaxInternalSize);
+
+    return b.obj();
 }
 
-void ObjectWrapper::_writeField(BSONObjBuilder* b, Key key, BSONObj* originalParent) {
-    JS::RootedValue value(_context);
-    key.get(_context, _object, &value);
+ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
+                                                                  JSObject* obj,
+                                                                  BSONObjBuilder* parent,
+                                                                  StringData sd)
+    : thisv(cx, obj), ids(cx, JS_Enumerate(cx, thisv)) {
+    if (parent) {
+        subbob.emplace(JS_IsArrayObject(cx, thisv) ? parent->subarrayStart(sd)
+                                                   : parent->subobjStart(sd));
+    }
 
-    ValueWriter x(_context, value, _depth);
+    if (!ids) {
+        throwCurrentJSException(
+            cx, ErrorCodes::JSInterpreterFailure, "Failure to enumerate object");
+    }
+
+    if (getScope(cx)->getProto<BSONInfo>().instanceOf(thisv)) {
+        std::tie(originalBSON, altered) = BSONInfo::originalBSON(cx, thisv);
+    }
+}
+
+void ObjectWrapper::_writeField(BSONObjBuilder* b,
+                                Key key,
+                                WriteFieldRecursionFrames* frames,
+                                BSONObj* originalParent) {
+    JS::RootedValue value(_context);
+    key.get(_context, frames->top().thisv, &value);
+
+    ValueWriter x(_context, value);
     x.setOriginalBSON(originalParent);
 
-    x.writeThis(b, key.toString(_context));
+    x.writeThis(b, key.toString(_context), frames);
 }
 
 std::string ObjectWrapper::getClassName() {

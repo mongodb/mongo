@@ -278,6 +278,9 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
     _checkErrorState(JS_InitStandardClasses(_context, _global));
 
     installBSONTypes();
+
+    JS_FireOnNewGlobalObject(_context, _global);
+
     execSetup(JSFiles::assert);
     execSetup(JSFiles::types);
 
@@ -425,10 +428,11 @@ BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
 
     _checkErrorState(JS::Call(_context, thisv, function, argv, &out), false, true);
 
-    BSONObjBuilder b;
-    ValueWriter(_context, out).writeThis(&b, "ret");
+    JS::RootedObject rout(_context, JS_NewPlainObject(_context));
+    ObjectWrapper wout(_context, rout);
+    wout.setValue("ret", out);
 
-    return b.obj();
+    return wout.toBSON();
 }
 
 bool hasFunctionIdentifier(StringData code) {
