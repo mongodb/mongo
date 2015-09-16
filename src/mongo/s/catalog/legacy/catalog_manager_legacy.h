@@ -62,8 +62,6 @@ public:
 
     void shutDown(OperationContext* txn, bool allowNetworking) override;
 
-    void advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) override;
-
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
                            const ShardKeyPattern& fieldsAndOrder,
@@ -149,8 +147,6 @@ public:
     DistLockManager* getDistLockManager() override;
 
     Status initConfigVersion(OperationContext* txn) override;
-
-    repl::OpTime getConfigOpTime(OperationContext* txn) override;
 
 private:
     Status _checkDbDoesNotExist(OperationContext* txn,

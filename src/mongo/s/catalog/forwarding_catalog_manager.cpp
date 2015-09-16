@@ -356,14 +356,6 @@ void ForwardingCatalogManager::shutDown(OperationContext* txn, bool allowNetwork
           });
 }
 
-void ForwardingCatalogManager::advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) {
-    retry(txn,
-          [&] {
-              _actual->advanceConfigOpTime(txn, opTime);
-              return 1;
-          });
-}
-
 Status ForwardingCatalogManager::enableSharding(OperationContext* txn, const std::string& dbName) {
     return retry(txn, [&] { return _actual->enableSharding(txn, dbName); });
 }
@@ -585,10 +577,6 @@ DistLockManager* ForwardingCatalogManager::getDistLockManager() {
 
 Status ForwardingCatalogManager::initConfigVersion(OperationContext* txn) {
     return retry(txn, [&] { return _actual->initConfigVersion(txn); });
-}
-
-repl::OpTime ForwardingCatalogManager::getConfigOpTime(OperationContext* txn) {
-    return retry(txn, [&] { return _actual->getConfigOpTime(txn); });
 }
 
 }  // namespace mongo

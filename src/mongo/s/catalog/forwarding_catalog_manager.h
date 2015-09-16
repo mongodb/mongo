@@ -119,8 +119,6 @@ private:
 
     void shutDown(OperationContext* txn, bool allowNetworking = true) override;
 
-    void advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) override;
-
     Status enableSharding(OperationContext* txn, const std::string& dbName) override;
 
     Status shardCollection(OperationContext* txn,
@@ -218,8 +216,6 @@ private:
     Status createDatabase(OperationContext* txn, const std::string& dbName) override;
 
     Status initConfigVersion(OperationContext* txn) override;
-
-    repl::OpTime getConfigOpTime(OperationContext* txn) override;
 
     template <typename Callable>
     auto retry(OperationContext* txn, Callable&& c) -> decltype(std::forward<Callable>(c)());

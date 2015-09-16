@@ -60,7 +60,6 @@ namespace {
 const char kCmdResponseWriteConcernField[] = "writeConcernError";
 const char kFindAndModifyResponseResultDocField[] = "value";
 const char kLocalTimeField[] = "localTime";
-const BSONObj kReplMetadata = BSON(rpc::kReplSetMetadataFieldName << 1);
 const ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly, TagSet());
 
 /**
@@ -346,14 +345,14 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
         return targetStatus.getStatus();
     }
 
-    auto resultStatus = _client->runCommandOnConfig(
-        targetStatus.getValue(), "admin", BSON("serverStatus" << 1), rpc::makeEmptyMetadata());
+    auto resultStatus =
+        _client->runCommandOnConfig(targetStatus.getValue(), "admin", BSON("serverStatus" << 1));
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
 
-    BSONObj responseObj(resultStatus.getValue().response);
+    BSONObj responseObj(resultStatus.getValue());
 
     auto cmdStatus = getStatusFromCommandResult(responseObj);
 
@@ -466,8 +465,7 @@ StatusWith<vector<BSONObj>> DistLockCatalogImpl::_findOnConfig(const HostAndPort
                                                                const BSONObj& sort,
                                                                boost::optional<long long> limit) {
     repl::ReadConcernArgs readConcern(boost::none, repl::ReadConcernLevel::kMajorityReadConcern);
-    auto result = _client->exhaustiveFindOnConfigNode(
-        host, nss, query, sort, limit, readConcern, kReplMetadata);
+    auto result = _client->exhaustiveFindOnConfigNode(host, nss, query, sort, limit, readConcern);
 
     if (!result.isOK()) {
         return result.getStatus();

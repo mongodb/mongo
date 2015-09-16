@@ -262,10 +262,6 @@ void CatalogManagerLegacy::shutDown(OperationContext* txn, bool allowNetworking)
     _distLockManager->shutDown(allowNetworking);
 }
 
-void CatalogManagerLegacy::advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) {
-    invariant(opTime.isNull());
-}
-
 Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
                                              const string& ns,
                                              const ShardKeyPattern& fieldsAndOrder,
@@ -1342,10 +1338,6 @@ void CatalogManagerLegacy::_consistencyChecker() {
 bool CatalogManagerLegacy::_isConsistentFromLastCheck() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _consistentFromLastCheck;
-}
-
-repl::OpTime CatalogManagerLegacy::getConfigOpTime(OperationContext* txn) {
-    return repl::OpTime();
 }
 
 }  // namespace mongo

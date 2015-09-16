@@ -69,11 +69,6 @@ class ShardRegistry {
     MONGO_DISALLOW_COPYING(ShardRegistry);
 
 public:
-    struct CommandResponse {
-        BSONObj response;
-        repl::OpTime opTime;
-    };
-
     struct QueryResponse {
         std::vector<BSONObj> docs;
         repl::OpTime opTime;
@@ -185,6 +180,17 @@ public:
     void toBSON(BSONObjBuilder* result);
 
     /**
+     * If the newly specified optime is newer than the one the ShardRegistry already knows, the
+     * one in the registry will be advanced. Otherwise, it remains the same.
+     */
+    void advanceConfigOpTime(repl::OpTime opTime);
+
+    /**
+     * Returns the last known OpTime of the config servers.
+     */
+    repl::OpTime getConfigOpTime();
+
+    /**
      * Executes 'find' command against the specified host and fetches *all* the results that
      * the host will return until there are no more or until an error is returned.
      * "host" must refer to a config server.
@@ -199,8 +205,7 @@ public:
         const BSONObj& query,
         const BSONObj& sort,
         boost::optional<long long> limit,
-        boost::optional<repl::ReadConcernArgs> readConcern,
-        const BSONObj& metadata);
+        boost::optional<repl::ReadConcernArgs> readConcern);
 
     /**
      * Runs a command against the specified host and returns the result.  It is the responsibility
@@ -225,10 +230,9 @@ public:
      *
      * "host" must refer to a config server node.
      */
-    StatusWith<CommandResponse> runCommandOnConfig(const HostAndPort& host,
-                                                   const std::string& dbname,
-                                                   const BSONObj& cmdObj,
-                                                   const BSONObj& metadata);
+    StatusWith<BSONObj> runCommandOnConfig(const HostAndPort& host,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj);
 
     /**
      * Helpers for running commands against a given shard with logic for retargeting and
@@ -249,12 +253,13 @@ public:
     StatusWith<BSONObj> runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
                                                                const BSONObj& cmdObj);
 
-    StatusWith<CommandResponse> runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
-                                                                       const BSONObj& cmdObj,
-                                                                       const BSONObj& metadata);
-
 private:
     typedef std::map<ShardId, std::shared_ptr<Shard>> ShardMap;
+
+    struct CommandResponse {
+        BSONObj response;
+        repl::OpTime opTime;
+    };
 
     /**
      * Creates a shard based on the specified information and puts it into the lookup maps.
@@ -303,11 +308,14 @@ private:
     // added as shards.  Does not have any connection hook set on it.
     const std::unique_ptr<executor::TaskExecutor> _executorForAddShard;
 
-    // Protects the config server connections string and the lookup maps below
+    // Protects the config server connections string, _configOpTime, and the lookup maps below
     mutable stdx::mutex _mutex;
 
     // Config server connection string
     ConnectionString _configServerCS;
+
+    // Last known highest opTime from the config server.
+    repl::OpTime _configOpTime;
 
     // Map of both shardName -> Shard and hostName -> Shard
     ShardMap _lookup;

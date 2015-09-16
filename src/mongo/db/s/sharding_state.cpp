@@ -191,10 +191,6 @@ void ShardingState::setShardName(const string& name) {
     }
 }
 
-void ShardingState::advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) {
-    grid.catalogManager(txn)->advanceConfigOpTime(txn, opTime);
-}
-
 void ShardingState::clearCollectionMetadata() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _collMetadata.clear();

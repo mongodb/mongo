@@ -94,6 +94,7 @@
 #include "mongo/rpc/metadata/config_server_response_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
@@ -1267,11 +1268,10 @@ void Command::execCommand(OperationContext* txn,
                 rpc::ConfigServerRequestMetadata::readFromCommand(request.getCommandArgs());
             auto optime = uassertStatusOK(requestMetadataStatus).getOpTime();
             if (optime.is_initialized()) {
-                auto shardingState = ShardingState::get(txn);
-                if (shardingState->enabled()) {
+                if (ShardingState::get(txn)->enabled()) {
                     // TODO(spencer): Do this unconditionally once all nodes are sharding aware
                     // by default.
-                    shardingState->advanceConfigOpTime(txn, optime.get());
+                    grid.shardRegistry()->advanceConfigOpTime(optime.get());
                 } else {
                     massert(
                         28807,
@@ -1411,7 +1411,7 @@ bool Command::run(OperationContext* txn,
     }
 
     if (isShardingAware) {
-        auto opTime = grid.catalogManager(txn)->getConfigOpTime(txn);
+        auto opTime = grid.shardRegistry()->getConfigOpTime();
         rpc::ConfigServerResponseMetadata(opTime).writeToMetadata(&metadataBob);
     }
 

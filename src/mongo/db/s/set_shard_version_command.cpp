@@ -44,6 +44,8 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
 
@@ -155,7 +157,7 @@ public:
             uassertStatusOK(ChunkVersionAndOpTime::parseFromBSONForSetShardVersion(cmdObj));
         const auto& version = verAndOpTime.getVersion();
 
-        shardingState->advanceConfigOpTime(txn, verAndOpTime.getOpTime());
+        grid.shardRegistry()->advanceConfigOpTime(verAndOpTime.getOpTime());
 
         // step 3
         const ChunkVersion oldVersion = info->getVersion(ns);

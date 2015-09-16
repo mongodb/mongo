@@ -52,8 +52,6 @@ Status CatalogManagerMock::startup(OperationContext* txn, bool allowNetworking) 
 
 void CatalogManagerMock::shutDown(OperationContext* txn, bool allowNetworking) {}
 
-void CatalogManagerMock::advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) {}
-
 Status CatalogManagerMock::shardCollection(OperationContext* txn,
                                            const string& ns,
                                            const ShardKeyPattern& fieldsAndOrder,
@@ -200,10 +198,6 @@ StatusWith<std::string> CatalogManagerMock::_generateNewShardName(OperationConte
 
 Status CatalogManagerMock::initConfigVersion(OperationContext* txn) {
     return Status::OK();
-}
-
-repl::OpTime CatalogManagerMock::getConfigOpTime(OperationContext* txn) {
-    return repl::OpTime();
 }
 
 }  // namespace mongo

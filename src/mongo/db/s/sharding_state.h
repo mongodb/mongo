@@ -105,12 +105,6 @@ public:
     void setShardName(const std::string& shardName);
 
     /**
-     * Causes the catalog manager to advance its optime so subsequent reads from the config servers
-     * see the latest data.
-     */
-    void advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime);
-
-    /**
      * Clears the collection metadata cache after step down.
      */
     void clearCollectionMetadata();

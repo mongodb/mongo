@@ -94,7 +94,6 @@ namespace {
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::PrimaryOnly, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
-const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
 const int kInitialSSVRetries = 3;
 const int kActionLogCollectionSize = 1024 * 1024 * 2;
 const int kChangeLogCollectionSize = 1024 * 1024 * 10;
@@ -129,10 +128,6 @@ void CatalogManagerReplicaSet::shutDown(OperationContext* txn, bool allowNetwork
 
     invariant(_distLockManager);
     _distLockManager->shutDown(allowNetworking);
-}
-
-void CatalogManagerReplicaSet::advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) {
-    _updateLastSeenConfigOpTime(opTime);
 }
 
 Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
@@ -557,7 +552,8 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
     // We just called updateCollection above and this would have advanced the config op time, so use
     // the latest value. On the MongoD side, we need to load the latest config metadata, which
     // indicates that the collection was dropped.
-    const ChunkVersionAndOpTime droppedVersion(ChunkVersion::DROPPED(), _getConfigOpTime());
+    const ChunkVersionAndOpTime droppedVersion(ChunkVersion::DROPPED(),
+                                               grid.shardRegistry()->getConfigOpTime());
 
     for (const auto& shardEntry : allShards) {
         SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
@@ -604,7 +600,8 @@ void CatalogManagerReplicaSet::logAction(OperationContext* txn, const ActionLogT
     if (_actionLogCollectionCreated.load() == 0) {
         BSONObj createCmd = BSON("create" << ActionLogType::ConfigNS << "capped" << true << "size"
                                           << kActionLogCollectionSize);
-        auto result = _runCommandOnConfigWithNotMasterRetries("config", createCmd);
+        auto result =
+            grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries("config", createCmd);
         if (!result.isOK()) {
             LOG(1) << "couldn't create actionlog collection: " << causedBy(result.getStatus());
             return;
@@ -633,7 +630,8 @@ void CatalogManagerReplicaSet::logChange(OperationContext* txn,
     if (_changeLogCollectionCreated.load() == 0) {
         BSONObj createCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true << "size"
                                           << kChangeLogCollectionSize);
-        auto result = _runCommandOnConfigWithNotMasterRetries("config", createCmd);
+        auto result =
+            grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries("config", createCmd);
         if (!result.isOK()) {
             LOG(1) << "couldn't create changelog collection: " << causedBy(result.getStatus());
             return;
@@ -898,7 +896,7 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* t
         return Command::appendCommandStatus(*result, scopedDistLock.getStatus());
     }
 
-    auto response = _runCommandOnConfigWithNotMasterRetries(dbname, cmdObj);
+    auto response = grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(dbname, cmdObj);
     if (!response.isOK()) {
         return Command::appendCommandStatus(*result, response.getStatus());
     }
@@ -928,7 +926,7 @@ Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
                                                          const BSONArray& updateOps,
                                                          const BSONArray& preCondition) {
     BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition);
-    auto response = _runCommandOnConfigWithNotMasterRetries("config", cmd);
+    auto response = grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries("config", cmd);
 
     if (!response.isOK()) {
         return response.getStatus();
@@ -956,7 +954,7 @@ void CatalogManagerReplicaSet::writeConfigServerDirect(OperationContext* txn,
     invariant(dbname == "config" || dbname == "admin");
     const BSONObj cmdObj = batchRequest.toBSON();
 
-    auto response = _runCommandOnConfigWithNotMasterRetries(dbname, cmdObj);
+    auto response = grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(dbname, cmdObj);
     if (!response.isOK()) {
         _toBatchError(response.getStatus(), batchResponse);
         return;
@@ -1069,7 +1067,8 @@ StatusWith<long long> CatalogManagerReplicaSet::_runCountCommandOnConfig(const H
     countBuilder.append("query", query);
     _appendReadConcern(&countBuilder);
 
-    auto responseStatus = _runCommandOnConfig(target, ns.db().toString(), countBuilder.done());
+    auto responseStatus =
+        grid.shardRegistry()->runCommandOnConfig(target, ns.db().toString(), countBuilder.done());
 
     if (!responseStatus.isOK()) {
         return responseStatus.getStatus();
@@ -1214,49 +1213,17 @@ StatusWith<VersionType> CatalogManagerReplicaSet::_getConfigVersion(OperationCon
     return versionTypeResult.getValue();
 }
 
-StatusWith<BSONObj> CatalogManagerReplicaSet::_runCommandOnConfig(const HostAndPort& target,
-                                                                  const string& dbName,
-                                                                  BSONObj cmdObj) {
-    auto result = grid.shardRegistry()->runCommandOnConfig(target, dbName, cmdObj, kReplMetadata);
-
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-
-    const auto& response = result.getValue();
-
-    _updateLastSeenConfigOpTime(response.opTime);
-
-    return response.response;
-}
-
-StatusWith<BSONObj> CatalogManagerReplicaSet::_runCommandOnConfigWithNotMasterRetries(
-    const std::string& dbName, BSONObj cmdObj) {
-    auto result =
-        grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(dbName, cmdObj, kReplMetadata);
-
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-
-    const auto& response = result.getValue();
-
-    _updateLastSeenConfigOpTime(response.opTime);
-
-    return response.response;
-}
-
 StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFindOnConfig(
     const HostAndPort& host,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    repl::ReadConcernArgs readConcern(_getConfigOpTime(),
+    repl::ReadConcernArgs readConcern(grid.shardRegistry()->getConfigOpTime(),
                                       repl::ReadConcernLevel::kMajorityReadConcern);
 
     auto result = grid.shardRegistry()->exhaustiveFindOnConfigNode(
-        host, nss, query, sort, limit, readConcern, kReplMetadata);
+        host, nss, query, sort, limit, readConcern);
 
     if (!result.isOK()) {
         return result.getStatus();
@@ -1264,26 +1231,11 @@ StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFin
 
     auto response = std::move(result.getValue());
 
-    _updateLastSeenConfigOpTime(response.opTime);
-
     return OpTimePair<vector<BSONObj>>(std::move(response.docs), response.opTime);
 }
 
-OpTime CatalogManagerReplicaSet::_getConfigOpTime() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _configOpTime;
-}
-
-void CatalogManagerReplicaSet::_updateLastSeenConfigOpTime(const OpTime& optime) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    if (_configOpTime < optime) {
-        _configOpTime = optime;
-    }
-}
-
 void CatalogManagerReplicaSet::_appendReadConcern(BSONObjBuilder* builder) {
-    repl::ReadConcernArgs readConcern(_getConfigOpTime(),
+    repl::ReadConcernArgs readConcern(grid.shardRegistry()->getConfigOpTime(),
                                       repl::ReadConcernLevel::kMajorityReadConcern);
     readConcern.appendInfo(builder);
 }
@@ -1299,7 +1251,7 @@ bool CatalogManagerReplicaSet::_runReadCommand(OperationContext* txn,
         return Command::appendCommandStatus(*result, target.getStatus());
     }
 
-    auto resultStatus = _runCommandOnConfig(target.getValue(), dbname, cmdObj);
+    auto resultStatus = grid.shardRegistry()->runCommandOnConfig(target.getValue(), dbname, cmdObj);
     if (!resultStatus.isOK()) {
         return Command::appendCommandStatus(*result, resultStatus.getStatus());
     }
@@ -1307,11 +1259,6 @@ bool CatalogManagerReplicaSet::_runReadCommand(OperationContext* txn,
     result->appendElements(resultStatus.getValue());
 
     return Command::getStatusFromCommandResult(resultStatus.getValue()).isOK();
-}
-
-repl::OpTime CatalogManagerReplicaSet::getConfigOpTime(OperationContext* txn) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _configOpTime;
 }
 
 }  // namespace mongo

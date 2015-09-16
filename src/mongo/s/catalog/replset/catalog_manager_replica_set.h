@@ -59,8 +59,6 @@ public:
 
     void shutDown(OperationContext* txn, bool allowNetworking) override;
 
-    void advanceConfigOpTime(OperationContext* txn, repl::OpTime opTime) override;
-
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
                            const ShardKeyPattern& fieldsAndOrder,
@@ -144,8 +142,6 @@ public:
 
     Status initConfigVersion(OperationContext* txn) override;
 
-    repl::OpTime getConfigOpTime(OperationContext* txn) override;
-
 private:
     Status _checkDbDoesNotExist(OperationContext* txn,
                                 const std::string& dbName,
@@ -167,13 +163,6 @@ private:
                                                    const NamespaceString& ns,
                                                    BSONObj query);
 
-    StatusWith<BSONObj> _runCommandOnConfig(const HostAndPort& target,
-                                            const std::string& dbName,
-                                            BSONObj cmdObj);
-
-    StatusWith<BSONObj> _runCommandOnConfigWithNotMasterRetries(const std::string& dbName,
-                                                                BSONObj cmdObj);
-
     StatusWith<OpTimePair<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         const HostAndPort& host,
         const NamespaceString& nss,
@@ -190,16 +179,6 @@ private:
      * Returns the current cluster schema/protocol version.
      */
     StatusWith<VersionType> _getConfigVersion(OperationContext* txn);
-
-    /**
-     * Returns the highest last known config server opTime.
-     */
-    repl::OpTime _getConfigOpTime();
-
-    /**
-     * Updates the last known config server opTime if the given opTime is newer.
-     */
-    void _updateLastSeenConfigOpTime(const repl::OpTime& optime);
 
     //
     // All member variables are labeled with one of the following codes indicating the
