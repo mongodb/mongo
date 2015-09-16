@@ -248,6 +248,7 @@ connection_stats = [
     LogStat('log_compress_small', 'log records too small to compress'),
     LogStat('log_compress_write_fails', 'log records not compressed'),
     LogStat('log_compress_writes', 'log records compressed'),
+    LogStat('log_flush', 'log flush operations'),
     LogStat('log_max_filesize', 'maximum log file size', 'no_clear,no_scale'),
     LogStat('log_prealloc_files', 'pre-allocated log files prepared'),
     LogStat('log_prealloc_max',
