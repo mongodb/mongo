@@ -203,9 +203,15 @@ public:
                 status = checkUniqueIndexConstraints(txn, ns.ns(), spec["key"].Obj());
 
                 if (!status.isOK()) {
-                    appendCommandStatus(result, status);
-                    return false;
+                    return appendCommandStatus(result, status);
                 }
+            }
+            if (spec["v"].isNumber() && spec["v"].numberInt() == 0) {
+                return appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::CannotCreateIndex,
+                           str::stream() << "illegal index specification: " << spec << ". "
+                                         << "The option v:0 cannot be passed explicitly"));
             }
         }
 

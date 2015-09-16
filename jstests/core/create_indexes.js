@@ -126,20 +126,12 @@
 
     assert.eq( 6, t.getIndexes().length );
 
-    //
-    // Test that v0 indexes can only be created with mmapv1
-    //
-    res = t.runCommand('createIndexes',
-                       {indexes: [{key: {d: 1}, name: 'd_1', v: 0}]});
+    // Test that v0 indexes cannot be created.
+    res = t.runCommand('createIndexes', {indexes: [{key: {d: 1}, name: 'd_1', v: 0}]});
+    assert.commandFailed(res, 'v0 index creation should fail');
 
-    if (!isMongos) {
-        var status = db.serverStatus();
-        assert.commandWorked(status);
-        if (status.storageEngine.name === 'mmapv1') {
-            assert.commandWorked(res, 'v0 index creation should work for mmapv1');
-        } else {
-            assert.commandFailed(res, 'v0 index creation should fail for non-mmapv1 storage engines');
-        }
-    }
+    // Test that v1 indexes can be created explicitly.
+    res = t.runCommand('createIndexes', {indexes: [{key: {d: 1}, name: 'd_1', v: 1}]});
+    assert.commandWorked(res, 'v1 index creation should succeed');
 
 }());
