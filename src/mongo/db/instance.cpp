@@ -1002,7 +1002,10 @@ NOINLINE_DECL void insertMulti(OperationContext* txn,
         // but smaller chunk sizes allow yielding to other threads and lower chance of WCEs
         if ((++chunkCount >= internalQueryExecYieldIterations / 2) ||
             (chunkSize >= maxInsertGroupSize)) {
-            insertMultiVector(txn, ctx, keepGoing, ns, op, chunkBegin, it + 1);
+            if (it == chunkBegin)  // there is only one doc to process, so avoid retry on failure
+                insertMultiSingletons(txn, ctx, keepGoing, ns, op, chunkBegin, it + 1);
+            else
+                insertMultiVector(txn, ctx, keepGoing, ns, op, chunkBegin, it + 1);
             chunkBegin = it + 1;
             chunkCount = 0;
             chunkSize = 0;
