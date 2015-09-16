@@ -20,7 +20,6 @@ selector:
     # These tests might be fixed under sharding:
     - jstests/core/count5.js  # SERVER-1444
     - jstests/core/or4.js  # SERVER-1444
-    - jstests/core/shellkillop.js  # SERVER-1445
     - jstests/core/update_setOnInsert.js  # SERVER-8653
     - jstests/core/max_time_ms.js  # SERVER-2212
     - jstests/core/fts_querylang.js  # SERVER-9063
