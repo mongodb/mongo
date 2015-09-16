@@ -299,22 +299,29 @@ Status AuthorizationSession::checkAuthForDelete(const NamespaceString& ns, const
 Status AuthorizationSession::checkAuthForKillCursors(const NamespaceString& ns,
                                                      long long cursorID) {
     // See implementation comments in checkAuthForGetMore().  This method looks very similar.
+
+    // SERVER-20364 Check for find or killCursor privileges until we have a way of associating
+    // a cursor with an owner.
     if (ns.isListCollectionsCursorNS()) {
-        if (!isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
-                                              ActionType::killCursors)) {
+        if (!(isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
+                                               ActionType::killCursors) ||
+              isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
+                                               ActionType::listCollections))) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized to kill listCollections cursor on "
                                         << ns.ns());
         }
     } else if (ns.isListIndexesCursorNS()) {
         NamespaceString targetNS = ns.getTargetNSForListIndexes();
-        if (!isAuthorizedForActionsOnNamespace(targetNS, ActionType::killCursors)) {
+        if (!(isAuthorizedForActionsOnNamespace(targetNS, ActionType::killCursors) ||
+              isAuthorizedForActionsOnNamespace(targetNS, ActionType::listIndexes))) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized to kill listIndexes cursor on "
                                         << ns.ns());
         }
     } else {
-        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::killCursors)) {
+        if (!(isAuthorizedForActionsOnNamespace(ns, ActionType::killCursors) ||
+              isAuthorizedForActionsOnNamespace(ns, ActionType::find))) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized to kill cursor on " << ns.ns());
         }
