@@ -184,12 +184,6 @@ protected:
     void simulateSuccessfulV1Election();
 
     /**
-     * Brings the repl coord from PRIMARY to SECONDARY by simulating a period of time in which
-     * all heartbeats respond with an error condition, such as time out.
-     */
-    void simulateStepDownOnIsolation();
-
-    /**
      * Asserts that calling start(configDoc, selfHost) successfully initiates the
      * ReplicationCoordinator under test.
      */

@@ -347,32 +347,6 @@ void ReplCoordTest::simulateSuccessfulElection() {
     }
 }
 
-void ReplCoordTest::simulateStepDownOnIsolation() {
-    ReplicationCoordinatorImpl* replCoord = getReplCoord();
-    NetworkInterfaceMock* net = getNet();
-    ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
-    ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
-    while (replCoord->getMemberState().primary()) {
-        log() << "Waiting on network in state " << replCoord->getMemberState();
-        getNet()->enterNetwork();
-        net->runUntil(net->now() + Seconds(10));
-        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
-        const RemoteCommandRequest& request = noi->getRequest();
-        log() << request.target.toString() << " processing " << request.cmdObj;
-        ReplSetHeartbeatArgs hbArgs;
-        if (hbArgs.initialize(request.cmdObj).isOK()) {
-            net->scheduleResponse(
-                noi, net->now(), ResponseStatus(ErrorCodes::NetworkTimeout, "Nobody's home"));
-        } else {
-            error() << "Black holing unexpected request to " << request.target << ": "
-                    << request.cmdObj;
-            net->blackHole(noi);
-        }
-        net->runReadyNetworkOperations();
-        getNet()->exitNetwork();
-    }
-}
-
 void ReplCoordTest::shutdown() {
     invariant(_callShutdown);
     _net->exitNetwork();
