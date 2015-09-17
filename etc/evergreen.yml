@@ -1138,7 +1138,7 @@ tasks:
       resmoke_args: --suites=replica_sets --storageEngine=wiredTiger
 
 - <<: *task_template
-  name: replica_sets_WT_ese
+  name: replicasets_WT_ese
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -2336,8 +2336,8 @@ buildvariants:
   - name: noPassthroughWithMongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
-  - name: replica_sets_WT_ese
   - name: replicasets_auth
+  - name: replicasets_WT_ese
   - name: replication_auth
   - name: sasl
   - name: sharding_auth
@@ -2790,11 +2790,11 @@ buildvariants:
   - name: dbtest_WT
   - name: ese_WT
   - name: jsCore_WT_ese
-  - name: replica_sets_WT_ese
   - name: sharding_WT_ese
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
+  - name: replicasets_WT_ese
   - name: sasl
   - name: sharding_auth
   - name: snmp
