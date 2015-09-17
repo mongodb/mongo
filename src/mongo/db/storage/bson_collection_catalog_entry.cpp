@@ -175,11 +175,11 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
         options.parse(obj["options"].Obj());
     }
 
-    BSONElement e = obj["indexes"];
-    if (e.isABSONObj()) {
-        std::vector<BSONElement> entries = e.Array();
-        for (unsigned i = 0; i < entries.size(); i++) {
-            BSONObj idx = entries[i].Obj();
+    BSONElement indexList = obj["indexes"];
+
+    if (indexList.isABSONObj()) {
+        for (BSONElement elt : indexList.Obj()) {
+            BSONObj idx = elt.Obj();
             IndexMetaData imd;
             imd.spec = idx["spec"].Obj().getOwned();
             imd.ready = idx["ready"].trueValue();
