@@ -215,5 +215,21 @@ void NetworkInterfaceASIO::AsyncOp::setOperationProtocol(rpc::Protocol proto) {
     _operationProtocol = proto;
 }
 
+void NetworkInterfaceASIO::AsyncOp::reset() {
+    // We don't reset owner as it never changes
+    _cbHandle = {};
+    _request = {};
+    _onFinish = {};
+    _connectionPoolHandle = {};
+    // We don't reset _connection as we want to reuse it.
+    // Ditto for _operationProtocol.
+    _start = {};
+    _timeoutAlarm.reset();
+    _canceled.store(0u);
+    _timedOut.store(0u);
+    _command = boost::none;
+    // _inSetup should always be false at this point.
+}
+
 }  // namespace executor
 }  // namespace mongo

@@ -292,6 +292,8 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
     auto conn = std::move(op->_connectionPoolHandle);
     auto asioConn = static_cast<connection_pool_asio::ASIOConnection*>(conn.get());
 
+    ownedOp->reset();
+
     asioConn->bindAsyncOp(std::move(ownedOp));
     if (!resp.isOK()) {
         asioConn->indicateFailed(resp.getStatus());

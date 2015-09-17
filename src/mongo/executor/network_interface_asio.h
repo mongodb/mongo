@@ -259,6 +259,8 @@ private:
 
         void setOperationProtocol(rpc::Protocol proto);
 
+        void reset();
+
     private:
         NetworkInterfaceASIO* const _owner;
         // Information describing a task enqueued on the NetworkInterface
