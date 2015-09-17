@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
+
 #include "mongo/platform/basic.h"
 
 #include <exception>
@@ -42,42 +44,136 @@
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace executor {
 namespace {
 
-TEST(NetworkInterfaceASIO, TestPing) {
-    auto fixture = unittest::getFixtureConnectionString();
+class NetworkInterfaceASIOIntegrationTest : public mongo::unittest::Test {
+public:
+    void setUp() override {
+        NetworkInterfaceASIO::Options options{};
+        options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
+        options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+        _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
+        _net->startup();
+    }
 
-    NetworkInterfaceASIO::Options options{};
-    options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
-    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
-    NetworkInterfaceASIO net{std::move(options)};
+    void tearDown() override {
+        if (!_net->inShutdown()) {
+            _net->shutdown();
+        }
+    }
 
-    net.startup();
-    auto guard = MakeGuard([&] { net.shutdown(); });
+    NetworkInterfaceASIO& net() {
+        return *_net;
+    }
 
-    TaskExecutor::CallbackHandle cb{};
+    ConnectionString fixture() {
+        return unittest::getFixtureConnectionString();
+    }
 
-    stdx::promise<RemoteCommandResponse> result;
+    StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request) {
+        TaskExecutor::CallbackHandle cb{};
+        stdx::promise<RemoteCommandResponse> result;
 
-    net.startCommand(
-        cb,
-        RemoteCommandRequest{fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj()},
-        [&result](StatusWith<RemoteCommandResponse> resp) {
-            try {
-                result.set_value(uassertStatusOK(resp));
-            } catch (...) {
-                result.set_exception(std::current_exception());
-            }
-        });
+        log() << "running command: " << request.toString();
 
-    auto fut = result.get_future();
-    auto commandReply = fut.get();
+        net().startCommand(cb,
+                           request,
+                           [&result](StatusWith<RemoteCommandResponse> resp) {
+                               try {
+                                   result.set_value(uassertStatusOK(resp));
+                               } catch (...) {
+                                   result.set_exception(std::current_exception());
+                               }
+                           });
+        try {
+            // We can't construct a stdx::promise<StatusWith<RemoteCommandResponse>> because
+            // StatusWith is not default constructible. So we do the status -> exception -> status
+            // dance instead.
+            auto res = result.get_future().get();
+            log() << "got command result: " << res.toString();
+            return res;
+        } catch (...) {
+            auto status = exceptionToStatus();
+            log() << "command failed with status: " << status;
+            return status;
+        }
+    }
 
-    ASSERT_OK(getStatusFromCommandResult(commandReply.data));
+    void assertCommandOK(StringData db,
+                         const BSONObj& cmd,
+                         Milliseconds timeoutMillis = Milliseconds(-1)) {
+        auto res = unittest::assertGet(
+            runCommand({fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis}));
+        ASSERT_OK(getStatusFromCommandResult(res.data));
+    }
+
+    void assertCommandFailsOnClient(StringData db,
+                                    const BSONObj& cmd,
+                                    Milliseconds timeoutMillis,
+                                    ErrorCodes::Error reason) {
+        auto clientStatus =
+            runCommand({fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis});
+        ASSERT_TRUE(clientStatus == reason);
+    }
+
+    void assertCommandFailsOnServer(StringData db,
+                                    const BSONObj& cmd,
+                                    Milliseconds timeoutMillis,
+                                    ErrorCodes::Error reason) {
+        auto res = unittest::assertGet(
+            runCommand({fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis}));
+        auto serverStatus = getStatusFromCommandResult(res.data);
+        ASSERT_TRUE(serverStatus == reason);
+    }
+
+private:
+    std::unique_ptr<NetworkInterfaceASIO> _net;
+};
+
+TEST_F(NetworkInterfaceASIOIntegrationTest, Ping) {
+    assertCommandOK("admin", BSON("ping" << 1));
+}
+
+TEST_F(NetworkInterfaceASIOIntegrationTest, Timeouts) {
+    // Insert 1 document in collection foo.bar. If we don't do this our queries will return
+    // immediately.
+    assertCommandOK("foo",
+                    BSON("insert"
+                         << "bar"
+                         << "documents" << BSON_ARRAY(BSON("foo" << 1))));
+
+    // Run a find command with a $where with an infinite loop. The remote server should time this
+    // out in 30 seconds, so we should time out client side first given our timeout of 100
+    // milliseconds.
+    assertCommandFailsOnClient("foo",
+                               BSON("find"
+                                    << "bar"
+                                    << "filter" << BSON("$where"
+                                                        << "while(true) { sleep(1); }")),
+                               Milliseconds(100),
+                               ErrorCodes::ExceededTimeLimit);
+
+    // Run a find command with a $where with an infinite loop. The server should time out the
+    // command.
+    assertCommandFailsOnServer("foo",
+                               BSON("find"
+                                    << "bar"
+                                    << "filter" << BSON("$where"
+                                                        << "while(true) { sleep(1); };")),
+                               Milliseconds(10000000000),  // big, big timeout.
+                               ErrorCodes::JSInterpreterFailure);
+
+    // Run a find command with a big timeout. It should return before we hit the ASIO timeout.
+    assertCommandOK("foo",
+                    BSON("find"
+                         << "bar"
+                         << "limit" << 1),
+                    Milliseconds(10000000));
 }
 
 }  // namespace
