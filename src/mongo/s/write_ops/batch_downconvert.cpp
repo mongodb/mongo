@@ -186,7 +186,7 @@ BSONObj stripNonWCInfo(const BSONObj& gleResponse) {
 
 // Adds a wOpTime and a wElectionId field to a set of gle options
 static BSONObj buildGLECmdWithOpTime(const BSONObj& gleOptions,
-                                     const Timestamp& opTime,
+                                     const repl::OpTime& opTime,
                                      const OID& electionId) {
     BSONObjBuilder builder;
     BSONObjIterator it(gleOptions);
@@ -204,7 +204,7 @@ static BSONObj buildGLECmdWithOpTime(const BSONObj& gleOptions,
 
         builder.append(el);
     }
-    builder.append("wOpTime", opTime);
+    opTime.append(&builder, "wOpTime");
     builder.appendOID("wElectionId", const_cast<OID*>(&electionId));
     return builder.obj();
 }
@@ -221,11 +221,12 @@ Status enforceLegacyWriteConcern(MultiCommandDispatch* dispatcher,
     for (HostOpTimeMap::const_iterator it = hostOpTimes.begin(); it != hostOpTimes.end(); ++it) {
         const ConnectionString& shardEndpoint = it->first;
         const HostOpTime hot = it->second;
-        const Timestamp& opTime = hot.opTime;
+        const repl::OpTime& opTime = hot.opTime;
         const OID& electionId = hot.electionId;
 
         LOG(3) << "enforcing write concern " << options << " on " << shardEndpoint.toString()
-               << " at opTime " << opTime.toStringPretty() << " with electionID " << electionId;
+               << " at opTime " << opTime.getTimestamp().toStringPretty() << " with electionID "
+               << electionId;
 
         BSONObj gleCmd = buildGLECmdWithOpTime(options, opTime, electionId);
         dispatcher->addCommand(shardEndpoint, dbName, gleCmd);

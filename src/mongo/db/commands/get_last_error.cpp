@@ -32,6 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
@@ -138,42 +139,52 @@ public:
 
         // Always append lastOp and connectionId
         Client& c = *txn->getClient();
-        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
-            repl::ReplicationCoordinator::modeReplSet) {
+        auto replCoord = repl::getGlobalReplicationCoordinator();
+        if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
             const repl::OpTime lastOp = repl::ReplClientInfo::forClient(c).getLastOp();
             if (!lastOp.isNull()) {
-                result.append("lastOp", lastOp.getTimestamp());
-                // TODO(siyuan) Add "lastOpTerm"
+                if (replCoord->isV1ElectionProtocol()) {
+                    lastOp.append(&result, "lastOp");
+                } else {
+                    result.append("lastOp", lastOp.getTimestamp());
+                }
             }
         }
 
         // for sharding; also useful in general for debugging
         result.appendNumber("connectionId", c.getConnectionId());
 
-        Timestamp lastTimestamp;
-        BSONField<Timestamp> wOpTimeField("wOpTime");
-        FieldParser::FieldState extracted =
-            FieldParser::extract(cmdObj, wOpTimeField, &lastTimestamp, &errmsg);
-        if (!extracted) {
-            result.append("badGLE", cmdObj);
-            appendCommandStatus(result, false, errmsg);
-            return false;
+        repl::OpTime lastOpTime;
+        bool lastOpTimePresent = true;
+        const BSONElement opTimeElement = cmdObj["wOpTime"];
+        if (opTimeElement.eoo()) {
+            lastOpTimePresent = false;
+            lastOpTime = repl::ReplClientInfo::forClient(c).getLastOp();
+        } else if (opTimeElement.type() == bsonTimestamp) {
+            lastOpTime = repl::OpTime(opTimeElement.timestamp(), repl::OpTime::kUninitializedTerm);
+        } else if (opTimeElement.type() == Date) {
+            lastOpTime =
+                repl::OpTime(Timestamp(opTimeElement.date()), repl::OpTime::kUninitializedTerm);
+        } else if (opTimeElement.type() == Object) {
+            Status status = bsonExtractOpTimeField(cmdObj, "wOpTime", &lastOpTime);
+            if (!status.isOK()) {
+                result.append("badGLE", cmdObj);
+                return appendCommandStatus(result, status);
+            }
+        } else {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::TypeMismatch,
+                       str::stream() << "Expected \"wOpTime\" field in getLastError to "
+                                        "have type Date, Timestamp, or OpTime but found type "
+                                     << typeName(opTimeElement.type())));
         }
 
-        repl::OpTime lastOpTime;
-        bool lastOpTimePresent = extracted != FieldParser::FIELD_NONE;
-        if (!lastOpTimePresent) {
-            // Use the client opTime if no wOpTime is specified
-            lastOpTime = repl::ReplClientInfo::forClient(c).getLastOp();
-            // TODO(siyuan) Fix mongos to supply wOpTimeTerm, then parse out that value here
-        } else {
-            // TODO(siyuan) Don't use the default term after fixing mongos.
-            lastOpTime = repl::OpTime(lastTimestamp, repl::OpTime::kInitialTerm);
-        }
 
         OID electionId;
         BSONField<OID> wElectionIdField("wElectionId");
-        extracted = FieldParser::extract(cmdObj, wElectionIdField, &electionId, &errmsg);
+        FieldParser::FieldState extracted =
+            FieldParser::extract(cmdObj, wElectionIdField, &electionId, &errmsg);
         if (!extracted) {
             result.append("badGLE", cmdObj);
             appendCommandStatus(result, false, errmsg);

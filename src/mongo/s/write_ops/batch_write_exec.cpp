@@ -280,10 +280,10 @@ void BatchWriteExec::executeBatch(OperationContext* txn,
                     // Remember that we successfully wrote to this shard
                     // NOTE: This will record lastOps for shards where we actually didn't update
                     // or delete any documents, which preserves old behavior but is conservative
-                    _stats->noteWriteAt(shardHost,
-                                        response.isLastOpSet() ? response.getLastOp() : Timestamp(),
-                                        response.isElectionIdSet() ? response.getElectionId()
-                                                                   : OID());
+                    _stats->noteWriteAt(
+                        shardHost,
+                        response.isLastOpSet() ? response.getLastOp() : repl::OpTime(),
+                        response.isElectionIdSet() ? response.getElectionId() : OID());
                 } else {
                     // Error occurred dispatching, note it
 
@@ -369,7 +369,7 @@ BatchWriteExecStats* BatchWriteExec::releaseStats() {
 }
 
 void BatchWriteExecStats::noteWriteAt(const ConnectionString& host,
-                                      Timestamp opTime,
+                                      repl::OpTime opTime,
                                       const OID& electionId) {
     _writeOpTimes[host] = HostOpTime(opTime, electionId);
 }

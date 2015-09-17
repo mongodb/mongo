@@ -28,6 +28,7 @@
 
 #include "mongo/s/write_ops/batched_command_response.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -45,7 +46,6 @@ const BSONField<long long> BatchedCommandResponse::n("n", 0);
 const BSONField<long long> BatchedCommandResponse::nModified("nModified", 0);
 const BSONField<std::vector<BatchedUpsertDetail*>> BatchedCommandResponse::upsertDetails(
     "upserted");
-const BSONField<Timestamp> BatchedCommandResponse::lastOp("lastOp");
 const BSONField<OID> BatchedCommandResponse::electionId("electionId");
 const BSONField<std::vector<WriteErrorDetail*>> BatchedCommandResponse::writeErrors("writeErrors");
 const BSONField<WCErrorDetail*> BatchedCommandResponse::writeConcernError("writeConcernError");
@@ -102,8 +102,13 @@ BSONObj BatchedCommandResponse::toBSON() const {
         upsertedBuilder.done();
     }
 
-    if (_isLastOpSet)
-        builder.append(lastOp(), _lastOp);
+    if (_isLastOpSet) {
+        if (_lastOp.getTerm() != repl::OpTime::kUninitializedTerm) {
+            _lastOp.append(&builder, "opTime");
+        } else {
+            builder.append("opTime", _lastOp.getTimestamp());
+        }
+    }
     if (_isElectionIdSet)
         builder.appendOID(electionId(), const_cast<OID*>(&_electionId));
 
@@ -186,10 +191,22 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, string* errMsg) {
         return false;
     _upsertDetails.reset(tempUpsertDetails);
 
-    fieldState = FieldParser::extract(source, lastOp, &_lastOp, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
+    const BSONElement opTimeElement = source["opTime"];
+    _isLastOpSet = true;
+    if (opTimeElement.eoo()) {
+        _isLastOpSet = false;
+    } else if (opTimeElement.type() == bsonTimestamp) {
+        _lastOp = repl::OpTime(opTimeElement.timestamp(), repl::OpTime::kUninitializedTerm);
+    } else if (opTimeElement.type() == Date) {
+        _lastOp = repl::OpTime(Timestamp(opTimeElement.date()), repl::OpTime::kUninitializedTerm);
+    } else if (opTimeElement.type() == Object) {
+        Status status = bsonExtractOpTimeField(source, "opTime", &_lastOp);
+        if (!status.isOK()) {
+            return false;
+        }
+    } else {
         return false;
-    _isLastOpSet = fieldState == FieldParser::FIELD_SET;
+    }
 
     fieldState = FieldParser::extract(source, electionId, &_electionId, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID)
@@ -239,7 +256,7 @@ void BatchedCommandResponse::clear() {
         _upsertDetails.reset();
     }
 
-    _lastOp = Timestamp();
+    _lastOp = repl::OpTime();
     _isLastOpSet = false;
 
     _electionId = OID();
@@ -465,7 +482,7 @@ const BatchedUpsertDetail* BatchedCommandResponse::getUpsertDetailsAt(size_t pos
     return _upsertDetails->at(pos);
 }
 
-void BatchedCommandResponse::setLastOp(Timestamp lastOp) {
+void BatchedCommandResponse::setLastOp(repl::OpTime lastOp) {
     _lastOp = lastOp;
     _isLastOpSet = true;
 }
@@ -478,7 +495,7 @@ bool BatchedCommandResponse::isLastOpSet() const {
     return _isLastOpSet;
 }
 
-Timestamp BatchedCommandResponse::getLastOp() const {
+repl::OpTime BatchedCommandResponse::getLastOp() const {
     dassert(_isLastOpSet);
     return _lastOp;
 }

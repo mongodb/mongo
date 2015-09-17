@@ -1542,7 +1542,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
         if (_rsConfig.getProtocolVersion() == 1) {
             BSONObjBuilder opTime(response->subobjStart("optime"));
             opTime.append("ts", lastOpApplied.getTimestamp());
-            opTime.append("term", lastOpApplied.getTerm());
+            opTime.append("t", lastOpApplied.getTerm());
             opTime.done();
         } else {
             response->append("optime", lastOpApplied.getTimestamp());
@@ -1577,7 +1577,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
                 if (_rsConfig.getProtocolVersion() == 1) {
                     BSONObjBuilder opTime(bb.subobjStart("optime"));
                     opTime.append("ts", lastOpApplied.getTimestamp());
-                    opTime.append("term", lastOpApplied.getTerm());
+                    opTime.append("t", lastOpApplied.getTerm());
                     opTime.done();
                 } else {
                     bb.append("optime", lastOpApplied.getTimestamp());
@@ -1632,7 +1632,7 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplicationExecutor::C
                 if (_rsConfig.getProtocolVersion() == 1) {
                     BSONObjBuilder opTime(bb.subobjStart("optime"));
                     opTime.append("ts", it->getOpTime().getTimestamp());
-                    opTime.append("term", it->getOpTime().getTerm());
+                    opTime.append("t", it->getOpTime().getTerm());
                     opTime.done();
                 } else {
                     bb.append("optime", it->getOpTime().getTimestamp());

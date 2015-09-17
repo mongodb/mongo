@@ -28,6 +28,7 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
 class BSONObj;
@@ -72,20 +73,20 @@ public:
                             BSONObjBuilder* metadataBob);
 
     /**
-     * Gets the OpTime of the oplog entry of the last succssful write operation executed by the
+     * Gets the OpTime of the oplog entry of the last successful write operation executed by the
      * server that produced the metadata.
      */
-    const Timestamp& getLastOpTime() const;
+    const repl::OpTime& getLastOpTime() const;
 
     /**
      * Gets the most recent election id observed by the server that produced the metadata.
      */
     const OID& getLastElectionId() const;
 
-    ShardingMetadata(Timestamp lastOpTime, OID lastElectionId);
+    ShardingMetadata(repl::OpTime lastOpTime, OID lastElectionId);
 
 private:
-    Timestamp _lastOpTime;
+    repl::OpTime _lastOpTime;
     OID _lastElectionId;
 };
 
