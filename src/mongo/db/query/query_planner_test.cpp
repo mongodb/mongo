@@ -3410,6 +3410,21 @@ TEST_F(QueryPlannerTest, NoKeepWithIndexedSort) {
         "[{ixscan: {pattern: {a: 1, b: 1}}}, {ixscan: {pattern: {a: 1, b: 1}}}]}}}}");
 }
 
+// No KeepMutations when we have a sort that is not root, like the ntoreturn hack.
+TEST_F(QueryPlannerTest, NoKeepWithNToReturn) {
+    params.options = QueryPlannerParams::KEEP_MUTATIONS;
+    params.options |= QueryPlannerParams::SPLIT_LIMITED_SORT;
+    addIndex(BSON("a" << 1));
+    runQuerySortProjSkipLimit(fromjson("{a: 1}"), fromjson("{b: 1}"), BSONObj(), 0, 3);
+
+    assertSolutionExists(
+        "{or: {nodes: ["
+        "{sort: {pattern: {b: 1}, limit: 3, node: {sortKeyGen: {node: "
+        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}, "
+        "{sort: {pattern: {b: 1}, limit: 0, node: {sortKeyGen: {node: "
+        "{fetch: {node: {ixscan: {pattern: {a: 1}}}}}}}}}]}}");
+}
+
 // Make sure a top-level $or hits the limiting number
 // of solutions that we are willing to consider.
 TEST_F(QueryPlannerTest, OrEnumerationLimit) {

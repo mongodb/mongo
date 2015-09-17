@@ -656,19 +656,24 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
     //
     // 3. There is an index-provided sort.  Ditto above comment about merging.
     //
+    // 4. There is a SORT that is not at the root of solution tree. Ditto above comment about
+    // merging.
+    //
     // TODO: do we want some kind of pre-planning step where we look for certain nodes and cache
     // them?  We do lookups in the tree a few times.  This may not matter as most trees are
     // shallow in terms of query nodes.
-    bool cannotKeepFlagged = hasNode(solnRoot, STAGE_TEXT) ||
+    const bool hasNotRootSort = hasSortStage && STAGE_SORT != solnRoot->getType();
+
+    const bool cannotKeepFlagged = hasNode(solnRoot, STAGE_TEXT) ||
         hasNode(solnRoot, STAGE_GEO_NEAR_2D) || hasNode(solnRoot, STAGE_GEO_NEAR_2DSPHERE) ||
-        (!lpq.getSort().isEmpty() && !hasSortStage);
+        (!lpq.getSort().isEmpty() && !hasSortStage) || hasNotRootSort;
 
     // Only these stages can produce flagged results.  A stage has to hold state past one call
     // to work(...) in order to possibly flag a result.
-    bool couldProduceFlagged =
+    const bool couldProduceFlagged =
         hasAndHashStage || hasNode(solnRoot, STAGE_AND_SORTED) || hasNode(solnRoot, STAGE_FETCH);
 
-    bool shouldAddMutation = !cannotKeepFlagged && couldProduceFlagged;
+    const bool shouldAddMutation = !cannotKeepFlagged && couldProduceFlagged;
 
     if (shouldAddMutation && (params.options & QueryPlannerParams::KEEP_MUTATIONS)) {
         KeepMutationsNode* keep = new KeepMutationsNode();
