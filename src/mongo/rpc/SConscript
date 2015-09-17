@@ -139,6 +139,7 @@ env.Library(
     source=[
         'metadata.cpp',
         'metadata/audit_metadata.cpp',
+        'metadata/config_server_request_metadata.cpp',
         'metadata/config_server_response_metadata.cpp',
         'metadata/server_selection_metadata.cpp',
         'metadata/sharding_metadata.cpp',

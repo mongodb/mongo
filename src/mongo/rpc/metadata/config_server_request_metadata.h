@@ -25,68 +25,61 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #pragma once
 
-#include "mongo/db/jsobj.h"
+#include <boost/optional.hpp>
+
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
+
 class BSONObj;
-class BSONObjBuilder;
-class Status;
 template <typename T>
 class StatusWith;
 
 namespace rpc {
 
 /**
- * This class compromises the reply metadata fields that concern sharding. MongoD attaches
- * this information to a command reply, which MongoS uses to process getLastError.
- * TODO(spencer): Rename this to ShardingResponseMetadata.
+ * This class encapsulates the extra information that mongos may attach to commands it sends to
+ * mongods, containing metadata information about the config servers.
+ *
+ * format:
+ * configsvrOpTime: {ts: Timestamp(0, 0), t: 0}
+ *
+ * TODO(SERVER-20442): Currently this extracts the config server information from the main command
+ * description rather than the actual OP_COMMAND metadata section.  Ideally this information
+ * should be in the metadata, but we currently have no good way to add metadata to all commands
+ * being *sent* to another server.
  */
-class ShardingMetadata {
+class ConfigServerRequestMetadata {
 public:
-    /**
-     * Reads ShardingMetadata from a metadata object.
-     */
-    static StatusWith<ShardingMetadata> readFromMetadata(const BSONObj& metadataObj);
+    ConfigServerRequestMetadata() = default;
+    explicit ConfigServerRequestMetadata(repl::OpTime opTime);
 
     /**
-     * Writes ShardingMetadata to a metadata builder.
+     * Parses the request metadata from the given command object.
+     * Returns a non-ok status on parse error.
+     * If no metadata is found, returns a default-constructed ConfigServerRequestMetadata.
      */
-    Status writeToMetadata(BSONObjBuilder* metadataBob) const;
+    static StatusWith<ConfigServerRequestMetadata> readFromCommand(const BSONObj& doc);
 
     /**
-     * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
-     * format.
+     * Writes the request metadata to the given BSONObjBuilder for building a command request.
+     * Only valid to call if _opTime is initialized.
      */
-    static Status downconvert(const BSONObj& commandReply,
-                              const BSONObj& replyMetadata,
-                              BSONObjBuilder* legacyCommandReply);
+    void writeToCommand(BSONObjBuilder* builder) const;
 
     /**
-     * Rewrites the ShardingMetadata from the legacy OP_QUERY format to the metadata object
-     * format.
+     * Returns the OpTime of the most recent operation on the config servers that this
+     * shard has seen.
      */
-    static Status upconvert(const BSONObj& legacyCommandReply,
-                            BSONObjBuilder* commandReplyBob,
-                            BSONObjBuilder* metadataBob);
-
-    /**
-     * Gets the OpTime of the oplog entry of the last succssful write operation executed by the
-     * server that produced the metadata.
-     */
-    const Timestamp& getLastOpTime() const;
-
-    /**
-     * Gets the most recent election id observed by the server that produced the metadata.
-     */
-    const OID& getLastElectionId() const;
-
-    ShardingMetadata(Timestamp lastOpTime, OID lastElectionId);
+    boost::optional<repl::OpTime> getOpTime() const {
+        return _opTime;
+    }
 
 private:
-    Timestamp _lastOpTime;
-    OID _lastElectionId;
+    const boost::optional<repl::OpTime> _opTime = boost::none;
 };
 
 }  // namespace rpc

@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
+#include "mongo/rpc/metadata/config_server_request_metadata.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -112,11 +112,11 @@ StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForCommand
 
     const ChunkVersion& chunkVersion = chunkVersionStatus.getValue();
 
-    const auto opTimeStatus = rpc::ShardingRequestMetadata::extractConfigServerOpTimeIfPresent(obj);
-    if (!opTimeStatus.isOK()) {
-        return opTimeStatus.getStatus();
+    const auto requestMetadataStatus = rpc::ConfigServerRequestMetadata::readFromCommand(obj);
+    if (!requestMetadataStatus.isOK()) {
+        return requestMetadataStatus.getStatus();
     }
-    auto opTime = opTimeStatus.getValue();
+    auto opTime = requestMetadataStatus.getValue().getOpTime();
     if (opTime.is_initialized()) {
         return ChunkVersionAndOpTime(chunkVersion, opTime.get());
     } else {
@@ -132,11 +132,11 @@ StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForSetShar
 
     const ChunkVersion& chunkVersion = chunkVersionStatus.getValue();
 
-    const auto opTimeStatus = rpc::ShardingRequestMetadata::extractConfigServerOpTimeIfPresent(obj);
-    if (!opTimeStatus.isOK()) {
-        return opTimeStatus.getStatus();
+    const auto requestMetadataStatus = rpc::ConfigServerRequestMetadata::readFromCommand(obj);
+    if (!requestMetadataStatus.isOK()) {
+        return requestMetadataStatus.getStatus();
     }
-    auto opTime = opTimeStatus.getValue();
+    auto opTime = requestMetadataStatus.getValue().getOpTime();
     if (opTime.is_initialized()) {
         return ChunkVersionAndOpTime(chunkVersion, opTime.get());
     } else {
@@ -146,12 +146,12 @@ StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForSetShar
 
 void ChunkVersionAndOpTime::appendForSetShardVersion(BSONObjBuilder* builder) const {
     _verAndOpT.value.addToBSON(*builder, kVersion);
-    _verAndOpT.opTime.append(builder, rpc::ShardingRequestMetadata::kConfigsvrOpTimeFieldName);
+    rpc::ConfigServerRequestMetadata(_verAndOpT.opTime).writeToCommand(builder);
 }
 
 void ChunkVersionAndOpTime::appendForCommands(BSONObjBuilder* builder) const {
     builder->appendArray(kShardVersion, _verAndOpT.value.toBSON());
-    _verAndOpT.opTime.append(builder, rpc::ShardingRequestMetadata::kConfigsvrOpTimeFieldName);
+    rpc::ConfigServerRequestMetadata(_verAndOpT.opTime).writeToCommand(builder);
 }
 
 }  // namespace mongo

@@ -90,6 +90,7 @@
 #include "mongo/rpc/request_interface.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/config_server_request_metadata.h"
 #include "mongo/rpc/metadata/config_server_response_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
@@ -1262,9 +1263,9 @@ void Command::execCommand(OperationContext* txn,
             auto commandNS = NamespaceString(command->parseNs(dbname, request.getCommandArgs()));
             operationShardVersion.initializeFromCommand(commandNS, request.getCommandArgs());
 
-            auto optimeStatus = rpc::ShardingRequestMetadata::extractConfigServerOpTimeIfPresent(
-                request.getCommandArgs());
-            auto optime = uassertStatusOK(optimeStatus);
+            auto requestMetadataStatus =
+                rpc::ConfigServerRequestMetadata::readFromCommand(request.getCommandArgs());
+            auto optime = uassertStatusOK(requestMetadataStatus).getOpTime();
             if (optime.is_initialized()) {
                 auto shardingState = ShardingState::get(txn);
                 if (shardingState->enabled()) {
