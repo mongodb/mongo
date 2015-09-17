@@ -164,6 +164,58 @@ ResponseStatus ReplCoordTest::makeResponseStatus(const BSONObj& doc, Millisecond
     return ResponseStatus(RemoteCommandResponse(doc, BSONObj(), millis));
 }
 
+void ReplCoordTest::simulateSuccessfulDryRun(
+    stdx::function<void(const RemoteCommandRequest& request)> onDryRunRequest) {
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+    ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
+    NetworkInterfaceMock* net = getNet();
+
+    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+    log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+
+    int voteRequests = 0;
+    int votesExpected = rsConfig.getNumMembers() / 2;
+    log() << "Simulating dry run responses - expecting " << votesExpected
+          << " replSetRequestVotes requests";
+    net->enterNetwork();
+    while (voteRequests < votesExpected) {
+        if (net->now() < electionTimeoutWhen) {
+            net->runUntil(electionTimeoutWhen);
+        }
+        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        log() << request.target.toString() << " processing " << request.cmdObj;
+        if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
+            ASSERT_TRUE(request.cmdObj.getBoolField("dryRun"));
+            onDryRunRequest(request);
+            net->scheduleResponse(
+                noi,
+                net->now(),
+                makeResponseStatus(BSON("ok" << 1 << "reason"
+                                             << ""
+                                             << "term" << request.cmdObj["term"].Long()
+                                             << "voteGranted" << true)));
+            voteRequests++;
+        } else {
+            error() << "Black holing unexpected request to " << request.target << ": "
+                    << request.cmdObj;
+            net->blackHole(noi);
+        }
+        net->runReadyNetworkOperations();
+    }
+    net->exitNetwork();
+    log() << "Simulating dry run responses - scheduled " << voteRequests
+          << " replSetRequestVotes responses";
+    getReplCoord()->waitForElectionDryRunFinish_forTest();
+    log() << "Simulating dry run responses - dry run completed";
+}
+
+void ReplCoordTest::simulateSuccessfulDryRun() {
+    auto onDryRunRequest = [](const RemoteCommandRequest& request) {};
+    simulateSuccessfulDryRun(onDryRunRequest);
+}
+
 void ReplCoordTest::simulateSuccessfulV1Election() {
     OperationContextReplMock txn;
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
