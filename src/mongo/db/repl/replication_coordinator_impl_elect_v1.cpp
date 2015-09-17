@@ -150,6 +150,7 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
         _topCoord->getTerm(),
         true,  // dry run
         getMyLastOptime(),
+        _rsConfig.getElectionTimeoutPeriod(),
         stdx::bind(&ReplicationCoordinatorImpl::_onDryRunComplete, this, term));
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
@@ -245,6 +246,7 @@ void ReplicationCoordinatorImpl::_startVoteRequester(long long newTerm) {
         _topCoord->getTerm(),
         false,
         getMyLastOptime(),
+        _rsConfig.getElectionTimeoutPeriod(),
         stdx::bind(&ReplicationCoordinatorImpl::_onVoteRequestComplete, this, newTerm));
     if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;

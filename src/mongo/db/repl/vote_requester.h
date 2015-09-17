@@ -65,7 +65,8 @@ public:
                   long long candidateId,
                   long long term,
                   bool dryRun,
-                  OpTime lastOplogEntry);
+                  OpTime lastOplogEntry,
+                  Milliseconds socketTimeout);
         virtual ~Algorithm();
         virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
         virtual void processResponse(const executor::RemoteCommandRequest& request,
@@ -95,6 +96,7 @@ public:
         bool _staleTerm = false;
         long long _responsesProcessed = 0;
         long long _votes = 1;
+        Milliseconds _socketTimeout;
     };
 
     VoteRequester();
@@ -116,6 +118,7 @@ public:
         long long term,
         bool dryRun,
         OpTime lastOplogEntry,
+        Milliseconds socketTimeout,
         const stdx::function<void()>& onCompletion = stdx::function<void()>());
 
     /**

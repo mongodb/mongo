@@ -83,7 +83,8 @@ public:
                                                       candidateId,
                                                       term,
                                                       false,  // not a dryRun
-                                                      lastOplogEntry));
+                                                      lastOplogEntry,
+                                                      Milliseconds(10 * 1000)));
     }
 
     virtual void tearDown() {
@@ -215,7 +216,8 @@ public:
                                                       candidateId,
                                                       term,
                                                       true,  // dryRun
-                                                      lastOplogEntry));
+                                                      lastOplogEntry,
+                                                      Milliseconds(10 * 1000)));
     }
 };
 
