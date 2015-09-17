@@ -477,9 +477,11 @@ def skipTest(path):
                            ("jstests", "bench_test1.js"),
                            ("jstests", "bench_test2.js"),
                            ("jstests", "bench_test3.js"),
+                           ("jstests", "bench_test_insert.js"),
                            ("core", "bench_test1.js"),
                            ("core", "bench_test2.js"),
                            ("core", "bench_test3.js"),
+                           ("core", "bench_test_insert.js"),
                            ]
 
         if os.path.join(parentDir,basename) in [ os.path.join(*test) for test in authTestsToSkip ]:
