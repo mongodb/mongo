@@ -272,12 +272,8 @@ public:
         exec->reattachToOperationContext(txn);
         exec->restoreState();
 
-        // If we're tailing a capped collection, retrieve a monotonically increasing insert
-        // counter.
-        uint64_t lastInsertCount = 0;
         if (isCursorAwaitData(cursor)) {
             invariant(ctx->getCollection()->isCapped());
-            lastInsertCount = ctx->getCollection()->getCappedInsertNotifier()->getCount();
         }
 
         CursorId respondWithId = 0;
@@ -305,7 +301,7 @@ public:
 
             // Block waiting for data.
             Microseconds timeout(CurOp::get(txn)->getRemainingMaxTimeMicros());
-            notifier->waitForInsert(lastInsertCount, timeout);
+            notifier->wait(timeout);
             notifier.reset();
 
             // Set expected latency to match wait time. This makes sure the logs aren't spammed

@@ -116,51 +116,40 @@ std::string CompactOptions::toString() const {
 // CappedInsertNotifier
 //
 
-CappedInsertNotifier::CappedInsertNotifier() : _cappedInsertCount(0), _dead(false) {}
-
-void CappedInsertNotifier::notifyOfInsert(int count) {
-    stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
-    if (!_dead) {
-        _cappedInsertCount += count;
-    }
-    _cappedNewDataNotifier.notify_all();
-}
+CappedInsertNotifier::CappedInsertNotifier() : _version(0), _dead(false) {}
 
 void CappedInsertNotifier::notifyAll() {
-    stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
-    ++_cappedInsertCount;
-    _cappedNewDataNotifier.notify_all();
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    ++_version;
+    _notifier.notify_all();
 }
 
-uint64_t CappedInsertNotifier::getCount() const {
-    stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
-    return _cappedInsertCount;
-}
-
-void CappedInsertNotifier::waitForInsert(uint64_t referenceCount, Microseconds timeout) const {
-    stdx::unique_lock<stdx::mutex> lk(_cappedNewDataMutex);
-    while (!_dead && referenceCount == _cappedInsertCount) {
-        if (stdx::cv_status::timeout == _cappedNewDataNotifier.wait_for(lk, timeout)) {
+void CappedInsertNotifier::wait(Microseconds timeout) const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    const auto startVer = _version;
+    while (!_dead && startVer == _version) {
+        if (stdx::cv_status::timeout == _notifier.wait_for(lk, timeout)) {
             return;
         }
     }
 }
 
-void CappedInsertNotifier::waitForInsert(uint64_t referenceCount) const {
-    stdx::unique_lock<stdx::mutex> lk(_cappedNewDataMutex);
-    while (!_dead && referenceCount == _cappedInsertCount) {
-        _cappedNewDataNotifier.wait(lk);
+void CappedInsertNotifier::wait() const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    const auto startVer = _version;
+    while (!_dead && startVer == _version) {
+        _notifier.wait(lk);
     }
 }
 
 void CappedInsertNotifier::kill() {
-    stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _dead = true;
-    _cappedNewDataNotifier.notify_all();
+    _notifier.notify_all();
 }
 
 bool CappedInsertNotifier::isDead() {
-    stdx::lock_guard<stdx::mutex> lk(_cappedNewDataMutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _dead;
 }
 

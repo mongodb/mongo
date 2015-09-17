@@ -389,8 +389,7 @@ QueryResult::View getMore(OperationContext* txn,
 
             // Block waiting for data for up to 1 second.
             Seconds timeout(1);
-            uint64_t lastInsertCount = notifier->getCount();
-            notifier->waitForInsert(lastInsertCount, timeout);
+            notifier->wait(timeout);
             notifier.reset();
 
             // Set expected latency to match wait time. This makes sure the logs aren't spammed

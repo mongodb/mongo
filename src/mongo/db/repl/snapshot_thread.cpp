@@ -125,7 +125,7 @@ void SnapshotThread::run() {
                 }
 
                 lock.unlock();
-                notifier->waitForInsert(notifier->getCount());
+                notifier->wait();
             }
 
             // might need to re-acquire the notifier
