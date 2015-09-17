@@ -221,15 +221,16 @@ def complex_populate_type(self, uri, config, rows, type):
     self.session.create(indxname + ':indx3', 'columns=(column4)' + ',' + type)
     self.session.create(
         indxname + ':indx4', 'columns=(column2,column4)' + ',' + type)
-    self.session.create(
-        indxname + ':indx5', 'columns=(column3,column5)' + ',' + type)
-    self.session.create(
-        indxname + ':indx6', 'columns=(column3,column5,column4)' + ',' + type)
     cursor = self.session.open_cursor(uri, None)
     for i in range(1, rows + 1):
         v = complex_value_populate(cursor, i)
         cursor[key_populate(cursor, i)] = (v[0], v[1], v[2], v[3])
     cursor.close()
+    # add some indices after populating
+    self.session.create(
+        indxname + ':indx5', 'columns=(column3,column5)' + ',' + type)
+    self.session.create(
+        indxname + ':indx6', 'columns=(column3,column5,column4)' + ',' + type)
 
 def complex_populate_colgroup_name(self, uri, i):
     return 'colgroup:' + uri.split(":")[1] + ':cgroup' + str(i + 1)
