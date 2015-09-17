@@ -43,6 +43,7 @@
 #include "mongo/db/index/haystack_access_method.h"
 #include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_interface.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
@@ -51,6 +52,7 @@
 #include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -215,7 +217,6 @@ void MMAPV1DatabaseCatalogEntry::_removeFromCache(RecoveryUnit* ru, StringData n
 
 Status MMAPV1DatabaseCatalogEntry::dropCollection(OperationContext* txn, StringData ns) {
     invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
-    _removeFromCache(txn->recoveryUnit(), ns);
 
     NamespaceDetails* details = _namespaceIndex.details(ns);
 
@@ -227,6 +228,7 @@ Status MMAPV1DatabaseCatalogEntry::dropCollection(OperationContext* txn, StringD
     invariant(details->indexBuildsInProgress == 0);  // TODO: delete instead?
 
     _removeNamespaceFromNamespaceCollection(txn, ns);
+    _removeFromCache(txn->recoveryUnit(), ns);
 
     // free extents
     if (!details->firstExtent.isNull()) {
@@ -282,10 +284,8 @@ Status MMAPV1DatabaseCatalogEntry::renameCollection(OperationContext* txn,
         const std::string& indexName = oldIndexSpec.getStringField("name");
 
         {
-            // fix IndexDetails pointer
-            NamespaceDetailsCollectionCatalogEntry ce(
-                toNS, details, _getNamespaceRecordStore(), systemIndexRecordStore, this);
-            int indexI = ce._findIndexNumber(txn, indexName);
+            // Fix the IndexDetails pointer.
+            int indexI = getCollectionCatalogEntry(toNS)->_findIndexNumber(txn, indexName);
 
             IndexDetails& indexDetails = details->idx(indexI);
             *txn->recoveryUnit()->writing(&indexDetails.info) =
@@ -293,7 +293,7 @@ Status MMAPV1DatabaseCatalogEntry::renameCollection(OperationContext* txn,
         }
 
         {
-            // move underlying namespac
+            // Move the underlying namespace.
             std::string oldIndexNs = IndexDescriptor::makeIndexNamespace(fromNS, indexName);
             std::string newIndexNs = IndexDescriptor::makeIndexNamespace(toNS, indexName);
 
@@ -320,8 +320,6 @@ Status MMAPV1DatabaseCatalogEntry::_renameSingleNamespace(OperationContext* txn,
     if (_namespaceIndex.details(toNS))
         return Status(ErrorCodes::BadValue, "to namespace already exists");
 
-    _removeFromCache(txn->recoveryUnit(), fromNS);
-
     // at this point, we haven't done anything destructive yet
 
     // ----
@@ -347,23 +345,11 @@ Status MMAPV1DatabaseCatalogEntry::_renameSingleNamespace(OperationContext* txn,
 
     // fix system.namespaces
     BSONObj newSpec;
-    RecordId oldSpecLocation;
+    RecordId oldSpecLocation = getCollectionCatalogEntry(fromNS)->getNamespacesRecordId();
+    invariant(!oldSpecLocation.isNull());
     {
-        BSONObj oldSpec;
-        {
-            RecordStoreV1Base* rs = _getNamespaceRecordStore();
-            auto cursor = rs->getCursor(txn);
-            while (auto record = cursor->next()) {
-                BSONObj entry = record->data.releaseToBson();
-                if (fromNS == entry["name"].String()) {
-                    oldSpecLocation = record->id;
-                    oldSpec = entry.getOwned();
-                    break;
-                }
-            }
-        }
+        BSONObj oldSpec = _getNamespaceRecordStore()->dataFor(txn, oldSpecLocation).releaseToBson();
         invariant(!oldSpec.isEmpty());
-        invariant(!oldSpecLocation.isNull());
 
         BSONObjBuilder b;
         BSONObjIterator i(oldSpec.getObjectField("options"));
@@ -379,7 +365,7 @@ Status MMAPV1DatabaseCatalogEntry::_renameSingleNamespace(OperationContext* txn,
         newSpec = b.obj();
     }
 
-    _addNamespaceToNamespaceCollection(txn, toNS, newSpec.isEmpty() ? 0 : &newSpec);
+    RecordId rid = _addNamespaceToNamespaceCollection(txn, toNS, newSpec.isEmpty() ? 0 : &newSpec);
 
     _getNamespaceRecordStore()->deleteRecord(txn, oldSpecLocation);
 
@@ -387,7 +373,8 @@ Status MMAPV1DatabaseCatalogEntry::_renameSingleNamespace(OperationContext* txn,
     invariant(entry == NULL);
     txn->recoveryUnit()->registerChange(new EntryInsertion(toNS, this));
     entry = new Entry();
-    _insertInCache(txn, toNS, entry);
+    _removeFromCache(txn->recoveryUnit(), fromNS);
+    _insertInCache(txn, toNS, rid, entry);
 
     return Status::OK();
 }
@@ -535,8 +522,9 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
             new SimpleRecordStoreV1(txn, nsi.toString(), md, &_extentManager, true));
     }
 
+    RecordId indexNamespaceId;
     if (isSystemIndexesGoingToBeNew) {
-        _addNamespaceToNamespaceCollection(txn, nsi.toString(), NULL);
+        indexNamespaceId = _addNamespaceToNamespaceCollection(txn, nsi.toString(), NULL);
     }
 
     if (!nsEntry->catalogEntry) {
@@ -544,6 +532,7 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
             new NamespaceDetailsCollectionCatalogEntry(nsn.toString(),
                                                        nsDetails,
                                                        nsEntry->recordStore.get(),
+                                                       RecordId(),
                                                        indexEntry->recordStore.get(),
                                                        this));
     }
@@ -553,6 +542,7 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
             new NamespaceDetailsCollectionCatalogEntry(nsi.toString(),
                                                        indexDetails,
                                                        nsEntry->recordStore.get(),
+                                                       indexNamespaceId,
                                                        indexEntry->recordStore.get(),
                                                        this));
     }
@@ -561,32 +551,28 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
 
     // Now put everything in the cache of namespaces. None of the operations below do any
     // transactional operations.
-    std::list<std::string> namespaces;
-    _namespaceIndex.getCollectionNamespaces(&namespaces);
+    RecordStoreV1Base* rs = _getNamespaceRecordStore();
+    invariant(rs);
 
-    for (std::list<std::string>::const_iterator i = namespaces.begin();
-         i != namespaces.end();  // we add to the list in the loop so can't cache end().
-         i++) {
-        const std::string& ns = *i;
+    auto cursor = rs->getCursor(txn);
+    while (auto record = cursor->next()) {
+        auto ns = record->data.releaseToBson()["name"].String();
         Entry*& entry = _collections[ns];
 
         // The two cases where entry is not null is for system.indexes and system.namespaces,
         // which we manually instantiated above. It is OK to skip these two collections,
         // because they don't have indexes on them anyway.
         if (entry) {
+            if (entry->catalogEntry->getNamespacesRecordId().isNull()) {
+                entry->catalogEntry->setNamespacesRecordId(record->id);
+            } else {
+                invariant(entry->catalogEntry->getNamespacesRecordId() == record->id);
+            }
             continue;
         }
 
         entry = new Entry();
-        _insertInCache(txn, ns, entry);
-
-        // Add the indexes on this namespace to the list of namespaces to load.
-        std::vector<std::string> indexNames;
-        entry->catalogEntry->getAllIndexes(txn, &indexNames);
-
-        for (size_t i = 0; i < indexNames.size(); i++) {
-            namespaces.push_back(IndexDescriptor::makeIndexNamespace(ns, indexNames[i]));
-        }
+        _insertInCache(txn, ns, record->id, entry);
     }
 }
 
@@ -600,7 +586,7 @@ Status MMAPV1DatabaseCatalogEntry::createCollection(OperationContext* txn,
     }
 
     BSONObj optionsAsBSON = options.toBSON();
-    _addNamespaceToNamespaceCollection(txn, ns, &optionsAsBSON);
+    RecordId rid = _addNamespaceToNamespaceCollection(txn, ns, &optionsAsBSON);
 
     _namespaceIndex.add_ns(txn, ns, DiskLoc(), options.capped);
     NamespaceDetails* details = _namespaceIndex.details(ns);
@@ -616,7 +602,7 @@ Status MMAPV1DatabaseCatalogEntry::createCollection(OperationContext* txn,
     invariant(!entry);
     txn->recoveryUnit()->registerChange(new EntryInsertion(ns, this));
     entry = new Entry();
-    _insertInCache(txn, ns, entry);
+    _insertInCache(txn, ns, rid, entry);
 
     if (allocateDefaultSpace) {
         RecordStoreV1Base* rs = _getRecordStore(ns);
@@ -653,17 +639,18 @@ void MMAPV1DatabaseCatalogEntry::createNamespaceForIndex(OperationContext* txn, 
     // This is a simplified form of createCollection.
     invariant(!_namespaceIndex.details(name));
 
-    _addNamespaceToNamespaceCollection(txn, name, NULL);
+    RecordId rid = _addNamespaceToNamespaceCollection(txn, name, NULL);
     _namespaceIndex.add_ns(txn, name, DiskLoc(), false);
 
     Entry*& entry = _collections[name.toString()];
     invariant(!entry);
     txn->recoveryUnit()->registerChange(new EntryInsertion(name, this));
     entry = new Entry();
-    _insertInCache(txn, name, entry);
+    _insertInCache(txn, name, rid, entry);
 }
 
-CollectionCatalogEntry* MMAPV1DatabaseCatalogEntry::getCollectionCatalogEntry(StringData ns) const {
+NamespaceDetailsCollectionCatalogEntry* MMAPV1DatabaseCatalogEntry::getCollectionCatalogEntry(
+    StringData ns) const {
     CollectionMap::const_iterator i = _collections.find(ns.toString());
     if (i == _collections.end()) {
         return NULL;
@@ -675,12 +662,13 @@ CollectionCatalogEntry* MMAPV1DatabaseCatalogEntry::getCollectionCatalogEntry(St
 
 void MMAPV1DatabaseCatalogEntry::_insertInCache(OperationContext* txn,
                                                 StringData ns,
+                                                RecordId rid,
                                                 Entry* entry) {
     NamespaceDetails* details = _namespaceIndex.details(ns);
     invariant(details);
 
     entry->catalogEntry.reset(new NamespaceDetailsCollectionCatalogEntry(
-        ns, details, _getNamespaceRecordStore(), _getIndexRecordStore(), this));
+        ns, details, _getNamespaceRecordStore(), rid, _getIndexRecordStore(), this));
 
     unique_ptr<NamespaceDetailsRSV1MetaData> md(new NamespaceDetailsRSV1MetaData(ns, details));
     const NamespaceString nss(ns);
@@ -764,12 +752,12 @@ RecordStoreV1Base* MMAPV1DatabaseCatalogEntry::_getNamespaceRecordStore() const 
     return i->second->recordStore.get();
 }
 
-void MMAPV1DatabaseCatalogEntry::_addNamespaceToNamespaceCollection(OperationContext* txn,
-                                                                    StringData ns,
-                                                                    const BSONObj* options) {
+RecordId MMAPV1DatabaseCatalogEntry::_addNamespaceToNamespaceCollection(OperationContext* txn,
+                                                                        StringData ns,
+                                                                        const BSONObj* options) {
     if (nsToCollectionSubstring(ns) == "system.namespaces") {
         // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
-        return;
+        return {};
     }
 
     BSONObjBuilder b;
@@ -785,6 +773,7 @@ void MMAPV1DatabaseCatalogEntry::_addNamespaceToNamespaceCollection(OperationCon
 
     StatusWith<RecordId> loc = rs->insertRecord(txn, obj.objdata(), obj.objsize(), false);
     massertStatusOK(loc.getStatus());
+    return loc.getValue();
 }
 
 void MMAPV1DatabaseCatalogEntry::_removeNamespaceFromNamespaceCollection(OperationContext* txn,
@@ -794,43 +783,49 @@ void MMAPV1DatabaseCatalogEntry::_removeNamespaceFromNamespaceCollection(Operati
         return;
     }
 
+    auto entry = _collections.find(ns.toString());
+    if (entry == _collections.end()) {
+        return;
+    }
+
     RecordStoreV1Base* rs = _getNamespaceRecordStore();
     invariant(rs);
 
-    auto cursor = rs->getCursor(txn);
-    while (auto record = cursor->next()) {
-        BSONObj entry = record->data.releaseToBson();
-        BSONElement name = entry["name"];
-        if (name.type() == String && name.String() == ns) {
-            rs->deleteRecord(txn, record->id);
-            break;
-        }
-    }
+    rs->deleteRecord(txn, entry->second->catalogEntry->getNamespacesRecordId());
 }
 
 CollectionOptions MMAPV1DatabaseCatalogEntry::getCollectionOptions(OperationContext* txn,
                                                                    StringData ns) const {
     if (nsToCollectionSubstring(ns) == "system.namespaces") {
-        return CollectionOptions();
+        return {};
+    }
+
+    auto entry = _collections.find(ns.toString());
+    if (entry == _collections.end()) {
+        return {};
+    }
+
+    return getCollectionOptions(txn, entry->second->catalogEntry->getNamespacesRecordId());
+}
+
+CollectionOptions MMAPV1DatabaseCatalogEntry::getCollectionOptions(OperationContext* txn,
+                                                                   RecordId rid) const {
+    CollectionOptions options;
+
+    if (rid.isNull()) {
+        return options;
     }
 
     RecordStoreV1Base* rs = _getNamespaceRecordStore();
     invariant(rs);
 
-    auto cursor = rs->getCursor(txn);
-    while (auto record = cursor->next()) {
-        BSONObj entry = record->data.releaseToBson();
-        BSONElement name = entry["name"];
-        if (name.type() == String && name.String() == ns) {
-            CollectionOptions options;
-            if (entry["options"].isABSONObj()) {
-                Status status = options.parse(entry["options"].Obj());
-                fassert(18523, status);
-            }
-            return options;
-        }
-    }
+    RecordData data;
+    invariant(rs->findRecord(txn, rid, &data));
 
-    return CollectionOptions();
+    if (data.releaseToBson()["options"].isABSONObj()) {
+        Status status = options.parse(data.releaseToBson()["options"].Obj());
+        fassert(18523, status);
+    }
+    return options;
 }
 }  // namespace mongo

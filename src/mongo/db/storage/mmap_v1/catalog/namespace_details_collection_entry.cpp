@@ -34,6 +34,7 @@
 
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
@@ -49,17 +50,20 @@ NamespaceDetailsCollectionCatalogEntry::NamespaceDetailsCollectionCatalogEntry(
     StringData ns,
     NamespaceDetails* details,
     RecordStore* namespacesRecordStore,
+    RecordId namespacesRecordId,
     RecordStore* indexRecordStore,
     MMAPV1DatabaseCatalogEntry* db)
     : CollectionCatalogEntry(ns),
       _details(details),
       _namespacesRecordStore(namespacesRecordStore),
       _indexRecordStore(indexRecordStore),
-      _db(db) {}
+      _db(db) {
+    setNamespacesRecordId(namespacesRecordId);
+}
 
 CollectionOptions NamespaceDetailsCollectionCatalogEntry::getCollectionOptions(
     OperationContext* txn) const {
-    CollectionOptions options = _db->getCollectionOptions(txn, ns().ns());
+    CollectionOptions options = _db->getCollectionOptions(txn, _namespacesRecordId);
 
     if (options.flagsSet) {
         if (options.flags != _details->userFlags) {
@@ -349,51 +353,44 @@ void NamespaceDetailsCollectionCatalogEntry::updateTTLSetting(OperationContext* 
     }
 }
 
-namespace {
-void updateSystemNamespaces(OperationContext* txn,
-                            RecordStore* namespaces,
-                            const NamespaceString& ns,
-                            const BSONObj& update) {
-    if (!namespaces)
+void NamespaceDetailsCollectionCatalogEntry::_updateSystemNamespaces(OperationContext* txn,
+                                                                     const BSONObj& update) {
+    if (!_namespacesRecordStore)
         return;
 
-    auto cursor = namespaces->getCursor(txn);
-    while (auto record = cursor->next()) {
-        BSONObj oldEntry = record->data.releaseToBson();
-        BSONElement e = oldEntry["name"];
-        if (e.type() != String)
-            continue;
-
-        if (e.String() != ns.ns())
-            continue;
-
-        const BSONObj newEntry = applyUpdateOperators(oldEntry, update);
-        StatusWith<RecordId> result = namespaces->updateRecord(
-            txn, record->id, newEntry.objdata(), newEntry.objsize(), false, NULL);
-        fassert(17486, result.getStatus());
-        return;
-    }
-    fassertFailed(17488);
-}
+    RecordData entry = _namespacesRecordStore->dataFor(txn, _namespacesRecordId);
+    const BSONObj newEntry = applyUpdateOperators(entry.releaseToBson(), update);
+    StatusWith<RecordId> result = _namespacesRecordStore->updateRecord(
+        txn, _namespacesRecordId, newEntry.objdata(), newEntry.objsize(), false, NULL);
+    fassert(17486, result.getStatus());
+    _namespacesRecordId = result.getValue();
 }
 
 void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) {
     NamespaceDetailsRSV1MetaData md(ns().ns(), _details);
     md.replaceUserFlags(txn, newValue);
-    updateSystemNamespaces(
-        txn, _namespacesRecordStore, ns(), BSON("$set" << BSON("options.flags" << newValue)));
+    _updateSystemNamespaces(txn, BSON("$set" << BSON("options.flags" << newValue)));
 }
 
 void NamespaceDetailsCollectionCatalogEntry::updateValidator(OperationContext* txn,
                                                              const BSONObj& validator,
                                                              StringData validationLevel,
                                                              StringData validationAction) {
-    updateSystemNamespaces(
+    _updateSystemNamespaces(
         txn,
-        _namespacesRecordStore,
-        ns(),
         BSON("$set" << BSON("options.validator" << validator << "options.validationLevel"
                                                 << validationLevel << "options.validationAction"
                                                 << validationAction)));
+}
+
+void NamespaceDetailsCollectionCatalogEntry::setNamespacesRecordId(RecordId newId) {
+    if (newId.isNull()) {
+        invariant(ns().coll() == "system.namespaces" || ns().coll() == "system.indexes");
+    } else {
+        // We don't need an OperationContext in MMAP, so 'nullptr' is OK.
+        auto namespaceEntry = _namespacesRecordStore->dataFor(nullptr, newId).releaseToBson();
+        invariant(namespaceEntry["name"].String() == ns().ns());
+        _namespacesRecordId = newId;
+    }
 }
 }

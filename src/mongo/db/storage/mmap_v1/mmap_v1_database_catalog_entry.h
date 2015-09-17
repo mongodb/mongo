@@ -35,6 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_index.h"
+#include "mongo/db/storage/mmap_v1/catalog/namespace_details_collection_entry.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 
 namespace mongo {
@@ -44,6 +45,7 @@ struct CollectionOptions;
 class IndexAccessMethod;
 class IndexCatalogEntry;
 class IndexDescriptor;
+class RecordId;
 class RecordStore;
 class RecordStoreV1Base;
 class RecoveryUnit;
@@ -100,7 +102,7 @@ public:
     /**
      * will return NULL if ns does not exist
      */
-    CollectionCatalogEntry* getCollectionCatalogEntry(StringData ns) const;
+    NamespaceDetailsCollectionCatalogEntry* getCollectionCatalogEntry(StringData ns) const;
 
     RecordStore* getRecordStore(StringData ns) const;
 
@@ -116,6 +118,8 @@ public:
     }
 
     CollectionOptions getCollectionOptions(OperationContext* txn, StringData ns) const;
+
+    CollectionOptions getCollectionOptions(OperationContext* txn, RecordId nsRid) const;
 
     /**
      * Creates a CollectionCatalogEntry in the form of an index rather than a collection.
@@ -141,7 +145,7 @@ private:
     // RecoveryUnit to ensure correct handling of rollback.
 
     struct Entry {
-        std::unique_ptr<CollectionCatalogEntry> catalogEntry;
+        std::unique_ptr<NamespaceDetailsCollectionCatalogEntry> catalogEntry;
         std::unique_ptr<RecordStoreV1Base> recordStore;
     };
 
@@ -152,9 +156,9 @@ private:
     RecordStoreV1Base* _getNamespaceRecordStore() const;
     RecordStoreV1Base* _getRecordStore(StringData ns) const;
 
-    void _addNamespaceToNamespaceCollection(OperationContext* txn,
-                                            StringData ns,
-                                            const BSONObj* options);
+    RecordId _addNamespaceToNamespaceCollection(OperationContext* txn,
+                                                StringData ns,
+                                                const BSONObj* options);
 
     void _removeNamespaceFromNamespaceCollection(OperationContext* txn, StringData ns);
 
@@ -170,7 +174,7 @@ private:
     /**
      * Populate the _collections cache.
      */
-    void _insertInCache(OperationContext* opCtx, StringData ns, Entry* entry);
+    void _insertInCache(OperationContext* opCtx, StringData ns, RecordId rid, Entry* entry);
 
     /**
      * Drop cached information for specified namespace. If a RecoveryUnit is specified,
