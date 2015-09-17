@@ -92,6 +92,8 @@ def main(args):
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--file", dest="file", help="path to json file containing"
                         "history data")
+    parser.add_argument("-t", "--tagFile", dest="tfile", help="path to json file containing"
+                        "tag data")
     parser.add_argument("--rev", dest="rev", help="revision to examine for regressions")
     parser.add_argument("--ndays", default=7, type=int, dest="ndays", help="Check against"
                         "commit from n days ago.")
@@ -104,19 +106,36 @@ def main(args):
                         "'threadThreshold'x100 percent off")
     parser.add_argument("--threadNoiseLevel", default=2, type=float, dest="threadNoise", help=
                         "Don't flag an error if thread level throughput is less than 'noise' times the computed noise level off")
-    parser.add_argument("--reference", dest="reference", help=
-                        "Reference commit to compare against. Should be a githash")
+    parser.add_argument("--refTag", dest="reference", help=
+                        "Reference tag to compare against. Should be a valid tag name")
+    parser.add_argument("--overrideFile", dest="overrideFile", help="File to read for comparison override information")
+    parser.add_argument("--variant", dest="variant", help="Variant to lookup in the override file")
+
     args = parser.parse_args()
+    tagHistory = ""
     j = get_json(args.file)
-    h = History(j)
-    testnames = h.testnames()
+    if args.tfile : 
+        t = get_json(args.tfile)
+        tagHistory = History(t)
+    history = History(j)
+    testnames = history.testnames()
+    failed = False
     failed = 0
 
     results = []
+    # Default empty override structure
+    overrides = {'ndays' : {}, 'reference' : {}}
+    if args.overrideFile :
+        # Read the overrides file
+        foverrides = get_json(args.overrideFile)
+        # Is this variant in the overrides file?
+        if args.variant in foverrides : 
+            overrides = foverrides[args.variant]
+
     for test in testnames:
         # The first entry is valid. The rest is dummy data to match the existing format
         result = {'test_file' : test, 'exit_code' : 0, 'elapsed' : 5, 'start': 1441227291.962453, 'end': 1441227293.428761}
-        this_one = h.seriesAtRevision(test, args.rev)
+        this_one = history.seriesAtRevision(test, args.rev)
         testFailed = False
         print "checking %s.." % (test)
         if not this_one:
@@ -126,31 +145,40 @@ def main(args):
         #If the new build is 10% lower than the target (3.0 will be
         #used as the baseline for 3.2 for instance), consider it
         #regressed.
-        previous = h.seriesItemsNBefore(test, args.rev, 1)
+        previous = history.seriesItemsNBefore(test, args.rev, 1)
         if not previous:
             print "\tno previous data, skipping"
             continue
-        if compareResults(this_one, previous[0], args.threshold, "Previous", h.noiseLevels(test),
+        if compareResults(this_one, previous[0], args.threshold, "Previous", history.noiseLevels(test),
                           args.noise, args.threadThreshold, args.threadNoise):
             testFailed = True
             result['PreviousCompare'] = 'fail'
         else :
             result['PreviousCompare'] = 'pass'
 
-        daysprevious = h.seriesItemsNDaysBefore(test, args.rev,args.ndays)
-        reference = h.seriesAtRevision(test, args.reference)
-        if compareResults(this_one, daysprevious, args.threshold, "NDays", h.noiseLevels(test),
+        daysprevious = history.seriesItemsNDaysBefore(test, args.rev,args.ndays)
+        if test in overrides['ndays']:
+            print "Override in ndays for test %s" % test
+            daysprevious = overrides['ndays'][test]
+        if compareResults(this_one, daysprevious, args.threshold, "NDays", history.noiseLevels(test),
                           args.noise, args.threadThreshold, args.threadNoise):
             testFailed = True
             result['NDayCompare'] = 'fail'
         else :
             result['NDayCompare'] = 'pass'
-        if compareResults(this_one, reference, args.threshold, "Reference", h.noiseLevels(test),
-                          args.noise, args.threadThreshold, args.threadNoise):
-            testFailed = True
-            result['BaselineCompare'] = 'fail'
-        else :
-            result['BaselineCompare'] = 'pass'
+        if tagHistory : 
+            reference = tagHistory.seriesAtTag(test, args.reference)
+            if not reference : 
+                print "Didn't get any data for test %s with baseline %s" % (test, args.reference)
+            if test in overrides['reference']:
+                print "Override in references for test %s" % test
+                reference = overrides['reference'][test]
+            if compareResults(this_one, reference, args.threshold, "Baseline Comparison " + args.reference, history.noiseLevels(test),
+                              args.noise, args.threadThreshold, args.threadNoise):
+                testFailed = True
+                result['BaselineCompare'] = 'fail'
+            else :
+                result['BaselineCompare'] = 'pass'
         if testFailed :
             result['status'] = 'fail'
             failed += 1
@@ -200,6 +228,13 @@ class History(object):
         s = self.series(testname)
         for result in s:
             if result["revision"] == revision:
+                return result
+        return None
+
+    def seriesAtTag(self, testname, tagName):
+        s = self.series(testname)
+        for result in s:
+            if result["tag"] == tagName:
                 return result
         return None
 
@@ -289,6 +324,7 @@ class History(object):
             if matching:
                 result = matching[0]
                 result["revision"] = commit["revision"]
+                result["tag"] = commit["tag"]
                 result["end"] = commit["data"]["end"]
                 result["order"] = commit["order"]
                 result["max"] = max(f["ops_per_sec"] for f in result["results"].values()

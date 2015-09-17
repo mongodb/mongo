@@ -1,0 +1,25 @@
+{
+"linux-wt-standalone" : 
+    {
+        "reference": {},
+        "ndays": {}
+    },
+
+"linux-mmap-standalone" : 
+    {
+        "reference": {},
+        "ndays": {}
+    },
+
+"linux-wt-repl" : 
+    {
+        "reference": {},
+        "ndays": {}
+    },
+
+"linux-mmap-repl" : 
+    {
+        "reference": {},
+        "ndays": {}
+    }
+}

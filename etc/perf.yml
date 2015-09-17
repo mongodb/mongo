@@ -77,6 +77,12 @@ functions:
         task: ${task_name}
         file: "src/history.json"
         name: "perf"
+    - command: json.get_history
+      params:
+        tags: true
+        task: ${task_name}
+        file: "src/tags.json"
+        name: "perf"
     - command: shell.exec
       type : test
       params:
@@ -85,7 +91,7 @@ functions:
           set -o errexit
           set -o verbose
           source ./venv/bin/activate
-          python perf_regression_check.py -f history.json --rev ${revision}
+          python perf_regression_check.py -f history.json --rev ${revision} -t tags.json --refTag 3.0.6-Baseline
   "run perf tests":
     - command: shell.exec
       params:
