@@ -1608,7 +1608,7 @@ TEST_F(ReplCoordTest, SetMaintenanceMode) {
     assertStartSuccess(
         BSON("_id"
              << "mySet"
-             << "version" << 1 << "members"
+             << "protocolVersion" << 1 << "version" << 1 << "members"
              << BSON_ARRAY(BSON("_id" << 0 << "host"
                                       << "test1:1234")
                            << BSON("_id" << 1 << "host"
@@ -1673,18 +1673,56 @@ TEST_F(ReplCoordTest, SetMaintenanceMode) {
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
     // Can't modify maintenance mode when PRIMARY
-    simulateSuccessfulElection();
+    simulateSuccessfulV1Election();
 
     status = getReplCoord()->setMaintenanceMode(true);
     ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
-    simulateStepDownOnIsolation();
+    // Step down from primary.
+    getReplCoord()->updateTerm(getReplCoord()->getTerm() + 1);
+    getReplCoord()->waitForMemberState_forTest(MemberState::RS_SECONDARY);
 
     status = getReplCoord()->setMaintenanceMode(false);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
     ASSERT_OK(getReplCoord()->setMaintenanceMode(true));
     ASSERT_OK(getReplCoord()->setMaintenanceMode(false));
+
+    // Can't modify maintenance mode when running for election (before and after dry run).
+    ASSERT_EQUALS(TopologyCoordinator::Role::follower, getTopoCoord().getRole());
+    auto net = this->getNet();
+    net->enterNetwork();
+    auto when = getReplCoord()->getElectionTimeout_forTest();
+    while (net->now() < when) {
+        net->runUntil(when);
+        if (!net->hasReadyRequests()) {
+            continue;
+        }
+        net->blackHole(net->getNextReadyRequest());
+    }
+    ASSERT_EQUALS(when, net->now());
+    net->exitNetwork();
+    ASSERT_EQUALS(TopologyCoordinator::Role::candidate, getTopoCoord().getRole());
+    status = getReplCoord()->setMaintenanceMode(false);
+    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    status = getReplCoord()->setMaintenanceMode(true);
+    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+
+    simulateSuccessfulDryRun();
+    ASSERT_EQUALS(TopologyCoordinator::Role::candidate, getTopoCoord().getRole());
+    status = getReplCoord()->setMaintenanceMode(false);
+    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    status = getReplCoord()->setMaintenanceMode(true);
+    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+
+    // This cancels the actual election.
+    bool success = false;
+    auto event = getReplCoord()->setFollowerMode_nonBlocking(MemberState::RS_ROLLBACK, &success);
+    // We do not need to respond to any pending network operations because setFollowerMode() will
+    // cancel the vote requester.
+    getReplCoord()->waitForElectionFinish_forTest();
+    getReplExec()->waitForEvent(event);
+    ASSERT_TRUE(success);
 }
 
 TEST_F(ReplCoordTest, GetHostsWrittenToReplSet) {
