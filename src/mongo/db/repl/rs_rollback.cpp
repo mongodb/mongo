@@ -242,6 +242,7 @@ Status refetch(FixUpInfo& fixUpInfo, const BSONObj& ourObj) {
                 severe() << "cannot rollback a collMod command: " << obj;
                 throw RSFatalException();
             }
+            return Status::OK();
         } else {
             severe() << "can't rollback this command yet: " << obj.toString();
             log() << "cmdname=" << cmdname;
@@ -251,9 +252,13 @@ Status refetch(FixUpInfo& fixUpInfo, const BSONObj& ourObj) {
 
     doc._id = obj["_id"];
     if (doc._id.eoo()) {
-        warning() << "ignoring op on rollback no _id TODO : " << doc.ns << ' '
-                  << doc.ownedObj.toString();
-        return Status::OK();
+        NamespaceString nss(doc.ns);
+        if (nss.isSystemDotIndexes()) {
+            return Status::OK();
+        }
+        severe() << "cannot rollback op with no _id. ns: " << doc.ns
+                 << ", document: " << doc.ownedObj;
+        throw RSFatalException();
     }
 
     fixUpInfo.toRefetch.insert(doc);
