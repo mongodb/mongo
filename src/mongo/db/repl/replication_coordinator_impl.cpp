@@ -1471,6 +1471,11 @@ void ReplicationCoordinatorImpl::_setMaintenanceMode_helper(
         return;
     }
 
+    if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+        *result = Status(ErrorCodes::NotMaster, "currently running for election");
+        return;
+    }
+
     boost::unique_lock<boost::mutex> lk(_mutex);
     if (_getMemberState_inlock().primary()) {
         *result = Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
