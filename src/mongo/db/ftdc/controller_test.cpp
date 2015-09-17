@@ -189,7 +189,7 @@ TEST(FTDCControllerTest, TestFull) {
 
     auto files = scanDirectory(dir);
 
-    ASSERT_EQUALS(files.size(), 2UL);
+    ASSERT_EQUALS(files.size(), 1UL);
 
     auto alog = files[0];
 

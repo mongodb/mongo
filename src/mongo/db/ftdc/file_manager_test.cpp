@@ -117,6 +117,11 @@ void ValidateInterimFileHasData(const boost::filesystem::path& dir, bool hasData
 
     auto interimFile = FTDCUtil::getInterimFile(dir);
 
+    ASSERT_EQUALS(boost::filesystem::exists(interimFile), hasData);
+    if (!hasData) {
+        return;
+    }
+
     std::fstream stream(interimFile.c_str());
     stream.read(&buf[0], sizeof(buf));
 

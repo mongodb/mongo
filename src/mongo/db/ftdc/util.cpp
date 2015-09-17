@@ -49,6 +49,7 @@
 namespace mongo {
 
 const char kFTDCInterimFile[] = "metrics.interim";
+const char kFTDCInterimTempFile[] = "metrics.interim.temp";
 const char kFTDCArchiveFile[] = "metrics";
 
 const char kFTDCIdField[] = "_id";
@@ -68,15 +69,25 @@ const std::size_t kMaxRecursion = 10;
 
 namespace FTDCUtil {
 
-boost::filesystem::path getInterimFile(const boost::filesystem::path& file) {
+namespace {
+boost::filesystem::path appendFileName(const boost::filesystem::path& file, const char* filename) {
     if (boost::filesystem::is_directory(file)) {
-        return file / kFTDCInterimFile;
+        return file / filename;
     }
 
     auto p = file.parent_path();
-    p /= kFTDCInterimFile;
+    p /= filename;
 
     return p;
+}
+}  // namespace
+
+boost::filesystem::path getInterimFile(const boost::filesystem::path& file) {
+    return appendFileName(file, kFTDCInterimFile);
+}
+
+boost::filesystem::path getInterimTempFile(const boost::filesystem::path& file) {
+    return appendFileName(file, kFTDCInterimTempFile);
 }
 
 Date_t roundTime(Date_t now, Milliseconds period) {

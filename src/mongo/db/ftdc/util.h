@@ -175,6 +175,11 @@ namespace FTDCUtil {
 boost::filesystem::path getInterimFile(const boost::filesystem::path& file);
 
 /**
+ * Construct the full path to the interim temp file before it is renamed.
+ */
+boost::filesystem::path getInterimTempFile(const boost::filesystem::path& file);
+
+/**
  * Round the specified time_point to the next multiple of period after the specified time_point
  */
 Date_t roundTime(Date_t now, Milliseconds period);

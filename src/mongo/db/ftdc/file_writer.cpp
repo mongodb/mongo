@@ -72,20 +72,11 @@ Status FTDCFileWriter::open(const boost::filesystem::path& file) {
 
     // Set internal size tracking to reflect the current file size
     _size = boost::filesystem::file_size(file);
+
     _sizeInterim = 0;
 
     _interimFile = FTDCUtil::getInterimFile(file);
-
-    // Disable file buffering
-    _interimStream.rdbuf()->pubsetbuf(0, 0);
-
-    _interimStream.open(_interimFile.c_str(),
-                        std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
-
-    if (!_interimStream.is_open()) {
-        return Status(ErrorCodes::FileNotOpen,
-                      "Failed to open interim file " + _interimFile.generic_string());
-    }
+    _interimTempFile = FTDCUtil::getInterimTempFile(file);
 
     _compressor.reset();
 
@@ -93,16 +84,38 @@ Status FTDCFileWriter::open(const boost::filesystem::path& file) {
 }
 
 Status FTDCFileWriter::writeInterimFileBuffer(ConstDataRange buf) {
-    _interimStream.seekp(0);
+    // Fixed size interim stream
+    std::ofstream interimStream;
 
-    _interimStream.write(buf.data(), buf.length());
+    // Disable file buffering
+    interimStream.rdbuf()->pubsetbuf(0, 0);
 
-    if (_interimStream.fail()) {
+    // Open up a temporary interim file
+    interimStream.open(_interimTempFile.c_str(),
+                       std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+
+    if (!interimStream.is_open()) {
+        return Status(ErrorCodes::FileNotOpen,
+                      "Failed to open interim file " + _interimTempFile.generic_string());
+    }
+
+    interimStream.write(buf.data(), buf.length());
+
+    if (interimStream.fail()) {
         return {
             ErrorCodes::FileStreamFailed,
             str::stream()
                 << "Failed to write to interim file buffer for full-time diagnostic data capture: "
-                << _interimFile.generic_string()};
+                << _interimTempFile.generic_string()};
+    }
+
+    interimStream.close();
+
+    // Now that the temp interim file is closed, rename the temp interim file to the real one.
+    boost::system::error_code ec;
+    boost::filesystem::rename(_interimTempFile, _interimFile, ec);
+    if (ec) {
+        return Status(ErrorCodes::FileRenameFailed, ec.message());
     }
 
     _sizeInterim = buf.length();
@@ -183,18 +196,16 @@ Status FTDCFileWriter::flush(const boost::optional<ConstDataRange>& range) {
         }
     }
 
-    // Nuke the interim stash by writes 8 bytes of zero to the head of the file
-    // We want to avoid truncating the file since we want to minimize I/O
-    char zero[8] = {};
-    return writeInterimFileBuffer({&zero[0], sizeof(zero)});
+    boost::filesystem::remove(_interimFile);
+
+    return Status::OK();
 }
 
 Status FTDCFileWriter::close() {
-    if (_interimStream.is_open()) {
+    if (_archiveStream.is_open()) {
         Status s = flush(boost::none_t());
 
         _archiveStream.close();
-        _interimStream.close();
 
         return s;
     }
@@ -204,7 +215,6 @@ Status FTDCFileWriter::close() {
 
 void FTDCFileWriter::closeWithoutFlushForTest() {
     _archiveStream.close();
-    _interimStream.close();
 }
 
 }  // namespace mongo

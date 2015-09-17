@@ -125,11 +125,11 @@ private:
     // Interim file name
     boost::filesystem::path _interimFile;
 
+    // Interim temp file name
+    boost::filesystem::path _interimTempFile;
+
     // Append only archive stream
     std::ofstream _archiveStream;
-
-    // Fixed size interim stream
-    std::ofstream _interimStream;
 
     // FTDC compressor
     FTDCCompressor _compressor;

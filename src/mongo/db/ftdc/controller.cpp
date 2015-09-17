@@ -100,7 +100,7 @@ void FTDCController::addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface
 }
 
 void FTDCController::start() {
-    log() << "Staring full-time diagnostic data capture with directory '" << _path.generic_string()
+    log() << "Starting full-time diagnostic data capture with directory '" << _path.generic_string()
           << "'";
 
     // Start the thread
