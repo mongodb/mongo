@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/stdx/functional.h"
@@ -72,9 +73,11 @@ private:
     void run();
 
     SnapshotManager* const _manager;
-    bool _inShutdown = false;             // guarded by newOpMutex in oplog.cpp.
-    bool _forcedSnapshotPending = false;  // guarded by newOpMutex in oplog.cpp.
+    bool _inShutdown = false;             // guarded by _mutex.
+    bool _forcedSnapshotPending = false;  // guarded by _mutex.
+    std::shared_ptr<CappedInsertNotifier> _notifier;
     stdx::thread _thread;
+    stdx::mutex _mutex;
 };
 
 }  // namespace repl

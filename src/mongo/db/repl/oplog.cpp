@@ -105,8 +105,6 @@ std::string rsOplogName = "local.oplog.rs";
 std::string masterSlaveOplogName = "local.oplog.$main";
 int OPLOG_VERSION = 2;
 
-MONGO_FP_DECLARE(disableSnapshotting);
-
 namespace {
 // cached copies of these...so don't rename them, drop them, etc.!!!
 Database* _localDB = nullptr;
@@ -156,8 +154,6 @@ std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
 
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
     Timestamp ts = getNextGlobalTimestamp();
-    newTimestampNotifier.notify_all();
-
     fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(txn, ts));
 
     // Set hash if we're in replset mode, otherwise it remains 0 in master/slave.
@@ -890,7 +886,6 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
 void setNewTimestamp(const Timestamp& newTime) {
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
     setGlobalTimestamp(newTime);
-    newTimestampNotifier.notify_all();
 }
 
 void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS) {
@@ -910,131 +905,5 @@ void oplogCheckCloseDatabase(OperationContext* txn, Database* db) {
     _localDB = nullptr;
     _localOplogCollection = nullptr;
 }
-
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(replSnapshotThreadThrottleMicros, int, 1000);
-
-SnapshotThread::SnapshotThread(SnapshotManager* manager)
-    : _manager(manager), _thread([this] { run(); }) {}
-
-void SnapshotThread::run() {
-    Client::initThread("SnapshotThread");
-    auto& client = cc();
-    auto serviceContext = client.getServiceContext();
-    auto replCoord = ReplicationCoordinator::get(serviceContext);
-
-    Timestamp lastTimestamp = {};
-    while (true) {
-        {
-            // This block logically belongs at the end of the loop, but having it at the top
-            // simplifies handling of the "continue" cases. It is harmless to do these before the
-            // first run of the loop.
-            _manager->cleanupUnneededSnapshots();
-            sleepmicros(replSnapshotThreadThrottleMicros);  // Throttle by sleeping.
-        }
-
-        {
-            stdx::unique_lock<stdx::mutex> lock(newOpMutex);
-            while (true) {
-                if (_inShutdown)
-                    return;
-
-                if (_forcedSnapshotPending || lastTimestamp != getLastSetTimestamp()) {
-                    _forcedSnapshotPending = false;
-                    lastTimestamp = getLastSetTimestamp();
-                    break;
-                }
-
-                newTimestampNotifier.wait(lock);
-            }
-        }
-
-        while (MONGO_FAIL_POINT(disableSnapshotting)) {
-            sleepsecs(1);
-            stdx::unique_lock<stdx::mutex> lock(newOpMutex);
-            if (_inShutdown) {
-                return;
-            }
-        }
-
-        try {
-            auto txn = client.makeOperationContext();
-            Lock::GlobalLock globalLock(txn->lockState(), MODE_IS, UINT_MAX);
-
-            if (!replCoord->getMemberState().readable()) {
-                // If our MemberState isn't readable, we may not be in a consistent state so don't
-                // take snapshots. When we transition into a readable state from a non-readable
-                // state, a snapshot is forced to ensure we don't miss the latest write. This must
-                // be checked each time we acquire the global IS lock since that prevents the node
-                // from transitioning to a !readable() state from a readable() one in the cases
-                // where we shouldn't be creating a snapshot.
-                continue;
-            }
-
-            SnapshotName name(0);  // assigned real value in block.
-            {
-                // Make sure there are no in-flight capped inserts while we create our snapshot.
-                Lock::ResourceLock cappedInsertLockForOtherDb(
-                    txn->lockState(), resourceCappedInFlightForOtherDb, MODE_X);
-                Lock::ResourceLock cappedInsertLockForLocalDb(
-                    txn->lockState(), resourceCappedInFlightForLocalDb, MODE_X);
-
-                // Reserve the name immediately before we take our snapshot. This ensures that all
-                // names that compare lower must be from points in time visible to this named
-                // snapshot.
-                name = replCoord->reserveSnapshotName(nullptr);
-
-                // This establishes the view that we will name.
-                _manager->prepareForCreateSnapshot(txn.get());
-            }
-
-            auto opTimeOfSnapshot = OpTime();
-            {
-                AutoGetCollectionForRead oplog(txn.get(), rsOplogName);
-                invariant(oplog.getCollection());
-                // Read the latest op from the oplog.
-                auto cursor = oplog.getCollection()->getCursor(txn.get(), /*forward*/ false);
-                auto record = cursor->next();
-                if (!record)
-                    continue;  // oplog is completely empty.
-
-                const auto op = record->data.releaseToBson();
-                opTimeOfSnapshot = fassertStatusOK(28780, OpTime::parseFromOplogEntry(op));
-                invariant(!opTimeOfSnapshot.isNull());
-            }
-
-            _manager->createSnapshot(txn.get(), name);
-            replCoord->onSnapshotCreate(opTimeOfSnapshot, name);
-        } catch (const WriteConflictException& wce) {
-            log() << "skipping storage snapshot pass due to write conflict";
-            continue;
-        }
-    }
-}
-
-void SnapshotThread::shutdown() {
-    invariant(_thread.joinable());
-    {
-        stdx::lock_guard<stdx::mutex> lock(newOpMutex);
-        invariant(!_inShutdown);
-        _inShutdown = true;
-        newTimestampNotifier.notify_all();
-    }
-    _thread.join();
-}
-
-void SnapshotThread::forceSnapshot() {
-    stdx::lock_guard<stdx::mutex> lock(newOpMutex);
-    _forcedSnapshotPending = true;
-    newTimestampNotifier.notify_all();
-}
-
-std::unique_ptr<SnapshotThread> SnapshotThread::start(ServiceContext* service) {
-    if (auto manager = service->getGlobalStorageEngine()->getSnapshotManager()) {
-        return std::unique_ptr<SnapshotThread>(new SnapshotThread(manager));
-    }
-    return {};
-}
-
 }  // namespace repl
 }  // namespace mongo

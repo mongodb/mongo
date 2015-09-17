@@ -103,7 +103,7 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
             _votes++;
         } else {
             log() << "VoteRequester: Got no vote from " << request.target
-                  << " because: " << voteResponse.getReason();
+                  << " because: " << voteResponse.getReason() << ", resp:" << voteResponse.toBSON();
         }
 
         if (voteResponse.getTerm() > _term) {

@@ -642,6 +642,7 @@ serverOnlyFiles = [
     "repl/resync.cpp",
     "repl/rs_initialsync.cpp",
     "repl/rs_sync.cpp",
+    "repl/snapshot_thread.cpp",
     "repl/sync_source_feedback.cpp",
     "service_context_d.cpp",
     "stats/fill_locker_info.cpp",
