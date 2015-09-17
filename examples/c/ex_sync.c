@@ -135,7 +135,7 @@ main(void)
 		cursor->set_value(cursor, v);
 		ret = cursor->insert(cursor);
 	}
-	session->log_flush(session, "sync=sync");
+	ret = session->log_flush(session, "sync=sync");
 
 	for (i = 0; i < MAX_KEYS; i++, record_count++) {
 		snprintf(k, sizeof(k), "key%d", record_count);
@@ -145,8 +145,8 @@ main(void)
 		ret = cursor->insert(cursor);
 	}
 	ret = cursor->close(cursor);
-	session->log_flush(session, "sync=write");
-	session->log_flush(session, "sync=sync");
+	ret = session->log_flush(session, "sync=write");
+	ret = session->log_flush(session, "sync=sync");
 
 	ret = wt_conn->close(wt_conn, NULL);
 	return (ret);
