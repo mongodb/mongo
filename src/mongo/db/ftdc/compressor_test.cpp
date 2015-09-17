@@ -296,14 +296,18 @@ TEST(FTDCCompressor, TestNumbersCompat) {
     ASSERT_HAS_SPACE(st);
 }
 
-// Test timestamp
-TEST(FTDCCompressor, TestTimeStamp) {
+// Test various date time types
+TEST(AFTDCCompressor, TestDateTimeTypes) {
     TestTie c;
+    for (int i = 0; i < 10; i++) {
+        BSONObjBuilder builder1;
+        builder1.append("ts", Timestamp(0x556677LL + i * 1356, 0x11223344LL + i * 2396));
+        builder1.append("d1", Date_t::fromMillisSinceEpoch((0x556677LL + i * 1356) / 1000));
+        BSONObj obj = builder1.obj().getOwned();
 
-    BSONObjBuilder builder1;
-    BSONObj o = builder1.append("ts", Timestamp(0x55667788LL, 0x11223344LL)).obj();
-    auto st = c.addSample(o);
-    ASSERT_HAS_SPACE(st);
+        auto st = c.addSample(obj);
+        ASSERT_HAS_SPACE(st);
+    }
 }
 
 // Test all types

@@ -169,8 +169,8 @@ StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
 
             case bsonTimestamp:
                 // very slightly more space efficient to treat these as two separate metrics
-                metrics->emplace_back(currentElement.timestampValue());
-                metrics->emplace_back(currentElement.timestampInc());
+                metrics->emplace_back(currentElement.timestamp().getSecs());
+                metrics->emplace_back(currentElement.timestamp().getInc());
                 break;
 
             case Object:
