@@ -73,5 +73,48 @@ TEST(AsyncTimerMock, BasicTest) {
     ASSERT(timer2Fired);
 }
 
+TEST(AsyncTimerMock, Cancel) {
+    AsyncTimerFactoryMock factory;
+
+    // Set a timer
+    bool fired = false;
+    auto timer = factory.make(Milliseconds(100));
+    timer->asyncWait([&fired](std::error_code ec) {
+        // This timer should have been canceled
+        ASSERT(ec);
+        ASSERT(ec == asio::error::operation_aborted);
+        fired = true;
+    });
+
+    // Cancel timer
+    timer->cancel();
+
+    // Ensure that its handler was called
+    ASSERT(fired);
+}
+
+TEST(AsyncTimerMock, CancelExpired) {
+    AsyncTimerFactoryMock factory;
+
+    // Set a timer
+    bool fired = false;
+    auto timer = factory.make(Milliseconds(100));
+    timer->asyncWait([&fired](std::error_code ec) {
+        // This timer should NOT have been canceled
+        ASSERT(!ec);
+        fired = true;
+    });
+
+    // Fast forward so it expires
+    factory.fastForward(Milliseconds(200));
+    ASSERT(fired);
+
+    fired = false;
+
+    // Cancel it, should not fire again
+    timer->cancel();
+    ASSERT(!fired);
+}
+
 }  // namespace executor
 }  // namespace mongo

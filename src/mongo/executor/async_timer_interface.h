@@ -51,6 +51,19 @@ public:
     using Handler = stdx::function<void(std::error_code)>;
 
     /**
+     * Cancel any asynchronous operations waiting on this timer, invoking
+     * their handlers immediately with an 'operation aborted' error code.
+     *
+     * If the timer has already expired when cancel() is called, the handlers
+     * for asyncWait operations may have already fired or been enqueued to
+     * fire soon, in which case we cannot cancel them.
+     *
+     * Calling cancel() does not change this timer's expiration time; future
+     * calls to asyncWait() will schedule callbacks to run as usual.
+     */
+    virtual void cancel() = 0;
+
+    /**
      * Perform an asynchronous wait on this timer.
      */
     virtual void asyncWait(Handler handler) = 0;

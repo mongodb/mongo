@@ -277,6 +277,12 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         ++(op->_access->id);
     }
 
+    // Cancel this operation's timeout. Note that the timeout callback may already be running,
+    // may have run, or may have already been scheduled to run in the near future.
+    if (op->_timeoutAlarm) {
+        op->_timeoutAlarm->cancel();
+    }
+
     op->finish(resp);
 
     std::unique_ptr<AsyncOp> ownedOp;

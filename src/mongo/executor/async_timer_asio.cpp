@@ -36,6 +36,10 @@ namespace executor {
 AsyncTimerASIO::AsyncTimerASIO(asio::io_service* service, Milliseconds expiration)
     : _timer(*service, expiration) {}
 
+void AsyncTimerASIO::cancel() {
+    _timer.cancel();
+}
+
 void AsyncTimerASIO::asyncWait(AsyncTimerInterface::Handler handler) {
     _timer.async_wait(std::move(handler));
 }

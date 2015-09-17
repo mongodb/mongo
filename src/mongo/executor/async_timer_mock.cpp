@@ -39,6 +39,10 @@ const Milliseconds kZeroMilliseconds = Milliseconds(0);
 
 AsyncTimerMockImpl::AsyncTimerMockImpl(Milliseconds expiration) : _timeLeft(expiration) {}
 
+void AsyncTimerMockImpl::cancel() {
+    _callAllHandlers(asio::error::operation_aborted);
+}
+
 void AsyncTimerMockImpl::asyncWait(AsyncTimerInterface::Handler handler) {
     // If we have expired, run handler now instead of storing.
     if (_timeLeft == kZeroMilliseconds) {
@@ -64,19 +68,23 @@ Milliseconds AsyncTimerMockImpl::timeLeft() {
     return _timeLeft;
 }
 
-void AsyncTimerMockImpl::_callAllHandlers() {
+void AsyncTimerMockImpl::_callAllHandlers(std::error_code ec) {
     for (auto elem = _handlers.begin(); elem != _handlers.end(); elem++) {
         const auto& handler = *elem;
-        handler(std::error_code());
+        handler(ec);
     }
     _handlers.clear();
 }
 
 void AsyncTimerMockImpl::_expire() {
-    _callAllHandlers();
+    _callAllHandlers(std::error_code());
 }
 
 AsyncTimerMock::AsyncTimerMock(std::shared_ptr<AsyncTimerMockImpl> timer) : _timer(timer) {}
+
+void AsyncTimerMock::cancel() {
+    _timer->cancel();
+}
 
 void AsyncTimerMock::asyncWait(AsyncTimerInterface::Handler handler) {
     _timer->asyncWait(handler);

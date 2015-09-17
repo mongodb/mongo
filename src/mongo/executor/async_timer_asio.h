@@ -39,6 +39,8 @@ class AsyncTimerASIO final : public AsyncTimerInterface {
 public:
     AsyncTimerASIO(asio::io_service* service, Milliseconds expiration);
 
+    void cancel() override;
+
     void asyncWait(AsyncTimerInterface::Handler handler) override;
 
 private:

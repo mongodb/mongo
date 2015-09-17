@@ -48,6 +48,12 @@ public:
     explicit AsyncTimerMockImpl(Milliseconds expiration);
 
     /**
+     * Cancel operations waiting on this timer, invoking their handlers with an
+     * 'operation aborted' error code.
+     */
+    void cancel();
+
+    /**
      * Perform an asynchronous wait on this timer. If timer has expired, callback
      * runs immediately, synchronously.
      */
@@ -67,7 +73,7 @@ public:
     Milliseconds timeLeft();
 
 private:
-    void _callAllHandlers();
+    void _callAllHandlers(std::error_code ec);
     void _expire();
 
     Milliseconds _timeLeft;
@@ -85,6 +91,8 @@ private:
 class AsyncTimerMock : public AsyncTimerInterface {
 public:
     AsyncTimerMock(std::shared_ptr<AsyncTimerMockImpl> timer);
+
+    void cancel() override;
 
     void asyncWait(AsyncTimerInterface::Handler handler) override;
 
