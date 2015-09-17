@@ -73,7 +73,8 @@ The WT_SESSION::commit_transaction supports several durability modes with
 the \c sync configuration that override the connection level settings.
 
 If \c sync=on is configured then this commit operation will wait for its
-log records, and all earlier ones, to be durable on disk before returning.
+log records, and all earlier ones, to be durable to the extent specified
+by the \c transaction_sync=(method) setting before returning.
 
 If \c sync=off is configured then this commit operation will write its
 records into the in-memory buffer and return immediately.
@@ -91,6 +92,8 @@ the \c sync configuration that immediately act upon the log.
 
 If \c sync=on is configured then this flush will force the current
 log and all earlier records to be durable on disk before returning.
+This method call overrides the \c transaction_sync setting and
+forces the data out via \c fsync.
 
 If \c sync=off is configured then this flush operation will force the
 logging subsystem to write any outstanding in-memory buffers to the
