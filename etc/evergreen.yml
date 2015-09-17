@@ -337,9 +337,13 @@ tasks:
 - name: compile
   depends_on: []
   commands:
+    - command: manifest.load
     - command: git.get_project
       params:
         directory: src
+        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+          enterprise: ${enterprise_rev}
+          rocksdb: ${rocksdb_rev}
     - command: git.apply_patch
       params:
         directory: src
@@ -443,9 +447,13 @@ tasks:
 - name: lint
   depends_on: []
   commands:
+    - command: manifest.load
     - command: git.get_project
       params:
         directory: src
+        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+          enterprise: ${enterprise_rev}
+          rocksdb: ${rocksdb_rev}
     - command: git.apply_patch
       params:
         directory: src
@@ -1777,7 +1785,8 @@ tasks:
 #######################################
 #               Modules               #
 #######################################
-
+# if a module is added and to be added to the manifest
+# be sure to add the module to git.get_project revisions parameter
 modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
