@@ -67,7 +67,6 @@ static void
 __async_set_value(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_CURSOR *c;
-	WT_DECL_RET;
 	va_list ap;
 
 	c = &asyncop->c;
