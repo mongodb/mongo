@@ -996,22 +996,29 @@ delete_b:	/*
 	 * Case #5: b_trk is more desirable and is a middle chunk of a_trk.
 	 * Split a_trk into two parts, the key range before b_trk and the
 	 * key range after b_trk.
+	 *
+	 * Allocate a new WT_TRACK object, and extend the array of pages as
+	 * necessary.
 	 */
 	WT_RET(__wt_calloc_one(session, &new));
-	new->shared = a_trk->shared;
-	new->ss = a_trk->ss;
-	++a_trk->shared->ref;
-
-	/*
-	 * Second, reallocate the array of pages if necessary, and then insert
-	 * the new element into the array after the existing element (that's
-	 * probably wrong, but we'll fix it up in a second).
-	 */
 	if ((ret = __wt_realloc_def(session,
 	    &ss->pages_allocated, ss->pages_next + 1, &ss->pages)) != 0) {
 		__wt_free(session, new);
 		return (ret);
 	}
+
+	/*
+	 * First, set up the track share (we do this after the allocation to
+	 * ensure the shared reference count is never incorrect).
+	 */
+	new->shared = a_trk->shared;
+	new->ss = a_trk->ss;
+	++new->shared->ref;
+
+	/*
+	 * Second, insert the new element into the array after the existing
+	 * element (that's probably wrong, but we'll fix it up in a second).
+	 */
 	memmove(ss->pages + a_slot + 1, ss->pages + a_slot,
 	    (ss->pages_next - a_slot) * sizeof(*ss->pages));
 	ss->pages[a_slot + 1] = new;
@@ -1636,22 +1643,29 @@ delete_b:	/*
 	 * Case #5: b_trk is more desirable and is a middle chunk of a_trk.
 	 * Split a_trk into two parts, the key range before b_trk and the
 	 * key range after b_trk.
+	 *
+	 * Allocate a new WT_TRACK object, and extend the array of pages as
+	 * necessary.
 	 */
 	WT_RET(__wt_calloc_one(session, &new));
-	new->shared = a_trk->shared;
-	new->ss = a_trk->ss;
-	++a_trk->shared->ref;
-
-	/*
-	 * Second, reallocate the array of pages if necessary, and then insert
-	 * the new element into the array after the existing element (that's
-	 * probably wrong, but we'll fix it up in a second).
-	 */
 	if ((ret = __wt_realloc_def(session,
 	    &ss->pages_allocated, ss->pages_next + 1, &ss->pages)) != 0) {
 		__wt_free(session, new);
 		return (ret);
 	}
+
+	/*
+	 * First, set up the track share (we do this after the allocation to
+	 * ensure the shared reference count is never incorrect).
+	 */
+	new->shared = a_trk->shared;
+	new->ss = a_trk->ss;
+	++new->shared->ref;
+
+	/*
+	 * Second, insert the new element into the array after the existing
+	 * element (that's probably wrong, but we'll fix it up in a second).
+	 */
 	memmove(ss->pages + a_slot + 1, ss->pages + a_slot,
 	    (ss->pages_next - a_slot) * sizeof(*ss->pages));
 	ss->pages[a_slot + 1] = new;
