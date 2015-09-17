@@ -42,7 +42,9 @@
 #include "mongo/db/client.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
+#include "mongo/rpc/metadata/config_server_response_metadata.h"
 #include "mongo/s/client/scc_fast_query_handler.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/version_manager.h"
@@ -51,6 +53,28 @@
 namespace mongo {
 
 using std::string;
+
+namespace {
+Status _shardingReplyMetadataReader(const BSONObj& metadataObj, StringData hostString) {
+    saveGLEStats(metadataObj, hostString);
+
+    auto shard = grid.shardRegistry()->getShardNoReload(hostString.toString());
+    if (!shard) {
+        return Status::OK();
+    }
+    // If this host is a known shard of ours, look for a config server optime in the response
+    // metadata to use to update our notion of the current config server optime.
+    auto responseStatus = rpc::ConfigServerResponseMetadata::readFromMetadata(metadataObj);
+    if (!responseStatus.isOK()) {
+        return responseStatus.getStatus();
+    }
+    auto opTime = responseStatus.getValue().getOpTime();
+    if (opTime.is_initialized()) {
+        grid.shardRegistry()->advanceConfigOpTime(opTime.get());
+    }
+    return Status::OK();
+}
+}  // namespace
 
 ShardingConnectionHook::ShardingConnectionHook(bool shardedConnections)
     : _shardedConnections(shardedConnections) {}
@@ -72,11 +96,7 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
         // For every DBClient created by mongos, add a hook that will capture the response from
         // commands we pass along from the client, so that we can target the correct node when
         // subsequent getLastError calls are made by mongos.
-        conn->setReplyMetadataReader([](const BSONObj& metadataObj, StringData hostString)
-                                         -> Status {
-                                             saveGLEStats(metadataObj, hostString);
-                                             return Status::OK();
-                                         });
+        conn->setReplyMetadataReader(_shardingReplyMetadataReader);
     }
 
     // For every DBClient created by mongos, add a hook that will append impersonated users
