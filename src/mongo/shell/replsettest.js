@@ -498,6 +498,57 @@ ReplSetTest.prototype.getLastOpTimeWritten = function() {
     }, "awaiting oplog query", 30000);
 };
 
+/**
+ * Waits for the last oplog entry on the primary to be visible in the committed snapshop view
+ * of the oplog on *all* secondaries.
+ */
+ReplSetTest.prototype.awaitLastOpCommitted = function() {
+    var rst = this;
+    var master = rst.getMaster();
+    var lastOp = master.getDB('local').oplog.rs.find().sort({ $natural: -1 }).limit(1).next();
+
+    var opTime;
+    var filter;
+    if (this.getReplSetConfig().protocolVersion === 1) {
+        opTime = {ts: lastOp.ts, t: lastOp.t};
+        filter = opTime;
+    } else {
+        opTime = {ts: lastOp.ts, t: -1};
+        filter = {ts: lastOp.ts};
+    }
+    print("Waiting for op with OpTime " + tojson(opTime) + " to be committed on all secondaries");
+
+    var isLastOpCommitted = function() {
+        for (var i = 0; i < rst.nodes.length; i++) {
+            var node = rst.nodes[i];
+
+            // Continue if we're connected to an arbiter
+            var res = node.getDB("admin").runCommand({replSetGetStatus: 1});
+            assert.commandWorked(res);
+            if (res.myState == 7) {
+                continue;
+            }
+
+            res = node.getDB('local').runCommand({find: 'oplog.rs',
+                                                  filter: filter,
+                                                  readConcern: {level: "majority",
+                                                                afterOpTime: opTime},
+                                                  maxTimeMS: 1000});
+            if (!res.ok) {
+                printjson(res);
+                return false;
+            }
+            var cursor = new DBCommandCursor(node, res);
+            if (!cursor.hasNext()) {
+                return false;
+            }
+        }
+        return true;
+    }
+    assert.soon(isLastOpCommitted,
+                "Op failed to become committed on all secondaries: " + tojson(lastOp));
+}
+
 ReplSetTest.prototype.awaitReplication = function(timeout) {
     timeout = timeout || 30000;
 

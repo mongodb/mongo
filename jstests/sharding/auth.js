@@ -166,6 +166,8 @@ function runTest(s) {
     }
     assert.writeOK(bulk.execute());
 
+    s.startBalancer(60000);
+
     var d1Chunks;
     var d2Chunks;
     var totalChunks;
@@ -321,7 +323,6 @@ var s = new ShardingTest("auth1", 0, 0, 1,
                             rs: true,
                             extraOptions: { "keyFile": "jstests/libs/key1" },
                             noChunkSize: true,
-                            enableBalancer: true
                          });
 
 if (s.getDB('admin').runCommand('buildInfo').bits < 64) {

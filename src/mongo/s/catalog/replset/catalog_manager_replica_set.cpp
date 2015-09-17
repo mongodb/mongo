@@ -88,10 +88,7 @@ using str::stream;
 
 namespace {
 
-// Until read committed is supported always write to the primary with majority write and read
-// from the secondary. That way we ensure that reads will see a consistent data.
-// TODO: switch back to SecondaryPreferred once SERVER-19675 is fixed
-const ReadPreferenceSetting kConfigReadSelector(ReadPreference::PrimaryOnly, TagSet{});
+const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
 const int kInitialSSVRetries = 3;

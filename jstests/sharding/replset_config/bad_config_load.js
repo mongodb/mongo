@@ -44,7 +44,8 @@ for( var i = 0; i < 2; i++ ){
                e.code == 13328 ||       // Connect error
                e.code == 13639 ||       // Connect error to replSet primary
                e.code == ErrorCodes.HostUnreachable ||
-               e.code == ErrorCodes.NotMaster);
+               e.code == ErrorCodes.NotMaster ||
+               e.code == ErrorCodes.FailedToSatisfyReadPreference);
     }
 }
 

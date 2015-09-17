@@ -193,6 +193,7 @@ public:
         ScopedDbConnection fromconn(fromShard->getConnString());
 
         config->setPrimary(txn, toShard->getConnString().toString());
+        config->reload(txn);
 
         if (shardedColls.empty()) {
             // TODO: Collections can be created in the meantime, and we should handle in the future.
