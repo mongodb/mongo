@@ -233,7 +233,6 @@ public:
     virtual HeartbeatResponseAction setMemberAsDown(Date_t now,
                                                     const int memberIndex,
                                                     const OpTime& myLastOpApplied);
-    virtual Milliseconds getTimeoutDelayForMember(int memberId);
     virtual bool becomeCandidateIfElectable(const Date_t now, const OpTime& lastOpApplied);
 
     ////////////////////////////////////////////////////////////

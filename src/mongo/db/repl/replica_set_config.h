@@ -59,10 +59,10 @@ public:
     static const size_t kMaxMembers = 50;
     static const size_t kMaxVotingMembers = 7;
 
-    // TODO: Consider returning different default heartbeat interval based on protocol version.
     static const Milliseconds kDefaultElectionTimeoutPeriod;
     static const Milliseconds kDefaultHeartbeatInterval;
     static const Seconds kDefaultHeartbeatTimeoutPeriod;
+    static const int kDefaultElectionTimeoutOffsetLimit;
 
     /**
      * Initializes this ReplicaSetConfig from the contents of "cfg".
@@ -286,9 +286,11 @@ public:
     Milliseconds getPriorityTakeoverDelay(int memberIdx) const;
 
     /**
-     * Returns the position of the node at "memberIdx" relative to all voting nodes.
+     * Returns the upper bound (in Milliseconds) of the election timeout's random offset.
      */
-    int getVoterPosition(int memberIdx) const;
+    int getElectionTimeoutOffsetLimit() const {
+        return _electionTimeoutOffsetLimit;
+    }
 
 private:
     /**
@@ -320,6 +322,7 @@ private:
     Milliseconds _heartbeatInterval = kDefaultHeartbeatInterval;
     Seconds _heartbeatTimeoutPeriod = Seconds(0);
     bool _chainingAllowed;
+    int _electionTimeoutOffsetLimit;
     int _majorityVoteCount;
     int _writeMajority;
     int _totalVotingMembers;

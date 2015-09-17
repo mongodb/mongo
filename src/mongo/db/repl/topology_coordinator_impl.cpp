@@ -882,21 +882,6 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinatorImpl::prepare
     return std::make_pair(hbArgs, timeout);
 }
 
-Milliseconds TopologyCoordinatorImpl::getTimeoutDelayForMember(int memberId) {
-    const MemberConfig* member = _rsConfig.findMemberByID(memberId);
-    if (!member) {
-        return Milliseconds();
-    }
-
-    HostAndPort target = member->getHostAndPort();
-    if (_pings.find(target) == _pings.end()) {
-        return Milliseconds();
-    }
-
-    Milliseconds pingTime = _pings[target].getMillis();
-    return pingTime * (_rsConfig.getVoterPosition(_selfIndex) + 1);
-}
-
 HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
     Date_t now,
     Milliseconds networkRoundTripTime,
@@ -932,10 +917,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
     Milliseconds heartbeatInterval;
     if (_rsConfig.getProtocolVersion() == 1 &&
         (getMemberState().arbiter() || (getSyncSourceAddress().empty() && !_iAmPrimary()))) {
-        // We want to delay by ping time times our position relative to other voters, in order to
-        // avoid having two nodes stand for election at the same time.
-        heartbeatInterval = _rsConfig.getElectionTimeoutPeriod() / 2 +
-            hbStats.getMillis() * _rsConfig.getVoterPosition(_selfIndex);
+        heartbeatInterval = _rsConfig.getElectionTimeoutPeriod() / 2;
     } else {
         heartbeatInterval = _rsConfig.getHeartbeatInterval();
     }

@@ -52,6 +52,7 @@ const std::string ReplicaSetConfig::kMajorityWriteConcernModeName = "$majority";
 const Milliseconds ReplicaSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
 const Milliseconds ReplicaSetConfig::kDefaultElectionTimeoutPeriod(10000);
+const int ReplicaSetConfig::kDefaultElectionTimeoutOffsetLimit(2000);
 
 namespace {
 
@@ -69,6 +70,7 @@ const std::string kLegalConfigTopFieldNames[] = {kIdFieldName,
                                                  ReplicaSetConfig::kConfigServerFieldName};
 
 const std::string kElectionTimeoutFieldName = "electionTimeoutMillis";
+const std::string kElectionTimeoutOffsetLimitFieldName = "electionTimeoutOffsetLimitMillis";
 const std::string kHeartbeatIntervalFieldName = "heartbeatIntervalMillis";
 const std::string kHeartbeatTimeoutFieldName = "heartbeatTimeoutSecs";
 const std::string kChainingAllowedFieldName = "chainingAllowed";
@@ -181,6 +183,7 @@ Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
     }
     _heartbeatInterval = Milliseconds(heartbeatIntervalMillis);
 
+    //
     // Parse electionTimeoutMillis
     //
     BSONElement electionTimeoutMillisElement = settings[kElectionTimeoutFieldName];
@@ -194,6 +197,22 @@ Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
                                     << kElectionTimeoutFieldName
                                     << " to be a number, but found a value of type "
                                     << typeName(electionTimeoutMillisElement.type()));
+    }
+
+    //
+    // Parse electionTimeoutOffsetLimit
+    //
+    BSONElement electionTimeoutOffsetLimitElement = settings[kElectionTimeoutOffsetLimitFieldName];
+    if (electionTimeoutOffsetLimitElement.eoo()) {
+        _electionTimeoutOffsetLimit = kDefaultElectionTimeoutOffsetLimit;
+    } else if (electionTimeoutOffsetLimitElement.isNumber()) {
+        _electionTimeoutOffsetLimit = electionTimeoutOffsetLimitElement.numberInt();
+    } else {
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "Expected type of " << kSettingsFieldName << "."
+                                    << kElectionTimeoutOffsetLimitFieldName
+                                    << " to be a number, but found a value of type "
+                                    << typeName(electionTimeoutOffsetLimitElement.type()));
     }
 
     //
@@ -322,6 +341,13 @@ Status ReplicaSetConfig::validate() const {
                                     << " field value must be non-negative, "
                                        "but found "
                                     << durationCount<Seconds>(_heartbeatTimeoutPeriod));
+    }
+    if (_electionTimeoutOffsetLimit < 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << kSettingsFieldName << '.'
+                                    << kElectionTimeoutOffsetLimitFieldName
+                                    << " field value must be non-negative, "
+                                       "but found " << _electionTimeoutOffsetLimit);
     }
     if (_electionTimeoutPeriod < Milliseconds(0)) {
         return Status(ErrorCodes::BadValue,
@@ -631,6 +657,8 @@ BSONObj ReplicaSetConfig::toBSON() const {
                                   durationCount<Seconds>(_heartbeatTimeoutPeriod));
     settingsBuilder.appendIntOrLL(kElectionTimeoutFieldName,
                                   durationCount<Milliseconds>(_electionTimeoutPeriod));
+    settingsBuilder.appendIntOrLL(kElectionTimeoutOffsetLimitFieldName,
+                                  _electionTimeoutOffsetLimit);
 
 
     BSONObjBuilder gleModes(settingsBuilder.subobjStart(kGetLastErrorModesFieldName));
@@ -670,9 +698,7 @@ std::vector<std::string> ReplicaSetConfig::getWriteConcernNames() const {
 Milliseconds ReplicaSetConfig::getPriorityTakeoverDelay(int memberIdx) const {
     auto member = getMemberAt(memberIdx);
     int priorityRank = _calculatePriorityRank(member.getPriority());
-    Milliseconds nodeSpecificDelay =
-        getVoterPosition(memberIdx) * getElectionTimeoutPeriod() / getTotalVotingMembers();
-    return (priorityRank + 1) * getElectionTimeoutPeriod() + nodeSpecificDelay;
+    return (priorityRank + 1) * getElectionTimeoutPeriod();
 }
 
 int ReplicaSetConfig::_calculatePriorityRank(int priority) const {
@@ -683,22 +709,6 @@ int ReplicaSetConfig::_calculatePriorityRank(int priority) const {
         }
     }
     return count;
-}
-
-int ReplicaSetConfig::getVoterPosition(int memberIdx) const {
-    int pos = 0;
-    int idx = 0;
-    for (auto mem = membersBegin(); mem != membersEnd(); ++mem) {
-        if (idx == memberIdx) {
-            break;
-        }
-
-        if (mem->isVoter()) {
-            pos++;
-        }
-        idx++;
-    }
-    return pos;
 }
 
 }  // namespace repl

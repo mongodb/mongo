@@ -623,8 +623,7 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock(
         return;
     }
 
-    auto nextTimeout = earliestDate + _rsConfig.getElectionTimeoutPeriod() +
-        _topCoord->getTimeoutDelayForMember(earliestMemberId);
+    auto nextTimeout = earliestDate + _rsConfig.getElectionTimeoutPeriod();
     if (nextTimeout > _replExecutor.now()) {
         LOG(3) << "scheduling next check at " << nextTimeout;
         auto cbh = _replExecutor.scheduleWorkAt(
@@ -681,7 +680,9 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
         return;
     }
 
-    auto when = _replExecutor.now() + _rsConfig.getElectionTimeoutPeriod();
+    Milliseconds randomOffset =
+        Milliseconds(_replExecutor.nextRandomInt64(_rsConfig.getElectionTimeoutOffsetLimit()));
+    auto when = _replExecutor.now() + _rsConfig.getElectionTimeoutPeriod() + randomOffset;
     _handleElectionTimeoutWhen = when;
     _handleElectionTimeoutCbh = _scheduleWorkAt(
         when, stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this));

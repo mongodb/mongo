@@ -72,6 +72,7 @@ TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS(ReplicaSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
     ASSERT_EQUALS(Seconds(10), config.getHeartbeatTimeoutPeriod());
     ASSERT_EQUALS(Seconds(10), config.getElectionTimeoutPeriod());
+    ASSERT_EQUALS(2000, config.getElectionTimeoutOffsetLimit());
     ASSERT_TRUE(config.isChainingAllowed());
     ASSERT_FALSE(config.isConfigServer());
     ASSERT_EQUALS(0, config.getProtocolVersion());
@@ -92,7 +93,7 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
                                        << BSON("eastCoast" << BSON("NYC" << 1)) << "chainingAllowed"
                                        << false << "heartbeatIntervalMillis" << 5000
                                        << "heartbeatTimeoutSecs" << 120 << "electionTimeoutMillis"
-                                       << 10))));
+                                       << 10 << "electionTimeoutOffsetLimitMillis" << 2))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS("rs0", config.getReplSetName());
     ASSERT_EQUALS(1234, config.getConfigVersion());
@@ -105,6 +106,7 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_EQUALS(Seconds(5), config.getHeartbeatInterval());
     ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
     ASSERT_EQUALS(Milliseconds(10), config.getElectionTimeoutPeriod());
+    ASSERT_EQUALS(2, config.getElectionTimeoutOffsetLimit());
     ASSERT_EQUALS(2, config.getProtocolVersion());
 }
 
@@ -480,6 +482,18 @@ TEST(ReplicaSetConfig, ParseFailsWithNonNumericElectionTimeoutMillisField) {
                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                     << "localhost:12345"))
                                            << "settings" << BSON("electionTimeoutMillis"
+                                                                 << "no")));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNonNumericElectionTimeoutOffsetLimitMillisField) {
+    ReplicaSetConfig config;
+    Status status = config.initialize(BSON("_id"
+                                           << "rs0"
+                                           << "version" << 1 << "members"
+                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                    << "localhost:12345"))
+                                           << "settings" << BSON("electionTimeoutOffsetLimitMillis"
                                                                  << "no")));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
@@ -884,6 +898,7 @@ bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
         a.getHeartbeatInterval() == b.getHeartbeatInterval() &&
         a.getHeartbeatTimeoutPeriod() == b.getHeartbeatTimeoutPeriod() &&
         a.getElectionTimeoutPeriod() == b.getElectionTimeoutPeriod() &&
+        a.getElectionTimeoutOffsetLimit() == b.getElectionTimeoutOffsetLimit() &&
         a.isChainingAllowed() == b.isChainingAllowed() &&
         a.isConfigServer() == b.isConfigServer() &&
         a.getDefaultWriteConcern().wNumNodes == b.getDefaultWriteConcern().wNumNodes &&
@@ -929,14 +944,14 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
                                     << BSON("coast"
                                             << "west"
                                             << "hdd"
-                                            << "true"))) << "protocolVersion" << 0
-        << "settings" << BSON("heartbeatIntervalMillis"
-                              << 5000 << "heartbeatTimeoutSecs" << 20 << "electionTimeoutMillis"
-                              << 4 << "chainingAllowd" << true << "getLastErrorDefaults"
-                              << BSON("w"
-                                      << "majority") << "getLastErrorModes"
-                              << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1) << "coasts"
-                                              << BSON("coast" << 2))))));
+                                            << "true"))) << "protocolVersion" << 0 << "settings"
+        << BSON("heartbeatIntervalMillis"
+                << 5000 << "heartbeatTimeoutSecs" << 20
+                << "electionTimeoutOffsetLimitMillis" << 2 << "electionTimeoutMillis" << 4
+                << "chainingAllowd" << true << "getLastErrorDefaults" << BSON("w"
+                                                                              << "majority")
+                << "getLastErrorModes" << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1) << "coasts"
+                                                       << BSON("coast" << 2))))));
     BSONObj configObjA = configA.toBSON();
     // Ensure a protocolVersion does not show up if it is 0 to maintain cross version compatibility.
     ASSERT_FALSE(configObjA.hasField("protocolVersion"));
@@ -962,7 +977,8 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityInvalid) {
                                          << "localhost:3828"
                                          << "votes" << 0 << "priority" << 0)) << "settings"
              << BSON("heartbeatIntervalMillis" << -5000 << "heartbeatTimeoutSecs" << -20
-                                               << "electionTimeoutMillis" << -2))));
+                                               << "electionTimeoutMillis" << -2
+                                               << "electionTimeoutOffsetLimitMillis" << -2))));
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_NOT_OK(configA.validate());
     ASSERT_NOT_OK(configB.validate());
@@ -1138,10 +1154,10 @@ TEST(ReplicaSetConfig, GetPriorityTakeoverDelay) {
                                       << BSON("electionTimeoutMillis" << 1000))));
     ASSERT_OK(configA.validate());
     ASSERT_EQUALS(Milliseconds(5000), configA.getPriorityTakeoverDelay(0));
-    ASSERT_EQUALS(Milliseconds(4200), configA.getPriorityTakeoverDelay(1));
-    ASSERT_EQUALS(Milliseconds(3400), configA.getPriorityTakeoverDelay(2));
-    ASSERT_EQUALS(Milliseconds(2600), configA.getPriorityTakeoverDelay(3));
-    ASSERT_EQUALS(Milliseconds(1800), configA.getPriorityTakeoverDelay(4));
+    ASSERT_EQUALS(Milliseconds(4000), configA.getPriorityTakeoverDelay(1));
+    ASSERT_EQUALS(Milliseconds(3000), configA.getPriorityTakeoverDelay(2));
+    ASSERT_EQUALS(Milliseconds(2000), configA.getPriorityTakeoverDelay(3));
+    ASSERT_EQUALS(Milliseconds(1000), configA.getPriorityTakeoverDelay(4));
 
     ReplicaSetConfig configB;
     ASSERT_OK(configB.initialize(BSON("_id"
@@ -1165,10 +1181,10 @@ TEST(ReplicaSetConfig, GetPriorityTakeoverDelay) {
                                       << BSON("electionTimeoutMillis" << 1000))));
     ASSERT_OK(configB.validate());
     ASSERT_EQUALS(Milliseconds(5000), configB.getPriorityTakeoverDelay(0));
-    ASSERT_EQUALS(Milliseconds(3200), configB.getPriorityTakeoverDelay(1));
-    ASSERT_EQUALS(Milliseconds(3400), configB.getPriorityTakeoverDelay(2));
-    ASSERT_EQUALS(Milliseconds(1600), configB.getPriorityTakeoverDelay(3));
-    ASSERT_EQUALS(Milliseconds(1800), configB.getPriorityTakeoverDelay(4));
+    ASSERT_EQUALS(Milliseconds(3000), configB.getPriorityTakeoverDelay(1));
+    ASSERT_EQUALS(Milliseconds(3000), configB.getPriorityTakeoverDelay(2));
+    ASSERT_EQUALS(Milliseconds(1000), configB.getPriorityTakeoverDelay(3));
+    ASSERT_EQUALS(Milliseconds(1000), configB.getPriorityTakeoverDelay(4));
 }
 
 }  // namespace

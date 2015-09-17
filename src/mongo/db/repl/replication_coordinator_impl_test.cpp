@@ -2696,8 +2696,8 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeout) {
 
     getReplCoord()->cancelAndRescheduleElectionTimeout();
 
-    ASSERT_EQUALS(until + replCoord->getConfig().getElectionTimeoutPeriod(),
-                  replCoord->getElectionTimeout_forTest());
+    ASSERT_LESS_THAN_OR_EQUALS(until + replCoord->getConfig().getElectionTimeoutPeriod(),
+                               replCoord->getElectionTimeout_forTest());
 }
 
 TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutWhenNotProtocolVersion1) {
@@ -2855,8 +2855,8 @@ TEST_F(ReplCoordTest,
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
-    ASSERT_EQUALS(heartbeatWhen + replCoord->getConfig().getElectionTimeoutPeriod(),
-                  replCoord->getElectionTimeout_forTest());
+    ASSERT_LESS_THAN_OR_EQUALS(heartbeatWhen + replCoord->getConfig().getElectionTimeoutPeriod(),
+                               replCoord->getElectionTimeout_forTest());
 }
 
 TEST_F(ReplCoordTest,
