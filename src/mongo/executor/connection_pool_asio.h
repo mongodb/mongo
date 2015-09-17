@@ -27,10 +27,13 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/async_stream_interface.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace executor {
@@ -48,10 +51,15 @@ public:
     void cancelTimeout() override;
 
 private:
+    struct CallbackSharedState {
+        stdx::mutex mutex;
+        std::size_t id = 0;
+    };
+
     TimeoutCallback _cb;
     asio::io_service* const _io_service;
     asio::steady_timer _impl;
-    bool _canceled;
+    std::shared_ptr<CallbackSharedState> _callbackSharedState;
 };
 
 /**

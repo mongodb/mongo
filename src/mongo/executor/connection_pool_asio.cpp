@@ -43,7 +43,9 @@ namespace executor {
 namespace connection_pool_asio {
 
 ASIOTimer::ASIOTimer(asio::io_service* io_service)
-    : _io_service(io_service), _impl(*io_service), _canceled(true) {}
+    : _io_service(io_service),
+      _impl(*io_service),
+      _callbackSharedState(std::make_shared<CallbackSharedState>()) {}
 
 ASIOTimer::~ASIOTimer() {
     cancelTimeout();
@@ -54,25 +56,42 @@ void ASIOTimer::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
 
     cancelTimeout();
     _impl.expires_after(timeout);
-    _canceled = false;
 
-    _impl.async_wait([this](const asio::error_code& error) {
+    decltype(_callbackSharedState->id) id;
+    decltype(_callbackSharedState) sharedState;
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_callbackSharedState->mutex);
+        id = ++_callbackSharedState->id;
+        sharedState = _callbackSharedState;
+    }
+
+    _impl.async_wait([this, id, sharedState](const asio::error_code& error) {
         if (error == asio::error::operation_aborted) {
             return;
         }
 
-        bool wasCanceled = _canceled;
-        _canceled = true;
+        stdx::unique_lock<stdx::mutex> lk(sharedState->mutex);
 
-        if (!wasCanceled) {
+        // If the id in shared state doesn't match the id in our callback, it
+        // means we were cancelled, but still executed. This can occur if we
+        // were cancelled just before our timeout. We need a generation, rather
+        // than just a bool here, because we could have been cancelled and
+        // another callback set, in which case we shouldn't run and the we
+        // should let the other callback execute instead.
+        if (sharedState->id == id) {
             auto cb = std::move(_cb);
+            lk.unlock();
             cb();
         }
     });
 }
 
 void ASIOTimer::cancelTimeout() {
-    _canceled = true;
+    {
+        stdx::lock_guard<stdx::mutex> lk(_callbackSharedState->mutex);
+        _callbackSharedState->id++;
+    }
     _impl.cancel();
 }
 
