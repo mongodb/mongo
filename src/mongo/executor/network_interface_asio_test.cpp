@@ -589,7 +589,7 @@ TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
     bool gotReplyMetadata = false;
     start(stdx::make_unique<TestMetadataHook>(&wroteRequestMetadata, &gotReplyMetadata));
 
-    std::promise<void> done;
+    stdx::promise<void> done;
 
     net().startCommand({},
                        {testHost, "blah", BSON("ping" << 1)},
