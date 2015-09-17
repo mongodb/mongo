@@ -45,6 +45,22 @@ for f in `find bench examples ext src test -name '*.[ci]'`; do
 	}
 done
 
+# Jumps inside va_start/va_end pairs.
+for f in `find bench examples ext src test -name '*.[ci]'`; do
+	file_parse $f |
+	egrep 'va_start.*(WT_RET|goto).*va_end' |
+	sed 's/:.*//' > $t
+	file_parse $f |
+	egrep -v 'va_start.*WT_ERR.*[^a-z_]err:	va_end' |
+	egrep 'va_start.*WT_ERR.*va_end' |
+	sed 's/:.*//' >> $t
+
+	test -s $t && {
+		echo "$f: va_end of va_start/va_end pair can be skipped"
+		sed 's/^/function @ line:/' < $t
+	}
+done
+
 # Early exits from critical loops.
 for f in `find bench examples ext src test -name '*.[ci]'`; do
 	sed -n -e '/API_CALL.*;$/,/API_END.*;/{=;p;}' \
