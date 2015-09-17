@@ -135,6 +135,23 @@ shellPrint = function( x ){
     }
 }
 
+print.captureAllOutput = function (fn, args) {
+    var res = {};
+    res.output = [];
+    var __orig_print = print;
+    print = function () {
+        Array.prototype.push.apply(res.output, Array.prototype.slice.call(arguments).join(" ").split("\n"));
+    };
+    try {
+        res.result = fn.apply(undefined, args);
+    }
+    finally {
+        // Stop capturing print() output
+        print = __orig_print;
+    }
+    return res;
+};
+
 if ( typeof TestData == "undefined" ){
     TestData = undefined
 }

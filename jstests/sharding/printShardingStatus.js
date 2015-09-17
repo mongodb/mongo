@@ -6,20 +6,6 @@
 (function () {
 
 
-// SERVER-19368 to move this into utils.js
-// jstests/auth/show_log_auth.js does something similar and could also benefit from this
-print.captureAllOutput = function (fn, args) {
-    var res = {};
-    res.output = [];
-    var __orig_print = print;
-    print = function () {
-        Array.prototype.push.apply(res.output, Array.prototype.slice.call(arguments).join(" ").split("\n"));
-    };
-    res.result = fn.apply(undefined, args);
-    print = __orig_print;
-    return res;
-}
-
 var st = new ShardingTest({ shards: 1, mongos: 2, config: 1, other: { smallfiles: true } });
 
 var mongos = st.s0;

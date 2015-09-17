@@ -7,25 +7,17 @@ var db = m.getDB( "admin" );
 
 db.createUser({user: "admin" , pwd: "pass", roles: jsTest.adminUserRoles});
 
-// Temporarily capture this shell's print() output
-var oldprint = print, printed = [];
-print = function(s) { printed.push(s); }
-
-try {
-    shellHelper.show('logs');
-    shellHelper.show('log ' + baseName);
-}
-finally {
-    // Stop capturing print() output
-    print = oldprint;
-}
-
 function assertStartsWith(s, prefix) {
     assert.eq(s.substr(0, prefix.length), prefix);
 }
 
-assertStartsWith(printed[0], 'Error while trying to show logs');
-assertStartsWith(printed[1], 'Error while trying to show ' + baseName + ' log');
+assertStartsWith( print.captureAllOutput( function () {
+    shellHelper.show('logs');
+} ).output[0], 'Error while trying to show logs');
+
+assertStartsWith( print.captureAllOutput( function () {
+    shellHelper.show('log ' + baseName);
+} ).output[0], 'Error while trying to show ' + baseName + ' log');
 
 db.auth( "admin" , "pass" );
 db.shutdownServer();
