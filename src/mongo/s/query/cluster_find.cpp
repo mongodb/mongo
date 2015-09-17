@@ -155,6 +155,9 @@ StatusWith<CursorId> runConfigServerQuerySCCC(const CanonicalQuery& query,
                               0,        // nToSkip
                               nullptr,  // fieldsToReturn
                               0);       // options
+    if (!cursor || !cursor->more()) {
+        return {ErrorCodes::OperationFailed, "failed to run find command against config shard"};
+    }
     BSONObj result = cursor->nextSafe().getOwned();
     conn.done();
 
