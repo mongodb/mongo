@@ -42,8 +42,8 @@ def compareOneResultNoise(this_one, reference, label, threadlevel="max", noiseLe
         delta = noise
     # Do the check
     if ref - current >= delta:
-        print ("\tregression found on %s: drop from %s (commit %s) to %s for comparison %s. Diff is"
-               " %.2f (%.2f%%), noise level is %.2f and multiple is %.2f" %
+        print ("\tregression found on %s: drop from %.2f ops/sec (commit %s) to %.2f ops/sec for comparison %s. Diff is"
+               " %.2f ops/sec (%.2f%%), noise level is %.2f ops/sec and multiple is %.2f" %
                (threadlevel, ref, reference["revision"][:5], current, label, ref - current,
                 100*(ref-current)/ref, noiseLevel, noiseMultiple))
         failed = True
