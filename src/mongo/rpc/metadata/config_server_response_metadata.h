@@ -40,30 +40,40 @@ namespace rpc {
 /**
  * This class encapsulates the response that mongod will return to mongos on every
  * command, containing metadata information about the config servers.
+ *
+ * format:
+ * configsvr: {
+ *     opTime: {ts: Timestamp(0, 0), t: 0}
+ * }
  */
 class ConfigServerResponseMetadata {
 public:
+    ConfigServerResponseMetadata() = default;
     explicit ConfigServerResponseMetadata(repl::OpTime opTime);
 
     /**
-     * format:
-     * configsvr: {
-     *     opTime: {ts: Timestamp(0, 0), t: 0}
-     * }
+     * Parses the response metadata from the given metadata object.
+     * Returns a non-ok status on parse error.
+     * If no metadata is found, returns a default-constructed ConfigServerResponseMetadata.
      */
     static StatusWith<ConfigServerResponseMetadata> readFromMetadata(const BSONObj& doc);
+
+    /**
+     * Writes the request metadata to the given BSONObjBuilder for building a command request.
+     * Only valid to call if _opTime is initialized.
+     */
     void writeToMetadata(BSONObjBuilder* builder) const;
 
     /**
      * Returns the OpTime of the most recent operation on the config servers that this
      * shard has seen.
      */
-    repl::OpTime getOpTime() const {
+    boost::optional<repl::OpTime> getOpTime() const {
         return _opTime;
     }
 
 private:
-    repl::OpTime _opTime;
+    boost::optional<repl::OpTime> _opTime;
 };
 
 }  // namespace rpc

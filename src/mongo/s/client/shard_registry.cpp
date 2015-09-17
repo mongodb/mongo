@@ -42,6 +42,7 @@
 #include "mongo/db/client.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/config_server_response_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -399,17 +400,34 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfigNo
     return response;
 }
 
+Status ShardRegistry::_advanceConfigOpTimeFromMetadata(const BSONObj& metadata) {
+    auto configMetadata = rpc::ConfigServerResponseMetadata::readFromMetadata(metadata);
+    if (!configMetadata.isOK()) {
+        return configMetadata.getStatus();
+    }
+    auto configOptime = configMetadata.getValue().getOpTime();
+    if (configOptime.is_initialized()) {
+        advanceConfigOpTime(configOptime.get());
+    }
+    return Status::OK();
+}
+
 StatusWith<BSONObj> ShardRegistry::runCommand(OperationContext* txn,
                                               const HostAndPort& host,
                                               const std::string& dbName,
                                               const BSONObj& cmdObj) {
-    auto status =
+    auto response =
         _runCommandWithMetadata(_executor.get(), host, dbName, cmdObj, rpc::makeEmptyMetadata());
-    if (!status.isOK()) {
-        return status.getStatus();
+    if (!response.isOK()) {
+        return response.getStatus();
     }
 
-    return status.getValue().response;
+    Status status = _advanceConfigOpTimeFromMetadata(response.getValue().metadata);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return response.getValue().response;
 }
 
 StatusWith<BSONObj> ShardRegistry::runCommandForAddShard(OperationContext* txn,
@@ -464,6 +482,12 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationConte
     if (!response.isOK()) {
         return response.getStatus();
     }
+
+    Status status = _advanceConfigOpTimeFromMetadata(response.getValue().metadata);
+    if (!status.isOK()) {
+        return status;
+    }
+
     return response.getValue().response;
 }
 
@@ -543,6 +567,7 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
 
     CommandResponse cmdResponse;
     cmdResponse.response = response.data;
+    cmdResponse.metadata = response.metadata;
 
     if (response.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
         auto replParseStatus = rpc::ReplSetMetadata::readFromMetadata(response.metadata);

@@ -54,7 +54,9 @@ StatusWith<ConfigServerResponseMetadata> ConfigServerResponseMetadata::readFromM
 
     Status status =
         bsonExtractTypedField(metadataObj, kRootFieldName, Object, &configMetadataElement);
-    if (!status.isOK()) {
+    if (status == ErrorCodes::NoSuchKey) {
+        return ConfigServerResponseMetadata{};
+    } else if (!status.isOK()) {
         return status;
     }
 
@@ -70,8 +72,9 @@ StatusWith<ConfigServerResponseMetadata> ConfigServerResponseMetadata::readFromM
 }
 
 void ConfigServerResponseMetadata::writeToMetadata(BSONObjBuilder* builder) const {
+    invariant(_opTime.is_initialized());
     BSONObjBuilder configMetadataBuilder(builder->subobjStart(kRootFieldName));
-    _opTime.append(&configMetadataBuilder, kOpTimeFieldName);
+    _opTime.get().append(&configMetadataBuilder, kOpTimeFieldName);
 }
 
 }  // namespace rpc

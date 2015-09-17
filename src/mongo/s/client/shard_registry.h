@@ -258,6 +258,7 @@ private:
 
     struct CommandResponse {
         BSONObj response;
+        BSONObj metadata;
         repl::OpTime opTime;
     };
 
@@ -275,6 +276,13 @@ private:
                                           const ConnectionString& newConnString);
 
     std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
+
+    /**
+     * Takes a metadata response object received in reply to running a command against a shard,
+     * and if that response metadata contains the shard's config server optime, passes that to
+     * advanceConfigOpTime.
+     */
+    Status _advanceConfigOpTimeFromMetadata(const BSONObj& metadata);
 
     /**
      * Runs a command against the specified host and returns the result.  It is the responsibility

@@ -40,7 +40,7 @@ TEST(ConfigSvrMetadataTest, Roundtrip) {
     OpTime opTime(Timestamp(1234, 100), 5);
     ConfigServerResponseMetadata metadata(opTime);
 
-    ASSERT_EQ(opTime, metadata.getOpTime());
+    ASSERT_EQ(opTime, metadata.getOpTime().get());
 
     BSONObjBuilder builder;
     metadata.writeToMetadata(&builder);
@@ -56,7 +56,7 @@ TEST(ConfigSvrMetadataTest, Roundtrip) {
     ASSERT_OK(cloneStatus.getStatus());
 
     const auto& clonedMetadata = cloneStatus.getValue();
-    ASSERT_EQ(opTime, clonedMetadata.getOpTime());
+    ASSERT_EQ(opTime, clonedMetadata.getOpTime().get());
 
     BSONObjBuilder clonedBuilder;
     clonedMetadata.writeToMetadata(&clonedBuilder);
