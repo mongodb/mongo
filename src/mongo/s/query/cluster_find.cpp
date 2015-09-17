@@ -368,6 +368,10 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
 
         invariant(chunkManager);
         chunkManager = chunkManager->reload(txn);
+        if (!chunkManager) {
+            dbConfig.getValue()->getChunkManagerOrPrimary(
+                txn, query.nss().ns(), chunkManager, primary);
+        }
     }
 
     return {ErrorCodes::StaleShardVersion,

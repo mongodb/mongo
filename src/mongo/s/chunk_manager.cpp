@@ -331,7 +331,7 @@ shared_ptr<ChunkManager> ChunkManager::reload(OperationContext* txn, bool force)
     auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
     shared_ptr<DBConfig> config = uassertStatusOK(status);
 
-    return config->getChunkManager(txn, getns(), force);
+    return config->getChunkManagerIfExists(txn, getns(), force);
 }
 
 void ChunkManager::_printChunks() const {

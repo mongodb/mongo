@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
@@ -308,6 +309,7 @@ TEST_F(ShardCollectionTest, anotherMongosSharding) {
         Status::OK());
 
     auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
         ASSERT_EQUALS(
             ErrorCodes::AlreadyInitialized,
             catalogManager()->shardCollection(
@@ -370,6 +372,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
         ASSERT_OK(catalogManager()->shardCollection(
             operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
     });
@@ -547,6 +550,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
         set<ShardId> shards{shard0.getName(), shard1.getName(), shard2.getName()};
         ASSERT_OK(catalogManager()->shardCollection(
             operationContext(),
@@ -713,6 +717,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
 
     // Now start actually sharding the collection.
     auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
         ASSERT_OK(catalogManager()->shardCollection(
             operationContext(), ns, keyPattern, false, vector<BSONObj>{}, set<ShardId>{}));
     });
