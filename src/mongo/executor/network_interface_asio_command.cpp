@@ -270,6 +270,13 @@ void NetworkInterfaceASIO::_networkErrorCallback(AsyncOp* op, const std::error_c
 // NOTE: This method may only be called by ASIO threads
 // (do not call from methods entered by TaskExecutor threads)
 void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus& resp) {
+    // Prevent any other threads or callbacks from accessing this op so we may
+    // safely complete and destroy it.
+    {
+        stdx::lock_guard<stdx::mutex> lk(op->_access->mutex);
+        ++(op->_access->id);
+    }
+
     op->finish(resp);
 
     std::unique_ptr<AsyncOp> ownedOp;
