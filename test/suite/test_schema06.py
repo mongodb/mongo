@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #
+# Public Domain 2014-2015 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -63,7 +64,7 @@ class test_schema06(wttest.WiredTigerTestCase):
     def drop_index(inum):
         colname = "s" + str(inum)
         self.session.drop("index:main:" + colname, None)
-        
+
     def test_index_stress(self):
         self.session.create("table:schema06",
                             "key_format=S,value_format=SSSSSS," +
@@ -82,7 +83,7 @@ class test_schema06(wttest.WiredTigerTestCase):
                              values[3],values[4],values[5])
             cursor.insert()
         cursor.close()
-        
+
     def check_entries(self, check_indices):
         cursor = self.session.open_cursor('table:main', None, None)
         # spot check via search
