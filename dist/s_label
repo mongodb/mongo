@@ -23,7 +23,7 @@ file_parse()
 # where there's a jump to the error label after the error label.
 for f in `find bench examples ext src test -name '*.[ci]'`; do
 	file_parse $f |
-	egrep '(WT_ERR|WT_ERR_MSG|WT_ERR_NOTFOUND_OK|WT_ERR_TEST|WT_ILLEGAL_VALUE_ERR)\(.*(WT_ASSERT_RET|WT_ILLEGAL_VALUE|WT_RET|WT_RET_MSG|WT_RET_NOTFOUND_OK|WT_RET_TEST|WT_VERBOSE_RET|WT_VERBOSE_RETVAL)\(.*err:|[^a-z_]err:.*(WT_ERR|WT_ERR_MSG|WT_ERR_NOTFOUND_OK|WT_ERR_TEST|WT_ILLEGAL_VALUE_ERR)\(' |
+	egrep '(WT_ERR|WT_ILLEGAL_VALUE_ERR)\(.*(WT_ILLEGAL_VALUE|WT_RET)\(.*err:|[^a-z_]err:.*(WT_ERR|WT_ILLEGAL_VALUE_ERR)\(' |
 	sed 's/:.*//' > $t
 
 	test -s $t && {
