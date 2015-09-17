@@ -54,6 +54,10 @@ namespace {
 const auto getFTDCController = ServiceContext::declareDecoration<std::unique_ptr<FTDCController>>();
 
 FTDCController* getGlobalFTDCController() {
+    if (!hasGlobalServiceContext()) {
+        return nullptr;
+    }
+
     return getFTDCController(getGlobalServiceContext()).get();
 }
 
