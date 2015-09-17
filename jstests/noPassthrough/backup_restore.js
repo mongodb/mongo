@@ -84,6 +84,7 @@
             "    'reindex_background.js'," +
             "    'yield_sort.js'," +
             "].map(function(file) { return dir + '/' + file; });" +
+            "Random.setRandomSeed();" +
             // run indefinitely
             "while (true) {" +
             "   try {" +
