@@ -84,11 +84,11 @@ __wt_block_buffer_to_addr(WT_BLOCK *block,
 }
 
 /*
- * __wt_block_addr_valid --
- *	Return if an address cookie is valid.
+ * __wt_block_addr_invalid --
+ *	Return an error code if an address cookie is invalid.
  */
 int
-__wt_block_addr_valid(WT_SESSION_IMPL *session,
+__wt_block_addr_invalid(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, size_t addr_size, int live)
 {
 	wt_off_t offset;
@@ -110,8 +110,8 @@ __wt_block_addr_valid(WT_SESSION_IMPL *session,
 	    session, block, "addr-valid", offset, size, live));
 #endif
 
-	/* Check if it's past the end of the file. */
-	return (offset + size > block->fh->size ? 0 : 1);
+	/* Check if the address is past the end of the file. */
+	return (offset + size > block->fh->size ? EINVAL : 0);
 }
 
 /*

@@ -35,10 +35,10 @@
 	} else								\
 		ret = 0;						\
 } while (0)
-#define	WT_ERR_BUSY_OK(a)						\
-	WT_ERR_TEST((ret = (a)) != 0 && ret != EBUSY, ret)
-#define	WT_ERR_NOTFOUND_OK(a)						\
-	WT_ERR_TEST((ret = (a)) != 0 && ret != WT_NOTFOUND, ret)
+#define	WT_ERR_ERROR_OK(a, e)						\
+	WT_ERR_TEST((ret = (a)) != 0 && ret != (e), ret)
+#define	WT_ERR_BUSY_OK(a)	WT_ERR_ERROR_OK(a, EBUSY)
+#define	WT_ERR_NOTFOUND_OK(a)	WT_ERR_ERROR_OK(a, WT_NOTFOUND)
 
 /* Return tests. */
 #define	WT_RET(a) do {							\
@@ -55,14 +55,13 @@
 	if (a)								\
 		return (v);						\
 } while (0)
-#define	WT_RET_BUSY_OK(a) do {						\
+#define	WT_RET_ERROR_OK(a, e) do {					\
 	int __ret = (a);						\
-	WT_RET_TEST(__ret != 0 && __ret != EBUSY, __ret);		\
+	WT_RET_TEST(__ret != 0 && __ret != (e), __ret);			\
 } while (0)
-#define	WT_RET_NOTFOUND_OK(a) do {					\
-	int __ret = (a);						\
-	WT_RET_TEST(__ret != 0 && __ret != WT_NOTFOUND, __ret);		\
-} while (0)
+#define	WT_RET_BUSY_OK(a)	WT_RET_ERROR_OK(a, EBUSY)
+#define	WT_RET_NOTFOUND_OK(a)	WT_RET_ERROR_OK(a, WT_NOTFOUND)
+
 /* Set "ret" if not already set. */
 #define	WT_TRET(a) do {							\
 	int __ret;							\
@@ -71,20 +70,15 @@
 	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
 		ret = __ret;						\
 } while (0)
-#define	WT_TRET_BUSY_OK(a) do {						\
+#define	WT_TRET_ERROR_OK(a, e) do {					\
 	int __ret;							\
-	if ((__ret = (a)) != 0 && __ret != EBUSY &&			\
+	if ((__ret = (a)) != 0 && __ret != (e) &&			\
 	    (__ret == WT_PANIC ||					\
 	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
 		ret = __ret;						\
 } while (0)
-#define	WT_TRET_NOTFOUND_OK(a) do {					\
-	int __ret;							\
-	if ((__ret = (a)) != 0 && __ret != WT_NOTFOUND &&		\
-	    (__ret == WT_PANIC ||					\
-	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
-		ret = __ret;						\
-} while (0)
+#define	WT_TRET_BUSY_OK(a)	WT_TRET_ERROR_OK(a, EBUSY)
+#define	WT_TRET_NOTFOUND_OK(a)	WT_TRET_ERROR_OK(a, WT_NOTFOUND)
 
 /* Return and branch-to-err-label cases for switch statements. */
 #define	WT_ILLEGAL_VALUE(session)					\

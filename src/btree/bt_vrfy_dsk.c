@@ -8,10 +8,10 @@
 
 #include "wt_internal.h"
 
-static int __err_cell_corrupted(WT_SESSION_IMPL *, uint32_t, const char *);
+static int __err_cell_corrupt(WT_SESSION_IMPL *, uint32_t, const char *);
+static int __err_cell_corrupt_or_eof(WT_SESSION_IMPL *, uint32_t, const char *);
 static int __err_cell_type(
 	WT_SESSION_IMPL *, uint32_t, const char *, uint8_t, uint8_t);
-static int __err_eof(WT_SESSION_IMPL *, uint32_t, const char *);
 static int __verify_dsk_chunk(
 	WT_SESSION_IMPL *, const char *, const WT_PAGE_HEADER *, uint32_t);
 static int __verify_dsk_col_fix(
@@ -223,8 +223,8 @@ __verify_dsk_row(
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, end) != 0) {
-			ret = __err_cell_corrupted(session, cell_num, tag);
+		if (__wt_cell_unpack_safe(cell, unpack, dsk, end) != 0) {
+			ret = __err_cell_corrupt(session, cell_num, tag);
 			goto err;
 		}
 
@@ -285,7 +285,7 @@ __verify_dsk_row(
 			break;
 		}
 
-		/* Check if any referenced item has a valid address. */
+		/* Check if any referenced item has an invalid address. */
 		switch (cell_type) {
 		case WT_CELL_ADDR_DEL:
 		case WT_CELL_ADDR_INT:
@@ -293,9 +293,14 @@ __verify_dsk_row(
 		case WT_CELL_ADDR_LEAF_NO:
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:
-			if (!bm->addr_valid(bm,
-			    session, unpack->data, unpack->size))
-				goto eof;
+			ret = bm->addr_invalid(
+			    bm, session, unpack->data, unpack->size);
+			WT_RET_ERROR_OK(ret, EINVAL);
+			if (ret == EINVAL) {
+				ret = __err_cell_corrupt_or_eof(
+				    session, cell_num, tag);
+				goto err;
+			}
 			break;
 		}
 
@@ -452,10 +457,6 @@ key_compare:	/*
 		    tag, key_cnt, dsk->u.entries);
 
 	if (0) {
-eof:		ret = __err_eof(session, cell_num, tag);
-	}
-
-	if (0) {
 err:		if (ret == 0)
 			ret = WT_ERROR;
 	}
@@ -477,6 +478,7 @@ __verify_dsk_col_int(
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	uint32_t cell_num, i;
 	uint8_t *end;
 
@@ -490,8 +492,8 @@ __verify_dsk_col_int(
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
-			return (__err_cell_corrupted(session, cell_num, tag));
+		if (__wt_cell_unpack_safe(cell, unpack, dsk, end) != 0)
+			return (__err_cell_corrupt(session, cell_num, tag));
 
 		/* Check the raw and collapsed cell types. */
 		WT_RET(__err_cell_type(
@@ -500,8 +502,11 @@ __verify_dsk_col_int(
 		    session, cell_num, tag, unpack->type, dsk->type));
 
 		/* Check if any referenced item is entirely in the file. */
-		if (!bm->addr_valid(bm, session, unpack->data, unpack->size))
-			return (__err_eof(session, cell_num, tag));
+		ret = bm->addr_invalid(bm, session, unpack->data, unpack->size);
+		WT_RET_ERROR_OK(ret, EINVAL);
+		if (ret == EINVAL)
+			return (
+			    __err_cell_corrupt_or_eof(session, cell_num, tag));
 	}
 	WT_RET(__verify_dsk_memsize(session, tag, dsk, cell));
 
@@ -537,6 +542,7 @@ __verify_dsk_col_var(
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	size_t last_size;
 	uint32_t cell_num, cell_type, i;
 	int last_deleted;
@@ -557,8 +563,8 @@ __verify_dsk_col_var(
 		++cell_num;
 
 		/* Carefully unpack the cell. */
-		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
-			return (__err_cell_corrupted(session, cell_num, tag));
+		if (__wt_cell_unpack_safe(cell, unpack, dsk, end) != 0)
+			return (__err_cell_corrupt(session, cell_num, tag));
 
 		/* Check the raw and collapsed cell types. */
 		WT_RET(__err_cell_type(
@@ -568,9 +574,14 @@ __verify_dsk_col_var(
 		cell_type = unpack->type;
 
 		/* Check if any referenced item is entirely in the file. */
-		if (cell_type == WT_CELL_VALUE_OVFL &&
-		    !bm->addr_valid(bm, session, unpack->data, unpack->size))
-			return (__err_eof(session, cell_num, tag));
+		if (cell_type == WT_CELL_VALUE_OVFL) {
+			ret = bm->addr_invalid(
+			    bm, session, unpack->data, unpack->size);
+			WT_RET_ERROR_OK(ret, EINVAL);
+			if (ret == EINVAL)
+				return (__err_cell_corrupt_or_eof(
+				    session, cell_num, tag));
+		}
 
 		/*
 		 * Compare the last two items and see if reconciliation missed
@@ -671,15 +682,29 @@ __verify_dsk_chunk(WT_SESSION_IMPL *session,
 }
 
 /*
- * __err_cell_corrupted --
+ * __err_cell_corrupt --
  *	Generic corrupted cell, we couldn't read it.
  */
 static int
-__err_cell_corrupted(
+__err_cell_corrupt(
     WT_SESSION_IMPL *session, uint32_t entry_num, const char *tag)
 {
 	WT_RET_VRFY(session,
 	    "item %" PRIu32 " on page at %s is a corrupted cell",
+	    entry_num, tag);
+}
+
+/*
+ * __err_cell_corrupt_or_eof --
+ *	Generic corrupted cell or item references non-existent file pages error.
+ */
+static int
+__err_cell_corrupt_or_eof(
+    WT_SESSION_IMPL *session, uint32_t entry_num, const char *tag)
+{
+	WT_RET_VRFY(session,
+	    "item %" PRIu32 " on page at %s is a corrupted cell or references "
+	    "non-existent file pages",
 	    entry_num, tag);
 }
 
@@ -740,17 +765,4 @@ __err_cell_type(WT_SESSION_IMPL *session,
 	    " on page at %s is a %s cell on a %s page",
 	    entry_num, tag,
 	    __wt_cell_type_string(cell_type), __wt_page_type_string(dsk_type));
-}
-
-/*
- * __err_eof --
- *	Generic item references non-existent file pages error.
- */
-static int
-__err_eof(WT_SESSION_IMPL *session, uint32_t entry_num, const char *tag)
-{
-	WT_RET_VRFY(session,
-	    "off-page item %" PRIu32
-	    " on page at %s references non-existent file pages",
-	    entry_num, tag);
 }

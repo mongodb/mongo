@@ -125,7 +125,28 @@ main(void)
 		fprintf(stderr,
 		    "Unexpected error %d from WT_SESSION::transaction_sync\n",
 		    ret);
+	/*
+	 * Demonstrate using log_flush to force the log to disk.
+	 */
+	for (i = 0; i < MAX_KEYS; i++, record_count++) {
+		snprintf(k, sizeof(k), "key%d", record_count);
+		snprintf(v, sizeof(v), "value%d", record_count);
+		cursor->set_key(cursor, k);
+		cursor->set_value(cursor, v);
+		ret = cursor->insert(cursor);
+	}
+	ret = session->log_flush(session, "sync=sync");
+
+	for (i = 0; i < MAX_KEYS; i++, record_count++) {
+		snprintf(k, sizeof(k), "key%d", record_count);
+		snprintf(v, sizeof(v), "value%d", record_count);
+		cursor->set_key(cursor, k);
+		cursor->set_value(cursor, v);
+		ret = cursor->insert(cursor);
+	}
 	ret = cursor->close(cursor);
+	ret = session->log_flush(session, "sync=write");
+	ret = session->log_flush(session, "sync=sync");
 
 	ret = wt_conn->close(wt_conn, NULL);
 	return (ret);

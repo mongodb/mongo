@@ -307,7 +307,7 @@ __wt_txn_checkpoint_log(
 	switch (flags) {
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = 1;
-		WT_ERR(__wt_log_ckpt_lsn(session, ckpt_lsn));
+		WT_ERR(__wt_log_flush_lsn(session, ckpt_lsn, 1));
 		/*
 		 * We need to make sure that the log records in the checkpoint
 		 * LSN are on disk.  In particular to make sure that the
@@ -336,7 +336,7 @@ __wt_txn_checkpoint_log(
 			txn->ckpt_nsnapshot = 0;
 			WT_CLEAR(empty);
 			ckpt_snapshot = &empty;
-			WT_ERR(__wt_log_ckpt_lsn(session, ckpt_lsn));
+			WT_ERR(__wt_log_flush_lsn(session, ckpt_lsn, 1));
 		} else
 			ckpt_snapshot = txn->ckpt_snapshot;
 
@@ -358,9 +358,13 @@ __wt_txn_checkpoint_log(
 		/*
 		 * If this full checkpoint completed successfully and there is
 		 * no hot backup in progress, tell the logging subsystem the
-		 * checkpoint LSN so that it can archive.
+		 * checkpoint LSN so that it can archive.  Do not update the
+		 * logging checkpoint LSN if this is during a clean connection
+		 * close, only during a full checkpoint.  A clean close may not
+		 * update any metadata LSN and we do not want to archive in
+		 * that case.
 		 */
-		if (!S2C(session)->hot_backup)
+		if (!S2C(session)->hot_backup && txn->full_ckpt)
 			WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
 
 		/* FALLTHROUGH */
