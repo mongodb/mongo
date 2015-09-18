@@ -1404,7 +1404,7 @@ bool Command::run(OperationContext* txn,
 
         // For commands from mongos, append some info to help getLastError(w) work.
         // TODO: refactor out of here as part of SERVER-18326
-        if (isShardingAware) {
+        if (isShardingAware || serverGlobalParams.configsvr) {
             rpc::ShardingMetadata(lastOpTimeFromClient.getTimestamp(), replCoord->getElectionId())
                 .writeToMetadata(&metadataBob);
         }
