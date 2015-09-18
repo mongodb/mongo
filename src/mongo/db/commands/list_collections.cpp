@@ -32,6 +32,7 @@
 
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/cursor_manager.h"
 #include "mongo/db/catalog/database.h"
@@ -126,46 +127,45 @@ public:
         ScopedTransaction scopedXact(txn, MODE_IS);
         AutoGetDb autoDb(txn, dbname, MODE_S);
 
-        const Database* d = autoDb.getDb();
-        const DatabaseCatalogEntry* dbEntry = NULL;
-
-        list<string> names;
-        if (d) {
-            dbEntry = d->getDatabaseCatalogEntry();
-            dbEntry->getCollectionNamespaces(&names);
-            names.sort();
-        }
+        const Database* db = autoDb.getDb();
 
         auto ws = make_unique<WorkingSet>();
         auto root = make_unique<QueuedDataStage>(txn, ws.get());
 
-        for (std::list<std::string>::const_iterator i = names.begin(); i != names.end(); ++i) {
-            const std::string& ns = *i;
+        if (db) {
+            // TODO when we stop needing to sort the output, don't copy to a vector and just iterate
+            // db.
+            auto collections = std::vector<Collection*>(db->begin(), db->end());
+            std::sort(collections.begin(),
+                      collections.end(),
+                      [](Collection* l, Collection* r) { return l->ns().coll() < r->ns().coll(); });
 
-            StringData collection = nsToCollectionSubstring(ns);
-            if (collection == "system.namespaces") {
-                continue;
+            for (auto&& collection : collections) {
+                StringData collectionName = collection->ns().coll();
+                if (collectionName == "system.namespaces") {
+                    continue;
+                }
+
+                BSONObjBuilder b;
+                b.append("name", collectionName);
+
+                CollectionOptions options =
+                    collection->getCatalogEntry()->getCollectionOptions(txn);
+                b.append("options", options.toBSON());
+
+                BSONObj maybe = b.obj();
+                if (matcher && !matcher->matchesBSON(maybe)) {
+                    continue;
+                }
+
+                WorkingSetID id = ws->allocate();
+                WorkingSetMember* member = ws->get(id);
+                member->keyData.clear();
+                member->loc = RecordId();
+                member->obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
+                member->transitionToOwnedObj();
+                root->pushBack(id);
             }
-
-            BSONObjBuilder b;
-            b.append("name", collection);
-
-            CollectionOptions options =
-                dbEntry->getCollectionCatalogEntry(ns)->getCollectionOptions(txn);
-            b.append("options", options.toBSON());
-
-            BSONObj maybe = b.obj();
-            if (matcher && !matcher->matchesBSON(maybe)) {
-                continue;
-            }
-
-            WorkingSetID id = ws->allocate();
-            WorkingSetMember* member = ws->get(id);
-            member->keyData.clear();
-            member->loc = RecordId();
-            member->obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
-            member->transitionToOwnedObj();
-            root->pushBack(id);
         }
 
         std::string cursorNamespace = str::stream() << dbname << ".$cmd." << name;

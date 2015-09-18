@@ -220,11 +220,7 @@ Status repairDatabase(OperationContext* txn,
             auto snapshotName = replCoord->reserveSnapshotName(txn);
             replCoord->forceSnapshotCreation();  // Ensure a newer snapshot is created even if idle.
 
-            auto dbce = db->getDatabaseCatalogEntry();
-            std::list<std::string> collections;
-            dbce->getCollectionNamespaces(&collections);
-            for (auto&& collectionName : collections) {
-                auto collection = db->getCollection(collectionName);
+            for (auto&& collection : *db) {
                 collection->setMinimumVisibleSnapshot(snapshotName);
             }
         } catch (...) {

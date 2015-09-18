@@ -49,16 +49,72 @@ class NamespaceDetails;
 class OperationContext;
 
 /**
- * Database represents a database database
- * Each database database has its own set of files -- dbname.ns, dbname.0, dbname.1, ...
- * NOT memory mapped
-*/
+ * Represents a logical database containing Collections.
+ *
+ * The semantics for a const Database are that you can mutate individual collections but not add or
+ * remove them.
+ */
 class Database {
 public:
+    typedef StringMap<Collection*> CollectionMap;
+
+    /**
+     * Iterating over a Database yields Collection* pointers.
+     */
+    class iterator {
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = Collection*;
+        using pointer = const value_type*;
+        using reference = const value_type&;
+        using difference_type = ptrdiff_t;
+
+        iterator() = default;
+        iterator(CollectionMap::const_iterator it) : _it(it) {}
+
+        reference operator*() const {
+            return _it->second;
+        }
+
+        pointer operator->() const {
+            return &_it->second;
+        }
+
+        bool operator==(const iterator& other) {
+            return _it == other._it;
+        }
+
+        bool operator!=(const iterator& other) {
+            return _it != other._it;
+        }
+
+        iterator& operator++() {
+            ++_it;
+            return *this;
+        }
+
+        iterator operator++(int) {
+            auto oldPosition = *this;
+            ++_it;
+            return oldPosition;
+        }
+
+    private:
+        CollectionMap::const_iterator _it;
+    };
+
     Database(OperationContext* txn, StringData name, DatabaseCatalogEntry* dbEntry);
 
     // must call close first
     ~Database();
+
+    iterator begin() const {
+        return iterator(_collections.begin());
+    }
+
+    iterator end() const {
+        return iterator(_collections.end());
+    }
 
     // closes files and other cleanup see below.
     void close(OperationContext* txn);
@@ -154,10 +210,6 @@ private:
 
     int _profile;  // 0=off.
 
-    // TODO: make sure deletes go through
-    // this in some ways is a dupe of _namespaceIndex
-    // but it points to a much more useful data structure
-    typedef StringMap<Collection*> CollectionMap;
     CollectionMap _collections;
 
     friend class Collection;
