@@ -1379,6 +1379,9 @@ Status WiredTigerRecordStore::validate(OperationContext* txn,
         if (full && scanData) {
             size_t validatedSize;
             Status status = adaptor->validate(record->data, &validatedSize);
+
+            // The validatedSize equals dataSize below is not a general requirement, but must be
+            // true for WT today because we never pad records.
             if (!status.isOK() || validatedSize != static_cast<size_t>(dataSize)) {
                 results->valid = false;
                 results->errors.push_back(str::stream() << record->id << " is corrupted");
