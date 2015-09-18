@@ -14,11 +14,9 @@ When logging is enabled, WiredTiger writes records to the log for each
 transaction.
 
 Transactions define which updates are made durable together; see
-@ref transactions for details.  By default, log records are flushed to
-disk by WT_SESSION::commit_transaction, ensuring that, once
-WT_SESSION::commit_transaction returns successfully, updates performed
-by the transaction will be included in the database state regardless of
-application or system failure.
+@ref transactions for details.  By default, log records are buffered in memory
+when written by WT_SESSION::commit_transaction.  See
+@ref durability_group_commit for information about durability options.
 
 When the transactional log is enabled, calling ::wiredtiger_open
 automatically performs a recovery step when opening the database that

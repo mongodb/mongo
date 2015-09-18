@@ -1460,8 +1460,13 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.commit_transaction, see dist/api_data.py}
 	 * @config{sync, override whether to sync log records when the
 	 * transaction commits\, inherited from ::wiredtiger_open \c
-	 * transaction_sync., a string\, chosen from the following options: \c
-	 * "background"\, \c "off"\, \c "on"; default empty.}
+	 * transaction_sync.  The \c background setting initiates a background
+	 * synchronization intended to be used with a later call to
+	 * WT_SESSION::transaction_sync.  The \c off setting does not wait for
+	 * record to be written or synchronized.  The \c on setting forces log
+	 * records to be written to the storage device., a string\, chosen from
+	 * the following options: \c "background"\, \c "off"\, \c "on"; default
+	 * empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1570,8 +1575,7 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.transaction_sync, see dist/api_data.py}
 	 * @config{timeout_ms, maximum amount of time to wait for background
 	 * sync to complete in milliseconds.  A value of zero disables the
-	 * timeout and returns immediately.  The default waits forever., an
-	 * integer; default \c .}
+	 * timeout and returns immediately., an integer; default \c 1200000.}
 	 * @configend
 	 * @errors
 	 */

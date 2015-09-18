@@ -913,7 +913,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL, 0
 	},
 	{ "WT_SESSION.transaction_sync",
-	  "timeout_ms=",
+	  "timeout_ms=1200000",
 	  confchk_WT_SESSION_transaction_sync, 1
 	},
 	{ "WT_SESSION.truncate",
