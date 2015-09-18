@@ -2388,7 +2388,7 @@ void TopologyCoordinatorImpl::processReplSetRequestVotes(const ReplSetRequestVot
     } else {
         if (!args.isADryRun()) {
             _lastVote.setTerm(args.getTerm());
-            _lastVote.setCandidateId(args.getCandidateId());
+            _lastVote.setCandidateIndex(_rsConfig.findMemberIndexByConfigId(args.getCandidateId()));
         }
         response->setVoteGranted(true);
     }
@@ -2416,7 +2416,7 @@ void TopologyCoordinatorImpl::loadLastVote(const LastVote& lastVote) {
 
 void TopologyCoordinatorImpl::voteForMyselfV1() {
     _lastVote.setTerm(_term);
-    _lastVote.setCandidateId(_selfConfig().getId());
+    _lastVote.setCandidateIndex(_selfIndex);
 }
 
 void TopologyCoordinatorImpl::setPrimaryIndex(long long primaryIndex) {

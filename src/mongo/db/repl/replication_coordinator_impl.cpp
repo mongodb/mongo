@@ -2731,7 +2731,7 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
     if (response->getVoteGranted()) {
         LastVote lastVote;
         lastVote.setTerm(args.getTerm());
-        lastVote.setCandidateId(args.getCandidateId());
+        lastVote.setCandidateIndex(_rsConfig.findMemberIndexByConfigId(args.getCandidateId()));
 
         Status status = _externalState->storeLocalLastVoteDocument(txn, lastVote);
         if (!status.isOK()) {
@@ -3105,8 +3105,7 @@ void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
 
         LastVote lastVote;
         lastVote.setTerm(OpTime::kInitialTerm);
-        // TODO(sz) Change candidate Id to index.
-        lastVote.setCandidateId(-1);
+        lastVote.setCandidateIndex(-1);
         auto status = _externalState->storeLocalLastVoteDocument(cbData.txn, lastVote);
         invariant(status.isOK());
     });

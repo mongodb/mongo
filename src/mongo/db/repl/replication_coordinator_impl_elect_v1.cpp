@@ -189,7 +189,7 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
     // Store the vote in persistent storage.
     LastVote lastVote;
     lastVote.setTerm(originalTerm + 1);
-    lastVote.setCandidateId(getMyId());
+    lastVote.setCandidateIndex(_selfIndex);
 
     auto cbStatus = _replExecutor.scheduleDBWork(
         [this, lastVote](const ReplicationExecutor::CallbackArgs& cbData) {

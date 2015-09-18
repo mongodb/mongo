@@ -41,14 +41,14 @@ public:
     Status initialize(const BSONObj& argsObj);
 
     long long getTerm() const;
-    long long getCandidateId() const;
+    long long getCandidateIndex() const;
 
     void setTerm(long long term);
-    void setCandidateId(long long candidateId);
+    void setCandidateIndex(long long candidateIndex);
     BSONObj toBSON() const;
 
 private:
-    long long _candidateId = -1;
+    long long _candidateIndex = -1;
     long long _term = -1;
 };
 

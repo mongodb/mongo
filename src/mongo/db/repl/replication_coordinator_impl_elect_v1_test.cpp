@@ -214,7 +214,7 @@ TEST_F(ReplCoordElectV1Test, ElectManyNodesSuccess) {
     // Check last vote
     auto lastVote = getExternalState()->loadLocalLastVoteDocument(nullptr);
     ASSERT(lastVote.isOK());
-    ASSERT_EQ(1, lastVote.getValue().getCandidateId());
+    ASSERT_EQ(0, lastVote.getValue().getCandidateIndex());
     ASSERT_EQ(1, lastVote.getValue().getTerm());
 
     stopCapturingLogMessages();
