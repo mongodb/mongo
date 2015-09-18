@@ -309,7 +309,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         results->push_back(std::move(*next.getValue()));
     }
 
-    if (!query.getParsed().wantMore()) {
+    if (!query.getParsed().wantMore() && !pinnedCursor.isTailable()) {
         cursorState = ClusterCursorManager::CursorState::Exhausted;
     }
 
