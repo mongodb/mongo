@@ -409,18 +409,6 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfigNo
     return response;
 }
 
-Status ShardRegistry::_advanceConfigOpTimeFromMetadata(const BSONObj& metadata) {
-    auto configMetadata = rpc::ConfigServerMetadata::readFromMetadata(metadata);
-    if (!configMetadata.isOK()) {
-        return configMetadata.getStatus();
-    }
-    auto configOptime = configMetadata.getValue().getOpTime();
-    if (configOptime.is_initialized()) {
-        advanceConfigOpTime(configOptime.get());
-    }
-    return Status::OK();
-}
-
 StatusWith<BSONObj> ShardRegistry::runCommand(OperationContext* txn,
                                               const HostAndPort& host,
                                               const std::string& dbName,
@@ -429,11 +417,6 @@ StatusWith<BSONObj> ShardRegistry::runCommand(OperationContext* txn,
         _runCommandWithMetadata(_executor.get(), host, dbName, cmdObj, rpc::makeEmptyMetadata());
     if (!response.isOK()) {
         return response.getStatus();
-    }
-
-    Status status = _advanceConfigOpTimeFromMetadata(response.getValue().metadata);
-    if (!status.isOK()) {
-        return status;
     }
 
     return response.getValue().response;
@@ -490,11 +473,6 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationConte
         _executor.get(), shard->getTargeter(), dbname, cmdObj, rpc::makeEmptyMetadata());
     if (!response.isOK()) {
         return response.getStatus();
-    }
-
-    Status status = _advanceConfigOpTimeFromMetadata(response.getValue().metadata);
-    if (!status.isOK()) {
-        return status;
     }
 
     return response.getValue().response;
