@@ -150,7 +150,9 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
                                         const RemoteCommandCompletionFn& onFinish) {
     {
         stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
-        _inGetConnection.push_back(cbHandle);
+        const auto insertResult = _inGetConnection.emplace(cbHandle);
+        // We should never see the same CallbackHandle added twice
+        invariant(insertResult.second);
     }
 
     auto startTime = now();
@@ -161,11 +163,7 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         if (!swConn.isOK()) {
             {
                 stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
-
-                auto& v = _inGetConnection;
-                auto iter = std::find(v.begin(), v.end(), cbHandle);
-                if (iter != v.end())
-                    v.erase(iter);
+                _inGetConnection.erase(cbHandle);
             }
 
             onFinish(swConn.getStatus());
@@ -180,10 +178,10 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         {
             stdx::unique_lock<stdx::mutex> lk(_inProgressMutex);
 
-            auto iter = std::find(_inGetConnection.begin(), _inGetConnection.end(), cbHandle);
+            const auto eraseCount = _inGetConnection.erase(cbHandle);
 
             // If we didn't find the request, we've been canceled
-            if (iter == _inGetConnection.end()) {
+            if (eraseCount == 0) {
                 lk.unlock();
                 onFinish({ErrorCodes::CallbackCanceled, "Callback canceled"});
                 signalWorkAvailable();
@@ -194,7 +192,6 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
             auto ownedOp = conn->releaseAsyncOp();
             op = ownedOp.get();
 
-            _inGetConnection.erase(iter);
             _inProgress.emplace(op, std::move(ownedOp));
         }
 
@@ -251,25 +248,32 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
 void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {
     stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
 
-    auto iter = std::find(_inGetConnection.begin(), _inGetConnection.end(), cbHandle);
-    if (iter != _inGetConnection.end()) {
-        _inGetConnection.erase(iter);
+    // If we found a matching cbHandle in _inGetConnection, then
+    // simply removing it has the same effect as cancelling it, so we
+    // can just return.
+    if (_inGetConnection.erase(cbHandle) != 0)
         return;
-    }
 
-    for (auto iter = _inProgress.begin(); iter != _inProgress.end(); ++iter) {
-        if (iter->first->cbHandle() == cbHandle) {
-            iter->first->cancel();
+    // TODO: This linear scan is unfortunate. It is here because our
+    // primary data structure is to keep the AsyncOps in an
+    // unordered_map by pointer, but here we only have the
+    // callback. We could keep two data structures at the risk of
+    // having them diverge.
+    for (auto&& kv : _inProgress) {
+        if (kv.first->cbHandle() == cbHandle) {
+            kv.first->cancel();
             break;
         }
     }
 }
 
 void NetworkInterfaceASIO::cancelAllCommands() {
-    stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
-    _inGetConnection.clear();
-    for (auto iter = _inProgress.begin(); iter != _inProgress.end(); ++iter) {
-        iter->first->cancel();
+    decltype(_inGetConnection) newInGetConnection;
+    {
+        stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
+        _inGetConnection.swap(newInGetConnection);
+        for (auto&& kv : _inProgress)
+            kv.first->cancel();
     }
 }
 

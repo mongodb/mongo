@@ -35,6 +35,7 @@
 #include <string>
 #include <system_error>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -387,7 +388,7 @@ private:
     // an AccessControl object, take this lock first, always.
     stdx::mutex _inProgressMutex;
     std::unordered_map<AsyncOp*, std::unique_ptr<AsyncOp>> _inProgress;
-    std::vector<TaskExecutor::CallbackHandle> _inGetConnection;
+    std::unordered_set<TaskExecutor::CallbackHandle> _inGetConnection;
 
     stdx::mutex _executorMutex;
     bool _isExecutorRunnable;
