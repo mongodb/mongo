@@ -83,10 +83,7 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     std::vector<RemoteCommandRequest> requests;
     for (const auto& target : _targets) {
         requests.push_back(RemoteCommandRequest(
-            target,
-            "admin",
-            requestVotesCmd,
-            Milliseconds(30 * 1000)));  // trying to match current Socket timeout
+            target, "admin", requestVotesCmd, _rsConfig.getElectionTimeoutPeriod()));
     }
 
     return requests;
