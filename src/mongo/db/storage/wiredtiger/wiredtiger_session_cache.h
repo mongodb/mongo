@@ -152,6 +152,11 @@ public:
      */
     void shuttingDown();
 
+    /**
+     * Waits until all commits that happened before this call are durable.
+     */
+    void waitUntilDurable(WiredTigerSession* session);
+
     WT_CONNECTION* conn() const {
         return _conn;
     }
@@ -180,5 +185,9 @@ private:
 
     // Bumped when all open sessions need to be closed
     AtomicUInt64 _epoch;  // atomic so we can check it outside of the lock
+
+    // Counter and critical section mutex for waitUntilDurable
+    AtomicUInt32 _lastSyncTime;
+    stdx::mutex _lastSyncMutex;
 };
-}
+}  // namespace

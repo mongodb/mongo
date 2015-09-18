@@ -151,6 +151,23 @@ void WiredTigerSessionCache::shuttingDown() {
     _snapshotManager.shutdown();
 }
 
+void WiredTigerSessionCache::waitUntilDurable(WiredTigerSession* session) {
+    uint32_t start = _lastSyncTime.load();
+    // Do the remainder in a critical section that ensures only a single thread at a time
+    // will attempt to synchronize.
+    stdx::unique_lock<stdx::mutex> lk(_lastSyncMutex);
+    uint32_t current = _lastSyncTime.loadRelaxed();  // synchronized with writes through mutex
+    if (current != start) {
+        // Someone else synced already since we read lastSyncTime, so we're done!
+        return;
+    }
+    _lastSyncTime.store(current + 1);
+
+    // Nobody has synched yet, so we have to sync ourselves.
+    WT_SESSION* s = session->getSession();
+    invariantWTOK(s->log_flush(s, "sync=on"));
+}
+
 void WiredTigerSessionCache::closeAll() {
     // Increment the epoch as we are now closing all sessions with this epoch
     SessionCache swap;

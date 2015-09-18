@@ -62,9 +62,8 @@ public:
     void abortUnitOfWork() final;
 
     virtual bool waitUntilDurable();
-    virtual void goingToWaitUntilDurable();
 
-    virtual void registerChange(Change*);
+    virtual void registerChange(Change* change);
 
     virtual void abandonSnapshot();
 
@@ -122,6 +121,7 @@ private:
     void _abort();
     void _commit();
 
+    void _ensureSession();
     void _txnClose(bool commit);
     void _txnOpen(OperationContext* opCtx);
 
@@ -134,8 +134,6 @@ private:
     uint64_t _myTransactionCount;
     bool _everStartedWrite;
     Timer _timer;
-    bool _currentlySquirreled;
-    bool _syncing;
     RecordId _oplogReadTill;
     bool _readFromMajorityCommittedSnapshot = false;
     SnapshotName _majorityCommittedSnapshot = SnapshotName::min();

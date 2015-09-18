@@ -90,8 +90,8 @@ boost::optional<SnapshotName> WiredTigerSnapshotManager::getMinSnapshotForNextCo
     return _committedSnapshot;
 }
 
-SnapshotName WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(WT_SESSION* session,
-                                                                            bool sync) const {
+SnapshotName WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
+    WT_SESSION* session) const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     uassert(ErrorCodes::ReadConcernMajorityNotAvailableYet,
@@ -100,8 +100,6 @@ SnapshotName WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(WT_S
 
     StringBuilder config;
     config << "snapshot=" << _committedSnapshot->asU64();
-    if (sync)
-        config << ",sync=true";
     invariantWTOK(session->begin_transaction(session, config.str().c_str()));
 
     return *_committedSnapshot;
