@@ -90,8 +90,7 @@
 #include "mongo/rpc/request_interface.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/rpc/metadata/config_server_request_metadata.h"
-#include "mongo/rpc/metadata/config_server_response_metadata.h"
+#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/client/shard_registry.h"
@@ -1262,33 +1261,20 @@ void Command::execCommand(OperationContext* txn,
             auto commandNS = NamespaceString(command->parseNs(dbname, request.getCommandArgs()));
             operationShardVersion.initializeFromCommand(commandNS, request.getCommandArgs());
 
-            auto requestMetadataStatus =
-                rpc::ConfigServerRequestMetadata::readFromCommand(request.getCommandArgs());
-            auto optime = uassertStatusOK(requestMetadataStatus).getOpTime();
-            if (optime.is_initialized()) {
-                if (ShardingState::get(txn)->enabled()) {
-                    // TODO(spencer): Do this unconditionally once all nodes are sharding aware
-                    // by default.
-                    grid.shardRegistry()->advanceConfigOpTime(optime.get());
-                } else {
-                    massert(
-                        28807,
-                        "Received a command with sharding chunk information but this node is not "
-                        "sharding aware",
-                        command->name == "setShardVersion");
-                }
+            auto shardingState = ShardingState::get(txn);
+            if (shardingState->enabled()) {
+                // TODO(spencer): Do this unconditionally once all nodes are sharding aware
+                // by default.
+                shardingState->updateConfigServerOpTimeFromMetadata(txn);
             } else {
-                // If there was top-level shard version information then there must have been
-                // config optime information as well.  a 3.0 mongos won't have shard version info
-                // at the top level (they have it in a nested "metadata" field) so it won't cause
-                // a problem here.
-                massert(28818,
-                        str::stream()
-                            << "Received command with chunk version information but no config "
-                               "server optime: " << request.getCommandArgs().jsonString(),
-                        !operationShardVersion.hasShardVersion() ||
-                            ChunkVersion::isIgnoredVersion(
-                                operationShardVersion.getShardVersion(commandNS)));
+                massert(
+                    28807,
+                    str::stream()
+                        << "Received a command with sharding chunk version information but this "
+                           "node is not sharding aware: " << request.getCommandArgs().jsonString(),
+                    !operationShardVersion.hasShardVersion() ||
+                        ChunkVersion::isIgnoredVersion(
+                            operationShardVersion.getShardVersion(commandNS)));
             }
         }
 
@@ -1418,7 +1404,7 @@ bool Command::run(OperationContext* txn,
 
     if (isShardingAware) {
         auto opTime = grid.shardRegistry()->getConfigOpTime();
-        rpc::ConfigServerResponseMetadata(opTime).writeToMetadata(&metadataBob);
+        rpc::ConfigServerMetadata(opTime).writeToMetadata(&metadataBob);
     }
 
     auto cmdResponse = replyBuilderBob.done();

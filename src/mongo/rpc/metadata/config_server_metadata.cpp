@@ -26,8 +26,9 @@
  *    it in the license file.
  */
 
-#include "mongo/rpc/metadata/config_server_request_metadata.h"
+#include "mongo/rpc/metadata/config_server_metadata.h"
 
+#include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/metadata.h"
@@ -38,27 +39,44 @@ namespace rpc {
 using repl::OpTime;
 
 namespace {
-const char kConfigsvrOpTimeFieldName[] = "configsvrOpTime";
-}  // namespace
 
-ConfigServerRequestMetadata::ConfigServerRequestMetadata(OpTime opTime)
-    : _opTime(std::move(opTime)) {}
+const char kRootFieldName[] = "configsvr";
+const char kOpTimeFieldName[] = "opTime";
 
-StatusWith<ConfigServerRequestMetadata> ConfigServerRequestMetadata::readFromCommand(
-    const BSONObj& cmdObj) {
-    repl::OpTime opTime;
-    Status status = bsonExtractOpTimeField(cmdObj, kConfigsvrOpTimeFieldName, &opTime);
+}  // unnamed namespace
+
+const OperationContext::Decoration<ConfigServerMetadata> ConfigServerMetadata::get =
+    OperationContext::declareDecoration<ConfigServerMetadata>();
+
+ConfigServerMetadata::ConfigServerMetadata(OpTime opTime) : _opTime(std::move(opTime)) {}
+
+StatusWith<ConfigServerMetadata> ConfigServerMetadata::readFromMetadata(
+    const BSONObj& metadataObj) {
+    BSONElement configMetadataElement;
+
+    Status status =
+        bsonExtractTypedField(metadataObj, kRootFieldName, Object, &configMetadataElement);
     if (status == ErrorCodes::NoSuchKey) {
-        return ConfigServerRequestMetadata{};
+        return ConfigServerMetadata{};
     } else if (!status.isOK()) {
         return status;
     }
-    return ConfigServerRequestMetadata(opTime);
+
+    BSONObj configMetadataObj = configMetadataElement.Obj();
+
+    repl::OpTime opTime;
+    status = bsonExtractOpTimeField(configMetadataObj, kOpTimeFieldName, &opTime);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    return ConfigServerMetadata(std::move(opTime));
 }
 
-void ConfigServerRequestMetadata::writeToCommand(BSONObjBuilder* builder) const {
-    invariant(_opTime.is_initialized());
-    _opTime->append(builder, kConfigsvrOpTimeFieldName);
+void ConfigServerMetadata::writeToMetadata(BSONObjBuilder* builder) const {
+    invariant(_opTime);
+    BSONObjBuilder configMetadataBuilder(builder->subobjStart(kRootFieldName));
+    _opTime->append(&configMetadataBuilder, kOpTimeFieldName);
 }
 
 }  // namespace rpc

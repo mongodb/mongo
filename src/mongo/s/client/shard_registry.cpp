@@ -42,7 +42,7 @@
 #include "mongo/db/client.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/config_server_response_metadata.h"
+#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -287,6 +287,11 @@ void ShardRegistry::_updateLookupMapsForShard_inlock(shared_ptr<Shard> shard,
 
     if (newConnString.type() == ConnectionString::SET) {
         _rsLookup[newConnString.getSetName()] = shard;
+    } else if (newConnString.type() == ConnectionString::CUSTOM) {
+        // CUSTOM connection strings (ie "$dummy:10000) become DBDirectClient connections which
+        // always return "localhost" as their resposne to getServerAddress().  This is just for
+        // making dbtest work.
+        _lookup["localhost"] = shard;
     }
 
     // TODO: The only reason to have the shard host names in the lookup table is for the
@@ -425,7 +430,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfigNo
 }
 
 Status ShardRegistry::_advanceConfigOpTimeFromMetadata(const BSONObj& metadata) {
-    auto configMetadata = rpc::ConfigServerResponseMetadata::readFromMetadata(metadata);
+    auto configMetadata = rpc::ConfigServerMetadata::readFromMetadata(metadata);
     if (!configMetadata.isOK()) {
         return configMetadata.getStatus();
     }

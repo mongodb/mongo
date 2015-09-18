@@ -131,12 +131,8 @@ bool setShardVersion(OperationContext* txn,
             SetShardVersionRequest::makeForInit(configServer, shardId, shardCS);
         cmd = ssv.toBSON();
     } else {
-        const ChunkVersionAndOpTime verAndOpT = manager
-            ? ChunkVersionAndOpTime(version, manager->getConfigOpTime())
-            : ChunkVersionAndOpTime(version);
-
         SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioning(
-            configServer, shardId, shardCS, NamespaceString(ns), verAndOpT, authoritative);
+            configServer, shardId, shardCS, NamespaceString(ns), version, authoritative);
 
         cmd = ssv.toBSON();
     }

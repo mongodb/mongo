@@ -84,7 +84,7 @@ public:
                                                     const std::string& shardName,
                                                     const ConnectionString& shard,
                                                     const NamespaceString& nss,
-                                                    const ChunkVersionAndOpTime& nssVersion,
+                                                    const ChunkVersion& nssVersion,
                                                     bool isAuthoritative);
 
     /**
@@ -95,13 +95,12 @@ public:
      * with operations that do per-operation versioning, and do not depend on the connection being
      * marked as sharded.
      */
-    static SetShardVersionRequest makeForVersioningNoPersist(
-        const ConnectionString& configServer,
-        const std::string& shardName,
-        const ConnectionString& shard,
-        const NamespaceString& nss,
-        const ChunkVersionAndOpTime& nssVersion,
-        bool isAuthoritative);
+    static SetShardVersionRequest makeForVersioningNoPersist(const ConnectionString& configServer,
+                                                             const std::string& shardName,
+                                                             const ConnectionString& shard,
+                                                             const NamespaceString& nss,
+                                                             const ChunkVersion& nssVersion,
+                                                             bool isAuthoritative);
 
     /**
      * Parses an SSV request from a set shard version command.
@@ -172,7 +171,7 @@ private:
                            std::string shardName,
                            ConnectionString shardConnectionString,
                            NamespaceString nss,
-                           ChunkVersionAndOpTime version,
+                           ChunkVersion version,
                            bool isAuthoritative);
 
     SetShardVersionRequest();
@@ -188,7 +187,7 @@ private:
 
     // These values are only set if _init is false
     boost::optional<NamespaceString> _nss;
-    boost::optional<ChunkVersionAndOpTime> _version;
+    boost::optional<ChunkVersion> _version;
 };
 
 }  // namespace mongo

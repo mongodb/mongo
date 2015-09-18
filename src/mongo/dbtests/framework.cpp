@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/dbtests/config_server_fixture.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/s/catalog/catalog_manager.h"
@@ -48,6 +49,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -69,6 +71,9 @@ int runDbTests(int argc, char** argv) {
         auto txn = cc().makeOperationContext();
 
         // Initialize the sharding state so we can run sharding tests in isolation
+        auto connectHook = stdx::make_unique<CustomConnectHook>(txn.get());
+        ConnectionString::setConnectionHook(connectHook.get());
+        ON_BLOCK_EXIT([] { ConnectionString::setConnectionHook(nullptr); });
         ShardingState::get(txn.get())->initialize(txn.get(), "$dummy:10000");
     }
 

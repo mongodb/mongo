@@ -214,7 +214,7 @@ bool checkShardVersion(OperationContext* txn,
         return false;
     }
 
-    ChunkVersion requestShardVersion = request.getShardVersion().getVersion();
+    ChunkVersion requestShardVersion = request.getShardVersion();
     if (ChunkVersion::isIgnoredVersion(requestShardVersion)) {
         return true;
     }
@@ -310,8 +310,7 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
     // TODO(spencer): Remove this after 3.2 ships.
     OperationShardVersion& operationShardVersion = OperationShardVersion::get(_txn);
     if (request.hasShardVersion() && !operationShardVersion.hasShardVersion()) {
-        operationShardVersion.setShardVersion(request.getTargetingNSS(),
-                                              request.getShardVersion().getVersion());
+        operationShardVersion.setShardVersion(request.getTargetingNSS(), request.getShardVersion());
     }
 
     //

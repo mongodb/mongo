@@ -63,7 +63,7 @@ SetShardVersionRequest::SetShardVersionRequest(ConnectionString configServer,
                                                std::string shardName,
                                                ConnectionString shardConnectionString,
                                                NamespaceString nss,
-                                               ChunkVersionAndOpTime version,
+                                               ChunkVersion version,
                                                bool isAuthoritative)
     : _init(false),
       _isAuthoritative(isAuthoritative),
@@ -96,7 +96,7 @@ SetShardVersionRequest SetShardVersionRequest::makeForVersioning(
     const std::string& shardName,
     const ConnectionString& shardConnectionString,
     const NamespaceString& nss,
-    const ChunkVersionAndOpTime& nssVersion,
+    const ChunkVersion& nssVersion,
     bool isAuthoritative) {
     return SetShardVersionRequest(
         configServer, shardName, shardConnectionString, nss, nssVersion, isAuthoritative);
@@ -107,7 +107,7 @@ SetShardVersionRequest SetShardVersionRequest::makeForVersioningNoPersist(
     const std::string& shardName,
     const ConnectionString& shard,
     const NamespaceString& nss,
-    const ChunkVersionAndOpTime& nssVersion,
+    const ChunkVersion& nssVersion,
     bool isAuthoritative) {
     auto ssv = makeForVersioning(configServer, shardName, shard, nss, nssVersion, isAuthoritative);
     ssv._noConnectionVersioning = true;
@@ -193,7 +193,7 @@ StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const B
     }
 
     {
-        auto versionStatus = ChunkVersionAndOpTime::parseFromBSONForSetShardVersion(cmdObj);
+        auto versionStatus = ChunkVersion::parseFromBSONForSetShardVersion(cmdObj);
         if (!versionStatus.isOK())
             return versionStatus.getStatus();
 
@@ -231,7 +231,7 @@ const NamespaceString& SetShardVersionRequest::getNS() const {
 
 const ChunkVersion SetShardVersionRequest::getNSVersion() const {
     invariant(!_init);
-    return _version.get().getVersion();
+    return _version.get();
 }
 
 }  // namespace mongo

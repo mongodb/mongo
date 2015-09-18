@@ -26,56 +26,45 @@
  *    it in the license file.
  */
 
-#include "mongo/rpc/metadata/config_server_response_metadata.h"
-
-#include "mongo/bson/util/bson_check.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/config_server_metadata.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace rpc {
+namespace {
 
 using repl::OpTime;
 
-namespace {
+TEST(ConfigSvrMetadataTest, Roundtrip) {
+    OpTime opTime(Timestamp(1234, 100), 5);
+    ConfigServerMetadata metadata(opTime);
 
-const char kRootFieldName[] = "configsvr";
-const char kOpTimeFieldName[] = "opTime";
+    ASSERT_EQ(opTime, metadata.getOpTime().get());
+
+    BSONObjBuilder builder;
+    metadata.writeToMetadata(&builder);
+
+    BSONObj expectedObj(
+        BSON("configsvr" << BSON(
+                 "opTime" << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm()))));
+
+    BSONObj serializedObj = builder.obj();
+    ASSERT_EQ(expectedObj, serializedObj);
+
+    auto cloneStatus = ConfigServerMetadata::readFromMetadata(serializedObj);
+    ASSERT_OK(cloneStatus.getStatus());
+
+    const auto& clonedMetadata = cloneStatus.getValue();
+    ASSERT_EQ(opTime, clonedMetadata.getOpTime().get());
+
+    BSONObjBuilder clonedBuilder;
+    clonedMetadata.writeToMetadata(&clonedBuilder);
+
+    BSONObj clonedSerializedObj = clonedBuilder.obj();
+    ASSERT_EQ(expectedObj, clonedSerializedObj);
+}
 
 }  // unnamed namespace
-
-ConfigServerResponseMetadata::ConfigServerResponseMetadata(OpTime opTime)
-    : _opTime(std::move(opTime)) {}
-
-StatusWith<ConfigServerResponseMetadata> ConfigServerResponseMetadata::readFromMetadata(
-    const BSONObj& metadataObj) {
-    BSONElement configMetadataElement;
-
-    Status status =
-        bsonExtractTypedField(metadataObj, kRootFieldName, Object, &configMetadataElement);
-    if (status == ErrorCodes::NoSuchKey) {
-        return ConfigServerResponseMetadata{};
-    } else if (!status.isOK()) {
-        return status;
-    }
-
-    BSONObj configMetadataObj = configMetadataElement.Obj();
-
-    repl::OpTime opTime;
-    status = bsonExtractOpTimeField(configMetadataObj, kOpTimeFieldName, &opTime);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return ConfigServerResponseMetadata(std::move(opTime));
-}
-
-void ConfigServerResponseMetadata::writeToMetadata(BSONObjBuilder* builder) const {
-    invariant(_opTime.is_initialized());
-    BSONObjBuilder configMetadataBuilder(builder->subobjStart(kRootFieldName));
-    _opTime.get().append(&configMetadataBuilder, kOpTimeFieldName);
-}
-
 }  // namespace rpc
 }  // namespace mongo

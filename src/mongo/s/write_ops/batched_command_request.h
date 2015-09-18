@@ -131,7 +131,7 @@ public:
     bool isOrderedSet() const;
     bool getOrdered() const;
 
-    void setShardVersion(ChunkVersionAndOpTime shardVersion) {
+    void setShardVersion(ChunkVersion shardVersion) {
         _shardVersion = std::move(shardVersion);
     }
 
@@ -139,7 +139,7 @@ public:
         return _shardVersion.is_initialized();
     }
 
-    const ChunkVersionAndOpTime& getShardVersion() const {
+    const ChunkVersion& getShardVersion() const {
         return _shardVersion.get();
     }
 
@@ -184,7 +184,7 @@ public:
 private:
     BatchType _batchType;
 
-    boost::optional<ChunkVersionAndOpTime> _shardVersion;
+    boost::optional<ChunkVersion> _shardVersion;
 
     std::unique_ptr<BatchedInsertRequest> _insertReq;
     std::unique_ptr<BatchedUpdateRequest> _updateReq;

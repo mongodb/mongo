@@ -259,12 +259,11 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         lpqToForward->asFindCommand(&cmdBuilder);
 
         if (chunkManager) {
-            ChunkVersionAndOpTime versionAndOpTime(chunkManager->getVersion(shard->getId()),
-                                                   chunkManager->getConfigOpTime());
-            versionAndOpTime.appendForCommands(&cmdBuilder);
+            ChunkVersion version(chunkManager->getVersion(shard->getId()));
+            version.appendForCommands(&cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
-            ChunkVersionAndOpTime versionAndOpTime(ChunkVersion::UNSHARDED());
-            versionAndOpTime.appendForCommands(&cmdBuilder);
+            ChunkVersion version(ChunkVersion::UNSHARDED());
+            version.appendForCommands(&cmdBuilder);
         }
 
         params.remotes.emplace_back(

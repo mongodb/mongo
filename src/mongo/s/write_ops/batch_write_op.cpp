@@ -87,13 +87,11 @@ static int compareEndpoints(const ShardEndpoint* endpointA, const ShardEndpoint*
     if (shardNameDiff != 0)
         return shardNameDiff;
 
-    long shardVersionDiff = endpointA->shardVersion.getVersion().toLong() -
-        endpointB->shardVersion.getVersion().toLong();
+    long shardVersionDiff = endpointA->shardVersion.toLong() - endpointB->shardVersion.toLong();
     if (shardVersionDiff != 0)
         return shardVersionDiff;
 
-    int shardEpochDiff = endpointA->shardVersion.getVersion().epoch().compare(
-        endpointB->shardVersion.getVersion().epoch());
+    int shardEpochDiff = endpointA->shardVersion.epoch().compare(endpointB->shardVersion.epoch());
     return shardEpochDiff;
 }
 

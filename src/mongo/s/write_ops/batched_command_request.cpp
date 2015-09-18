@@ -256,15 +256,15 @@ bool BatchedCommandRequest::parseBSON(StringData dbName,
         return false;
     }
 
-    auto verAndOpT = ChunkVersionAndOpTime::parseFromBSONForCommands(metadataObj);
-    if (verAndOpT.isOK()) {
-        _shardVersion = verAndOpT.getValue();
+    auto chunkVersion = ChunkVersion::parseFromBSONForCommands(metadataObj);
+    if (chunkVersion.isOK()) {
+        _shardVersion = chunkVersion.getValue();
         return true;
-    } else if ((verAndOpT == ErrorCodes::NoSuchKey) && !required) {
+    } else if ((chunkVersion == ErrorCodes::NoSuchKey) && !required) {
         return true;
     }
 
-    *errMsg = causedBy(verAndOpT.getStatus());
+    *errMsg = causedBy(chunkVersion.getStatus());
     return false;
 }
 

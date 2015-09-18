@@ -153,11 +153,8 @@ public:
         }
 
         // step 2
-        ChunkVersionAndOpTime verAndOpTime =
-            uassertStatusOK(ChunkVersionAndOpTime::parseFromBSONForSetShardVersion(cmdObj));
-        const auto& version = verAndOpTime.getVersion();
-
-        grid.shardRegistry()->advanceConfigOpTime(verAndOpTime.getOpTime());
+        ChunkVersion version =
+            uassertStatusOK(ChunkVersion::parseFromBSONForSetShardVersion(cmdObj));
 
         // step 3
         const ChunkVersion oldVersion = info->getVersion(ns);

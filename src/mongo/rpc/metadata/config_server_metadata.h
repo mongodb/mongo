@@ -28,47 +28,45 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 
 namespace mongo {
 
 class BSONObj;
-template <typename T>
-class StatusWith;
+class BSONObjBuilder;
 
 namespace rpc {
 
 /**
- * This class encapsulates the extra information that mongos may attach to commands it sends to
- * mongods, containing metadata information about the config servers.
+ * This class encapsulates the metadata sent between shard mongods and mongos on every command
+ * request and response, containing metadata information about the config servers.
  *
  * format:
- * configsvrOpTime: {ts: Timestamp(0, 0), t: 0}
- *
- * TODO(SERVER-20442): Currently this extracts the config server information from the main command
- * description rather than the actual OP_COMMAND metadata section.  Ideally this information
- * should be in the metadata, but we currently have no good way to add metadata to all commands
- * being *sent* to another server.
+ * configsvr: {
+ *     opTime: {ts: Timestamp(0, 0), t: 0}
+ * }
  */
-class ConfigServerRequestMetadata {
+class ConfigServerMetadata {
 public:
-    ConfigServerRequestMetadata() = default;
-    explicit ConfigServerRequestMetadata(repl::OpTime opTime);
+    static const OperationContext::Decoration<ConfigServerMetadata> get;
+
+    ConfigServerMetadata() = default;
+    explicit ConfigServerMetadata(repl::OpTime opTime);
 
     /**
-     * Parses the request metadata from the given command object.
+     * Parses the metadata from the given metadata object.
      * Returns a non-ok status on parse error.
-     * If no metadata is found, returns a default-constructed ConfigServerRequestMetadata.
+     * If no metadata is found, returns a default-constructed ConfigServerMetadata.
      */
-    static StatusWith<ConfigServerRequestMetadata> readFromCommand(const BSONObj& doc);
+    static StatusWith<ConfigServerMetadata> readFromMetadata(const BSONObj& doc);
 
     /**
-     * Writes the request metadata to the given BSONObjBuilder for building a command request.
+     * Writes the metadata to the given BSONObjBuilder for building a command request or response
+     * metadata.
      * Only valid to call if _opTime is initialized.
      */
-    void writeToCommand(BSONObjBuilder* builder) const;
+    void writeToMetadata(BSONObjBuilder* builder) const;
 
     /**
      * Returns the OpTime of the most recent operation on the config servers that this
@@ -79,7 +77,7 @@ public:
     }
 
 private:
-    const boost::optional<repl::OpTime> _opTime = boost::none;
+    boost::optional<repl::OpTime> _opTime;
 };
 
 }  // namespace rpc

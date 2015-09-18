@@ -99,12 +99,17 @@ public:
     void initialize(OperationContext* txn, const std::string& server);
 
     /**
+     * Updates the ShardRegistry's stored notion of the config server optime based on the
+     * ConfigServerMetadata decoration attached to the OperationContext.
+     */
+    void updateConfigServerOpTimeFromMetadata(OperationContext* txn);
+
+    /**
      * Assigns a shard name to this MongoD instance.
-     *
      * TODO: The only reason we need this method and cannot merge it together with the initialize
-     * call is the setShardVersion request being sent by the config coordinator to the config
-     * server instances. This is the only command, which does not include shard name and once we
-     * get rid of the legacy style config servers, we can merge these methods.
+     * call is the setShardVersion request being sent by the config coordinator to the config server
+     * instances. This is the only command, which does not include shard name and once we get rid of
+     * the legacy style config servers, we can merge these methods.
      *
      * Throws an error if shard name has always been set and the newly specified value does not
      * match what was previously installed.
@@ -171,7 +176,7 @@ public:
 
     void appendInfo(OperationContext* txn, BSONObjBuilder& b);
 
-    bool needCollectionMetadata(OperationContext* txn, const std::string& ns) const;
+    bool needCollectionMetadata(OperationContext* txn, const std::string& ns);
 
     std::shared_ptr<CollectionMetadata> getCollectionMetadata(const std::string& ns);
 
@@ -319,6 +324,8 @@ private:
                             bool useRequestedVersion,
                             ChunkVersion* latestShardVersion);
 
+    void _updateConfigServerOpTimeFromMetadata_inlock(OperationContext* txn);
+
     // Manages the state of the migration donor shard
     MigrationSourceManager _migrationSourceManager;
 
@@ -328,8 +335,16 @@ private:
     // Protects state below
     stdx::mutex _mutex;
 
-    // Whether ::initialize has been called
-    bool _enabled{false};
+    enum class InitializationState {
+        kUninitialized,
+        kInitializing,
+        kInitialized,
+    };
+
+    InitializationState _initializationState;
+
+    // Signaled when ::initialize finishes.
+    stdx::condition_variable _initializationFinishedCondition;
 
     // Sets the shard name for this host (comes through setShardVersion)
     std::string _shardName;

@@ -216,7 +216,7 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
         dbPrimaryShardId,
         primaryShard->getConnString(),
         NamespaceString(ns),
-        ChunkVersionAndOpTime(manager->getVersion(), manager->getConfigOpTime()),
+        manager->getVersion(),
         true);
 
     auto ssvStatus = grid.shardRegistry()->runCommandWithNotMasterRetries(
@@ -549,19 +549,13 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
 
     LOG(1) << "dropCollection " << ns << " collection marked as dropped";
 
-    // We just called updateCollection above and this would have advanced the config op time, so use
-    // the latest value. On the MongoD side, we need to load the latest config metadata, which
-    // indicates that the collection was dropped.
-    const ChunkVersionAndOpTime droppedVersion(ChunkVersion::DROPPED(),
-                                               grid.shardRegistry()->getConfigOpTime());
-
     for (const auto& shardEntry : allShards) {
         SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
             grid.shardRegistry()->getConfigServerConnectionString(),
             shardEntry.getName(),
             fassertStatusOK(28781, ConnectionString::parse(shardEntry.getHost())),
             ns,
-            droppedVersion,
+            ChunkVersion::DROPPED(),
             true);
 
         auto ssvResult = shardRegistry->runCommandWithNotMasterRetries(

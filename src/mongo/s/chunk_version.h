@@ -372,6 +372,17 @@ public:
         b.appendElements(toBSONWithPrefix(prefix));
     }
 
+    /**
+     * Appends the contents to the specified builder in the format expected by the setShardVersion
+     * command.
+     */
+    void appendForSetShardVersion(BSONObjBuilder* builder) const;
+
+    /**
+     * Appends the contents to the specified builder in the format expected by the write commands.
+     */
+    void appendForCommands(BSONObjBuilder* builder) const;
+
     BSONObj toBSON() const {
         // ChunkVersion wants to be an array.
         BSONArrayBuilder b;
@@ -403,52 +414,5 @@ inline std::ostream& operator<<(std::ostream& s, const ChunkVersion& v) {
     s << v.toString();
     return s;
 }
-
-
-/**
- * Represents a chunk version along with the optime from when it was retrieved. Provides logic to
- * serialize and deserialize the combo to BSON.
- */
-class ChunkVersionAndOpTime {
-public:
-    ChunkVersionAndOpTime(ChunkVersion chunkVersion);
-    ChunkVersionAndOpTime(ChunkVersion chunkVersion, repl::OpTime ts);
-
-    const ChunkVersion& getVersion() const {
-        return _verAndOpT.value;
-    }
-
-    const repl::OpTime& getOpTime() const {
-        return _verAndOpT.opTime;
-    }
-
-    /**
-     * Interprets the contents of the BSON documents as having been constructed in the format for
-     * write commands. The optime component is optional for backwards compatibility and if not
-     * present, the optime will be default initialized.
-     */
-    static StatusWith<ChunkVersionAndOpTime> parseFromBSONForCommands(const BSONObj& obj);
-
-    /**
-     * Interprets the contents of the BSON document as having been constructed in the format for the
-     * setShardVersion command. The optime component is optional for backwards compatibility and if
-     * not present, the optime will be default initialized.
-     */
-    static StatusWith<ChunkVersionAndOpTime> parseFromBSONForSetShardVersion(const BSONObj& obj);
-
-    /**
-     * Appends the contents to the specified builder in the format expected by the setShardVersion
-     * command.
-     */
-    void appendForSetShardVersion(BSONObjBuilder* builder) const;
-
-    /**
-     * Appends the contents to the specified builder in the format expected by the write commands.
-     */
-    void appendForCommands(BSONObjBuilder* builder) const;
-
-private:
-    OpTimePair<ChunkVersion> _verAndOpT;
-};
 
 }  // namespace mongo

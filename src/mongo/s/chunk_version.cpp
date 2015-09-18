@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/rpc/metadata/config_server_request_metadata.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -97,61 +96,12 @@ StatusWith<ChunkVersion> ChunkVersion::parseFromBSONForSetShardVersion(const BSO
     return chunkVersion;
 }
 
-
-ChunkVersionAndOpTime::ChunkVersionAndOpTime(ChunkVersion chunkVersion)
-    : _verAndOpT(chunkVersion) {}
-
-ChunkVersionAndOpTime::ChunkVersionAndOpTime(ChunkVersion chunkVersion, repl::OpTime ts)
-    : _verAndOpT(chunkVersion, ts) {}
-
-StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForCommands(
-    const BSONObj& obj) {
-    const auto chunkVersionStatus = ChunkVersion::parseFromBSONForCommands(obj);
-    if (!chunkVersionStatus.isOK())
-        return chunkVersionStatus.getStatus();
-
-    const ChunkVersion& chunkVersion = chunkVersionStatus.getValue();
-
-    const auto requestMetadataStatus = rpc::ConfigServerRequestMetadata::readFromCommand(obj);
-    if (!requestMetadataStatus.isOK()) {
-        return requestMetadataStatus.getStatus();
-    }
-    auto opTime = requestMetadataStatus.getValue().getOpTime();
-    if (opTime.is_initialized()) {
-        return ChunkVersionAndOpTime(chunkVersion, opTime.get());
-    } else {
-        return ChunkVersionAndOpTime(chunkVersion);
-    }
+void ChunkVersion::appendForSetShardVersion(BSONObjBuilder* builder) const {
+    addToBSON(*builder, kVersion);
 }
 
-StatusWith<ChunkVersionAndOpTime> ChunkVersionAndOpTime::parseFromBSONForSetShardVersion(
-    const BSONObj& obj) {
-    const auto chunkVersionStatus = ChunkVersion::parseFromBSONForSetShardVersion(obj);
-    if (!chunkVersionStatus.isOK())
-        return chunkVersionStatus.getStatus();
-
-    const ChunkVersion& chunkVersion = chunkVersionStatus.getValue();
-
-    const auto requestMetadataStatus = rpc::ConfigServerRequestMetadata::readFromCommand(obj);
-    if (!requestMetadataStatus.isOK()) {
-        return requestMetadataStatus.getStatus();
-    }
-    auto opTime = requestMetadataStatus.getValue().getOpTime();
-    if (opTime.is_initialized()) {
-        return ChunkVersionAndOpTime(chunkVersion, opTime.get());
-    } else {
-        return ChunkVersionAndOpTime(chunkVersion);
-    }
-}
-
-void ChunkVersionAndOpTime::appendForSetShardVersion(BSONObjBuilder* builder) const {
-    _verAndOpT.value.addToBSON(*builder, kVersion);
-    rpc::ConfigServerRequestMetadata(_verAndOpT.opTime).writeToCommand(builder);
-}
-
-void ChunkVersionAndOpTime::appendForCommands(BSONObjBuilder* builder) const {
-    builder->appendArray(kShardVersion, _verAndOpT.value.toBSON());
-    rpc::ConfigServerRequestMetadata(_verAndOpT.opTime).writeToCommand(builder);
+void ChunkVersion::appendForCommands(BSONObjBuilder* builder) const {
+    builder->appendArray(kShardVersion, toBSON());
 }
 
 }  // namespace mongo

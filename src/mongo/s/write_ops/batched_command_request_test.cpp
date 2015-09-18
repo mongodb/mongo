@@ -70,9 +70,7 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
 
     ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest()->getNS().toString());
     ASSERT(insertRequest.hasShardVersion());
-    ASSERT_EQ(ChunkVersion(1, 2, epoch).toString(),
-              insertRequest.getShardVersion().getVersion().toString());
-    ASSERT_EQ(repl::OpTime(Timestamp(3, 4), 5), insertRequest.getShardVersion().getOpTime());
+    ASSERT_EQ(ChunkVersion(1, 2, epoch).toString(), insertRequest.getShardVersion().toString());
 }
 
 TEST(BatchedCommandRequest, InsertWithShardVersionInLegacyMetadata) {
@@ -96,9 +94,7 @@ TEST(BatchedCommandRequest, InsertWithShardVersionInLegacyMetadata) {
 
     ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest()->getNS().toString());
     ASSERT(insertRequest.hasShardVersion());
-    ASSERT_EQ(ChunkVersion(1, 2, epoch).toString(),
-              insertRequest.getShardVersion().getVersion().toString());
-    ASSERT_EQ(repl::OpTime(Timestamp(3, 4), 5), insertRequest.getShardVersion().getOpTime());
+    ASSERT_EQ(ChunkVersion(1, 2, epoch).toString(), insertRequest.getShardVersion().toString());
 }
 
 TEST(BatchedCommandRequest, InsertClone) {

@@ -33,6 +33,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
+#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 
@@ -55,6 +56,12 @@ Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj) {
         return swAuditMetadata.getStatus();
     }
     AuditMetadata::get(txn) = std::move(swAuditMetadata.getValue());
+
+    auto configServerMetadata = ConfigServerMetadata::readFromMetadata(metadataObj);
+    if (!configServerMetadata.isOK()) {
+        return configServerMetadata.getStatus();
+    }
+    ConfigServerMetadata::get(txn) = std::move(configServerMetadata.getValue());
 
     return Status::OK();
 }
