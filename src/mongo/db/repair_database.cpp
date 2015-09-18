@@ -229,7 +229,7 @@ Status repairDatabase(OperationContext* txn,
             }
         } catch (...) {
             severe() << "Unexpected exception encountered while reopening database after repair.";
-            std::terminate(); // Logs additional info about the specific error.
+            std::terminate();  // Logs additional info about the specific error.
         }
     });
 
