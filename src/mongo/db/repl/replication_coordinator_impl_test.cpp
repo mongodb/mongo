@@ -1704,16 +1704,16 @@ TEST_F(ReplCoordTest, SetMaintenanceMode) {
     net->exitNetwork();
     ASSERT_EQUALS(TopologyCoordinator::Role::candidate, getTopoCoord().getRole());
     status = getReplCoord()->setMaintenanceMode(false);
-    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
     status = getReplCoord()->setMaintenanceMode(true);
-    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
 
     simulateSuccessfulDryRun();
     ASSERT_EQUALS(TopologyCoordinator::Role::candidate, getTopoCoord().getRole());
     status = getReplCoord()->setMaintenanceMode(false);
-    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
     status = getReplCoord()->setMaintenanceMode(true);
-    ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+    ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
 
     // This cancels the actual election.
     bool success = false;

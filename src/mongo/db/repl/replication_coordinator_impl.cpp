@@ -1678,7 +1678,7 @@ void ReplicationCoordinatorImpl::_setMaintenanceMode_helper(
     }
 
     if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
-        *result = Status(ErrorCodes::NotMaster, "currently running for election");
+        *result = Status(ErrorCodes::NotSecondary, "currently running for election");
         return;
     }
 
