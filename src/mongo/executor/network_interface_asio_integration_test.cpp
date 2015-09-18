@@ -37,6 +37,7 @@
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/async_timer_asio.h"
 #include "mongo/executor/network_interface_asio.h"
+#include "mongo/executor/network_interface_asio_test_utils.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/future.h"
@@ -76,7 +77,7 @@ public:
     }
 
     StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request) {
-        TaskExecutor::CallbackHandle cb{};
+        auto cb = makeCallbackHandle();
         stdx::promise<RemoteCommandResponse> result;
 
         log() << "running command: " << request.toString();

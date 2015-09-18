@@ -38,6 +38,7 @@
 #include "mongo/executor/async_mock_stream_factory.h"
 #include "mongo/executor/async_timer_mock.h"
 #include "mongo/executor/network_interface_asio.h"
+#include "mongo/executor/network_interface_asio_test_utils.h"
 #include "mongo/executor/test_network_connection_hook.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/stdx/future.h"
@@ -105,24 +106,13 @@ protected:
     std::unique_ptr<NetworkInterfaceASIO> _net;
 };
 
-// A mock class mimicking TaskExecutor::CallbackState, does nothing.
-class MockCallbackState : public TaskExecutor::CallbackState {
-public:
-    MockCallbackState() = default;
-    void cancel() override {}
-    void waitForCompletion() override {}
-};
-
 TEST_F(NetworkInterfaceASIOTest, CancelMissingOperation) {
     // This is just a sanity check, this action should have no effect.
-    auto cbState = std::make_shared<MockCallbackState>();
-    TaskExecutor::CallbackHandle cb(cbState);
-    net().cancelCommand(cb);
+    net().cancelCommand(makeCallbackHandle());
 }
 
 TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
-    auto cbState = std::make_shared<MockCallbackState>();
-    TaskExecutor::CallbackHandle cbh(cbState);
+    auto cbh = makeCallbackHandle();
 
     stdx::promise<bool> canceled;
 
@@ -160,7 +150,7 @@ TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
     auto timedOutFuture = timedOut.get_future();
 
     // Kick off operation
-    TaskExecutor::CallbackHandle cb{};
+    auto cb = makeCallbackHandle();
     Milliseconds timeout(1000);
     net().startCommand(cb,
                        {testHost, "testDB", BSON("a" << 1), BSONObj(), timeout},
@@ -195,7 +185,7 @@ TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
 }
 
 TEST_F(NetworkInterfaceASIOTest, StartCommand) {
-    TaskExecutor::CallbackHandle cb{};
+    auto cb = makeCallbackHandle();
 
     HostAndPort testHost{"localhost", 20000};
 
@@ -298,7 +288,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
     bool statusCorrect = false;
     auto doneFuture = done.get_future();
 
-    net().startCommand({},
+    net().startCommand(makeCallbackHandle(),
                        {testHost,
                         "blah",
                         BSON("foo"
@@ -356,7 +346,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
     bool statusCorrect = false;
     auto doneFuture = done.get_future();
 
-    net().startCommand({},
+    net().startCommand(makeCallbackHandle(),
                        {testHost,
                         "blah",
                         BSON("foo"
@@ -411,7 +401,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     auto metadata = BSON("aaa"
                          << "bbb");
 
-    net().startCommand({},
+    net().startCommand(makeCallbackHandle(),
                        {testHost, "blah", commandRequest},
                        [&](StatusWith<RemoteCommandResponse> result) {
                            statusCorrect =
@@ -483,7 +473,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
     bool statusCorrect = false;
     auto commandRequest = BSON("foo"
                                << "bar");
-    net().startCommand({},
+    net().startCommand(makeCallbackHandle(),
                        {testHost, "blah", commandRequest},
                        [&](StatusWith<RemoteCommandResponse> result) {
                            statusCorrect = (result == handleReplyError);
@@ -591,7 +581,7 @@ TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
 
     stdx::promise<void> done;
 
-    net().startCommand({},
+    net().startCommand(makeCallbackHandle(),
                        {testHost, "blah", BSON("ping" << 1)},
                        [&](StatusWith<RemoteCommandResponse> result) { done.set_value(); });
 

@@ -34,6 +34,7 @@
 #include "mongo/executor/async_stream_factory.h"
 #include "mongo/executor/async_timer_asio.h"
 #include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface_asio_test_utils.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
@@ -101,7 +102,7 @@ TEST(ConnectionPoolASIO, TestPing) {
             auto status = Status::OK();
             stdx::promise<void> result;
 
-            net.startCommand(TaskExecutor::CallbackHandle(),
+            net.startCommand(makeCallbackHandle(),
                              RemoteCommandRequest{
                                  fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj()},
                              [&result, &status](StatusWith<RemoteCommandResponse> resp) {
