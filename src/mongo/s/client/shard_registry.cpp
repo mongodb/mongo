@@ -318,6 +318,26 @@ void ShardRegistry::advanceConfigOpTime(OpTime opTime) {
     }
 }
 
+void ShardRegistry::_advanceCommittedAndVisibleConfigOpTime(const CommandResponse& response) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (_configOpTime < response.committedOpTime) {
+        _configOpTime = response.committedOpTime;
+    }
+
+    if (_configVisibleOpTime < response.visibleOpTime) {
+        _configVisibleOpTime = response.visibleOpTime;
+    }
+}
+
+void ShardRegistry::advanceToVisibleConfigOpTime() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (_configOpTime < _configVisibleOpTime) {
+        _configOpTime = _configVisibleOpTime;
+    }
+}
+
 OpTime ShardRegistry::getConfigOpTime() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _configOpTime;
@@ -456,7 +476,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(const HostAndPort& host,
         return response.getStatus();
     }
 
-    advanceConfigOpTime(response.getValue().opTime);
+    _advanceCommittedAndVisibleConfigOpTime(response.getValue());
     return response.getValue().response;
 }
 
@@ -470,7 +490,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(const 
         return response.getStatus();
     }
 
-    advanceConfigOpTime(response.getValue().opTime);
+    _advanceCommittedAndVisibleConfigOpTime(response.getValue());
     return response.getValue().response;
 }
 
@@ -580,8 +600,9 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
             return replParseStatus.getStatus();
         }
 
-        // TODO: SERVER-19734 use config server snapshot time.
-        cmdResponse.opTime = replParseStatus.getValue().getLastOpCommitted();
+        const auto& replMetadata = replParseStatus.getValue();
+        cmdResponse.committedOpTime = replMetadata.getLastOpCommitted();
+        cmdResponse.visibleOpTime = replMetadata.getLastOpVisible();
     }
 
     return cmdResponse;

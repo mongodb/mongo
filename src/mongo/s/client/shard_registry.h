@@ -186,6 +186,12 @@ public:
     void advanceConfigOpTime(repl::OpTime opTime);
 
     /**
+     * Sets the stored opTime to the last known visible opTime if it is greater than the currently
+     * stored opTime.
+     */
+    void advanceToVisibleConfigOpTime();
+
+    /**
      * Returns the last known OpTime of the config servers.
      */
     repl::OpTime getConfigOpTime();
@@ -259,7 +265,8 @@ private:
     struct CommandResponse {
         BSONObj response;
         BSONObj metadata;
-        repl::OpTime opTime;
+        repl::OpTime committedOpTime;
+        repl::OpTime visibleOpTime;
     };
 
     /**
@@ -283,6 +290,11 @@ private:
      * advanceConfigOpTime.
      */
     Status _advanceConfigOpTimeFromMetadata(const BSONObj& metadata);
+
+    /**
+     * Update the last known config visible opTime if the given one is newer.
+     */
+    void _advanceCommittedAndVisibleConfigOpTime(const CommandResponse& response);
 
     /**
      * Runs a command against the specified host and returns the result.  It is the responsibility
@@ -322,8 +334,15 @@ private:
     // Config server connection string
     ConnectionString _configServerCS;
 
-    // Last known highest opTime from the config server.
+    // Last known highest opTime from the config server that should be used when doing reads.
     repl::OpTime _configOpTime;
+
+    // Last known highest opTime from the config server that can contain uncommitted data.
+    // Safe to use only with majority read concern.
+    // This is a temporary workaround for SERVER-20487 and is only used for cases when a
+    // write conflict occurred (for example duplicate key error), and we want to make sure that
+    // the next read will be able to see that write.
+    repl::OpTime _configVisibleOpTime;
 
     // Map of both shardName -> Shard and hostName -> Shard
     ShardMap _lookup;
