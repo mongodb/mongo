@@ -159,6 +159,7 @@ void appendBuildInfo(BSONObjBuilder& result) {
 #if defined(_WIN32)
            << "targetMinOS" << targetMinOS()
 #endif
+           << "modules" << compiledModules()
            << "allocator" << allocator() << "javascriptEngine" << compiledJSEngine() << "sysInfo"
            << "deprecated";
 
@@ -179,8 +180,6 @@ void appendBuildInfo(BSONObjBuilder& result) {
     opensslInfo.done();
 
     BSONObjBuilder buildvarsInfo(result.subobjStart("buildEnvironment"));
-    buildvarsInfo << "modules" << compiledModules();
-
     for (auto&& envDataEntry : kBuildEnvironment) {
         if (std::get<2>(envDataEntry)) {
             buildvarsInfo << std::get<0>(envDataEntry) << std::get<1>(envDataEntry);

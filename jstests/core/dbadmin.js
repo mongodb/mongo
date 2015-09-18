@@ -75,7 +75,7 @@ var isMaster = db._adminCommand( "ismaster" );
 
 // Test buildinfo has the expected keys
 var expectedKeys = ["version", "gitVersion", "allocator", "versionArray", "javascriptEngine",
-    "openssl", "buildEnvironment", "debug", "maxBsonObjectSize", "bits" ];
+    "openssl", "buildEnvironment", "debug", "maxBsonObjectSize", "bits", "modules" ];
 
 var keys = Object.keySet(latestStartUpLog.buildinfo);
 // Disabled to check
