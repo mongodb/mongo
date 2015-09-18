@@ -33,8 +33,10 @@
 
 #include "mongo/db/repl/rs_rollback.h"
 
+#include <algorithm>
 #include <memory>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/collection.h"
@@ -107,6 +109,7 @@ using std::unique_ptr;
 using std::endl;
 using std::list;
 using std::map;
+using std::multimap;
 using std::set;
 using std::string;
 using std::pair;
@@ -148,6 +151,10 @@ struct FixUpInfo {
 
     // collections to drop
     set<string> toDrop;
+
+    // Indexes to drop.
+    // Key is collection namespace. Value is name of index to drop.
+    multimap<string, string> indexesToDrop;
 
     set<string> collectionsToResyncData;
     set<string> collectionsToResyncMetadata;
@@ -250,12 +257,46 @@ Status refetch(FixUpInfo& fixUpInfo, const BSONObj& ourObj) {
         }
     }
 
+    NamespaceString nss(doc.ns);
+    if (nss.isSystemDotIndexes()) {
+        if (*op != 'i') {
+            severe() << "Unexpected operation type '" << *op << "' on system.indexes operation, "
+                     << "document: " << doc.ownedObj;
+            throw RSFatalException();
+        }
+        string objNs;
+        auto status = bsonExtractStringField(obj, "ns", &objNs);
+        if (!status.isOK()) {
+            severe() << "Missing collection namespace in system.indexes operation, document: "
+                     << doc.ownedObj;
+            throw RSFatalException();
+        }
+        NamespaceString objNss(objNs);
+        if (!objNss.isValid()) {
+            severe() << "Invalid collection namespace in system.indexes operation, document: "
+                     << doc.ownedObj;
+            throw RSFatalException();
+        }
+        string indexName;
+        status = bsonExtractStringField(obj, "name", &indexName);
+        if (!status.isOK()) {
+            severe() << "Missing index name in system.indexes operation, document: "
+                     << doc.ownedObj;
+            throw RSFatalException();
+        }
+        using ValueType = multimap<string, string>::value_type;
+        ValueType pairToInsert = std::make_pair(objNs, indexName);
+        auto lowerBound = fixUpInfo.indexesToDrop.lower_bound(objNs);
+        auto upperBound = fixUpInfo.indexesToDrop.upper_bound(objNs);
+        auto matcher = [pairToInsert](const ValueType& pair) { return pair == pairToInsert; };
+        if (!std::count_if(lowerBound, upperBound, matcher)) {
+            fixUpInfo.indexesToDrop.insert(pairToInsert);
+        }
+        return Status::OK();
+    }
+
     doc._id = obj["_id"];
     if (doc._id.eoo()) {
-        NamespaceString nss(doc.ns);
-        if (nss.isSystemDotIndexes()) {
-            return Status::OK();
-        }
         severe() << "cannot rollback op with no _id. ns: " << doc.ns
                  << ", document: " << doc.ownedObj;
         throw RSFatalException();
@@ -338,6 +379,7 @@ void syncFixUp(OperationContext* txn,
         for (const string& ns : fixUpInfo.collectionsToResyncData) {
             log() << "rollback 4.1.1 coll resync " << ns;
 
+            fixUpInfo.indexesToDrop.erase(ns);
             fixUpInfo.collectionsToResyncMetadata.erase(ns);
 
             const NamespaceString nss(ns);
@@ -461,6 +503,8 @@ void syncFixUp(OperationContext* txn,
     for (set<string>::iterator it = fixUpInfo.toDrop.begin(); it != fixUpInfo.toDrop.end(); it++) {
         log() << "rollback drop: " << *it;
 
+        fixUpInfo.indexesToDrop.erase(*it);
+
         ScopedTransaction transaction(txn, MODE_IX);
         const NamespaceString nss(*it);
         Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_X);
@@ -497,6 +541,44 @@ void syncFixUp(OperationContext* txn,
             db->dropCollection(txn, *it);
             wunit.commit();
         }
+    }
+
+    // Drop indexes.
+    for (auto it = fixUpInfo.indexesToDrop.begin(); it != fixUpInfo.indexesToDrop.end(); it++) {
+        const NamespaceString nss(it->first);
+        const string& indexName = it->second;
+        log() << "rollback drop index: collection: " << nss.toString() << ". index: " << indexName;
+
+        ScopedTransaction transaction(txn, MODE_IX);
+        Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_X);
+        auto db = dbHolder().get(txn, nss.db());
+        if (!db) {
+            continue;
+        }
+        auto collection = db->getCollection(nss.toString());
+        if (!collection) {
+            continue;
+        }
+        auto indexCatalog = collection->getIndexCatalog();
+        if (!indexCatalog) {
+            continue;
+        }
+        bool includeUnfinishedIndexes = false;
+        auto indexDescriptor =
+            indexCatalog->findIndexByName(txn, indexName, includeUnfinishedIndexes);
+        if (!indexDescriptor) {
+            warning() << "rollback failed to drop index " << indexName << " in " << nss.toString()
+                      << ": index not found";
+            continue;
+        }
+        WriteUnitOfWork wunit(txn);
+        auto status = indexCatalog->dropIndex(txn, indexDescriptor);
+        if (!status.isOK()) {
+            severe() << "rollback failed to drop index " << indexName << " in " << nss.toString()
+                     << ": " << status;
+            throw RSFatalException();
+        }
+        wunit.commit();
     }
 
     log() << "rollback 4.7";
