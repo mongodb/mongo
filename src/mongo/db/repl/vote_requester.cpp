@@ -48,14 +48,12 @@ VoteRequester::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
                                     long long candidateId,
                                     long long term,
                                     bool dryRun,
-                                    OpTime lastOplogEntry,
-                                    Milliseconds socketTimeout)
+                                    OpTime lastOplogEntry)
     : _rsConfig(rsConfig),
       _candidateId(candidateId),
       _term(term),
       _dryRun(dryRun),
-      _lastOplogEntry(lastOplogEntry),
-      _socketTimeout(socketTimeout) {
+      _lastOplogEntry(lastOplogEntry) {
     // populate targets with all voting members that aren't this node
     for (auto member = _rsConfig.membersBegin(); member != _rsConfig.membersEnd(); member++) {
         if (member->isVoter() && member->getId() != candidateId) {
@@ -84,11 +82,11 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
 
     std::vector<RemoteCommandRequest> requests;
     for (const auto& target : _targets) {
-        requests.push_back(
-            RemoteCommandRequest(target,
-                                 "admin",
-                                 requestVotesCmd,
-                                 _socketTimeout));  // trying to match current Socket timeout
+        requests.push_back(RemoteCommandRequest(
+            target,
+            "admin",
+            requestVotesCmd,
+            Milliseconds(30 * 1000)));  // trying to match current Socket timeout
     }
 
     return requests;
@@ -146,10 +144,8 @@ StatusWith<ReplicationExecutor::EventHandle> VoteRequester::start(
     long long term,
     bool dryRun,
     OpTime lastOplogEntry,
-    Milliseconds socketTimeout,
     const stdx::function<void()>& onCompletion) {
-    _algorithm.reset(
-        new Algorithm(rsConfig, candidateId, term, dryRun, lastOplogEntry, socketTimeout));
+    _algorithm.reset(new Algorithm(rsConfig, candidateId, term, dryRun, lastOplogEntry));
     _runner.reset(new ScatterGatherRunner(_algorithm.get()));
     return _runner->start(executor, onCompletion);
 }
