@@ -547,7 +547,8 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
  *	Unpack a WT_CELL into a structure during verification.
  */
 static inline int
-__wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
+__wt_cell_unpack_safe(
+    WT_CELL *cell, WT_CELL_UNPACK *unpack, const void *start, const void *end)
 {
 	struct {
 		uint32_t len;
@@ -560,14 +561,15 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	copy.v = 0;			/* -Werror=maybe-uninitialized */
 
 	/*
-	 * The verification code specifies an end argument, a pointer to 1 past
-	 * the end-of-page.  In that case, make sure we don't go past the end
-	 * of the page when reading.  If an error occurs, we simply return the
-	 * error code, the verification code takes care of complaining (and, in
-	 * the case of salvage, it won't complain at all, it's OK to fail).
+	 * The verification code specifies start/end arguments, pointers to the
+	 * start of the page and to 1 past the end-of-page. In which case, make
+	 * sure all reads are inside the page image. If an error occurs, return
+	 * an error code but don't output messages, our caller handles that.
 	 */
-#define	WT_CELL_LEN_CHK(p, len) do {					\
-	if (end != NULL && (((uint8_t *)p) + (len)) > end)		\
+#define	WT_CELL_LEN_CHK(t, len) do {					\
+	if (start != NULL &&						\
+	    ((uint8_t *)t < (uint8_t *)start ||				\
+	    (((uint8_t *)t) + (len)) > (uint8_t *)end))			\
 		return (WT_ERROR);					\
 } while (0)
 
@@ -630,7 +632,7 @@ restart:
 	 */
 	if (cell->__chunk[0] & WT_CELL_64V)		/* skip value */
 		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &unpack->v));
+		    &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &unpack->v));
 
 	/*
 	 * Handle special actions for a few different cell types and set the
@@ -647,7 +649,7 @@ restart:
 		 * earlier cell.
 		 */
 		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
+		    &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &v));
 		copy.len = WT_PTRDIFF32(p, cell);
 		copy.v = unpack->v;
 		cell = (WT_CELL *)((uint8_t *)cell - v);
@@ -675,7 +677,7 @@ restart:
 		 * data.
 		 */
 		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
+		    &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &v));
 
 		if (unpack->raw == WT_CELL_KEY ||
 		    unpack->raw == WT_CELL_KEY_PFX ||
@@ -716,7 +718,7 @@ done:	WT_CELL_LEN_CHK(cell, unpack->__len);
 static inline void
 __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 {
-	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
+	(void)__wt_cell_unpack_safe(cell, unpack, NULL, NULL);
 }
 
 /*

@@ -509,20 +509,14 @@ restart:
 	}
 
 	if (page->pg_row_entries != 0) {
-		/*
-		 * The use case for this call is finding a place to split the
-		 * tree.  Cheat (it's not like this is "random", anyway), and
-		 * make things easier by returning the first key on the page.
-		 * If the caller is attempting to split a newly created tree,
-		 * or a tree with just one big page, that's not going to work,
-		 * check for that.
-		 */
 		cbt->ref = current;
 		cbt->compare = 0;
-		WT_INTL_INDEX_GET(session, btree->root.page, pindex);
-		cbt->slot = pindex->entries < 2 ?
-		    __wt_random(&session->rnd) % page->pg_row_entries : 0;
+		cbt->slot = __wt_random(&session->rnd) % page->pg_row_entries;
 
+		/*
+		 * The real row-store search function builds the key, so we
+		 * have to as well.
+		 */
 		return (__wt_row_leaf_key(session,
 		    page, page->pg_row_d + cbt->slot, cbt->tmp, 0));
 	}

@@ -473,7 +473,7 @@ __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page,
 
 	if (WT_VERBOSE_ISSET(session, WT_VERB_OVERFLOW))
 		WT_RET(__ovfl_reuse_verbose(session, page, reuse, "reclaim"));
-	return (1);
+	return (0);
 }
 
 /*

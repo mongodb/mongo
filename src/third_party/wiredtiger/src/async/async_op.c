@@ -31,18 +31,16 @@ static void
 __async_set_key(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_CURSOR *c;
-	WT_DECL_RET;
 	va_list ap;
 
 	c = &asyncop->c;
 	va_start(ap, asyncop);
 	__wt_cursor_set_keyv(c, c->flags, ap);
 	if (!WT_DATA_IN_ITEM(&c->key) && !WT_CURSOR_RECNO(c))
-		WT_ERR(__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop), &c->key,
-		    c->key.data, c->key.size));
+		c->saved_err = __wt_buf_set(
+		    O2S((WT_ASYNC_OP_IMPL *)asyncop),
+		    &c->key, c->key.data, c->key.size);
 	va_end(ap);
-	if (0)
-err:		c->saved_err = ret;
 }
 
 /*
@@ -69,7 +67,6 @@ static void
 __async_set_value(WT_ASYNC_OP *asyncop, ...)
 {
 	WT_CURSOR *c;
-	WT_DECL_RET;
 	va_list ap;
 
 	c = &asyncop->c;
@@ -77,11 +74,10 @@ __async_set_value(WT_ASYNC_OP *asyncop, ...)
 	__wt_cursor_set_valuev(c, ap);
 	/* Copy the data, if it is pointing at data elsewhere. */
 	if (!WT_DATA_IN_ITEM(&c->value))
-		WT_ERR(__wt_buf_set(O2S((WT_ASYNC_OP_IMPL *)asyncop),
-		    &c->value, c->value.data, c->value.size));
+		c->saved_err = __wt_buf_set(
+		    O2S((WT_ASYNC_OP_IMPL *)asyncop),
+		    &c->value, c->value.data, c->value.size);
 	va_end(ap);
-	if (0)
-err:		c->saved_err = ret;
 }
 
 /*

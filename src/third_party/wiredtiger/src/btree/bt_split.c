@@ -1180,19 +1180,18 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Assert splitting makes sense; specifically assert the page is dirty,
 	 * we depend on that, otherwise the page might be evicted based on its
 	 * last reconciliation which no longer matches reality after the split.
+	 *
+	 * Note this page has already been through an in-memory split.
 	 */
 	WT_ASSERT(session, __wt_page_can_split(session, page));
 	WT_ASSERT(session, __wt_page_is_modified(page));
+	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
 	/* Find the last item on the page. */
 	ins_head = page->pg_row_entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
 	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
 	moved_ins = WT_SKIP_LAST(ins_head);
-
-	/* Mark that this page has already been through an in-memory split. */
-	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT));
-	F_SET_ATOMIC(page, WT_PAGE_SPLIT_INSERT);
 
 	/*
 	 * The first page in the split is the current page, but we still have

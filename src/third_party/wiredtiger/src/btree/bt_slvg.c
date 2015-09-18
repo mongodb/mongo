@@ -153,7 +153,6 @@ static int  __slvg_trk_leaf_ovfl(
 		WT_SESSION_IMPL *, const WT_PAGE_HEADER *, WT_TRACK *);
 static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
 		const WT_PAGE_HEADER *, uint8_t *, size_t, WT_STUFF *);
-static int  __slvg_trk_split(WT_SESSION_IMPL *, WT_TRACK *, WT_TRACK **);
 
 /*
  * __wt_bt_salvage --
@@ -512,26 +511,6 @@ err:	__wt_free(session, trk->trk_addr);
 }
 
 /*
- * __slvg_trk_split --
- *	Split a tracked chunk.
- */
-static int
-__slvg_trk_split(WT_SESSION_IMPL *session, WT_TRACK *orig, WT_TRACK **newp)
-{
-	WT_TRACK *trk;
-
-	WT_RET(__wt_calloc_one(session, &trk));
-
-	trk->shared = orig->shared;
-	trk->ss = orig->ss;
-
-	++orig->shared->ref;
-
-	*newp = trk;
-	return (0);
-}
-
-/*
  * __slvg_trk_leaf --
  *	Track a leaf page.
  */
@@ -872,6 +851,7 @@ static int
 __slvg_col_range_overlap(
     WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_slot, WT_STUFF *ss)
 {
+	WT_DECL_RET;
 	WT_TRACK *a_trk, *b_trk, *new;
 	uint32_t i;
 
@@ -1016,16 +996,29 @@ delete_b:	/*
 	 * Case #5: b_trk is more desirable and is a middle chunk of a_trk.
 	 * Split a_trk into two parts, the key range before b_trk and the
 	 * key range after b_trk.
+	 *
+	 * Allocate a new WT_TRACK object, and extend the array of pages as
+	 * necessary.
 	 */
-	WT_RET(__slvg_trk_split(session, a_trk, &new));
+	WT_RET(__wt_calloc_one(session, &new));
+	if ((ret = __wt_realloc_def(session,
+	    &ss->pages_allocated, ss->pages_next + 1, &ss->pages)) != 0) {
+		__wt_free(session, new);
+		return (ret);
+	}
 
 	/*
-	 * Second, reallocate the array of pages if necessary, and then insert
-	 * the new element into the array after the existing element (that's
-	 * probably wrong, but we'll fix it up in a second).
+	 * First, set up the track share (we do this after the allocation to
+	 * ensure the shared reference count is never incorrect).
 	 */
-	WT_RET(__wt_realloc_def(
-	    session, &ss->pages_allocated, ss->pages_next + 1, &ss->pages));
+	new->shared = a_trk->shared;
+	new->ss = a_trk->ss;
+	++new->shared->ref;
+
+	/*
+	 * Second, insert the new element into the array after the existing
+	 * element (that's probably wrong, but we'll fix it up in a second).
+	 */
 	memmove(ss->pages + a_slot + 1, ss->pages + a_slot,
 	    (ss->pages_next - a_slot) * sizeof(*ss->pages));
 	ss->pages[a_slot + 1] = new;
@@ -1489,6 +1482,7 @@ __slvg_row_range_overlap(
     WT_SESSION_IMPL *session, uint32_t a_slot, uint32_t b_slot, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_TRACK *a_trk, *b_trk, *new;
 	uint32_t i;
 	int start_cmp, stop_cmp;
@@ -1649,16 +1643,29 @@ delete_b:	/*
 	 * Case #5: b_trk is more desirable and is a middle chunk of a_trk.
 	 * Split a_trk into two parts, the key range before b_trk and the
 	 * key range after b_trk.
+	 *
+	 * Allocate a new WT_TRACK object, and extend the array of pages as
+	 * necessary.
 	 */
-	WT_RET(__slvg_trk_split(session, a_trk, &new));
+	WT_RET(__wt_calloc_one(session, &new));
+	if ((ret = __wt_realloc_def(session,
+	    &ss->pages_allocated, ss->pages_next + 1, &ss->pages)) != 0) {
+		__wt_free(session, new);
+		return (ret);
+	}
 
 	/*
-	 * Second, reallocate the array of pages if necessary, and then insert
-	 * the new element into the array after the existing element (that's
-	 * probably wrong, but we'll fix it up in a second).
+	 * First, set up the track share (we do this after the allocation to
+	 * ensure the shared reference count is never incorrect).
 	 */
-	WT_RET(__wt_realloc_def(
-	    session, &ss->pages_allocated, ss->pages_next + 1, &ss->pages));
+	new->shared = a_trk->shared;
+	new->ss = a_trk->ss;
+	++new->shared->ref;
+
+	/*
+	 * Second, insert the new element into the array after the existing
+	 * element (that's probably wrong, but we'll fix it up in a second).
+	 */
 	memmove(ss->pages + a_slot + 1, ss->pages + a_slot,
 	    (ss->pages_next - a_slot) * sizeof(*ss->pages));
 	ss->pages[a_slot + 1] = new;
