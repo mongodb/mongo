@@ -478,6 +478,18 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 */
 		__wt_cache_read_gen_incr(session);
 
+		/*
+		 * Update the oldest ID: we use it to decide whether pages are
+		 * candidates for eviction.  Without this, if all threads are
+		 * blocked after a long-running transaction (such as a
+		 * checkpoint) completes, we may never start evicting again.
+		 *
+		 * Do this every time the eviction server wakes up, regardless
+		 * of whether the cache is full, to prevent the oldest ID
+		 * falling too far behind.
+		 */
+		__wt_txn_update_oldest(session, 1);
+
 		WT_RET(__evict_has_work(session, &flags));
 		if (flags == 0)
 			break;
@@ -922,14 +934,6 @@ __evict_walk(WT_SESSION_IMPL *session, uint32_t flags)
 	dhandle = NULL;
 	incr = dhandle_locked = 0;
 	retries = 0;
-
-	/*
-	 * Update the oldest ID: we use it to decide whether pages are
-	 * candidates for eviction.  Without this, if all threads are blocked
-	 * after a long-running transaction (such as a checkpoint) completes,
-	 * we may never start evicting again.
-	 */
-	__wt_txn_update_oldest(session, 1);
 
 	if (cache->evict_current == NULL)
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_queue_empty);
