@@ -4,7 +4,7 @@ load('jstests/libs/fts.js');
 
 (function() {
     "use strict";
-    var coll = db.fts_diacritic_and_caseinsensitive;
+    var coll = db.fts_index_version2;
 
     coll.drop();
 
