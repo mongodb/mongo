@@ -77,7 +77,7 @@ std::unique_ptr<Message> assembleCommandRequest(DBClientWithCommands* cli,
     BSONObjBuilder metadataBob;
     metadataBob.appendElements(upconvertedMetadata);
     if (cli->getRequestMetadataWriter()) {
-        uassertStatusOK(cli->getRequestMetadataWriter()(&metadataBob));
+        uassertStatusOK(cli->getRequestMetadataWriter()(&metadataBob, cli->getServerAddress()));
     }
 
     requestBuilder->setDatabase(database);

@@ -102,7 +102,7 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
     // For every DBClient created by mongos, add a hook that will append impersonated users
     // to the end of every runCommand.  mongod uses this information to produce auditing
     // records attributed to the proper authenticated user(s).
-    conn->setRequestMetadataWriter([](BSONObjBuilder* metadataBob) -> Status {
+    conn->setRequestMetadataWriter([](BSONObjBuilder* metadataBob, StringData) -> Status {
         audit::writeImpersonatedUsersToMetadata(metadataBob);
         return Status::OK();
     });

@@ -88,7 +88,7 @@ static void sayAsCmd(DBClientBase* conn, StringData dbName, const BSONObj& cmdOb
     BSONObjBuilder metadataBob;
     metadataBob.appendElements(upconvertedMetadata);
     if (conn->getRequestMetadataWriter()) {
-        conn->getRequestMetadataWriter()(&metadataBob);
+        conn->getRequestMetadataWriter()(&metadataBob, conn->getServerAddress());
     }
 
     requestBuilder->setDatabase(dbName);

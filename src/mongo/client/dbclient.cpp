@@ -291,11 +291,14 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
             str::stream() << "Database name '" << database << "' is not valid.",
             NamespaceString::validDBName(database));
 
+    // call() oddly takes this by pointer, so we need to put it on the stack.
+    auto host = getServerAddress();
+
     BSONObjBuilder metadataBob;
     metadataBob.appendElements(metadata);
 
     if (_metadataWriter) {
-        uassertStatusOK(_metadataWriter(&metadataBob));
+        uassertStatusOK(_metadataWriter(&metadataBob, host));
     }
 
     auto requestBuilder = rpc::makeRequestBuilder(getClientRPCProtocols(), getServerRPCProtocols());
@@ -307,8 +310,6 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     auto requestMsg = requestBuilder->done();
 
     auto replyMsg = stdx::make_unique<Message>();
-    // call oddly takes this by pointer, so we need to put it on the stack.
-    auto host = getServerAddress();
 
     // We always want to throw if there was a network error, we do it here
     // instead of passing 'true' for the 'assertOk' parameter so we can construct a

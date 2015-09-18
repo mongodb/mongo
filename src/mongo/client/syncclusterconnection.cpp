@@ -248,7 +248,7 @@ bool SyncClusterConnection::runCommand(const std::string& dbname,
         BSONObjBuilder metadataBob;
         metadataBob.appendElements(upconvertedMetadata);
 
-        uassertStatusOK(getRequestMetadataWriter()(&metadataBob));
+        uassertStatusOK(getRequestMetadataWriter()(&metadataBob, getServerAddress()));
 
         std::tie(interposedCmd, options) = uassertStatusOK(
             rpc::downconvertRequestMetadata(std::move(upconvertedCommand), metadataBob.done()));
