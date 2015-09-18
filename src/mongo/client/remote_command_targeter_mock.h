@@ -61,6 +61,11 @@ public:
     void markHostNotMaster(const HostAndPort& host) override;
 
     /**
+     * No-op for the mock.
+     */
+    void markHostUnreachable(const HostAndPort& host) override;
+
+    /**
      * Sets the return value for the next call to connectionString.
      */
     void setConnectionStringReturnValue(const ConnectionString returnValue);

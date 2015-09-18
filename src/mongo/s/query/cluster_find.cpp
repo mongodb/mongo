@@ -211,6 +211,8 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     }
 
     ClusterClientCursorParams params(query.nss());
+    params.txn = txn;
+    params.shardRegistry = shardRegistry;
     params.limit = query.getParsed().getLimit();
     params.batchSize = query.getParsed().getEffectiveBatchSize();
     params.skip = query.getParsed().getSkip();
@@ -262,7 +264,8 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
             versionAndOpTime.appendForCommands(&cmdBuilder);
         }
 
-        params.remotes.emplace_back(std::move(hostAndPort.getValue()), cmdBuilder.obj());
+        params.remotes.emplace_back(
+            std::move(hostAndPort.getValue()), shard->getId(), cmdBuilder.obj());
     }
 
     auto ccc =
@@ -365,14 +368,15 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
         }
         auto status = std::move(cursorId.getStatus());
 
-        if (status != ErrorCodes::SendStaleConfig && status != ErrorCodes::RecvStaleConfig) {
-            // Errors other than receiving a stale config message from mongoD are fatal to the
-            // operation.
+        if (status != ErrorCodes::SendStaleConfig && status != ErrorCodes::RecvStaleConfig &&
+            status != ErrorCodes::HostUnreachable) {
+            // Errors other than receiving a stale config message from mongoD or an unreachable host
+            // are fatal to the operation.
             return status;
         }
 
-        LOG(1) << "Received stale config for query " << query.toStringShort() << " on attempt "
-               << retries << " of " << kMaxStaleConfigRetries << ": " << status.reason();
+        LOG(1) << "Received error status for query " << query.toStringShort() << " on attempt "
+               << retries << " of " << kMaxStaleConfigRetries << ": " << status;
 
         invariant(chunkManager);
         chunkManager = chunkManager->reload(txn);
@@ -384,7 +388,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
 
     return {ErrorCodes::StaleShardVersion,
             str::stream() << "Retried " << kMaxStaleConfigRetries
-                          << " times without establishing shard version."};
+                          << " times without establishing shard version on a reachable host."};
 }
 
 StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,

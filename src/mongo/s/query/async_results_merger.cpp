@@ -32,6 +32,7 @@
 
 #include "mongo/s/query/async_results_merger.h"
 
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/killcursors_request.h"
@@ -337,6 +338,21 @@ void AsyncResultsMerger::handleBatchResponse(
 
     if (!cbData.response.isOK()) {
         remote.status = cbData.response.getStatus();
+
+        // If we failed to retrieve the batch because we couldn't contact the remote, we notify that
+        // targeter that the host is unreachable. The caller can then retry on a new host.
+        if (remote.status == ErrorCodes::HostUnreachable && remote.shardId) {
+            auto shard = _params.shardRegistry->getShard(_params.txn, *remote.shardId);
+            if (!shard) {
+                remote.status =
+                    Status(ErrorCodes::HostUnreachable,
+                           str::stream() << "Could not find shard " << *remote.shardId
+                                         << " containing host " << remote.hostAndPort.toString());
+            } else {
+                shard->getTargeter()->markHostUnreachable(remote.hostAndPort);
+            }
+        }
+
         return;
     }
 
@@ -498,7 +514,10 @@ executor::TaskExecutor::EventHandle AsyncResultsMerger::kill() {
 
 AsyncResultsMerger::RemoteCursorData::RemoteCursorData(
     const ClusterClientCursorParams::Remote& params)
-    : hostAndPort(params.hostAndPort), cmdObj(params.cmdObj), cursorId(params.cursorId) {
+    : hostAndPort(params.hostAndPort),
+      shardId(params.shardId),
+      cmdObj(params.cmdObj),
+      cursorId(params.cursorId) {
     // Either cmdObj or cursorId can be provided, but not both.
     invariant(static_cast<bool>(cmdObj) != static_cast<bool>(cursorId));
 }

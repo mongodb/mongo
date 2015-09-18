@@ -56,6 +56,8 @@ public:
 
     void markHostNotMaster(const HostAndPort& host) override;
 
+    void markHostUnreachable(const HostAndPort& host) override;
+
 private:
     // Name of the replica set which this targeter maintains
     const std::string _rsName;

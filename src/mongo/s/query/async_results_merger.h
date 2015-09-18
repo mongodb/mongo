@@ -167,6 +167,7 @@ private:
         bool exhausted() const;
 
         HostAndPort hostAndPort;
+        boost::optional<ShardId> shardId;
 
         // The command object for sending to the remote to establish the cursor. If a remote cursor
         // has not been established yet, this member will be set to a valid command object. If a

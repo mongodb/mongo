@@ -55,6 +55,10 @@ public:
         _mock->markHostNotMaster(host);
     }
 
+    void markHostUnreachable(const HostAndPort& host) override {
+        _mock->markHostUnreachable(host);
+    }
+
 private:
     const std::shared_ptr<RemoteCommandTargeter> _mock;
 };

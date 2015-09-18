@@ -73,6 +73,13 @@ public:
      */
     virtual void markHostNotMaster(const HostAndPort& host) = 0;
 
+    /**
+     * Similar to markHostNotMaster(). Reports to the targeter that a HostUnreachable response was
+     * received when communicating with "host". The targeter should update its bookkeeping to avoid
+     * giving out the same host on a subsequent request.
+     */
+    virtual void markHostUnreachable(const HostAndPort& host) = 0;
+
 protected:
     RemoteCommandTargeter() = default;
 };

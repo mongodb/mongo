@@ -84,4 +84,10 @@ void RemoteCommandTargeterRS::markHostNotMaster(const HostAndPort& host) {
     _rsMonitor->failedHost(host);
 }
 
+void RemoteCommandTargeterRS::markHostUnreachable(const HostAndPort& host) {
+    invariant(_rsMonitor);
+
+    _rsMonitor->failedHost(host);
+}
+
 }  // namespace mongo

@@ -51,4 +51,8 @@ void RemoteCommandTargeterStandalone::markHostNotMaster(const HostAndPort& host)
     dassert(host == _hostAndPort);
 }
 
+void RemoteCommandTargeterStandalone::markHostUnreachable(const HostAndPort& host) {
+    dassert(host == _hostAndPort);
+}
+
 }  // namespace mongo

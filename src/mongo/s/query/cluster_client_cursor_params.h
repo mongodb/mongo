@@ -29,11 +29,14 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <memory>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -50,8 +53,10 @@ struct ClusterClientCursorParams {
         /**
          * Use when a new cursor should be created on the remote.
          */
-        Remote(HostAndPort hostAndPort, BSONObj cmdObj)
-            : hostAndPort(std::move(hostAndPort)), cmdObj(std::move(cmdObj)) {}
+        Remote(HostAndPort hostAndPort, ShardId sid, BSONObj cmdObj)
+            : hostAndPort(std::move(hostAndPort)),
+              shardId(std::move(sid)),
+              cmdObj(std::move(cmdObj)) {}
 
         /**
          * Use when an a cursor already exists on the remote.  The resulting CCC will take ownership
@@ -67,6 +72,13 @@ struct ClusterClientCursorParams {
         // How the networking layer should contact this remote.
         HostAndPort hostAndPort;
 
+        // The id of the shard to which this remote belongs. If the cursor was already established
+        // on the remote when the CCC was established, 'shardId' is boost::none. (Since a cursor has
+        // already been successfully created on a particular host in this case, there is no need to
+        // know or care to which shard this host belongs. No re-targeting of a different host within
+        // the shard will take place.)
+        boost::optional<ShardId> shardId;
+
         // The raw command parameters to send to this remote (e.g. the find command specification).
         //
         // Exactly one of 'cmdObj' or 'cursorId' must be set.
@@ -81,6 +93,12 @@ struct ClusterClientCursorParams {
     ClusterClientCursorParams() {}
 
     ClusterClientCursorParams(NamespaceString nss) : nsString(std::move(nss)) {}
+
+    // Not owned.
+    OperationContext* txn = nullptr;
+
+    // Unowned pointer to the global registry of shards.
+    ShardRegistry* shardRegistry = nullptr;
 
     NamespaceString nsString;
 

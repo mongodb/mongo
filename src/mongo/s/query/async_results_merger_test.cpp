@@ -89,7 +89,7 @@ protected:
         params.isSecondaryOk = isSecondaryOk;
 
         for (const auto& hostAndPort : remotes) {
-            params.remotes.emplace_back(hostAndPort, findCmd);
+            params.remotes.emplace_back(hostAndPort, "testShard", findCmd);
         }
 
         arm = stdx::make_unique<AsyncResultsMerger>(executor, params);

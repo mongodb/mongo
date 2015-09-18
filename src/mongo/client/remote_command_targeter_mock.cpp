@@ -57,6 +57,8 @@ StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(const ReadPreference
 
 void RemoteCommandTargeterMock::markHostNotMaster(const HostAndPort& host) {}
 
+void RemoteCommandTargeterMock::markHostUnreachable(const HostAndPort& host) {}
+
 void RemoteCommandTargeterMock::setConnectionStringReturnValue(const ConnectionString returnValue) {
     _connectionStringReturnValue = std::move(returnValue);
 }
