@@ -2,10 +2,6 @@ selector:
   js_test:
     roots:
     - jstests/slow2/*.js
-    exclude_files:
-    # Skip the passthrough tests because each passthrough
-    # is run as its own independent suite.
-    - jstests/slow2/readmajority_jscore_passthrough.js
 
 executor:
   js_test:
