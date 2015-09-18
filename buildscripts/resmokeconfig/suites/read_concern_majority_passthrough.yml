@@ -4,11 +4,34 @@ selector:
     - jstests/core/*.js
     exclude_files:
     # Tests that won't work with an injected 'majority' readConcern
-    # and/or an injected 'majority' writeConcern
-    - jstests/core/array_match4.js # checks commands with various write concerns
+    # and/or an injected 'majority' writeConcern. Where a function is
+    # listed the reason is we don't have a reliable solution to override
+    # the write concern for that function.
+    - jstests/core/apply_ops1.js # applyOps() used for writes
     - jstests/core/batch_write_command*.js # these tests use various write concerns
+    - jstests/core/bench_test_crud_commands.js # benchRun() used for writes
     - jstests/core/crud_api.js # has specific w:0 tests
-    - jstests/core/evalb.js # system.profile not replicated
+    - jstests/core/error2.js # db.eval() used
+    - jstests/core/eval0.js # db.eval() used
+    - jstests/core/eval1.js # db.eval() used
+    - jstests/core/eval3.js # db.eval() used
+    - jstests/core/eval4.js # db.eval() used
+    - jstests/core/eval5.js # db.eval() used
+    - jstests/core/eval6.js # db.eval() used
+    - jstests/core/eval7.js # db.eval() used
+    - jstests/core/eval9.js # db.eval() used
+    - jstests/core/evala.js # db.eval() used
+    - jstests/core/evalb.js # db.eval() used
+    - jstests/core/evalc.js # db.eval() used
+    - jstests/core/evald.js # db.eval() used
+    - jstests/core/evale.js # db.eval() used
+    - jstests/core/evalg.js # db.eval() used
+    - jstests/core/eval_mr.js # db.eval() used
+    - jstests/core/eval_nolock.js # db.eval() used
+    - jstests/core/geo_s2cursorlimitskip.js # drops system.profile collection and counts ops.
+    - jstests/core/js3.js # db.dbEval() used
+    - jstests/core/js7.js # db.eval() used
+    - jstests/core/js9.js # db.eval() used
     - jstests/core/mr_merge.js # mr temp tables aren't replicated
     - jstests/core/mr_merge2.js # mr temp tables aren't replicated
     - jstests/core/mr_outreduce.js # mr temp tables aren't replicated
@@ -21,27 +44,24 @@ selector:
     - jstests/core/profile4.js # system.profile not replicated
     - jstests/core/profile5.js # system.profile not replicated
     - jstests/core/read_after_optime.js # verifies read after optime fails on standalone
+    - jstests/core/remove8.js # db.eval() used
+    - jstests/core/rename4.js # db.eval() used
     - jstests/core/shell1.js # tests setSlaveOk() variations on standalone mongod
+    - jstests/core/shellkillop.js # db.eval() used
     - jstests/core/shell_writeconcern.js # checks write concern shell helpers
-    # Timing / excessive run time with sleep workaround in place for SERVER-20260
-    - jstests/core/index_create_too_many.js
-    - jstests/core/index_many2.js
-    - jstests/core/index_many.js
-    # Tests that are flaky with the level of sleep we've set
-    - jstests/core/apply_ops1.js
-    - jstests/core/eval6.js
-    - jstests/core/geo_s2cursorlimitskip.js
-    - jstests/core/plan_cache_clear.js
-    - jstests/core/stages_delete.js
-    - jstests/core/updatej.js
+    - jstests/core/storefunc.js # db.eval() used
     # Tests that need triaging & remediation | blacklist decision
-    - jstests/core/capped6.js # might be autoIndexId
+    # Comments list possible problem point under review.
+    - jstests/core/capped6.js # Uses captrunc test command.
+    - jstests/core/convert_to_capped_nonexistant.js # Uses convertToCapped and captrunc command.
+    - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
+
 
 executor:
   js_test:
     config:
       shell_options:
-        eval: "var testingReplication = true;load('jstests/slow2/readmajority_jscore_passthrough.js');"
+        eval: "var testingReplication = true;load('jstests/libs/override_methods/set_majority_read_and_write_concerns.js');"
         readMode: commands
     fixture:
       class: ReplicaSetFixture
@@ -49,6 +69,4 @@ executor:
         set_parameters:
           enableTestCommands: 1
         enableMajorityReadConcern: ''
-      # Running with one node until SERVER-20260 in place. Allows us to use a much smaller sleep.
-      # Bring up to two or three once fixed.
-      num_nodes: 1
+      num_nodes: 2
