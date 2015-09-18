@@ -78,31 +78,22 @@ public:
 
     StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request) {
         auto cb = makeCallbackHandle();
-        stdx::promise<RemoteCommandResponse> result;
-
+        Deferred<StatusWith<RemoteCommandResponse>> deferred;
         log() << "running command: " << request.toString();
 
         net().startCommand(cb,
                            request,
-                           [&result](StatusWith<RemoteCommandResponse> resp) {
-                               try {
-                                   result.set_value(uassertStatusOK(resp));
-                               } catch (...) {
-                                   result.set_exception(std::current_exception());
-                               }
+                           [&deferred](StatusWith<RemoteCommandResponse> resp) {
+                               deferred.emplace(std::move(resp));
                            });
-        try {
-            // We can't construct a stdx::promise<StatusWith<RemoteCommandResponse>> because
-            // StatusWith is not default constructible. So we do the status -> exception -> status
-            // dance instead.
-            auto res = result.get_future().get();
-            log() << "got command result: " << res.toString();
-            return res;
-        } catch (...) {
-            auto status = exceptionToStatus();
-            log() << "command failed with status: " << status;
-            return status;
+
+        auto& res = deferred.get();
+        if (res.isOK()) {
+            log() << "got command result: " << res.getValue().toString();
+        } else {
+            log() << "command failed: " << res.getStatus();
         }
+        return res;
     }
 
     void assertCommandOK(StringData db,

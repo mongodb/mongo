@@ -100,21 +100,16 @@ TEST(ConnectionPoolASIO, TestPing) {
     for (auto& thread : threads) {
         thread = stdx::thread([&net, &fixture]() {
             auto status = Status::OK();
-            stdx::promise<void> result;
+            Deferred<StatusWith<RemoteCommandResponse>> deferred;
 
             net.startCommand(makeCallbackHandle(),
                              RemoteCommandRequest{
                                  fixture.getServers()[0], "admin", BSON("ping" << 1), BSONObj()},
-                             [&result, &status](StatusWith<RemoteCommandResponse> resp) {
-                                 if (!resp.isOK()) {
-                                     status = std::move(resp.getStatus());
-                                 }
-                                 result.set_value();
+                             [&deferred](StatusWith<RemoteCommandResponse> resp) {
+                                 deferred.emplace(std::move(resp));
                              });
 
-            result.get_future().get();
-
-            ASSERT_OK(status);
+            ASSERT_OK(deferred.get().getStatus());
         });
     }
 

@@ -28,7 +28,11 @@
 
 #include <memory>
 
+#include <boost/optional.hpp>
+
 #include "mongo/executor/task_executor.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace executor {
@@ -46,6 +50,31 @@ public:
 TaskExecutor::CallbackHandle makeCallbackHandle() {
     return TaskExecutor::CallbackHandle(std::make_shared<MockCallbackState>());
 }
+
+/**
+ * Simple future-like utility for waiting for the result of startCommand.
+ */
+template <typename T>
+class Deferred {
+public:
+    template <typename... Args>
+    void emplace(Args&&... args) {
+        stdx::unique_lock<stdx::mutex> lk(_mtx);
+        _thing.emplace(std::forward<T>(args)...);
+        _cv.notify_one();
+    }
+
+    T& get() {
+        stdx::unique_lock<stdx::mutex> lk(_mtx);
+        _cv.wait(lk, [this] { return _thing.is_initialized(); });
+        return *_thing;
+    }
+
+private:
+    stdx::mutex _mtx;
+    stdx::condition_variable _cv;
+    boost::optional<T> _thing;
+};
 
 
 }  // namespace executor
