@@ -1140,10 +1140,6 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* txn) {
            << " records totaling to " << _dataSize.load() << " bytes";
 }
 
-StatusWith<RecordId> WiredTigerRecordStore::extractAndCheckLocForOplog(const char* data, int len) {
-    return oploghack::extractKey(data, len);
-}
-
 StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
                                                          const char* data,
                                                          int len,
@@ -1154,7 +1150,7 @@ StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
 
     RecordId loc;
     if (_useOplogHack) {
-        StatusWith<RecordId> status = extractAndCheckLocForOplog(data, len);
+        StatusWith<RecordId> status = oploghack::extractKey(data, len);
         if (!status.isOK())
             return status;
         loc = status.getValue();
