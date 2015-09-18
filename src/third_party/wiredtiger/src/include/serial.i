@@ -56,7 +56,7 @@ __insert_simple_func(WT_SESSION_IMPL *session,
 	for (i = 0; i < skipdepth; i++) {
 		WT_INSERT *old_ins = *ins_stack[i];
 		if (old_ins != new_ins->next[i] ||
-		    !WT_ATOMIC_CAS8(*ins_stack[i], old_ins, new_ins))
+		    !__wt_atomic_cas_ptr(ins_stack[i], old_ins, new_ins))
 			return (i == 0 ? WT_RESTART : 0);
 	}
 
@@ -93,7 +93,7 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head,
 	for (i = 0; i < skipdepth; i++) {
 		WT_INSERT *old_ins = *ins_stack[i];
 		if (old_ins != new_ins->next[i] ||
-		    !WT_ATOMIC_CAS8(*ins_stack[i], old_ins, new_ins))
+		    !__wt_atomic_cas_ptr(ins_stack[i], old_ins, new_ins))
 			return (i == 0 ? WT_RESTART : 0);
 		if (ins_head->tail[i] == NULL ||
 		    ins_stack[i] == &ins_head->tail[i]->next[i])
@@ -271,7 +271,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * Swap the update into place.  If that fails, a new update was added
 	 * after our search, we raced.  Check if our update is still permitted.
 	 */
-	while (!WT_ATOMIC_CAS8(*srch_upd, upd->next, upd)) {
+	while (!__wt_atomic_cas_ptr(srch_upd, upd->next, upd)) {
 		if ((ret = __wt_txn_update_check(
 		    session, upd->next = *srch_upd)) != 0) {
 			/* Free unused memory on error. */

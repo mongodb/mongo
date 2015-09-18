@@ -17,11 +17,11 @@ struct __wt_stats {
 #define	WT_STAT(stats, fld)						\
 	((stats)->fld.v)
 #define	WT_STAT_ATOMIC_DECRV(stats, fld, value) do {			\
-	(void)WT_ATOMIC_SUB8(WT_STAT(stats, fld), (value));		\
+	(void)__wt_atomic_sub64(&WT_STAT(stats, fld), (value));		\
 } while (0)
 #define	WT_STAT_ATOMIC_DECR(stats, fld) WT_STAT_ATOMIC_DECRV(stats, fld, 1)
 #define	WT_STAT_ATOMIC_INCRV(stats, fld, value) do {			\
-	(void)WT_ATOMIC_ADD8(WT_STAT(stats, fld), (value));		\
+	(void)__wt_atomic_add64(&WT_STAT(stats, fld), (value));		\
 } while (0)
 #define	WT_STAT_ATOMIC_INCR(stats, fld) WT_ATOMIC_ADD8(WT_STAT(stats, fld), 1)
 #define	WT_STAT_DECRV(stats, fld, value) do {				\
@@ -214,6 +214,7 @@ struct __wt_connection_stats {
 	WT_STATS log_compress_small;
 	WT_STATS log_compress_write_fails;
 	WT_STATS log_compress_writes;
+	WT_STATS log_flush;
 	WT_STATS log_max_filesize;
 	WT_STATS log_prealloc_files;
 	WT_STATS log_prealloc_max;

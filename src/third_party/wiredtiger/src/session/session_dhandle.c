@@ -31,7 +31,7 @@ __session_add_dhandle(
 	if (dhandle_cachep != NULL)
 		*dhandle_cachep = dhandle_cache;
 
-	(void)WT_ATOMIC_ADD4(session->dhandle->session_ref, 1);
+	(void)__wt_atomic_add32(&session->dhandle->session_ref, 1);
 
 	/* Sweep the handle list to remove any dead handles. */
 	return (__session_dhandle_sweep(session));
@@ -51,7 +51,7 @@ __session_discard_dhandle(
 	TAILQ_REMOVE(&session->dhandles, dhandle_cache, q);
 	TAILQ_REMOVE(&session->dhhash[bucket], dhandle_cache, hashq);
 
-	(void)WT_ATOMIC_SUB4(dhandle_cache->dhandle->session_ref, 1);
+	(void)__wt_atomic_sub32(&dhandle_cache->dhandle->session_ref, 1);
 
 	__wt_overwrite_and_free(session, dhandle_cache);
 }
@@ -362,7 +362,7 @@ __session_find_shared_dhandle(WT_SESSION_IMPL *session,
     const char *uri, const char *checkpoint, uint32_t flags)
 {
 	WT_RET(__wt_conn_dhandle_find(session, uri, checkpoint, flags));
-	(void)WT_ATOMIC_ADD4(session->dhandle->session_ref, 1);
+	(void)__wt_atomic_add32(&session->dhandle->session_ref, 1);
 	return (0);
 }
 
@@ -392,7 +392,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * shared handle list and cache any handle we find.
 		 */
 		WT_WITH_DHANDLE_LOCK(session, ret =
-		    __session_find_shared_dhandle(session, uri, checkpoint, flags));
+		    __session_find_shared_dhandle(
+		    session, uri, checkpoint, flags));
 		dhandle = (ret == 0) ? session->dhandle : NULL;
 		WT_RET_NOTFOUND_OK(ret);
 	}

@@ -464,6 +464,7 @@ bzalloc
 bzfree
 bzip
 calloc
+cas
 catfmt
 cb
 cd
@@ -909,6 +910,7 @@ ps
 pse
 psp
 pthread
+ptr
 pushms
 putK
 putV
