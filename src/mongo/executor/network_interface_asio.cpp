@@ -233,7 +233,7 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
                     }
                     op->_timedOut.store(1);
                 } else {
-                    warning() << "failed to time operation out: " << ec.message();
+                    LOG(4) << "failed to time operation out: " << ec.message();
                 }
             });
         }
