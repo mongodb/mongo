@@ -71,14 +71,14 @@ long long NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleObject thisv) {
         if (!o.hasField(kFloatApprox))
             uasserted(ErrorCodes::InternalError, "No top and no floatApprox fields");
 
-        return o.getNumber(kFloatApprox);
+        return o.getNumberLongLong(kFloatApprox);
     }
 
     if (!o.hasField(kBottom))
         uasserted(ErrorCodes::InternalError, "top but no bottom field");
 
-    return ((unsigned long long)((long long)o.getNumber(kTop) << 32) +
-            (unsigned)(o.getNumber(kBottom)));
+    return ((unsigned long long)((long long)o.getNumberLongLong(kTop) << 32) +
+            (unsigned)(o.getNumberLongLong(kBottom)));
 }
 
 void NumberLongInfo::Functions::valueOf::call(JSContext* cx, JS::CallArgs args) {
