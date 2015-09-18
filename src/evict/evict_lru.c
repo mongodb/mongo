@@ -1473,11 +1473,11 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 	    session->nhazard > 0 ||
 	    (txn_state->snap_min != WT_TXN_NONE &&
 	    txn_global->current != txn_global->oldest_id);
-	if (txn_busy) {
-		if (pct_full < 100)
-			return (0);
-		busy = 1;
-	}
+	if (txn_busy && pct_full < 100)
+		return (0);
+
+	if (busy == 1)
+		txn_busy = 1;
 
 	/* Wake the eviction server if we need to do work. */
 	WT_RET(__wt_evict_server_wake(session));
@@ -1491,7 +1491,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 	init_evict_count = cache->pages_evict;
 
 	for (;;) {
-		max_pages_evicted = busy ? 10 : 50;
+		max_pages_evicted = txn_busy ? 5 : 20;
 
 		/*
 		 * A pathological case: if we're the oldest transaction in the
@@ -1515,24 +1515,25 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 		switch (ret = __evict_page(session, 0)) {
 		case 0:
 			cache->app_evicts++;
+			if (txn_busy)
+				return (0);
 			/* Fallthrough */
 		case EBUSY:
-			continue;
+			break;
 		case WT_NOTFOUND:
+			/* Allow the queue to re-populate before retrying. */
+			WT_RET(__wt_cond_wait(
+			    session, cache->evict_waiter_cond, 100000));
+			cache->app_waits++;
 			break;
 		default:
 			return (ret);
 		}
 
-		/* Wait for the queue to re-populate before trying again. */
-		WT_RET(
-		    __wt_cond_wait(session, cache->evict_waiter_cond, 100000));
-
-		cache->app_waits++;
-		/* Check if things have changed so that we are busy. */
+		/* Check if we have become busy. */
 		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
 		    txn_global->current != txn_global->oldest_id)
-			busy = 1;
+			txn_busy = 1;
 	}
 	/* NOTREACHED */
 }
