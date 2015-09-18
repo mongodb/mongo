@@ -35,14 +35,17 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {
 
-CommandReplyBuilder::CommandReplyBuilder() : _message{stdx::make_unique<Message>()} {}
+CommandReplyBuilder::CommandReplyBuilder() : CommandReplyBuilder(stdx::make_unique<Message>()) {}
 
 CommandReplyBuilder::CommandReplyBuilder(std::unique_ptr<Message> message)
-    : _message{std::move(message)} {}
+    : _message{std::move(message)} {
+    _builder.skip(mongo::MsgData::MsgDataHeaderSize);
+}
 
 CommandReplyBuilder& CommandReplyBuilder::setMetadata(const BSONObj& metadata) {
     invariant(_state == State::kMetadata);
@@ -101,15 +104,18 @@ void CommandReplyBuilder::reset() {
         return;
     }
     _builder.reset();
+    _builder.skip(mongo::MsgData::MsgDataHeaderSize);
     _message = stdx::make_unique<Message>();
     _state = State::kMetadata;
 }
 
 std::unique_ptr<Message> CommandReplyBuilder::done() {
     invariant(_state == State::kOutputDocs);
-    // TODO: we can elide a large copy here by transferring the internal buffer of
-    // the BufBuilder to the Message.
-    _message->setData(dbCommandReply, _builder.buf(), _builder.len());
+    MsgData::View msg = _builder.buf();
+    msg.setLen(_builder.len());
+    msg.setOperation(dbCommandReply);
+    _builder.decouple();                      // release ownership from BufBuilder
+    _message->setData(msg.view2ptr(), true);  // transfer ownership to Message
     _state = State::kDone;
     return std::move(_message);
 }
@@ -118,9 +124,8 @@ std::size_t CommandReplyBuilder::availableBytes() const {
     int intLen = _builder.len();
     invariant(0 <= intLen);
     std::size_t len = static_cast<std::size_t>(intLen);
-    std::size_t msgHeaderSz = static_cast<std::size_t>(MsgData::MsgDataHeaderSize);
-    invariant(len + msgHeaderSz <= mongo::MaxMessageSizeBytes);
-    return mongo::MaxMessageSizeBytes - len - msgHeaderSz;
+    invariant(len <= mongo::MaxMessageSizeBytes);
+    return mongo::MaxMessageSizeBytes - len;
 }
 
 Status CommandReplyBuilder::_hasSpaceFor(std::size_t dataSize) const {

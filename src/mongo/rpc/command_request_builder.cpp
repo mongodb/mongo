@@ -34,16 +34,20 @@
 
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {
 
-CommandRequestBuilder::CommandRequestBuilder() : _message{stdx::make_unique<Message>()} {}
+CommandRequestBuilder::CommandRequestBuilder()
+    : CommandRequestBuilder(stdx::make_unique<Message>()) {}
 
 CommandRequestBuilder::~CommandRequestBuilder() {}
 
 CommandRequestBuilder::CommandRequestBuilder(std::unique_ptr<Message> message)
-    : _message{std::move(message)} {}
+    : _message{std::move(message)} {
+    _builder.skip(mongo::MsgData::MsgDataHeaderSize);  // Leave room for message header.
+}
 
 CommandRequestBuilder& CommandRequestBuilder::setDatabase(StringData database) {
     invariant(_state == State::kDatabase);
@@ -96,9 +100,11 @@ Protocol CommandRequestBuilder::getProtocol() const {
 
 std::unique_ptr<Message> CommandRequestBuilder::done() {
     invariant(_state == State::kInputDocs);
-    // TODO: we can elide a large copy here by transferring the internal buffer of
-    // the BufBuilder to the Message.
-    _message->setData(dbCommand, _builder.buf(), _builder.len());
+    MsgData::View msg = _builder.buf();
+    msg.setLen(_builder.len());
+    msg.setOperation(dbCommand);
+    _builder.decouple();                      // release ownership from BufBuilder.
+    _message->setData(msg.view2ptr(), true);  // transfer ownership to Message.
     _state = State::kDone;
     return std::move(_message);
 }
