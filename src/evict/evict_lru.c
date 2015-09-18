@@ -1454,13 +1454,11 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	int count, q_found, txn_busy;
+	int txn_busy;
+	uint64_t init_evict_count, max_pages_evicted;
 
 	conn = S2C(session);
 	cache = conn->cache;
-
-	/* First, wake the eviction server. */
-	WT_RET(__wt_evict_server_wake(session));
 
 	/*
 	 * If the current transaction is keeping the oldest ID pinned, it is in
@@ -1481,15 +1479,20 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 		busy = 1;
 	}
 
+	/* Wake the eviction server if we need to do work. */
+	WT_RET(__wt_evict_server_wake(session));
+
 	/*
 	 * If we're busy, either because of the transaction check we just did,
 	 * or because our caller is waiting on a longer-than-usual event (such
 	 * as a page read), limit the work to a single eviction and return. If
 	 * that's not the case, we can do more.
 	 */
-	count = busy ? 1 : 10;
+	init_evict_count = cache->pages_evict;
 
 	for (;;) {
+		max_pages_evicted = busy ? 10 : 50;
+
 		/*
 		 * A pathological case: if we're the oldest transaction in the
 		 * system and the eviction server is stuck trying to find space,
@@ -1503,16 +1506,16 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 			return (WT_ROLLBACK);
 		}
 
+		/* See if eviction is still needed. */
+		if (!__wt_eviction_needed(session, NULL) ||
+		    cache->pages_evict > init_evict_count + max_pages_evicted)
+			return (0);
+
 		/* Evict a page. */
-		q_found = 0;
 		switch (ret = __evict_page(session, 0)) {
 		case 0:
 			cache->app_evicts++;
-			if (--count == 0)
-				return (0);
-
-			q_found = 1;
-			break;
+			/* Fallthrough */
 		case EBUSY:
 			continue;
 		case WT_NOTFOUND:
@@ -1520,14 +1523,6 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 		default:
 			return (ret);
 		}
-
-		/* See if eviction is still needed. */
-		if (!__wt_eviction_needed(session, NULL))
-			return (0);
-
-		/* If we found pages in the eviction queue, continue there. */
-		if (q_found)
-			continue;
 
 		/* Wait for the queue to re-populate before trying again. */
 		WT_RET(
@@ -1537,7 +1532,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 		/* Check if things have changed so that we are busy. */
 		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
 		    txn_global->current != txn_global->oldest_id)
-			busy = count = 1;
+			busy = 1;
 	}
 	/* NOTREACHED */
 }
