@@ -64,9 +64,8 @@ public:
     virtual void endUnitOfWork();
 
     virtual bool awaitCommit();
-    virtual void goingToAwaitCommit();
 
-    virtual void registerChange(Change*);
+    virtual void registerChange(Change* change);
 
     virtual void beingReleasedFromOperationContext();
     virtual void beingSetOnOperationContext();
@@ -115,6 +114,7 @@ private:
     void _abort();
     void _commit();
 
+    void _ensureSession();
     void _txnClose(bool commit);
     void _txnOpen(OperationContext* opCtx);
 
@@ -127,7 +127,6 @@ private:
     bool _everStartedWrite;
     Timer _timer;
     bool _currentlySquirreled;
-    bool _syncing;
     RecordId _oplogReadTill;
 
     typedef OwnedPointerVector<Change> Changes;

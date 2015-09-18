@@ -48,34 +48,6 @@
 
 namespace mongo {
 
-namespace {
-struct AwaitCommitData {
-    AwaitCommitData() : numWaitingForSync(0), lastSyncTime(0) {}
-
-    void syncHappend() {
-        boost::mutex::scoped_lock lk(mutex);
-        lastSyncTime++;
-        condvar.notify_all();
-    }
-
-    // return true if happened
-    bool awaitCommit() {
-        boost::mutex::scoped_lock lk(mutex);
-        long long start = lastSyncTime;
-        numWaitingForSync.fetchAndAdd(1);
-        condvar.timed_wait(lk, boost::posix_time::milliseconds(50));
-        numWaitingForSync.fetchAndAdd(-1);
-        return lastSyncTime > start;
-    }
-
-    AtomicUInt32 numWaitingForSync;
-
-    boost::mutex mutex;  // this just protects lastSyncTime
-    boost::condition condvar;
-    long long lastSyncTime;
-} awaitCommitData;
-}
-
 WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc)
     : _sessionCache(sc),
       _session(NULL),
@@ -84,7 +56,6 @@ WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc)
       _myTransactionCount(1),
       _everStartedWrite(false),
       _currentlySquirreled(false),
-      _syncing(false),
       _noTicketNeeded(false) {}
 
 WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
@@ -162,21 +133,16 @@ void WiredTigerRecoveryUnit::endUnitOfWork() {
     }
 }
 
-void WiredTigerRecoveryUnit::goingToAwaitCommit() {
-    if (_active) {
-        // too late, can't change config
-        return;
+void WiredTigerRecoveryUnit::_ensureSession() {
+    if (!_session) {
+        _session = _sessionCache->getSession();
     }
-    // yay, we've configured ourselves for sync
-    _syncing = true;
 }
 
 bool WiredTigerRecoveryUnit::awaitCommit() {
-    if (_syncing && _everStartedWrite) {
-        // we did a sync, so we're good
-        return true;
-    }
-    awaitCommitData.awaitCommit();
+    invariant(_depth == 0);
+    _ensureSession();
+    _sessionCache->waitUntilDurable(_session);
     return true;
 }
 
@@ -195,9 +161,7 @@ void WiredTigerRecoveryUnit::assertInActiveTxn() const {
 }
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSession(OperationContext* opCtx) {
-    if (!_session) {
-        _session = _sessionCache->getSession();
-    }
+    _ensureSession();
 
     if (!_active) {
         _txnOpen(opCtx);
@@ -291,8 +255,6 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     if (commit) {
         invariantWTOK(s->commit_transaction(s, NULL));
         LOG(2) << "WT commit_transaction";
-        if (_syncing)
-            awaitCommitData.syncHappend();
     } else {
         invariantWTOK(s->rollback_transaction(s, NULL));
         LOG(2) << "WT rollback_transaction";
@@ -342,8 +304,7 @@ void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
     _getTicket(opCtx);
 
     WT_SESSION* s = _session->getSession();
-    _syncing = _syncing || awaitCommitData.numWaitingForSync.load() > 0;
-    invariantWTOK(s->begin_transaction(s, _syncing ? "sync=true" : NULL));
+    invariantWTOK(s->begin_transaction(s, NULL));
     LOG(2) << "WT begin_transaction";
     _timer.reset();
     _active = true;
