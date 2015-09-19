@@ -81,7 +81,6 @@ env.Library(
     target='kv_engine_test_harness',
     source=[
         'kv_engine_test_harness.cpp',
-        'kv_engine_test_snapshots.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
