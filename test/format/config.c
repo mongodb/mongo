@@ -170,6 +170,10 @@ config_setup(void)
 			g.c_insert_pct = mmrand(NULL, 50, 85);
 	}
 
+	/* Ensure there is at least 1MB of cache per thread. */
+	if (!config_is_perm("cache") && g.c_threads < g.c_cache)
+		g.c_cache = g.c_threads;
+
 	/* Make the default maximum-run length 20 minutes. */
 	if (!config_is_perm("timer"))
 		g.c_timer = 20;
