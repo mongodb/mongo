@@ -55,7 +55,7 @@ class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
         self.home = dir
         conn_params = \
                 'log=(archive=false,enabled,file_max=%s)' % self.logmax + \
-                ',create,cache_size=8G,error_prefix="%s: ",' % self.shortid() 
+                ',create,cache_size=8G,error_prefix="%s: ",' % self.shortid()
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
         try:
             conn = wiredtiger_open(dir, conn_params)
