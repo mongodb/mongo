@@ -1,4 +1,9 @@
 
+// Call the defaultPrompt function once at the beginning of the test to cache the
+// build info. The first invocation of the function would otherwise overwrite the
+// getLastError result.
+defaultPrompt();
+
 t = db.server5441;
 t.drop();
 

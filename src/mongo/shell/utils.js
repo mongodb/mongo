@@ -284,6 +284,21 @@ jsTest.isMongos = function(conn) {
 
 defaultPrompt = function() {
     var status = db.getMongo().authStatus;
+    var prefix = db.getMongo().promptPrefix;
+
+    if (typeof prefix == 'undefined') {
+        prefix = "";
+        var buildInfo = db.runCommand({buildInfo: 1});
+        try {
+            if (buildInfo.modules.indexOf("enterprise") > -1) {
+                prefix = "MongoDB Enterprise "
+            }
+        } catch (e) {
+            // Don't do anything here. Just throw the error away.
+        }
+        db.getMongo().promptPrefix = prefix;
+    }
+
     try {
         // try to use repl set prompt -- no status or auth detected yet
         if (!status || !status.authRequired) {
@@ -291,7 +306,7 @@ defaultPrompt = function() {
                 var prompt = replSetMemberStatePrompt();
                 // set our status that it was good
                 db.getMongo().authStatus = {replSetGetStatus:true, isMaster: true};
-                return prompt;
+                return prefix + prompt;
             } catch (e) {
                 // don't have permission to run that, or requires auth
                 //print(e);
@@ -307,7 +322,7 @@ defaultPrompt = function() {
                 // set our status that it was good
                 status.replSetGetStatus = true;
                 db.getMongo().authStatus = status;
-                return prompt;
+                return prefix + prompt;
             } catch (e) {
                 // don't have permission to run that, or requires auth
                 //print(e);
@@ -322,7 +337,7 @@ defaultPrompt = function() {
                 var prompt = isMasterStatePrompt();
                 status.isMaster = true;
                 db.getMongo().authStatus = status;
-                return prompt;
+                return prefix + prompt;
             } catch (e) {
                 status.authRequired = true;
                 status.isMaster = false;
@@ -335,7 +350,7 @@ defaultPrompt = function() {
     }
 
     db.getMongo().authStatus = status;
-    return "> ";
+    return prefix + "> ";
 }
 
 replSetMemberStatePrompt = function() {
