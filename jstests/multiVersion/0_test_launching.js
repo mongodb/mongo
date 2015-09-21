@@ -12,9 +12,9 @@ for( var i = 0; i < versionsToCheck.length; i++ ){
 
     var version = versionsToCheck[ i ]
 
-    var mongod1 = MongoRunner.runMongod({ binVersion : version });
-    var mongod2 = MongoRunner.runMongod({ binVersion : version });
-    var mongod3 = MongoRunner.runMongod({ binVersion : version });
+    var mongod1 = MongoRunner.runMongod({ binVersion : version, configsvr : "" });
+    var mongod2 = MongoRunner.runMongod({ binVersion : version, configsvr : "" });
+    var mongod3 = MongoRunner.runMongod({ binVersion : version, configsvr : "" });
     var configdbStr = mongod1.host + "," + mongod2.host + "," + mongod3.host;
     var mongos = MongoRunner.runMongos({ binVersion : version, configdb : configdbStr });
 

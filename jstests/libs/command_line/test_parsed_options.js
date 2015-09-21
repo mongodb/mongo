@@ -139,16 +139,33 @@ function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
 //
 var getCmdLineOptsBaseMongos;
 function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
+    "use strict";
 
     // Get the options object returned by "getCmdLineOpts" when we spawn a mongos using our test
     // framework without passing any additional options.  We need this because the framework adds
     // options of its own, and we only want to compare against the options we care about.
     function getCmdLineOptsFromMongos(mongosOptions) {
         // Start mongod with no options
-        var baseMongod1 = MongoRunner.runMongod();
-        var baseMongod2 = MongoRunner.runMongod();
-        var baseMongod3 = MongoRunner.runMongod();
-        var configdbStr = baseMongod1.host + "," + baseMongod2.host + "," + baseMongod3.host;
+        var baseMongod = MongoRunner.runMongod({
+            configsvr: "",
+            replSet: "csrs",
+            storageEngine: "wiredTiger"
+        });
+        assert.commandWorked(baseMongod.adminCommand( {
+            replSetInitiate: {
+                _id: "csrs", configsvr: true, members: [{_id: 0, host: baseMongod.host}]
+            }
+        }));
+        var configdbStr = "csrs/" + baseMongod.host;
+        var ismasterResult;
+        assert.soon(
+            function() {
+                ismasterResult = baseMongod.adminCommand("ismaster");
+                return ismasterResult.ismaster;
+            },
+            function () {
+                return tojson(ismasterResult);
+            });
 
         var options = Object.merge(mongosOptions, {configdb: configdbStr});
         var baseMongos = MongoRunner.runMongos(options);
@@ -161,9 +178,7 @@ function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
 
         // Stop the mongod and mongos we used to get the options
         MongoRunner.stopMongos(baseMongos);
-        MongoRunner.stopMongod(baseMongod1);
-        MongoRunner.stopMongod(baseMongod2);
-        MongoRunner.stopMongod(baseMongod3);
+        MongoRunner.stopMongod(baseMongod);
 
         return getCmdLineOptsResult;
     }
