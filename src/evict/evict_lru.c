@@ -1531,7 +1531,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 		}
 
 		/* Check if we have become busy. */
-		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
+		if (!txn_busy && txn_state->snap_min != WT_TXN_NONE &&
 		    txn_global->current != txn_global->oldest_id)
 			txn_busy = 1;
 	}
