@@ -4339,7 +4339,7 @@ buildvariants:
     - rhel55-test
 
 - name: ubuntu1404-asio
-  display_name: ~ ASIO SSL Ubuntu 14.04
+  display_name: ~ SSL Ubuntu 14.04 (Synchronous Networking)
   modules: ~
   run_on:
   - ubuntu1404-test
@@ -4350,7 +4350,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: "--continueOnFailure --mongosSetParameters='{outboundNetworkImpl: 'ASIO'}' --mongodSetParameters='{outboundNetworkImpl: 'ASIO'}'"
+    test_flags: "--continueOnFailure --mongosSetParameters='{outboundNetworkImpl: 'threadPool'}' --mongodSetParameters='{outboundNetworkImpl: 'threadPool'}'"
   tasks:
   - name: compile
     distros:
@@ -4368,7 +4368,7 @@ buildvariants:
   - name: concurrency_replication_WT
   - name: concurrency_sharded_WT
   - name: replicasets_WT
-  #- name: replicasets_auth
+  - name: replicasets_auth
   - name: replication_WT
   - name: replication_auth
   - name: sharding_WT
@@ -4381,7 +4381,7 @@ buildvariants:
   - name: tool_WT
 
 - name: windows-64-2k8-ssl-asio
-  display_name: ~ ASIO SSL Windows 2008R2
+  display_name: ~ SSL Windows 2008R2 (Synchronous Networking)
   modules: ~
   run_on:
   - windows-64-vs2013-test
@@ -4396,7 +4396,7 @@ buildvariants:
     compile_flags: --release --ssl MONGO_DISTMOD=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
     num_cores: $(grep -c ^processor /proc/cpuinfo)
     num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: "--continueOnFailure --mongosSetParameters='{outboundNetworkImpl: 'ASIO'}' --mongodSetParameters='{outboundNetworkImpl: 'ASIO'}'"
+    test_flags: "--continueOnFailure --mongosSetParameters='{outboundNetworkImpl: 'threadPool'}' --mongodSetParameters='{outboundNetworkImpl: 'threadPool'}'"
     ext: zip
   tasks:
   - name: compile
