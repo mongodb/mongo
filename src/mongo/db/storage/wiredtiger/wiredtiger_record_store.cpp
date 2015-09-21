@@ -1166,45 +1166,49 @@ Status WiredTigerRecordStore::insertRecords(OperationContext* txn,
     WT_CURSOR* c = curwrap.get();
     invariant(c);
 
-    RecordId loc;
+    RecordId highestLoc = RecordId();
+    dassert(!records->empty());
     for (auto& record : *records) {
         if (_useOplogHack) {
             StatusWith<RecordId> status =
                 oploghack::extractKey(record.data.data(), record.data.size());
             if (!status.isOK())
                 return status.getStatus();
-            loc = status.getValue();
-            // RecordIds are monotonically increasing
-            if (loc > _oplog_highestSeen) {
-                stdx::lock_guard<stdx::mutex> lk(_uncommittedDiskLocsMutex);
-                if (loc > _oplog_highestSeen) {
-                    _oplog_highestSeen = loc;
-                }
-            }
+            record.id = status.getValue();
         } else if (_isCapped) {
             stdx::lock_guard<stdx::mutex> lk(_uncommittedDiskLocsMutex);
-            loc = _nextId();
-            _addUncommitedDiskLoc_inlock(txn, loc);
+            record.id = _nextId();
+            _addUncommitedDiskLoc_inlock(txn, record.id);
         } else {
-            loc = _nextId();
+            record.id = _nextId();
         }
+        dassert(record.id > highestLoc);
+        highestLoc = record.id;
+    }
 
-        c->set_key(c, _makeKey(loc));
+    if (_useOplogHack && (highestLoc > _oplog_highestSeen)) {
+        stdx::lock_guard<stdx::mutex> lk(_uncommittedDiskLocsMutex);
+        if (highestLoc > _oplog_highestSeen)
+            _oplog_highestSeen = highestLoc;
+    }
+
+    for (auto& record : *records) {
+        c->set_key(c, _makeKey(record.id));
         WiredTigerItem value(record.data.data(), record.data.size());
         c->set_value(c, value.Get());
         int ret = WT_OP_CHECK(c->insert(c));
         if (ret)
             return wtRCToStatus(ret, "WiredTigerRecordStore::insertRecord");
-        record.id = loc;
     }
 
     _changeNumRecords(txn, records->size());
     _increaseDataSize(txn, totalLength);
 
     if (_oplogStones) {
-        _oplogStones->updateCurrentStoneAfterInsertOnCommit(txn, totalLength, loc, records->size());
+        _oplogStones->updateCurrentStoneAfterInsertOnCommit(
+            txn, totalLength, highestLoc, records->size());
     } else {
-        cappedDeleteAsNeeded(txn, loc);
+        cappedDeleteAsNeeded(txn, highestLoc);
     }
 
     return Status::OK();
