@@ -697,7 +697,7 @@ namespace mongo {
         if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR, &gnNode)) {
             // No index for GEO_NEAR?  No query.
             RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
-            if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
+            if (!tag || (0 == tag->first.size() && 0 == tag->notFirst.size())) {
                 QLOG() << "Unable to find index for $geoNear query." << endl;
                 // Don't leave tags on query tree.
                 query.root()->resetTag();

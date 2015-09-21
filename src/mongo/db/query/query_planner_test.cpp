@@ -2180,6 +2180,11 @@ namespace {
         assertSolutionExists("{geoNear2d: {a: '2d', b: 1}}");
     }
 
+    TEST_F(QueryPlannerTest, NearEmptyPath) {
+        addIndex(BSON("" << "2dsphere"));
+        runInvalidQuery(fromjson("{'': {$near: {$geometry: {type:'Point',coordinates:[0,0]}}}}"));
+    }
+
     //
     // $in
     //
