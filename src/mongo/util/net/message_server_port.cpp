@@ -168,8 +168,8 @@ public:
         Listener::setAsTimeTracker();
     }
 
-    virtual void setupSockets() {
-        Listener::setupSockets();
+    virtual bool setupSockets() {
+        return Listener::setupSockets();
     }
 
     void run() {

@@ -406,13 +406,19 @@ static void _initAndListen(int listenPort) {
 
     // This is what actually creates the sockets, but does not yet listen on them because we
     // do not want connections to just hang if recovery takes a very long time.
-    server->setupSockets();
+    if (!server->setupSockets()) {
+        error() << "Failed to set up sockets during startup.";
+        return;
+    }
 
     std::shared_ptr<DbWebServer> dbWebServer;
     if (serverGlobalParams.isHttpInterfaceEnabled) {
         dbWebServer.reset(new DbWebServer(
             serverGlobalParams.bind_ip, serverGlobalParams.port + 1000, new RestAdminAccess()));
-        dbWebServer->setupSockets();
+        if (!dbWebServer->setupSockets()) {
+            error() << "Failed to set up sockets for HTTP interface during startup.";
+            return;
+        }
     }
 
     getGlobalServiceContext()->initializeGlobalStorageEngine();

@@ -80,8 +80,9 @@ public:
     /**
      * Allocate sockets for the listener and set _setupSocketsSuccessful to true
      * iff the process was successful.
+     * Returns _setupSocketsSuccessful.
      */
-    void setupSockets();
+    bool setupSockets();
 
     void setAsTimeTracker() {
         _timeTracker = this;

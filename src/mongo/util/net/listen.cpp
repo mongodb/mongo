@@ -138,7 +138,7 @@ Listener::~Listener() {
         _timeTracker = 0;
 }
 
-void Listener::setupSockets() {
+bool Listener::setupSockets() {
     checkTicketNumbers();
 
 #if !defined(_WIN32)
@@ -153,7 +153,7 @@ void Listener::setupSockets() {
 
         if (!me.isValid()) {
             error() << "listen(): socket is invalid." << endl;
-            return;
+            return _setupSocketsSuccessful;
         }
 
         SOCKET sock = ::socket(me.getType(), SOCK_STREAM, 0);
@@ -193,7 +193,7 @@ void Listener::setupSockets() {
                     << " for socket: " << me.toString() << endl;
             if (x == EADDRINUSE)
                 error() << "  addr already in use" << endl;
-            return;
+            return _setupSocketsSuccessful;
         }
 
 #if !defined(_WIN32)
@@ -212,6 +212,7 @@ void Listener::setupSockets() {
     }
 
     _setupSocketsSuccessful = true;
+    return _setupSocketsSuccessful;
 }
 
 

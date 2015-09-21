@@ -264,7 +264,9 @@ static ExitCode runMongosServer() {
     ShardedMessageHandler handler;
     MessageServer* server = createServer(opts, &handler);
     server->setAsTimeTracker();
-    server->setupSockets();
+    if (!server->setupSockets()) {
+        return EXIT_NET_ERROR;
+    }
     server->run();
 
     // MessageServer::run will return when exit code closes its socket
