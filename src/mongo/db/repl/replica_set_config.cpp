@@ -128,7 +128,10 @@ Status ReplicaSetConfig::initialize(const BSONObj& cfg, bool usePV1ByDefault) {
     //
     // Parse configServer
     //
-    status = bsonExtractBooleanFieldWithDefault(cfg, kConfigServerFieldName, false, &_configServer);
+    status = bsonExtractBooleanFieldWithDefault(cfg,
+                                                kConfigServerFieldName,
+                                                serverGlobalParams.configsvr,
+                                                &_configServer);
     if (!status.isOK()) {
         return status;
     }
