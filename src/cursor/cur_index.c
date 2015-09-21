@@ -349,29 +349,19 @@ static int
 __curindex_open_colgroups(
     WT_SESSION_IMPL *session, WT_CURSOR_INDEX *cindex, const char *cfg_arg[])
 {
-	WT_CONFIG_ITEM cval;
 	WT_TABLE *table;
 	WT_CURSOR **cp;
-	char cfg_bulk[30], *proj;
-	/* Child cursors are opened with dump disabled. */
-	const char *cfg[] = { cfg_arg[0], cfg_arg[1], "dump=\"\"",
-			      cfg_bulk, NULL };
-	size_t cgcnt;
 	u_long arg;
+	/* Child cursors are opened with dump disabled. */
+	const char *cfg[] = { cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL };
+	char *proj;
+	size_t cgcnt;
 
 	table = cindex->table;
 	cgcnt = WT_COLGROUPS(table);
 	WT_RET(__wt_calloc_def(session, cgcnt, &cindex->cg_needvalue));
 	WT_RET(__wt_calloc_def(session, cgcnt, &cp));
 	cindex->cg_cursors = cp;
-
-	/* Remove "bulk=unordered", it doesn't apply to column group files. */
-	WT_RET(__wt_config_gets_def(session, cfg_arg, "bulk", 0, &cval));
-	if (cval.len != 0 &&
-	    WT_STRING_MATCH("unordered", cval.str, cval.len))
-		strncpy(cfg_bulk, "bulk=0", sizeof(cfg_bulk));
-	else
-		cfg_bulk[0] = '\0';
 
 	/* Work out which column groups we need. */
 	for (proj = (char *)cindex->value_plan; *proj != '\0'; proj++) {

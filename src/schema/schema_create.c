@@ -326,16 +326,13 @@ __wt_schema_index_source(WT_SESSION_IMPL *session,
  *	Fill the index from the current contents of the table.
  */
 static int
-__fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, const char *name)
+__fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 {
 	WT_DECL_RET;
-	WT_CURSOR *tcur, *icur, *child;
-	WT_CURSOR_INDEX *cindex;
-	WT_CURSOR_TABLE *ctable;
-	WT_INDEX *idx;
-	WT_SESSION *sess;
+	WT_CURSOR *tcur, *icur;
+	WT_SESSION *wt_session;
 
-	sess = (WT_SESSION *)session;
+	wt_session = &session->iface;
 	tcur = NULL;
 	icur = NULL;
 	WT_RET(__wt_schema_open_colgroups(session, table));
@@ -347,17 +344,14 @@ __fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, const char *name)
 	if (!table->cg_complete)
 		return (0);
 
-	WT_ERR(sess->open_cursor(sess, name, NULL, "bulk=unordered", &icur));
-	WT_ERR(sess->open_cursor(sess, table->name, NULL, "readonly", &tcur));
-
-	ctable = (WT_CURSOR_TABLE *)tcur;
-	cindex = (WT_CURSOR_INDEX *)icur;
-	child = cindex->child;
-	idx = cindex->index;
+	WT_ERR(wt_session->open_cursor(wt_session,
+	    idx->source, NULL, "bulk=unordered", &icur));
+	WT_ERR(wt_session->open_cursor(wt_session,
+	    table->name, NULL, "readonly", &tcur));
 
 	while ((ret = tcur->next(tcur)) == 0)
 		WT_ERR(__wt_apply_single_idx(session, idx,
-		    child, ctable, child->insert));
+		    icur, (WT_CURSOR_TABLE *)tcur, icur->insert));
 
 	WT_ERR_NOTFOUND_OK(ret);
 err:
@@ -380,6 +374,7 @@ __create_index(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM ckey, cval, icols, kval;
 	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
+	WT_INDEX *idx;
 	WT_ITEM confbuf, extra_cols, fmt, namebuf;
 	WT_PACK pack;
 	WT_TABLE *table;
@@ -539,11 +534,12 @@ __create_index(WT_SESSION_IMPL *session,
 			ret = exclusive ? EEXIST : 0;
 		goto err;
 	}
-	WT_ERR(__fill_index(session, table, name));
 
 	/* Make sure that the configuration is valid. */
 	WT_ERR(__wt_schema_open_index(
-	    session, table, idxname, strlen(idxname), NULL));
+	    session, table, idxname, strlen(idxname), &idx));
+
+	WT_ERR(__fill_index(session, table, idx));
 
 err:	__wt_free(session, idxconf);
 	__wt_free(session, sourceconf);
