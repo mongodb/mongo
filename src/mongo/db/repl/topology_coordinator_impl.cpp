@@ -104,7 +104,8 @@ void PingStats::start(Date_t now) {
 void PingStats::hit(Milliseconds millis) {
     _numFailuresSinceLastStart = std::numeric_limits<int>::max();
     ++count;
-    value = value == Milliseconds() ? millis : Milliseconds((value * 4 + millis) / 5);
+
+    value = value == UninitializedPing ? millis : Milliseconds((value * 4 + millis) / 5);
 }
 
 void PingStats::miss() {

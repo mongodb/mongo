@@ -52,7 +52,7 @@ class ReplSetMetadata;
 
 namespace repl {
 
-static const Milliseconds UninitializedPing{};
+static const Milliseconds UninitializedPing{-1};
 
 /**
  * Represents a latency measurement for each replica set member based on heartbeat requests.
@@ -90,9 +90,10 @@ public:
 
     /**
      * Gets the weighted average round trip time for heartbeat messages to the target.
+     * Returns 0 if there have been no pings recorded yet.
      */
     Milliseconds getMillis() const {
-        return value;
+        return value == UninitializedPing ? Milliseconds(0) : value;
     }
 
     /**
