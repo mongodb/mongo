@@ -1580,39 +1580,50 @@ __rec_child_deleted(
 	}
 
 	/*
+	 * If the original page is gone, we can skip the slot on the internal
+	 * page.
+	 */
+	if (ref->addr == NULL) {
+		*statep = WT_CHILD_IGNORE;
+
+		/*
+		 * Minor memory cleanup: if a truncate call deleted this page
+		 * and we were ever forced to instantiate the page in memory,
+		 * we would have built a list of updates in the page reference
+		 * in order to be able to abort the truncate.  It's a cheap
+		 * test to make that memory go away, we do it here because
+		 * there's really nowhere else we do the checks.  In short, if
+		 * we have such a list, and the backing address blocks are
+		 * gone, there can't be any transaction that can abort.
+		 */
+		if (page_del != NULL) {
+			__wt_free(session, ref->page_del->update_list);
+			__wt_free(session, ref->page_del);
+		}
+
+		return (0);
+	}
+
+	/*
 	 * If there are deleted child pages that we can't discard immediately,
 	 * keep the page dirty so they are eventually freed.
 	 */
-	if (ref->addr != NULL) {
-		r->leave_dirty = 1;
+	r->leave_dirty = 1;
 
-		/* This page cannot be evicted, quit now. */
-		if (F_ISSET(r, WT_EVICTING))
-			return (EBUSY);
-	}
+	/* Internal pages with deletes that aren't stable cannot be evicted. */
+	if (F_ISSET(r, WT_EVICTING))
+		return (EBUSY);
 
 	/*
-	 * Minor memory cleanup: if a truncate call deleted this page and we
-	 * were ever forced to instantiate the page in memory, we would have
-	 * built a list of updates in the page reference in order to be able
-	 * to abort the truncate.  It's a cheap test to make that memory go
-	 * away, we do it here because there's really nowhere else we do the
-	 * checks.  In short, if we have such a list, and the backing address
-	 * blocks are gone, there can't be any transaction that can abort.
+	 * If the original page cannot be freed, we need to keep a slot on the
+	 * page to reference it from the parent page.
+	 *
+	 * If the delete is not visible in this checkpoint, write the original
+	 * address normally.  Otherwise, we have to write a proxy record.
 	 */
-	if (ref->addr == NULL && page_del != NULL) {
-		__wt_free(session, ref->page_del->update_list);
-		__wt_free(session, ref->page_del);
-	}
+	if (__wt_txn_visible(session, page_del->txnid))
+		*statep = WT_CHILD_PROXY;
 
-	/*
-	 * If the delete is not visible to a checkpoint, write the original
-	 * page.  If there's still a disk address, then we have to write a
-	 * proxy record, otherwise we can safely ignore this child page.
-	 */
-	if (page_del == NULL || __wt_txn_visible(session, page_del->txnid))
-		*statep = ref->addr != NULL ?
-		    WT_CHILD_PROXY : WT_CHILD_IGNORE;
 	return (0);
 }
 
