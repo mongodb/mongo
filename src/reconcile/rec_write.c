@@ -1606,10 +1606,13 @@ __rec_child_deleted(
 	}
 
 	/*
-	 * If there's still a disk address, then we have to write a proxy
-	 * record, otherwise, we can safely ignore this child page.
+	 * If the delete is not visible to a checkpoint, write the original
+	 * page.  If there's still a disk address, then we have to write a
+	 * proxy record, otherwise we can safely ignore this child page.
 	 */
-	*statep = ref->addr == NULL ? WT_CHILD_IGNORE : WT_CHILD_PROXY;
+	if (page_del == NULL || __wt_txn_visible(session, page_del->txnid))
+		*statep = ref->addr != NULL ?
+		    WT_CHILD_PROXY : WT_CHILD_IGNORE;
 	return (0);
 }
 
