@@ -181,7 +181,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseNotExisting) {
 
     auto future = launchAsync([this] {
         auto dbResult = catalogManager()->getDatabase(operationContext(), "NonExistent");
-        ASSERT_EQ(dbResult.getStatus(), ErrorCodes::DatabaseNotFound);
+        ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NamespaceNotFound);
     });
 
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });

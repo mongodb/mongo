@@ -213,7 +213,7 @@ public:
         }
 
         Status status = dropDatabase(txn, dbname);
-        if (status == ErrorCodes::DatabaseNotFound) {
+        if (status == ErrorCodes::NamespaceNotFound) {
             return appendCommandStatus(result, Status::OK());
         }
         if (status.isOK()) {

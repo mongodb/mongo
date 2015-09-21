@@ -268,7 +268,7 @@ public:
             if (autoDb.getDb()) {
                 collection = autoDb.getDb()->getCollection(nsString.ns());
             } else {
-                return {ErrorCodes::DatabaseNotFound,
+                return {ErrorCodes::NamespaceNotFound,
                         str::stream() << "database " << dbName << " does not exist."};
             }
 
@@ -304,7 +304,7 @@ public:
             if (autoDb.getDb()) {
                 collection = autoDb.getDb()->getCollection(nsString.ns());
             } else {
-                return {ErrorCodes::DatabaseNotFound,
+                return {ErrorCodes::NamespaceNotFound,
                         str::stream() << "database " << dbName << " does not exist."};
             }
 

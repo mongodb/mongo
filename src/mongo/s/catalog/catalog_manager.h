@@ -188,7 +188,7 @@ public:
      * Returns Status::OK along with the database information and the OpTime of the config server
      * which the database information was based upon. Otherwise, returns an error code indicating
      * the failure. These are some of the known failures:
-     *  - DatabaseNotFound - database does not exist
+     *  - NamespaceNotFound - database does not exist
      */
     virtual StatusWith<OpTimePair<DatabaseType>> getDatabase(OperationContext* txn,
                                                              const std::string& dbName) = 0;

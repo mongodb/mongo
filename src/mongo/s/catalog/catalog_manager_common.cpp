@@ -328,7 +328,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
                                         << "'" << shardConnectionString.toString() << "'"
                                         << " because a local database '" << dbName
                                         << "' exists in another " << dbDoc.getPrimary());
-        } else if (dbt != ErrorCodes::DatabaseNotFound) {
+        } else if (dbt != ErrorCodes::NamespaceNotFound) {
             return dbt.getStatus();
         }
     }

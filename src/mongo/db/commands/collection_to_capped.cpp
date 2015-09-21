@@ -112,7 +112,7 @@ public:
         if (!db) {
             return appendCommandStatus(
                 result,
-                Status(ErrorCodes::DatabaseNotFound,
+                Status(ErrorCodes::NamespaceNotFound,
                        str::stream() << "database " << dbname << " not found"));
         }
 

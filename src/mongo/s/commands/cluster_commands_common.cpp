@@ -203,7 +203,7 @@ int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& 
 bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns) {
     invariant(!status.isOK());
 
-    if (status == ErrorCodes::DatabaseNotFound) {
+    if (status == ErrorCodes::NamespaceNotFound) {
         // Old style reply
         result << "result" << BSONArray();
 

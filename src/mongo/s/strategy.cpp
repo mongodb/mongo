@@ -559,7 +559,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
     // for now has same semantics as legacy request
     const NamespaceString nss(ns);
     auto statusGetDb = grid.catalogCache()->getDatabase(txn, nss.db().toString());
-    if (statusGetDb == ErrorCodes::DatabaseNotFound) {
+    if (statusGetDb == ErrorCodes::NamespaceNotFound) {
         cursorCache.remove(id);
         replyToQuery(ResultFlag_CursorNotFound, request.p(), request.m(), 0, 0, 0);
         return;

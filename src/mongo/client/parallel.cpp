@@ -615,7 +615,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
         shared_ptr<DBConfig> config;
 
         auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
-        if (status.getStatus().code() != ErrorCodes::DatabaseNotFound) {
+        if (status.getStatus().code() != ErrorCodes::NamespaceNotFound) {
             config = uassertStatusOK(status);
             config->getChunkManagerOrPrimary(txn, nss.ns(), manager, primary);
         }

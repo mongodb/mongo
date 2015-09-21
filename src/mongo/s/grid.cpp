@@ -67,7 +67,7 @@ StatusWith<std::shared_ptr<DBConfig>> Grid::implicitCreateDb(OperationContext* t
         return status;
     }
 
-    if (status == ErrorCodes::DatabaseNotFound) {
+    if (status == ErrorCodes::NamespaceNotFound) {
         auto statusCreateDb = catalogManager(txn)->createDatabase(txn, dbName);
         if (statusCreateDb.isOK() || statusCreateDb == ErrorCodes::NamespaceExists) {
             return catalogCache()->getDatabase(txn, dbName);

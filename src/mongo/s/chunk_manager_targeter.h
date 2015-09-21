@@ -48,8 +48,8 @@ struct TargeterStats {
 };
 
 /**
- * NSTargeter based on a ChunkManager implementation.  Wraps all exception codepaths and
- * returns DatabaseNotFound statuses on applicable failures.
+ * NSTargeter based on a ChunkManager implementation. Wraps all exception codepaths and returns
+ * NamespaceNotFound status on applicable failures.
  *
  * Must be initialized before use, and initialization may fail.
  */

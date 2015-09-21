@@ -373,7 +373,7 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
 
     const auto& docsWithOpTime = findStatus.getValue();
     if (docsWithOpTime.value.empty()) {
-        return {ErrorCodes::DatabaseNotFound, stream() << "database " << dbName << " not found"};
+        return {ErrorCodes::NamespaceNotFound, stream() << "database " << dbName << " not found"};
     }
 
     invariant(docsWithOpTime.value.size() == 1);

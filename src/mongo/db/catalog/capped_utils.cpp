@@ -222,7 +222,7 @@ Status convertToCapped(OperationContext* txn, const NamespaceString& collectionN
 
     Database* const db = autoDb.getDb();
     if (!db) {
-        return Status(ErrorCodes::DatabaseNotFound,
+        return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "database " << dbname << " not found");
     }
 

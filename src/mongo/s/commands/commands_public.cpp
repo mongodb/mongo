@@ -480,7 +480,7 @@ public:
              BSONObjBuilder& result) {
         auto status = grid.catalogCache()->getDatabase(txn, dbName);
         if (!status.isOK()) {
-            if (status == ErrorCodes::DatabaseNotFound) {
+            if (status == ErrorCodes::NamespaceNotFound) {
                 return true;
             }
 
