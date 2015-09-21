@@ -78,7 +78,7 @@ __wt_metadata_cursor(
 {
 	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
-	int is_dead;
+	bool is_dead;
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_open_cursor), config, NULL };
 

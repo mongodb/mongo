@@ -11,7 +11,7 @@
 static int __lsm_tree_cleanup_old(WT_SESSION_IMPL *, const char *);
 static int __lsm_tree_open_check(WT_SESSION_IMPL *, WT_LSM_TREE *);
 static int __lsm_tree_open(
-    WT_SESSION_IMPL *, const char *, int, WT_LSM_TREE **);
+    WT_SESSION_IMPL *, const char *, bool, WT_LSM_TREE **);
 static int __lsm_tree_set_name(WT_SESSION_IMPL *, WT_LSM_TREE *, const char *);
 
 /*
@@ -443,7 +443,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	 */
 	if (ret == 0)
 		WT_WITH_HANDLE_LIST_LOCK(session,
-		    ret = __lsm_tree_open(session, uri, 1, &lsm_tree));
+		    ret = __lsm_tree_open(session, uri, true, &lsm_tree));
 	if (ret == 0)
 		__wt_lsm_tree_release(session, lsm_tree);
 
@@ -555,7 +555,7 @@ __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
  */
 static int
 __lsm_tree_open(WT_SESSION_IMPL *session,
-    const char *uri, int exclusive, WT_LSM_TREE **treep)
+    const char *uri, bool exclusive, WT_LSM_TREE **treep)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -598,7 +598,7 @@ __lsm_tree_open(WT_SESSION_IMPL *session,
 	 * with getting handles exclusive.
 	 */
 	lsm_tree->refcnt = 1;
-	lsm_tree->exclusive = exclusive ? 1 : 0;
+	lsm_tree->exclusive = exclusive;
 	lsm_tree->queue_ref = 0;
 
 	/* Set a flush timestamp as a baseline. */
@@ -819,13 +819,13 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk, *last_chunk;
 	uint32_t chunks_moved, nchunks, new_id;
-	int first_switch;
+	bool first_switch;
 
 	WT_RET(__wt_lsm_tree_writelock(session, lsm_tree));
 
 	nchunks = lsm_tree->nchunks;
 
-	first_switch = nchunks == 0 ? 1 : 0;
+	first_switch = nchunks == 0;
 
 	/*
 	 * Check if a switch is still needed: we may have raced while waiting
@@ -1202,7 +1202,7 @@ __wt_lsm_tree_writeunlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
  *	Compact an LSM tree called via __wt_schema_worker.
  */
 int
-__wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
+__wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
@@ -1222,7 +1222,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		return (0);
 
 	/* Tell __wt_schema_worker not to look inside the LSM tree. */
-	*skip = 1;
+	*skipp = true;
 
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, name, 0, &lsm_tree));
@@ -1411,7 +1411,7 @@ int
 __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
    const char *uri,
    int (*file_func)(WT_SESSION_IMPL *, const char *[]),
-   int (*name_func)(WT_SESSION_IMPL *, const char *, int *),
+   int (*name_func)(WT_SESSION_IMPL *, const char *, bool *),
    const char *cfg[], uint32_t open_flags)
 {
 	WT_DECL_RET;
@@ -1421,7 +1421,7 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	int exclusive, locked;
 
 	locked = 0;
-	exclusive = FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
+	exclusive = FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE);
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, uri, exclusive, &lsm_tree));
 	WT_RET(ret);

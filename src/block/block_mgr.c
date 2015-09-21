@@ -183,7 +183,7 @@ __bm_compact_start(WT_BM *bm, WT_SESSION_IMPL *session)
  */
 static int
 __bm_compact_page_skip(WT_BM *bm, WT_SESSION_IMPL *session,
-    const uint8_t *addr, size_t addr_size, int *skipp)
+    const uint8_t *addr, size_t addr_size, bool *skipp)
 {
 	return (__wt_block_compact_page_skip(
 	    session, bm->block, addr, addr_size, skipp));
@@ -194,7 +194,7 @@ __bm_compact_page_skip(WT_BM *bm, WT_SESSION_IMPL *session,
  *	Return if a file can be compacted.
  */
 static int
-__bm_compact_skip(WT_BM *bm, WT_SESSION_IMPL *session, int *skipp)
+__bm_compact_skip(WT_BM *bm, WT_SESSION_IMPL *session, bool *skipp)
 {
 	return (__wt_block_compact_skip(session, bm->block, skipp));
 }
@@ -350,9 +350,9 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->compact_end =
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->compact_page_skip = (int (*)(WT_BM *, WT_SESSION_IMPL *,
-		    const uint8_t *, size_t, int *))__bm_readonly;
+		    const uint8_t *, size_t, bool *))__bm_readonly;
 		bm->compact_skip = (int (*)
-		    (WT_BM *, WT_SESSION_IMPL *, int *))__bm_readonly;
+		    (WT_BM *, WT_SESSION_IMPL *, bool *))__bm_readonly;
 		bm->compact_start =
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->free = (int (*)(WT_BM *,

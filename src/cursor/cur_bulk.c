@@ -225,7 +225,7 @@ err:	API_END_RET(session, ret);
  */
 int
 __wt_curbulk_init(WT_SESSION_IMPL *session,
-    WT_CURSOR_BULK *cbulk, int bitmap, int skip_sort_check)
+    WT_CURSOR_BULK *cbulk, int bitmap, bool skip_sort_check)
 {
 	WT_CURSOR *c;
 	WT_CURSOR_BTREE *cbt;

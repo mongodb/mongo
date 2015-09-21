@@ -230,11 +230,12 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, size_t size)
  */
 static inline int
 __wt_cell_pack_data_match(
-    WT_CELL *page_cell, WT_CELL *val_cell, const uint8_t *val_data, int *matchp)
+    WT_CELL *page_cell, WT_CELL *val_cell, const uint8_t *val_data,
+    bool *matchp)
 {
 	const uint8_t *a, *b;
 	uint64_t av, bv;
-	int rle;
+	bool rle;
 
 	*matchp = 0;				/* Default to no-match */
 
@@ -252,7 +253,7 @@ __wt_cell_pack_data_match(
 		av = a[0] >> WT_CELL_SHORT_SHIFT;
 		++a;
 	} else if (WT_CELL_TYPE(a[0]) == WT_CELL_VALUE) {
-		rle = a[0] & WT_CELL_64V ? 1 : 0;	/* Skip any RLE */
+		rle = (a[0] & WT_CELL_64V) != 0;	/* Skip any RLE */
 		++a;
 		if (rle)
 			WT_RET(__wt_vunpack_uint(&a, 0, &av));
@@ -264,7 +265,7 @@ __wt_cell_pack_data_match(
 		bv = b[0] >> WT_CELL_SHORT_SHIFT;
 		++b;
 	} else if (WT_CELL_TYPE(b[0]) == WT_CELL_VALUE) {
-		rle = b[0] & WT_CELL_64V ? 1 : 0;	/* Skip any RLE */
+		rle = (b[0] & WT_CELL_64V) != 0;	/* Skip any RLE */
 		++b;
 		if (rle)
 			WT_RET(__wt_vunpack_uint(&b, 0, &bv));
@@ -273,7 +274,7 @@ __wt_cell_pack_data_match(
 		return (0);
 
 	if (av == bv)
-		*matchp = memcmp(a, val_data, av) == 0 ? 1 : 0;
+		*matchp = memcmp(a, val_data, av) == 0;
 	return (0);
 }
 

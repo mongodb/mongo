@@ -80,7 +80,7 @@ __wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	int now_shared, was_shared;
+	bool now_shared, was_shared;
 
 	conn = S2C(session);
 

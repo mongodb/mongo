@@ -149,7 +149,7 @@ __wt_split_stash_discard_all(
  */
 static int
 __split_safe_free(WT_SESSION_IMPL *session,
-    uint64_t split_gen, int exclusive, void *p, size_t s)
+    uint64_t split_gen, bool exclusive, void *p, size_t s)
 {
 	/* We should only call safe free if we aren't pinning the memory. */
 	WT_ASSERT(session, session->split_gen != split_gen);
@@ -159,7 +159,7 @@ __split_safe_free(WT_SESSION_IMPL *session,
 	 * access, check whether there are other threads in the same tree.
 	 */
 	if (!exclusive && __split_oldest_gen(session) > split_gen)
-		exclusive = 1;
+		exclusive = true;
 
 	if (exclusive) {
 		__wt_free(session, p);
@@ -845,7 +845,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
  */
 static int
 __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
-    WT_REF **ref_new, uint32_t new_entries, size_t parent_incr, int exclusive)
+    WT_REF **ref_new, uint32_t new_entries, size_t parent_incr, bool exclusive)
 {
 	WT_DECL_RET;
 	WT_IKEY *ikey;
@@ -1384,7 +1384,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	page = NULL;
 	if ((ret = __split_parent(
-	    session, ref, split_ref, 2, parent_incr, 0)) != 0) {
+	    session, ref, split_ref, 2, parent_incr, false)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
@@ -1473,7 +1473,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Resolve a page split.
  */
 int
-__wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
+__wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;

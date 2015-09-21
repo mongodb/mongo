@@ -24,7 +24,7 @@ static inline bool
 __wt_page_is_empty(WT_PAGE *page)
 {
 	return (page->modify != NULL &&
-	    F_ISSET(page->modify, WT_PM_REC_MASK) == WT_PM_REC_EMPTY ? 1 : 0);
+	    F_MASK(page->modify, WT_PM_REC_MASK) == WT_PM_REC_EMPTY);
 }
 
 /*
@@ -1115,7 +1115,8 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int locked, too_big;
+	int locked;
+	bool too_big;
 
 	btree = S2BT(session);
 	page = ref->page;
@@ -1134,7 +1135,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
 
-	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
+	too_big = (page->memory_footprint > btree->maxmempage);
 	if ((ret = __wt_evict(session, ref, 0)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);

@@ -961,7 +961,7 @@ nockpt:			F_SET(btree, WT_BTREE_SKIP_CKPT);
 	 * names with checkpoints.
 	 */
 	if (is_checkpoint)
-		switch (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
+		switch (F_MASK(btree, WT_BTREE_SPECIAL_FLAGS)) {
 		case 0:
 			break;
 		case WT_BTREE_BULK:
@@ -1163,10 +1163,10 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	int bulk, need_tracking;
+	bool bulk, need_tracking;
 
 	btree = S2BT(session);
-	bulk = F_ISSET(btree, WT_BTREE_BULK) ? 1 : 0;
+	bulk = F_ISSET(btree, WT_BTREE_BULK);
 
 	/*
 	 * If the handle is already dead or the file isn't durable, force the

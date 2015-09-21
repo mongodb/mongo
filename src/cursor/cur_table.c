@@ -75,7 +75,7 @@ __curextract_insert(WT_CURSOR *cursor) {
  *	Apply an operation to all indices of a table.
  */
 static int
-__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, int skip_immutable) {
+__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, bool skip_immutable) {
 	WT_CURSOR_STATIC_INIT(iface,
 	    __wt_cursor_get_key,	/* get-key */
 	    __wt_cursor_get_value,	/* get-value */
@@ -504,7 +504,7 @@ __curtable_insert(WT_CURSOR *cursor)
 	cp = ctable->cg_cursors;
 	primary = *cp++;
 
-	flag_orig = F_ISSET(primary, WT_CURSTD_OVERWRITE);
+	flag_orig = F_MASK(primary, WT_CURSTD_OVERWRITE);
 	if (ctable->table->nindices > 0)
 		F_CLR(primary, WT_CURSTD_OVERWRITE);
 	ret = primary->insert(primary);
