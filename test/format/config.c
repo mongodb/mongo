@@ -171,7 +171,7 @@ config_setup(void)
 	}
 
 	/* Ensure there is at least 1MB of cache per thread. */
-	if (!config_is_perm("cache") && g.c_threads < g.c_cache)
+	if (!config_is_perm("cache") && g.c_cache < g.c_threads)
 		g.c_cache = g.c_threads;
 
 	/* Make the default maximum-run length 20 minutes. */
