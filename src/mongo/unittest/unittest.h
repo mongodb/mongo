@@ -319,6 +319,11 @@ protected:
         return _capturedLogMessages;
     }
 
+    /**
+     * Returns the number of collected log lines containing "needle".
+     */
+    int64_t countLogLinesContaining(const std::string& needle);
+
 private:
     /**
      * Called on the test object before running the test.

@@ -50,12 +50,6 @@
 namespace mongo {
 namespace repl {
 
-namespace {
-bool stringContains(const std::string& haystack, const std::string& needle) {
-    return haystack.find(needle) != std::string::npos;
-}
-}  // namespace
-
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
@@ -352,12 +346,6 @@ void ReplCoordTest::shutdown() {
     _net->exitNetwork();
     _repl->shutdown();
     _callShutdown = false;
-}
-
-int64_t ReplCoordTest::countLogLinesContaining(const std::string& needle) {
-    return std::count_if(getCapturedLogMessages().begin(),
-                         getCapturedLogMessages().end(),
-                         stdx::bind(stringContains, stdx::placeholders::_1, needle));
 }
 
 void ReplCoordTest::replyToReceivedHeartbeat() {

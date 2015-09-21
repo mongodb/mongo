@@ -195,11 +195,6 @@ protected:
     void shutdown();
 
     /**
-     * Returns the number of collected log lines containing "needle".
-     */
-    int64_t countLogLinesContaining(const std::string& needle);
-
-    /**
      * Receive the heartbeat request from replication coordinator and reply with a response.
      */
     void replyToReceivedHeartbeat();
