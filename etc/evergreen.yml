@@ -1900,6 +1900,10 @@ buildvariants:
   - name: compile
     distros:
     - rhel55
+  - name: dbtest
+  - name: dbtest_WT
+  - name: integration_tests_standalone
+  - name: integration_tests_replset
   - name: jsCore
   - name: jsCore_WT
   - name: jstestfuzz
