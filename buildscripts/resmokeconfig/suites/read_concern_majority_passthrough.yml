@@ -46,7 +46,6 @@ executor:
     fixture:
       class: ReplicaSetFixture
       mongod_options:
-        nopreallocj: ''
         set_parameters:
           enableTestCommands: 1
       # Running with one node until SERVER-20260 in place. Allows us to use a much smaller sleep.

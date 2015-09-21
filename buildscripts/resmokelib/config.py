@@ -45,8 +45,7 @@ DEFAULTS = {
     "mongodSetParameters": None,
     "mongos": None,
     "mongosSetParameters": None,
-    "nojournal": None,
-    "nopreallocj": None,
+    "nojournal": False,
     "repeat": 1,
     "reportFile": None,
     "seed": long(time.time() * 256),  # Taken from random.py code in Python 2.7.

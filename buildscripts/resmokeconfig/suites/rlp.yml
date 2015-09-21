@@ -11,7 +11,6 @@ executor:
     fixture:
       class: MongoDFixture
       mongod_options:
-        nopreallocj: ''
         basisTechRootDirectory: /opt/basis
         set_parameters:
           enableTestCommands: 1

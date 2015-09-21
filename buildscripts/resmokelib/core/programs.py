@@ -47,16 +47,22 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     opts_without_vals = ("nojournal", "nopreallocj")
 
     # Have the --nojournal command line argument to resmoke.py unset the journal option.
-    if shortcut_opts["nojournal"] is not None and "journal" in kwargs:
+    if shortcut_opts["nojournal"] and "journal" in kwargs:
         del kwargs["journal"]
 
+    # Command line options override the YAML configuration.
     for opt_name in shortcut_opts:
-        if shortcut_opts[opt_name] is not None:
-            # Command line options override the YAML configuration.
-            if opt_name in opts_without_vals:
+        opt_value = shortcut_opts[opt_name]
+        if opt_name in opts_without_vals:
+            # Options that are specified as --flag on the command line are represented by a boolean
+            # value where True indicates that the flag should be included in 'kwargs'.
+            if opt_value:
                 kwargs[opt_name] = ""
-            else:
-                kwargs[opt_name] = shortcut_opts[opt_name]
+        else:
+            # Options that are specified as --key=value on the command line are represented by a
+            # value where None indicates that the key-value pair shouldn't be included in 'kwargs'.
+            if opt_value is not None:
+                kwargs[opt_name] = opt_value
 
     # Override the storage engine specified on the command line with "wiredTiger" if running a
     # config server replica set.

@@ -51,7 +51,6 @@ executor:
         set_parameters:
           enableTestCommands: 1
       mongod_options:
-        nopreallocj: ''
         set_parameters:
           enableTestCommands: 1
       enable_sharding:

@@ -30,7 +30,7 @@ DEST_TO_CONFIG = {
     "mongos_executable": "mongos",
     "mongos_parameters": "mongosSetParameters",
     "no_journal": "nojournal",
-    "no_prealloc_journal": "nopreallocj",
+    "prealloc_journal": "preallocJournal",
     "repeat": "repeat",
     "report_file": "reportFile",
     "seed": "seed",
@@ -130,8 +130,13 @@ def parse_command_line():
     parser.add_option("--nojournal", action="store_true", dest="no_journal",
                       help="Disable journaling for all mongod's.")
 
-    parser.add_option("--nopreallocj", action="store_true", dest="no_prealloc_journal",
-                      help="Disable preallocation of journal files for all mongod's.")
+    parser.add_option("--nopreallocj", action="store_const", const="off", dest="prealloc_journal",
+                      help="Disable preallocation of journal files for all mongod processes.")
+
+    parser.add_option("--preallocJournal", type="choice", action="store", dest="prealloc_journal",
+                      choices=("on", "off"), metavar="ON|OFF",
+                      help=("Enable or disable preallocation of journal files for all mongod"
+                            " processes. Defaults to %default."))
 
     parser.add_option("--repeat", type="int", dest="repeat", metavar="N",
                       help="Repeat the given suite(s) N times, or until one fails.")
@@ -169,7 +174,8 @@ def parse_command_line():
     parser.set_defaults(executor_file="with_server",
                         logger_file="console",
                         dry_run="off",
-                        list_suites=False)
+                        list_suites=False,
+                        prealloc_journal="off")
 
     return parser.parse_args()
 
@@ -205,7 +211,7 @@ def update_config_vars(values):
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos"))
     _config.MONGOS_SET_PARAMETERS = config.pop("mongosSetParameters")
     _config.NO_JOURNAL = config.pop("nojournal")
-    _config.NO_PREALLOC_JOURNAL = config.pop("nopreallocj")
+    _config.NO_PREALLOC_JOURNAL = config.pop("preallocJournal") == "off"
     _config.RANDOM_SEED = config.pop("seed")
     _config.REPEAT = config.pop("repeat")
     _config.REPORT_FILE = config.pop("reportFile")
