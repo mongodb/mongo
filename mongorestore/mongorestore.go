@@ -448,9 +448,9 @@ func (restore *MongoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
 // SIGHUP signal. It ends restore reads for all goroutines
 // as soon as any of those signals is received.
 func (restore *MongoRestore) handleSignals() {
-	log.Log(log.DebugLow, "will listen for SIGTERM, SIGINT and SIGHUP")
+	log.Log(log.DebugLow, "will listen for SIGTERM and SIGINT")
 	sigChan := make(chan os.Signal, 2)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 	// first signal cleanly terminates restore reads
 	<-sigChan
 	log.Log(log.Always, "ending restore reads")
