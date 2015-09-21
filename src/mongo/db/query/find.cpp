@@ -538,9 +538,10 @@ std::string runQuery(OperationContext* txn,
         return "";
     }
 
+    ShardingState* const shardingState = ShardingState::get(txn);
+
     // We freak out later if this changes before we're done with the query.
-    const ChunkVersion shardingVersionAtStart =
-        ShardingState::get(getGlobalServiceContext())->getVersion(nss.ns());
+    const ChunkVersion shardingVersionAtStart = shardingState->getVersion(nss.ns());
 
     // Handle query option $maxTimeMS (not used with commands).
     curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
@@ -614,16 +615,13 @@ std::string runQuery(OperationContext* txn,
     // TODO: Currently, chunk ranges are kept around until all ClientCursors created while the
     // chunk belonged on this node are gone. Separating chunk lifetime management from
     // ClientCursor should allow this check to go away.
-    if (!ShardingState::get(getGlobalServiceContext())
-             ->getVersion(nss.ns())
-             .isWriteCompatibleWith(shardingVersionAtStart)) {
+    if (!shardingState->getVersion(nss.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
         // if the version changed during the query we might be missing some data and its safe to
         // send this as mongos can resend at this point
-        throw SendStaleConfigException(
-            nss.ns(),
-            "version changed during initial query",
-            shardingVersionAtStart,
-            ShardingState::get(getGlobalServiceContext())->getVersion(nss.ns()));
+        throw SendStaleConfigException(nss.ns(),
+                                       "version changed during initial query",
+                                       shardingVersionAtStart,
+                                       shardingState->getVersion(nss.ns()));
     }
 
     // Fill out curop based on query results. If we have a cursorid, we will fill out curop with

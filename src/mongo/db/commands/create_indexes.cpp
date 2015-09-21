@@ -295,10 +295,11 @@ private:
                                               const BSONObj& newIdxKey) {
         invariant(txn->lockState()->isCollectionLockedForMode(ns, MODE_X));
 
-        if (ShardingState::get(getGlobalServiceContext())->enabled()) {
+        ShardingState* const shardingState = ShardingState::get(txn);
+
+        if (shardingState->enabled()) {
             std::shared_ptr<CollectionMetadata> metadata(
-                ShardingState::get(getGlobalServiceContext())
-                    ->getCollectionMetadata(ns.toString()));
+                shardingState->getCollectionMetadata(ns.toString()));
             if (metadata) {
                 ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
                 if (!shardKeyPattern.isUniqueIndexCompatible(newIdxKey)) {

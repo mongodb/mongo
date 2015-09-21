@@ -1305,10 +1305,8 @@ public:
 
             // Get metadata before we check our version, to make sure it doesn't increment
             // in the meantime.  Need to do this in the same lock scope as the block.
-            if (ShardingState::get(getGlobalServiceContext())
-                    ->needCollectionMetadata(txn, config.ns)) {
-                collMetadata =
-                    ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(config.ns);
+            if (ShardingState::get(txn)->needCollectionMetadata(txn, config.ns)) {
+                collMetadata = ShardingState::get(txn)->getCollectionMetadata(config.ns);
             }
         }
 
@@ -1631,7 +1629,7 @@ public:
 
             // Fetch result from other shards 1 chunk at a time. It would be better to do
             // just one big $or query, but then the sorting would not be efficient.
-            const string shardName = ShardingState::get(getGlobalServiceContext())->getShardName();
+            const string shardName = ShardingState::get(txn)->getShardName();
             const ChunkMap& chunkMap = cm->getChunkMap();
 
             for (ChunkMap::const_iterator it = chunkMap.begin(); it != chunkMap.end(); ++it) {

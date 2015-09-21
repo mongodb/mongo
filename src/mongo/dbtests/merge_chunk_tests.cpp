@@ -233,9 +233,8 @@ TEST_F(MergeChunkTests, BasicMerge) {
 
     // Get latest version
     ChunkVersion latestVersion;
-    ShardingState::get(getGlobalServiceContext())
-        ->refreshMetadataNow(&_txn, nss.ns(), &latestVersion);
-    ShardingState::get(getGlobalServiceContext())->resetMetadata(nss.ns());
+    ShardingState::get(&_txn)->refreshMetadataNow(&_txn, nss.ns(), &latestVersion);
+    ShardingState::get(&_txn)->resetMetadata(nss.ns());
 
     // Do merge
     string errMsg;
@@ -244,8 +243,7 @@ TEST_F(MergeChunkTests, BasicMerge) {
     ASSERT(result);
 
     // Verify result
-    CollectionMetadataPtr metadata =
-        ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(nss.ns());
+    CollectionMetadataPtr metadata = ShardingState::get(&_txn)->getCollectionMetadata(nss.ns());
 
     ChunkType chunk;
     ASSERT(metadata->getNextChunk(BSON("x" << 0), &chunk));
@@ -272,9 +270,8 @@ TEST_F(MergeChunkTests, BasicMergeMinMax) {
 
     // Get latest version
     ChunkVersion latestVersion;
-    ShardingState::get(getGlobalServiceContext())
-        ->refreshMetadataNow(&_txn, nss.ns(), &latestVersion);
-    ShardingState::get(getGlobalServiceContext())->resetMetadata(nss.ns());
+    ShardingState::get(&_txn)->refreshMetadataNow(&_txn, nss.ns(), &latestVersion);
+    ShardingState::get(&_txn)->resetMetadata(nss.ns());
 
     // Do merge
     string errMsg;
@@ -283,8 +280,7 @@ TEST_F(MergeChunkTests, BasicMergeMinMax) {
     ASSERT(result);
 
     // Verify result
-    CollectionMetadataPtr metadata =
-        ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(nss.ns());
+    CollectionMetadataPtr metadata = ShardingState::get(&_txn)->getCollectionMetadata(nss.ns());
 
     ChunkType chunk;
     ASSERT(metadata->getNextChunk(BSON("x" << MINKEY), &chunk));
@@ -313,9 +309,8 @@ TEST_F(MergeChunkTests, CompoundMerge) {
 
     // Get latest version
     ChunkVersion latestVersion;
-    ShardingState::get(getGlobalServiceContext())
-        ->refreshMetadataNow(&_txn, nss.ns(), &latestVersion);
-    ShardingState::get(getGlobalServiceContext())->resetMetadata(nss.ns());
+    ShardingState::get(&_txn)->refreshMetadataNow(&_txn, nss.ns(), &latestVersion);
+    ShardingState::get(&_txn)->resetMetadata(nss.ns());
 
     // Do merge
     string errMsg;
@@ -325,8 +320,7 @@ TEST_F(MergeChunkTests, CompoundMerge) {
     ASSERT(result);
 
     // Verify result
-    CollectionMetadataPtr metadata =
-        ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(nss.ns());
+    CollectionMetadataPtr metadata = ShardingState::get(&_txn)->getCollectionMetadata(nss.ns());
 
     ChunkType chunk;
     ASSERT(metadata->getNextChunk(BSON("x" << 0 << "y" << 1), &chunk));

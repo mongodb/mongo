@@ -79,8 +79,8 @@ void ConfigServerFixture::setUp() {
 
     const ConnectionString connStr(uassertStatusOK(ConnectionString::parse("$dummy:10000")));
 
-    ShardingState::get(getGlobalServiceContext())->initialize(&_txn, connStr.toString());
-    ShardingState::get(getGlobalServiceContext())->setShardName(shardName());
+    ShardingState::get(&_txn)->initialize(&_txn, connStr.toString());
+    ShardingState::get(&_txn)->setShardName(shardName());
 }
 
 void ConfigServerFixture::clearServer() {
@@ -112,7 +112,7 @@ void ConfigServerFixture::dumpServer() {
 }
 
 void ConfigServerFixture::tearDown() {
-    ShardingState::get(getGlobalServiceContext())->clearCollectionMetadata();
+    ShardingState::get(&_txn)->clearCollectionMetadata();
     clearServer();
 
     // Make all connections redirect to the direct client

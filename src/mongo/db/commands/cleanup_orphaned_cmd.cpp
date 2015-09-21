@@ -82,7 +82,7 @@ CleanupResult cleanupOrphanedData(OperationContext* txn,
     BSONObj startingFromKey = startingFromKeyConst;
 
     std::shared_ptr<CollectionMetadata> metadata =
-        ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(ns.toString());
+        ShardingState::get(txn)->getCollectionMetadata(ns.toString());
     if (!metadata || metadata->getKeyPattern().isEmpty()) {
         warning() << "skipping orphaned data cleanup for " << ns.toString()
                   << ", collection is not sharded";
@@ -255,15 +255,16 @@ public:
             writeConcern.wTimeout = kDefaultWTimeoutMs;
         }
 
-        if (!ShardingState::get(getGlobalServiceContext())->enabled()) {
+        ShardingState* const shardingState = ShardingState::get(txn);
+
+        if (!shardingState->enabled()) {
             errmsg = str::stream() << "server is not part of a sharded cluster or "
                                    << "the sharding metadata is not yet initialized.";
             return false;
         }
 
         ChunkVersion shardVersion;
-        status = ShardingState::get(getGlobalServiceContext())
-                     ->refreshMetadataNow(txn, ns, &shardVersion);
+        status = shardingState->refreshMetadataNow(txn, ns, &shardVersion);
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::RemoteChangeDetected) {
                 warning() << "Shard version in transition detected while refreshing "

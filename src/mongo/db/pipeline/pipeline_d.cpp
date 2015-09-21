@@ -73,7 +73,7 @@ public:
 
     bool isSharded(const NamespaceString& ns) final {
         const ChunkVersion unsharded(0, 0, OID());
-        return !(ShardingState::get(getGlobalServiceContext())
+        return !(ShardingState::get(_ctx->opCtx)
                      ->getVersion(ns.ns())
                      .isWriteCompatibleWith(unsharded));
     }
@@ -140,13 +140,12 @@ shared_ptr<PlanExecutor> createRandomCursorExecutor(Collection* collection,
     auto stage = stdx::make_unique<MultiIteratorStage>(txn, ws.get(), collection);
     stage->addIterator(std::move(randCursor));
 
+    ShardingState* const shardingState = ShardingState::get(txn);
+
     // If we're in a sharded environment, we need to filter out documents we don't own.
-    if (ShardingState::get(getGlobalServiceContext())->needCollectionMetadata(txn, txn->getNS())) {
+    if (shardingState->needCollectionMetadata(txn, txn->getNS())) {
         auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
-            txn,
-            ShardingState::get(getGlobalServiceContext())->getCollectionMetadata(txn->getNS()),
-            ws.get(),
-            stage.release());
+            txn, shardingState->getCollectionMetadata(txn->getNS()), ws.get(), stage.release());
         return uassertStatusOK(PlanExecutor::make(
             txn, std::move(ws), std::move(shardFilterStage), collection, PlanExecutor::YIELD_AUTO));
     }
