@@ -64,6 +64,9 @@ namespace {
 
 const auto getShardingState = ServiceContext::declareDecoration<ShardingState>();
 
+// Max number of concurrent config server refresh threads
+const int kMaxConfigServerRefreshThreads = 3;
+
 enum class VersionChoice { Local, Remote, Unknown };
 
 /**
@@ -112,9 +115,7 @@ bool isMongos() {
     return false;
 }
 
-ShardingState::ShardingState()
-    : _enabled(false),
-      _configServerTickets(3 /* max number of concurrent config server refresh threads */) {}
+ShardingState::ShardingState() : _configServerTickets(kMaxConfigServerRefreshThreads) {}
 
 ShardingState::~ShardingState() = default;
 
@@ -470,20 +471,20 @@ Status ShardingState::refreshMetadataIfNeeded(OperationContext* txn,
                << ", need to verify with config server";
     }
 
-    return doRefreshMetadata(txn, ns, reqShardVersion, true, latestShardVersion);
+    return _refreshMetadata(txn, ns, reqShardVersion, true, latestShardVersion);
 }
 
 Status ShardingState::refreshMetadataNow(OperationContext* txn,
                                          const string& ns,
                                          ChunkVersion* latestShardVersion) {
-    return doRefreshMetadata(txn, ns, ChunkVersion(0, 0, OID()), false, latestShardVersion);
+    return _refreshMetadata(txn, ns, ChunkVersion(0, 0, OID()), false, latestShardVersion);
 }
 
-Status ShardingState::doRefreshMetadata(OperationContext* txn,
-                                        const string& ns,
-                                        const ChunkVersion& reqShardVersion,
-                                        bool useRequestedVersion,
-                                        ChunkVersion* latestShardVersion) {
+Status ShardingState::_refreshMetadata(OperationContext* txn,
+                                       const string& ns,
+                                       const ChunkVersion& reqShardVersion,
+                                       bool useRequestedVersion,
+                                       ChunkVersion* latestShardVersion) {
     // The idea here is that we're going to reload the metadata from the config server, but
     // we need to do so outside any locks.  When we get our result back, if the current metadata
     // has changed, we may not be able to install the new metadata.

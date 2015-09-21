@@ -46,7 +46,6 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/range_deleter_service.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/migration_impl.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/chunk_version.h"
@@ -248,7 +247,8 @@ public:
             shardingState->setShardName(cmdObj["toShardName"].String());
         }
 
-        string ns = cmdObj.firstElement().String();
+        const string ns = cmdObj.firstElement().String();
+
         BSONObj min = cmdObj["min"].Obj().getOwned();
         BSONObj max = cmdObj["max"].Obj().getOwned();
 
@@ -267,39 +267,9 @@ public:
         }
 
         // Process secondary throttle settings and assign defaults if necessary.
-        WriteConcernOptions writeConcern;
-        status = writeConcern.parseSecondaryThrottle(cmdObj, NULL);
-
-        if (!status.isOK()) {
-            if (status.code() != ErrorCodes::WriteConcernNotDefined) {
-                warning() << status.toString();
-                return appendCommandStatus(result, status);
-            }
-
-            writeConcern = getDefaultWriteConcernForMigration();
-        } else {
-            repl::ReplicationCoordinator* replCoordinator = repl::getGlobalReplicationCoordinator();
-
-            if (replCoordinator->getReplicationMode() ==
-                    repl::ReplicationCoordinator::modeMasterSlave &&
-                writeConcern.shouldWaitForOtherNodes()) {
-                warning() << "recvChunk cannot check if secondary throttle setting "
-                          << writeConcern.toBSON()
-                          << " can be enforced in a master slave configuration";
-            }
-
-            Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
-            if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
-                warning() << status.toString();
-                return appendCommandStatus(result, status);
-            }
-        }
-
-        if (writeConcern.shouldWaitForOtherNodes() &&
-            writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
-            // Don't allow no timeout.
-            writeConcern.wTimeout = kDefaultWriteTimeoutForMigrationMs;
-        }
+        const auto moveWriteConcernOptions =
+            uassertStatusOK(ChunkMoveWriteConcernOptions::initFromCommand(cmdObj));
+        const auto& writeConcern = moveWriteConcernOptions.getWriteConcern();
 
         BSONObj shardKeyPattern;
         if (cmdObj.hasField("shardKeyPattern")) {

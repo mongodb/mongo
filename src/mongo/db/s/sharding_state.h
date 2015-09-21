@@ -80,6 +80,7 @@ public:
     bool enabled();
 
     ConnectionString getConfigServer(OperationContext* txn);
+
     std::string getShardName();
 
     MigrationSourceManager* migrationSourceManager() {
@@ -90,18 +91,24 @@ public:
         return &_migrationDestManager;
     }
 
-    // Initialize sharding state and begin authenticating outgoing connections and handling
-    // shard versions.  If this is not run before sharded operations occur auth will not work
-    // and versions will not be tracked.
+    /**
+     * Initialize sharding state and begin authenticating outgoing connections and handling shard
+     * versions. If this is not run before sharded operations occur auth will not work and versions
+     * will not be tracked.
+     */
     void initialize(OperationContext* txn, const std::string& server);
 
-    // TODO: The only reason we need this method and cannot merge it together with the initialize
-    // call is the setShardVersion request being sent by the config coordinator to the config server
-    // instances. This is the only command, which does not include shard name and once we get rid of
-    // the legacy style config servers, we can merge these methods.
-    //
-    // Throws an error if shard name has always been set and the newly specified value does not
-    // match
+    /**
+     * Assigns a shard name to this MongoD instance.
+     *
+     * TODO: The only reason we need this method and cannot merge it together with the initialize
+     * call is the setShardVersion request being sent by the config coordinator to the config
+     * server instances. This is the only command, which does not include shard name and once we
+     * get rid of the legacy style config servers, we can merge these methods.
+     *
+     * Throws an error if shard name has always been set and the newly specified value does not
+     * match what was previously installed.
+     */
     void setShardName(const std::string& shardName);
 
     /**
@@ -109,9 +116,8 @@ public:
      */
     void clearCollectionMetadata();
 
-    // versioning support
-
     bool hasVersion(const std::string& ns);
+
     ChunkVersion getVersion(const std::string& ns);
 
     /**
@@ -165,9 +171,8 @@ public:
 
     void appendInfo(OperationContext* txn, BSONObjBuilder& b);
 
-    // querying support
-
     bool needCollectionMetadata(OperationContext* txn, const std::string& ns) const;
+
     std::shared_ptr<CollectionMetadata> getCollectionMetadata(const std::string& ns);
 
     // chunk migrate and split support
@@ -305,14 +310,14 @@ private:
     typedef std::map<std::string, std::shared_ptr<CollectionMetadata>> CollectionMetadataMap;
 
     /**
-     * Refreshes collection metadata by asking the config server for the latest information.
-     * May or may not be based on a requested version.
+     * Refreshes collection metadata by asking the config server for the latest information. May or
+     * may not be based on a requested version.
      */
-    Status doRefreshMetadata(OperationContext* txn,
-                             const std::string& ns,
-                             const ChunkVersion& reqShardVersion,
-                             bool useRequestedVersion,
-                             ChunkVersion* latestShardVersion);
+    Status _refreshMetadata(OperationContext* txn,
+                            const std::string& ns,
+                            const ChunkVersion& reqShardVersion,
+                            bool useRequestedVersion,
+                            ChunkVersion* latestShardVersion);
 
     // Manages the state of the migration donor shard
     MigrationSourceManager _migrationSourceManager;
@@ -324,15 +329,15 @@ private:
     stdx::mutex _mutex;
 
     // Whether ::initialize has been called
-    bool _enabled;
+    bool _enabled{false};
 
     // Sets the shard name for this host (comes through setShardVersion)
     std::string _shardName;
 
-    // protects accessing the config server
-    // Using a ticket holder so we can have multiple redundant tries at any given time
-    mutable TicketHolder _configServerTickets;
+    // Protects from hitting the config server from too many threads at once
+    TicketHolder _configServerTickets;
 
+    // Cache of collection metadata on this shard
     CollectionMetadataMap _collMetadata;
 };
 

@@ -28,19 +28,168 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <string>
+
+#include "mongo/base/disallow_copying.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/forwarding_catalog_manager.h"
+#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
-/**
- * Specified the default timeout that the migration should use for writes to complete.
- */
-extern const int kDefaultWriteTimeoutForMigrationMs;
+class CollectionMetadata;
+class OperationContext;
+template <typename T>
+class StatusWith;
 
 /**
  * Returns the default write concern for migration cleanup on the donor shard and for cloning
  * documents on the destination shard.
  */
-WriteConcernOptions getDefaultWriteConcernForMigration();
+class ChunkMoveWriteConcernOptions {
+public:
+    /**
+     * Parses the chunk move options from a command object.
+     */
+    static StatusWith<ChunkMoveWriteConcernOptions> initFromCommand(const BSONObj& cmdObj);
+
+    /**
+     * Returns the throttle options to be used when committing migrated documents on the recipient
+     * shard's seconary.
+     */
+    const BSONObj& getSecThrottle() const {
+        return _secThrottleObj;
+    }
+
+    /**
+     * Returns the write concern options.
+     */
+    const WriteConcernOptions& getWriteConcern() const {
+        return _writeConcernOptions;
+    }
+
+private:
+    ChunkMoveWriteConcernOptions(BSONObj secThrottleObj, WriteConcernOptions writeConcernOptions);
+
+    const BSONObj _secThrottleObj;
+    const WriteConcernOptions _writeConcernOptions;
+};
+
+/**
+ * Contains all the runtime state for an active move operation and allows persistence of this state
+ * to BSON, so it can be resumed. Intended to be used from within a single thread of execution
+ * (single OperationContext) at a time and should not be moved between threads.
+ */
+class ChunkMoveOperationState {
+    MONGO_DISALLOW_COPYING(ChunkMoveOperationState);
+
+public:
+    ChunkMoveOperationState(NamespaceString ns);
+
+    /**
+     * Starts a new chunk move operation from the beginning.
+     */
+    Status initialize(OperationContext* txn, const BSONObj& cmdObj);
+
+    /**
+     * Acquires the distributed lock for the collection, whose chunk is being moved and fetches the
+     * latest metadata as of the time of the call. The fetched metadata will be cached on the
+     * operation state until the entire operation completes. Also, because of the distributed lock
+     * being held, other processes should not change it on the config servers.
+     *
+     * Returns a pointer to the distributed lock acquired by the operation so it can be periodically
+     * checked for liveness. The returned value is owned by the move operation state and should not
+     * be accessed after it completes.
+     *
+     * TODO: Once the entire chunk move process is moved to be inside this state machine, there
+     *       will not be any need to expose the distributed lock.
+     */
+    StatusWith<ForwardingCatalogManager::ScopedDistLock*> acquireMoveMetadata(
+        OperationContext* txn);
+
+    /**
+     * Implements the migration critical section. Needs to be invoked after all data has been moved
+     * after which it will enter the migration critical section, move the remaining batch and then
+     * donate the chunk.
+     *
+     * Returns OK if the migration commits successfully or a status describing the error otherwise.
+     * Since some migration failures are non-recoverable, it may also shut down the server on
+     * certain errors.
+     */
+    Status commitMigration(OperationContext* txn);
+
+    const NamespaceString& getNss() const {
+        return _nss;
+    }
+
+    const std::string& getFromShard() const {
+        return _fromShard;
+    }
+
+    const ConnectionString& getFromShardCS() const {
+        return _fromShardCS;
+    }
+
+    const std::string& getToShard() const {
+        return _toShard;
+    }
+
+    const ConnectionString& getToShardCS() const {
+        return _toShardCS;
+    }
+
+    const BSONObj& getMinKey() const {
+        return _minKey;
+    }
+
+    const BSONObj& getMaxKey() const {
+        return _maxKey;
+    }
+
+    /**
+     * Retrieves the highest chunk version on this shard of the collection being moved as of the
+     * time the distributed lock was acquired. It is illegal to call this method before
+     * acquireMoveMetadata has been called and succeeded.
+     */
+    ChunkVersion getShardVersion() const;
+
+    /**
+     * Retrieves the snapshotted collection metadata as of the time the distributed lock was
+     * acquired. It is illegal to call this method before acquireMoveMetadata has been called and
+     * succeeded.
+     */
+    std::shared_ptr<CollectionMetadata> getCollMetadata() const;
+
+private:
+    const NamespaceString _nss;
+
+    // The source and recipient shard ids
+    std::string _fromShard;
+    std::string _toShard;
+
+    // Resolved shard connection strings for the above shards
+    ConnectionString _fromShardCS;
+    ConnectionString _toShardCS;
+
+    // Expected epoch for the collection, whose chunks are being moved
+    OID _collectionEpoch;
+
+    // Min and max key of the chunk being moved
+    BSONObj _minKey;
+    BSONObj _maxKey;
+
+    // The distributed lock, which protects other migrations from happening on the same collection
+    boost::optional<StatusWith<ForwardingCatalogManager::ScopedDistLock>> _distLockStatus;
+
+    // The cached collection metadata and the shard version from the time the migration process
+    // started. This metadata is guaranteed to not change until either failure or successful
+    // completion, because the distributed lock is being held.
+    ChunkVersion _shardVersion;
+    std::shared_ptr<CollectionMetadata> _collMetadata;
+};
 
 }  // namespace mongo
