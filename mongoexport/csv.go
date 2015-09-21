@@ -96,6 +96,9 @@ func extractFieldByName(fieldName string, document interface{}) interface{} {
 
 	for _, path := range dotParts {
 		docValue := reflect.ValueOf(subdoc)
+		if !docValue.IsValid() {
+			return ""
+		}
 		docType := docValue.Type()
 		docKind := docType.Kind()
 		if docKind == reflect.Map {
