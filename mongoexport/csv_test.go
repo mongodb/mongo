@@ -58,6 +58,7 @@ func TestExtractDField(t *testing.T) {
 			{"a", "string"},
 			{"b", []interface{}{"inner", bsonutil.MarshalD{{"inner2", 1}}}},
 			{"c", bsonutil.MarshalD{{"x", 5}}},
+			{"d", bsonutil.MarshalD{{"z", nil}}},
 		}
 
 		Convey("regular fields should be extracted by name", func() {
@@ -79,12 +80,23 @@ func TestExtractDField(t *testing.T) {
 			So(val, ShouldResemble, bsonutil.MarshalD{{"x", 5}})
 			val = extractFieldByName("c.x", testD)
 			So(val, ShouldEqual, 5)
+
+			Convey("even if they contain null values", func() {
+				val := extractFieldByName("d", testD)
+				So(val, ShouldResemble, bsonutil.MarshalD{{"z", nil}})
+				val = extractFieldByName("d.z", testD)
+				So(val, ShouldEqual, nil)
+				val = extractFieldByName("d.z.nope", testD)
+				So(val, ShouldEqual, "")
+			})
 		})
 
 		Convey(`non-existing fields should return ""`, func() {
 			val := extractFieldByName("f", testD)
 			So(val, ShouldEqual, "")
 			val = extractFieldByName("c.nope", testD)
+			So(val, ShouldEqual, "")
+			val = extractFieldByName("c.nope.NOPE", testD)
 			So(val, ShouldEqual, "")
 			val = extractFieldByName("b.1000", testD)
 			So(val, ShouldEqual, "")
@@ -96,6 +108,11 @@ func TestExtractDField(t *testing.T) {
 
 	Convey(`Extraction of a non-document should return ""`, t, func() {
 		val := extractFieldByName("meh", []interface{}{"meh"})
+		So(val, ShouldEqual, "")
+	})
+
+	Convey(`Extraction of a nil document should return ""`, t, func() {
+		val := extractFieldByName("a", nil)
 		So(val, ShouldEqual, "")
 	})
 }
