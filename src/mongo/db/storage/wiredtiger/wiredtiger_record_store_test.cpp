@@ -208,8 +208,8 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
     unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-    RecordId loc1;
-    RecordId loc2;
+    RecordId id1;
+    RecordId id2;
 
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
@@ -218,11 +218,11 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
 
             StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
             ASSERT_OK(res.getStatus());
-            loc1 = res.getValue();
+            id1 = res.getValue();
 
             res = rs->insertRecord(opCtx.get(), "a", 2, false);
             ASSERT_OK(res.getStatus());
-            loc2 = res.getValue();
+            id2 = res.getValue();
 
             uow.commit();
         }
@@ -235,15 +235,15 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
         unique_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
         unique_ptr<WriteUnitOfWork> w2(new WriteUnitOfWork(t2.get()));
 
-        rs->dataFor(t1.get(), loc1);
-        rs->dataFor(t2.get(), loc1);
+        rs->dataFor(t1.get(), id1);
+        rs->dataFor(t2.get(), id1);
 
-        ASSERT_OK(rs->updateRecord(t1.get(), loc1, "b", 2, false, NULL).getStatus());
-        ASSERT_OK(rs->updateRecord(t1.get(), loc2, "B", 2, false, NULL).getStatus());
+        ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2, false, NULL).getStatus());
+        ASSERT_OK(rs->updateRecord(t1.get(), id2, "B", 2, false, NULL).getStatus());
 
         try {
             // this should fail
-            rs->updateRecord(t2.get(), loc1, "c", 2, false, NULL);
+            rs->updateRecord(t2.get(), id1, "c", 2, false, NULL);
             ASSERT(0);
         } catch (WriteConflictException& dle) {
             w2.reset(NULL);
@@ -258,8 +258,8 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
     unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
-    RecordId loc1;
-    RecordId loc2;
+    RecordId id1;
+    RecordId id2;
 
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
@@ -268,11 +268,11 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
 
             StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
             ASSERT_OK(res.getStatus());
-            loc1 = res.getValue();
+            id1 = res.getValue();
 
             res = rs->insertRecord(opCtx.get(), "a", 2, false);
             ASSERT_OK(res.getStatus());
-            loc2 = res.getValue();
+            id2 = res.getValue();
 
             uow.commit();
         }
@@ -283,21 +283,21 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
         unique_ptr<OperationContext> t2(harnessHelper->newOperationContext());
 
         // ensure we start transactions
-        rs->dataFor(t1.get(), loc2);
-        rs->dataFor(t2.get(), loc2);
+        rs->dataFor(t1.get(), id2);
+        rs->dataFor(t2.get(), id2);
 
         {
             WriteUnitOfWork w(t1.get());
-            ASSERT_OK(rs->updateRecord(t1.get(), loc1, "b", 2, false, NULL).getStatus());
+            ASSERT_OK(rs->updateRecord(t1.get(), id1, "b", 2, false, NULL).getStatus());
             w.commit();
         }
 
         {
             WriteUnitOfWork w(t2.get());
-            ASSERT_EQUALS(string("a"), rs->dataFor(t2.get(), loc1).data());
+            ASSERT_EQUALS(string("a"), rs->dataFor(t2.get(), id1).data());
             try {
-                // this should fail as our version of loc1 is too old
-                rs->updateRecord(t2.get(), loc1, "c", 2, false, NULL);
+                // this should fail as our version of id1 is too old
+                rs->updateRecord(t2.get(), id1, "c", 2, false, NULL);
                 ASSERT(0);
             } catch (WriteConflictException& dle) {
             }
@@ -529,7 +529,7 @@ StatusWith<RecordId> insertBSON(unique_ptr<OperationContext>& opCtx,
     WriteUnitOfWork wuow(opCtx.get());
     WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
     invariant(wrs);
-    Status status = wrs->oplogDiskLocRegister(opCtx.get(), opTime);
+    Status status = wrs->oplogRecordIdRegister(opCtx.get(), opTime);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
     StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), false);
@@ -648,7 +648,7 @@ TEST(WiredTigerRecordStoreTest, CappedOrder) {
     unique_ptr<WiredTigerHarnessHelper> harnessHelper(new WiredTigerHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newCappedRecordStore("a.b", 100000, 10000));
 
-    RecordId loc1;
+    RecordId id1;
 
     {  // first insert a document
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
@@ -656,7 +656,7 @@ TEST(WiredTigerRecordStoreTest, CappedOrder) {
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
             ASSERT_OK(res.getStatus());
-            loc1 = res.getValue();
+            id1 = res.getValue();
             uow.commit();
         }
     }
@@ -664,8 +664,8 @@ TEST(WiredTigerRecordStoreTest, CappedOrder) {
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         auto cursor = rs->getCursor(opCtx.get());
-        auto record = cursor->seekExact(loc1);
-        ASSERT_EQ(loc1, record->id);
+        auto record = cursor->seekExact(id1);
+        ASSERT_EQ(id1, record->id);
         ASSERT(!cursor->next());
     }
 
@@ -689,8 +689,8 @@ TEST(WiredTigerRecordStoreTest, CappedOrder) {
         {  // state should be the same
             unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
             auto cursor = rs->getCursor(opCtx.get());
-            auto record = cursor->seekExact(loc1);
-            ASSERT_EQ(loc1, record->id);
+            auto record = cursor->seekExact(id1);
+            ASSERT_EQ(id1, record->id);
             ASSERT(!cursor->next());
         }
 
@@ -700,8 +700,8 @@ TEST(WiredTigerRecordStoreTest, CappedOrder) {
     {  // now all 3 docs should be visible
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         auto cursor = rs->getCursor(opCtx.get());
-        auto record = cursor->seekExact(loc1);
-        ASSERT_EQ(loc1, record->id);
+        auto record = cursor->seekExact(id1);
+        ASSERT_EQ(id1, record->id);
         ASSERT(cursor->next());
         ASSERT(cursor->next());
         ASSERT(!cursor->next());
@@ -747,7 +747,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorRollover) {
 RecordId _oplogOrderInsertOplog(OperationContext* txn, unique_ptr<RecordStore>& rs, int inc) {
     Timestamp opTime = Timestamp(5, inc);
     WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
-    Status status = wrs->oplogDiskLocRegister(txn, opTime);
+    Status status = wrs->oplogRecordIdRegister(txn, opTime);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
     StatusWith<RecordId> res = rs->insertRecord(txn, obj.objdata(), obj.objsize(), false);
@@ -765,13 +765,13 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
         ASSERT(wrs->usingOplogHack());
     }
 
-    RecordId loc1;
+    RecordId id1;
 
     {  // first insert a document
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            loc1 = _oplogOrderInsertOplog(opCtx.get(), rs, 1);
+            id1 = _oplogOrderInsertOplog(opCtx.get(), rs, 1);
             uow.commit();
         }
     }
@@ -779,8 +779,8 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         auto cursor = rs->getCursor(opCtx.get());
-        auto record = cursor->seekExact(loc1);
-        ASSERT_EQ(loc1, record->id);
+        auto record = cursor->seekExact(id1);
+        ASSERT_EQ(id1, record->id);
         ASSERT(!cursor->next());
     }
 
@@ -804,8 +804,8 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
         {  // state should be the same
             unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
             auto cursor = rs->getCursor(opCtx.get());
-            auto record = cursor->seekExact(loc1);
-            ASSERT_EQ(loc1, record->id);
+            auto record = cursor->seekExact(id1);
+            ASSERT_EQ(id1, record->id);
             ASSERT(!cursor->next());
         }
 
@@ -815,8 +815,8 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
     {  // now all 3 docs should be visible
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         auto cursor = rs->getCursor(opCtx.get());
-        auto record = cursor->seekExact(loc1);
-        ASSERT_EQ(loc1, record->id);
+        auto record = cursor->seekExact(id1);
+        ASSERT_EQ(id1, record->id);
         ASSERT(cursor->next());
         ASSERT(cursor->next());
         ASSERT(!cursor->next());
@@ -859,14 +859,14 @@ TEST(WiredTigerRecordStoreTest, CappedCursorYieldFirst) {
     unique_ptr<WiredTigerHarnessHelper> harnessHelper(new WiredTigerHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newCappedRecordStore("a.b", 10000, 50));
 
-    RecordId loc1;
+    RecordId id1;
 
     {  // first insert a document
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, false);
         ASSERT_OK(res.getStatus());
-        loc1 = res.getValue();
+        id1 = res.getValue();
         uow.commit();
     }
 
@@ -879,7 +879,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorYieldFirst) {
     ASSERT_TRUE(cursor->restore());
     auto record = cursor->next();
     ASSERT(record);
-    ASSERT_EQ(loc1, record->id);
+    ASSERT_EQ(id1, record->id);
     ASSERT(!cursor->next());
 }
 
@@ -904,7 +904,7 @@ StatusWith<RecordId> insertBSONWithSize(OperationContext* opCtx,
     WriteUnitOfWork wuow(opCtx);
     WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs);
     invariant(wtrs);
-    Status status = wtrs->oplogDiskLocRegister(opCtx, opTime);
+    Status status = wtrs->oplogRecordIdRegister(opCtx, opTime);
     if (!status.isOK()) {
         return StatusWith<RecordId>(status);
     }

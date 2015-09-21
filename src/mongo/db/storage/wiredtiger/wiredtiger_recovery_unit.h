@@ -98,7 +98,7 @@ public:
         return _everStartedWrite;
     }
 
-    void setOplogReadTill(const RecordId& loc);
+    void setOplogReadTill(const RecordId& id);
     RecordId getOplogReadTill() const {
         return _oplogReadTill;
     }

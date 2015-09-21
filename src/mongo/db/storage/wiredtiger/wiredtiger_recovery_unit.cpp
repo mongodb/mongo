@@ -187,8 +187,8 @@ void WiredTigerRecoveryUnit::abandonSnapshot() {
     _areWriteUnitOfWorksBanned = false;
 }
 
-void WiredTigerRecoveryUnit::setOplogReadTill(const RecordId& loc) {
-    _oplogReadTill = loc;
+void WiredTigerRecoveryUnit::setOplogReadTill(const RecordId& id) {
+    _oplogReadTill = id;
 }
 
 namespace {

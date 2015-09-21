@@ -108,11 +108,11 @@ public:
 
     // CRUD related
 
-    virtual RecordData dataFor(OperationContext* txn, const RecordId& loc) const;
+    virtual RecordData dataFor(OperationContext* txn, const RecordId& id) const;
 
-    virtual bool findRecord(OperationContext* txn, const RecordId& loc, RecordData* out) const;
+    virtual bool findRecord(OperationContext* txn, const RecordId& id, RecordData* out) const;
 
-    virtual void deleteRecord(OperationContext* txn, const RecordId& dl);
+    virtual void deleteRecord(OperationContext* txn, const RecordId& id);
 
     virtual Status insertRecords(OperationContext* txn,
                                  std::vector<Record>* records,
@@ -137,7 +137,7 @@ public:
     virtual bool updateWithDamagesSupported() const;
 
     virtual StatusWith<RecordData> updateWithDamages(OperationContext* txn,
-                                                     const RecordId& loc,
+                                                     const RecordId& id,
                                                      const RecordData& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages);
@@ -178,7 +178,7 @@ public:
     virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
                                                      const RecordId& startingPosition) const;
 
-    virtual Status oplogDiskLocRegister(OperationContext* txn, const Timestamp& opTime);
+    virtual Status oplogRecordIdRegister(OperationContext* txn, const Timestamp& opTime);
 
     virtual void updateStatsAfterRepair(OperationContext* txn,
                                         long long numRecords,
@@ -208,7 +208,7 @@ public:
         _sizeStorer = ss;
     }
 
-    bool isCappedHidden(const RecordId& loc) const;
+    bool isCappedHidden(const RecordId& id) const;
     RecordId lowestCappedHiddenRecord() const;
 
     bool inShutdown() const;
@@ -243,14 +243,14 @@ private:
 
     static WiredTigerRecoveryUnit* _getRecoveryUnit(OperationContext* txn);
 
-    static int64_t _makeKey(const RecordId& loc);
+    static int64_t _makeKey(const RecordId& id);
     static RecordId _fromKey(int64_t k);
 
-    void _dealtWithCappedLoc(const RecordId& loc);
-    void _addUncommitedDiskLoc_inlock(OperationContext* txn, const RecordId& loc);
+    void _dealtWithCappedId(const RecordId& id);
+    void _addUncommitedRecordId_inlock(OperationContext* txn, const RecordId& id);
 
     RecordId _nextId();
-    void _setId(RecordId loc);
+    void _setId(RecordId id);
     bool cappedAndNeedDelete() const;
     void _changeNumRecords(OperationContext* txn, int64_t diff);
     void _increaseDataSize(OperationContext* txn, int64_t amount);
@@ -277,11 +277,11 @@ private:
 
     const bool _useOplogHack;
 
-    typedef std::vector<RecordId> SortedDiskLocs;
-    SortedDiskLocs _uncommittedDiskLocs;
+    typedef std::vector<RecordId> SortedRecordIds;
+    SortedRecordIds _uncommittedRecordIds;
     RecordId _oplog_visibleTo;
     RecordId _oplog_highestSeen;
-    mutable stdx::mutex _uncommittedDiskLocsMutex;
+    mutable stdx::mutex _uncommittedRecordIdsMutex;
 
     AtomicInt64 _nextIdNum;
     AtomicInt64 _dataSize;
