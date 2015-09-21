@@ -163,17 +163,14 @@ read_index(WT_SESSION *session)
 			break;
 		if ((ret = cursor->get_key(cursor, &rec_year)) != 0)
 			break;
-		if ((ret = cursor->get_value(cursor, &last_name,
-		    &first_name, &term_start, &term_end)) != 0)
+		if ((ret = cursor->get_value(cursor,
+		    &last_name, &first_name, &term_start, &term_end)) != 0)
 			break;
 
-		/*
-		 * There may be more than one president for
-		 * this year, get them all.
-		 */
-		while (term_start <= year && year <= term_end &&
-		    year == rec_year) {
-			printf("        %s %s\n", first_name, last_name);
+		/* Report all presidents that served during the chosen year */
+		while (term_start <= year &&
+		    year <= term_end && year == rec_year) {
+			printf("\t%s %s\n", first_name, last_name);
 			if ((ret = cursor->next(cursor)) != 0)
 				break;
 			if ((ret = cursor->get_key(cursor, &rec_year)) != 0)
