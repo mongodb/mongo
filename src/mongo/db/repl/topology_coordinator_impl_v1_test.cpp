@@ -1825,7 +1825,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesTwoRequestsForSameTerm) {
     ReplSetRequestVotesArgs args;
     args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
                                                << "rs0"
-                                               << "term" << 1LL << "candidateId" << 10LL
+                                               << "term" << 1LL << "candidateIndex" << 0LL
                                                << "configVersion" << 1LL << "lastCommittedOp"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response;
@@ -1839,7 +1839,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesTwoRequestsForSameTerm) {
     args2.initialize(BSON("replSetRequestVotes"
                           << 1 << "setName"
                           << "rs0"
-                          << "term" << 1LL << "candidateId" << 20LL << "configVersion" << 1LL
+                          << "term" << 1LL << "candidateIndex" << 1LL << "configVersion" << 1LL
                           << "lastCommittedOp" << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response2;
 
@@ -1865,8 +1865,8 @@ TEST_F(TopoCoordTest, ProcessRequestVotesDryRunsDoNotDisallowFutureRequestVotes)
     ReplSetRequestVotesArgs args;
     args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
                                                << "rs0"
-                                               << "dryRun" << true << "term" << 1LL << "candidateId"
-                                               << 10LL << "configVersion" << 1LL
+                                               << "dryRun" << true << "term" << 1LL
+                                               << "candidateIndex" << 0LL << "configVersion" << 1LL
                                                << "lastCommittedOp"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response;
@@ -1881,7 +1881,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesDryRunsDoNotDisallowFutureRequestVotes)
     args2.initialize(BSON("replSetRequestVotes"
                           << 1 << "setName"
                           << "rs0"
-                          << "dryRun" << true << "term" << 1LL << "candidateId" << 10LL
+                          << "dryRun" << true << "term" << 1LL << "candidateIndex" << 0LL
                           << "configVersion" << 1LL << "lastCommittedOp"
                           << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response2;
@@ -1895,7 +1895,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesDryRunsDoNotDisallowFutureRequestVotes)
     args3.initialize(BSON("replSetRequestVotes"
                           << 1 << "setName"
                           << "rs0"
-                          << "dryRun" << false << "term" << 1LL << "candidateId" << 10LL
+                          << "dryRun" << false << "term" << 1LL << "candidateIndex" << 0LL
                           << "configVersion" << 1LL << "lastCommittedOp"
                           << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response3;
@@ -1909,7 +1909,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesDryRunsDoNotDisallowFutureRequestVotes)
     args4.initialize(BSON("replSetRequestVotes"
                           << 1 << "setName"
                           << "rs0"
-                          << "dryRun" << false << "term" << 1LL << "candidateId" << 10LL
+                          << "dryRun" << false << "term" << 1LL << "candidateIndex" << 0LL
                           << "configVersion" << 1LL << "lastCommittedOp"
                           << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response4;
@@ -1935,7 +1935,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommands) {
     ReplSetRequestVotesArgs args;
     args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
                                                << "wrongName"
-                                               << "term" << 1LL << "candidateId" << 10LL
+                                               << "term" << 1LL << "candidateIndex" << 0LL
                                                << "configVersion" << 1LL << "lastCommittedOp"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response;
@@ -1950,7 +1950,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommands) {
     args2.initialize(BSON("replSetRequestVotes"
                           << 1 << "setName"
                           << "rs0"
-                          << "term" << 1LL << "candidateId" << 20LL << "configVersion" << 0LL
+                          << "term" << 1LL << "candidateIndex" << 1LL << "configVersion" << 0LL
                           << "lastCommittedOp" << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response2;
 
@@ -1973,7 +1973,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommands) {
     args3.initialize(BSON("replSetRequestVotes"
                           << 1 << "setName"
                           << "rs0"
-                          << "term" << 1LL << "candidateId" << 20LL << "configVersion" << 1LL
+                          << "term" << 1LL << "candidateIndex" << 1LL << "configVersion" << 1LL
                           << "lastCommittedOp" << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response3;
 
@@ -1987,7 +1987,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommands) {
     args4.initialize(BSON("replSetRequestVotes"
                           << 1 << "setName"
                           << "rs0"
-                          << "term" << 3LL << "candidateId" << 20LL << "configVersion" << 1LL
+                          << "term" << 3LL << "candidateIndex" << 1LL << "configVersion" << 1LL
                           << "lastCommittedOp" << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response4;
     OpTime lastAppliedOpTime2 = {Timestamp(20, 0), 0};
@@ -2015,7 +2015,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommandsDryRun) {
     argsForRealVote.initialize(BSON("replSetRequestVotes"
                                     << 1 << "setName"
                                     << "rs0"
-                                    << "term" << 1LL << "candidateId" << 10LL << "configVersion"
+                                    << "term" << 1LL << "candidateIndex" << 0LL << "configVersion"
                                     << 1LL << "lastCommittedOp"
                                     << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse responseForRealVote;
@@ -2031,8 +2031,8 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommandsDryRun) {
     ReplSetRequestVotesArgs args;
     args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
                                                << "wrongName"
-                                               << "dryRun" << true << "term" << 2LL << "candidateId"
-                                               << 10LL << "configVersion" << 1LL
+                                               << "dryRun" << true << "term" << 2LL
+                                               << "candidateIndex" << 0LL << "configVersion" << 1LL
                                                << "lastCommittedOp"
                                                << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response;
@@ -2047,7 +2047,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommandsDryRun) {
     args2.initialize(BSON("replSetRequestVotes"
                           << 1 << "setName"
                           << "rs0"
-                          << "dryRun" << true << "term" << 2LL << "candidateId" << 20LL
+                          << "dryRun" << true << "term" << 2LL << "candidateIndex" << 1LL
                           << "configVersion" << 0LL << "lastCommittedOp"
                           << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response2;
@@ -2062,7 +2062,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommandsDryRun) {
     args3.initialize(BSON("replSetRequestVotes"
                           << 1 << "setName"
                           << "rs0"
-                          << "dryRun" << true << "term" << 0LL << "candidateId" << 20LL
+                          << "dryRun" << true << "term" << 0LL << "candidateIndex" << 1LL
                           << "configVersion" << 1LL << "lastCommittedOp"
                           << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response3;
@@ -2077,7 +2077,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommandsDryRun) {
     args4.initialize(BSON("replSetRequestVotes"
                           << 1 << "setName"
                           << "rs0"
-                          << "dryRun" << true << "term" << 1LL << "candidateId" << 20LL
+                          << "dryRun" << true << "term" << 1LL << "candidateIndex" << 1LL
                           << "configVersion" << 1LL << "lastCommittedOp"
                           << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response4;
@@ -2092,7 +2092,7 @@ TEST_F(TopoCoordTest, ProcessRequestVotesBadCommandsDryRun) {
     args5.initialize(BSON("replSetRequestVotes"
                           << 1 << "setName"
                           << "rs0"
-                          << "dryRun" << true << "term" << 3LL << "candidateId" << 20LL
+                          << "dryRun" << true << "term" << 3LL << "candidateIndex" << 1LL
                           << "configVersion" << 1LL << "lastCommittedOp"
                           << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
     ReplSetRequestVotesResponse response5;

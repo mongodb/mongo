@@ -62,7 +62,7 @@ public:
     class Algorithm : public ScatterGatherAlgorithm {
     public:
         Algorithm(const ReplicaSetConfig& rsConfig,
-                  long long candidateId,
+                  long long candidateIndex,
                   long long term,
                   bool dryRun,
                   OpTime lastOplogEntry);
@@ -86,7 +86,7 @@ public:
 
     private:
         const ReplicaSetConfig _rsConfig;
-        const long long _candidateId;
+        const long long _candidateIndex;
         const long long _term;
         bool _dryRun = false;  // this bool indicates this is a mock election when true
         const OpTime _lastOplogEntry;
@@ -112,7 +112,7 @@ public:
     StatusWith<ReplicationExecutor::EventHandle> start(
         ReplicationExecutor* executor,
         const ReplicaSetConfig& rsConfig,
-        long long candidateId,
+        long long candidateIndex,
         long long term,
         bool dryRun,
         OpTime lastOplogEntry,

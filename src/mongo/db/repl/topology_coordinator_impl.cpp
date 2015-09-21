@@ -2387,7 +2387,7 @@ void TopologyCoordinatorImpl::processReplSetRequestVotes(const ReplSetRequestVot
     } else {
         if (!args.isADryRun()) {
             _lastVote.setTerm(args.getTerm());
-            _lastVote.setCandidateIndex(_rsConfig.findMemberIndexByConfigId(args.getCandidateId()));
+            _lastVote.setCandidateIndex(args.getCandidateIndex());
         }
         response->setVoteGranted(true);
     }

@@ -146,7 +146,7 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
     StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
         &_replExecutor,
         _rsConfig,
-        _rsConfig.getMemberAt(_selfIndex).getId(),
+        _selfIndex,
         _topCoord->getTerm(),
         true,  // dry run
         getMyLastOptime(),
@@ -241,7 +241,7 @@ void ReplicationCoordinatorImpl::_startVoteRequester(long long newTerm) {
     StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _voteRequester->start(
         &_replExecutor,
         _rsConfig,
-        _rsConfig.getMemberAt(_selfIndex).getId(),
+        _selfIndex,
         _topCoord->getTerm(),
         false,
         getMyLastOptime(),

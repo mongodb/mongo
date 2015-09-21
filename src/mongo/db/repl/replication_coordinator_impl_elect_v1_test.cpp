@@ -655,7 +655,7 @@ TEST_F(ReplCoordElectV1Test, ElectTermChangeDuringDryRun) {
 
     auto onDryRunRequest = [this](const RemoteCommandRequest& request) {
         // Update to a future term before dry run completes.
-        ASSERT_EQUALS(1, request.cmdObj.getIntField("candidateId"));
+        ASSERT_EQUALS(0, request.cmdObj.getIntField("candidateIndex"));
         ASSERT_TRUE(getTopoCoord().updateTerm(1000, getNet()->now()));
     };
     simulateSuccessfulDryRun(onDryRunRequest);

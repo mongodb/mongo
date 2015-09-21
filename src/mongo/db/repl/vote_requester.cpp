@@ -45,20 +45,22 @@ namespace repl {
 using executor::RemoteCommandRequest;
 
 VoteRequester::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
-                                    long long candidateId,
+                                    long long candidateIndex,
                                     long long term,
                                     bool dryRun,
                                     OpTime lastOplogEntry)
     : _rsConfig(rsConfig),
-      _candidateId(candidateId),
+      _candidateIndex(candidateIndex),
       _term(term),
       _dryRun(dryRun),
       _lastOplogEntry(lastOplogEntry) {
     // populate targets with all voting members that aren't this node
+    long long index = 0;
     for (auto member = _rsConfig.membersBegin(); member != _rsConfig.membersEnd(); member++) {
-        if (member->isVoter() && member->getId() != candidateId) {
+        if (member->isVoter() && index != candidateIndex) {
             _targets.push_back(member->getHostAndPort());
         }
+        index++;
     }
 }
 
@@ -70,7 +72,7 @@ std::vector<RemoteCommandRequest> VoteRequester::Algorithm::getRequests() const 
     requestVotesCmdBuilder.append("setName", _rsConfig.getReplSetName());
     requestVotesCmdBuilder.append("dryRun", _dryRun);
     requestVotesCmdBuilder.append("term", _term);
-    requestVotesCmdBuilder.append("candidateId", _candidateId);
+    requestVotesCmdBuilder.append("candidateIndex", _candidateIndex);
     requestVotesCmdBuilder.append("configVersion", _rsConfig.getConfigVersion());
 
     BSONObjBuilder lastCommittedOp(requestVotesCmdBuilder.subobjStart("lastCommittedOp"));
@@ -143,12 +145,12 @@ VoteRequester::~VoteRequester() {}
 StatusWith<ReplicationExecutor::EventHandle> VoteRequester::start(
     ReplicationExecutor* executor,
     const ReplicaSetConfig& rsConfig,
-    long long candidateId,
+    long long candidateIndex,
     long long term,
     bool dryRun,
     OpTime lastOplogEntry,
     const stdx::function<void()>& onCompletion) {
-    _algorithm.reset(new Algorithm(rsConfig, candidateId, term, dryRun, lastOplogEntry));
+    _algorithm.reset(new Algorithm(rsConfig, candidateIndex, term, dryRun, lastOplogEntry));
     _runner.reset(new ScatterGatherRunner(_algorithm.get()));
     return _runner->start(executor, onCompletion);
 }

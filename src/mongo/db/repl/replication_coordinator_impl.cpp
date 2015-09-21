@@ -2741,7 +2741,7 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
     if (response->getVoteGranted()) {
         LastVote lastVote;
         lastVote.setTerm(args.getTerm());
-        lastVote.setCandidateIndex(_rsConfig.findMemberIndexByConfigId(args.getCandidateId()));
+        lastVote.setCandidateIndex(args.getCandidateIndex());
 
         Status status = _externalState->storeLocalLastVoteDocument(txn, lastVote);
         if (!status.isOK()) {

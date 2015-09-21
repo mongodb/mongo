@@ -44,7 +44,7 @@ public:
 
     const std::string& getSetName() const;
     long long getTerm() const;
-    long long getCandidateId() const;
+    long long getCandidateIndex() const;
     long long getConfigVersion() const;
     OpTime getLastCommittedOp() const;
     bool isADryRun() const;
@@ -52,12 +52,13 @@ public:
     void addToBSON(BSONObjBuilder* builder) const;
 
 private:
-    std::string _setName;         // Name of the replset
-    long long _term = -1;         // Current known term of the command issuer
-    long long _candidateId = -1;  // replSet id of the member who sent the replSetRequestVotesCmd
-    long long _cfgver = -1;       // replSet config version known to the command issuer
-    OpTime _lastCommittedOp;      // The last known committed op of the command issuer
-    bool _dryRun = false;         // Indicates this is a pre-election check when true
+    std::string _setName;  // Name of the replset.
+    long long _term = -1;  // Current known term of the command issuer.
+    // replSet config index of the member who sent the replSetRequestVotesCmd.
+    long long _candidateIndex = -1;
+    long long _cfgver = -1;   // replSet config version known to the command issuer.
+    OpTime _lastCommittedOp;  // The last known committed op of the command issuer.
+    bool _dryRun = false;     // Indicates this is a pre-election check when true.
 };
 
 class ReplSetRequestVotesResponse {
