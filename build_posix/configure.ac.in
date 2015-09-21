@@ -33,6 +33,11 @@ AC_SUBST([LIBTOOL_DEPS])
 AC_PROG_CC(cc gcc)
 # AC_PROG_CXX(c++ g++)
 
+AC_PROG_CC_C99
+if test "$ac_cv_prog_cc_c99" = "no" ; then
+    AC_MSG_ERROR([WiredTiger requires a C99 compatible compiler.])
+fi
+
 if test "$GCC" = "yes"; then
 	# The Solaris gcc compiler gets the additional -pthreads flag.
 	if test "`uname -s`" = "SunOS"; then
