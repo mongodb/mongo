@@ -66,6 +66,43 @@ most durability guarantees).
 	logging configured; updates durable on application or system
 	failure}
 </table>
+
+The durability setting can also be controlled directly on a per-transaction
+basis via the WT_SESSION::commit_transaction method.
+The WT_SESSION::commit_transaction supports several durability modes with
+the \c sync configuration that override the connection level settings.
+
+If \c sync=on is configured then this commit operation will wait for its
+log records, and all earlier ones, to be durable to the extent specified
+by the \c transaction_sync=(method) setting before returning.
+
+If \c sync=off is configured then this commit operation will write its
+records into the in-memory buffer and return immediately.
+
+If \c sync=background is configured then this commit operation will write
+its record to an in-memory buffer, and will return.  Prior to returning it
+will signal an internal WiredTiger worker thread to synchronize this log
+record.  The caller may then check the status of that background
+synchronization with the WT_SESSION::transaction_sync method.
+
+The durability of the write-ahead log can be controlled independently
+as well via the WT_SESSION::log_flush method.
+The WT_SESSION::log_flush supports several durability modes with
+the \c sync configuration that immediately act upon the log.
+
+If \c sync=on is configured then this flush will force the current
+log and all earlier records to be durable on disk before returning.
+This method call overrides the \c transaction_sync setting and
+forces the data out via \c fsync.
+
+If \c sync=off is configured then this flush operation will force the
+logging subsystem to write any outstanding in-memory buffers to the
+file system before returning.
+
+If \c sync=background is configured then this flush operation will force
+the signalling of a background synchronization operation.
+The caller may then check the status of that background
+synchronization with the WT_SESSION::transaction_sync method.
  */
 
 /*! @page tune_durability Commit-level durability

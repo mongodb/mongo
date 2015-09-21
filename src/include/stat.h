@@ -316,6 +316,7 @@ struct __wt_connection_stats {
 	int64_t log_compress_small;
 	int64_t log_compress_write_fails;
 	int64_t log_compress_writes;
+	int64_t log_flush;
 	int64_t log_max_filesize;
 	int64_t log_prealloc_files;
 	int64_t log_prealloc_max;
