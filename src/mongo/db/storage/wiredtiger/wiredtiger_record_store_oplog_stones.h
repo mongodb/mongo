@@ -71,7 +71,8 @@ public:
 
     void updateCurrentStoneAfterInsertOnCommit(OperationContext* txn,
                                                int64_t bytesInserted,
-                                               RecordId justInserted);
+                                               RecordId highestInserted,
+                                               int64_t countInserted);
 
     void clearStonesOnCommit(OperationContext* txn);
 

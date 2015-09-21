@@ -96,17 +96,23 @@ const std::string kWiredTigerEngineName = "wiredTiger";
 
 class WiredTigerRecordStore::OplogStones::InsertChange final : public RecoveryUnit::Change {
 public:
-    InsertChange(OplogStones* oplogStones, int64_t bytesInserted, RecordId justInserted)
-        : _oplogStones(oplogStones), _bytesInserted(bytesInserted), _justInserted(justInserted) {}
+    InsertChange(OplogStones* oplogStones,
+                 int64_t bytesInserted,
+                 RecordId highestInserted,
+                 int64_t countInserted)
+        : _oplogStones(oplogStones),
+          _bytesInserted(bytesInserted),
+          _highestInserted(highestInserted),
+          _countInserted(countInserted) {}
 
     void commit() final {
         invariant(_bytesInserted >= 0);
-        invariant(_justInserted.isNormal());
+        invariant(_highestInserted.isNormal());
 
-        _oplogStones->_currentRecords.addAndFetch(1);
+        _oplogStones->_currentRecords.addAndFetch(_countInserted);
         int64_t newCurrentBytes = _oplogStones->_currentBytes.addAndFetch(_bytesInserted);
         if (newCurrentBytes >= _oplogStones->_minBytesPerStone) {
-            _oplogStones->createNewStoneIfNeeded(_justInserted);
+            _oplogStones->createNewStoneIfNeeded(_highestInserted);
         }
     }
 
@@ -115,7 +121,8 @@ public:
 private:
     OplogStones* _oplogStones;
     int64_t _bytesInserted;
-    RecordId _justInserted;
+    RecordId _highestInserted;
+    int64_t _countInserted;
 };
 
 class WiredTigerRecordStore::OplogStones::TruncateChange final : public RecoveryUnit::Change {
@@ -213,8 +220,9 @@ void WiredTigerRecordStore::OplogStones::createNewStoneIfNeeded(RecordId lastRec
 }
 
 void WiredTigerRecordStore::OplogStones::updateCurrentStoneAfterInsertOnCommit(
-    OperationContext* txn, int64_t bytesInserted, RecordId justInserted) {
-    txn->recoveryUnit()->registerChange(new InsertChange(this, bytesInserted, justInserted));
+    OperationContext* txn, int64_t bytesInserted, RecordId highestInserted, int64_t countInserted) {
+    txn->recoveryUnit()->registerChange(
+        new InsertChange(this, bytesInserted, highestInserted, countInserted));
 }
 
 void WiredTigerRecordStore::OplogStones::clearStonesOnCommit(OperationContext* txn) {
@@ -1140,58 +1148,81 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* txn) {
            << " records totaling to " << _dataSize.load() << " bytes";
 }
 
-StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
-                                                         const char* data,
-                                                         int len,
-                                                         bool enforceQuota) {
-    if (_isCapped && len > _cappedMaxSize) {
-        return StatusWith<RecordId>(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
-    }
+Status WiredTigerRecordStore::insertRecords(OperationContext* txn,
+                                            std::vector<Record>* records,
+                                            bool enforceQuota) {
+    // We are kind of cheating on capped collections since we write all of them at once ....
+    // Simplest way out would be to just block vector writes for everything except oplog ?
+    int totalLength = 0;
+    for (auto& record : *records)
+        totalLength += record.data.size();
 
-    RecordId loc;
-    if (_useOplogHack) {
-        StatusWith<RecordId> status = oploghack::extractKey(data, len);
-        if (!status.isOK())
-            return status;
-        loc = status.getValue();
-        if (loc > _oplog_highestSeen) {
-            stdx::lock_guard<stdx::mutex> lk(_uncommittedDiskLocsMutex);
-            if (loc > _oplog_highestSeen) {
-                _oplog_highestSeen = loc;
-            }
-        }
-    } else if (_isCapped) {
-        stdx::lock_guard<stdx::mutex> lk(_uncommittedDiskLocsMutex);
-        loc = _nextId();
-        _addUncommitedDiskLoc_inlock(txn, loc);
-    } else {
-        loc = _nextId();
-    }
+    // caller will retry one element at a time
+    if (_isCapped && totalLength > _cappedMaxSize)
+        return Status(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
 
     WiredTigerCursor curwrap(_uri, _tableId, true, txn);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
 
-    c->set_key(c, _makeKey(loc));
-    WiredTigerItem value(data, len);
-    c->set_value(c, value.Get());
-    int ret = WT_OP_CHECK(c->insert(c));
-    if (ret) {
-        return StatusWith<RecordId>(wtRCToStatus(ret, "WiredTigerRecordStore::insertRecord"));
+    RecordId loc;
+    for (auto& record : *records) {
+        if (_useOplogHack) {
+            StatusWith<RecordId> status =
+                oploghack::extractKey(record.data.data(), record.data.size());
+            if (!status.isOK())
+                return status.getStatus();
+            loc = status.getValue();
+            // RecordIds are monotonically increasing
+            if (loc > _oplog_highestSeen) {
+                stdx::lock_guard<stdx::mutex> lk(_uncommittedDiskLocsMutex);
+                if (loc > _oplog_highestSeen) {
+                    _oplog_highestSeen = loc;
+                }
+            }
+        } else if (_isCapped) {
+            stdx::lock_guard<stdx::mutex> lk(_uncommittedDiskLocsMutex);
+            loc = _nextId();
+            _addUncommitedDiskLoc_inlock(txn, loc);
+        } else {
+            loc = _nextId();
+        }
+
+        c->set_key(c, _makeKey(loc));
+        WiredTigerItem value(record.data.data(), record.data.size());
+        c->set_value(c, value.Get());
+        int ret = WT_OP_CHECK(c->insert(c));
+        if (ret)
+            return wtRCToStatus(ret, "WiredTigerRecordStore::insertRecord");
+        record.id = loc;
     }
 
-    _changeNumRecords(txn, 1);
-    _increaseDataSize(txn, len);
+    _changeNumRecords(txn, records->size());
+    _increaseDataSize(txn, totalLength);
 
     if (_oplogStones) {
-        _oplogStones->updateCurrentStoneAfterInsertOnCommit(txn, len, loc);
+        _oplogStones->updateCurrentStoneAfterInsertOnCommit(txn, totalLength, loc, records->size());
     } else {
         cappedDeleteAsNeeded(txn, loc);
     }
 
-    return StatusWith<RecordId>(loc);
+    return Status::OK();
 }
+
+StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
+                                                         const char* data,
+                                                         int len,
+                                                         bool enforceQuota) {
+    std::vector<Record> records;
+    Record record = {RecordId(), RecordData(data, len)};
+    records.push_back(record);
+    Status status = insertRecords(txn, &records, enforceQuota);
+    if (!status.isOK())
+        return StatusWith<RecordId>(status);
+    return StatusWith<RecordId>(records[0].id);
+}
+
 
 void WiredTigerRecordStore::_dealtWithCappedLoc(const RecordId& loc) {
     stdx::lock_guard<stdx::mutex> lk(_uncommittedDiskLocsMutex);

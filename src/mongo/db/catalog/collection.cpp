@@ -423,18 +423,24 @@ Status Collection::_insertDocuments(OperationContext* txn,
     //       under the RecordStore, this feels broken since that should be a
     //       collection access method probably
 
-    // insertRecord(s) will be vectorized in a future patch
-    std::vector<BsonRecord> bsonRecords;
+    std::vector<Record> records;
     for (vector<BSONObj>::iterator it = begin; it != end; it++) {
-        StatusWith<RecordId> loc = _recordStore->insertRecord(
-            txn, it->objdata(), it->objsize(), _enforceQuota(enforceQuota));
-        if (!loc.isOK())
-            return loc.getStatus();
-        BsonRecord bsonRecord = {loc.getValue(), &(*it)};
-        bsonRecords.push_back(bsonRecord);
+        Record record = {RecordId(), RecordData(it->objdata(), it->objsize())};
+        records.push_back(record);
+    }
+    Status status = _recordStore->insertRecords(txn, &records, _enforceQuota(enforceQuota));
+    if (!status.isOK())
+        return status;
 
-        invariant(RecordId::min() < loc.getValue());
-        invariant(loc.getValue() < RecordId::max());
+    std::vector<BsonRecord> bsonRecords;
+    int recordIndex = 0;
+    for (vector<BSONObj>::iterator it = begin; it != end; it++) {
+        RecordId loc = records[recordIndex++].id;
+        invariant(RecordId::min() < loc);
+        invariant(loc < RecordId::max());
+
+        BsonRecord bsonRecord = {loc, &(*it)};
+        bsonRecords.push_back(bsonRecord);
     }
 
     return _indexCatalog.indexRecords(txn, bsonRecords);

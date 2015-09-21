@@ -114,6 +114,10 @@ public:
 
     virtual void deleteRecord(OperationContext* txn, const RecordId& dl);
 
+    virtual Status insertRecords(OperationContext* txn,
+                                 std::vector<Record>* records,
+                                 bool enforceQuota);
+
     virtual StatusWith<RecordId> insertRecord(OperationContext* txn,
                                               const char* data,
                                               int len,

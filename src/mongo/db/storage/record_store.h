@@ -371,6 +371,20 @@ public:
                                               const DocWriter* doc,
                                               bool enforceQuota) = 0;
 
+    virtual Status insertRecords(OperationContext* txn,
+                                 std::vector<Record>* records,
+                                 bool enforceQuota) {
+        for (auto& record : *records) {
+            StatusWith<RecordId> res =
+                insertRecord(txn, record.data.data(), record.data.size(), enforceQuota);
+            if (!res.isOK())
+                return res.getStatus();
+
+            record.id = res.getValue();
+        }
+        return Status::OK();
+    }
+
     /**
      * @param notifier - Only used by record stores which do not support doc-locking.
      *                   In the case of a document move, this is called after the document
