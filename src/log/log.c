@@ -1798,6 +1798,15 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 	conn = S2C(session);
 	log = conn->log;
+	if (record->size > UINT32_MAX) {
+		__wt_errx(session, "Record size %" PRIu64
+		    "too large to write into log.  Maximum %" PRIu32,
+		    (uint64_t)record->size, UINT32_MAX);
+		/*
+		 * Other possible errors: E2BIG, EPERM, ENOMEM, EINVAL
+		 */
+		return (EFBIG);
+	}
 	free_slot = 0;
 	WT_INIT_LSN(&lsn);
 	myslot.slot = NULL;
