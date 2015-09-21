@@ -16,6 +16,9 @@ st.ensurePrimaryShard('test', 'shard0001');
 adminDB.runCommand({shardCollection : "test.foo", key : {x : 1}});
 st.stopBalancer();
 
+// TODO: SERVER-20194. This test forces use of the old mongos query path.
+assert.commandWorked(adminDB.runCommand({setParameter: 1, useClusterClientCursor: false}));
+
 for (var i = 0; i < 100; i++) {
     db.foo.insert({x:i});
 }

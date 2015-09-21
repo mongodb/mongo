@@ -6,6 +6,9 @@ s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 
+// TODO: SERVER-20194. This test forces use of the old mongos query path.
+assert.commandWorked(s.s0.adminCommand({setParameter: 1, useClusterClientCursor: false}));
+
 bigString = "";
 while ( bigString.length < 1024 * 50 )
     bigString += "asocsancdnsjfnsdnfsjdhfasdfasdfasdfnsadofnsadlkfnsaldknfsad";

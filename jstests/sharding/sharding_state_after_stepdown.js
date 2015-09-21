@@ -7,6 +7,9 @@ var options = { rs : true, rsOptions : { nodes : 1 } };
 var st = new ShardingTest({ shards : 2, mongos : 1, other : options });
 st.stopBalancer();
 
+// TODO: SERVER-20194. This test forces use of the old mongos query path.
+assert.commandWorked(st.s.adminCommand({setParameter: 1, useClusterClientCursor: false}));
+
 var mongos = st.s0;
 var admin = mongos.getDB("admin");
 var shards = mongos.getCollection("config.shards").find().toArray();

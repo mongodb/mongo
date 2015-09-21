@@ -25,6 +25,12 @@
     };
     var shardingTest = new ShardingTest(shardingTestConfig);
 
+    // TODO: SERVER-20194. This test forces use of the old mongos query path.
+    assert.commandWorked(shardingTest.s0.adminCommand({
+        setParameter: 1,
+        useClusterClientCursor: false
+    }));
+
     // Get connection to the individual shard
     var replSet1 = shardingTest.rs0;
 

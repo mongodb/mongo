@@ -78,7 +78,7 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-MONGO_EXPORT_SERVER_PARAMETER(useClusterClientCursor, bool, false);
+MONGO_EXPORT_SERVER_PARAMETER(useClusterClientCursor, bool, true);
 
 static bool _isSystemIndexes(const char* ns) {
     return nsToCollectionSubstring(ns) == "system.indexes";
