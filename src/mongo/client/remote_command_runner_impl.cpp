@@ -31,7 +31,6 @@
 #include "mongo/client/remote_command_runner_impl.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
@@ -64,15 +63,6 @@ StatusWith<Milliseconds> getTimeoutMillis(const Date_t expDate, const Date_t now
                                  "Expiration was set to " << dateToISOStringUTC(expDate)};
     }
     return expDate - nowDate;
-}
-
-/**
- * Updates command output document with status.
- */
-BSONObj getCommandResultFromStatus(const Status& status) {
-    BSONObjBuilder result;
-    Command::appendCommandStatus(result, status);
-    return result.obj();
 }
 
 /**
