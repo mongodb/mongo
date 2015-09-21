@@ -196,8 +196,9 @@ static bool useSparseFiles(int fd) {
 // these are from <linux/magic.h> but that isn't available on all systems
 #define NFS_SUPER_MAGIC 0x6969
 #define TMPFS_MAGIC 0x01021994
-
-    return (fs_stats.f_type == NFS_SUPER_MAGIC) || (fs_stats.f_type == TMPFS_MAGIC);
+#define ZFS_SUPER_MAGIC 0x2fc12fc1
+    return (fs_stats.f_type == NFS_SUPER_MAGIC) || (fs_stats.f_type == TMPFS_MAGIC) ||
+        (fs_stats.f_type == ZFS_SUPER_MAGIC);
 
 #elif defined(__FreeBSD__)
 
