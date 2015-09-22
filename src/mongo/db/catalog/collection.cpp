@@ -38,6 +38,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_map.h"
+#include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
@@ -480,7 +481,8 @@ uint64_t Collection::getIndexSize(OperationContext* opCtx, BSONObjBuilder* detai
  */
 Status Collection::truncate(OperationContext* txn) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
-    massert(17445, "index build in progress", _indexCatalog.numIndexesInProgress(txn) == 0);
+    BackgroundOperation::assertNoBgOpInProgForNs(ns());
+    invariant(_indexCatalog.numIndexesInProgress(txn) == 0);
 
     // 1) store index specs
     vector<BSONObj> indexSpecs;
@@ -517,6 +519,8 @@ Status Collection::truncate(OperationContext* txn) {
 void Collection::temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
     invariant(isCapped());
+    BackgroundOperation::assertNoBgOpInProgForNs(ns());
+    invariant(_indexCatalog.numIndexesInProgress(txn) == 0);
 
     _cursorManager.invalidateAll(false);
     _recordStore->temp_cappedTruncateAfter(txn, end, inclusive);

@@ -1079,6 +1079,10 @@ public:
         Database* const db = autoDb.getDb();
         Collection* coll = db ? db->getCollection(ns) : NULL;
 
+        // This can kill all cursors so don't allow running it while a background operation is in
+        // progress.
+        BackgroundOperation::assertNoBgOpInProgForNs(ns);
+
         // If db/collection does not exist, short circuit and return.
         if (!db || !coll) {
             errmsg = "ns does not exist";
