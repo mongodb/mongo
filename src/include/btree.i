@@ -1135,7 +1135,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
 
-	too_big = (page->memory_footprint > btree->maxmempage);
+	too_big = page->memory_footprint > btree->maxmempage;
 	if ((ret = __wt_evict(session, ref, 0)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
