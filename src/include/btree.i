@@ -24,7 +24,7 @@ static inline bool
 __wt_page_is_empty(WT_PAGE *page)
 {
 	return (page->modify != NULL &&
-	    F_MASK(page->modify, WT_PM_REC_MASK) == WT_PM_REC_EMPTY);
+	    page->modify->recon_result == WT_PM_REC_EMPTY);
 }
 
 /*

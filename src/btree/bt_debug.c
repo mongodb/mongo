@@ -651,7 +651,7 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", split-insert");
 
 	if (mod != NULL)
-		switch (F_MASK(mod, WT_PM_REC_MASK)) {
+		switch (mod->recon_result) {
 		case WT_PM_REC_EMPTY:
 			__dmsg(ds, ", empty");
 			break;

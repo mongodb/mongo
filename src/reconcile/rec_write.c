@@ -624,7 +624,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * write it instead of adding code to write blocks based on the list of
 	 * blocks resulting from a multiblock reconciliation.
 	 */
-	switch (F_MASK(mod, WT_PM_REC_MASK)) {
+	switch (mod->recon_result) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 	case WT_PM_REC_REPLACE:				/* 1-for-1 page swap */
 	case WT_PM_REC_REWRITE:				/* Rewrite */
@@ -1499,7 +1499,7 @@ in_memory:
 	 * reason to write the cell.
 	 */
 	mod = ref->page->modify;
-	if (mod != NULL && F_ISSET(mod, WT_PM_REC_MASK))
+	if (mod != NULL && mod->recon_result != 0)
 		*statep = WT_CHILD_MODIFIED;
 	else if (ref->addr == NULL) {
 		*statep = WT_CHILD_IGNORE;
@@ -3244,7 +3244,8 @@ supd_check_complete:
 	 */
 	bnd_slot = (uint32_t)(bnd - r->bnd);
 	if (bnd_slot > 1 ||
-	    (F_ISSET(mod, WT_PM_REC_MULTIBLOCK) && mod->mod_multi != NULL)) {
+	    (mod->recon_result == WT_PM_REC_MULTIBLOCK &&
+	    mod->mod_multi != NULL)) {
 		/*
 		 * There are page header fields which need to be cleared to get
 		 * consistent checksums: specifically, the write generation and
@@ -3256,7 +3257,7 @@ supd_check_complete:
 		memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
 		bnd->cksum = __wt_cksum(buf->data, buf->size);
 
-		if (F_ISSET(mod, WT_PM_REC_MULTIBLOCK) &&
+		if (mod->recon_result == WT_PM_REC_MULTIBLOCK &&
 		    mod->mod_multi_entries > bnd_slot) {
 			multi = &mod->mod_multi[bnd_slot];
 			if (multi->size == bnd->size &&
@@ -3759,7 +3760,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * discarded.
 		 */
 		if (state == WT_CHILD_MODIFIED) {
-			switch (F_MASK(child->modify, WT_PM_REC_MASK)) {
+			switch (child->modify->recon_result) {
 			case WT_PM_REC_EMPTY:
 				/*
 				 * Column-store pages are almost never empty, as
@@ -4595,7 +4596,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * discarded.
 		 */
 		if (state == WT_CHILD_MODIFIED)
-			switch (F_MASK(child->modify, WT_PM_REC_MASK)) {
+			switch (child->modify->recon_result) {
 			case WT_PM_REC_EMPTY:
 				/*
 				 * Overflow keys referencing empty pages are no
@@ -5310,7 +5311,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * and clear the underlying modification information, we're creating a
 	 * new reality.
 	 */
-	switch (F_MASK(mod, WT_PM_REC_MASK)) {
+	switch (mod->recon_result) {
 	case 0:	/*
 		 * The page has never been reconciled before, free the original
 		 * address blocks (if any).  The "if any" is for empty trees
@@ -5364,7 +5365,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
-	F_CLR(mod, WT_PM_REC_MASK);
+
+	/* Reset the reconciliation state. */
+	mod->recon_result = 0;
 
 	/*
 	 * Wrap up overflow tracking.  If we are about to create a checkpoint,
@@ -5394,7 +5397,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * page in memory.  If the page is subsequently modified, that
 		 * is OK, we'll just reconcile it again.
 		 */
-		F_SET(mod, WT_PM_REC_EMPTY);
+		mod->recon_result = WT_PM_REC_EMPTY;
 		break;
 	case 1:						/* 1-for-1 page swap */
 		/*
@@ -5420,7 +5423,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			bnd->dsk = NULL;
 			mod->mod_multi_entries = 1;
 
-			F_SET(mod, WT_PM_REC_REWRITE);
+			mod->recon_result = WT_PM_REC_REWRITE;
 			break;
 		}
 
@@ -5437,7 +5440,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			bnd->addr.addr = NULL;
 		}
 
-		F_SET(mod, WT_PM_REC_REPLACE);
+		mod->recon_result = WT_PM_REC_REPLACE;
 		break;
 	default:					/* Page split */
 		WT_RET(__wt_verbose(session, WT_VERB_RECONCILE,
@@ -5512,7 +5515,7 @@ err:			__wt_scr_free(session, &tkey);
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
-		F_SET(mod, WT_PM_REC_MULTIBLOCK);
+		mod->recon_result = WT_PM_REC_MULTIBLOCK;
 		break;
 	}
 	return (0);
@@ -5538,7 +5541,7 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * information (otherwise we might think the backing block is being
 	 * reused on a subsequent reconciliation where we want to free it).
 	 */
-	switch (F_MASK(mod, WT_PM_REC_MASK)) {
+	switch (mod->recon_result) {
 	case WT_PM_REC_MULTIBLOCK:
 	case WT_PM_REC_REWRITE:
 		for (multi = mod->mod_multi,

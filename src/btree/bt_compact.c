@@ -44,13 +44,13 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	 * If the page is a 1-to-1 replacement, test the replacement addresses.
 	 * Ignore empty pages, they get merged into the parent.
 	 */
-	if (mod == NULL || F_MASK(mod, WT_PM_REC_MASK) == 0) {
+	if (mod == NULL || mod->recon_result == 0) {
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		if (addr == NULL)
 			return (0);
 		WT_RET(
 		    bm->compact_page_skip(bm, session, addr, addr_size, skipp));
-	} else if (F_MASK(mod, WT_PM_REC_MASK) == WT_PM_REC_REPLACE) {
+	} else if (mod->recon_result == WT_PM_REC_REPLACE) {
 		/*
 		 * The page's modification information can change underfoot if
 		 * the page is being reconciled, serialize with reconciliation.
