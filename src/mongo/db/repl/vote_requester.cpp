@@ -98,12 +98,18 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
     } else {
         _responders.insert(request.target);
         ReplSetRequestVotesResponse voteResponse;
-        voteResponse.initialize(response.getValue().data);
+        const auto status = voteResponse.initialize(response.getValue().data);
+        if (!status.isOK()) {
+            log() << "VoteRequester: Got error processing response with status: " << status
+                  << ", resp:" << response.getValue().data;
+        }
+
         if (voteResponse.getVoteGranted()) {
             _votes++;
         } else {
             log() << "VoteRequester: Got no vote from " << request.target
-                  << " because: " << voteResponse.getReason() << ", resp:" << voteResponse.toBSON();
+                  << " because: " << voteResponse.getReason()
+                  << ", resp:" << response.getValue().data;
         }
 
         if (voteResponse.getTerm() > _term) {

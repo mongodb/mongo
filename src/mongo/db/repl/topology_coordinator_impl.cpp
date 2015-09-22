@@ -2367,7 +2367,6 @@ void TopologyCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {
 void TopologyCoordinatorImpl::processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
                                                          ReplSetRequestVotesResponse* response,
                                                          const OpTime& lastAppliedOpTime) {
-    response->setOk(true);
     response->setTerm(_term);
 
     if (args.getTerm() < _term) {

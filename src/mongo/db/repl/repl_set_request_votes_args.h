@@ -64,20 +64,10 @@ class ReplSetRequestVotesResponse {
 public:
     Status initialize(const BSONObj& argsObj);
 
-    void setOk(bool ok) {
-        _ok = ok;
-    }
-    void setVoteGranted(bool voteGranted) {
-        _voteGranted = voteGranted;
-    }
-    void setTerm(long long term) {
-        _term = term;
-    }
-    void setReason(const std::string& reason) {
-        _reason = reason;
-    }
+    void setVoteGranted(bool voteGranted);
+    void setTerm(long long term);
+    void setReason(const std::string& reason);
 
-    bool getOk() const;
     long long getTerm() const;
     bool getVoteGranted() const;
     const std::string& getReason() const;
@@ -86,7 +76,6 @@ public:
     BSONObj toBSON() const;
 
 private:
-    bool _ok = false;
     long long _term = -1;
     bool _voteGranted = false;
     std::string _reason;

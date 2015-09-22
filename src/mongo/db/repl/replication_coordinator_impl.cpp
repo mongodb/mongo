@@ -2723,7 +2723,7 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
     }
 
     auto termStatus = updateTerm(args.getTerm());
-    if (!termStatus.isOK())
+    if (!termStatus.isOK() && termStatus.code() != ErrorCodes::StaleTerm)
         return termStatus;
 
     Status result{ErrorCodes::InternalError, "didn't set status in processReplSetRequestVotes"};

@@ -148,15 +148,19 @@ Status ReplSetRequestVotesResponse::initialize(const BSONObj& argsObj) {
     if (!status.isOK())
         return status;
 
-    status = bsonExtractBooleanField(argsObj, kOkFieldName, &_ok);
-    if (!status.isOK())
-        return status;
-
     return Status::OK();
 }
 
-bool ReplSetRequestVotesResponse::getOk() const {
-    return _ok;
+void ReplSetRequestVotesResponse::setVoteGranted(bool voteGranted) {
+    _voteGranted = voteGranted;
+}
+
+void ReplSetRequestVotesResponse::setTerm(long long term) {
+    _term = term;
+}
+
+void ReplSetRequestVotesResponse::setReason(const std::string& reason) {
+    _reason = reason;
 }
 
 long long ReplSetRequestVotesResponse::getTerm() const {
@@ -172,7 +176,6 @@ const std::string& ReplSetRequestVotesResponse::getReason() const {
 }
 
 void ReplSetRequestVotesResponse::addToBSON(BSONObjBuilder* builder) const {
-    builder->append(kOkFieldName, _ok);
     builder->append(kTermFieldName, _term);
     builder->append(kVoteGrantedFieldName, _voteGranted);
     builder->append(kReasonFieldName, _reason);

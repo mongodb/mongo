@@ -126,7 +126,6 @@ protected:
 
     ResponseStatus votedYes() {
         ReplSetRequestVotesResponse response;
-        response.setOk(true);
         response.setVoteGranted(true);
         response.setTerm(1);
         return ResponseStatus(
@@ -135,7 +134,6 @@ protected:
 
     ResponseStatus votedNoBecauseConfigVersionDoesNotMatch() {
         ReplSetRequestVotesResponse response;
-        response.setOk(true);
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's config version differs from mine");
@@ -145,7 +143,6 @@ protected:
 
     ResponseStatus votedNoBecauseSetNameDiffers() {
         ReplSetRequestVotesResponse response;
-        response.setOk(true);
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's set name differs from mine");
@@ -155,7 +152,6 @@ protected:
 
     ResponseStatus votedNoBecauseLastOpTimeIsGreater() {
         ReplSetRequestVotesResponse response;
-        response.setOk(true);
         response.setVoteGranted(false);
         response.setTerm(1);
         response.setReason("candidate's data is staler than mine");
@@ -165,7 +161,6 @@ protected:
 
     ResponseStatus votedNoBecauseTermIsGreater() {
         ReplSetRequestVotesResponse response;
-        response.setOk(true);
         response.setVoteGranted(false);
         response.setTerm(3);
         response.setReason("candidate's term is lower than mine");
@@ -175,7 +170,6 @@ protected:
 
     ResponseStatus votedNoBecauseAlreadyVoted() {
         ReplSetRequestVotesResponse response;
-        response.setOk(true);
         response.setVoteGranted(false);
         response.setTerm(2);
         response.setReason("already voted for another candidate this term");
