@@ -275,6 +275,10 @@ OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() {
     return OpTime();
 }
 
+void ReplicationCoordinatorImpl::appendConnectionStats(BSONObjBuilder* b) {
+    _replExecutor.appendConnectionStats(b);
+}
+
 void ReplicationCoordinatorImpl::_updateLastVote(const LastVote& lastVote) {
     _topCoord->loadLastVote(lastVote);
 }

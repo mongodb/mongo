@@ -438,6 +438,10 @@ ReplicationExecutor::scheduleWorkWithGlobalExclusiveLock(const CallbackFn& work)
     return handle;
 }
 
+void ReplicationExecutor::appendConnectionStats(BSONObjBuilder* b) {
+    _networkInterface->appendConnectionStats(b);
+}
+
 std::pair<ReplicationExecutor::WorkItem, ReplicationExecutor::CallbackHandle>
 ReplicationExecutor::getWork() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);

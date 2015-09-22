@@ -100,6 +100,7 @@ public:
     NetworkInterfaceASIO(Options = Options());
 
     std::string getDiagnosticString() override;
+    void appendConnectionStats(BSONObjBuilder* b) override;
     std::string getHostName() override;
     void startup() override;
     void shutdown() override;

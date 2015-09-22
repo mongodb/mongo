@@ -127,6 +127,8 @@ public:
 
     virtual void appendSlaveInfoData(BSONObjBuilder* result);
 
+    void appendConnectionStats(BSONObjBuilder* b) override;
+
     virtual ReplicaSetConfig getConfig() const;
 
     virtual void processReplSetGetConfig(BSONObjBuilder* result);

@@ -90,6 +90,10 @@ std::string NetworkInterfaceASIO::getDiagnosticString() {
     return output;
 }
 
+void NetworkInterfaceASIO::appendConnectionStats(BSONObjBuilder* b) {
+    _connectionPool.appendConnectionStats(b);
+}
+
 std::string NetworkInterfaceASIO::getHostName() {
     return getHostNameCached();
 }

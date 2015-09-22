@@ -80,6 +80,8 @@ public:
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle) override;
 
+    void appendConnectionStats(BSONObjBuilder* b) override;
+
     /**
      * Cancels all commands on the network interface.
      */

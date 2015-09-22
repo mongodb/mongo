@@ -63,6 +63,8 @@ std::string NetworkInterfaceMock::getDiagnosticString() {
     return "NetworkInterfaceMock diagnostics here";
 }
 
+void NetworkInterfaceMock::appendConnectionStats(BSONObjBuilder* b) {}
+
 Date_t NetworkInterfaceMock::now() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _now_inlock();

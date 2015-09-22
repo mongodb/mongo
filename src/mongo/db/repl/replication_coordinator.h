@@ -701,6 +701,11 @@ public:
      */
     virtual OpTime getCurrentCommittedSnapshotOpTime() = 0;
 
+    /**
+     * Appends connection information to the provided BSONObjBuilder.
+     */
+    virtual void appendConnectionStats(BSONObjBuilder* b) = 0;
+
 protected:
     ReplicationCoordinator();
 };

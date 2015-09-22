@@ -87,6 +87,8 @@ std::string NetworkInterfaceImpl::getDiagnosticString() {
     return output;
 }
 
+void NetworkInterfaceImpl::appendConnectionStats(BSONObjBuilder* b) {}
+
 void NetworkInterfaceImpl::startup() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(!_inShutdown);

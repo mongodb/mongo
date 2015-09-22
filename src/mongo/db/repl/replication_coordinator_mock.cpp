@@ -217,6 +217,8 @@ void ReplicationCoordinatorMock::fillIsMasterForReplSet(IsMasterResponse* result
 
 void ReplicationCoordinatorMock::appendSlaveInfoData(BSONObjBuilder* result) {}
 
+void ReplicationCoordinatorMock::appendConnectionStats(BSONObjBuilder* b) {}
+
 Status ReplicationCoordinatorMock::setMaintenanceMode(bool activate) {
     return Status::OK();
 }

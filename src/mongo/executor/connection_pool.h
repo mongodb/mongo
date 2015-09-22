@@ -38,6 +38,9 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
+class BSONObjBuilder;
+
 namespace executor {
 
 /**
@@ -110,9 +113,7 @@ public:
 
     void get(const HostAndPort& hostAndPort, Milliseconds timeout, GetConnectionCallback cb);
 
-    /**
-     * TODO add a function returning connection pool stats
-     */
+    void appendConnectionStats(BSONObjBuilder* b);
 
 private:
     void returnConnection(ConnectionInterface* connection);

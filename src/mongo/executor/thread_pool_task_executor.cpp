@@ -342,6 +342,10 @@ void ThreadPoolTaskExecutor::wait(const CallbackHandle& cbHandle) {
     waitForEvent(cbState->finishedEvent);
 }
 
+void ThreadPoolTaskExecutor::appendConnectionStats(BSONObjBuilder* b) {
+    _net->appendConnectionStats(b);
+}
+
 void ThreadPoolTaskExecutor::cancelAllCommands() {
     _net->cancelAllCommands();
 }

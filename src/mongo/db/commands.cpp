@@ -535,37 +535,4 @@ public:
 
 } poolFlushCmd;
 
-class PoolStats : public Command {
-public:
-    PoolStats() : Command("connPoolStats") {}
-    virtual void help(stringstream& help) const {
-        help << "stats about connection pool";
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::connPoolStats);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-    }
-    virtual bool run(OperationContext* txn,
-                     const string&,
-                     mongo::BSONObj&,
-                     int,
-                     std::string&,
-                     mongo::BSONObjBuilder& result) {
-        globalConnPool.appendInfo(result);
-        result.append("numDBClientConnection", DBClientConnection::getNumConnections());
-        result.append("numAScopedConnection", AScopedConnection::getNumConnections());
-        return true;
-    }
-    virtual bool slaveOk() const {
-        return true;
-    }
-
-} poolStatsCmd;
-
 }  // namespace mongo

@@ -50,6 +50,7 @@
 
 namespace mongo {
 
+class BSONObjBuilder;
 class NamespaceString;
 class OperationContext;
 
@@ -123,6 +124,8 @@ public:
                                                      const RemoteCommandCallbackFn& cb) override;
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle) override;
+
+    void appendConnectionStats(BSONObjBuilder* b) override;
 
     /**
      * Executes the run loop. May be called up to one time.

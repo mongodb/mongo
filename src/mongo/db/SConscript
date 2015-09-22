@@ -476,6 +476,7 @@ env.Library(
         "audit.cpp",
         "commands.cpp",
         "commands/authentication_commands.cpp",
+        "commands/conn_pool_stats.cpp",
         "commands/connection_status.cpp",
         "commands/copydb_common.cpp",
         "commands/fail_point_cmd.cpp",
@@ -494,6 +495,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/logger/parse_log_component_settings',
         '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',

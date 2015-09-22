@@ -43,6 +43,7 @@
 
 namespace mongo {
 
+class BSONObjBuilder;
 class OperationContext;
 
 namespace executor {
@@ -229,6 +230,12 @@ public:
      * NOTE: Do not call from a callback running in the executor.
      */
     virtual void wait(const CallbackHandle& cbHandle) = 0;
+
+    /**
+     * Appends information about the underlying network interface's connections to the given
+     * builder.
+     */
+    virtual void appendConnectionStats(BSONObjBuilder* b) = 0;
 
 protected:
     TaskExecutor();

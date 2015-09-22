@@ -296,6 +296,8 @@ public:
 
     virtual void waitForNewSnapshot(OperationContext* txn) override;
 
+    virtual void appendConnectionStats(BSONObjBuilder* b) override;
+
     // ================== Test support API ===================
 
     /**

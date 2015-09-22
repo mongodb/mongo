@@ -67,6 +67,8 @@ void PoolForHost::clear() {
 void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) {
     bool isFailed = c->isFailed();
 
+    --_checkedOut;
+
     // Remember that this host had a broken connection for later
     if (isFailed)
         reportBadConnectionAt(c->getSockCreationMicroSec());
@@ -115,6 +117,7 @@ DBClientBase* PoolForHost::get(DBConnectionPool* pool, double socketTimeout) {
 
         verify(sc.conn->getSoTimeout() == socketTimeout);
 
+        ++_checkedOut;
         return sc.conn;
     }
 
@@ -162,7 +165,10 @@ bool PoolForHost::StoredConnection::ok(time_t now) {
 void PoolForHost::createdOne(DBClientBase* base) {
     if (_created == 0)
         _type = base->type();
-    _created++;
+    ++_created;
+    // _checkedOut is used to indicate the number of in-use connections so
+    // though we didn't actually check this connection out, we bump it here.
+    ++_checkedOut;
 }
 
 void PoolForHost::initializeHostName(const std::string& hostName) {
@@ -336,11 +342,9 @@ void DBConnectionPool::onDestroy(DBClientBase* conn) {
 }
 
 void DBConnectionPool::appendInfo(BSONObjBuilder& b) {
-    int avail = 0;
-    long long created = 0;
-
-
-    map<ConnectionString::ConnectionType, long long> createdByType;
+    int totalInUse = 0;
+    int totalAvailable = 0;
+    long long totalCreated = 0;
 
     BSONObjBuilder bb(b.subobjStart("hosts"));
     {
@@ -349,39 +353,29 @@ void DBConnectionPool::appendInfo(BSONObjBuilder& b) {
             if (i->second.numCreated() == 0)
                 continue;
 
-            string s = str::stream() << i->first.ident << "::" << i->first.timeout;
+            auto inUse = i->second.numInUse();
+            auto available = i->second.numAvailable();
+            auto created = i->second.numCreated();
 
+            string s = str::stream() << i->first.ident << "::" << i->first.timeout;
             BSONObjBuilder temp(bb.subobjStart(s));
-            temp.append("available", i->second.numAvailable());
-            temp.appendNumber("created", i->second.numCreated());
+
+            temp.append("inUse", inUse);
+            temp.append("available", available);
+            temp.appendNumber("created", created);
+
             temp.done();
 
-            avail += i->second.numAvailable();
-            created += i->second.numCreated();
-
-            long long& x = createdByType[i->second.type()];
-            x += i->second.numCreated();
+            totalInUse += inUse;
+            totalAvailable += available;
+            totalCreated += created;
         }
     }
     bb.done();
 
-    // Always report all replica sets being tracked
-    BSONObjBuilder setBuilder(b.subobjStart("replicaSets"));
-    globalRSMonitorManager.report(&setBuilder);
-    setBuilder.done();
-
-    {
-        BSONObjBuilder temp(bb.subobjStart("createdByType"));
-        for (map<ConnectionString::ConnectionType, long long>::iterator i = createdByType.begin();
-             i != createdByType.end();
-             ++i) {
-            temp.appendNumber(ConnectionString::typeToString(i->first), i->second);
-        }
-        temp.done();
-    }
-
-    b.append("totalAvailable", avail);
-    b.appendNumber("totalCreated", created);
+    b.append("totalInUse", totalInUse);
+    b.append("totalAvailable", totalAvailable);
+    b.appendNumber("totalCreated", totalCreated);
 }
 
 bool DBConnectionPool::serverNameCompare::operator()(const string& a, const string& b) const {

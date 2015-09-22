@@ -36,6 +36,9 @@
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
+
+class BSONObjBuilder;
+
 namespace executor {
 
 /**
@@ -57,6 +60,11 @@ public:
      * Returns diagnostic info.
      */
     virtual std::string getDiagnosticString() = 0;
+
+    /**
+     * Appends connection information to the provided BSONObjBuilder.
+     */
+    virtual void appendConnectionStats(BSONObjBuilder* b) = 0;
 
     /**
      * Starts up the network interface.

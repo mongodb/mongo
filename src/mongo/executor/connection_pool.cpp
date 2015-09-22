@@ -29,6 +29,7 @@
 
 #include "mongo/executor/connection_pool.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -57,7 +58,7 @@ public:
     ~SpecificPool();
 
     /**
-     * Get's a connection from the specific pool. Sinks a unique_lock from the
+     * Gets a connection from the specific pool. Sinks a unique_lock from the
      * parent to preserve the lock on _mutex
      */
     void getConnection(const HostAndPort& hostAndPort,
@@ -66,7 +67,7 @@ public:
                        GetConnectionCallback cb);
 
     /**
-     * Cascade a failure across existing connections and requests. Invoking
+     * Cascades a failure across existing connections and requests. Invoking
      * this function drops all current connections and fails all current
      * requests with the passed status.
      */
@@ -77,6 +78,21 @@ public:
      * parent to preserve the lock on _mutex
      */
     void returnConnection(ConnectionInterface* connection, stdx::unique_lock<stdx::mutex> lk);
+
+    /**
+     * Returns the number of connections currently checked out of the pool.
+     */
+    size_t inUseConnections(const stdx::unique_lock<stdx::mutex>& lk);
+
+    /**
+     * Returns the number of available connections in the pool.
+     */
+    size_t availableConnections(const stdx::unique_lock<stdx::mutex>& lk);
+
+    /**
+     * Returns the total number of connections ever created in this pool.
+     */
+    size_t createdConnections(const stdx::unique_lock<stdx::mutex>& lk);
 
 private:
     using OwnedConnection = std::unique_ptr<ConnectionInterface>;
@@ -117,6 +133,8 @@ private:
     Date_t _requestTimerExpiration;
     size_t _generation;
     bool _inFulfillRequests;
+
+    size_t _created;
 
     /**
      * The current state of the pool
@@ -187,6 +205,44 @@ void ConnectionPool::get(const HostAndPort& hostAndPort,
     pool->getConnection(hostAndPort, timeout, std::move(lk), std::move(cb));
 }
 
+void ConnectionPool::appendConnectionStats(BSONObjBuilder* b) {
+    size_t inUse = 0u;
+    size_t available = 0u;
+    size_t created = 0u;
+
+    BSONObjBuilder hostBuilder(b->subobjStart("hosts"));
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+    for (const auto& kv : _pools) {
+        std::string label = kv.first.toString();
+        BSONObjBuilder hostInfo(hostBuilder.subobjStart(label));
+
+        auto& pool = kv.second;
+        auto inUseConnections = pool->inUseConnections(lk);
+        auto availableConnections = pool->availableConnections(lk);
+        auto createdConnections = pool->createdConnections(lk);
+        hostInfo.appendNumber("inUse", inUseConnections);
+        hostInfo.appendNumber("available", availableConnections);
+        hostInfo.appendNumber("created", createdConnections);
+
+        hostInfo.done();
+
+        // update available and created
+        inUse += inUseConnections;
+        available += availableConnections;
+        created += createdConnections;
+    }
+
+    hostBuilder.done();
+
+    b->appendNumber("totalInUse", inUse);
+    b->appendNumber("totalAvailable", available);
+    b->appendNumber("totalCreated", created);
+
+    return;
+}
+
 void ConnectionPool::returnConnection(ConnectionInterface* conn) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
@@ -203,10 +259,24 @@ ConnectionPool::SpecificPool::SpecificPool(ConnectionPool* parent, const HostAnd
       _requestTimer(parent->_factory->makeTimer()),
       _generation(0),
       _inFulfillRequests(false),
+      _created(0),
       _state(State::kRunning) {}
 
 ConnectionPool::SpecificPool::~SpecificPool() {
     DESTRUCTOR_GUARD(_requestTimer->cancelTimeout();)
+}
+
+size_t ConnectionPool::SpecificPool::inUseConnections(const stdx::unique_lock<stdx::mutex>& lk) {
+    return _checkedOutPool.size();
+}
+
+size_t ConnectionPool::SpecificPool::availableConnections(
+    const stdx::unique_lock<stdx::mutex>& lk) {
+    return _readyPool.size();
+}
+
+size_t ConnectionPool::SpecificPool::createdConnections(const stdx::unique_lock<stdx::mutex>& lk) {
+    return _created;
 }
 
 void ConnectionPool::SpecificPool::getConnection(const HostAndPort& hostAndPort,
@@ -413,6 +483,8 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
         auto handle = _parent->_factory->makeConnection(hostAndPort, _generation);
         auto connPtr = handle.get();
         _processingPool[connPtr] = std::move(handle);
+
+        ++_created;
 
         // Run the setup callback
         lk.unlock();
