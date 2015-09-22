@@ -186,9 +186,6 @@ public:
                 result, Status(ErrorCodes::InvalidOptions, "need to specify namespace in command"));
         }
 
-        ChunkMoveOperationState chunkMoveState{NamespaceString(ns)};
-        uassertStatusOK(chunkMoveState.initialize(txn, cmdObj));
-
         ShardingState* const shardingState = ShardingState::get(txn);
 
         // This could be the first call that enables sharding - make sure we initialize the
@@ -203,6 +200,9 @@ public:
             const string configdb = cmdObj["configdb"].String();
             shardingState->initialize(txn, configdb);
         }
+
+        ChunkMoveOperationState chunkMoveState{NamespaceString(ns)};
+        uassertStatusOK(chunkMoveState.initialize(txn, cmdObj));
 
         // Initialize our current shard name in the shard state if needed
         shardingState->setShardName(chunkMoveState.getFromShard());

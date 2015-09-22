@@ -328,15 +328,6 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
 
     log() << "moveChunk migrate commit accepted by TO-shard: " << res << migrateLog;
 
-    // Version at which the next highest lastmod will be set. If the chunk being moved is the
-    // last in the shard, nextVersion is that chunk's lastmod otherwise the highest version is
-    // from the chunk being bumped on the FROM-shard.
-    ChunkVersion nextVersion;
-
-    // We want to go only once to the configDB but perhaps change two chunks, the one being
-    // migrated and another local one (so to bump version for the entire shard) we use the
-    // 'applyOps' mechanism to group the two updates and make them safer.
-
     BSONArrayBuilder updates;
 
     {
@@ -362,11 +353,13 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
         updates.append(op.obj());
     }
 
-    nextVersion = myVersion;
+    // Version at which the next highest lastmod will be set. If the chunk being moved is the last
+    // in the shard, nextVersion is that chunk's lastmod otherwise the highest version is from the
+    // chunk being bumped on the FROM-shard.
+    ChunkVersion nextVersion = myVersion;
 
-    // If we have chunks left on the FROM shard, update the version of one of them as well. We
-    // can figure that out by grabbing the metadata as it has been changed.
-
+    // If we have chunks left on the FROM shard, update the version of one of them as well. We can
+    // figure that out by grabbing the metadata as it has been changed.
     const std::shared_ptr<CollectionMetadata> bumpedCollMetadata(
         shardingState->getCollectionMetadata(_nss.ns()));
     if (bumpedCollMetadata->getNumChunks() > 0) {
