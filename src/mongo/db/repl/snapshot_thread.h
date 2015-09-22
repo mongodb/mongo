@@ -72,12 +72,13 @@ private:
     explicit SnapshotThread(SnapshotManager* manager);
     void run();
 
+    stdx::mutex _mutex;  // Must be first, and def. before _thread.
+
     SnapshotManager* const _manager;
     bool _inShutdown = false;             // guarded by _mutex.
     bool _forcedSnapshotPending = false;  // guarded by _mutex.
     std::shared_ptr<CappedInsertNotifier> _notifier;
     stdx::thread _thread;
-    stdx::mutex _mutex;
 };
 
 }  // namespace repl
