@@ -44,6 +44,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context.h"
@@ -286,15 +287,10 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
         }
     }
 
-    if (state != PlanExecutor::IS_EOF) {
-        // If the plan executor was killed, this means the DB/collection was dropped and so it
-        // is not safe to cleanup the in-progress indexes.
-        if (state == PlanExecutor::DEAD) {
-            abortWithoutCleanup();
-        }
-
-        uasserted(28550, "Unable to complete index build as the collection is no longer readable");
-    }
+    uassert(28550,
+            "Unable to complete index build due to collection scan failure: " +
+                WorkingSetCommon::toStatusString(objToIndex.value()),
+            state == PlanExecutor::IS_EOF);
 
     progress->finished();
 

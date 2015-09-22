@@ -30,6 +30,7 @@
 
 #include "mongo/db/catalog/coll_mod.h"
 
+#include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
@@ -49,6 +50,10 @@ Status collMod(OperationContext* txn,
     AutoGetDb autoDb(txn, dbName, MODE_X);
     Database* const db = autoDb.getDb();
     Collection* coll = db ? db->getCollection(nss) : NULL;
+
+    // This can kill all cursors so don't allow running it while a background operation is in
+    // progress.
+    BackgroundOperation::assertNoBgOpInProgForNs(nss);
 
     // If db/collection does not exist, short circuit and return.
     if (!db || !coll) {

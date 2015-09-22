@@ -824,10 +824,15 @@ Status IndexCatalog::_dropIndex(OperationContext* txn, IndexCatalogEntry* entry)
     string indexName = entry->descriptor()->indexName();
     string indexNamespace = entry->descriptor()->indexNamespace();
 
-    // there may be pointers pointing at keys in the btree(s).  kill them.
-    // TODO: can this can only clear cursors on this index?
-    _collection->getCursorManager()->invalidateAll(
-        false, str::stream() << "index '" << indexName << "' dropped");
+    // If any cursors could be using this index, invalidate them. Note that we do not use indexes
+    // until they are ready, so we do not need to invalidate anything if the index fails while it is
+    // being built.
+    // TODO only kill cursors that are actually using the index rather than everything on this
+    // collection.
+    if (entry->isReady(txn)) {
+        _collection->getCursorManager()->invalidateAll(
+            false, str::stream() << "index '" << indexName << "' dropped");
+    }
 
     // --------- START REAL WORK ----------
     audit::logDropIndex(&cc(), indexName, _collection->ns().ns());
@@ -1060,6 +1065,7 @@ const IndexCatalogEntry* IndexCatalog::getEntry(const IndexDescriptor* desc) con
 const IndexDescriptor* IndexCatalog::refreshEntry(OperationContext* txn,
                                                   const IndexDescriptor* oldDesc) {
     invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+    invariant(!BackgroundOperation::inProgForNs(_collection->ns()));
 
     const std::string indexName = oldDesc->indexName();
     invariant(_collection->getCatalogEntry()->isIndexReady(txn, indexName));

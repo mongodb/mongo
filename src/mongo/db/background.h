@@ -64,6 +64,16 @@ public:
     static void awaitNoBgOpInProgForNs(StringData ns);
     static void dump(std::ostream&);
 
+    static bool inProgForNs(const NamespaceString& ns) {
+        return inProgForNs(ns.ns());
+    }
+    static void assertNoBgOpInProgForNs(const NamespaceString& ns) {
+        assertNoBgOpInProgForNs(ns.ns());
+    }
+    static void awaitNoBgOpInProgForNs(const NamespaceString& ns) {
+        awaitNoBgOpInProgForNs(ns.ns());
+    }
+
     /* check for in progress before instantiating */
     BackgroundOperation(StringData ns);
 
