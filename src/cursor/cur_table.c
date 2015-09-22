@@ -108,8 +108,7 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx,
 		extract_cursor.f = f;
 
 		WT_RET(__wt_cursor_get_raw_key(&ctable->iface, &key));
-		WT_RET(
-		    __wt_cursor_get_raw_value(&ctable->iface, &value));
+		WT_RET(__wt_cursor_get_raw_value(&ctable->iface, &value));
 		ret = idx->extractor->extract(idx->extractor,
 		    &session->iface, &key, &value,
 		    &extract_cursor.iface);
