@@ -291,8 +291,6 @@ static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_KV *, uint8_t, uint64_t);
 static int  __rec_cell_build_val(WT_SESSION_IMPL *,
 		WT_RECONCILE *, const void *, size_t, uint64_t);
-static int  __rec_child_deleted(
-		WT_SESSION_IMPL *, WT_RECONCILE *, WT_REF *, int *);
 static int  __rec_col_fix(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_col_fix_slvg(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_PAGE *, WT_SALVAGE_COOKIE *);
@@ -1034,23 +1032,152 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 }
 
 /*
- * CHILD_RELEASE --
+ * WT_CHILD_RELEASE, WT_CHILD_RELEASE_ERR --
  *	Macros to clean up during internal-page reconciliation, releasing the
  * hazard pointer we're holding on child pages.
  */
-#undef	CHILD_RELEASE
-#define	CHILD_RELEASE(session, hazard, ref) do {			\
+#define	WT_CHILD_RELEASE(session, hazard, ref) do {			\
 	if (hazard) {							\
 		hazard = 0;						\
 		WT_TRET(						\
 		    __wt_page_release(session, ref, WT_READ_NO_EVICT));	\
 	}								\
 } while (0)
-#undef	CHILD_RELEASE_ERR
-#define	CHILD_RELEASE_ERR(session, hazard, ref) do {			\
-	CHILD_RELEASE(session, hazard, ref);				\
+#define	WT_CHILD_RELEASE_ERR(session, hazard, ref) do {			\
+	WT_CHILD_RELEASE(session, hazard, ref);				\
 	WT_ERR(ret);							\
 } while (0)
+
+typedef enum {
+    WT_CHILD_IGNORE,				/* Deleted child: ignore */
+    WT_CHILD_MODIFIED,				/* Modified child */
+    WT_CHILD_ORIGINAL,				/* Original child */
+    WT_CHILD_PROXY				/* Deleted child: proxy */
+} WT_CHILD_STATE;
+
+/*
+ * __rec_child_deleted --
+ *	Handle pages with leaf pages in the WT_REF_DELETED state.
+ */
+static int
+__rec_child_deleted(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, WT_REF *ref, WT_CHILD_STATE *statep)
+{
+	WT_BM *bm;
+	WT_PAGE_DELETED *page_del;
+	size_t addr_size;
+	const uint8_t *addr;
+
+	page_del = ref->page_del;
+
+	/*
+	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
+	 * a special case during reconciliation.  First, if the deletion was a
+	 * result of a session truncate call, the deletion may not be visible to
+	 * us. In that case, we proceed as with any change not visible during
+	 * reconciliation by ignoring the change for the purposes of writing the
+	 * internal page.
+	 *
+	 * In this case, there must be an associated page-deleted structure, and
+	 * it holds the transaction ID we care about.
+	 *
+	 * In some cases, there had better not be any updates we can't see.
+	 */
+	if (F_ISSET(r, WT_SKIP_UPDATE_ERR) &&
+	    page_del != NULL && !__wt_txn_visible(session, page_del->txnid))
+		WT_PANIC_RET(session, EINVAL,
+		    "reconciliation illegally skipped an update");
+
+	/*
+	 * Deal with any underlying disk blocks.
+	 *
+	 * First, check to see if there is an address associated with this leaf:
+	 * if there isn't, we're done, the underlying page is already gone.  If
+	 * the page still exists, check for any transactions in the system that
+	 * might want to see the page's state before it's deleted.
+	 *
+	 * If any such transactions exist, we cannot discard the underlying leaf
+	 * page to the block manager because the transaction may eventually read
+	 * it.  However, this write might be part of a checkpoint, and should we
+	 * recover to that checkpoint, we'll need to delete the leaf page, else
+	 * we'd leak it.  The solution is to write a proxy cell on the internal
+	 * page ensuring the leaf page is eventually discarded.
+	 *
+	 * If no such transactions exist, we can discard the leaf page to the
+	 * block manager and no cell needs to be written at all.  We do this
+	 * outside of the underlying tracking routines because this action is
+	 * permanent and irrevocable.  (Clearing the address means we've lost
+	 * track of the disk address in a permanent way.  This is safe because
+	 * there's no path to reading the leaf page again: if there's ever a
+	 * read into this part of the name space again, the cache read function
+	 * instantiates an entirely new page.)
+	 */
+	if (ref->addr != NULL &&
+	    (page_del == NULL ||
+	    __wt_txn_visible_all(session, page_del->txnid))) {
+		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
+		bm = S2BT(session)->bm;
+		WT_RET(bm->free(bm, session, addr, addr_size));
+
+		if (__wt_off_page(ref->home, ref->addr)) {
+			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+			__wt_free(session, ref->addr);
+		}
+		ref->addr = NULL;
+	}
+
+	/*
+	 * If the original page is gone, we can skip the slot on the internal
+	 * page.
+	 */
+	if (ref->addr == NULL) {
+		*statep = WT_CHILD_IGNORE;
+
+		/*
+		 * Minor memory cleanup: if a truncate call deleted this page
+		 * and we were ever forced to instantiate the page in memory,
+		 * we would have built a list of updates in the page reference
+		 * in order to be able to abort the truncate.  It's a cheap
+		 * test to make that memory go away, we do it here because
+		 * there's really nowhere else we do the checks.  In short, if
+		 * we have such a list, and the backing address blocks are
+		 * gone, there can't be any transaction that can abort.
+		 */
+		if (page_del != NULL) {
+			__wt_free(session, ref->page_del->update_list);
+			__wt_free(session, ref->page_del);
+		}
+
+		return (0);
+	}
+
+	/*
+	 * Internal pages with deletes that aren't stable cannot be evicted, we
+	 * don't have sufficient information to restore the page's information
+	 * if subsequently read (we wouldn't know which transactions should see
+	 * the original page and which should see the deleted page).
+	 */
+	if (F_ISSET(r, WT_EVICTING))
+		return (EBUSY);
+
+	/*
+	 * If there are deleted child pages we can't discard immediately, keep
+	 * the page dirty so they are eventually freed.
+	 */
+	r->leave_dirty = 1;
+
+	/*
+	 * If the original page cannot be freed, we need to keep a slot on the
+	 * page to reference it from the parent page.
+	 *
+	 * If the delete is not visible in this checkpoint, write the original
+	 * address normally.  Otherwise, we have to write a proxy record.
+	 */
+	if (__wt_txn_visible(session, page_del->txnid))
+		*statep = WT_CHILD_PROXY;
+
+	return (0);
+}
 
 /*
  * __rec_child_modify --
@@ -1058,7 +1185,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
  */
 static int
 __rec_child_modify(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_REF *ref, int *hazardp, int *statep)
+    WT_RECONCILE *r, WT_REF *ref, int *hazardp, WT_CHILD_STATE *statep)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
@@ -1066,10 +1193,8 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 	/* We may acquire a hazard pointer our caller must release. */
 	*hazardp = 0;
 
-#define	WT_CHILD_IGNORE		1		/* Deleted child: ignore */
-#define	WT_CHILD_MODIFIED	2		/* Modified child */
-#define	WT_CHILD_PROXY		3		/* Deleted child: proxy */
-	*statep = 0;
+	/* Default to using the original child address. */
+	*statep = WT_CHILD_ORIGINAL;
 
 	/*
 	 * This function is called when walking an internal page to decide how
@@ -1215,119 +1340,11 @@ in_memory:
 		*statep = WT_CHILD_MODIFIED;
 	else if (ref->addr == NULL) {
 		*statep = WT_CHILD_IGNORE;
-		CHILD_RELEASE(session, *hazardp, ref);
+		WT_CHILD_RELEASE(session, *hazardp, ref);
 	}
 
 done:	WT_DIAGNOSTIC_YIELD;
 	return (ret);
-}
-
-/*
- * __rec_child_deleted --
- *	Handle pages with leaf pages in the WT_REF_DELETED state.
- */
-static int
-__rec_child_deleted(
-    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref, int *statep)
-{
-	WT_BM *bm;
-	WT_PAGE_DELETED *page_del;
-	size_t addr_size;
-	const uint8_t *addr;
-
-	bm = S2BT(session)->bm;
-	page_del = ref->page_del;
-
-	/*
-	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
-	 * a special case during reconciliation.  First, if the deletion was a
-	 * result of a session truncate call, the deletion may not be visible to
-	 * us.  In that case, we proceed as with any change that's not visible
-	 * during reconciliation by setting the skipped flag and ignoring the
-	 * change for the purposes of writing the internal page.
-	 *
-	 * In this case, there must be an associated page-deleted structure, and
-	 * it holds the transaction ID we care about.
-	 */
-	if (page_del != NULL && !__wt_txn_visible(session, page_del->txnid)) {
-		/*
-		 * In some cases, there had better not be any updates we can't
-		 * write.
-		 */
-		if (F_ISSET(r, WT_SKIP_UPDATE_ERR))
-			WT_PANIC_RET(session, EINVAL,
-			    "reconciliation illegally skipped an update");
-	}
-
-	/*
-	 * The deletion is visible to us, deal with any underlying disk blocks.
-	 *
-	 * First, check to see if there is an address associated with this leaf:
-	 * if there isn't, we're done, the underlying page is already gone.  If
-	 * the page still exists, check for any transactions in the system that
-	 * might want to see the page's state before it's deleted.
-	 *
-	 * If any such transactions exist, we cannot discard the underlying leaf
-	 * page to the block manager because the transaction may eventually read
-	 * it.  However, this write might be part of a checkpoint, and should we
-	 * recover to that checkpoint, we'll need to delete the leaf page, else
-	 * we'd leak it.  The solution is to write a proxy cell on the internal
-	 * page ensuring the leaf page is eventually discarded.
-	 *
-	 * If no such transactions exist, we can discard the leaf page to the
-	 * block manager and no cell needs to be written at all.  We do this
-	 * outside of the underlying tracking routines because this action is
-	 * permanent and irrevocable.  (Clearing the address means we've lost
-	 * track of the disk address in a permanent way.  This is safe because
-	 * there's no path to reading the leaf page again: if there's ever a
-	 * read into this part of the name space again, the cache read function
-	 * instantiates an entirely new page.)
-	 */
-	if (ref->addr != NULL &&
-	    (page_del == NULL ||
-	    __wt_txn_visible_all(session, page_del->txnid))) {
-		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
-		WT_RET(bm->free(bm, session, addr, addr_size));
-
-		if (__wt_off_page(ref->home, ref->addr)) {
-			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-			__wt_free(session, ref->addr);
-		}
-		ref->addr = NULL;
-	}
-
-	/*
-	 * If there are deleted child pages that we can't discard immediately,
-	 * keep the page dirty so they are eventually freed.
-	 */
-	if (ref->addr != NULL) {
-		r->leave_dirty = 1;
-
-		/* This page cannot be evicted, quit now. */
-		if (F_ISSET(r, WT_EVICTING))
-			return (EBUSY);
-	}
-
-	/*
-	 * Minor memory cleanup: if a truncate call deleted this page and we
-	 * were ever forced to instantiate the page in memory, we would have
-	 * built a list of updates in the page reference in order to be able
-	 * to abort the truncate.  It's a cheap test to make that memory go
-	 * away, we do it here because there's really nowhere else we do the
-	 * checks.  In short, if we have such a list, and the backing address
-	 * blocks are gone, there can't be any transaction that can abort.
-	 */
-	if (ref->addr == NULL && page_del != NULL) {
-		__wt_free(session, ref->page_del->update_list);
-		__wt_free(session, ref->page_del);
-	}
-
-	/*
-	 * If there's still a disk address, then we have to write a proxy
-	 * record, otherwise, we can safely ignore this child page.
-	 */
-	*statep = ref->addr == NULL ? WT_CHILD_IGNORE : WT_CHILD_PROXY;
-	return (0);
 }
 
 /*
@@ -3256,11 +3273,12 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_ADDR *addr;
 	WT_BTREE *btree;
 	WT_CELL_UNPACK *vpack, _vpack;
+	WT_CHILD_STATE state;
 	WT_DECL_RET;
 	WT_KV *val;
 	WT_PAGE *child;
 	WT_REF *ref;
-	int hazard, state;
+	int hazard;
 
 	btree = S2BT(session);
 	child = NULL;
@@ -3286,17 +3304,16 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		addr = NULL;
 		child = ref->page;
 
-		/* Deleted child we don't have to write. */
-		if (state == WT_CHILD_IGNORE) {
-			CHILD_RELEASE_ERR(session, hazard, ref);
+		switch (state) {
+		case WT_CHILD_IGNORE:
+			/* Deleted child we don't have to write. */
+			WT_CHILD_RELEASE_ERR(session, hazard, ref);
 			continue;
-		}
-
-		/*
-		 * Modified child.  Empty pages are merged into the parent and
-		 * discarded.
-		 */
-		if (state == WT_CHILD_MODIFIED) {
+		case WT_CHILD_MODIFIED:
+			/*
+			 * Modified child. Empty pages are merged into the
+			 * parent and discarded.
+			 */
 			switch (F_ISSET(child->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -3305,11 +3322,11 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * name space.  The exceptions are pages created
 				 * when the tree is created, and never filled.
 				 */
-				CHILD_RELEASE_ERR(session, hazard, ref);
+				WT_CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_MULTIBLOCK:
 				WT_ERR(__rec_col_merge(session, r, child));
-				CHILD_RELEASE_ERR(session, hazard, ref);
+				WT_CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_REPLACE:
 				addr = &child->modify->mod_replace;
@@ -3318,9 +3335,18 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
-		} else
-			/* No other states are expected for column stores. */
-			WT_ASSERT(session, state == 0);
+			break;
+		case WT_CHILD_ORIGINAL:
+			/* Original child. */
+			break;
+		case WT_CHILD_PROXY:
+			/*
+			 * Deleted child where we write a proxy cell, not
+			 * yet supported for column-store.
+			 */
+			ret = __wt_illegal_value(session, NULL);
+			goto err;
+		}
 
 		/*
 		 * Build the value cell.  The child page address is in one of 3
@@ -3342,7 +3368,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		} else
 			__rec_cell_build_addr(r, addr->addr, addr->size,
 			    __rec_vtype(addr), ref->key.recno);
-		CHILD_RELEASE_ERR(session, hazard, ref);
+		WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/* Boundary: split or write the page. */
 		if (val->len > r->space_avail)
@@ -3357,7 +3383,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
 
-err:	CHILD_RELEASE(session, hazard, ref);
+err:	WT_CHILD_RELEASE(session, hazard, ref);
 	return (ret);
 }
 
@@ -4030,6 +4056,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *kpack, _kpack, *vpack, _vpack;
+	WT_CHILD_STATE state;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_KV *key, *val;
@@ -4037,7 +4064,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_REF *ref;
 	size_t size;
 	u_int vtype;
-	int hazard, key_onpage_ovfl, ovfl_key, state;
+	int hazard, key_onpage_ovfl, ovfl_key;
 	const void *p;
 
 	btree = S2BT(session);
@@ -4097,9 +4124,11 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		addr = ref->addr;
 		child = ref->page;
 
-		/* Deleted child we don't have to write. */
-		if (state == WT_CHILD_IGNORE) {
+		switch (state) {
+		case WT_CHILD_IGNORE:
 			/*
+			 * Deleted child we don't have to write.
+			 *
 			 * Overflow keys referencing discarded pages are no
 			 * longer useful, schedule them for discard.  Don't
 			 * worry about instantiation, internal page keys are
@@ -4109,15 +4138,13 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			if (key_onpage_ovfl)
 				WT_ERR(__wt_ovfl_discard_add(
 				    session, page, kpack->cell));
-			CHILD_RELEASE_ERR(session, hazard, ref);
+			WT_CHILD_RELEASE_ERR(session, hazard, ref);
 			continue;
-		}
-
-		/*
-		 * Modified child.  Empty pages are merged into the parent and
-		 * discarded.
-		 */
-		if (state == WT_CHILD_MODIFIED)
+		case WT_CHILD_MODIFIED:
+			/*
+			 * Modified child. Empty pages are merged into the
+			 * parent and discarded.
+			 */
 			switch (F_ISSET(child->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -4131,7 +4158,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				if (key_onpage_ovfl)
 					WT_ERR(__wt_ovfl_discard_add(
 					    session, page, kpack->cell));
-				CHILD_RELEASE_ERR(session, hazard, ref);
+				WT_CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_MULTIBLOCK:
 				/*
@@ -4148,7 +4175,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 					    session, page, kpack->cell));
 
 				WT_ERR(__rec_row_merge(session, r, child));
-				CHILD_RELEASE_ERR(session, hazard, ref);
+				WT_CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_REPLACE:
 				/*
@@ -4159,6 +4186,14 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
+			break;
+		case WT_CHILD_ORIGINAL:
+			/* Original child. */
+			break;
+		case WT_CHILD_PROXY:
+			/* Deleted child where we write a proxy cell. */
+			break;
+		}
 
 		/*
 		 * Build the value cell, the child page's address.  Addr points
@@ -4180,7 +4215,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			    WT_CELL_ADDR_DEL : (u_int)vpack->raw;
 		}
 		__rec_cell_build_addr(r, p, size, vtype, 0);
-		CHILD_RELEASE_ERR(session, hazard, ref);
+		WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/*
 		 * Build key cell.
@@ -4232,7 +4267,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
 
-err:	CHILD_RELEASE(session, hazard, ref);
+err:	WT_CHILD_RELEASE(session, hazard, ref);
 	return (ret);
 }
 
