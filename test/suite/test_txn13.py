@@ -82,7 +82,7 @@ class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
 
         if self.expect_err:
             # EFBIG is expected: File too large
-            msg = '/too large/'
+            msg = '/exceeds the maximum/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda:self.session.commit_transaction(), msg)
             gotException = True
