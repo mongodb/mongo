@@ -283,7 +283,6 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
 
 void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(const Timestamp& newTime) {
     setNewTimestamp(newTime);
-    forceSnapshotCreation();
 }
 
 StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(OperationContext* txn) {

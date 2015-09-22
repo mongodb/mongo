@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/stdx/functional.h"
@@ -72,12 +71,9 @@ private:
     explicit SnapshotThread(SnapshotManager* manager);
     void run();
 
-    stdx::mutex _mutex;  // Must be first, and def. before _thread.
-
     SnapshotManager* const _manager;
-    bool _inShutdown = false;             // guarded by _mutex.
-    bool _forcedSnapshotPending = false;  // guarded by _mutex.
-    std::shared_ptr<CappedInsertNotifier> _notifier;
+    bool _inShutdown = false;             // guarded by newOpMutex in oplog.cpp.
+    bool _forcedSnapshotPending = false;  // guarded by newOpMutex in oplog.cpp.
     stdx::thread _thread;
 };
 
