@@ -331,6 +331,17 @@ __wt_conn_btree_open(
 	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
 
 	WT_ERR(__wt_btree_open(session, cfg));
+
+	/*
+	 * Bulk handles require true exclusive access, otherwise, handles
+	 * marked as exclusive are allowed to be relocked by the same
+	 * session.
+	 */
+	if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
+	    !LF_ISSET(WT_BTREE_BULK)) {
+		dhandle->excl_session = session;
+		dhandle->excl_ref = 1;
+	}
 	F_SET(dhandle, WT_DHANDLE_OPEN);
 
 	/*

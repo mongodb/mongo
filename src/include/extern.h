@@ -307,6 +307,7 @@ extern int __wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp);
 extern int __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config);
 extern int __wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor);
 extern int __wt_cursor_init(WT_CURSOR *cursor, const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp);
+extern int __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx, WT_CURSOR *cur, WT_CURSOR_TABLE *ctable, int (*f)(WT_CURSOR *));
 extern int __wt_curtable_get_key(WT_CURSOR *cursor, ...);
 extern int __wt_curtable_get_value(WT_CURSOR *cursor, ...);
 extern void __wt_curtable_set_key(WT_CURSOR *cursor, ...);
