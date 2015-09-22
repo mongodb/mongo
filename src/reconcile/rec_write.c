@@ -1320,21 +1320,19 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 }
 
 /*
- * CHILD_RELEASE --
+ * WT_CHILD_RELEASE, WT_CHILD_RELEASE_ERR --
  *	Macros to clean up during internal-page reconciliation, releasing the
  * hazard pointer we're holding on child pages.
  */
-#undef	CHILD_RELEASE
-#define	CHILD_RELEASE(session, hazard, ref) do {			\
+#define	WT_CHILD_RELEASE(session, hazard, ref) do {			\
 	if (hazard) {							\
 		hazard = 0;						\
 		WT_TRET(						\
 		    __wt_page_release(session, ref, WT_READ_NO_EVICT));	\
 	}								\
 } while (0)
-#undef	CHILD_RELEASE_ERR
-#define	CHILD_RELEASE_ERR(session, hazard, ref) do {			\
-	CHILD_RELEASE(session, hazard, ref);				\
+#define	WT_CHILD_RELEASE_ERR(session, hazard, ref) do {			\
+	WT_CHILD_RELEASE(session, hazard, ref);				\
 	WT_ERR(ret);							\
 } while (0)
 
@@ -1628,7 +1626,7 @@ in_memory:
 		*statep = WT_CHILD_MODIFIED;
 	else if (ref->addr == NULL) {
 		*statep = WT_CHILD_IGNORE;
-		CHILD_RELEASE(session, *hazardp, ref);
+		WT_CHILD_RELEASE(session, *hazardp, ref);
 	}
 
 done:	WT_DIAGNOSTIC_YIELD;
@@ -3774,7 +3772,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		switch (state) {
 		case WT_CHILD_IGNORE:
 			/* Deleted child we don't have to write. */
-			CHILD_RELEASE_ERR(session, hazard, ref);
+			WT_CHILD_RELEASE_ERR(session, hazard, ref);
 			continue;
 		case WT_CHILD_MODIFIED:
 			/*
@@ -3789,11 +3787,11 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * name space.  The exceptions are pages created
 				 * when the tree is created, and never filled.
 				 */
-				CHILD_RELEASE_ERR(session, hazard, ref);
+				WT_CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_MULTIBLOCK:
 				WT_ERR(__rec_col_merge(session, r, child));
-				CHILD_RELEASE_ERR(session, hazard, ref);
+				WT_CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_REPLACE:
 				addr = &child->modify->mod_replace;
@@ -3835,7 +3833,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		} else
 			__rec_cell_build_addr(r, addr->addr, addr->size,
 			    __rec_vtype(addr), ref->key.recno);
-		CHILD_RELEASE_ERR(session, hazard, ref);
+		WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/* Boundary: split or write the page. */
 		if (val->len > r->space_avail)
@@ -3850,7 +3848,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
 
-err:	CHILD_RELEASE(session, hazard, ref);
+err:	WT_CHILD_RELEASE(session, hazard, ref);
 	return (ret);
 }
 
@@ -4620,7 +4618,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			if (key_onpage_ovfl)
 				WT_ERR(__wt_ovfl_discard_add(
 				    session, page, kpack->cell));
-			CHILD_RELEASE_ERR(session, hazard, ref);
+			WT_CHILD_RELEASE_ERR(session, hazard, ref);
 			continue;
 		case WT_CHILD_MODIFIED:
 			/*
@@ -4640,7 +4638,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				if (key_onpage_ovfl)
 					WT_ERR(__wt_ovfl_discard_add(
 					    session, page, kpack->cell));
-				CHILD_RELEASE_ERR(session, hazard, ref);
+				WT_CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_MULTIBLOCK:
 				/*
@@ -4657,7 +4655,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 					    session, page, kpack->cell));
 
 				WT_ERR(__rec_row_merge(session, r, child));
-				CHILD_RELEASE_ERR(session, hazard, ref);
+				WT_CHILD_RELEASE_ERR(session, hazard, ref);
 				continue;
 			case WT_PM_REC_REPLACE:
 				/*
@@ -4697,7 +4695,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			    WT_CELL_ADDR_DEL : (u_int)vpack->raw;
 		}
 		__rec_cell_build_addr(r, p, size, vtype, WT_RECNO_OOB);
-		CHILD_RELEASE_ERR(session, hazard, ref);
+		WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/*
 		 * Build key cell.
@@ -4749,7 +4747,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* Write the remnant page. */
 	return (__rec_split_finish(session, r));
 
-err:	CHILD_RELEASE(session, hazard, ref);
+err:	WT_CHILD_RELEASE(session, hazard, ref);
 	return (ret);
 }
 
