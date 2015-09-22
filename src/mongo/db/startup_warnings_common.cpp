@@ -75,6 +75,13 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
         warned = true;
     }
 
+    const bool is32bit = sizeof(int*) == 4;
+    if (is32bit) {
+        log() << startupWarningsLog;
+        log() << "** WARNING: This 32-bit MongoDB binary is deprecated" << startupWarningsLog;
+        warned = true;
+    }
+
 #if defined(_WIN32) && !defined(_WIN64)
     // Warn user that they are running a 32-bit app on 64-bit Windows
     BOOL wow64Process;
