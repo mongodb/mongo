@@ -31,6 +31,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -49,31 +50,66 @@ Status ShardingNetworkConnectionHook::validateHost(
 
 Status ShardingNetworkConnectionHook::validateHostImpl(
     const HostAndPort& remoteHost, const executor::RemoteCommandResponse& isMasterReply) {
-    long long configServerModeNumber;
-    Status status =
-        bsonExtractIntegerField(isMasterReply.data, "configsvr", &configServerModeNumber);
-
-    if (status == ErrorCodes::NoSuchKey) {
-        // This isn't a config server we're talking to.
-        return Status::OK();
-    } else if (!status.isOK()) {
-        return status;
+    auto shard = grid.shardRegistry()->getShardNoReload(remoteHost.toString());
+    if (!shard) {
+        return {ErrorCodes::ShardNotFound,
+                str::stream() << "No shard found for host: " << remoteHost.toString()};
     }
 
-    BSONElement setName = isMasterReply.data["setName"];
-    return grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
-        configServerModeNumber == 0 ? CatalogManager::ConfigServerMode::SCCC
-                                    : CatalogManager::ConfigServerMode::CSRS,
-        setName.type() == String ? setName.valueStringData() : StringData(),
-        remoteHost);
+    long long configServerModeNumber;
+    auto status = bsonExtractIntegerField(isMasterReply.data, "configsvr", &configServerModeNumber);
+
+    switch (status.code()) {
+        case ErrorCodes::OK: {
+            // The ismaster response indicates remoteHost is a config server.
+            if (!shard->isConfig()) {
+                return {ErrorCodes::InvalidOptions,
+                        str::stream() << "Surprised to discover that " << remoteHost.toString()
+                                      << " believes it is a config server"};
+            }
+            using ConfigServerMode = CatalogManager::ConfigServerMode;
+            const BSONElement setName = isMasterReply.data["setName"];
+            return grid.forwardingCatalogManager()->scheduleReplaceCatalogManagerIfNeeded(
+                (configServerModeNumber == 0 ? ConfigServerMode::SCCC : ConfigServerMode::CSRS),
+                (setName.type() == String ? setName.valueStringData() : StringData()),
+                remoteHost);
+        }
+        case ErrorCodes::NoSuchKey: {
+            // The ismaster response indicates that remoteHost is not a config server, or that
+            // the config server is running a version prior to the 3.1 development series.
+            if (!shard->isConfig()) {
+                return Status::OK();
+            }
+            long long remoteMaxWireVersion;
+            status = bsonExtractIntegerFieldWithDefault(isMasterReply.data,
+                                                        "maxWireVersion",
+                                                        RELEASE_2_4_AND_BEFORE,
+                                                        &remoteMaxWireVersion);
+            if (!status.isOK()) {
+                return status;
+            }
+            if (remoteMaxWireVersion < FIND_COMMAND) {
+                // Prior to the introduction of the find command and the 3.1 release series, it was
+                // not possible to distinguish a config server from a shard server from its ismaster
+                // response. As such, we must assume that the system is properly configured.
+                return Status::OK();
+            }
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "Surprised to discover that " << remoteHost.toString()
+                                  << " does not believe it is a config server"};
+        }
+        default:
+            // The ismaster response was malformed.
+            return status;
+    }
 }
 
 StatusWith<boost::optional<executor::RemoteCommandRequest>>
 ShardingNetworkConnectionHook::makeRequest(const HostAndPort& remoteHost) {
     auto shard = grid.shardRegistry()->getShardNoReload(remoteHost.toString());
     if (!shard) {
-        return Status(ErrorCodes::ShardNotFound,
-                      str::stream() << "No shard found for host: " << remoteHost.toString());
+        return {ErrorCodes::ShardNotFound,
+                str::stream() << "No shard found for host: " << remoteHost.toString()};
     }
     if (shard->isConfig()) {
         // No need to initialize sharding metadata if talking to a config server
