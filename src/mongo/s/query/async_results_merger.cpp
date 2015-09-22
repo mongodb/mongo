@@ -298,6 +298,27 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() 
     return eventToReturn;
 }
 
+StatusWith<CursorResponse> AsyncResultsMerger::parseCursorResponse(const BSONObj& responseObj,
+                                                                   const RemoteCursorData& remote) {
+    auto getMoreParseStatus = CursorResponse::parseFromBSON(responseObj);
+    if (!getMoreParseStatus.isOK()) {
+        return getMoreParseStatus.getStatus();
+    }
+
+    auto cursorResponse = getMoreParseStatus.getValue();
+
+    // If we have a cursor established, and we get a non-zero cursor id that is not equal to the
+    // established cursor id, we will fail the operation.
+    if (remote.cursorId && cursorResponse.cursorId != 0 &&
+        *remote.cursorId != cursorResponse.cursorId) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Expected cursorid " << *remote.cursorId << " but received "
+                                    << cursorResponse.cursorId);
+    }
+
+    return cursorResponse;
+}
+
 void AsyncResultsMerger::handleBatchResponse(
     const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData, size_t remoteIndex) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -314,6 +335,15 @@ void AsyncResultsMerger::handleBatchResponse(
 
         // Make sure to wake up anyone waiting on '_currentEvent' if we're shutting down.
         signalCurrentEventIfReady_inlock();
+
+        // Make a best effort to parse the response and retrieve the cursor id. We need the cursor
+        // id in order to issue a killCursors command against it.
+        if (cbData.response.isOK()) {
+            auto cursorResponse = parseCursorResponse(cbData.response.getValue().data, remote);
+            if (cursorResponse.isOK()) {
+                remote.cursorId = cursorResponse.getValue().cursorId;
+            }
+        }
 
         // If we're killed and we're not waiting on any more batches to come back, then we are ready
         // to kill the cursors on the remote hosts and clean up this cursor. Schedule the
@@ -356,24 +386,13 @@ void AsyncResultsMerger::handleBatchResponse(
         return;
     }
 
-    auto getMoreParseStatus = CursorResponse::parseFromBSON(cbData.response.getValue().data);
-    if (!getMoreParseStatus.isOK()) {
-        remote.status = getMoreParseStatus.getStatus();
+    auto cursorResponseStatus = parseCursorResponse(cbData.response.getValue().data, remote);
+    if (!cursorResponseStatus.isOK()) {
+        remote.status = cursorResponseStatus.getStatus();
         return;
     }
 
-    auto cursorResponse = getMoreParseStatus.getValue();
-
-    // If we have a cursor established, and we get a non-zero cursorid that is not equal to the
-    // established cursorid, we will fail the operation.
-    if (remote.cursorId && cursorResponse.cursorId != 0 &&
-        *remote.cursorId != cursorResponse.cursorId) {
-        remote.status = Status(ErrorCodes::BadValue,
-                               str::stream() << "Expected cursorid " << *remote.cursorId
-                                             << " but received " << cursorResponse.cursorId);
-        return;
-    }
-
+    auto cursorResponse = cursorResponseStatus.getValue();
     remote.cursorId = cursorResponse.cursorId;
     remote.cmdObj = boost::none;
 
@@ -475,13 +494,6 @@ executor::TaskExecutor::EventHandle AsyncResultsMerger::kill() {
     }
 
     _lifecycleState = kKillStarted;
-
-    // Cancel callbacks.
-    for (const auto& remote : _remotes) {
-        if (remote.cbHandle.isValid()) {
-            _executor->cancel(remote.cbHandle);
-        }
-    }
 
     // Make '_killCursorsScheduledEvent', which we will signal as soon as we have scheduled a
     // killCursors command to run on all the remote shards.

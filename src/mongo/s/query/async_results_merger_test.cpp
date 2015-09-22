@@ -167,13 +167,6 @@ protected:
         net->exitNetwork();
     }
 
-    void runReadyNetworkOperations() {
-        executor::NetworkInterfaceMock* net = getNet();
-        net->enterNetwork();
-        net->runReadyNetworkOperations();
-        net->exitNetwork();
-    }
-
     const NamespaceString _nss;
     const std::vector<HostAndPort> _remotes;
 
@@ -822,8 +815,67 @@ TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
     // Kill event will only be signalled once the pending batches are received.
     auto killedEvent = arm->kill();
 
-    // Ensures that callbacks run with a cancelled status.
-    runReadyNetworkOperations();
+    // After the kill, the ARM waits for outstanding batches to come back. This ensures that we
+    // receive cursor ids for any established remote cursors, and can clean them up by issuing
+    // killCursors commands.
+    responses.clear();
+    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
+    responses.emplace_back(_nss, CursorId(123), batch2);
+    std::vector<BSONObj> batch3 = {fromjson("{_id: 4}"), fromjson("{_id: 5}")};
+    responses.emplace_back(_nss, CursorId(0), batch2);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+
+    // Only one of the responses has a non-zero cursor id. The ARM should have issued a killCursors
+    // command against this id.
+    BSONObj expectedCmdObj = BSON("killCursors"
+                                  << "testcoll"
+                                  << "cursors" << BSON_ARRAY(CursorId(123)));
+    ASSERT_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
+
+    // Ensure that we properly signal both those waiting for the kill, and those waiting for more
+    // results to be ready.
+    executor->waitForEvent(readyEvent);
+    executor->waitForEvent(killedEvent);
+}
+
+TEST_F(AsyncResultsMergerTest, KillOutstandingGetMore) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
+    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+    responses.emplace_back(_nss, CursorId(123), batch1);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+
+    // First batch received.
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()));
+
+    // This will schedule a getMore on cursor id 123.
+    ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    auto killedEvent = arm->kill();
+
+    // The kill can't complete until the getMore response is received.
+    responses.clear();
+    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
+    responses.emplace_back(_nss, CursorId(123), batch2);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+
+    // While processing the getMore response, a killCursors against id 123 should have been
+    // scheduled.
+    BSONObj expectedCmdObj = BSON("killCursors"
+                                  << "testcoll"
+                                  << "cursors" << BSON_ARRAY(CursorId(123)));
+    ASSERT_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
 
     // Ensure that we properly signal both those waiting for the kill, and those waiting for more
     // results to be ready.

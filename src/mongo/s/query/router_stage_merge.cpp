@@ -41,9 +41,6 @@ RouterStageMerge::RouterStageMerge(executor::TaskExecutor* executor,
     : _executor(executor), _arm(executor, std::move(params)) {}
 
 StatusWith<boost::optional<BSONObj>> RouterStageMerge::next() {
-    // On error, kill the underlying async results merger.
-    auto killer = MakeGuard(&RouterStageMerge::kill, this);
-
     while (!_arm.ready()) {
         auto nextEventStatus = _arm.nextEvent();
         if (!nextEventStatus.isOK()) {
@@ -55,11 +52,7 @@ StatusWith<boost::optional<BSONObj>> RouterStageMerge::next() {
         _executor->waitForEvent(event);
     }
 
-    auto statusWithNext = _arm.nextReady();
-    if (statusWithNext.isOK()) {
-        killer.Dismiss();
-    }
-    return statusWithNext;
+    return _arm.nextReady();
 }
 
 void RouterStageMerge::kill() {

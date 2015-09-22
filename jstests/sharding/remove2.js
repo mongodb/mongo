@@ -78,9 +78,6 @@ var st = new ShardingTest({ shards: {
                                 enableBalancer: true
                             }});
 
-// TODO: SERVER-20194. This test forces use of the old mongos query path.
-assert.commandWorked(st.s.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-
 // Pending resolution of SERVER-8598, we need to wait for deletion after chunk migrations to avoid
 // a pending delete re-creating a database after it was dropped.
 st.s.getDB("config").settings.update( { _id: "balancer" },
