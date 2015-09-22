@@ -53,7 +53,7 @@ struct ClusterClientCursorParams {
         /**
          * Use when a new cursor should be created on the remote.
          */
-        Remote(HostAndPort hostAndPort, ShardId sid, BSONObj cmdObj)
+        Remote(HostAndPort hostAndPort, boost::optional<ShardId> sid, BSONObj cmdObj)
             : hostAndPort(std::move(hostAndPort)),
               shardId(std::move(sid)),
               cmdObj(std::move(cmdObj)) {}
@@ -126,6 +126,10 @@ struct ClusterClientCursorParams {
     // Whether any of the remote nodes might be secondaries due to a read preference mode other
     // than "primary".
     bool isSecondaryOk = false;
+
+    // Whether the client indicated that it is willing to receive partial results in the case of an
+    // unreachable host.
+    bool isAllowPartialResults = false;
 };
 
 }  // mongo

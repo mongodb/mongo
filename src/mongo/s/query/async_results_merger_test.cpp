@@ -86,10 +86,16 @@ protected:
         params.batchSize = getMoreBatchSize ? getMoreBatchSize : lpq->getBatchSize();
         params.skip = lpq->getSkip();
         params.isTailable = lpq->isTailable();
+        params.isAllowPartialResults = lpq->isAllowPartialResults();
         params.isSecondaryOk = isSecondaryOk;
 
         for (const auto& hostAndPort : remotes) {
-            params.remotes.emplace_back(hostAndPort, "testShard", findCmd);
+            // Pass boost::none in place of a ShardId. If there is a ShardId and the ARM receives an
+            // UnreachableHost error, it will attempt to look inside the shard registry in order to
+            // find the Shard to which the host belongs and notify it of the unreachable host. Since
+            // this text fixture is not passing down the shard registry (or an OperationContext),
+            // we must skip this unreachable host handling.
+            params.remotes.emplace_back(hostAndPort, boost::none, findCmd);
         }
 
         arm = stdx::make_unique<AsyncResultsMerger>(executor, params);
@@ -1041,6 +1047,96 @@ TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
 
     ASSERT_TRUE(arm->ready());
     ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT(!unittest::assertGet(arm->nextReady()));
+}
+
+TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', allowPartialResults: true}");
+    makeCursorFromFindCmd(findCmd, _remotes);
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // The network layer reports that the first host is unreachable.
+    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
+    ASSERT_FALSE(arm->ready());
+
+    // Instead of propagating the error, we should be willing to return results from the two
+    // remaining shards.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}")};
+    responses.emplace_back(_nss, CursorId(98), batch1);
+    std::vector<BSONObj> batch2 = {fromjson("{_id: 2}")};
+    responses.emplace_back(_nss, CursorId(99), batch2);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()));
+
+    ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Now the second host becomes unreachable. We should still be willing to return results from
+    // the third shard.
+    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
+    ASSERT_FALSE(arm->ready());
+
+    responses.clear();
+    std::vector<BSONObj> batch3 = {fromjson("{_id: 3}")};
+    responses.emplace_back(_nss, CursorId(99), batch3);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()));
+
+    ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Once the last reachable shard indicates that its cursor is closed, we're done.
+    responses.clear();
+    std::vector<BSONObj> batch4 = {};
+    responses.emplace_back(_nss, CursorId(0), batch4);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT(!unittest::assertGet(arm->nextReady()));
+}
+
+TEST_F(AsyncResultsMergerTest, AllowPartialResultsSingleNode) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', allowPartialResults: true}");
+    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+    responses.emplace_back(_nss, CursorId(98), batch);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()));
+
+    ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // The lone host involved in this query becomes unreachable. This should simply cause us to
+    // return EOF.
+    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
     ASSERT_TRUE(arm->ready());
     ASSERT(!unittest::assertGet(arm->nextReady()));
 }

@@ -218,6 +218,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     params.skip = query.getParsed().getSkip();
     params.isTailable = query.getParsed().isTailable();
     params.isSecondaryOk = (readPref.pref != ReadPreference::PrimaryOnly);
+    params.isAllowPartialResults = query.getParsed().isAllowPartialResults();
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
     // usually use the batchSize associated with the initial find, but as it is illegal to send a

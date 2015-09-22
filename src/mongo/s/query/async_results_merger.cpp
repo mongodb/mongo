@@ -369,9 +369,14 @@ void AsyncResultsMerger::handleBatchResponse(
     if (!cbData.response.isOK()) {
         remote.status = cbData.response.getStatus();
 
-        // If we failed to retrieve the batch because we couldn't contact the remote, we notify that
-        // targeter that the host is unreachable. The caller can then retry on a new host.
-        if (remote.status == ErrorCodes::HostUnreachable && remote.shardId) {
+        // Errors other than HostUnreachable have no special handling.
+        if (remote.status != ErrorCodes::HostUnreachable) {
+            return;
+        }
+
+        // Notify that targeter that the host is unreachable. The caller can then retry on a new
+        // host.
+        if (remote.shardId) {
             auto shard = _params.shardRegistry->getShard(_params.txn, *remote.shardId);
             if (!shard) {
                 remote.status =
@@ -381,6 +386,17 @@ void AsyncResultsMerger::handleBatchResponse(
             } else {
                 shard->getTargeter()->markHostUnreachable(remote.hostAndPort);
             }
+        }
+
+        // Unreachable host errors are swallowed if the 'allowPartialResults' option is set. We
+        // remove the unreachable host entirely from consideration by marking it as exhausted.
+        if (_params.isAllowPartialResults) {
+            remote.status = Status::OK();
+
+            // Clear the results buffer and cursor id.
+            std::queue<BSONObj> emptyBuffer;
+            std::swap(remote.docBuffer, emptyBuffer);
+            remote.cursorId = 0;
         }
 
         return;
