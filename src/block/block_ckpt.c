@@ -44,7 +44,7 @@ __wt_block_ckpt_init(
 int
 __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
     const uint8_t *addr, size_t addr_size,
-    uint8_t *root_addr, size_t *root_addr_sizep, int checkpoint)
+    uint8_t *root_addr, size_t *root_addr_sizep, bool checkpoint)
 {
 	WT_BLOCK_CKPT *ci, _ci;
 	WT_DECL_ITEM(tmp);
@@ -217,7 +217,7 @@ __wt_block_ckpt_destroy(WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci)
  */
 int
 __wt_block_checkpoint(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *buf, WT_CKPT *ckptbase, int data_cksum)
+    WT_BLOCK *block, WT_ITEM *buf, WT_CKPT *ckptbase, bool data_cksum)
 {
 	WT_BLOCK_CKPT *ci;
 	WT_DECL_RET;
@@ -242,7 +242,7 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	} else
 		WT_ERR(__wt_block_write_off(session, block, buf,
 		    &ci->root_offset, &ci->root_size, &ci->root_cksum,
-		    data_cksum, 0));
+		    data_cksum, false));
 
 	/*
 	 * Checkpoints are potentially reading/writing/merging lots of blocks,

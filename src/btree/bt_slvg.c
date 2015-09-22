@@ -365,7 +365,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	const WT_PAGE_HEADER *dsk;
 	size_t addr_size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
-	int eof, valid;
+	bool eof, valid;
 
 	bm = S2BT(session)->bm;
 	WT_ERR(__wt_scr_alloc(session, 0, &as));
@@ -391,9 +391,9 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * Report the block's status to the block manager.
 		 */
 		if ((ret = __wt_bt_read(session, buf, addr, addr_size)) == 0)
-			valid = 1;
+			valid = true;
 		else {
-			valid = 0;
+			valid = false;
 			if (ret == WT_ERROR)
 				ret = 0;
 			WT_ERR(ret);

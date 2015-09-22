@@ -1151,7 +1151,7 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Should have an underlying block manager reference. */
 	WT_ASSERT(session, bm != NULL);
 
-	return (bm->sync(bm, session, 0));
+	return (bm->sync(bm, session, false));
 }
 
 /*

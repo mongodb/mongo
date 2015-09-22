@@ -94,7 +94,7 @@ __wt_block_offset_invalid(WT_BLOCK *block, wt_off_t offset, uint32_t size)
  */
 int
 __wt_block_salvage_next(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, uint8_t *addr, size_t *addr_sizep, int *eofp)
+    WT_BLOCK *block, uint8_t *addr, size_t *addr_sizep, bool *eofp)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_ITEM(tmp);

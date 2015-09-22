@@ -1315,8 +1315,8 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 #endif
 
 	/* Write the extent list to disk. */
-	WT_ERR(__wt_block_write_off(
-	    session, block, tmp, &el->offset, &el->size, &el->cksum, 1, 1));
+	WT_ERR(__wt_block_write_off(session,
+	    block, tmp, &el->offset, &el->size, &el->cksum, true, true));
 
 	/*
 	 * Remove the allocated blocks from the system's allocation list, extent

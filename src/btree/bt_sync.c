@@ -221,7 +221,7 @@ err:	/* On error, clear any left-over tree walk. */
 	 * but don't wait for it.
 	 */
 	if (ret == 0 && syncop == WT_SYNC_WRITE_LEAVES)
-		WT_RET(btree->bm->sync(btree->bm, session, 1));
+		WT_RET(btree->bm->sync(btree->bm, session, true));
 
 	return (ret);
 }

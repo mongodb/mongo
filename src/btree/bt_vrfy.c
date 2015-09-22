@@ -205,7 +205,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		/* Load the checkpoint. */
 		WT_ERR(bm->checkpoint_load(bm, session,
 		    ckpt->raw.data, ckpt->raw.size,
-		    root_addr, &root_addr_size, 1));
+		    root_addr, &root_addr_size, true));
 
 		/*
 		 * Ignore trees with no root page.

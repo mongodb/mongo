@@ -161,9 +161,9 @@ struct __wt_bm {
 	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, size_t);
 	u_int (*block_header)(WT_BM *);
 	int (*checkpoint)
-	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_CKPT *, int);
+	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_CKPT *, bool);
 	int (*checkpoint_load)(WT_BM *, WT_SESSION_IMPL *,
-	    const uint8_t *, size_t, uint8_t *, size_t *, int);
+	    const uint8_t *, size_t, uint8_t *, size_t *, bool);
 	int (*checkpoint_resolve)(WT_BM *, WT_SESSION_IMPL *);
 	int (*checkpoint_unload)(WT_BM *, WT_SESSION_IMPL *);
 	int (*close)(WT_BM *, WT_SESSION_IMPL *);
@@ -178,18 +178,18 @@ struct __wt_bm {
 	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, size_t);
 	int (*salvage_end)(WT_BM *, WT_SESSION_IMPL *);
 	int (*salvage_next)
-	    (WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t *, int *);
+	    (WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t *, bool *);
 	int (*salvage_start)(WT_BM *, WT_SESSION_IMPL *);
 	int (*salvage_valid)
-	    (WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t, int);
+	    (WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t, bool);
 	int (*stat)(WT_BM *, WT_SESSION_IMPL *, WT_DSRC_STATS *stats);
-	int (*sync)(WT_BM *, WT_SESSION_IMPL *, int);
+	int (*sync)(WT_BM *, WT_SESSION_IMPL *, bool);
 	int (*verify_addr)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
 	int (*verify_end)(WT_BM *, WT_SESSION_IMPL *);
 	int (*verify_start)
 	    (WT_BM *, WT_SESSION_IMPL *, WT_CKPT *, const char *[]);
 	int (*write) (WT_BM *,
-	    WT_SESSION_IMPL *, WT_ITEM *, uint8_t *, size_t *, int);
+	    WT_SESSION_IMPL *, WT_ITEM *, uint8_t *, size_t *, bool);
 	int (*write_size)(WT_BM *, WT_SESSION_IMPL *, size_t *);
 
 	WT_BLOCK *block;			/* Underlying file */
@@ -202,7 +202,7 @@ struct __wt_bm {
 	 * There's only a single block manager handle that can be written, all
 	 * others are checkpoints.
 	 */
-	int is_live;				/* The live system */
+	bool is_live;				/* The live system */
 };
 
 /*

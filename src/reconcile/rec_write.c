@@ -50,7 +50,7 @@ typedef struct {
 	 * When we can't mark the page clean (for example, checkpoint found some
 	 * uncommitted updates), there's a leave-dirty flag.
 	 */
-	int leave_dirty;
+	bool leave_dirty;
 
 	/*
 	 * Raw compression (don't get me started, as if normal reconciliation
@@ -61,7 +61,7 @@ typedef struct {
 	 * a lot of work, we turn off most compression: dictionary, copy-cell,
 	 * prefix and row-store internal page suffix compression are all off.
 	 */
-	int	  raw_compression;
+	bool	  raw_compression;
 	uint32_t  raw_max_slots;	/* Raw compression array sizes */
 	uint32_t *raw_entries;		/* Raw compression slot entries */
 	uint32_t *raw_offsets;		/* Raw compression slot offsets */
@@ -86,7 +86,7 @@ typedef struct {
 	 * figure out if the rows selected by raw compression included overflow
 	 * items, and the optimization isn't worth another pass over the data.
 	 */
-	int	ovfl_items;
+	bool	ovfl_items;
 
 	/*
 	 * Track if reconciliation of a row-store leaf page has seen empty (zero
@@ -101,7 +101,7 @@ typedef struct {
 	 * The test is per-page reconciliation as described above for the
 	 * overflow-item test.
 	 */
-	int	all_empty_value, any_empty_value;
+	bool	all_empty_value, any_empty_value;
 
 	/*
 	 * Reconciliation gets tricky if we have to split a page, which happens
@@ -184,7 +184,7 @@ typedef struct {
 		 * final block as part of a checkpoint.  If raw compression
 		 * was configured, that block may have already been compressed.
 		 */
-		int already_compressed;
+		bool already_compressed;
 	} *bnd;				/* Saved boundaries */
 	uint32_t bnd_next;		/* Next boundary slot */
 	uint32_t bnd_next_max;		/* Maximum boundary slots used */
@@ -241,7 +241,7 @@ typedef struct {
 	 * There's some trickiness here, see the code for comments on how
 	 * these fields work.
 	 */
-	int	 cell_zero;		/* Row-store internal page 0th key */
+	bool	 cell_zero;		/* Row-store internal page 0th key */
 
 	/*
 	 * WT_DICTIONARY --
@@ -276,17 +276,17 @@ typedef struct {
 	WT_ITEM *cur, _cur;		/* Key/Value being built */
 	WT_ITEM *last, _last;		/* Last key/value built */
 
-	int key_pfx_compress;		/* If can prefix-compress next key */
-	int key_pfx_compress_conf;	/* If prefix compression configured */
-	int key_sfx_compress;		/* If can suffix-compress next key */
-	int key_sfx_compress_conf;	/* If suffix compression configured */
+	bool key_pfx_compress;		/* If can prefix-compress next key */
+	bool key_pfx_compress_conf;	/* If prefix compression configured */
+	bool key_sfx_compress;		/* If can suffix-compress next key */
+	bool key_sfx_compress_conf;	/* If suffix compression configured */
 
-	int is_bulk_load;		/* If it's a bulk load */
+	bool is_bulk_load;		/* If it's a bulk load */
 
 	WT_SALVAGE_COOKIE *salvage;	/* If it's a salvage operation */
 
-	int cache_write_lookaside;	/* Used the lookaside table */
-	int cache_write_restore;		/* Used update/restoration */
+	bool cache_write_lookaside;	/* Used the lookaside table */
+	bool cache_write_restore;	/* Used update/restoration */
 
 	uint32_t tested_ref_state;	/* Debugging information */
 } WT_RECONCILE;
@@ -818,7 +818,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	r->flags = flags;
 
 	/* Track if the page can be marked clean. */
-	r->leave_dirty = 0;
+	r->leave_dirty = false;
 
 	/* Raw compression. */
 	r->raw_compression =
@@ -826,11 +826,11 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	r->raw_destination.flags = WT_ITEM_ALIGNED;
 
 	/* Track overflow items. */
-	r->ovfl_items = 0;
+	r->ovfl_items = false;
 
 	/* Track empty values. */
-	r->all_empty_value = 1;
-	r->any_empty_value = 0;
+	r->all_empty_value = true;
+	r->any_empty_value = false;
 
 	/* The list of saved updates. */
 	r->supd_next = 0;
@@ -850,6 +850,14 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	__rec_dictionary_reset(r);
 
 	/*
+	 * Prefix compression discards repeated prefix bytes from row-store leaf
+	 * page keys.
+	 */
+	r->key_pfx_compress_conf = false;
+	if (btree->prefix_compression && page->type == WT_PAGE_ROW_LEAF)
+		r->key_pfx_compress_conf = true;
+
+	/*
 	 * Suffix compression shortens internal page keys by discarding trailing
 	 * bytes that aren't necessary for tree navigation.  We don't do suffix
 	 * compression if there is a custom collator because we don't know what
@@ -863,20 +871,16 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	 * The raw compression routines don't even consider suffix compression,
 	 * but it doesn't hurt to confirm that.
 	 */
-	r->key_sfx_compress_conf = 0;
+	r->key_sfx_compress_conf = false;
 	if (btree->collator == NULL &&
 	    btree->internal_key_truncate && !r->raw_compression)
-		r->key_sfx_compress_conf = 1;
+		r->key_sfx_compress_conf = true;
 
-	/*
-	 * Prefix compression discards repeated prefix bytes from row-store leaf
-	 * page keys.
-	 */
-	r->key_pfx_compress_conf = 0;
-	if (btree->prefix_compression && page->type == WT_PAGE_ROW_LEAF)
-		r->key_pfx_compress_conf = 1;
+	r->is_bulk_load = false;
 
 	r->salvage = salvage;
+
+	r->cache_write_lookaside = r->cache_write_restore = false;
 
 	/*
 	 * Running transactions may update the page after we write it, so
@@ -1177,7 +1181,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * the page can't be marked clean.
 	 */
 	if (!F_ISSET(r, WT_EVICTING)) {
-		r->leave_dirty = 1;
+		r->leave_dirty = true;
 		return (0);
 	}
 
@@ -1216,7 +1220,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		*updp = NULL;
 
 		/* The page can't be marked clean. */
-		r->leave_dirty = 1;
+		r->leave_dirty = true;
 
 		/*
 		 * A special-case for overflow values, where we can't write the
@@ -1584,7 +1588,7 @@ __rec_child_deleted(
 	 * keep the page dirty so they are eventually freed.
 	 */
 	if (ref->addr != NULL) {
-		r->leave_dirty = 1;
+		r->leave_dirty = true;
 
 		/* This page cannot be evicted, quit now. */
 		if (F_ISSET(r, WT_EVICTING))
@@ -1748,7 +1752,7 @@ __rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
 	 * value and turn on both prefix and suffix compression.
 	 */
 	if (ovfl_key)
-		r->key_sfx_compress = 0;
+		r->key_sfx_compress = false;
 	else {
 		a = r->cur;
 		r->cur = r->last;
@@ -1859,7 +1863,7 @@ __rec_split_bnd_init(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd)
 	 * reconciliation.
 	 */
 
-	bnd->already_compressed = 0;
+	bnd->already_compressed = false;
 }
 
 /*
@@ -2045,7 +2049,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	r->recno = recno;
 
 	/* New page, compression off. */
-	r->key_pfx_compress = r->key_sfx_compress = 0;
+	r->key_pfx_compress = r->key_sfx_compress = false;
 
 	return (0);
 }
@@ -2680,7 +2684,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 			 * Mark it as uncompressed so the standard compression
 			 * function is called before the buffer is written.
 			 */
-			last->already_compressed = 0;
+			last->already_compressed = false;
 		} else {
 			WT_STAT_FAST_DATA_INCR(session, compress_raw_ok);
 
@@ -2701,7 +2705,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 			if (result_slots == slots && !no_more_rows)
 				result_slots = 0;
 			else
-				last->already_compressed = 1;
+				last->already_compressed = true;
 		}
 		break;
 	default:
@@ -2790,7 +2794,7 @@ no_slots:
 		r->space_avail = r->page_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 
 		write_ref = &r->dsk;
-		last->already_compressed = 0;
+		last->already_compressed = false;
 	} else {
 		/*
 		 * Compression failed, there are more rows to accumulate and the
@@ -3198,7 +3202,7 @@ supd_check_complete:
 	 */
 	if (F_ISSET(r, WT_EVICT_LOOKASIDE) && bnd->supd != NULL) {
 		F_SET(dsk, WT_PAGE_LAS_UPDATE);
-		r->cache_write_lookaside = 1;
+		r->cache_write_lookaside = true;
 	}
 
 	/*
@@ -3208,7 +3212,7 @@ supd_check_complete:
 	 * updates we skipped.
 	 */
 	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) {
-		r->cache_write_restore = 1;
+		r->cache_write_restore = true;
 
 		/*
 		 * If the buffer is compressed (raw compression was configured),
@@ -3272,7 +3276,7 @@ supd_check_complete:
 	}
 
 	WT_ERR(__wt_bt_write(session,
-	    buf, addr, &addr_size, 0, bnd->already_compressed));
+	    buf, addr, &addr_size, false, bnd->already_compressed));
 	WT_ERR(__wt_strndup(session, addr, addr_size, &bnd->addr.addr));
 	bnd->addr.size = (uint8_t)addr_size;
 
@@ -3449,7 +3453,7 @@ __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	WT_RET(
 	    __rec_write_init(session, cbulk->ref, 0, NULL, &cbulk->reconcile));
 	r = cbulk->reconcile;
-	r->is_bulk_load = 1;
+	r->is_bulk_load = true;
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -3546,7 +3550,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 			 * overflow key), rebuild the key without compression.
 			 */
 			if (r->key_pfx_compress_conf) {
-				r->key_pfx_compress = 0;
+				r->key_pfx_compress = false;
 				if (!ovfl_key)
 					WT_RET(__rec_cell_build_leaf_key(
 					    session, r, NULL, 0, &ovfl_key));
@@ -3559,9 +3563,9 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	/* Copy the key/value pair onto the page. */
 	__rec_copy_incr(session, r, key);
 	if (val->len == 0)
-		r->any_empty_value = 1;
+		r->any_empty_value = true;
 	else {
-		r->all_empty_value = 0;
+		r->all_empty_value = false;
 		if (btree->dictionary)
 			WT_RET(__rec_dict_replace(session, r, 0, val));
 		__rec_copy_incr(session, r, val);
@@ -4327,7 +4331,7 @@ record_loop:	/*
 					    WT_CELL_VALUE_OVFL, repeat_count));
 
 					/* Track if page has overflow items. */
-					r->ovfl_items = 1;
+					r->ovfl_items = true;
 
 					ovfl_state = OVFL_USED;
 					continue;
@@ -4547,7 +4551,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * have to special case transforming the page from its disk image to
 	 * its in-memory version, for example).
 	 */
-	r->cell_zero = 1;
+	r->cell_zero = true;
 
 	/* For each entry in the in-memory page... */
 	WT_INTL_FOREACH_BEGIN(session, page, ref) {
@@ -4675,7 +4679,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			WT_ERR(__rec_cell_build_int_key(
 			    session, r, p, r->cell_zero ? 1 : size, &ovfl_key));
 		}
-		r->cell_zero = 0;
+		r->cell_zero = false;
 
 		/* Boundary: split or write the page. */
 		if (key->len + val->len > r->space_avail) {
@@ -4740,7 +4744,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_RET(__rec_cell_build_int_key(session, r,
 		    WT_IKEY_DATA(multi->key.ikey),
 		    r->cell_zero ? 1 : multi->key.ikey->size, &ovfl_key));
-		r->cell_zero = 0;
+		r->cell_zero = false;
 
 		addr = &multi->addr;
 		__rec_cell_build_addr(
@@ -4937,7 +4941,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 
 				/* Track if page has overflow items. */
 				if (vpack->ovfl)
-					r->ovfl_items = 1;
+					r->ovfl_items = true;
 			}
 		} else {
 			/*
@@ -5029,7 +5033,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			tmpkey->size = 0;
 
 			/* Track if page has overflow items. */
-			r->ovfl_items = 1;
+			r->ovfl_items = true;
 		} else {
 			/*
 			 * Get the key from the page or an instantiated key, or
@@ -5103,7 +5107,7 @@ build:
 				 * key without compression.
 				 */
 				if (r->key_pfx_compress_conf) {
-					r->key_pfx_compress = 0;
+					r->key_pfx_compress = false;
 					if (!ovfl_key)
 						WT_ERR(
 						    __rec_cell_build_leaf_key(
@@ -5119,9 +5123,9 @@ build:
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
 		if (val->len == 0)
-			r->any_empty_value = 1;
+			r->any_empty_value = true;
 		else {
-			r->all_empty_value = 0;
+			r->all_empty_value = false;
 			if (dictionary && btree->dictionary)
 				WT_ERR(__rec_dict_replace(session, r, 0, val));
 			__rec_copy_incr(session, r, val);
@@ -5189,7 +5193,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 				 * key without compression.
 				 */
 				if (r->key_pfx_compress_conf) {
-					r->key_pfx_compress = 0;
+					r->key_pfx_compress = false;
 					if (!ovfl_key)
 						WT_RET(
 						    __rec_cell_build_leaf_key(
@@ -5205,9 +5209,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
 		if (val->len == 0)
-			r->any_empty_value = 1;
+			r->any_empty_value = true;
 		else {
-			r->all_empty_value = 0;
+			r->all_empty_value = false;
 			if (btree->dictionary)
 				WT_RET(__rec_dict_replace(session, r, 0, val));
 			__rec_copy_incr(session, r, val);
@@ -5387,8 +5391,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		/* If this is the root page, we need to create a sync point. */
 		ref = r->ref;
 		if (__wt_ref_is_root(ref))
-			WT_RET(
-			    bm->checkpoint(bm, session, NULL, btree->ckpt, 0));
+			WT_RET(bm->checkpoint(
+			    bm, session, NULL, btree->ckpt, false));
 
 		/*
 		 * If the page was empty, we want to discard it from the tree
@@ -5433,8 +5437,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * we were about to write the buffer so we know what to do here.
 		 */
 		if (bnd->addr.addr == NULL)
-			WT_RET(__wt_bt_write(session,
-			    &r->dsk, NULL, NULL, 1, bnd->already_compressed));
+			WT_RET(__wt_bt_write(session, &r->dsk,
+			    NULL, NULL, true, bnd->already_compressed));
 		else {
 			mod->mod_replace = bnd->addr;
 			bnd->addr.addr = NULL;
@@ -5906,7 +5910,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	page = r->page;
 
 	/* Track if page has overflow items. */
-	r->ovfl_items = 1;
+	r->ovfl_items = true;
 
 	/*
 	 * See if this overflow record has already been written and reuse it if
@@ -5932,7 +5936,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 
 		/* Write the buffer. */
 		addr = buf;
-		WT_ERR(__wt_bt_write(session, tmp, addr, &size, 0, 0));
+		WT_ERR(__wt_bt_write(session, tmp, addr, &size, false, false));
 
 		/*
 		 * Track the overflow record (unless it's a bulk load, which

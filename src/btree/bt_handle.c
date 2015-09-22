@@ -12,7 +12,7 @@ static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
 static int __btree_preload(WT_SESSION_IMPL *);
-static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
+static int __btree_tree_open_empty(WT_SESSION_IMPL *, bool);
 
 /*
  * __wt_btree_open --
@@ -29,14 +29,14 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	WT_DECL_RET;
 	size_t root_addr_size;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
-	int creation, forced_salvage, readonly;
 	const char *filename;
+	bool creation, forced_salvage, readonly;
 
 	dhandle = session->dhandle;
 	btree = S2BT(session);
 
 	/* Checkpoint files are readonly. */
-	readonly = dhandle->checkpoint == NULL ? 0 : 1;
+	readonly = dhandle->checkpoint != NULL;
 
 	/* Get the checkpoint information for this name/checkpoint pair. */
 	WT_CLEAR(ckpt);
@@ -53,10 +53,10 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 		    "bulk-load is only supported on newly created objects");
 
 	/* Handle salvage configuration. */
-	forced_salvage = 0;
+	forced_salvage = false;
 	if (F_ISSET(btree, WT_BTREE_SALVAGE)) {
 		WT_ERR(__wt_config_gets(session, op_cfg, "force", &cval));
-		forced_salvage = (cval.val != 0);
+		forced_salvage = cval.val != 0;
 	}
 
 	/* Initialize and configure the WT_BTREE structure. */
@@ -446,7 +446,7 @@ err:	__wt_buf_free(session, &dsk);
  *	Create an empty in-memory tree.
  */
 static int
-__btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
+__btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
