@@ -100,7 +100,7 @@ void DocumentSourceUnwind::Unwinder::resetDocument(const Document& document) {
 
 boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
     // WARNING: Any functional changes to this method must also be implemented in the unwinding
-    // implementation of the $lookUp stage.
+    // implementation of the $lookup stage.
     if (!_haveNext) {
         return boost::none;
     }

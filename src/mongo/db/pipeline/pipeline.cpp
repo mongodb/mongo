@@ -356,7 +356,7 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
             }
             Privilege::addPrivilegeToPrivilegeVector(
                 &privileges, Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
-        } else if (stageName == "$lookUp" && stage.firstElementType() == Object) {
+        } else if (stageName == "$lookup" && stage.firstElementType() == Object) {
             NamespaceString fromNs(db, stage.firstElement()["from"].str());
             Privilege::addPrivilegeToPrivilegeVector(
                 &privileges,
