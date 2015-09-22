@@ -274,7 +274,8 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 			continue;
 
 		case WT_PROJ_VALUE:
-			if ((skip = key_only) != false)
+			skip = key_only;
+			if (skip)
 				continue;
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->value_format));
