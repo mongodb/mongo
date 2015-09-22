@@ -158,7 +158,7 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
         _format_shell_vars(eval_sb, var_name, global_vars[var_name])
 
     if "eval" in kwargs:
-        eval_sb.append(kwargs.pop("eval"))
+        eval_sb.append(str(kwargs.pop("eval")))
 
     eval_str = "; ".join(eval_sb)
     args.append("--eval")

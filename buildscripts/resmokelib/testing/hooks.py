@@ -528,13 +528,13 @@ class CheckReplDBHash(CustomBehavior):
             sb.append("The following %ss were present on the secondary, but not on the"
                       " primary:" % (item_type_name))
             for item in missing_on_primary:
-                sb.append(item)
+                sb.append(str(item))
 
         if missing_on_secondary:
             sb.append("The following %ss were present on the primary, but not on the"
                       " secondary:" % (item_type_name))
             for item in missing_on_secondary:
-                sb.append(item)
+                sb.append(str(item))
 
     @staticmethod
     def _dump_all_collections(database, coll_names, sb):
