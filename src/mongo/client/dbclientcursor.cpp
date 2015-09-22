@@ -45,6 +45,7 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -215,9 +216,9 @@ void DBClientCursor::requestMore() {
         ScopedDbConnection conn(_scopedHost);
         conn->call(toSend, *response);
         _client = conn.get();
+        ON_BLOCK_EXIT([this] { _client = nullptr; });
         this->batch.m = std::move(response);
         dataReceived();
-        _client = 0;
         conn.done();
     }
 }
