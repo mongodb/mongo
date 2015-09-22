@@ -192,6 +192,10 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
             auto ownedOp = conn->releaseAsyncOp();
             op = ownedOp.get();
 
+            // Sanity check that we are getting a clean AsyncOp.
+            invariant(!op->canceled());
+            invariant(!op->timedOut());
+
             _inProgress.emplace(op, std::move(ownedOp));
         }
 

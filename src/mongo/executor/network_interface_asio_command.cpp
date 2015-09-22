@@ -270,13 +270,6 @@ void NetworkInterfaceASIO::_networkErrorCallback(AsyncOp* op, const std::error_c
 // NOTE: This method may only be called by ASIO threads
 // (do not call from methods entered by TaskExecutor threads)
 void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus& resp) {
-    // Prevent any other threads or callbacks from accessing this op so we may
-    // safely complete and destroy it.
-    {
-        stdx::lock_guard<stdx::mutex> lk(op->_access->mutex);
-        ++(op->_access->id);
-    }
-
     // Cancel this operation's timeout. Note that the timeout callback may already be running,
     // may have run, or may have already been scheduled to run in the near future.
     if (op->_timeoutAlarm) {
@@ -305,6 +298,17 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
     auto conn = std::move(op->_connectionPoolHandle);
     auto asioConn = static_cast<connection_pool_asio::ASIOConnection*>(conn.get());
 
+    // Prevent any other threads or callbacks from accessing this op so we may safely complete and
+    // destroy it. It is key that we do this after we remove the op from the _inProgress map or
+    // someone else in cancelCommand could read the bumped generation and cancel the next command
+    // that uses this op. See SERVER-20556.
+    {
+        stdx::lock_guard<stdx::mutex> lk(op->_access->mutex);
+        ++(op->_access->id);
+    }
+
+    // We need to bump the generation BEFORE we call reset() or we could flip the timeout in the
+    // timeout callback before returning the AsyncOp to the pool.
     ownedOp->reset();
 
     asioConn->bindAsyncOp(std::move(ownedOp));
