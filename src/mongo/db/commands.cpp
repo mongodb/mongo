@@ -410,15 +410,15 @@ namespace {
 
 void _generateErrorResponse(OperationContext* txn,
                             rpc::ReplyBuilderInterface* replyBuilder,
-                            const DBException& exception) {
+                            const DBException& exception,
+                            const BSONObj& metadata) {
     Command::registerError(txn, exception);
 
     // We could have thrown an exception after setting fields in the builder,
     // so we need to reset it to a clean state just to be sure.
     replyBuilder->reset();
 
-    // No metadata is needed for an error reply.
-    replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+    replyBuilder->setMetadata(metadata);
 
     // We need to include some extra information for SendStaleConfig.
     if (exception.getCode() == ErrorCodes::SendStaleConfig) {
@@ -439,14 +439,15 @@ void Command::generateErrorResponse(OperationContext* txn,
                                     rpc::ReplyBuilderInterface* replyBuilder,
                                     const DBException& exception,
                                     const rpc::RequestInterface& request,
-                                    Command* command) {
+                                    Command* command,
+                                    const BSONObj& metadata) {
     LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
            << "on database '" << request.getDatabase() << "' "
            << "with arguments '" << command->getRedactedCopyForLogging(request.getCommandArgs())
            << "' "
            << "and metadata '" << request.getMetadata() << "': " << exception.toString();
 
-    _generateErrorResponse(txn, replyBuilder, exception);
+    _generateErrorResponse(txn, replyBuilder, exception, metadata);
 }
 
 void Command::generateErrorResponse(OperationContext* txn,
@@ -456,14 +457,14 @@ void Command::generateErrorResponse(OperationContext* txn,
     LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
            << "on database '" << request.getDatabase() << "': " << exception.toString();
 
-    _generateErrorResponse(txn, replyBuilder, exception);
+    _generateErrorResponse(txn, replyBuilder, exception, rpc::makeEmptyMetadata());
 }
 
 void Command::generateErrorResponse(OperationContext* txn,
                                     rpc::ReplyBuilderInterface* replyBuilder,
                                     const DBException& exception) {
     LOG(1) << "assertion while executing command: " << exception.toString();
-    _generateErrorResponse(txn, replyBuilder, exception);
+    _generateErrorResponse(txn, replyBuilder, exception, rpc::makeEmptyMetadata());
 }
 
 void runCommands(OperationContext* txn,

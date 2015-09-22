@@ -1309,7 +1309,15 @@ void Command::execCommand(OperationContext* txn,
             command->_commandsFailed.increment();
         }
     } catch (const DBException& exception) {
-        Command::generateErrorResponse(txn, replyBuilder, exception, request, command);
+        BSONObj metadata = rpc::makeEmptyMetadata();
+        if (ShardingState::get(txn)->enabled()) {
+            auto opTime = grid.shardRegistry()->getConfigOpTime();
+            BSONObjBuilder metadataBob;
+            rpc::ConfigServerMetadata(opTime).writeToMetadata(&metadataBob);
+            metadata = metadataBob.obj();
+        }
+
+        Command::generateErrorResponse(txn, replyBuilder, exception, request, command, metadata);
     }
 }
 

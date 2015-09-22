@@ -386,7 +386,8 @@ public:
                                       rpc::ReplyBuilderInterface* replyBuilder,
                                       const DBException& exception,
                                       const rpc::RequestInterface& request,
-                                      Command* command);
+                                      Command* command,
+                                      const BSONObj& metadata);
 
     /**
      * Generates a command error response. This overload of generateErrorResponse is intended
