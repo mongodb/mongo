@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/cursor_manager.h"
@@ -89,12 +90,25 @@ public:
         help << "list indexes for a collection";
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::listIndexes);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    virtual Status checkAuthForCommand(ClientBasic* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj) {
+        AuthorizationSession* authzSession = AuthorizationSession::get(client);
+
+        // Check for the listIndexes ActionType on the database, or find on system.indexes for pre
+        // 3.0 systems.
+        NamespaceString ns(parseNs(dbname, cmdObj));
+        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns),
+                                                           ActionType::listIndexes) ||
+            authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.indexes")),
+                ActionType::find)) {
+            return Status::OK();
+        }
+
+        return Status(ErrorCodes::Unauthorized,
+                      str::stream()
+                          << "Not authorized to list indexes on collection: " << ns.coll());
     }
 
     CmdListIndexes() : Command("listIndexes") {}

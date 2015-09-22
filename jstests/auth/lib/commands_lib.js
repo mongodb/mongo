@@ -1664,7 +1664,7 @@ var authCommandsLib = {
                         }
                     ]
                 },
-                // test legacy (pre 3.0) way of authorizing listCollections
+                // Test legacy (pre 3.0) way of authorizing listCollections.
                 {
                     runOnDb: firstDbName,
                     privileges: [
@@ -1703,6 +1703,16 @@ var authCommandsLib = {
                         {
                             resource: {db: firstDbName, collection: ""},
                             actions: ["listIndexes"]
+                        }
+                    ]
+                },
+                // Test legacy (pre 3.0) way of authorizing listIndexes.
+                {
+                    runOnDb: firstDbName,
+                    privileges: [
+                        {
+                            resource: {db: firstDbName, collection: "system.indexes"},
+                            actions: ["find"]
                         }
                     ]
                 }
