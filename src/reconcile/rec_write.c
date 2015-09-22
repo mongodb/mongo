@@ -3803,7 +3803,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			break;
 		case WT_CHILD_ORIGINAL:
 			/* Original child. */
-			 break;
+			break;
 		case WT_CHILD_PROXY:
 			/*
 			 * Deleted child where we write a proxy cell, not
@@ -4669,7 +4669,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			break;
 		case WT_CHILD_ORIGINAL:
 			/* Original child. */
-			 break;
+			break;
 		case WT_CHILD_PROXY:
 			/* Deleted child where we write a proxy cell. */
 			break;
