@@ -529,7 +529,7 @@ StatusWith<RecordId> insertBSON(unique_ptr<OperationContext>& opCtx,
     WriteUnitOfWork wuow(opCtx.get());
     WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
     invariant(wrs);
-    Status status = wrs->oplogRecordIdRegister(opCtx.get(), opTime);
+    Status status = wrs->oplogDiskLocRegister(opCtx.get(), opTime);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
     StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), false);
@@ -747,7 +747,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorRollover) {
 RecordId _oplogOrderInsertOplog(OperationContext* txn, unique_ptr<RecordStore>& rs, int inc) {
     Timestamp opTime = Timestamp(5, inc);
     WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
-    Status status = wrs->oplogRecordIdRegister(txn, opTime);
+    Status status = wrs->oplogDiskLocRegister(txn, opTime);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
     StatusWith<RecordId> res = rs->insertRecord(txn, obj.objdata(), obj.objsize(), false);
@@ -904,7 +904,7 @@ StatusWith<RecordId> insertBSONWithSize(OperationContext* opCtx,
     WriteUnitOfWork wuow(opCtx);
     WiredTigerRecordStore* wtrs = checked_cast<WiredTigerRecordStore*>(rs);
     invariant(wtrs);
-    Status status = wtrs->oplogRecordIdRegister(opCtx, opTime);
+    Status status = wtrs->oplogDiskLocRegister(opCtx, opTime);
     if (!status.isOK()) {
         return StatusWith<RecordId>(status);
     }
