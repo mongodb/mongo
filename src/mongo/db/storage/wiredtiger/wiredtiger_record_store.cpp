@@ -1501,8 +1501,7 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* txn,
     }
 }
 
-Status WiredTigerRecordStore::oplogDiskLocRegister(OperationContext* txn,
-                                                    const Timestamp& opTime) {
+Status WiredTigerRecordStore::oplogDiskLocRegister(OperationContext* txn, const Timestamp& opTime) {
     StatusWith<RecordId> id = oploghack::keyForOptime(opTime);
     if (!id.isOK())
         return id.getStatus();
