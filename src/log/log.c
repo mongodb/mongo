@@ -1760,9 +1760,16 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 	conn = S2C(session);
 	log = conn->log;
-	free_slot = locked = 0;
+	if (record->size > UINT32_MAX) {
+		__wt_errx(session, "Log record size of %" WT_SIZET_FMT
+		    " exceeds the maximum supported size of %" PRIu32,
+		    record->size, UINT32_MAX);
+		return (EFBIG);
+	}
 	WT_INIT_LSN(&lsn);
+	free_slot = locked = 0;
 	myslot.slot = NULL;
+
 	/*
 	 * Assume the WT_ITEM the caller passed is a WT_LOG_RECORD, which has a
 	 * header at the beginning for us to fill in.
