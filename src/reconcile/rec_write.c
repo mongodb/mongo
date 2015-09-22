@@ -1605,14 +1605,19 @@ __rec_child_deleted(
 	}
 
 	/*
-	 * If there are deleted child pages that we can't discard immediately,
-	 * keep the page dirty so they are eventually freed.
+	 * Internal pages with deletes that aren't stable cannot be evicted, we
+	 * don't have sufficient information to restore the page's information
+	 * if subsequently read (we wouldn't know which transactions should see
+	 * the original page and which should see the deleted page).
 	 */
-	r->leave_dirty = 1;
-
-	/* Internal pages with deletes that aren't stable cannot be evicted. */
 	if (F_ISSET(r, WT_EVICTING))
 		return (EBUSY);
+
+	/*
+	 * If there are deleted child pages we can't discard immediately, keep
+	 * the page dirty so they are eventually freed.
+	 */
+	r->leave_dirty = 1;
 
 	/*
 	 * If the original page cannot be freed, we need to keep a slot on the
