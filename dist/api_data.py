@@ -271,7 +271,9 @@ file_config = format_meta + [
         leaf pages''',
         min=0),
     Config('split_deepen_min_child', '0', r'''
-        minimum entries in a page to consider deepening the tree''',
+        minimum entries in a page to consider deepening the tree. Once
+        there are more than this many entries pages will be immediately
+        considered for splitting''',
         type='int', undoc=True),
     Config('split_deepen_per_child', '0', r'''
         entries allocated per child when deepening the tree''',

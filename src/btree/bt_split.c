@@ -191,31 +191,27 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_REF *ref)
 	pindex = WT_INTL_INDEX_GET_SAFE(page);
 
 	/*
+	 * Sanity check for a reasonable number of keys on-page keys. Splitting
+	 * with too few keys leads to excessively deep trees.
+	 */
+	if (pindex->entries < 100)
+		return (false);
+
+	/*
 	 * Deepen the tree if the page's memory footprint is larger than the
 	 * maximum size for a page in memory (presumably putting eviction
 	 * pressure on the cache).
 	 */
-	if (page->memory_footprint < btree->maxmempage)
-		return (false);
-
-	/*
-	 * Ensure the page has enough entries to make it worth splitting and
-	 * we get a significant payback (in the case of a set of large keys,
-	 * splitting won't help).
-	 */
-	if (pindex->entries > btree->split_deepen_min_child)
+	if (page->memory_footprint > btree->maxmempage)
 		return (true);
 
 	/*
-	 * Don't allow a single page to put pressure on cache usage. The root
-	 * page cannot be evicted, so if it's larger than the maximum, or if
-	 * and page has a quarter of the cache, let it split, a deep tree is
-	 * better than making no progress at all. Sanity check for 100 on-page
-	 * keys, nothing helps in the case of large keys and a too-small cache.
+	 * Check if the page has enough keys to make it worth splitting. If
+	 * the number of keys is allowed to grow too large, the cost of
+	 * splitting into parent pages can become large enough to result
+	 * in slow operations.
 	 */
-	if (pindex->entries >= 100 &&
-	    (__wt_ref_is_root(ref) ||
-	    page->memory_footprint >= S2C(session)->cache_size / 4))
+	if (pindex->entries > btree->split_deepen_min_child)
 		return (true);
 
 	return (false);
