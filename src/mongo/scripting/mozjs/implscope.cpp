@@ -113,7 +113,14 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
 
             ObjectWrapper(cx, excn).getValue("stack", &stack);
 
-            ss << " :\n" << ValueWriter(cx, stack).toString();
+            auto str = ValueWriter(cx, stack).toString();
+
+            if (str.empty()) {
+                ss << " @" << report->filename << ":" << report->lineno << ":" << report->column
+                   << "\n";
+            } else {
+                ss << " :\n" << str;
+            }
         }
 
         scope->_status = Status(
