@@ -165,7 +165,13 @@ void WiredTigerSessionCache::waitUntilDurable(WiredTigerSession* session) {
 
     // Nobody has synched yet, so we have to sync ourselves.
     WT_SESSION* s = session->getSession();
-    invariantWTOK(s->log_flush(s, "sync=on"));
+
+    // Use the journal when available, or a checkpoint otherwise.
+    if (_engine->isDurable()) {
+        invariantWTOK(s->log_flush(s, "sync=on"));
+    } else {
+        invariantWTOK(s->checkpoint(s, NULL));
+    }
 }
 
 void WiredTigerSessionCache::closeAll() {
