@@ -52,8 +52,13 @@
         // After some journaled write operations have been performed against the mongod, send a
         // SIGKILL to the process to trigger an unclean shutdown.
         assert.soon(function() {
-            var count = conn.getDB('test').nojournal.count({journaled: {$exists: true}});
+            var testDB = conn.getDB('test');
+            var count = testDB.nojournal.count({journaled: {$exists: true}});
             if (count >= 100) {
+                // We saw 100 journaled inserts, but visibility does not guarantee durability, so
+                // do an extra journaled write to make all visible commits durable, before killing
+                // the mongod.
+                assert.writeOK(testDB.nojournal.insert({}, {writeConcern: {j: true}}));
                 MongoRunner.stopMongod(conn, 9);
                 return true;
             }
