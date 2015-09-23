@@ -1185,8 +1185,6 @@ func (s *S) TestRemovalOfClusterMember(c *C) {
 	c.Logf("========== Removing slave: %s ==========", slaveAddr)
 
 	master.Run(bson.D{{"$eval", `rs.remove("` + slaveAddr + `")`}}, nil)
-	err = master.Ping()
-	c.Assert(err, Equals, io.EOF)
 
 	master.Refresh()
 

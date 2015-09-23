@@ -58,7 +58,7 @@ func (s *S) TestBulkInsertError(c *C) {
 
 	coll := session.DB("mydb").C("mycoll")
 	bulk := coll.Bulk()
-	bulk.Insert(M{"_id": 1}, M{"_id": 2}, M{"_id": 2}, M{"n": 3})
+	bulk.Insert(M{"_id": 1}, M{"_id": 2}, M{"_id": 2}, M{"_id": 3})
 	_, err = bulk.Run()
 	c.Assert(err, ErrorMatches, ".*duplicate key.*")
 
@@ -90,4 +90,42 @@ func (s *S) TestBulkInsertErrorUnordered(c *C) {
 	err = coll.Find(nil).Sort("_id").All(&res)
 	c.Assert(err, IsNil)
 	c.Assert(res, DeepEquals, []doc{{1}, {2}, {3}})
+}
+
+func (s *S) TestBulkInsertErrorUnorderedSplitBatch(c *C) {
+	// The server has a batch limit of 1000 documents when using write commands.
+	// This artificial limit did not exist with the old wire protocol, so to
+	// avoid compatibility issues the implementation internally split batches
+	// into the proper size and delivers them one by one. This test ensures that
+	// the behavior of unordered (that is, continue on error) remains correct
+	// when errors happen and there are batches left.
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	coll := session.DB("mydb").C("mycoll")
+	bulk := coll.Bulk()
+	bulk.Unordered()
+
+	const total = 4096
+	type doc struct {
+		Id int `_id`
+	}
+	docs := make([]interface{}, total)
+	for i := 0; i < total; i++ {
+		docs[i] = doc{i}
+	}
+	docs[1] = doc{0}
+	bulk.Insert(docs...)
+	_, err = bulk.Run()
+	c.Assert(err, ErrorMatches, ".*duplicate key.*")
+
+	n, err := coll.Count()
+	c.Assert(err, IsNil)
+	c.Assert(n, Equals, total-1)
+
+	var res doc
+	err = coll.FindId(1500).One(&res)
+	c.Assert(err, IsNil)
+	c.Assert(res.Id, Equals, 1500)
 }

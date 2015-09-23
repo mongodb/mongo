@@ -1056,6 +1056,25 @@ func (i *getterSetterInt) SetBSON(raw bson.Raw) error {
 	return err
 }
 
+type ifaceType interface {
+	Hello()
+}
+
+type ifaceSlice []ifaceType
+
+func (s *ifaceSlice) SetBSON(raw bson.Raw) error {
+	var ns []int
+	if err := raw.Unmarshal(&ns); err != nil {
+		return err
+	}
+	*s = make(ifaceSlice, ns[0])
+	return nil
+}
+
+func (s ifaceSlice) GetBSON() (interface{}, error) {
+	return []int{len(s)}, nil
+}
+
 type (
 	MyString string
 	MyBytes  []byte
@@ -1249,6 +1268,7 @@ var twoWayCrossItems = []crossTypeItem{
 
 	// arrays
 	{&struct{ V [2]int }{[...]int{1, 2}}, map[string][2]int{"v": [2]int{1, 2}}},
+	{&struct{ V [2]byte }{[...]byte{1, 2}}, map[string][2]byte{"v": [2]byte{1, 2}}},
 
 	// zero time
 	{&struct{ V time.Time }{}, map[string]interface{}{"v": time.Time{}}},
@@ -1281,6 +1301,9 @@ var twoWayCrossItems = []crossTypeItem{
 	// bson.D <=> non-struct getter/setter
 	{&bson.D{{"a", 1}}, &getterSetterD{{"a", 1}, {"suffix", true}}},
 	{&bson.D{{"a", 42}}, &gsintvar},
+
+	// Interface slice setter.
+	{&struct{ V ifaceSlice }{ifaceSlice{nil, nil, nil}}, bson.M{"v": []interface{}{3}}},
 }
 
 // Same thing, but only one way (obj1 => obj2).

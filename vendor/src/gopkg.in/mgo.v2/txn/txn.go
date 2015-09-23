@@ -382,28 +382,51 @@ func (r *Runner) ChangeLog(logc *mgo.Collection) {
 func (r *Runner) PurgeMissing(collections ...string) error {
 	type M map[string]interface{}
 	type S []interface{}
-	pipeline := []M{
-		{"$project": M{"_id": 1, "txn-queue": 1}},
-		{"$unwind": "$txn-queue"},
-		{"$sort": M{"_id": 1, "txn-queue": 1}},
-		//{"$group": M{"_id": M{"$substr": S{"$txn-queue", 0, 24}}, "docids": M{"$push": "$_id"}}},
-	}
 
-	type TRef struct {
-		DocId interface{} "_id"
-		TxnId string      "txn-queue"
+	type TDoc struct {
+		Id       interface{} "_id"
+		TxnQueue []string    "txn-queue"
 	}
 
 	found := make(map[bson.ObjectId]bool)
-	colls := make(map[string]bool)
 
 	sort.Strings(collections)
 	for _, collection := range collections {
 		c := r.tc.Database.C(collection)
-		iter := c.Pipe(pipeline).Iter()
-		var tref TRef
-		for iter.Next(&tref) {
-			txnId := bson.ObjectIdHex(tref.TxnId[:24])
+		iter := c.Find(nil).Select(bson.M{"_id": 1, "txn-queue": 1}).Iter()
+		var tdoc TDoc
+		for iter.Next(&tdoc) {
+			for _, txnToken := range tdoc.TxnQueue {
+				txnId := bson.ObjectIdHex(txnToken[:24])
+				if found[txnId] {
+					continue
+				}
+				if r.tc.FindId(txnId).One(nil) == nil {
+					found[txnId] = true
+					continue
+				}
+				logf("WARNING: purging from document %s/%v the missing transaction id %s", collection, tdoc.Id, txnId)
+				err := c.UpdateId(tdoc.Id, M{"$pull": M{"txn-queue": M{"$regex": "^" + txnId.Hex() + "_*"}}})
+				if err != nil {
+					return fmt.Errorf("error purging missing transaction %s: %v", txnId.Hex(), err)
+				}
+			}
+		}
+		if err := iter.Close(); err != nil {
+			return fmt.Errorf("transaction queue iteration error for %s: %v", collection, err)
+		}
+	}
+
+	type StashTDoc struct {
+		Id       docKey   "_id"
+		TxnQueue []string "txn-queue"
+	}
+
+	iter := r.sc.Find(nil).Select(bson.M{"_id": 1, "txn-queue": 1}).Iter()
+	var stdoc StashTDoc
+	for iter.Next(&stdoc) {
+		for _, txnToken := range stdoc.TxnQueue {
+			txnId := bson.ObjectIdHex(txnToken[:24])
 			if found[txnId] {
 				continue
 			}
@@ -411,36 +434,15 @@ func (r *Runner) PurgeMissing(collections ...string) error {
 				found[txnId] = true
 				continue
 			}
-			logf("WARNING: purging from document %s/%v the missing transaction id %s", collection, tref.DocId, txnId)
-			err := c.UpdateId(tref.DocId, M{"$pull": M{"txn-queue": M{"$regex": "^" + txnId.Hex() + "_*"}}})
+			logf("WARNING: purging from stash document %s/%v the missing transaction id %s", stdoc.Id.C, stdoc.Id.Id, txnId)
+			err := r.sc.UpdateId(stdoc.Id, M{"$pull": M{"txn-queue": M{"$regex": "^" + txnId.Hex() + "_*"}}})
 			if err != nil {
 				return fmt.Errorf("error purging missing transaction %s: %v", txnId.Hex(), err)
 			}
 		}
-		colls[collection] = true
 	}
-
-	type StashTRef struct {
-		Id    docKey "_id"
-		TxnId string "txn-queue"
-	}
-
-	iter := r.sc.Pipe(pipeline).Iter()
-	var stref StashTRef
-	for iter.Next(&stref) {
-		txnId := bson.ObjectIdHex(stref.TxnId[:24])
-		if found[txnId] {
-			continue
-		}
-		if r.tc.FindId(txnId).One(nil) == nil {
-			found[txnId] = true
-			continue
-		}
-		logf("WARNING: purging from stash document %s/%v the missing transaction id %s", stref.Id.C, stref.Id.Id, txnId)
-		err := r.sc.UpdateId(stref.Id, M{"$pull": M{"txn-queue": M{"$regex": "^" + txnId.Hex() + "_*"}}})
-		if err != nil {
-			return fmt.Errorf("error purging missing transaction %s: %v", txnId.Hex(), err)
-		}
+	if err := iter.Close(); err != nil {
+		return fmt.Errorf("transaction stash iteration error: %v", err)
 	}
 
 	return nil

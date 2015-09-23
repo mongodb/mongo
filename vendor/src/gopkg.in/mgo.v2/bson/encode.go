@@ -365,7 +365,17 @@ func (e *encoder) addElem(name string, v reflect.Value, minSize bool) {
 		et := v.Type().Elem()
 		if et.Kind() == reflect.Uint8 {
 			e.addElemName('\x05', name)
-			e.addBinary('\x00', v.Slice(0, v.Len()).Interface().([]byte))
+			if v.CanAddr() {
+				e.addBinary('\x00', v.Slice(0, v.Len()).Interface().([]byte))
+			} else {
+				n := v.Len()
+				e.addInt32(int32(n))
+				e.addBytes('\x00')
+				for i := 0; i < n; i++ {
+					el := v.Index(i)
+					e.addBytes(byte(el.Uint()))
+				}
+			}
 		} else {
 			e.addElemName('\x04', name)
 			e.addDoc(v)
