@@ -18,6 +18,8 @@ selector:
     - jstests/sharding/copydb_from_mongos.js  # SERVER-13080
     - jstests/sharding/sync_cluster_config/parallel.js
     - jstests/sharding/sync_cluster_config/sync[36].js
+    # flaky - SERVER-20580
+    - jstests/sharding/csrs_upgrade_during_migrate.js
 
 executor:
   js_test:
