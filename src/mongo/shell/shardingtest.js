@@ -186,7 +186,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
             rsDefaults = { useHostname : otherParams.useHostname,
                            noJournalPrealloc : otherParams.nopreallocj, 
-                           oplogSize : 40,
+                           oplogSize : 16,
                            pathOpts : Object.merge( pathOpts, { shard : i } )}
 
             rsDefaults = Object.merge( rsDefaults, ShardingTest.rsOptions || {} )

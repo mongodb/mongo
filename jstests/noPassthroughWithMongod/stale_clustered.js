@@ -10,15 +10,9 @@ var shardTest = new ShardingTest( name = "clusteredstale" ,
                                   numShards = 2 ,
                                   verboseLevel = 0 ,
                                   numMongos = 2 ,
-                                  otherParams = { rs : true } )//, 
-                                                  //rs0 : { logpath : "$path/mongod.log" }, 
-                                                  //rs1 : { logpath : "$path/mongod.log" } } );
+                                  otherParams = { rs : true } );
 
 shardTest.setBalancer( false )
-
-// TODO: SERVER-20194. This test forces use of the old mongos query path.
-assert.commandWorked(shardTest.s0.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-assert.commandWorked(shardTest.s1.adminCommand({setParameter: 1, useClusterClientCursor: false}));
 
 var mongos = shardTest.s0
 var mongosSOK = shardTest.s1
