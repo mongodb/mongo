@@ -209,8 +209,7 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
 		    "Missed %" PRIu32 ". Now pre-allocating up to %" PRIu32,
 		    log->prep_missed, conn->log_prealloc));
 	}
-	WT_STAT_FAST_CONN_SET(session,
-	    log_prealloc_max, conn->log_prealloc);
+	WT_STAT_FAST_CONN_SET(session, log_prealloc_max, conn->log_prealloc);
 	/*
 	 * Allocate up to the maximum number that we just computed and detected.
 	 */
@@ -456,14 +455,14 @@ restart:
 	while (i < WT_SLOT_POOL) {
 		save_i = i;
 		slot = &log->slot_pool[i++];
+#ifdef	HAVE_DIAGNOSTIC
 		/*
-		 * XXX - During debugging I saw slot 0 become orphaned.
-		 * I believe it is fixed, but check for now.
-		 * This assertion should catch that.
+		 * Any slot in a zero state must be currently in progress.
 		 */
 		if (slot->slot_state == 0)
 			WT_ASSERT(session,
 			    slot->slot_release_lsn.file >= log->write_lsn.file);
+#endif
 		if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
 			continue;
 		written[written_i].slot_index = save_i;
@@ -543,6 +542,14 @@ restart:
 				 */
 				WT_ASSERT(session, __wt_log_cmp(&written[i].lsn,
 				    &slot->slot_release_lsn) == 0);
+				/*
+				 * We need to maintain the starting offset of
+				 * a log record so that the checkpoint LSN
+				 * refers to the beginning of a real record.
+				 * The last offset in a slot is kept so that
+				 * the checkpoint LSN is close to the end of
+				 * the record.
+				 */
 				if (slot->slot_start_lsn.offset !=
 				    slot->slot_last_offset)
 					slot->slot_start_lsn.offset =
