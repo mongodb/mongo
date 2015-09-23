@@ -63,6 +63,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/s/d_state.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -355,7 +356,12 @@ public:
             maybeDisableValidation.emplace(txn);
 
         auto client = txn->getClient();
-        auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+        auto lastOpHolder = repl::ReplClientInfo::forClient(client);
+        auto lastOpAtOperationStart = lastOpHolder.getLastOp();
+        ScopeGuard lastOpSetterGuard =
+            MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                         &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                         txn);
 
         // We may encounter a WriteConflictException when creating a collection during an
         // upsert, even when holding the exclusive lock on the database (due to other load on
@@ -477,9 +483,11 @@ public:
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "findAndModify", nsString.ns());
 
-        // No-ops need to reset lastOp in the client, for write concern.
-        if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
-            repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+        if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+            // If this operation has already generated a new lastOp, don't bother setting it here.
+            // No-op updates will not generate a new lastOp, so we still need the guard to fire in
+            // that case.
+            lastOpSetterGuard.Dismiss();
         }
 
         WriteConcernResult res;

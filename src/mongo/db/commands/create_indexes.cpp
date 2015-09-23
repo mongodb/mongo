@@ -51,6 +51,7 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -178,6 +179,12 @@ public:
         const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(txn);
         result.append("numIndexesBefore", numIndexesBefore);
 
+        auto client = txn->getClient();
+        ScopeGuard lastOpSetterGuard =
+            MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                         &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                         txn);
+
         MultiIndexBlock indexer(txn, collection);
         indexer.allowBackgroundBuilding();
         indexer.allowInterruption();
@@ -188,8 +195,6 @@ public:
         if (specs.size() == 0) {
             result.append("numIndexesAfter", numIndexesBefore);
             result.append("note", "all indexes already exist");
-            // No-ops need to reset lastOp in the client, for write concern.
-            repl::ReplClientInfo::forClient(txn->getClient()).setLastOpToSystemLastOpTime(txn);
             return true;
         }
 
@@ -291,6 +296,8 @@ public:
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createIndexes", ns.ns());
 
         result.append("numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(txn));
+
+        lastOpSetterGuard.Dismiss();
 
         return true;
     }

@@ -1,4 +1,5 @@
-// Test that lastOp is updated properly in the face of no-op writes.
+// Test that lastOp is updated properly in the face of no-op writes and for writes that generate
+// errors based on the preexisting data (e.g. duplicate key errors, but not parse errors).
 // lastOp is used as the optime to wait for when write concern waits for replication.
 (function () {
     var replTest = new ReplSetTest({ name: 'testSet', nodes: 1 });
@@ -26,7 +27,6 @@
 
     assert.eq(noOp, secondOp);
 
-    
     assert.writeOK(m1.getCollection("test.foo").remove({ m1 : 1 }));
     var thirdOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
@@ -64,4 +64,60 @@
     noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
     assert.eq(noOp, eighthOp);
+
+    assert.writeOK(m1.getCollection("test.foo").insert({ _id : 1, x : 1 }));
+    var ninthOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+
+    assert.writeOK(m2.getCollection("test.foo").insert({ m2 : 991 }));
+    var tenthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+
+    // update with immutable field error
+    assert.writeError(m1.getCollection("test.foo").update({ _id : 1, x : 1 },
+                                                          { $set: { _id : 2 }}));
+    // "After applying the update to the document {_id: 1.0 , ...}, the (immutable) field '_id'
+    // was found to have been altered to _id: 2.0"
+    noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+
+    assert.eq(noOp, tenthOp);
+
+    assert.writeOK(m2.getCollection("test.foo").insert({ m2 : 992 }));
+    var eleventhOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+
+    // find-and-modify immutable field error
+    try {
+        m1.getCollection("test.foo").findAndModify( { query: { _id : 1, x : 1 },
+                                                      update: { $set: { _id : 2 } } } );
+        // The findAndModify shell helper should throw.
+        assert(false);
+    } catch (e) {
+        assert.eq(e.code, 66);
+    }
+    noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+
+    assert.eq(noOp, eleventhOp);
+
+    var bigString = new Array(3000).toString();
+    assert.writeOK(m2.getCollection("test.foo").insert({ m2 : 994, m3: bigString}));
+
+    // createIndex with a >1024 byte field fails.
+    var twelfthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+    assert.commandFailed(m1.getCollection("test.foo").createIndex({m3:1}));
+    noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+
+    assert.eq(noOp, twelfthOp);
+
+    // Test update and delete failures in legacy write mode.
+    m2.forceWriteMode('legacy');
+    m1.forceWriteMode('legacy');
+    m2.getCollection("test.foo").insert({ m2 : 995 });
+    var thirteenthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+
+    m1.getCollection("test.foo").remove({ m1 : 1 });
+    noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+    assert.eq(noOp, thirteenthOp);
+
+    m1.getCollection("test.foo").update({ m1 : 1 }, {$set: {m1: 4}});
+    noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
+    assert.eq(noOp, thirteenthOp);
+
 })();

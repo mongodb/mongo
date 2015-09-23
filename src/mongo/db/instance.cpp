@@ -105,6 +105,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -650,7 +651,11 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
     int flags = d.pullInt();
     BSONObj query = d.nextJsObj();
     auto client = txn->getClient();
+    auto lastOpHolder = repl::ReplClientInfo::forClient(client);
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+    ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                                                &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                                                txn);
 
     verify(d.moreJSObjs());
     verify(query.objsize() < m.header().dataLen());
@@ -719,9 +724,11 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
                 Explain::getSummaryStats(*exec, &summary);
                 collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
-                // No-ops need to reset lastOp in the client, for write concern.
-                if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
-                    repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+                if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+                    // If this operation has already generated a new lastOp, don't bother setting it
+                    // here. No-op updates will not generate a new lastOp, so we still need the
+                    // guard to fire in that case.
+                    lastOpSetterGuard.Dismiss();
                 }
                 return;
             }
@@ -774,9 +781,11 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
         Explain::getSummaryStats(*exec, &summary);
         collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
-        // No-ops need to reset lastOp in the client, for write concern.
-        if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
-            repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+        if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+            // If this operation has already generated a new lastOp, don't bother setting it
+            // here. No-op updates will not generate a new lastOp, so we still need the
+            // guard to fire in that case.
+            lastOpSetterGuard.Dismiss();
         }
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "update", nsString.ns());
@@ -792,7 +801,11 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
     BSONObj pattern = d.nextJsObj();
 
     auto client = txn->getClient();
+    auto lastOpHolder = repl::ReplClientInfo::forClient(client);
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+    ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                                                &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                                                txn);
 
     op.debug().query = pattern;
     {
@@ -842,9 +855,11 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
             Explain::getSummaryStats(*exec, &summary);
             collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
-            // No-ops need to reset lastOp in the client, for write concern.
-            if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
-                repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+            if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+                // If this operation has already generated a new lastOp, don't bother setting it
+                // here. No-op updates will not generate a new lastOp, so we still need the
+                // guard to fire in that case.
+                lastOpSetterGuard.Dismiss();
             }
             break;
         } catch (const WriteConflictException& dle) {

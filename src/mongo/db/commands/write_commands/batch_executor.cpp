@@ -80,6 +80,7 @@
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -1120,7 +1121,11 @@ static void multiUpdate(OperationContext* txn,
     }
 
     auto client = txn->getClient();
+    auto lastOpHolder = repl::ReplClientInfo::forClient(client);
     auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+    ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                                                &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                                                txn);
 
     int attempt = 0;
     bool createCollection = false;
@@ -1240,9 +1245,11 @@ static void multiUpdate(OperationContext* txn,
             Explain::getSummaryStats(*exec, &summary);
             collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
-            // No-ops need to reset lastOp in the client, for write concern.
-            if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
-                repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+            if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+                // If this operation has already generated a new lastOp, don't bother setting it
+                // here. No-op updates will not generate a new lastOp, so we still need the guard to
+                // fire in that case.
+                lastOpSetterGuard.Dismiss();
             }
         } catch (const WriteConflictException& dle) {
             debug->writeConflicts++;
@@ -1297,7 +1304,11 @@ static void multiRemove(OperationContext* txn,
     }
 
     auto client = txn->getClient();
-    auto lastOpAtOperationStart = repl::ReplClientInfo::forClient(client).getLastOp();
+    auto lastOpHolder = repl::ReplClientInfo::forClient(client);
+    auto lastOpAtOperationStart = lastOpHolder.getLastOp();
+    ScopeGuard lastOpSetterGuard = MakeObjGuard(repl::ReplClientInfo::forClient(client),
+                                                &repl::ReplClientInfo::setLastOpToSystemLastOpTime,
+                                                txn);
 
     int attempt = 1;
     while (1) {
@@ -1343,9 +1354,11 @@ static void multiRemove(OperationContext* txn,
             Explain::getSummaryStats(*exec, &summary);
             collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
-            // No-ops need to reset lastOp in the client, for write concern.
-            if (repl::ReplClientInfo::forClient(client).getLastOp() == lastOpAtOperationStart) {
-                repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(txn);
+            if (lastOpHolder.getLastOp() != lastOpAtOperationStart) {
+                // If this operation has already generated a new lastOp, don't bother setting it
+                // here. No-op updates will not generate a new lastOp, so we still need the guard to
+                // fire in that case.
+                lastOpSetterGuard.Dismiss();
             }
             break;
         } catch (const WriteConflictException& dle) {
