@@ -141,7 +141,7 @@ var AuthReplTest = function(spec) {
                     { resource: {cluster: true}, actions: [ actions[i] ] }
                 ],
                 roles: [ ],
-                writeConcern: {w: numNodes, wtimeout: 5000}
+                writeConcern: {w: numNodes, wtimeout: 15000}
             });
             assert.commandWorked(res);
         }
@@ -150,7 +150,7 @@ var AuthReplTest = function(spec) {
             createUser: testUser,
             pwd: testUser,
             roles: [testRole],
-            writeConcern: {w: numNodes, wtimeout: 5000}
+            writeConcern: {w: numNodes, wtimeout: 15000}
         });
         assert.commandWorked(res);
     };
