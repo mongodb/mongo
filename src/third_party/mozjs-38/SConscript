@@ -1,6 +1,9 @@
 # -*- mode: python -*-
 
-Import("env")
+Import([
+    "debugBuild",
+    "env",
+    ])
 
 env = env.Clone()
 env.InjectThirdPartyIncludePaths(libraries=['zlib'])
@@ -24,6 +27,13 @@ env.Prepend(CPPDEFINES=[
 	'STATIC_JS_API=1',
         'U_NO_DEFAULT_INCLUDE_UTF_HEADERS=1',
         ])
+
+if debugBuild:
+    env.Prepend(CPPDEFINES=[
+            'DEBUG',
+            'JS_DEBUG',
+            'JS_GC_ZEAL',
+            ])
 
 # js-confdefs.h has to get in front on windows or wherever
 if env.TargetOSIs('windows'):

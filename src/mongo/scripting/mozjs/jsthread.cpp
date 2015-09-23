@@ -33,6 +33,7 @@
 #include "mongo/scripting/mozjs/jsthread.h"
 
 #include <cstdio>
+#include "vm/PosixNSPR.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/scripting/mozjs/implscope.h"
@@ -79,7 +80,7 @@ const char* const JSThreadInfo::className = "JSThread";
 class JSThreadConfig {
 public:
     JSThreadConfig(JSContext* cx, JS::CallArgs args)
-        : _started(false), _done(false), _sharedData(new SharedData()) {
+        : _started(false), _done(false), _sharedData(new SharedData()), _jsthread(*this) {
         auto scope = getScope(cx);
 
         uassert(ErrorCodes::JSInterpreterFailure, "need at least one argument", args.length() > 0);
@@ -109,14 +110,24 @@ public:
     void start() {
         uassert(ErrorCodes::JSInterpreterFailure, "Thread already started", !_started);
 
-        _thread = stdx::thread(JSThread(*this));
+        // Despite calling PR_CreateThread, we're actually using our own
+        // implementation of PosixNSPR.cpp in this directory. So these threads
+        // are actually hosted on top of stdx::threads and most of the flags
+        // don't matter.
+        _thread = PR_CreateThread(PR_USER_THREAD,
+                                  JSThread::run,
+                                  &_jsthread,
+                                  PR_PRIORITY_NORMAL,
+                                  PR_LOCAL_THREAD,
+                                  PR_JOINABLE_THREAD,
+                                  0);
         _started = true;
     }
 
     void join() {
         uassert(ErrorCodes::JSInterpreterFailure, "Thread not running", _started && !_done);
 
-        _thread.join();
+        PR_JoinThread(_thread);
         _done = true;
     }
 
@@ -181,19 +192,21 @@ private:
     public:
         JSThread(JSThreadConfig& config) : _sharedData(config._sharedData) {}
 
-        void operator()() {
+        static void run(void* priv) {
+            auto thisv = static_cast<JSThread*>(priv);
+
             try {
                 MozJSImplScope scope(static_cast<MozJSScriptEngine*>(globalScriptEngine));
 
-                scope.setParentStack(_sharedData->_stack);
-                _sharedData->_returnData = scope.callThreadArgs(_sharedData->_args);
+                scope.setParentStack(thisv->_sharedData->_stack);
+                thisv->_sharedData->_returnData = scope.callThreadArgs(thisv->_sharedData->_args);
             } catch (...) {
                 auto status = exceptionToStatus();
 
                 log() << "js thread raised js exception: " << status.reason()
-                      << _sharedData->_stack;
-                _sharedData->setErrored(true);
-                _sharedData->_returnData = BSON("ret" << BSONUndefined);
+                      << thisv->_sharedData->_stack;
+                thisv->_sharedData->setErrored(true);
+                thisv->_sharedData->_returnData = BSON("ret" << BSONUndefined);
             }
         }
 
@@ -203,8 +216,9 @@ private:
 
     bool _started;
     bool _done;
-    stdx::thread _thread;
+    PRThread* _thread = nullptr;
     std::shared_ptr<SharedData> _sharedData;
+    JSThread _jsthread;
 };
 
 namespace {
