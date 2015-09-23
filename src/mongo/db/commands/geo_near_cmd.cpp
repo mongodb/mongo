@@ -281,9 +281,7 @@ public:
         // Fill in nscanned from the explain.
         PlanSummaryStats summary;
         Explain::getSummaryStats(*exec, &summary);
-        if (collection) {
-            collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
-        }
+        collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
         stats.appendNumber("nscanned", summary.totalKeysExamined);
         stats.appendNumber("objectsLoaded", summary.totalDocsExamined);
