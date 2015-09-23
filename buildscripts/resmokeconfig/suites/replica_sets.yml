@@ -2,6 +2,15 @@ selector:
   js_test:
     roots:
     - jstests/replsets/*.js
+    exclude_files:
+    # Below tests temporarily disabled due to intermittent failures that are currently undergoing
+    # investigation.  TODO: Re-enable as part of SERVER-20579 work.
+    - jstests/replsets/rollback5.js
+    - jstests/replsets/rollback_cmd_unrollbackable.js
+    - jstests/replsets/rollback_empty_ns.js
+    - jstests/replsets/rollback_empty_o.js
+    - jstests/replsets/rollback_empty_o2.js
+    - jstests/replsets/rollback_fake_cmd.js
 
 executor:
   js_test:
