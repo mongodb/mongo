@@ -226,6 +226,9 @@ result = replTest.nodes[2].getDB("admin")
     .runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});
 printjson(result);
 assert.eq(1, result.ok);
+assert.soon(function() {
+    return checkSyncingFrom(nodes[2], replTest.host+":"+replTest.ports[3]);
+}, 'failed to change sync target', 60000);
 
 print("do writes and check that 2 changes sync targets");
 assert.soon(function() {
