@@ -206,6 +206,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                                        nodes : numReplicas,
                                        useHostName : otherParams.useHostname,
                                        keyFile : keyFile,
+                                       protocolVersion: protocolVersion,
                                        shardSvr : true });
 
             this._rs[i] = { setName : setName,
@@ -213,11 +214,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                             nodes : rs.startSet(rsDefaults),
                             url : rs.getURL() };
 
-            var config = rs.getReplSetConfig();
-            if (protocolVersion !== undefined && protocolVersion !== null) {
-                config.protocolVersion = protocolVersion;
-            }
-            rs.initiate(config);
+            rs.initiate();
             this["rs" + i] = rs
 
             this._rsObjects[i] = rs
