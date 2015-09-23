@@ -564,32 +564,18 @@ bool Grid::getCollShouldBalance(const std::string& ns) const {
 }
 
 bool Grid::_inBalancingWindow(const BSONObj& balancerDoc, const boost::posix_time::ptime& now) {
-    // check the 'activeWindow' marker
-    // if present, it is an interval during the day when the balancer should be active
     // { start: "08:00" , stop: "19:30" }, strftime format is %H:%M
-    BSONElement windowElem = balancerDoc[SettingsType::balancerActiveWindow()];
-    if (windowElem.eoo()) {
-        return true;
-    }
-
-    // check if both 'start' and 'stop' are present
-    if (!windowElem.isABSONObj()) {
-        warning() << "'activeWindow' format is { start: \"hh:mm\" , stop: ... }" << balancerDoc
-                  << endl;
-        return true;
-    }
-    BSONObj intervalDoc = windowElem.Obj();
-    const string start = intervalDoc["start"].str();
-    const string stop = intervalDoc["stop"].str();
+    const string start = balancerDoc["start"].str();
+    const string stop = balancerDoc["stop"].str();
     if (start.empty() || stop.empty()) {
-        warning() << "must specify both start and end of balancing window: " << intervalDoc << endl;
+        warning() << "must specify both start and end of balancing window: " << balancerDoc;
         return true;
     }
 
     // check that both 'start' and 'stop' are valid time-of-day
     boost::posix_time::ptime startTime, stopTime;
     if (!toPointInTime(start, &startTime) || !toPointInTime(stop, &stopTime)) {
-        warning() << "cannot parse active window (use hh:mm 24hs format): " << intervalDoc << endl;
+        warning() << "cannot parse active window (use hh:mm 24hs format): " << balancerDoc;
         return true;
     }
 
@@ -649,13 +635,13 @@ public:
         const string E = "28:35";
 
         // closed in the past
-        BSONObj w1 = BSON(SettingsType::balancerActiveWindow(BSON("start" << T0 << "stop" << T1)));
+        BSONObj w1 = BSON("start" << T0 << "stop" << T1);
         // not opened until the future
-        BSONObj w2 = BSON(SettingsType::balancerActiveWindow(BSON("start" << T2 << "stop" << T3)));
+        BSONObj w2 = BSON("start" << T2 << "stop" << T3);
         // open now
-        BSONObj w3 = BSON(SettingsType::balancerActiveWindow(BSON("start" << T1 << "stop" << T2)));
+        BSONObj w3 = BSON("start" << T1 << "stop" << T2);
         // open since last day
-        BSONObj w4 = BSON(SettingsType::balancerActiveWindow(BSON("start" << T3 << "stop" << T2)));
+        BSONObj w4 = BSON("start" << T3 << "stop" << T2);
 
         verify(!Grid::_inBalancingWindow(w1, now));
         verify(!Grid::_inBalancingWindow(w2, now));
@@ -668,16 +654,16 @@ public:
         BSONObj w5;
 
         // missing stop
-        BSONObj w6 = BSON(SettingsType::balancerActiveWindow(BSON("start" << 1)));
+        BSONObj w6 = BSON("start" << 1);
 
         // missing start
-        BSONObj w7 = BSON(SettingsType::balancerActiveWindow(BSON("stop" << 1)));
+        BSONObj w7 = BSON("stop" << 1);
 
         // active window marker missing
         BSONObj w8 = BSON("wrongMarker" << 1 << "start" << 1 << "stop" << 1);
 
         // garbage in window
-        BSONObj w9 = BSON(SettingsType::balancerActiveWindow(BSON("start" << T3 << "stop" << E)));
+        BSONObj w9 = BSON("start" << T3 << "stop" << E);
 
         verify(Grid::_inBalancingWindow(w5, now));
         verify(Grid::_inBalancingWindow(w6, now));
