@@ -277,8 +277,8 @@ void JSThreadInfo::Functions::hasFailed::call(JSContext* cx, JS::CallArgs args) 
 }
 
 void JSThreadInfo::Functions::returnData::call(JSContext* cx, JS::CallArgs args) {
-    ValueReader(cx, args.rval())
-        .fromBSONElement(getConfig(cx, args)->returnData().firstElement(), true);
+    auto obj = getConfig(cx, args)->returnData();
+    ValueReader(cx, args.rval()).fromBSONElement(obj.firstElement(), obj, true);
 }
 
 void JSThreadInfo::Functions::_threadInject::call(JSContext* cx, JS::CallArgs args) {

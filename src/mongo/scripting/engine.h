@@ -82,7 +82,7 @@ public:
     }
     virtual Decimal128 getNumberDecimal(const char* field) = 0;
 
-    virtual void setElement(const char* field, const BSONElement& e) = 0;
+    virtual void setElement(const char* field, const BSONElement& e, const BSONObj& parent) = 0;
     virtual void setNumber(const char* field, double val) = 0;
     virtual void setString(const char* field, StringData val) = 0;
     virtual void setObject(const char* field, const BSONObj& obj, bool readOnly = true) = 0;
@@ -102,6 +102,8 @@ public:
     virtual bool isKillPending() const = 0;
 
     virtual void gc() = 0;
+
+    virtual void advanceGeneration() = 0;
 
     virtual ScriptingFunction createFunction(const char* code);
 

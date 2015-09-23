@@ -69,7 +69,8 @@ struct BSONInfo : public BaseInfo {
     static const JSFunctionSpec freeFunctions[2];
 
     static std::tuple<BSONObj*, bool> originalBSON(JSContext* cx, JS::HandleObject obj);
-    static void make(JSContext* cx, JS::MutableHandleObject obj, BSONObj bson, bool ro);
+    static void make(
+        JSContext* cx, JS::MutableHandleObject obj, BSONObj bson, const BSONObj* parent, bool ro);
 };
 
 }  // namespace mozjs

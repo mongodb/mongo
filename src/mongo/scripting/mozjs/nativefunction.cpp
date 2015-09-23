@@ -92,7 +92,7 @@ void NativeFunctionInfo::call(JSContext* cx, JS::CallArgs args) {
 
     BSONObj out = holder->_func(wobj.toBSON(), holder->_ctx);
 
-    ValueReader(cx, args.rval()).fromBSONElement(out.firstElement(), false);
+    ValueReader(cx, args.rval()).fromBSONElement(out.firstElement(), out, false);
 }
 
 void NativeFunctionInfo::finalize(JSFreeOp* fop, JSObject* obj) {

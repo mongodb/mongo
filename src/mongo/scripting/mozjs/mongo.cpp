@@ -137,7 +137,9 @@ void MongoBase::Functions::runCommand::call(JSContext* cx, JS::CallArgs args) {
     conn->runCommand(database, cmdObj, cmdRes, queryOptions);
 
     // the returned object is not read only as some of our tests depend on modifying it.
-    ValueReader(cx, args.rval()).fromBSON(cmdRes, false /* read only */);
+    //
+    // Also, we make a copy here because we want a copy after we dump cmdRes
+    ValueReader(cx, args.rval()).fromBSON(cmdRes.getOwned(), nullptr, false /* read only */);
 }
 
 void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallArgs args) {
@@ -173,7 +175,7 @@ void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallA
     mergedResultBob.append("metadata", res->getMetadata());
 
     auto mergedResult = mergedResultBob.done();
-    ValueReader(cx, args.rval()).fromBSON(mergedResult, false);
+    ValueReader(cx, args.rval()).fromBSON(mergedResult, nullptr, false);
 }
 
 void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
@@ -385,7 +387,9 @@ void MongoBase::Functions::logout::call(JSContext* cx, JS::CallArgs args) {
         conn->logout(db, ret);
     }
 
-    ValueReader(cx, args.rval()).fromBSON(ret, false);
+    // Make a copy because I want to insulate us from whether conn->logout
+    // writes an owned bson or not
+    ValueReader(cx, args.rval()).fromBSON(ret.getOwned(), nullptr, false);
 }
 
 void MongoBase::Functions::cursorFromId::call(JSContext* cx, JS::CallArgs args) {
@@ -508,7 +512,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
             if (code == ErrorCodes::OK)
                 code = ErrorCodes::UnknownError;
 
-            ValueReader(cx, args.rval()).fromBSON(inputObj, true);
+            ValueReader(cx, args.rval()).fromBSON(inputObj, nullptr, true);
             return;
         }
 
@@ -520,7 +524,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
         uasserted(ErrorCodes::InternalError, "copydb client finished before server.");
     }
 
-    ValueReader(cx, args.rval()).fromBSON(inputObj, true);
+    ValueReader(cx, args.rval()).fromBSON(inputObj, nullptr, true);
 }
 
 void MongoBase::Functions::getClientRPCProtocols::call(JSContext* cx, JS::CallArgs args) {

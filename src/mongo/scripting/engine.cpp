@@ -219,7 +219,7 @@ void Scope::loadStored(OperationContext* txn, bool ignoreNotConnected) {
 
     set<string> thisTime;
     while (c->more()) {
-        BSONObj o = c->nextSafe();
+        BSONObj o = c->nextSafe().getOwned();
         BSONElement n = o["_id"];
         BSONElement v = o["value"];
 
@@ -227,7 +227,7 @@ void Scope::loadStored(OperationContext* txn, bool ignoreNotConnected) {
         uassert(10210, "value has to be set", v.type() != EOO);
 
         try {
-            setElement(n.valuestr(), v);
+            setElement(n.valuestr(), v, o);
             thisTime.insert(n.valuestr());
             _storedNames.insert(n.valuestr());
         } catch (const DBException& setElemEx) {
@@ -417,6 +417,9 @@ public:
     void gc() {
         _real->gc();
     }
+    void advanceGeneration() {
+        _real->advanceGeneration();
+    }
     bool isKillPending() const {
         return _real->isKillPending();
     }
@@ -453,8 +456,8 @@ public:
     void setString(const char* field, StringData val) {
         _real->setString(field, val);
     }
-    void setElement(const char* field, const BSONElement& val) {
-        _real->setElement(field, val);
+    void setElement(const char* field, const BSONElement& val, const BSONObj& parent) {
+        _real->setElement(field, val, parent);
     }
     void setObject(const char* field, const BSONObj& obj, bool readOnly = true) {
         _real->setObject(field, obj, readOnly);

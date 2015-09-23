@@ -257,16 +257,19 @@ void ObjectWrapper::setBoolean(Key key, bool val) {
     setValue(key, jsValue);
 }
 
-void ObjectWrapper::setBSONElement(Key key, const BSONElement& elem, bool readOnly) {
+void ObjectWrapper::setBSONElement(Key key,
+                                   const BSONElement& elem,
+                                   const BSONObj& parent,
+                                   bool readOnly) {
     JS::RootedValue value(_context);
-    ValueReader(_context, &value).fromBSONElement(elem, readOnly);
+    ValueReader(_context, &value).fromBSONElement(elem, parent, readOnly);
 
     setValue(key, value);
 }
 
 void ObjectWrapper::setBSON(Key key, const BSONObj& obj, bool readOnly) {
     JS::RootedValue value(_context);
-    ValueReader(_context, &value).fromBSON(obj, readOnly);
+    ValueReader(_context, &value).fromBSON(obj, nullptr, readOnly);
 
     setValue(key, value);
 }

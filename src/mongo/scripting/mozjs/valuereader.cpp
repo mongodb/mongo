@@ -48,7 +48,7 @@ namespace mozjs {
 ValueReader::ValueReader(JSContext* cx, JS::MutableHandleValue value)
     : _context(cx), _value(value) {}
 
-void ValueReader::fromBSONElement(const BSONElement& elem, bool readOnly) {
+void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent, bool readOnly) {
     auto scope = getScope(_context);
 
     switch (elem.type()) {
@@ -92,14 +92,14 @@ void ValueReader::fromBSONElement(const BSONElement& elem, bool readOnly) {
                 sprintf(str, "%i", i++);
                 JS::RootedValue member(_context);
 
-                ValueReader(_context, &member).fromBSONElement(subElem, readOnly);
+                ValueReader(_context, &member).fromBSONElement(subElem, parent, readOnly);
                 ObjectWrapper(_context, array).setValue(str, member);
             }
             _value.setObjectOrNull(array);
             return;
         }
         case mongo::Object:
-            fromBSON(elem.embeddedObject(), readOnly);
+            fromBSON(elem.embeddedObject(), &parent, readOnly);
             return;
         case mongo::Date:
             _value.setObjectOrNull(
@@ -213,7 +213,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, bool readOnly) {
     _value.setUndefined();
 }
 
-void ValueReader::fromBSON(const BSONObj& obj, bool readOnly) {
+void ValueReader::fromBSON(const BSONObj& obj, const BSONObj* parent, bool readOnly) {
     if (obj.firstElementType() == String && str::equals(obj.firstElementFieldName(), "$ref")) {
         BSONObjIterator it(obj);
         const BSONElement ref = it.next();
@@ -222,30 +222,30 @@ void ValueReader::fromBSON(const BSONObj& obj, bool readOnly) {
         if (id.ok() && str::equals(id.fieldName(), "$id")) {
             JS::AutoValueArray<2> args(_context);
 
-            ValueReader(_context, args[0]).fromBSONElement(ref, readOnly);
+            ValueReader(_context, args[0]).fromBSONElement(ref, parent ? *parent : obj, readOnly);
 
             // id can be a subobject
-            ValueReader(_context, args[1]).fromBSONElement(id, readOnly);
+            ValueReader(_context, args[1]).fromBSONElement(id, parent ? *parent : obj, readOnly);
 
-            JS::RootedObject obj(_context);
+            JS::RootedObject robj(_context);
 
             auto scope = getScope(_context);
 
-            scope->getProto<DBRefInfo>().newInstance(args, &obj);
-            ObjectWrapper o(_context, obj);
+            scope->getProto<DBRefInfo>().newInstance(args, &robj);
+            ObjectWrapper o(_context, robj);
 
             while (it.more()) {
                 BSONElement elem = it.next();
-                o.setBSONElement(elem.fieldName(), elem, readOnly);
+                o.setBSONElement(elem.fieldName(), elem, parent ? *parent : obj, readOnly);
             }
 
-            _value.setObjectOrNull(obj);
+            _value.setObjectOrNull(robj);
             return;
         }
     }
 
     JS::RootedObject child(_context);
-    BSONInfo::make(_context, &child, obj, readOnly);
+    BSONInfo::make(_context, &child, obj, parent, readOnly);
 
     _value.setObjectOrNull(child);
 }

@@ -118,7 +118,8 @@ public:
         s->setNumber("notANumberVal", std::numeric_limits<double>::quiet_NaN());
         ASSERT(!s->getBoolean("notANumberVal"));
 
-        s->setElement("nullVal", BSONObjBuilder().appendNull("null").obj().getField("null"));
+        auto obj = BSONObjBuilder().appendNull("null").obj();
+        s->setElement("nullVal", obj.getField("null"), obj);
         ASSERT(!s->getBoolean("nullVal"));
 
         s->setNumber("zeroVal", 0);

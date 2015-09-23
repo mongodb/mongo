@@ -135,6 +135,7 @@ bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* d
         _scope->init(&_userScope);
     }
 
+    _scope->advanceGeneration();
     _scope->setObject("obj", const_cast<BSONObj&>(obj));
     _scope->setBoolean("fullObject", true);  // this is a hack b/c fullObject used to be relevant
 

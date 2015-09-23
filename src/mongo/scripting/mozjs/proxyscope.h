@@ -127,6 +127,8 @@ public:
 
     void gc() override;
 
+    void advanceGeneration() override;
+
     double getNumber(const char* field) override;
     int getNumberInt(const char* field) override;
     long long getNumberLongLong(const char* field) override;
@@ -138,7 +140,7 @@ public:
     void setNumber(const char* field, double val) override;
     void setString(const char* field, StringData val) override;
     void setBoolean(const char* field, bool val) override;
-    void setElement(const char* field, const BSONElement& e) override;
+    void setElement(const char* field, const BSONElement& e, const BSONObj& parent) override;
     void setObject(const char* field, const BSONObj& obj, bool readOnly) override;
     void setFunction(const char* field, const char* code) override;
 

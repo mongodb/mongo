@@ -106,7 +106,7 @@ public:
     void setNumber(Key key, double val);
     void setString(Key key, StringData val);
     void setBoolean(Key key, bool val);
-    void setBSONElement(Key key, const BSONElement& elem, bool readOnly);
+    void setBSONElement(Key key, const BSONElement& elem, const BSONObj& obj, bool readOnly);
     void setBSON(Key key, const BSONObj& obj, bool readOnly);
     void setValue(Key key, JS::HandleValue value);
     void setObject(Key key, JS::HandleObject value);

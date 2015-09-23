@@ -137,6 +137,8 @@ Status GroupStage::processObject(const BSONObj& obj) {
         return getKeyStatus;
     }
 
+    _scope->advanceGeneration();
+
     int& n = _groupMap[key];
     if (n == 0) {
         n = _groupMap.size();

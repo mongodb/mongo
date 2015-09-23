@@ -119,6 +119,10 @@ void MozJSProxyScope::gc() {
     _implScope->gc();
 }
 
+void MozJSProxyScope::advanceGeneration() {
+    runOnImplThread([&] { _implScope->advanceGeneration(); });
+}
+
 double MozJSProxyScope::getNumber(const char* field) {
     double out;
     runOnImplThread([&] { out = _implScope->getNumber(field); });
@@ -173,8 +177,8 @@ void MozJSProxyScope::setBoolean(const char* field, bool val) {
     runOnImplThread([&] { _implScope->setBoolean(field, val); });
 }
 
-void MozJSProxyScope::setElement(const char* field, const BSONElement& e) {
-    runOnImplThread([&] { _implScope->setElement(field, e); });
+void MozJSProxyScope::setElement(const char* field, const BSONElement& e, const BSONObj& parent) {
+    runOnImplThread([&] { _implScope->setElement(field, e, parent); });
 }
 
 void MozJSProxyScope::setObject(const char* field, const BSONObj& obj, bool readOnly) {
