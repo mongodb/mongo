@@ -154,12 +154,8 @@ DistLockCatalogImpl::DistLockCatalogImpl(ShardRegistry* shardRegistry,
 
 DistLockCatalogImpl::~DistLockCatalogImpl() = default;
 
-RemoteCommandTargeter* DistLockCatalogImpl::_targeter() {
-    return _client->getConfigShard()->getTargeter();
-}
-
 StatusWith<LockpingsType> DistLockCatalogImpl::getPing(StringData processID) {
-    auto targetStatus = _targeter()->findHost(kReadPref);
+    auto targetStatus = _client->getConfigShard()->getTargeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
@@ -339,7 +335,7 @@ Status DistLockCatalogImpl::unlock(const OID& lockSessionID) {
 }
 
 StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
-    auto targetStatus = _targeter()->findHost(kReadPref);
+    auto targetStatus = _client->getConfigShard()->getTargeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
@@ -378,7 +374,7 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
 }
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(const OID& lockSessionID) {
-    auto targetStatus = _targeter()->findHost(kReadPref);
+    auto targetStatus = _client->getConfigShard()->getTargeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
@@ -410,7 +406,7 @@ StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(const OID& lockSessionID)
 }
 
 StatusWith<LocksType> DistLockCatalogImpl::getLockByName(StringData name) {
-    auto targetStatus = _targeter()->findHost(kReadPref);
+    auto targetStatus = _client->getConfigShard()->getTargeter()->findHost(kReadPref);
 
     if (!targetStatus.isOK()) {
         return targetStatus.getStatus();
