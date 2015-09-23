@@ -64,7 +64,7 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	int evict_reset;
+	bool evict_reset;
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;

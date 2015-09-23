@@ -125,7 +125,7 @@ __wt_conn_dhandle_find(
 static int
 __conn_dhandle_mark_dead(WT_SESSION_IMPL *session)
 {
-	int evict_reset;
+	bool evict_reset;
 
 	/*
 	 * Handle forced discard (e.g., when dropping a file).

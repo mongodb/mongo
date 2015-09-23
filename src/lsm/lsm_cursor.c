@@ -648,9 +648,9 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 */
 		btree = ((WT_CURSOR_BTREE *)(primary))->btree;
 		if (btree->bulk_load_ok) {
-			btree->bulk_load_ok = 0;
+			btree->bulk_load_ok = false;
 			WT_WITH_BTREE(session, btree,
-			    __wt_btree_evictable(session, 0));
+			    __wt_btree_evictable(session, false));
 		}
 	}
 

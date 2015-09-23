@@ -25,7 +25,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	uint64_t internal_bytes, leaf_bytes;
 	uint64_t internal_pages, leaf_pages;
 	uint32_t flags;
-	int evict_reset;
+	bool evict_reset;
 
 	btree = S2BT(session);
 

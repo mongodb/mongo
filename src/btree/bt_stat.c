@@ -117,7 +117,7 @@ __stat_page_col_var(
 	WT_UPDATE *upd;
 	uint64_t deleted_cnt, entry_cnt, ovfl_cnt, rle_cnt;
 	uint32_t i;
-	int orig_deleted;
+	bool orig_deleted;
 
 	unpack = &_unpack;
 	deleted_cnt = entry_cnt = ovfl_cnt = rle_cnt = 0;
@@ -134,13 +134,13 @@ __stat_page_col_var(
 	 */
 	WT_COL_FOREACH(page, cip, i) {
 		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
-			orig_deleted = 1;
+			orig_deleted = true;
 			++deleted_cnt;
 		} else {
-			orig_deleted = 0;
+			orig_deleted = false;
 			__wt_cell_unpack(cell, unpack);
 			if (unpack->type == WT_CELL_ADDR_DEL)
-				orig_deleted = 1;
+				orig_deleted = true;
 			else {
 				entry_cnt += __wt_cell_rle(unpack);
 				rle_cnt += __wt_cell_rle(unpack) - 1;

@@ -644,11 +644,11 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_COL_INT, 1, mod->mod_multi_entries, 0, &next));
+		    WT_PAGE_COL_INT, 1, mod->mod_multi_entries, false, &next));
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_RET(__wt_page_alloc(session,
-		    WT_PAGE_ROW_INT, 0, mod->mod_multi_entries, 0, &next));
+		    WT_PAGE_ROW_INT, 0, mod->mod_multi_entries, false, &next));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -2184,8 +2184,8 @@ __rec_split_row_promote(
 		for (i = r->supd_next; i > 0; --i) {
 			supd = &r->supd[i - 1];
 			if (supd->ins == NULL)
-				WT_ERR(__wt_row_leaf_key(
-				    session, r->page, supd->rip, update, 0));
+				WT_ERR(__wt_row_leaf_key(session,
+				    r->page, supd->rip, update, false));
 			else {
 				update->data = WT_INSERT_KEY(supd->ins);
 				update->size = WT_INSERT_KEY_SIZE(supd->ins);
@@ -2879,8 +2879,8 @@ __rec_raw_decompress(
 		WT_ERR(__wt_illegal_value(session, btree->dhandle->name));
 
 	WT_ERR(__wt_strndup(session, tmp->data, dsk->mem_size, retp));
-	WT_ASSERT(session, __wt_verify_dsk_image(
-	    session, "[raw evict split]", tmp->data, dsk->mem_size, 0) == 0);
+	WT_ASSERT(session, __wt_verify_dsk_image(session,
+	    "[raw evict split]", tmp->data, dsk->mem_size, false) == 0);
 
 err:	__wt_scr_free(session, &tmp);
 	return (ret);
@@ -3170,7 +3170,7 @@ __rec_split_write(WT_SESSION_IMPL *session,
 		case WT_PAGE_ROW_LEAF:
 			if (supd->ins == NULL)
 				WT_ERR(__wt_row_leaf_key(
-				    session, page, supd->rip, key, 0));
+				    session, page, supd->rip, key, false));
 			else {
 				key->data = WT_INSERT_KEY(supd->ins);
 				key->size = WT_INSERT_KEY_SIZE(supd->ins);
@@ -3231,7 +3231,7 @@ supd_check_complete:
 			WT_ERR(__wt_strndup(
 			    session, buf->data, buf->size, &bnd->dsk));
 			WT_ASSERT(session, __wt_verify_dsk_image(session,
-			    "[evict split]", buf->data, buf->size, 1) == 0);
+			    "[evict split]", buf->data, buf->size, true) == 0);
 		}
 		goto done;
 	}
@@ -3369,7 +3369,7 @@ __rec_update_las(WT_SESSION_IMPL *session,
 		case WT_PAGE_ROW_LEAF:
 			if (list->ins == NULL)
 				WT_ERR(__wt_row_leaf_key(
-				    session, page, list->rip, key, 0));
+				    session, page, list->rip, key, false));
 			else {
 				key->data = WT_INSERT_KEY(list->ins);
 				key->size = WT_INSERT_KEY_SIZE(list->ins);
@@ -4978,7 +4978,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 					if (ikey == NULL)
 						WT_ERR(__wt_row_leaf_key(
 						    session,
-						    page, rip, tmpkey, 1));
+						    page, rip, tmpkey, true));
 
 					WT_ERR(__wt_ovfl_discard_add(
 					    session, page, kpack->cell));

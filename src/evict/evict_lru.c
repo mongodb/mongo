@@ -701,7 +701,7 @@ __evict_clear_all_walks(WT_SESSION_IMPL *session)
  *	blocks queued for eviction.
  */
 int
-__wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, int *evict_resetp)
+__wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, bool *evict_resetp)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -715,10 +715,10 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, int *evict_resetp)
 	 * If the file isn't evictable, there's no work to do.
 	 */
 	if (F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
-		*evict_resetp = 0;
+		*evict_resetp = false;
 		return (0);
 	}
-	*evict_resetp = 1;
+	*evict_resetp = true;
 
 	/*
 	 * Hold the walk lock to set the "no eviction" flag: no new pages from
@@ -1447,14 +1447,15 @@ __evict_page(WT_SESSION_IMPL *session, int is_server)
  * crosses its boundaries.
  */
 int
-__wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
+__wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	int count, q_found, txn_busy;
+	int count, q_found;
+	bool txn_busy;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -1478,7 +1479,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 	if (txn_busy) {
 		if (pct_full < 100)
 			return (0);
-		busy = 1;
+		busy = true;
 	}
 
 	/*
@@ -1536,8 +1537,10 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, int busy, u_int pct_full)
 		cache->app_waits++;
 		/* Check if things have changed so that we are busy. */
 		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
-		    txn_global->current != txn_global->oldest_id)
-			busy = count = 1;
+		    txn_global->current != txn_global->oldest_id) {
+			busy = true;
+			count = 1;
+		}
 	}
 	/* NOTREACHED */
 }

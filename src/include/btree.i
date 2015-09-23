@@ -791,7 +791,7 @@ __wt_row_leaf_value_set(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *unpack)
  */
 static inline int
 __wt_row_leaf_key(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, int instantiate)
+    WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, bool instantiate)
 {
 	void *copy;
 
@@ -838,7 +838,7 @@ __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 		session = (WT_SESSION_IMPL *)cbt->iface.session;
 		page = cbt->ref->page;
 		rip = &page->u.row.d[cbt->slot];
-		WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
+		WT_RET(__wt_row_leaf_key(session, page, rip, key, false));
 	} else {
 		key->data = WT_INSERT_KEY(cbt->ins);
 		key->size = WT_INSERT_KEY_SIZE(cbt->ins);
