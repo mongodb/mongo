@@ -286,7 +286,9 @@ public:
         stats.appendNumber("nscanned", summary.totalKeysExamined);
         stats.appendNumber("objectsLoaded", summary.totalDocsExamined);
 
-        stats.append("avgDistance", totalDistance / results);
+        if (results > 0) {
+            stats.append("avgDistance", totalDistance / results);
+        }
         stats.append("maxDistance", farthestDist);
         stats.append("time", CurOp::get(txn)->elapsedMillis());
         stats.done();
