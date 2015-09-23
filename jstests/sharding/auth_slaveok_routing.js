@@ -24,7 +24,7 @@ function doesRouteToSec( coll, query ) {
     return cmdRes.secondary;
 }
 
-var rsOpts = { oplogSize: 10 };
+var rsOpts = { oplogSize: 50 };
 var st = new ShardingTest({ keyFile: 'jstests/libs/key1', shards: 1,
     rs: rsOpts, other: { nopreallocj: 1 }});
 
