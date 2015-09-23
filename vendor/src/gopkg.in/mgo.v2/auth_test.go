@@ -576,7 +576,7 @@ func (s *S) TestAuthLoginCachingWithNewSession(c *C) {
 
 	coll := session.DB("mydb").C("mycoll")
 	err = coll.Insert(M{"n": 1})
-	c.Assert(err, ErrorMatches, "unauthorized|need to login|not authorized for .*")
+	c.Assert(err, ErrorMatches, "unauthorized|need to login|not authorized .*")
 }
 
 func (s *S) TestAuthLoginCachingAcrossPool(c *C) {
@@ -1021,7 +1021,6 @@ var (
 
 	winKerberosPasswordEnv = "MGO_KERBEROS_PASSWORD"
 )
-
 
 // Kerberos has its own suite because it talks to a remote server
 // that is prepared to authenticate against a kerberos deployment.

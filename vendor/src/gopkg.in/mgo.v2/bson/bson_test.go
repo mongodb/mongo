@@ -1056,6 +1056,25 @@ func (i *getterSetterInt) SetBSON(raw bson.Raw) error {
 	return err
 }
 
+type ifaceType interface {
+	Hello()
+}
+
+type ifaceSlice []ifaceType
+
+func (s *ifaceSlice) SetBSON(raw bson.Raw) error {
+	var ns []int
+	if err := raw.Unmarshal(&ns); err != nil {
+		return err
+	}
+	*s = make(ifaceSlice, ns[0])
+	return nil
+}
+
+func (s ifaceSlice) GetBSON() (interface{}, error) {
+	return []int{len(s)}, nil
+}
+
 type (
 	MyString string
 	MyBytes  []byte
@@ -1249,6 +1268,7 @@ var twoWayCrossItems = []crossTypeItem{
 
 	// arrays
 	{&struct{ V [2]int }{[...]int{1, 2}}, map[string][2]int{"v": [2]int{1, 2}}},
+	{&struct{ V [2]byte }{[...]byte{1, 2}}, map[string][2]byte{"v": [2]byte{1, 2}}},
 
 	// zero time
 	{&struct{ V time.Time }{}, map[string]interface{}{"v": time.Time{}}},
@@ -1281,6 +1301,9 @@ var twoWayCrossItems = []crossTypeItem{
 	// bson.D <=> non-struct getter/setter
 	{&bson.D{{"a", 1}}, &getterSetterD{{"a", 1}, {"suffix", true}}},
 	{&bson.D{{"a", 42}}, &gsintvar},
+
+	// Interface slice setter.
+	{&struct{ V ifaceSlice }{ifaceSlice{nil, nil, nil}}, bson.M{"v": []interface{}{3}}},
 }
 
 // Same thing, but only one way (obj1 => obj2).
@@ -1296,6 +1319,11 @@ var oneWayCrossItems = []crossTypeItem{
 
 	// Would get decoded into a int32 too in the opposite direction.
 	{&shortIface{int64(1) << 30}, map[string]interface{}{"v": 1 << 30}},
+
+	// Ensure omitempty on struct with private fields works properly.
+	{&struct {
+		V struct{ v time.Time } ",omitempty"
+	}{}, map[string]interface{}{}},
 }
 
 func testCrossPair(c *C, dump interface{}, load interface{}) {
@@ -1446,31 +1474,65 @@ func (s *S) TestNewObjectIdWithTime(c *C) {
 // ObjectId JSON marshalling.
 
 type jsonType struct {
-	Id *bson.ObjectId
+	Id bson.ObjectId
 }
+
+var jsonIdTests = []struct {
+	value     jsonType
+	json      string
+	marshal   bool
+	unmarshal bool
+	error     string
+}{{
+	value:     jsonType{Id: bson.ObjectIdHex("4d88e15b60f486e428412dc9")},
+	json:      `{"Id":"4d88e15b60f486e428412dc9"}`,
+	marshal:   true,
+	unmarshal: true,
+}, {
+	value:     jsonType{},
+	json:      `{"Id":""}`,
+	marshal:   true,
+	unmarshal: true,
+}, {
+	value:     jsonType{},
+	json:      `{"Id":null}`,
+	marshal:   false,
+	unmarshal: true,
+}, {
+	json:      `{"Id":"4d88e15b60f486e428412dc9A"}`,
+	error:     `Invalid ObjectId in JSON: "4d88e15b60f486e428412dc9A"`,
+	marshal:   false,
+	unmarshal: true,
+}, {
+	json:      `{"Id":"4d88e15b60f486e428412dcZ"}`,
+	error:     `Invalid ObjectId in JSON: "4d88e15b60f486e428412dcZ" .*`,
+	marshal:   false,
+	unmarshal: true,
+}}
 
 func (s *S) TestObjectIdJSONMarshaling(c *C) {
-	id := bson.ObjectIdHex("4d88e15b60f486e428412dc9")
-	v := jsonType{Id: &id}
-	data, err := json.Marshal(&v)
-	c.Assert(err, IsNil)
-	c.Assert(string(data), Equals, `{"Id":"4d88e15b60f486e428412dc9"}`)
-}
+	for _, test := range jsonIdTests {
+		if test.marshal {
+			data, err := json.Marshal(&test.value)
+			if test.error == "" {
+				c.Assert(err, IsNil)
+				c.Assert(string(data), Equals, test.json)
+			} else {
+				c.Assert(err, ErrorMatches, test.error)
+			}
+		}
 
-func (s *S) TestObjectIdJSONUnmarshaling(c *C) {
-	data := []byte(`{"Id":"4d88e15b60f486e428412dc9"}`)
-	v := jsonType{}
-	err := json.Unmarshal(data, &v)
-	c.Assert(err, IsNil)
-	c.Assert(*v.Id, Equals, bson.ObjectIdHex("4d88e15b60f486e428412dc9"))
-}
-
-func (s *S) TestObjectIdJSONUnmarshalingError(c *C) {
-	v := jsonType{}
-	err := json.Unmarshal([]byte(`{"Id":"4d88e15b60f486e428412dc9A"}`), &v)
-	c.Assert(err, ErrorMatches, `Invalid ObjectId in JSON: "4d88e15b60f486e428412dc9A"`)
-	err = json.Unmarshal([]byte(`{"Id":"4d88e15b60f486e428412dcZ"}`), &v)
-	c.Assert(err, ErrorMatches, `Invalid ObjectId in JSON: "4d88e15b60f486e428412dcZ" .*`)
+		if test.unmarshal {
+			var value jsonType
+			err := json.Unmarshal([]byte(test.json), &value)
+			if test.error == "" {
+				c.Assert(err, IsNil)
+				c.Assert(value, DeepEquals, test.value)
+			} else {
+				c.Assert(err, ErrorMatches, test.error)
+			}
+		}
+	}
 }
 
 // --------------------------------------------------------------------------

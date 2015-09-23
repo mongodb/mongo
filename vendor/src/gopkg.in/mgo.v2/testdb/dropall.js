@@ -3,7 +3,7 @@ var ports = [40001, 40002, 40011, 40012, 40013, 40021, 40022, 40023, 40041, 4010
 var auth = [40002, 40103, 40203, 40031]
 var db1 = new Mongo("localhost:40001")
 
-if (db1.getDB("admin").serverBuildInfo().OpenSSLVersion != "") {
+if (db1.getDB("admin").serverBuildInfo().OpenSSLVersion) {
     ports.push(40003)
     auth.push(40003)
 }
@@ -32,12 +32,12 @@ for (var i in ports) {
     }
     var result = admin.runCommand({"listDatabases": 1})
     for (var j = 0; j != 100; j++) {
-        if (typeof result.databases != "undefined" || result.errmsg == "not master") {
+        if (typeof result.databases != "undefined" || notMaster(result)) {
             break
         }
         result = admin.runCommand({"listDatabases": 1})
     }
-    if (result.errmsg == "not master") {
+    if (notMaster(result)) {
         continue
     }
     if (typeof result.databases == "undefined") {
@@ -57,6 +57,10 @@ for (var i in ports) {
             mongo.getDB(db.name).dropDatabase()
         }
     }
+}
+
+function notMaster(result) {
+        return typeof result.errmsg != "undefined" && result.errmsg.indexOf("not master") >= 0
 }
 
 // vim:ts=4:sw=4:et

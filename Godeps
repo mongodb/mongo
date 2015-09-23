@@ -1,4 +1,4 @@
-gopkg.in/mgo.v2                         6bc18a881e53b57a25d47acb4a04c8a1770e5ce2	github.com/go-mgo/mgo
+gopkg.in/mgo.v2                         22287bab4379e1fbf6002fb4eb769888f3fb224c	github.com/go-mgo/mgo
 gopkg.in/tomb.v2                        14b3d72120e8d10ea6e6b7f87f7175734b1faab8	github.com/go-tomb/tomb
 github.com/jacobsa/oglematchers         4fc24f97b5b74022c2a3f4ca7eed57ca29083d3e
 github.com/smartystreets/goconvey       75bc4a2dad71e5c5b51c5009b33eba766ec57051
