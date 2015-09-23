@@ -81,8 +81,6 @@ public:
     virtual Status stopPing(StringData processId) override;
 
 private:
-    RemoteCommandTargeter* _targeter();
-
     StatusWith<std::vector<BSONObj>> _findOnConfig(const HostAndPort& host,
                                                    const NamespaceString& nss,
                                                    const BSONObj& query,
