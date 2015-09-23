@@ -91,7 +91,7 @@ public:
 
     const SpecificStats* getSpecificStats() const final;
 
-    typedef unordered_set<StringData, StringData::Hasher> FieldSet;
+    using FieldSet = StringMap<bool>;  // Value is unused.
 
     /**
      * Given the projection spec for a simple inclusion projection,
@@ -131,7 +131,7 @@ private:
 
     // Data used for both SIMPLE_DOC and COVERED_ONE_INDEX paths.
     // Has the field names present in the simple projection.
-    unordered_set<StringData, StringData::Hasher> _includedFields;
+    FieldSet _includedFields;
 
     //
     // Used for the COVERED_ONE_INDEX path.
