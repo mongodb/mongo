@@ -150,6 +150,7 @@ void WiredTigerRecoveryUnit::_ensureSession() {
 }
 
 bool WiredTigerRecoveryUnit::waitUntilDurable() {
+    invariant(!_inUnitOfWork);
     _ensureSession();
     _sessionCache->waitUntilDurable(_session);
     return true;
