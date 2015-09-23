@@ -28,13 +28,13 @@ if (typeof getToolTest === 'undefined') {
   } else {
     // On sharded and standalone, kill the server
     startParallelShell(
-      'sleep(1000); ' +
+      'sleep(500); ' +
       (toolTest.authCommand || '') +
       'db.getSiblingDB(\'admin\').shutdownServer({ force: true });');
   }
 
   var dumpArgs = ['dump', '--db', 'foo', '--collection', 'bar',
-    '--query', '{ $where: "sleep(10); return true;" }'].
+    '--query', '{ $where: "sleep(25); return true;" }'].
         concat(getDumpTarget()).
         concat(commonToolArgs);
 
@@ -42,8 +42,9 @@ if (typeof getToolTest === 'undefined') {
     'mongodump should crash gracefully when remote server dies');
 
   var output = rawMongoProgramOutput();
-  var expectedError = 'error reading from db';
-  assert(output.indexOf(expectedError) !== -1,
+  var expectedError1 = 'error reading from db';
+  var expectedError2 = 'error reading collection';
+  assert( output.indexOf(expectedError1) !== -1 || output.indexOf(expectedError2) !== -1 ,
     'mongodump crash should output the correct error message');
 
   toolTest.stop();

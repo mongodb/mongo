@@ -543,12 +543,17 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 // dumped, and any errors that occured.
 func (dump *MongoDump) dumpQueryToWriter(
 	query *mgo.Query, intent *intents.Intent) (int64, error) {
-
-	total, err := query.Count()
-	if err != nil {
-		return int64(0), fmt.Errorf("error reading from db: %v", err)
+	var total int
+	var err error
+	if len(dump.query) == 0 {
+		total, err = query.Count()
+		if err != nil {
+			return int64(0), fmt.Errorf("error reading from db: %v", err)
+		}
+		log.Logf(log.DebugLow, "counted %v %v in %v", total, docPlural(int64(total)), intent.Namespace())
+	} else {
+		log.Logf(log.DebugLow, "not counting query on %v", intent.Namespace())
 	}
-	log.Logf(log.Info, "\tcounted %v %v in %v", total, docPlural(int64(total)), intent.Namespace())
 
 	dumpProgressor := progress.NewCounter(int64(total))
 	bar := &progress.Bar{
