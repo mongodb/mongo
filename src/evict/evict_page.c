@@ -106,7 +106,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		conn->cache->evict_max_page_size = page->memory_footprint;
 
 	/* Update the reference and discard the page. */
-	if (mod == NULL || mod->recon_result == 0) {
+	if (mod == NULL || mod->rec_result == 0) {
 		if (__wt_ref_is_root(ref))
 			__wt_ref_out(session, ref);
 		else
@@ -184,7 +184,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	parent = ref->home;
 	mod = ref->page->modify;
 
-	switch (mod->recon_result) {
+	switch (mod->rec_result) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 		/* Discard the parent's address. */
 		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {

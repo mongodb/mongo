@@ -147,7 +147,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	mod = page->modify;
 
-	switch (mod->recon_result) {
+	switch (mod->rec_result) {
 	case WT_PM_REC_MULTIBLOCK:
 	case WT_PM_REC_REWRITE:
 		/* Free list of replacement blocks. */
