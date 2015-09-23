@@ -45,6 +45,15 @@ namespace executor {
 AsyncSecureStream::AsyncSecureStream(asio::io_service* io_service, asio::ssl::context* sslContext)
     : _stream(*io_service, *sslContext) {}
 
+AsyncSecureStream::~AsyncSecureStream() {
+    std::error_code ec;
+    _stream.lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+    _stream.lowest_layer().close();
+    if (ec) {
+        warning() << "Failed to close AsyncSecureStream: " << ec.message();
+    }
+}
+
 void AsyncSecureStream::connect(const asio::ip::tcp::resolver::iterator endpoints,
                                 ConnectHandler&& connectHandler) {
     // Stash the connectHandler as we won't be able to call it until we re-enter the state

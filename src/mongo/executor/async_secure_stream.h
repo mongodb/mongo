@@ -44,6 +44,8 @@ class AsyncSecureStream final : public AsyncStreamInterface {
 public:
     AsyncSecureStream(asio::io_service* io_service, asio::ssl::context* sslContext);
 
+    ~AsyncSecureStream();
+
     void connect(const asio::ip::tcp::resolver::iterator endpoints,
                  ConnectHandler&& connectHandler) override;
 

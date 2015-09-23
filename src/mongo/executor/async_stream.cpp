@@ -26,9 +26,14 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
+
 #include "mongo/platform/basic.h"
 
+#include <atomic>
+
 #include "mongo/executor/async_stream.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace executor {
@@ -36,6 +41,15 @@ namespace executor {
 using asio::ip::tcp;
 
 AsyncStream::AsyncStream(asio::io_service* io_service) : _stream(*io_service) {}
+
+AsyncStream::~AsyncStream() {
+    std::error_code ec;
+    _stream.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+    _stream.close();
+    if (ec) {
+        warning() << "Failed to close AsyncStream: " << ec.message();
+    }
+}
 
 void AsyncStream::connect(tcp::resolver::iterator iter, ConnectHandler&& connectHandler) {
     asio::async_connect(

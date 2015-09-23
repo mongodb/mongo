@@ -39,6 +39,8 @@ class AsyncStream final : public AsyncStreamInterface {
 public:
     AsyncStream(asio::io_service* io_service);
 
+    ~AsyncStream();
+
     void connect(asio::ip::tcp::resolver::iterator iter, ConnectHandler&& connectHandler) override;
 
     void write(asio::const_buffer buffer, StreamHandler&& streamHandler) override;
