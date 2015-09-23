@@ -746,9 +746,7 @@ DB.prototype._getCollectionInfosCommand = function(filter) {
         throw _getErrorWithCode(res, "listCollections failed: " + tojson(res));
     }
 
-    // The listCollections command returns its results sorted by collection name.  There's no need
-    // to re-sort.
-    return new DBCommandCursor(this._mongo, res).toArray();
+    return new DBCommandCursor(this._mongo, res).toArray().sort(compareOn("name"));
 }
 
 /**

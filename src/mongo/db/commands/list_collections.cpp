@@ -30,7 +30,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <vector>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -50,11 +52,92 @@
 
 namespace mongo {
 
-using std::list;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
+using std::vector;
 using stdx::make_unique;
+
+namespace {
+/**
+ * Determines if 'matcher' is an exact match on the "name" field. If so, returns a vector of all the
+ * collection names it is matching against. Returns {} if there is no obvious exact match on name.
+ *
+ * Note the collection names returned are not guaranteed to exist, nor are they guaranteed to match
+ * 'matcher'.
+ */
+boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* matcher) {
+    if (!matcher) {
+        return {};
+    }
+
+    MatchExpression::MatchType matchType(matcher->matchType());
+    if (matchType == MatchExpression::EQ) {
+        auto eqMatch = checked_cast<const EqualityMatchExpression*>(matcher);
+        if (eqMatch->path() == "name") {
+            auto& elem = eqMatch->getData();
+            if (elem.type() == String) {
+                return {vector<StringData>{elem.valueStringData()}};
+            } else {
+                return vector<StringData>();
+            }
+        }
+    } else if (matchType == MatchExpression::MATCH_IN) {
+        auto matchIn = checked_cast<const InMatchExpression*>(matcher);
+        const ArrayFilterEntries& entries = matchIn->getData();
+        if (matchIn->path() == "name" && entries.numRegexes() == 0) {
+            vector<StringData> exactMatches;
+            for (auto&& elem : entries.equalities()) {
+                if (elem.type() == String) {
+                    exactMatches.push_back(elem.valueStringData());
+                }
+            }
+            return {std::move(exactMatches)};
+        }
+    }
+    return {};
+}
+
+/**
+ * Uses 'matcher' to determine if the collection's information should be added to 'root'. If so,
+ * allocates a WorkingSetMember containing information about 'collection', and adds it to 'root'.
+ *
+ * Does not add any information about the system.namespaces collection, or non-existent collections.
+ */
+void _addWorkingSetMember(OperationContext* txn,
+                          const Collection* collection,
+                          const MatchExpression* matcher,
+                          WorkingSet* ws,
+                          QueuedDataStage* root) {
+    if (!collection) {
+        return;
+    }
+
+    StringData collectionName = collection->ns().coll();
+    if (collectionName == "system.namespaces") {
+        return;
+    }
+
+    BSONObjBuilder b;
+    b.append("name", collectionName);
+
+    CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(txn);
+    b.append("options", options.toBSON());
+
+    BSONObj maybe = b.obj();
+    if (matcher && !matcher->matchesBSON(maybe)) {
+        return;
+    }
+
+    WorkingSetID id = ws->allocate();
+    WorkingSetMember* member = ws->get(id);
+    member->keyData.clear();
+    member->loc = RecordId();
+    member->obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
+    member->transitionToOwnedObj();
+    root->pushBack(id);
+}
+}  // namespace
 
 class CmdListCollections : public Command {
 public:
@@ -133,38 +216,16 @@ public:
         auto root = make_unique<QueuedDataStage>(txn, ws.get());
 
         if (db) {
-            // TODO when we stop needing to sort the output, don't copy to a vector and just iterate
-            // db.
-            auto collections = std::vector<Collection*>(db->begin(), db->end());
-            std::sort(collections.begin(),
-                      collections.end(),
-                      [](Collection* l, Collection* r) { return l->ns().coll() < r->ns().coll(); });
-
-            for (auto&& collection : collections) {
-                StringData collectionName = collection->ns().coll();
-                if (collectionName == "system.namespaces") {
-                    continue;
+            if (auto collNames = _getExactNameMatches(matcher.get())) {
+                for (auto&& collName : *collNames) {
+                    auto nss = NamespaceString(db->name(), collName);
+                    _addWorkingSetMember(
+                        txn, db->getCollection(nss), matcher.get(), ws.get(), root.get());
                 }
-
-                BSONObjBuilder b;
-                b.append("name", collectionName);
-
-                CollectionOptions options =
-                    collection->getCatalogEntry()->getCollectionOptions(txn);
-                b.append("options", options.toBSON());
-
-                BSONObj maybe = b.obj();
-                if (matcher && !matcher->matchesBSON(maybe)) {
-                    continue;
+            } else {
+                for (auto&& collection : *db) {
+                    _addWorkingSetMember(txn, collection, matcher.get(), ws.get(), root.get());
                 }
-
-                WorkingSetID id = ws->allocate();
-                WorkingSetMember* member = ws->get(id);
-                member->keyData.clear();
-                member->loc = RecordId();
-                member->obj = Snapshotted<BSONObj>(SnapshotId(), maybe);
-                member->transitionToOwnedObj();
-                root->pushBack(id);
             }
         }
 
@@ -209,6 +270,5 @@ public:
 
         return true;
     }
-
 } cmdListCollections;
 }
