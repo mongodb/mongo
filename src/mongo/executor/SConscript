@@ -168,8 +168,9 @@ env.CppIntegrationTest(
         'network_interface_asio_integration_test.cpp',
     ],
     LIBDEPS=[
-        'network_interface_asio',
         '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'network_interface_asio',
     ],
 )
 

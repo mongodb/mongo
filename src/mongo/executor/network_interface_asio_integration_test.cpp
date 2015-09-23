@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
 #include <exception>
 
 #include "mongo/client/connection_string.h"
@@ -39,12 +40,14 @@
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/executor/network_interface_asio_test_utils.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -58,6 +61,7 @@ public:
         NetworkInterfaceASIO::Options options{};
         options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
         options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+        options.connectionPoolOptions.maxConnections = 256u;
         _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
         _net->startup();
     }
@@ -76,17 +80,19 @@ public:
         return unittest::getFixtureConnectionString();
     }
 
-    StatusWith<RemoteCommandResponse> runCommand(const RemoteCommandRequest& request) {
-        auto cb = makeCallbackHandle();
+    Deferred<StatusWith<RemoteCommandResponse>> runCommand(
+        const TaskExecutor::CallbackHandle& cbHandle, const RemoteCommandRequest& request) {
         Deferred<StatusWith<RemoteCommandResponse>> deferred;
-        log() << "running command: " << request.toString();
-
-        net().startCommand(cb,
+        net().startCommand(cbHandle,
                            request,
-                           [&deferred](StatusWith<RemoteCommandResponse> resp) {
+                           [deferred](StatusWith<RemoteCommandResponse> resp) mutable {
                                deferred.emplace(std::move(resp));
                            });
+        return deferred;
+    }
 
+    StatusWith<RemoteCommandResponse> runCommandSync(const RemoteCommandRequest& request) {
+        auto deferred = runCommand(makeCallbackHandle(), request);
         auto& res = deferred.get();
         if (res.isOK()) {
             log() << "got command result: " << res.getValue().toString();
@@ -99,8 +105,8 @@ public:
     void assertCommandOK(StringData db,
                          const BSONObj& cmd,
                          Milliseconds timeoutMillis = Milliseconds(-1)) {
-        auto res = unittest::assertGet(
-            runCommand({fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis}));
+        auto res = unittest::assertGet(runCommandSync(
+            {fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis}));
         ASSERT_OK(getStatusFromCommandResult(res.data));
     }
 
@@ -108,8 +114,8 @@ public:
                                     const BSONObj& cmd,
                                     Milliseconds timeoutMillis,
                                     ErrorCodes::Error reason) {
-        auto clientStatus =
-            runCommand({fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis});
+        auto clientStatus = runCommandSync(
+            {fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis});
         ASSERT_TRUE(clientStatus == reason);
     }
 
@@ -117,8 +123,8 @@ public:
                                     const BSONObj& cmd,
                                     Milliseconds timeoutMillis,
                                     ErrorCodes::Error reason) {
-        auto res = unittest::assertGet(
-            runCommand({fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis}));
+        auto res = unittest::assertGet(runCommandSync(
+            {fixture().getServers()[0], db.toString(), cmd, BSONObj(), timeoutMillis}));
         auto serverStatus = getStatusFromCommandResult(res.data);
         ASSERT_TRUE(serverStatus == reason);
     }
@@ -160,12 +166,139 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, Timeouts) {
                                Milliseconds(10000000000),  // big, big timeout.
                                ErrorCodes::JSInterpreterFailure);
 
-    // Run a find command with a big timeout. It should return before we hit the ASIO timeout.
+    // Run a find command with a big timeout.It should return before we hit the ASIO
+    // timeout
     assertCommandOK("foo",
                     BSON("find"
                          << "bar"
                          << "limit" << 1),
                     Milliseconds(10000000));
+}
+
+class StressTestOp {
+public:
+    using Fixture = NetworkInterfaceASIOIntegrationTest;
+    using Pool = ThreadPoolInterface;
+
+    Deferred<Status> run(Fixture* fixture, Pool* pool) {
+        auto cb = makeCallbackHandle();
+        auto self = *this;
+        auto out =
+            fixture->runCommand(cb,
+                                {unittest::getFixtureConnectionString().getServers()[0],
+                                 "foo",
+                                 _command,
+                                 Seconds(5)})
+                .then(pool,
+                      [self](StatusWith<RemoteCommandResponse> resp) -> Status {
+                          auto status = resp.isOK()
+                              ? getStatusFromCommandResult(resp.getValue().data)
+                              : resp.getStatus();
+
+                          return status == self._expected
+                              ? Status::OK()
+                              : Status{ErrorCodes::BadValue,
+                                       str::stream() << "Expected "
+                                                     << ErrorCodes::errorString(self._expected)
+                                                     << " but got " << status.toString()};
+                      });
+        if (_cancel) {
+            // TODO: have this happen at some random time in the future.
+            fixture->net().cancelCommand(cb);
+        }
+        return out;
+    }
+
+    static Deferred<Status> runTimeoutOp(Fixture* fixture, Pool* pool) {
+        return StressTestOp(BSON("find"
+                                 << "bar"
+                                 << "filter" << BSON("$where"
+                                                     << "while(true) { sleep(1); }")),
+                            ErrorCodes::ExceededTimeLimit,
+                            false).run(fixture, pool);
+    }
+
+    static Deferred<Status> runCompleteOp(Fixture* fixture, Pool* pool) {
+        return StressTestOp(BSON("find"
+                                 << "baz"
+                                 << "limit" << 1),
+                            ErrorCodes::OK,
+                            false).run(fixture, pool);
+    }
+
+    static Deferred<Status> runCancelOp(Fixture* fixture, Pool* pool) {
+        return StressTestOp(BSON("find"
+                                 << "bar"
+                                 << "filter" << BSON("$where"
+                                                     << "while(true) { sleep(1); }")),
+                            ErrorCodes::CallbackCanceled,
+                            true).run(fixture, pool);
+    }
+
+private:
+    StressTestOp(const BSONObj& command, ErrorCodes::Error expected, bool cancel)
+        : _command(command), _expected(expected), _cancel(cancel) {}
+
+    BSONObj _command;
+    ErrorCodes::Error _expected;
+    bool _cancel;
+};
+
+TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
+    const std::size_t numOps = 10000;
+    std::vector<Deferred<Status>> ops;
+
+    std::unique_ptr<SecureRandom> seedSource{SecureRandom::create()};
+    auto seed = seedSource->nextInt64();
+
+    log() << "Random seed is " << seed;
+    auto rng = PseudoRandom(seed);  // TODO: read from command line
+    log() << "Starting stress test...";
+
+    ThreadPool::Options threadPoolOpts;
+    threadPoolOpts.poolName = "StressTestPool";
+    threadPoolOpts.maxThreads = 8;
+    ThreadPool pool(threadPoolOpts);
+    pool.startup();
+
+    auto poolGuard = MakeGuard([&pool] {
+        pool.schedule([&pool] { pool.shutdown(); });
+        pool.join();
+    });
+
+    std::generate_n(std::back_inserter(ops),
+                    numOps,
+                    [&rng, &pool, this] {
+                        switch (rng.nextInt32(3)) {
+                            case 0:
+                                return StressTestOp::runCancelOp(this, &pool);
+                            case 1:
+                                return StressTestOp::runCompleteOp(this, &pool);
+
+                            case 2:
+                                // TODO: Reenable runTimeoutOp after we fix whatever bug causes it
+                                // to hang.
+                                // return StressTestOp::runTimeoutOp(this, &pool);
+                                return StressTestOp::runCompleteOp(this, &pool);
+                            default:
+
+                                MONGO_UNREACHABLE;
+                        }
+                    });
+
+    log() << "running ops";
+    auto res = helpers::collect(ops, &pool)
+                   .then(&pool,
+                         [](std::vector<Status> opResults) -> Status {
+                             for (const auto& opResult : opResults) {
+                                 if (!opResult.isOK()) {
+                                     return opResult;
+                                 }
+                             }
+                             return Status::OK();
+                         })
+                   .get();
+    ASSERT_OK(res);
 }
 
 }  // namespace
