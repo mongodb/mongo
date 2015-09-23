@@ -1227,12 +1227,9 @@ StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
     return StatusWith<RecordId>(records[0].id);
 }
 
-
-void WiredTigerRecordStore::_dealtWithCappedId(const RecordId& id) {
+void WiredTigerRecordStore::_dealtWithCappedId(SortedRecordIds::iterator it) {
+    invariant(&(*it) != NULL);
     stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-    SortedRecordIds::iterator it =
-        std::find(_uncommittedRecordIds.begin(), _uncommittedRecordIds.end(), id);
-    invariant(it != _uncommittedRecordIds.end());
     _uncommittedRecordIds.erase(it);
 }
 
@@ -1513,31 +1510,32 @@ Status WiredTigerRecordStore::oplogDiskLocRegister(OperationContext* txn, const 
 
 class WiredTigerRecordStore::CappedInsertChange : public RecoveryUnit::Change {
 public:
-    CappedInsertChange(WiredTigerRecordStore* rs, const RecordId& id) : _rs(rs), _id(id) {}
+    CappedInsertChange(WiredTigerRecordStore* rs, SortedRecordIds::iterator it)
+        : _rs(rs), _it(it) {}
 
     virtual void commit() {
         // Do not notify here because all committed inserts notify, always.
-        _rs->_dealtWithCappedId(_id);
+        _rs->_dealtWithCappedId(_it);
     }
 
     virtual void rollback() {
         // Notify on rollback since it might make later commits visible.
-        _rs->_dealtWithCappedId(_id);
+        _rs->_dealtWithCappedId(_it);
         if (_rs->_cappedCallback)
             _rs->_cappedCallback->notifyCappedWaitersIfNeeded();
     }
 
 private:
     WiredTigerRecordStore* _rs;
-    RecordId _id;
+    SortedRecordIds::iterator _it;
 };
 
 void WiredTigerRecordStore::_addUncommitedRecordId_inlock(OperationContext* txn,
                                                           const RecordId& id) {
     // todo: make this a dassert at some point
     // invariant(_uncommittedRecordIds.empty() || _uncommittedRecordIds.back() < id);
-    _uncommittedRecordIds.push_back(id);
-    txn->recoveryUnit()->registerChange(new CappedInsertChange(this, id));
+    SortedRecordIds::iterator it = _uncommittedRecordIds.insert(_uncommittedRecordIds.end(), id);
+    txn->recoveryUnit()->registerChange(new CappedInsertChange(this, it));
     _oplog_highestSeen = id;
 }
 

@@ -57,6 +57,7 @@ class WiredTigerRecoveryUnit;
 class WiredTigerSizeStorer;
 
 extern const std::string kWiredTigerEngineName;
+typedef std::list<RecordId> SortedRecordIds;
 
 class WiredTigerRecordStore : public RecordStore {
 public:
@@ -246,7 +247,7 @@ private:
     static int64_t _makeKey(const RecordId& id);
     static RecordId _fromKey(int64_t k);
 
-    void _dealtWithCappedId(const RecordId& id);
+    void _dealtWithCappedId(SortedRecordIds::iterator it);
     void _addUncommitedRecordId_inlock(OperationContext* txn, const RecordId& id);
 
     RecordId _nextId();
@@ -277,7 +278,6 @@ private:
 
     const bool _useOplogHack;
 
-    typedef std::vector<RecordId> SortedRecordIds;
     SortedRecordIds _uncommittedRecordIds;
     RecordId _oplog_visibleTo;
     RecordId _oplog_highestSeen;
