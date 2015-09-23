@@ -98,6 +98,20 @@ TEST_F(ReplCoordTest, StartupWithValidLocalConfig) {
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345"))),
                        HostAndPort("node1", 12345));
+    ASSERT_TRUE(getExternalState()->threadsStarted());
+}
+
+TEST_F(ReplCoordTest, StartupWithValidLocalConfigAsArbiter) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                     << "node1:12345"
+                                                     << "arbiterOnly" << true)
+                                          << BSON("_id" << 2 << "host"
+                                                        << "node2:12345"))),
+                       HostAndPort("node1", 12345));
+    ASSERT_FALSE(getExternalState()->threadsStarted());
 }
 
 TEST_F(ReplCoordTest, StartupWithConfigMissingSelf) {
@@ -162,6 +176,7 @@ TEST_F(ReplCoordTest, InitiateSucceedsWithOneNodeConfig) {
                                                                              << "node1:12345"))),
                                                &result1));
     ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
+    ASSERT_TRUE(getExternalState()->threadsStarted());
 
     // Show that initiate fails after it has already succeeded.
     BSONObjBuilder result2;
@@ -177,6 +192,29 @@ TEST_F(ReplCoordTest, InitiateSucceedsWithOneNodeConfig) {
 
     // Still in repl set mode, even after failed reinitiate.
     ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
+}
+
+TEST_F(ReplCoordTest, InitiateFailsAsArbiter) {
+    OperationContextNoop txn;
+    init("mySet");
+    start(HostAndPort("node1", 12345));
+    ASSERT_EQUALS(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
+
+    // Starting uninitialized, show that we can perform the initiate behavior.
+    BSONObjBuilder result1;
+    auto status = getReplCoord()->processReplSetInitiate(
+        &txn,
+        BSON("_id"
+             << "mySet"
+             << "version" << 1 << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "node1:12345"
+                                                                     << "arbiterOnly" << true)
+                                                          << BSON("_id" << 1 << "host"
+                                                                        << "node2:12345"))),
+        &result1);
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "is not electable under the new configuration version");
+    ASSERT_FALSE(getExternalState()->threadsStarted());
 }
 
 TEST_F(ReplCoordTest, InitiateSucceedsAfterFailing) {

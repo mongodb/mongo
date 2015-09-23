@@ -134,6 +134,11 @@ public:
      */
     bool isApplierSignaledToCancelFetcher() const;
 
+    /**
+     * Returns true if startThreads() has been called.
+     */
+    bool threadsStarted() const;
+
 private:
     StatusWith<BSONObj> _localRsConfigDocument;
     StatusWith<LastVote> _localRsLastVoteDocument;
@@ -153,6 +158,7 @@ private:
     bool _isApplierSignaledToCancelFetcher;
     bool _connectionsClosed;
     HostAndPort _clientHostAndPort;
+    bool _threadsStarted;
 };
 
 }  // namespace repl

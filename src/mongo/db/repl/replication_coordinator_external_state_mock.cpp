@@ -53,11 +53,15 @@ ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock
       _storeLocalConfigDocumentShouldHang(false),
       _storeLocalLastVoteDocumentShouldHang(false),
       _isApplierSignaledToCancelFetcher(false),
-      _connectionsClosed(false) {}
+      _connectionsClosed(false),
+      _threadsStarted(false) {}
 
 ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
 
-void ReplicationCoordinatorExternalStateMock::startThreads() {}
+void ReplicationCoordinatorExternalStateMock::startThreads() {
+    _threadsStarted = true;
+}
+
 void ReplicationCoordinatorExternalStateMock::startMasterSlave(OperationContext*) {}
 void ReplicationCoordinatorExternalStateMock::initiateOplog(OperationContext* txn,
                                                             bool updateReplOpTime) {}
@@ -160,6 +164,10 @@ void ReplicationCoordinatorExternalStateMock::setStoreLocalConfigDocumentToHang(
 
 bool ReplicationCoordinatorExternalStateMock::isApplierSignaledToCancelFetcher() const {
     return _isApplierSignaledToCancelFetcher;
+}
+
+bool ReplicationCoordinatorExternalStateMock::threadsStarted() const {
+    return _threadsStarted;
 }
 
 void ReplicationCoordinatorExternalStateMock::setStoreLocalLastVoteDocumentStatus(Status status) {

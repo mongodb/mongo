@@ -424,7 +424,11 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
         lk.unlock();
 
-        _externalState->startThreads();
+        bool isArbiter = myIndex.isOK() && myIndex.getValue() != -1 &&
+            newConfig.getMemberAt(myIndex.getValue()).isArbiter();
+        if (!isArbiter) {
+            _externalState->startThreads();
+        }
     }
 
     const stdx::function<void(const ReplicationExecutor::CallbackArgs&)> reconfigFinishFn(
