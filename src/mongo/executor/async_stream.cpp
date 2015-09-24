@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <atomic>
-
 #include "mongo/executor/async_stream.h"
 #include "mongo/util/log.h"
 
