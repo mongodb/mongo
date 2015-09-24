@@ -106,7 +106,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		WT_ERR(__wt_spin_init(
 		    session, &cp->cache_pool_lock, "cache shared pool"));
 		WT_ERR(__wt_cond_alloc(session,
-		    "cache pool server", 0, &cp->cache_pool_cond));
+		    "cache pool server", false, &cp->cache_pool_cond));
 
 		__wt_process.cache_pool = cp;
 		WT_ERR(__wt_verbose(session,

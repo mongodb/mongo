@@ -13,7 +13,7 @@
  *	Lock/unlock a byte in a file.
  */
 int
-__wt_bytelock(WT_FH *fhp, wt_off_t byte, int lock)
+__wt_bytelock(WT_FH *fhp, wt_off_t byte, bool lock)
 {
 	WT_DECL_RET;
 

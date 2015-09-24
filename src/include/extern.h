@@ -465,7 +465,7 @@ extern int __wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, v
 extern void __wt_free_int(WT_SESSION_IMPL *session, const void *p_arg);
 extern int __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix, uint32_t flags, char ***dirlist, u_int *countp);
 extern int __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp);
-extern int __wt_dlsym(WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, int fail, void *sym_ret);
+extern int __wt_dlsym(WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, bool fail, void *sym_ret);
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
 extern int __wt_errno(void);
 extern const char *__wt_strerror(WT_SESSION_IMPL *session, int error, char *errbuf, size_t errlen);
@@ -474,7 +474,7 @@ extern void __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_fallocate( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len);
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep);
 extern int __wt_filesize_name( WT_SESSION_IMPL *session, const char *filename, wt_off_t *sizep);
-extern int __wt_bytelock(WT_FH *fhp, wt_off_t byte, int lock);
+extern int __wt_bytelock(WT_FH *fhp, wt_off_t byte, bool lock);
 extern int __wt_directory_sync_fh(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_directory_sync(WT_SESSION_IMPL *session, char *path);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
@@ -487,7 +487,7 @@ extern int __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *le
 extern int __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size);
 extern int __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size);
 extern int __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len, void **mappingcookie);
-extern int __wt_cond_alloc(WT_SESSION_IMPL *session, const char *name, int is_signalled, WT_CONDVAR **condp);
+extern int __wt_cond_alloc(WT_SESSION_IMPL *session, const char *name, bool is_signalled, WT_CONDVAR **condp);
 extern int __wt_cond_wait_signal( WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, bool *signalled);
 extern int __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp);
@@ -504,7 +504,7 @@ extern int __wt_open(WT_SESSION_IMPL *session, const char *name, bool ok_create,
 extern int __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp);
 extern bool __wt_absolute_path(const char *path);
 extern const char *__wt_path_separator(void);
-extern int __wt_has_priv(void);
+extern bool __wt_has_priv(void);
 extern int __wt_remove(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to);
 extern int __wt_read( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf);

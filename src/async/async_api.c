@@ -240,7 +240,8 @@ __async_start(WT_SESSION_IMPL *session)
 	async = conn->async;
 	TAILQ_INIT(&async->formatqh);
 	WT_RET(__wt_spin_init(session, &async->ops_lock, "ops"));
-	WT_RET(__wt_cond_alloc(session, "async flush", 0, &async->flush_cond));
+	WT_RET(__wt_cond_alloc(
+	    session, "async flush", false, &async->flush_cond));
 	WT_RET(__wt_async_op_init(session));
 
 	/*
