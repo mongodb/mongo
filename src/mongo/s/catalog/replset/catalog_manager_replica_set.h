@@ -149,6 +149,9 @@ private:
 
     StatusWith<std::string> _generateNewShardName(OperationContext* txn) override;
 
+    /**
+     * Helper method for running a read command against the config server.
+     */
     bool _runReadCommand(OperationContext* txn,
                          const std::string& dbname,
                          const BSONObj& cmdObj,
@@ -156,15 +159,15 @@ private:
                          BSONObjBuilder* result);
 
     /**
-     * Helper method for running a count command against a given target server with appropriate
+     * Helper method for running a count command against the config server with appropriate
      * error handling.
      */
-    StatusWith<long long> _runCountCommandOnConfig(const HostAndPort& target,
+    StatusWith<long long> _runCountCommandOnConfig(OperationContext* txn,
                                                    const NamespaceString& ns,
                                                    BSONObj query);
 
     StatusWith<OpTimePair<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
-        const HostAndPort& host,
+        OperationContext* txn,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
