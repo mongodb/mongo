@@ -451,12 +451,18 @@ struct __wt_page {
 			 */
 			uint32_t deepen_split_append;
 			uint32_t deepen_split_last;
+			/*
+			 * Used to protect and fairly co-ordinate splits into
+			 * this page.
+			 */
+			WT_RWLOCK *split_lock;
 		} intl;
 #undef	pg_intl_recno
 #define	pg_intl_recno			u.intl.recno
 #define	pg_intl_parent_ref		u.intl.parent_ref
 #define	pg_intl_deepen_split_append	u.intl.deepen_split_append
 #define	pg_intl_deepen_split_last	u.intl.deepen_split_last
+#define	pg_intl_split_lock		u.intl.split_lock
 
 	/*
 	 * Macros to copy/set the index because the name is obscured to ensure

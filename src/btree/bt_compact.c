@@ -55,10 +55,20 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 		 * The page's modification information can change underfoot if
 		 * the page is being reconciled, serialize with reconciliation.
 		 */
-		F_CAS_ATOMIC_WAIT(page, WT_PAGE_RECONCILIATION);
+		if (WT_PAGE_IS_INTERNAL(page))
+			WT_RET(__wt_writelock(
+			    session, page->pg_intl_split_lock));
+		else
+			F_CAS_ATOMIC_WAIT(page, WT_PAGE_RECONCILIATION);
+
 		ret = bm->compact_page_skip(bm, session,
 		    mod->mod_replace.addr, mod->mod_replace.size, skipp);
-		F_CLR_ATOMIC(page, WT_PAGE_RECONCILIATION);
+
+		if (WT_PAGE_IS_INTERNAL(page))
+			WT_TRET(__wt_writeunlock(
+			    session, page->pg_intl_split_lock));
+		else
+			F_CLR_ATOMIC(page, WT_PAGE_RECONCILIATION);
 		WT_RET(ret);
 	}
 	return (0);
