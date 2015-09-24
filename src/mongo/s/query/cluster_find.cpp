@@ -262,6 +262,9 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
             ChunkVersionAndOpTime versionAndOpTime(chunkManager->getVersion(shard->getId()),
                                                    chunkManager->getConfigOpTime());
             versionAndOpTime.appendForCommands(&cmdBuilder);
+        } else if (!query.nss().isOnInternalDb()) {
+            ChunkVersionAndOpTime versionAndOpTime(ChunkVersion::UNSHARDED());
+            versionAndOpTime.appendForCommands(&cmdBuilder);
         }
 
         params.remotes.emplace_back(
@@ -378,8 +381,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
         LOG(1) << "Received error status for query " << query.toStringShort() << " on attempt "
                << retries << " of " << kMaxStaleConfigRetries << ": " << status;
 
-        invariant(chunkManager);
-        chunkManager = chunkManager->reload(txn);
+        chunkManager = dbConfig.getValue()->getChunkManagerIfExists(txn, query.nss().ns(), true);
         if (!chunkManager) {
             dbConfig.getValue()->getChunkManagerOrPrimary(
                 txn, query.nss().ns(), chunkManager, primary);

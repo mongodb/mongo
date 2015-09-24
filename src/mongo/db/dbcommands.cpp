@@ -1192,15 +1192,15 @@ void Command::execCommand(OperationContext* txn,
             return;
         }
 
-        repl::ReplicationCoordinator* replCoord =
-            repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
         ImpersonationSessionGuard guard(txn);
-
         uassertStatusOK(
             _checkAuthorization(command, txn->getClient(), dbname, request.getCommandArgs()));
 
+        repl::ReplicationCoordinator* replCoord =
+            repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
+        const bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
+
         {
-            bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
             bool commandCanRunOnSecondary = command->slaveOk();
 
             bool commandIsOverriddenToRunOnSecondary = command->slaveOverrideOk() &&
@@ -1253,7 +1253,7 @@ void Command::execCommand(OperationContext* txn,
 
         CurOp::get(txn)->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS) * 1000);
 
-        {
+        if (iAmPrimary) {
             // Handle shard version and config optime information that may have been sent along with
             // the command.
             auto& operationShardVersion = OperationShardVersion::get(txn);

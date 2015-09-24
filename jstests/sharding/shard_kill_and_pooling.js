@@ -10,9 +10,6 @@ var killWith = (test == 0 ? 15 : 9);
 
 var st = new ShardingTest({shards : 2, mongos : 1});
 
-// TODO: SERVER-20194. This test forces use of the old mongos query path.
-assert.commandWorked(st.s.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-
 // Stop balancer to eliminate weird conn stuff
 st.stopBalancer();
 

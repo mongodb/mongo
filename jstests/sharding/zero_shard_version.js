@@ -6,12 +6,6 @@
 var st = new ShardingTest({ shards: 2, mongos: 4 });
 st.stopBalancer();
 
-// TODO: SERVER-20194. This test forces use of the old mongos query path.
-assert.commandWorked(st.s0.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-assert.commandWorked(st.s1.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-assert.commandWorked(st.s2.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-assert.commandWorked(st.s3.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-
 var testDB_s0 = st.s.getDB('test');
 testDB_s0.adminCommand({ enableSharding: 'test' });
 testDB_s0.adminCommand({ movePrimary: 'test', to: 'shard0001' });
@@ -116,7 +110,7 @@ checkShardMajorVersion(st.d1, 2);
 // refresh it's metadata correctly.
 assert.neq(null, testDB_s2.user.findOne({ x: 1 }));
 
-checkShardMajorVersion(st.d0, 0);
+checkShardMajorVersion(st.d0, 2);
 checkShardMajorVersion(st.d1, 2);
 
 // Set shard metadata to 2|0|b
