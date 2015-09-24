@@ -483,7 +483,7 @@ __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
 	bool start;
 
 	conn = S2C(session);
-	start = 0;
+	start = false;
 
 	/*
 	 * Stop any server that is already running. This means that each time

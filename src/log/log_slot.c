@@ -113,7 +113,7 @@ __log_slot_switch_internal(
 	bool free_slot, release;
 
 	log = S2C(session)->log;
-	release = 0;
+	release = false;
 	slot = myslot->slot;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));

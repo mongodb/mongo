@@ -68,7 +68,7 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;
-	evict_reset = 0;
+	evict_reset = false;
 
 	/*
 	 * Acquire an exclusive lock on the handle and mark it dead.

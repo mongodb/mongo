@@ -234,7 +234,7 @@ __backup_start(
 	 * copying data files to avoid rolling the metadata forward across
 	 * a checkpoint that completes during the backup.
 	 */
-	target_list = 0;
+	target_list = false;
 	WT_ERR(__backup_uri(session, cb, cfg, &target_list, &log_only));
 
 	if (!target_list) {

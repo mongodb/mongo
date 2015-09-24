@@ -787,7 +787,7 @@ __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 
 	conn = S2C(session);
 	log = conn->log;
-	created_log = 1;
+	created_log = true;
 	/*
 	 * Add recsize to alloc_lsn.  Save our starting LSN
 	 * where the previous allocation finished for the release LSN.
@@ -1808,7 +1808,6 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		    record->size, UINT32_MAX);
 		return (EFBIG);
 	}
-	free_slot = 0;
 	WT_INIT_LSN(&lsn);
 	myslot.slot = NULL;
 	memset(&myslot, 0, sizeof(myslot));

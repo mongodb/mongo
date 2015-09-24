@@ -100,7 +100,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		 */
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			colgroup = table->cgroups[i];
-			skip = 0;
+			skip = false;
 			if (name_func != NULL)
 				WT_ERR(name_func(
 				    session, colgroup->name, &skip));
@@ -113,7 +113,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_schema_open_indices(session, table));
 		for (i = 0; i < table->nindices; i++) {
 			idx = table->indices[i];
-			skip = 0;
+			skip = false;
 			if (name_func != NULL)
 				WT_ERR(name_func(session, idx->name, &skip));
 			if (!skip)

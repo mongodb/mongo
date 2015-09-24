@@ -164,7 +164,7 @@ __wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
 	bool start;
 
 	conn = S2C(session);
-	start = 0;
+	start = false;
 
 	/* If there is already a server running, shut it down. */
 	if (conn->ckpt_session != NULL)

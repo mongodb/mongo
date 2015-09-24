@@ -107,7 +107,8 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	WT_DECL_RET;
 	WT_LOG *log;
 	uint32_t lognum, min_lognum;
-	u_int i, locked, logcount;
+	u_int i, logcount;
+	bool locked;
 	char **logfiles;
 
 	conn = S2C(session);
@@ -140,7 +141,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	 * if we are the backup.
 	 */
 	WT_RET(__wt_readlock(session, conn->hot_backup_lock));
-	locked = 1;
+	locked = true;
 	if (conn->hot_backup == 0 || backup_file != 0) {
 		for (i = 0; i < logcount; i++) {
 			WT_ERR(__wt_log_extract_lognum(
@@ -151,7 +152,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 		}
 	}
 	WT_ERR(__wt_readunlock(session, conn->hot_backup_lock));
-	locked = 0;
+	locked = false;
 	__wt_log_files_free(session, logfiles, logcount);
 	logfiles = NULL;
 	logcount = 0;
@@ -246,7 +247,8 @@ __wt_log_truncate_files(
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	uint32_t backup_file, locked;
+	uint32_t backup_file;
+	bool locked;
 
 	WT_UNUSED(cfg);
 	conn = S2C(session);
@@ -264,10 +266,10 @@ __wt_log_truncate_files(
 	    "log_truncate_files: Archive once up to %" PRIu32,
 	    backup_file));
 	WT_RET(__wt_writelock(session, log->log_archive_lock));
-	locked = 1;
+	locked = true;
 	WT_ERR(__log_archive_once(session, backup_file));
 	WT_ERR(__wt_writeunlock(session, log->log_archive_lock));
-	locked = 0;
+	locked = false;
 err:
 	if (locked)
 		WT_RET(__wt_writeunlock(session, log->log_archive_lock));

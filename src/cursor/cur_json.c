@@ -776,12 +776,12 @@ __json_pack_size(
 	WT_DECL_PACK_VALUE(pv);
 	WT_PACK pack;
 	WT_PACK_NAME packname;
-	const char *tokstart;
-	int multi;
 	size_t toksize, total;
+	bool multi;
+	const char *tokstart;
 
 	WT_RET(__pack_name_init(session, names, iskey, &packname));
-	multi = 0;
+	multi = false;
 	WT_RET(__pack_init(session, &pack, fmt));
 	for (total = 0; __pack_next(&pack, &pv) == 0;) {
 		if (multi)
@@ -797,7 +797,7 @@ __json_pack_size(
 		JSON_EXPECT_TOKEN(session, jstr, ':');
 		WT_PACK_JSON_GET(session, pv, jstr);
 		total += __pack_size(session, &pv);
-		multi = 1;
+		multi = true;
 	}
 	/* check end of string */
 	JSON_EXPECT_TOKEN(session, jstr, 0);

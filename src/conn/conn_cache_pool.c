@@ -421,7 +421,7 @@ __cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
 	uint64_t bump_threshold, highest;
 
 	cp = __wt_process.cache_pool;
-	adjusted = 0;
+	adjusted = false;
 	highest = 0;
 
 	__wt_spin_lock(NULL, &cp->cache_pool_lock);
