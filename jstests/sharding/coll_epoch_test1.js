@@ -4,11 +4,6 @@ var st = new ShardingTest({ shards : 3, mongos : 3, verbose : 1 })
 // Stop balancer, it'll interfere
 st.stopBalancer()
 
-// TODO: SERVER-20194. This test forces use of the old mongos query path.
-assert.commandWorked(st.s0.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-assert.commandWorked(st.s1.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-assert.commandWorked(st.s2.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-
 // Use separate mongoses for admin, inserting data, and validating results, so no
 // single-mongos tricks will work
 var insertMongos = st.s2

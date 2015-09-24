@@ -88,10 +88,6 @@ var st;
         }
     });
 
-    // TODO: SERVER-20194. This test forces use of the old mongos query path.
-    assert.commandWorked(st.s0.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-    assert.commandWorked(st.s1.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-
     var shardConfigs = st.s0.getCollection("config.shards").find().toArray();
     assert.eq(2, shardConfigs.length);
     var shard0Name = shardConfigs[0]._id;
