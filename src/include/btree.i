@@ -1076,6 +1076,16 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	}
 
 	/*
+	 * We can't evict clean, multiblock row-store pages with overflow keys
+	 * when the file is being checkpointed: the split into the parent frees
+	 * the backing blocks for no-longer-used overflow keys, corrupting the
+	 * checkpoint's block management.
+	 */
+	if (btree->checkpointing &&
+	    mod->rec_result == WT_PM_REC_MULTIBLOCK && mod->mod_multi_row_ovfl)
+		return (false);
+
+	/*
 	 * If the tree was deepened, there's a requirement that newly created
 	 * internal pages not be evicted until all threads are known to have
 	 * exited the original page index array, because evicting an internal
