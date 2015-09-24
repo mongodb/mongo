@@ -609,7 +609,7 @@ extern int __wt_decrypt(WT_SESSION_IMPL *session, WT_ENCRYPTOR *encryptor, size_
 extern int __wt_encrypt(WT_SESSION_IMPL *session, WT_KEYED_ENCRYPTOR *kencryptor, size_t skip, WT_ITEM *in, WT_ITEM *out);
 extern void __wt_encrypt_size(WT_SESSION_IMPL *session, WT_KEYED_ENCRYPTOR *kencryptor, size_t incoming_size, size_t *sizep);
 extern void __wt_event_handler_set(WT_SESSION_IMPL *session, WT_EVENT_HANDLER *handler);
-extern int __wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error, const char *file_name, int line_number, const char *fmt, va_list ap);
+extern int __wt_eventv(WT_SESSION_IMPL *session, bool msg_event, int error, const char *file_name, int line_number, const char *fmt, va_list ap);
 extern void __wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
 extern void __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 2, 3)));
 extern int __wt_ext_err_printf( WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *fmt, ...) WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 3, 4)));
