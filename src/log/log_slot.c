@@ -299,7 +299,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	slot = &log->slot_pool[0];
 	/*
 	 * We cannot initialize the release LSN in the activate function
-	 * because that functino can be called after a log file switch.
+	 * because that function can be called after a log file switch.
 	 */
 	slot->slot_release_lsn = log->alloc_lsn;
 	__wt_log_slot_activate(session, slot);

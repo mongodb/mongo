@@ -740,6 +740,12 @@ __log_newfile(WT_SESSION_IMPL *session, int conn_open, int *created)
 		if (ret != 0 && ret != WT_NOTFOUND)
 			return (ret);
 		ret = 0;
+		if (create_log != 0) {
+			WT_STAT_FAST_CONN_INCR(session, log_prealloc_missed);
+			if (conn->log_cond != NULL)
+				WT_RET(__wt_cond_signal(
+				    session, conn->log_cond));
+		}
 	}
 	/*
 	 * If we need to create the log file, do so now.

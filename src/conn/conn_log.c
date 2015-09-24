@@ -455,14 +455,8 @@ restart:
 	while (i < WT_SLOT_POOL) {
 		save_i = i;
 		slot = &log->slot_pool[i++];
-#ifdef	HAVE_DIAGNOSTIC
-		/*
-		 * Any slot in a zero state must be currently in progress.
-		 */
-		if (slot->slot_state == 0)
-			WT_ASSERT(session,
+			WT_ASSERT(session, slot->slot_state != 0 ||
 			    slot->slot_release_lsn.file >= log->write_lsn.file);
-#endif
 		if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
 			continue;
 		written[written_i].slot_index = save_i;
