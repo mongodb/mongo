@@ -582,7 +582,7 @@ err:	/*
 	 */
 	session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
 	if (tracking)
-		WT_TRET(__wt_meta_track_off(session, 0, ret != 0));
+		WT_TRET(__wt_meta_track_off(session, false, ret != 0));
 
 	if (F_ISSET(txn, WT_TXN_RUNNING)) {
 		/*
@@ -1212,7 +1212,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, int final)
 	WT_TRET(__checkpoint_worker(session, NULL, 0));
 
 	if (need_tracking)
-		WT_RET(__wt_meta_track_off(session, 1, ret != 0));
+		WT_RET(__wt_meta_track_off(session, true, ret != 0));
 
 	return (ret);
 }

@@ -46,8 +46,8 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 			WT_SAVE_DHANDLE(session,
 			    ret = func(session, cfg));
 			if (WT_META_TRACKING(session))
-				WT_TRET(
-				    __wt_meta_track_handle_lock(session, 0));
+				WT_TRET(__wt_meta_track_handle_lock(
+				    session, false));
 			else
 				WT_TRET(__wt_session_release_btree(session));
 		} else if (ret == EBUSY)

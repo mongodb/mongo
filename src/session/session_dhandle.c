@@ -571,7 +571,7 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	dhandle = session->dhandle;
 	F_SET(dhandle, WT_DHANDLE_DISCARD);
 
-	WT_ERR(__wt_meta_track_handle_lock(session, 0));
+	WT_ERR(__wt_meta_track_handle_lock(session, false));
 
 	/* Restore the original btree in the session. */
 err:	session->dhandle = saved_dhandle;

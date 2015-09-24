@@ -201,7 +201,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	/* Bump the schema generation so that stale data is ignored. */
 	++S2C(session)->schema_gen;
 
-	WT_TRET(__wt_meta_track_off(session, 1, ret != 0));
+	WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
 	return (ret);
 }

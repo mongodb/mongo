@@ -135,7 +135,7 @@ __create_file(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_session_get_btree(
 	    session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
 	if (WT_META_TRACKING(session))
-		WT_ERR(__wt_meta_track_handle_lock(session, 1));
+		WT_ERR(__wt_meta_track_handle_lock(session, true));
 	else
 		WT_ERR(__wt_session_release_btree(session));
 
@@ -703,7 +703,7 @@ __wt_schema_create(
 		ret = __wt_bad_object_type(session, uri);
 
 	session->dhandle = NULL;
-	WT_TRET(__wt_meta_track_off(session, 1, ret != 0));
+	WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
 	return (ret);
 }
