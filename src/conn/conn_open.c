@@ -94,7 +94,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * transaction ID will catch up with the current ID.
 	 */
 	for (;;) {
-		__wt_txn_update_oldest(session, 1);
+		__wt_txn_update_oldest(session, true);
 		if (txn_global->oldest_id == txn_global->current)
 			break;
 		__wt_yield();
@@ -136,7 +136,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
 	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE))
 		WT_TRET(__wt_txn_checkpoint_log(
-		    session, 1, WT_TXN_LOG_CKPT_STOP, NULL));
+		    session, true, WT_TXN_LOG_CKPT_STOP, NULL));
 	F_CLR(conn, WT_CONN_LOG_SERVER_RUN);
 	WT_TRET(__wt_logmgr_destroy(session));
 

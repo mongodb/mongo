@@ -342,7 +342,7 @@ __evict_review(
 		 * fallen behind current.
 		 */
 		if (__wt_page_is_modified(page))
-			__wt_txn_update_oldest(session, 1);
+			__wt_txn_update_oldest(session, true);
 
 		if (!__wt_page_can_evict(session, page, false, inmem_splitp))
 			return (EBUSY);

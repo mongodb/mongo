@@ -523,7 +523,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * of whether the cache is full, to prevent the oldest ID
 		 * falling too far behind.
 		 */
-		__wt_txn_update_oldest(session, 1);
+		__wt_txn_update_oldest(session, true);
 
 		if (!__evict_update_work(session))
 			break;
