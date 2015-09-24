@@ -84,8 +84,6 @@ StatusWith<std::unique_ptr<Message>> messageFromRequest(const RemoteCommandReque
                       .setMetadata(maybeAugmented)
                       .setCommandArgs(request.cmdObj)
                       .done();
-
-    toSend->header().setId(nextMessageId());
     return std::move(toSend);
 }
 

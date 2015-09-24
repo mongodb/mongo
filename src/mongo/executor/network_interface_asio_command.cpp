@@ -76,6 +76,8 @@ template <typename Handler>
 void asyncSendMessage(AsyncStreamInterface& stream, Message* m, Handler&& handler) {
     static_assert(IsNetworkHandler<Handler>::value,
                   "Handler passed to asyncSendMessage does not conform to NetworkHandler concept");
+    m->header().setResponseTo(0);
+    m->header().setId(nextMessageId());
     // TODO: Some day we may need to support vector messages.
     fassert(28708, m->buf() != 0);
     stream.write(asio::buffer(m->buf(), m->size()), std::forward<Handler>(handler));
