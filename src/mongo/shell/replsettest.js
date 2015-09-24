@@ -41,7 +41,6 @@
  *        as the replica set name (overrides the name property). Default: false
  *     keyFile {string}
  *     shardSvr {boolean}: Whether this replica set serves as a shard in a cluster. Default: false.
- *     protocolVersion {number}: protocol version of replset used by the replset initiation.
  *   }
  * 
  * Member variables:
@@ -56,7 +55,6 @@ ReplSetTest = function(opts) {
     this.useSeedList = opts.useSeedList || false;
     this.keyFile = opts.keyFile;
     this.shardSvr = opts.shardSvr || false;
-    this.protocolVersion = opts.protocolVersion;
 
     this.nodeOptions = {};
 
@@ -156,10 +154,6 @@ ReplSetTest.prototype.getReplSetConfig = function() {
     var cfg = {};
 
     cfg['_id']  = this.name;
-    if (this.protocolVersion !== undefined && this.protocolVersion !== null) {
-        cfg.protocolVersion = this.protocolVersion;
-    }
-
     cfg.members = [];
 
     for (var i=0; i<this.ports.length; i++) {

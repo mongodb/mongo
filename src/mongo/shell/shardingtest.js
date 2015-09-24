@@ -202,7 +202,6 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                                        nodes : numReplicas,
                                        useHostName : otherParams.useHostname,
                                        keyFile : keyFile,
-                                       protocolVersion: protocolVersion,
                                        shardSvr : true });
 
             this._rs[i] = { setName : setName,
