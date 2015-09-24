@@ -488,9 +488,19 @@ public:
                 request.setLifecycle(&updateLifecycle);
                 UpdateResult res = mongo::update(txn, ctx.db(), request, &txn->getCurOp()->debug());
 
-                invariant(collection);
-                invariant(res.existing);
                 LOG(3) << "update result: " << res;
+                invariant(collection);
+
+                // The snapshot in which we update by _id should be the same snapshot from which we
+                // read the matching document. Therefore, we expect the update to successfully find
+                // a document to apply the update ops to. If this fails, then the _id index is
+                // likely missing the necessary index key.
+                uassert(28735,
+                        str::stream()
+                            << "Failed to update document by _id: " << oldDoc
+                            << ". The _id index may be missing the entry for this document. "
+                            << "See <http://dochub.mongodb.org/core/index-key-length-limit>.",
+                        res.existing);
 
                 // Committing the WUOW can close the current snapshot. Until this happens, the
                 // snapshot id should not have changed.
