@@ -103,7 +103,7 @@
  *	Called via the schema_worker function.
  */
 int
-__wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, int *skip)
+__wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, bool *skipp)
 {
 	/*
 	 * Add references to schema URI objects to the list of objects to be
@@ -112,7 +112,7 @@ __wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, int *skip)
 	 */
 	if (WT_PREFIX_MATCH(uri, "lsm:")) {
 		session->compact->lsm_count++;
-		*skip = 1;
+		*skipp = true;
 	} else if (WT_PREFIX_MATCH(uri, "file:"))
 		session->compact->file_count++;
 

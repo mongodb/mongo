@@ -415,12 +415,12 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	WT_RECOVERY r;
 	struct WT_RECOVERY_FILE *metafile;
 	char *config;
-	int needs_rec, was_backup;
+	bool needs_rec, was_backup;
 
 	conn = S2C(session);
 	WT_CLEAR(r);
 	WT_INIT_LSN(&r.ckpt_lsn);
-	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP) ? 1 : 0;
+	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP);
 
 	/* We need a real session for recovery. */
 	WT_RET(__wt_open_session(conn, NULL, NULL, 1, &session));

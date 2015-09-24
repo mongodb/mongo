@@ -458,12 +458,12 @@ __txn_printlog(WT_SESSION_IMPL *session,
 	FILE *out;
 	WT_LOG_RECORD *logrec;
 	WT_LSN ckpt_lsn;
-	int compressed;
+	const uint8_t *end, *p;
+	const char *msg;
 	uint64_t txnid;
 	uint32_t fileid, rectype;
 	int32_t start;
-	const uint8_t *end, *p;
-	const char *msg;
+	bool compressed;
 
 	WT_UNUSED(next_lsnp);
 	out = cookie;

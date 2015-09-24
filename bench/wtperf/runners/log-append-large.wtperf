@@ -8,4 +8,3 @@ report_interval=5
 run_time=0
 value_sz=5000000
 populate_threads=8
-

@@ -168,7 +168,7 @@ err:	__wt_scr_free(session, &tmp);
  */
 int
 __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
-    uint8_t *addr, size_t *addr_sizep, int checkpoint, int compressed)
+    uint8_t *addr, size_t *addr_sizep, bool checkpoint, bool compressed)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -179,17 +179,18 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_ITEM *ip;
 	WT_PAGE_HEADER *dsk;
 	size_t dst_len, len, result_len, size, src_len;
-	int compression_failed, data_cksum, encrypted;
+	int compression_failed;		/* Extension API, so not a bool. */
 	uint8_t *dst, *src;
+	bool data_cksum, encrypted;
 
 	btree = S2BT(session);
 	bm = btree->bm;
-	encrypted = 0;
+	encrypted = false;
 
 	/* Checkpoint calls are different than standard calls. */
 	WT_ASSERT(session,
-	    (checkpoint == 0 && addr != NULL && addr_sizep != NULL) ||
-	    (checkpoint == 1 && addr == NULL && addr_sizep == NULL));
+	    (!checkpoint && addr != NULL && addr_sizep != NULL) ||
+	    (checkpoint && addr == NULL && addr_sizep == NULL));
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
@@ -280,7 +281,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 			ip = buf;
 			WT_STAT_FAST_DATA_INCR(session, compress_write_fail);
 		} else {
-			compressed = 1;
+			compressed = true;
 			WT_STAT_FAST_DATA_INCR(session, compress_write);
 
 			/*
@@ -307,7 +308,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		WT_ERR(__wt_encrypt(session,
 		    kencryptor, WT_BLOCK_ENCRYPT_SKIP, ip, etmp));
 
-		encrypted = 1;
+		encrypted = true;
 		ip = etmp;
 	}
 	dsk = ip->mem;
@@ -341,10 +342,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 */
 	switch (btree->checksum) {
 	case CKSUM_ON:
-		data_cksum = 1;
+		data_cksum = true;
 		break;
 	case CKSUM_OFF:
-		data_cksum = 0;
+		data_cksum = false;
 		break;
 	case CKSUM_UNCOMPRESSED:
 	default:

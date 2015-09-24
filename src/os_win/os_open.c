@@ -14,7 +14,7 @@
  */
 int
 __wt_open(WT_SESSION_IMPL *session,
-    const char *name, int ok_create, int exclusive, int dio_type, WT_FH **fhp)
+    const char *name, bool ok_create, bool exclusive, int dio_type, WT_FH **fhp)
 {
 	DWORD dwCreationDisposition;
 	HANDLE filehandle, filehandle_secondary;

@@ -47,7 +47,7 @@ err:	__wt_free(session, cond);
  */
 int
 __wt_cond_wait_signal(
-    WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, int *signalled)
+    WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, bool *signalled)
 {
 	struct timespec ts;
 	WT_DECL_RET;
@@ -56,7 +56,7 @@ __wt_cond_wait_signal(
 	locked = 0;
 
 	/* Fast path if already signalled. */
-	*signalled = 1;
+	*signalled = true;
 	if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
 		return (0);
 
@@ -92,7 +92,7 @@ __wt_cond_wait_signal(
 	    ret == ETIME ||
 #endif
 	    ret == ETIMEDOUT) {
-		*signalled = 0;
+		*signalled = false;
 		ret = 0;
 	}
 

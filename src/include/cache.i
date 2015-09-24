@@ -134,11 +134,11 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
  * __wt_eviction_aggressive --
  *	Return if the eviction server is running in aggressive mode.
  */
-static inline int
+static inline bool
 __wt_eviction_aggressive(WT_SESSION_IMPL *session)
 {
 	return (FLD_ISSET(
-	    S2C(session)->cache->state, WT_EVICT_PASS_AGGRESSIVE) ? 1 : 0);
+	    S2C(session)->cache->state, WT_EVICT_PASS_AGGRESSIVE));
 }
 
 /*
@@ -146,11 +146,10 @@ __wt_eviction_aggressive(WT_SESSION_IMPL *session)
  *	Return if the eviction server is running to reduce the number of dirty
  * pages (versus running to discard pages from the cache).
  */
-static inline int
+static inline bool
 __wt_eviction_dirty_target(WT_SESSION_IMPL *session)
 {
-	return (FLD_ISSET(
-	    S2C(session)->cache->state, WT_EVICT_PASS_DIRTY) ? 1 : 0);
+	return (FLD_ISSET(S2C(session)->cache->state, WT_EVICT_PASS_DIRTY));
 }
 
 /*
@@ -198,13 +197,13 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
  *	Evict pages if the cache crosses its boundaries.
  */
 static inline int
-__wt_cache_eviction_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
+__wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 {
 	WT_BTREE *btree;
 	u_int pct_full;
 
 	if (didworkp != NULL)
-		*didworkp = 0;
+		*didworkp = false;
 
 	/*
 	 * LSM sets the no-cache-check flag when holding the LSM tree lock, in
@@ -232,7 +231,7 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
 	 * was no cache work to do. After this point, let them skip the sleep.
 	 */
 	if (didworkp != NULL)
-		*didworkp = 1;
+		*didworkp = true;
 
 	return (__wt_cache_eviction_worker(session, busy, pct_full));
 }

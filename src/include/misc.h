@@ -120,18 +120,21 @@
  * hex constant might be a negative integer), and to ensure the hex constant is
  * the correct size before applying the bitwise not operator.
  */
-#define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)(mask)))
-#define	F_ISSET(p, mask)	((p)->flags & ((uint32_t)(mask)))
-#define	F_SET(p, mask)		((p)->flags |= ((uint32_t)(mask)))
+#define	FLD_CLR(field, mask)	        ((field) &= ~((uint32_t)(mask)))
+#define	FLD_MASK(field, mask)	        ((field) & (uint32_t)(mask))
+#define	FLD_ISSET(field, mask)	        (FLD_MASK(field, mask) != 0)
+#define	FLD64_ISSET(field, mask)	(((field) & (uint64_t)(mask)) != 0)
+#define	FLD_SET(field, mask)	        ((field) |= ((uint32_t)(mask)))
 
-#define	LF_CLR(mask)		((flags) &= ~((uint32_t)(mask)))
-#define	LF_ISSET(mask)		((flags) & ((uint32_t)(mask)))
-#define	LF_SET(mask)		((flags) |= ((uint32_t)(mask)))
+#define	F_CLR(p, mask)		        FLD_CLR((p)->flags, mask)
+#define	F_ISSET(p, mask)	        FLD_ISSET((p)->flags, mask)
+#define	F_MASK(p, mask)	                FLD_MASK((p)->flags, mask)
+#define	F_SET(p, mask)		        FLD_SET((p)->flags, mask)
 
-#define	FLD_CLR(field, mask)	((field) &= ~((uint32_t)(mask)))
-#define	FLD_ISSET(field, mask)	((field) & ((uint32_t)(mask)))
-#define	FLD64_ISSET(field, mask)	((field) & ((uint64_t)(mask)))
-#define	FLD_SET(field, mask)	((field) |= ((uint32_t)(mask)))
+#define	LF_CLR(mask)		        FLD_CLR(flags, mask)
+#define	LF_ISSET(mask)		        FLD_ISSET(flags, mask)
+#define	LF_MASK(mask)		        FLD_MASK(flags, mask)
+#define	LF_SET(mask)		        FLD_SET(flags, mask)
 
 /*
  * Insertion sort, for sorting small sets of values.

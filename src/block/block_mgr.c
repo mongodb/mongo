@@ -8,7 +8,7 @@
 
 #include "wt_internal.h"
 
-static void __bm_method_set(WT_BM *, int);
+static void __bm_method_set(WT_BM *, bool);
 
 /*
  * __bm_readonly --
@@ -62,7 +62,7 @@ __bm_block_header(WT_BM *bm)
  */
 static int
 __bm_checkpoint(WT_BM *bm,
-    WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckptbase, int data_cksum)
+    WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckptbase, bool data_cksum)
 {
 	return (__wt_block_checkpoint(
 	    session, bm->block, buf, ckptbase, data_cksum));
@@ -73,7 +73,7 @@ __bm_checkpoint(WT_BM *bm,
  *	Flush a file to disk.
  */
 static int
-__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, int async)
+__bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, bool async)
 {
 	return (async ?
 	    __wt_fsync_async(session, bm->block->fh) :
@@ -87,7 +87,7 @@ __bm_sync(WT_BM *bm, WT_SESSION_IMPL *session, int async)
 static int
 __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
     const uint8_t *addr, size_t addr_size,
-    uint8_t *root_addr, size_t *root_addr_sizep, int checkpoint)
+    uint8_t *root_addr, size_t *root_addr_sizep, bool checkpoint)
 {
 	WT_CONNECTION_IMPL *conn;
 
@@ -113,7 +113,7 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
 		 * prevents attempts to write a checkpoint reference, paranoia
 		 * is healthy.
 		 */
-		__bm_method_set(bm, 1);
+		__bm_method_set(bm, true);
 	}
 
 	return (0);
@@ -183,7 +183,7 @@ __bm_compact_start(WT_BM *bm, WT_SESSION_IMPL *session)
  */
 static int
 __bm_compact_page_skip(WT_BM *bm, WT_SESSION_IMPL *session,
-    const uint8_t *addr, size_t addr_size, int *skipp)
+    const uint8_t *addr, size_t addr_size, bool *skipp)
 {
 	return (__wt_block_compact_page_skip(
 	    session, bm->block, addr, addr_size, skipp));
@@ -194,7 +194,7 @@ __bm_compact_page_skip(WT_BM *bm, WT_SESSION_IMPL *session,
  *	Return if a file can be compacted.
  */
 static int
-__bm_compact_skip(WT_BM *bm, WT_SESSION_IMPL *session, int *skipp)
+__bm_compact_skip(WT_BM *bm, WT_SESSION_IMPL *session, bool *skipp)
 {
 	return (__wt_block_compact_skip(session, bm->block, skipp));
 }
@@ -237,7 +237,7 @@ __bm_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
  */
 static int
 __bm_write(WT_BM *bm, WT_SESSION_IMPL *session,
-    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, int data_cksum)
+    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, bool data_cksum)
 {
 	return (__wt_block_write(
 	    session, bm->block, buf, addr, addr_sizep, data_cksum));
@@ -269,7 +269,7 @@ __bm_salvage_start(WT_BM *bm, WT_SESSION_IMPL *session)
  */
 static int
 __bm_salvage_valid(WT_BM *bm,
-    WT_SESSION_IMPL *session, uint8_t *addr, size_t addr_size, int valid)
+    WT_SESSION_IMPL *session, uint8_t *addr, size_t addr_size, bool valid)
 {
 	return (__wt_block_salvage_valid(
 	    session, bm->block, addr, addr_size, valid));
@@ -281,7 +281,7 @@ __bm_salvage_valid(WT_BM *bm,
  */
 static int
 __bm_salvage_next(WT_BM *bm,
-    WT_SESSION_IMPL *session, uint8_t *addr, size_t *addr_sizep, int *eofp)
+    WT_SESSION_IMPL *session, uint8_t *addr, size_t *addr_sizep, bool *eofp)
 {
 	return (__wt_block_salvage_next(
 	    session, bm->block, addr, addr_sizep, eofp));
@@ -334,14 +334,14 @@ __bm_verify_end(WT_BM *bm, WT_SESSION_IMPL *session)
  *	Set up the legal methods.
  */
 static void
-__bm_method_set(WT_BM *bm, int readonly)
+__bm_method_set(WT_BM *bm, bool readonly)
 {
 	if (readonly) {
 		bm->addr_invalid = __bm_addr_invalid;
 		bm->addr_string = __bm_addr_string;
 		bm->block_header = __bm_block_header;
-		bm->checkpoint = (int (*)(WT_BM *,
-		    WT_SESSION_IMPL *, WT_ITEM *, WT_CKPT *, int))__bm_readonly;
+		bm->checkpoint = (int (*)(WT_BM *, WT_SESSION_IMPL *,
+		    WT_ITEM *, WT_CKPT *, bool))__bm_readonly;
 		bm->checkpoint_load = __bm_checkpoint_load;
 		bm->checkpoint_resolve =
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
@@ -350,9 +350,9 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->compact_end =
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->compact_page_skip = (int (*)(WT_BM *, WT_SESSION_IMPL *,
-		    const uint8_t *, size_t, int *))__bm_readonly;
+		    const uint8_t *, size_t, bool *))__bm_readonly;
 		bm->compact_skip = (int (*)
-		    (WT_BM *, WT_SESSION_IMPL *, int *))__bm_readonly;
+		    (WT_BM *, WT_SESSION_IMPL *, bool *))__bm_readonly;
 		bm->compact_start =
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->free = (int (*)(WT_BM *,
@@ -362,19 +362,19 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->salvage_end = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->salvage_next = (int (*)(WT_BM *, WT_SESSION_IMPL *,
-		    uint8_t *, size_t *, int *))__bm_readonly;
+		    uint8_t *, size_t *, bool *))__bm_readonly;
 		bm->salvage_start = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->salvage_valid = (int (*)(WT_BM *,
-		    WT_SESSION_IMPL *, uint8_t *, size_t, int))__bm_readonly;
+		    WT_SESSION_IMPL *, uint8_t *, size_t, bool))__bm_readonly;
 		bm->stat = __bm_stat;
 		bm->sync =
-		    (int (*)(WT_BM *, WT_SESSION_IMPL *, int))__bm_readonly;
+		    (int (*)(WT_BM *, WT_SESSION_IMPL *, bool))__bm_readonly;
 		bm->verify_addr = __bm_verify_addr;
 		bm->verify_end = __bm_verify_end;
 		bm->verify_start = __bm_verify_start;
 		bm->write = (int (*)(WT_BM *, WT_SESSION_IMPL *,
-		    WT_ITEM *, uint8_t *, size_t *, int))__bm_readonly;
+		    WT_ITEM *, uint8_t *, size_t *, bool))__bm_readonly;
 		bm->write_size = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *, size_t *))__bm_readonly;
 	} else {
@@ -414,7 +414,7 @@ __bm_method_set(WT_BM *bm, int readonly)
 int
 __wt_block_manager_open(WT_SESSION_IMPL *session,
     const char *filename, const char *cfg[],
-    int forced_salvage, int readonly, uint32_t allocsize, WT_BM **bmp)
+    bool forced_salvage, bool readonly, uint32_t allocsize, WT_BM **bmp)
 {
 	WT_BM *bm;
 	WT_DECL_RET;
@@ -422,7 +422,7 @@ __wt_block_manager_open(WT_SESSION_IMPL *session,
 	*bmp = NULL;
 
 	WT_RET(__wt_calloc_one(session, &bm));
-	__bm_method_set(bm, 0);
+	__bm_method_set(bm, false);
 
 	WT_ERR(__wt_block_open(session, filename, cfg,
 	    forced_salvage, readonly, allocsize, &bm->block));

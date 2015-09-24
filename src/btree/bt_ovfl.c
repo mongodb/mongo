@@ -154,7 +154,7 @@ int
 __wt_ovfl_cache(WT_SESSION_IMPL *session,
     WT_PAGE *page, void *cookie, WT_CELL_UNPACK *vpack)
 {
-	int visible;
+	bool visible;
 
 	/*
 	 * This function solves a problem in reconciliation. The scenario is:

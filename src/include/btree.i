@@ -24,7 +24,7 @@ static inline bool
 __wt_page_is_empty(WT_PAGE *page)
 {
 	return (page->modify != NULL &&
-	    F_ISSET(page->modify, WT_PM_REC_MASK) == WT_PM_REC_EMPTY ? 1 : 0);
+	    page->modify->rec_result == WT_PM_REC_EMPTY);
 }
 
 /*
@@ -791,7 +791,7 @@ __wt_row_leaf_value_set(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *unpack)
  */
 static inline int
 __wt_row_leaf_key(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, int instantiate)
+    WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, bool instantiate)
 {
 	void *copy;
 
@@ -838,7 +838,7 @@ __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 		session = (WT_SESSION_IMPL *)cbt->iface.session;
 		page = cbt->ref->page;
 		rip = &page->u.row.d[cbt->slot];
-		WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
+		WT_RET(__wt_row_leaf_key(session, page, rip, key, false));
 	} else {
 		key->data = WT_INSERT_KEY(cbt->ins);
 		key->size = WT_INSERT_KEY_SIZE(cbt->ins);
@@ -1035,14 +1035,14 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static inline bool
 __wt_page_can_evict(WT_SESSION_IMPL *session,
-    WT_PAGE *page, int check_splits, int *inmem_splitp)
+    WT_PAGE *page, int check_splits, bool *inmem_splitp)
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_GLOBAL *txn_global;
 
 	if (inmem_splitp != NULL)
-		*inmem_splitp = 0;
+		*inmem_splitp = false;
 
 	btree = S2BT(session);
 	mod = page->modify;
@@ -1059,7 +1059,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 */
 	if (__wt_page_can_split(session, page)) {
 		if (inmem_splitp != NULL)
-			*inmem_splitp = 1;
+			*inmem_splitp = true;
 		return (true);
 	}
 
@@ -1115,7 +1115,8 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int locked, too_big;
+	int locked;
+	bool too_big;
 
 	btree = S2BT(session);
 	page = ref->page;
@@ -1134,7 +1135,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
 
-	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
+	too_big = page->memory_footprint > btree->maxmempage;
 	if ((ret = __wt_evict(session, ref, 0)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);

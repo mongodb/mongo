@@ -117,19 +117,19 @@ retry:	TAILQ_FOREACH(dhandle_cache, &session->dhhash[bucket], hashq) {
  */
 int
 __wt_session_lock_dhandle(
-    WT_SESSION_IMPL *session, uint32_t flags, int *is_deadp)
+    WT_SESSION_IMPL *session, uint32_t flags, bool *is_deadp)
 {
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	int is_open, lock_busy, want_exclusive;
+	bool is_open, lock_busy, want_exclusive;
 
 	*is_deadp = 0;
 
 	dhandle = session->dhandle;
 	btree = dhandle->handle;
-	lock_busy = 0;
-	want_exclusive = LF_ISSET(WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
+	lock_busy = false;
+	want_exclusive = LF_ISSET(WT_DHANDLE_EXCLUSIVE);
 
 	/*
 	 * Check that the handle is open.  We've already incremented
@@ -173,12 +173,12 @@ __wt_session_lock_dhandle(
 				    __wt_readunlock(session, dhandle->rwlock));
 			}
 
-			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN) ? 1 : 0;
+			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN);
 			if (is_open && !want_exclusive)
 				return (0);
 			WT_RET(__wt_readunlock(session, dhandle->rwlock));
 		} else
-			is_open = 0;
+			is_open = false;
 
 		/*
 		 * It isn't open or we want it exclusive: try to get an
@@ -199,7 +199,7 @@ __wt_session_lock_dhandle(
 			 */
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    !want_exclusive) {
-				lock_busy = 0;
+				lock_busy = false;
 				WT_RET(
 				    __wt_writeunlock(session, dhandle->rwlock));
 				continue;
@@ -212,7 +212,7 @@ __wt_session_lock_dhandle(
 		}
 		if (ret != EBUSY || (is_open && want_exclusive))
 			return (ret);
-		lock_busy = 1;
+		lock_busy = true;
 
 		/* Give other threads a chance to make progress. */
 		__wt_yield();
@@ -230,12 +230,12 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
-	int locked, write_locked;
+	bool locked, write_locked;
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;
-	write_locked = F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
-	locked = 1;
+	write_locked = F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE);
+	locked = true;
 
 	/*
 	 * If we had special flags set, close the handle so that future access
@@ -249,12 +249,12 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	}
 
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_FORCE)) {
-		ret = __wt_conn_btree_sync_and_close(session, 0, 1);
+		ret = __wt_conn_btree_sync_and_close(session, false, true);
 		F_CLR(dhandle, WT_DHANDLE_DISCARD_FORCE);
 	} else if (F_ISSET(dhandle, WT_DHANDLE_DISCARD) ||
 	    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
-		ret = __wt_conn_btree_sync_and_close(session, 0, 0);
+		ret = __wt_conn_btree_sync_and_close(session, false, false);
 		F_CLR(dhandle, WT_DHANDLE_DISCARD);
 	}
 
@@ -262,7 +262,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		if (--dhandle->excl_ref == 0)
 			dhandle->excl_session = NULL;
 		else
-			locked = 0;
+			locked = false;
 	}
 	if (locked) {
 		if (write_locked)
@@ -446,7 +446,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	int is_dead;
+	bool is_dead;
 
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES));
 
