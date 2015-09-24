@@ -62,6 +62,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/grid.h"
@@ -1562,6 +1563,7 @@ public:
             maybeDisableValidation.emplace(txn);
 
         ShardedConnectionInfo::addHook();
+
         // legacy name
         string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
         verify(shardedOutputCollection.size() > 0);
@@ -1596,7 +1598,15 @@ public:
             BSONObjIterator i(shardCounts);
             while (i.more()) {
                 BSONElement e = i.next();
-                servers.insert(e.fieldName());
+                std::string server = e.fieldName();
+                servers.insert(server);
+
+                if (!grid.shardRegistry()->getShard(txn, server)) {
+                    return appendCommandStatus(
+                        result,
+                        Status(ErrorCodes::ShardNotFound,
+                               str::stream() << "Shard not found for server: " << server));
+                }
             }
         }
 
