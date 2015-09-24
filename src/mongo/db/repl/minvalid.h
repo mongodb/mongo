@@ -28,40 +28,67 @@
 
 #pragma once
 
+#include "mongo/db/repl/optime.h"
+
 namespace mongo {
 class BSONObj;
 class OperationContext;
 
 namespace repl {
-class OpTime;
+
+struct BatchBoundaries {
+    BatchBoundaries(const OpTime s, const OpTime e) : start(s), end(e) {}
+    const OpTime start;
+    const OpTime end;
+};
 
 /**
- * Helper functions for maintaining local.replset.minvalid collection contents.
+ * Helper functions for maintaining a single document in the local.replset.minvalid collection.
  *
  * When a member reaches its minValid optime it is in a consistent state.  Thus, minValid is
- * set as the last step in initial sync.  At the beginning of initial sync, _initialSyncFlag
+ * set as the last step in initial sync.  At the beginning of initial sync, doingInitialSync
  * is appended onto minValid to indicate that initial sync was started but has not yet
  * completed.
- * minValid is also used during "normal" sync: the last op in each batch is used to set
- * minValid, to indicate that we are in a consistent state when the batch has been fully
- * applied.
+ *
+ * The document is also updated during "normal" sync. The optime of the last op in each batch is
+ * used to set minValid, along with a "begin" field to demark the start and the fact that a batch
+ * is active. When the batch is done the "begin" field is removed to indicate that we are in a
+ * consistent state when the batch has been fully applied.
+ *
+ * Example of all fields:
+ * { _id:...,
+ *      doingInitialSync: true // initial sync is active
+ *      ts:..., t:...   // end-OpTime
+ *      begin: {ts:..., t:...} // a batch is currently being applied, and not consistent
+ * }
  */
 
 /**
- * The initial sync flag is used to durably record the state of an initial sync; its boolean
- * value is true when an initial sync is in progress and hasn't yet completed.  The flag
- * is stored as part of the local.replset.minvalid collection.
+ * The initial sync flag is used to durably record that initial sync has not completed.
  */
 void clearInitialSyncFlag(OperationContext* txn);
 void setInitialSyncFlag(OperationContext* txn);
 bool getInitialSyncFlag();
 
+
+/**
+ * Returns the bounds of the current apply batch, if active. If start is null/missing, and
+ * end is equal to the last oplog entry then we are in a consistent state and ready for reads.
+ */
+BatchBoundaries getMinValid(OperationContext* txn);
+
 /**
  * The minValid value is the earliest (minimum) Timestamp that must be applied in order to
- * consider the dataset consistent.  Do not allow client reads if our last applied operation is
- * before the minValid time.
+ * consider the dataset consistent.
+ *
+ * This is called when a batch finishes.
  */
-void setMinValid(OperationContext* ctx, const OpTime& opTime);
-OpTime getMinValid(OperationContext* txn);
+void setMinValid(OperationContext* ctx, const OpTime& endOpTime);
+
+/**
+ * The bounds indicate an apply is active and we are not in a consistent state to allow reads
+ * or transition from a non-visible state to primary/secondary.
+ */
+void setMinValid(OperationContext* ctx, const BatchBoundaries& boundaries);
 }
 }

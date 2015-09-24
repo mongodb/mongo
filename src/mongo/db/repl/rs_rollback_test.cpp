@@ -154,6 +154,7 @@ void RSRollbackTest::setUp() {
     setGlobalReplicationCoordinator(_coordinator);
 
     setOplogCollectionName();
+    repl::setMinValid(_txn.get(), {OpTime{}, OpTime{}});
 }
 
 void RSRollbackTest::tearDown() {
@@ -169,7 +170,8 @@ void RSRollbackTest::tearDown() {
 void noSleep(Seconds seconds) {}
 
 TEST_F(RSRollbackTest, InconsistentMinValid) {
-    repl::setMinValid(_txn.get(), OpTime(Timestamp(Seconds(1), 0), 0));
+    repl::setMinValid(_txn.get(),
+                      {OpTime(Timestamp(Seconds(0), 0), 0), OpTime(Timestamp(Seconds(1), 0), 0)});
     auto status = syncRollback(_txn.get(),
                                OpTime(),
                                OplogInterfaceMock(kEmptyMockOperations),

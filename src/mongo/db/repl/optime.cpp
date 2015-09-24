@@ -82,6 +82,13 @@ StatusWith<OpTime> OpTime::parseFromOplogEntry(const BSONObj& obj) {
     return OpTime(ts, term);
 }
 
+BSONObj OpTime::toBSON() const {
+    BSONObjBuilder bldr;
+    bldr.append(kTimestampFieldName, _timestamp);
+    bldr.append(kTermFieldName, _term);
+    return bldr.obj();
+}
+
 std::string OpTime::toString() const {
     std::stringstream ss;
     ss << "(term: " << _term << ", timestamp: " << _timestamp.toStringPretty() << ")";

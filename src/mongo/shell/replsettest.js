@@ -597,7 +597,7 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
 
                  // Continue if we're connected to an arbiter
                  if (res = slave.getDB("admin").runCommand({replSetGetStatus: 1})) {
-                     if (res.myState == 7) {
+                     if (res.myState == self.ARBITER) {
                          continue;
                      }
                  }

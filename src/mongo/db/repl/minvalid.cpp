@@ -46,9 +46,10 @@ namespace mongo {
 namespace repl {
 
 namespace {
-const char* initialSyncFlagString = "doingInitialSync";
+const char initialSyncFlagString[] = "doingInitialSync";
 const BSONObj initialSyncFlag(BSON(initialSyncFlagString << true));
-const char* minvalidNS = "local.replset.minvalid";
+const char minvalidNS[] = "local.replset.minvalid";
+const char beginFieldName[] = "begin";
 }  // namespace
 
 // Writes
@@ -60,6 +61,7 @@ void clearInitialSyncFlag(OperationContext* txn) {
         Helpers::putSingleton(txn, minvalidNS, BSON("$unset" << initialSyncFlag));
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "clearInitialSyncFlags", minvalidNS);
+    LOG(3) << "clearing initial sync flag";
 }
 
 void setInitialSyncFlag(OperationContext* txn) {
@@ -69,18 +71,38 @@ void setInitialSyncFlag(OperationContext* txn) {
         Helpers::putSingleton(txn, minvalidNS, BSON("$set" << initialSyncFlag));
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "setInitialSyncFlags", minvalidNS);
+    LOG(3) << "setting initial sync flag";
 }
 
-void setMinValid(OperationContext* ctx, const OpTime& opTime) {
+void setMinValid(OperationContext* ctx, const OpTime& endOpTime) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(ctx, MODE_IX);
         Lock::DBLock dblk(ctx->lockState(), "local", MODE_X);
         Helpers::putSingleton(
             ctx,
             minvalidNS,
-            BSON("$set" << BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm())));
+            BSON("$set" << BSON("ts" << endOpTime.getTimestamp() << "t" << endOpTime.getTerm())
+                        << "$unset" << BSON(beginFieldName << 1)));
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(ctx, "setMinValid", minvalidNS);
+    LOG(3) << "setting minvalid: " << endOpTime.toString() << "(" << endOpTime.toBSON() << ")";
+}
+
+void setMinValid(OperationContext* ctx, const BatchBoundaries& boundaries) {
+    const OpTime& start(boundaries.start);
+    const OpTime& end(boundaries.end);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction transaction(ctx, MODE_IX);
+        Lock::DBLock dblk(ctx->lockState(), "local", MODE_X);
+        Helpers::putSingleton(ctx,
+                              minvalidNS,
+                              BSON("$set" << BSON("ts" << end.getTimestamp() << "t" << end.getTerm()
+                                                       << beginFieldName << start.toBSON())));
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(ctx, "setMinValid", minvalidNS);
+    LOG(3) << "setting minvalid: " << boundaries.start.toString() << "("
+           << boundaries.start.toBSON() << ") -> " << boundaries.end.toString() << "("
+           << boundaries.end.toBSON() << ")";
 }
 
 // Reads
@@ -94,8 +116,11 @@ bool getInitialSyncFlag() {
         bool found = Helpers::getSingleton(&txn, minvalidNS, mv);
 
         if (found) {
-            return mv[initialSyncFlagString].trueValue();
+            const auto flag = mv[initialSyncFlagString].trueValue();
+            LOG(3) << "return initial flag value of " << flag;
+            return flag;
         }
+        LOG(3) << "return initial flag value of false";
         return false;
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(&txn, "getInitialSyncFlags", minvalidNS);
@@ -103,7 +128,7 @@ bool getInitialSyncFlag() {
     MONGO_UNREACHABLE;
 }
 
-OpTime getMinValid(OperationContext* txn) {
+BatchBoundaries getMinValid(OperationContext* txn) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(txn, MODE_IS);
         Lock::DBLock dblk(txn->lockState(), "local", MODE_IS);
@@ -111,9 +136,16 @@ OpTime getMinValid(OperationContext* txn) {
         BSONObj mv;
         bool found = Helpers::getSingleton(txn, minvalidNS, mv);
         if (found) {
-            return fassertStatusOK(28771, OpTime::parseFromOplogEntry(mv));
+            auto status = OpTime::parseFromOplogEntry(mv.getObjectField(beginFieldName));
+            OpTime start(status.isOK() ? status.getValue() : OpTime{});
+            OpTime end(fassertStatusOK(28771, OpTime::parseFromOplogEntry(mv)));
+            LOG(3) << "returning minvalid: " << start.toString() << "(" << start.toBSON() << ") -> "
+                   << end.toString() << "(" << end.toBSON() << ")";
+
+            return BatchBoundaries(start, end);
         }
-        return OpTime();
+        LOG(3) << "returning empty minvalid";
+        return BatchBoundaries{OpTime{}, OpTime{}};
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "getMinValid", minvalidNS);
 }

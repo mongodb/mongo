@@ -40,15 +40,15 @@
 #include "mongo/base/counter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/global_timestamp.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"
@@ -59,6 +59,7 @@
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
@@ -502,8 +503,8 @@ void tryToGoLiveAsASecondary(OperationContext* txn, ReplicationCoordinator* repl
         return;
     }
 
-    OpTime minvalid = getMinValid(txn);
-    if (minvalid > replCoord->getMyLastOptime()) {
+    BatchBoundaries boundaries = getMinValid(txn);
+    if (!boundaries.start.isNull() || boundaries.end > replCoord->getMyLastOptime()) {
         return;
     }
 
@@ -519,9 +520,10 @@ void tryToGoLiveAsASecondary(OperationContext* txn, ReplicationCoordinator* repl
 void SyncTail::oplogApplication() {
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
+    OperationContextImpl txn;
+    OpTime originalEndOpTime(getMinValid(&txn).end);
     while (!inShutdown()) {
         OpQueue ops;
-        OperationContextImpl txn;
 
         Timer batchTimer;
         int lastTimeChecked = 0;
@@ -591,10 +593,18 @@ void SyncTail::oplogApplication() {
         const BSONObj lastOp = ops.back();
         handleSlaveDelay(lastOp);
 
-        // Set minValid to the last op to be applied in this next batch.
+        // Set minValid to the last OpTime to be applied in this batch.
         // This will cause this node to go into RECOVERING state
-        // if we should crash and restart before updating the oplog
-        setMinValid(&txn, fassertStatusOK(28773, OpTime::parseFromOplogEntry(lastOp)));
+        // if we should crash and restart before updating finishing.
+        const OpTime start(getLastSetTimestamp(), OpTime::kUninitializedTerm);
+
+        // Take the max of the first endOptime (if we recovered) and the end of our batch.
+        const auto lastOpTime = fassertStatusOK(28773, OpTime::parseFromOplogEntry(lastOp));
+        const OpTime end(std::max(originalEndOpTime, lastOpTime));
+
+        // This write will not journal/checkpoint.
+        setMinValid(&txn, {start, end});
+
         multiApply(&txn,
                    ops,
                    &_prefetcherPool,
@@ -602,6 +612,9 @@ void SyncTail::oplogApplication() {
                    _applyFunc,
                    this,
                    supportsWaitingUntilDurable());
+
+        // This write will journal/checkpoint, and finish the batch.
+        setMinValid(&txn, end);
     }
 }
 
@@ -822,8 +835,6 @@ bool SyncTail::shouldRetry(OperationContext* txn, const BSONObj& o) {
     // fixes compile errors on GCC - see SERVER-18219 for details
     MONGO_UNREACHABLE;
 }
-
-static AtomicUInt32 replWriterWorkerId;
 
 static void initializeWriterThread() {
     // Only do this once per thread

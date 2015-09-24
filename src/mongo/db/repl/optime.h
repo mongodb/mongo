@@ -76,6 +76,7 @@ public:
      *      subObjName : { ts: <timestamp>, t: <term> }
      */
     void append(BSONObjBuilder* builder, const std::string& subObjName) const;
+    BSONObj toBSON() const;
 
     static StatusWith<OpTime> parseFromOplogEntry(const BSONObj& obj);
 

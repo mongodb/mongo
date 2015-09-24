@@ -165,7 +165,7 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
             log() << "our last optime : " << lastOpTimeFetched;
             log() << "oldest available is " << oldestOpTimeSeen;
             log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
-            setMinValid(txn, oldestOpTimeSeen);
+            setMinValid(txn, {lastOpTimeFetched, oldestOpTimeSeen});
             bool worked = replCoord->setFollowerMode(MemberState::RS_RECOVERING);
             if (!worked) {
                 warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)

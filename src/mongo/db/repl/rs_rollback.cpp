@@ -372,7 +372,7 @@ void syncFixUp(OperationContext* txn,
     // online until we get to that point in freshness.
     OpTime minValid = fassertStatusOK(28774, OpTime::parseFromOplogEntry(newMinValid));
     log() << "minvalid=" << minValid;
-    setMinValid(txn, minValid);
+    setMinValid(txn, {OpTime{}, minValid});
 
     // any full collection resyncs required?
     if (!fixUpInfo.collectionsToResyncData.empty() ||
@@ -476,7 +476,8 @@ void syncFixUp(OperationContext* txn,
             } else {
                 OpTime minValid = fassertStatusOK(28775, OpTime::parseFromOplogEntry(newMinValid));
                 log() << "minvalid=" << minValid;
-                setMinValid(txn, minValid);
+                const OpTime start{fixUpInfo.commonPoint, OpTime::kUninitializedTerm};
+                setMinValid(txn, {start, minValid});
             }
         } catch (const DBException& e) {
             err = "can't get/set minvalid: ";
@@ -812,13 +813,14 @@ Status _syncRollback(OperationContext* txn,
             auto res = syncRollBackLocalOperations(
                 localOplog, rollbackSource.getOplog(), processOperationForFixUp);
             if (!res.isOK()) {
-                switch (res.getStatus().code()) {
+                const auto status = res.getStatus();
+                switch (status.code()) {
                     case ErrorCodes::OplogStartMissing:
                     case ErrorCodes::UnrecoverableRollbackError:
                         sleepSecondsFn(Seconds(1));
-                        return res.getStatus();
+                        return status;
                     default:
-                        throw RSFatalException(res.getStatus().toString());
+                        throw RSFatalException(status.toString());
                 }
             } else {
                 how.commonPoint = res.getValue().first;
@@ -887,13 +889,13 @@ Status syncRollback(OperationContext* txn,
     // check that we are at minvalid, otherwise we cannot rollback as we may be in an
     // inconsistent state
     {
-        OpTime minvalid = getMinValid(txn);
-        if (minvalid > lastOpTimeApplied) {
+        BatchBoundaries boundaries = getMinValid(txn);
+        if (!boundaries.start.isNull() || boundaries.end > lastOpTimeApplied) {
             severe() << "need to rollback, but in inconsistent state" << endl;
             return Status(ErrorCodes::UnrecoverableRollbackError,
                           str::stream() << "need to rollback, but in inconsistent state. "
-                                        << "minvalid: " << minvalid.toString()
-                                        << " our last optime: " << lastOpTimeApplied.toString(),
+                                        << "minvalid: " << boundaries.end.toString()
+                                        << " > our last optime: " << lastOpTimeApplied.toString(),
                           18750);
         }
     }
