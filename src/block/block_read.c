@@ -20,7 +20,7 @@ __wt_bm_preload(WT_BM *bm,
 	WT_DECL_RET;
 	wt_off_t offset;
 	uint32_t cksum, size;
-	int mapped;
+	bool mapped;
 
 	WT_UNUSED(addr_size);
 	block = bm->block;
@@ -63,9 +63,9 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
     WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
 {
 	WT_BLOCK *block;
-	int mapped;
 	wt_off_t offset;
 	uint32_t cksum, size;
+	bool mapped;
 
 	WT_UNUSED(addr_size);
 	block = bm->block;

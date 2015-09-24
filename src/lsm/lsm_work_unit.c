@@ -357,7 +357,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * forced eviction.
 	 */
 	WT_RET(__wt_session_get_btree(session, chunk->uri, NULL, NULL, 0));
-	__wt_btree_evictable(session, 1);
+	__wt_btree_evictable(session, true);
 	WT_RET(__wt_session_release_btree(session));
 
 	/* Make sure we aren't pinning a transaction ID. */

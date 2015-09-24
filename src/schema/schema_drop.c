@@ -14,7 +14,7 @@
  */
 static int
 __drop_file(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
@@ -53,7 +53,7 @@ __drop_file(
  */
 static int
 __drop_colgroup(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[])
 {
 	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
@@ -78,7 +78,7 @@ __drop_colgroup(
  */
 static int
 __drop_index(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[])
 {
 	WT_INDEX *idx;
 	WT_DECL_RET;
@@ -100,8 +100,7 @@ __drop_index(
  *	WT_SESSION::drop for a table.
  */
 static int
-__drop_table(
-    WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+__drop_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
@@ -164,10 +163,10 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_CONFIG_ITEM cval;
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
-	int force;
+	bool force;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
-	force = (cval.val != 0);
+	force = cval.val != 0;
 
 	WT_RET(__wt_meta_track_on(session));
 

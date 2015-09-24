@@ -43,7 +43,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
  */
 int
 __wt_cond_wait_signal(
-    WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, int *signalled)
+    WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, bool *signalled)
 {
 	DWORD err, milliseconds;
 	WT_DECL_RET;
@@ -53,7 +53,7 @@ __wt_cond_wait_signal(
 	locked = 0;
 
 	/* Fast path if already signalled. */
-	*signalled = 1;
+	*signalled = true;
 	if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
 		return (0);
 
@@ -101,7 +101,7 @@ __wt_cond_wait_signal(
 	 */
 	if (ret == 0) {
 		if ((err = GetLastError()) == ERROR_TIMEOUT)
-			*signalled = 0;
+			*signalled = false;
 		else
 			ret = __wt_errno();
 	} else

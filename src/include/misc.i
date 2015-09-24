@@ -13,7 +13,7 @@
 static inline int
 __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 {
-	int notused;
+	bool notused;
 
 	return (__wt_cond_wait_signal(session, cond, usecs, &notused));
 }

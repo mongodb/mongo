@@ -516,7 +516,7 @@ __curtable_insert(WT_CURSOR *cursor)
 	cp = ctable->cg_cursors;
 	primary = *cp++;
 
-	flag_orig = F_ISSET(primary, WT_CURSTD_OVERWRITE);
+	flag_orig = F_MASK(primary, WT_CURSTD_OVERWRITE);
 	if (ctable->table->nindices > 0)
 		F_CLR(primary, WT_CURSTD_OVERWRITE);
 	ret = primary->insert(primary);
