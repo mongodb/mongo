@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <iosfwd>
+#include <memory>
 #include <boost/filesystem/path.hpp>
 
 #include "mongo/db/db.h"
@@ -216,14 +218,18 @@ struct Helpers {
 
     public:
         RemoveSaver(const std::string& type, const std::string& ns, const std::string& why);
-        ~RemoveSaver();
 
-        void goingToDelete(const BSONObj& o);
+        /**
+         * Writes document to file. File is created lazily before writing the first document.
+         * Returns error status if the file could not be created or if there were errors writing
+         * to the file.
+         */
+        Status goingToDelete(const BSONObj& o);
 
     private:
         boost::filesystem::path _root;
         boost::filesystem::path _file;
-        std::ofstream* _out;
+        std::unique_ptr<std::ostream> _out;
     };
 };
 
