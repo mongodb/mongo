@@ -952,15 +952,12 @@ StatusWith<boost::optional<std::string>> SSLManager::parseAndValidatePeerCertifi
         sk_GENERAL_NAME_pop_free(sanNames, GENERAL_NAME_free);
     } else {
         // If Subject Alternate Name (SAN) didn't exist, check Common Name (CN).
-        size_t cnBegin = peerSubjectName.find("CN=");
-        if (cnBegin != std::string::npos) {
-            size_t cnEnd = peerSubjectName.find(",", cnBegin);
-            if (cnEnd != std::string::npos) {
-                cnEnd = cnEnd - cnBegin;
-            }
-            std::string commonName = peerSubjectName.substr(cnBegin + 3, cnEnd);
+        int cnBegin = peerSubjectName.find("CN=") + 3;
+        int cnEnd = peerSubjectName.find(",", cnBegin);
+        std::string commonName = peerSubjectName.substr(cnBegin, cnEnd - cnBegin);
 
-            cnMatch = _hostNameMatch(remoteHost.c_str(), commonName.c_str());
+        if (_hostNameMatch(remoteHost.c_str(), commonName.c_str())) {
+            cnMatch = true;
         }
     }
 
