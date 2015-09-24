@@ -31,13 +31,13 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 }
 
 /*
- * __wt_log_slot_close --
+ * __log_slot_close --
  *	Close out the slot the caller is using.  The slot may already be
  *	closed or freed by another thread.
  */
-int
-__wt_log_slot_close(
-    WT_SESSION_IMPL *session, WT_LOGSLOT *slot, int *releasep, int forced)
+static int
+__log_slot_close(
+    WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *releasep, bool forced)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
@@ -105,12 +105,12 @@ retry:
  */
 static int
 __log_slot_switch_internal(
-    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, int forced)
+    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool forced)
 {
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int free_slot, release;
+	bool free_slot, release;
 
 	log = S2C(session)->log;
 	release = 0;
@@ -132,7 +132,7 @@ __log_slot_switch_internal(
 	 * someone else and we need to try setting up a new slot again.
 	 */
 	if (!F_ISSET(myslot, WT_MYSLOT_CLOSE)) {
-		ret = __wt_log_slot_close(session, slot, &release, forced);
+		ret = __log_slot_close(session, slot, &release, forced);
 		if (ret == WT_NOTFOUND)
 			return (0);
 		WT_RET(ret);
@@ -158,7 +158,7 @@ __log_slot_switch_internal(
  */
 int
 __wt_log_slot_switch(
-    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, int retry, int forced)
+    WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool retry, bool forced)
 {
 	WT_DECL_RET;
 	WT_LOG *log;
@@ -356,7 +356,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	int64_t flag_state, new_state, old_state, released;
 	int32_t join_offset, new_join;
 #ifdef	HAVE_DIAGNOSTIC
-	int unbuf_force;
+	bool unbuf_force;
 #endif
 
 	conn = S2C(session);
@@ -373,7 +373,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	 * There should almost always be a slot open.
 	 */
 #ifdef	HAVE_DIAGNOSTIC
-	unbuf_force = ((++log->write_calls % 1000) == 0);
+	unbuf_force = (++log->write_calls % 1000) == 0;
 #endif
 	for (;;) {
 		WT_BARRIER();
