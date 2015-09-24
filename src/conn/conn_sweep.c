@@ -360,7 +360,7 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 	F_SET(conn, WT_CONN_SERVER_SWEEP);
 
 	WT_RET(__wt_open_internal_session(
-	    conn, "sweep-server", 1, 1, &conn->sweep_session));
+	    conn, "sweep-server", true, true, &conn->sweep_session));
 	session = conn->sweep_session;
 
 	/*

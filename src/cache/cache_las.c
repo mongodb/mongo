@@ -102,7 +102,7 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	 * for eviction.
 	 */
 	WT_RET(__wt_open_internal_session(
-	    conn, "lookaside table", 1, 1, &conn->las_session));
+	    conn, "lookaside table", true, true, &conn->las_session));
 	session = conn->las_session;
 	F_SET(session, WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION);
 

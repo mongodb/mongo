@@ -284,14 +284,14 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
  */
 int
 __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session,
-    const char *cfg[], int *has_create, int *has_drops)
+    const char *cfg[], bool *has_create, bool *has_drops)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONFIG_ITEM all_config, names_config, to_config, before_config;
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	*has_create = *has_drops = 0;
+	*has_create = *has_drops = false;
 
 	/* Verify that the name is legal. */
 	WT_RET(__wt_config_gets_def(session, cfg, "name", 0, &cval));
@@ -311,7 +311,7 @@ __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session,
 			WT_RET_MSG(session, EINVAL,
 			    "Can't create a named snapshot from a running "
 			    "transaction that has made updates");
-		*has_create = 1;
+		*has_create = true;
 	}
 
 	/* Verify that the drop configuration is sane. */
@@ -334,7 +334,7 @@ __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session,
 			WT_RET_MSG(session, EINVAL,
 			    "Illegal configuration; named snapshot drop can't "
 			    "specify all and any other options");
-		*has_drops = 1;
+		*has_drops = true;
 	}
 
 	if (!*has_create && !*has_drops)

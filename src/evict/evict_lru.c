@@ -247,7 +247,7 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 
 	for (i = conn->evict_workers_alloc; i < conn->evict_workers_max; i++) {
 		WT_ERR(__wt_open_internal_session(conn,
-		    "eviction-worker", 1, 0, &workers[i].session));
+		    "eviction-worker", true, false, &workers[i].session));
 		workers[i].id = i;
 
 		/*
@@ -286,7 +286,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 
 	/* We need a session handle because we're reading/writing pages. */
 	WT_RET(__wt_open_internal_session(
-	    conn, "eviction-server", 1, 0, &conn->evict_session));
+	    conn, "eviction-server", true, false, &conn->evict_session));
 	session = conn->evict_session;
 
 	/*

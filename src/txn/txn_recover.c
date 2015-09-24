@@ -423,7 +423,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP);
 
 	/* We need a real session for recovery. */
-	WT_RET(__wt_open_session(conn, NULL, NULL, 1, &session));
+	WT_RET(__wt_open_session(conn, NULL, NULL, true, &session));
 	F_SET(session, WT_SESSION_NO_LOGGING);
 	r.session = session;
 
