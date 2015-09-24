@@ -34,6 +34,7 @@
 
 #include <utility>
 
+#include "mongo/base/system_error.h"
 #include "mongo/config.h"
 #include "mongo/executor/async_stream.h"
 #include "mongo/executor/async_stream_factory.h"
@@ -91,6 +92,11 @@ void NetworkInterfaceASIO::_connect(AsyncOp* op) {
                                std::to_string(op->request().target.port()));
     // TODO: Investigate how we might hint or use shortcuts to resolve when possible.
     const auto thenConnect = [this, op](std::error_code ec, tcp::resolver::iterator endpoints) {
+        if (endpoints == tcp::resolver::iterator()) {
+            // Workaround a bug in ASIO returning an invalid resolver iterator (with a non-error
+            // std::error_code) when file descriptors are exhausted.
+            ec = make_error_code(ErrorCodes::HostUnreachable);
+        }
         _validateAndRun(
             op, ec, [this, op, endpoints]() { _setupSocket(op, std::move(endpoints)); });
     };
