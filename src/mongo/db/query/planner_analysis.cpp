@@ -765,6 +765,13 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
                     }
                 }
             }
+
+            // If we have a $meta sortKey, just use the project default path, as currently the
+            // project fast paths cannot handle $meta sortKey projections.
+            if (query.getProj()->wantSortKey()) {
+                projType = ProjectionNode::DEFAULT;
+                LOG(5) << "PROJECTION: needs $meta sortKey, using DEFAULT path instead";
+            }
         }
         // If we don't have a covered project, and we're not allowed to put an uncovered one in,
         // bail out.

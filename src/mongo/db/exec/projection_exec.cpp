@@ -69,8 +69,6 @@ ProjectionExec::ProjectionExec()
       _skip(0),
       _limit(-1),
       _arrayOpType(ARRAY_OP_NORMAL),
-      _hasNonSimple(false),
-      _hasDottedField(false),
       _queryExpression(NULL),
       _hasReturnKey(false) {}
 
@@ -84,23 +82,15 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
       _skip(0),
       _limit(-1),
       _arrayOpType(ARRAY_OP_NORMAL),
-      _hasNonSimple(false),
-      _hasDottedField(false),
       _queryExpression(queryExpression),
       _hasReturnKey(false) {
-    // Are we including or excluding fields?
-    // -1 when we haven't initialized it.
-    // 1 when we're including
-    // 0 when we're excluding.
-    int include_exclude = -1;
+    // Whether we're including or excluding fields.
+    enum class IncludeExclude { kUninitialized, kInclude, kExclude };
+    IncludeExclude includeExclude = IncludeExclude::kUninitialized;
 
     BSONObjIterator it(_source);
     while (it.more()) {
         BSONElement e = it.next();
-
-        if (!e.isNumber() && !e.isBoolean()) {
-            _hasNonSimple = true;
-        }
 
         if (Object == e.type()) {
             BSONObj obj = e.embeddedObject();
@@ -170,16 +160,10 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
         } else {
             add(e.fieldName(), e.trueValue());
 
-            // Projections of dotted fields aren't covered.
-            if (mongoutils::str::contains(e.fieldName(), '.')) {
-                _hasDottedField = true;
-            }
-
-            // Validate input.
-            if (include_exclude == -1) {
-                // If we haven't specified an include/exclude, initialize include_exclude.
-                // We expect further include/excludes to match it.
-                include_exclude = e.trueValue();
+            // If we haven't specified an include/exclude, initialize includeExclude.
+            if (includeExclude == IncludeExclude::kUninitialized) {
+                includeExclude =
+                    e.trueValue() ? IncludeExclude::kInclude : IncludeExclude::kExclude;
                 _include = !e.trueValue();
             }
         }
@@ -287,7 +271,7 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
             return projStatus;
         }
     } else {
-        verify(!requiresDocument());
+        invariant(!_include);
         // Go field by field.
         if (_includeID) {
             BSONElement elt;
@@ -303,6 +287,18 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
             if (mongoutils::str::equals("_id", specElt.fieldName())) {
                 continue;
             }
+
+            // $meta sortKey is the only meta-projection which is allowed to operate on index keys
+            // rather than the full document.
+            auto metaIt = _meta.find(specElt.fieldName());
+            if (metaIt != _meta.end()) {
+                invariant(metaIt->second == META_SORT_KEY);
+                continue;
+            }
+
+            // $meta sortKey is also the only element with an Object value in the projection spec
+            // that can operate on index keys rather than the full document.
+            invariant(BSONType::Object != specElt.type());
 
             BSONElement keyElt;
             // We can project a field that doesn't exist.  We just ignore it.
@@ -361,24 +357,6 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
     member->loc = RecordId();
     member->transitionToOwnedObj();
 
-    return Status::OK();
-}
-
-Status ProjectionExec::transform(const BSONObj& in, BSONObj* out) const {
-    // If it's a positional projection we need a MatchDetails.
-    MatchDetails matchDetails;
-    if (transformRequiresDetails()) {
-        matchDetails.requestElemMatchKey();
-        verify(NULL != _queryExpression);
-        verify(_queryExpression->matchesBSON(in, &matchDetails));
-    }
-
-    BSONObjBuilder bob;
-    Status s = transform(in, &bob, &matchDetails);
-    if (!s.isOK()) {
-        return s;
-    }
-    *out = bob.obj();
     return Status::OK();
 }
 

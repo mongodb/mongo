@@ -273,7 +273,6 @@ Status prepareExecution(OperationContext* opCtx,
                 *rootOut = new SortKeyGeneratorStage(opCtx,
                                                      *rootOut,
                                                      ws,
-                                                     collection,
                                                      canonicalQuery->getParsed().getSort(),
                                                      canonicalQuery->getParsed().getFilter());
             }

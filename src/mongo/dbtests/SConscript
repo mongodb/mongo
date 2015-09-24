@@ -109,6 +109,7 @@ dbtest = env.Program(
         'repltests.cpp',
         'rollbacktests.cpp',
         'socktests.cpp',
+        'sort_key_generator_test.cpp',
         'threadedtests.cpp',
         'updatetests.cpp',
         'validate_tests.cpp',

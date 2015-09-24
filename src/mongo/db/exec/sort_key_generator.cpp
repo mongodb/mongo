@@ -49,10 +49,7 @@ namespace mongo {
 // SortKeyGenerator
 //
 
-SortKeyGenerator::SortKeyGenerator(const Collection* collection,
-                                   const BSONObj& sortSpec,
-                                   const BSONObj& queryObj) {
-    _collection = collection;
+SortKeyGenerator::SortKeyGenerator(const BSONObj& sortSpec, const BSONObj& queryObj) {
     _hasBounds = false;
     _sortHasMeta = false;
     _rawSortSpec = sortSpec;
@@ -109,15 +106,19 @@ SortKeyGenerator::SortKeyGenerator(const Collection* collection,
 }
 
 Status SortKeyGenerator::getSortKey(const WorkingSetMember& member, BSONObj* objOut) const {
-    BSONObj btreeKeyToUse;
+    StatusWith<BSONObj> sortKey = BSONObj();
 
-    Status btreeStatus = getBtreeKey(member.obj.value(), &btreeKeyToUse);
-    if (!btreeStatus.isOK()) {
-        return btreeStatus;
+    if (member.hasObj()) {
+        sortKey = getSortKeyFromObject(member);
+    } else {
+        sortKey = getSortKeyFromIndexKey(member);
+    }
+    if (!sortKey.isOK()) {
+        return sortKey.getStatus();
     }
 
     if (!_sortHasMeta) {
-        *objOut = btreeKeyToUse;
+        *objOut = sortKey.getValue();
         return Status::OK();
     }
 
@@ -125,12 +126,12 @@ Status SortKeyGenerator::getSortKey(const WorkingSetMember& member, BSONObj* obj
 
     // Merge metadata into the key.
     BSONObjIterator it(_rawSortSpec);
-    BSONObjIterator btreeIt(btreeKeyToUse);
+    BSONObjIterator sortKeyIt(sortKey.getValue());
     while (it.more()) {
         BSONElement elt = it.next();
         if (elt.isNumber()) {
             // Merge btree key elt.
-            mergedKeyBob.append(btreeIt.next());
+            mergedKeyBob.append(sortKeyIt.next());
         } else if (LiteParsedQuery::isTextScoreMeta(elt)) {
             // Add text score metadata
             double score = 0.0;
@@ -147,11 +148,25 @@ Status SortKeyGenerator::getSortKey(const WorkingSetMember& member, BSONObj* obj
     return Status::OK();
 }
 
-Status SortKeyGenerator::getBtreeKey(const BSONObj& memberObj, BSONObj* objOut) const {
+StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromIndexKey(const WorkingSetMember& member) const {
+    invariant(member.getState() == WorkingSetMember::LOC_AND_IDX);
+    invariant(!_sortHasMeta);
+
+    BSONObjBuilder sortKeyObj;
+    for (BSONElement specElt : _rawSortSpec) {
+        invariant(specElt.isNumber());
+        BSONElement sortKeyElt;
+        invariant(member.getFieldDotted(specElt.fieldName(), &sortKeyElt));
+        sortKeyObj.appendAs(sortKeyElt, "");
+    }
+
+    return sortKeyObj.obj();
+}
+
+StatusWith<BSONObj> SortKeyGenerator::getSortKeyFromObject(const WorkingSetMember& member) const {
     // Not sorting by anything in the key, just bail out early.
     if (_btreeObj.isEmpty()) {
-        *objOut = BSONObj();
-        return Status::OK();
+        return BSONObj();
     }
 
     // We will sort '_data' in the same order an index over '_pattern' would have.  This is
@@ -161,7 +176,7 @@ Status SortKeyGenerator::getBtreeKey(const BSONObj& memberObj, BSONObj* objOut) 
     BSONObjSet keys(patternCmp);
 
     try {
-        _keyGen->getKeys(memberObj, &keys);
+        _keyGen->getKeys(member.obj.value(), &keys);
     } catch (const UserException& e) {
         // Probably a parallel array.
         if (BtreeKeyGenerator::ParallelArraysCode == e.getCode()) {
@@ -179,8 +194,7 @@ Status SortKeyGenerator::getBtreeKey(const BSONObj& memberObj, BSONObj* objOut) 
     // No bounds?  No problem!  Use the first key.
     if (!_hasBounds) {
         // Note that we sort 'keys' according to the pattern '_btreeObj'.
-        *objOut = *keys.begin();
-        return Status::OK();
+        return *keys.begin();
     }
 
     // To decide which key to use in sorting, we must consider not only the sort pattern but
@@ -192,15 +206,13 @@ Status SortKeyGenerator::getBtreeKey(const BSONObj& memberObj, BSONObj* objOut) 
     verify(NULL != _boundsChecker.get());
     for (BSONObjSet::const_iterator it = keys.begin(); it != keys.end(); ++it) {
         if (_boundsChecker->isValidKey(*it)) {
-            *objOut = *it;
-            return Status::OK();
+            return *it;
         }
     }
 
     // No key is in our bounds.
     // TODO: will this ever happen?  don't think it should.
-    *objOut = *keys.begin();
-    return Status::OK();
+    return *keys.begin();
 }
 
 void SortKeyGenerator::getBoundsForSort(const BSONObj& queryObj, const BSONObj& sortObj) {
@@ -258,14 +270,9 @@ const char* SortKeyGeneratorStage::kStageType = "SORT_KEY_GENERATOR";
 SortKeyGeneratorStage::SortKeyGeneratorStage(OperationContext* opCtx,
                                              PlanStage* child,
                                              WorkingSet* ws,
-                                             const Collection* collection,
                                              const BSONObj& sortSpecObj,
                                              const BSONObj& queryObj)
-    : PlanStage(kStageType, opCtx),
-      _ws(ws),
-      _collection(collection),
-      _sortSpec(sortSpecObj),
-      _query(queryObj) {
+    : PlanStage(kStageType, opCtx), _ws(ws), _sortSpec(sortSpecObj), _query(queryObj) {
     _children.emplace_back(child);
 }
 
@@ -280,7 +287,7 @@ PlanStage::StageState SortKeyGeneratorStage::work(WorkingSetID* out) {
     ScopedTimer timer(&_commonStats.executionTimeMillis);
 
     if (!_sortKeyGen) {
-        _sortKeyGen = stdx::make_unique<SortKeyGenerator>(_collection, _sortSpec, _query);
+        _sortKeyGen = stdx::make_unique<SortKeyGenerator>(_sortSpec, _query);
         ++_commonStats.needTime;
         return PlanStage::NEED_TIME;
     }

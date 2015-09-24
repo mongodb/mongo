@@ -125,7 +125,7 @@ PlanStage* buildStages(OperationContext* txn,
             return NULL;
         }
         return new SortKeyGeneratorStage(
-            txn, childStage, ws, collection, keyGenNode->sortSpec, keyGenNode->queryObj);
+            txn, childStage, ws, keyGenNode->sortSpec, keyGenNode->queryObj);
     } else if (STAGE_PROJECTION == root->getType()) {
         const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
         PlanStage* childStage = buildStages(txn, collection, qsol, pn->children[0], ws);

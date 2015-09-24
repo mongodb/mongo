@@ -75,14 +75,6 @@ public:
      */
     Status transform(WorkingSetMember* member) const;
 
-    /**
-     * Apply this projection to the object 'in'.
-     *
-     * Upon success, 'out' is set to the new object and Status::OK() is returned.
-     * Otherwise, returns an error Status and *out is not mutated.
-     */
-    Status transform(const BSONObj& in, BSONObj* out) const;
-
 private:
     //
     // Initialization
@@ -122,13 +114,6 @@ private:
      */
     bool transformRequiresDetails() const {
         return ARRAY_OP_POSITIONAL == _arrayOpType;
-    }
-
-    /**
-     * Is the full document required to compute this projection?
-     */
-    bool requiresDocument() const {
-        return _include || _hasNonSimple || _hasDottedField;
     }
 
     /**
@@ -177,12 +162,6 @@ private:
     std::vector<BSONObj> _elemMatchObjs;
 
     ArrayOpType _arrayOpType;
-
-    // Is there an slice, elemMatch or meta operator?
-    bool _hasNonSimple;
-
-    // Is there a projection over a dotted field or a $ positional operator?
-    bool _hasDottedField;
 
     // The full query expression.  Used when we need MatchDetails.
     const MatchExpression* _queryExpression;
