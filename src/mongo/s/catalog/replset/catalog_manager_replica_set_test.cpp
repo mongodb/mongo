@@ -74,6 +74,8 @@ using unittest::assertGet;
 
 using CatalogManagerReplSetTest = CatalogManagerReplSetTestFixture;
 
+const int kMaxCommandRetry = 3;
+
 TEST_F(CatalogManagerReplSetTest, GetCollectionExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
@@ -2383,6 +2385,97 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeCmdThenFind) {
     });
 
     future2.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTest, RetryOnReadCommandNetworkErrorFailsAtMaxRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    auto future1 = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        auto ok = catalogManager()->runReadCommand(
+            operationContext(), "test", BSON("dummy" << 1), &responseBuilder);
+        ASSERT_FALSE(ok);
+        auto status = Command::getStatusFromCommandResult(responseBuilder.obj());
+        ASSERT_EQ(ErrorCodes::HostUnreachable, status.code());
+    });
+
+    for (int i = 0; i < kMaxCommandRetry; ++i) {
+        onCommand([](const RemoteCommandRequest&) {
+            return Status{ErrorCodes::HostUnreachable, "bad host"};
+        });
+    }
+
+    future1.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTest, RetryOnReadCommandNetworkErrorSucceedsAtMaxRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    BSONObj expectedResult = BSON("ok" << 1 << "yes"
+                                       << "dummy");
+
+    auto future1 = launchAsync([this, expectedResult] {
+        BSONObjBuilder responseBuilder;
+        auto ok = catalogManager()->runReadCommand(
+            operationContext(), "test", BSON("dummy" << 1), &responseBuilder);
+        ASSERT_TRUE(ok);
+        auto response = responseBuilder.obj();
+        ASSERT_EQ(expectedResult, response);
+    });
+
+    for (int i = 0; i < kMaxCommandRetry - 1; ++i) {
+        onCommand([](const RemoteCommandRequest&) {
+            return Status{ErrorCodes::HostUnreachable, "bad host"};
+        });
+    }
+
+    onCommand([expectedResult](const RemoteCommandRequest& request) { return expectedResult; });
+
+    future1.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTest, RetryOnFindCommandNetworkErrorFailsAtMaxRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    auto future = launchAsync([this] {
+        BSONObjBuilder responseBuilder;
+        auto status = catalogManager()->getGlobalSettings(operationContext(), "test");
+        ASSERT_EQ(ErrorCodes::HostUnreachable, status.getStatus().code());
+    });
+
+    for (int i = 0; i < kMaxCommandRetry; ++i) {
+        onFindCommand([](const RemoteCommandRequest&) {
+            return Status{ErrorCodes::HostUnreachable, "bad host"};
+        });
+    }
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRetry) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    SettingsType st;
+    st.setKey(SettingsType::BalancerDocKey);
+    st.setBalancerStopped(true);
+
+    auto future = launchAsync([this, st] {
+        BSONObjBuilder responseBuilder;
+        auto docStatus = catalogManager()->getGlobalSettings(operationContext(), "test");
+        ASSERT_OK(docStatus.getStatus());
+        ASSERT_EQ(st.toBSON(), docStatus.getValue().toBSON());
+    });
+
+    for (int i = 0; i < kMaxCommandRetry - 1; ++i) {
+        onFindCommand([](const RemoteCommandRequest&) {
+            return Status{ErrorCodes::HostUnreachable, "bad host"};
+        });
+    }
+
+    onFindCommand(
+        [st](const RemoteCommandRequest& request) { return vector<BSONObj>{st.toBSON()}; });
+
+    future.timed_get(kFutureTimeout);
 }
 
 }  // namespace

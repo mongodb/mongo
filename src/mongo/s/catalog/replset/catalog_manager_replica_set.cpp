@@ -95,6 +95,7 @@ const int kInitialSSVRetries = 3;
 const int kActionLogCollectionSize = 1024 * 1024 * 2;
 const int kChangeLogCollectionSize = 1024 * 1024 * 10;
 const int kMaxConfigVersionInitRetry = 3;
+const int kMaxReadRetry = 3;
 
 void _toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
@@ -1122,25 +1123,36 @@ StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFin
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    const auto configShard = grid.shardRegistry()->getShard(txn, "config");
-    const auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
-    if (!readHost.isOK()) {
-        return readHost.getStatus();
+    Status lastStatus = Status::OK();
+
+    for (int retry = 0; retry < kMaxReadRetry; retry++) {
+        const auto configShard = grid.shardRegistry()->getShard(txn, "config");
+        const auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
+        if (!readHost.isOK()) {
+            return readHost.getStatus();
+        }
+
+        repl::ReadConcernArgs readConcern(grid.shardRegistry()->getConfigOpTime(),
+                                          repl::ReadConcernLevel::kMajorityReadConcern);
+
+        auto result = grid.shardRegistry()->exhaustiveFindOnConfigNode(
+            readHost.getValue(), nss, query, sort, limit, readConcern);
+
+        if (ErrorCodes::isNetworkError(result.getStatus().code())) {
+            lastStatus = result.getStatus();
+            configShard->getTargeter()->markHostUnreachable(readHost.getValue());
+            continue;
+        }
+
+        if (!result.isOK()) {
+            return result.getStatus();
+        }
+
+        auto response = std::move(result.getValue());
+        return OpTimePair<vector<BSONObj>>(std::move(response.docs), response.opTime);
     }
 
-    repl::ReadConcernArgs readConcern(grid.shardRegistry()->getConfigOpTime(),
-                                      repl::ReadConcernLevel::kMajorityReadConcern);
-
-    auto result = grid.shardRegistry()->exhaustiveFindOnConfigNode(
-        readHost.getValue(), nss, query, sort, limit, readConcern);
-
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-
-    auto response = std::move(result.getValue());
-
-    return OpTimePair<vector<BSONObj>>(std::move(response.docs), response.opTime);
+    return lastStatus;
 }
 
 void CatalogManagerReplicaSet::_appendReadConcern(BSONObjBuilder* builder) {
@@ -1154,20 +1166,33 @@ bool CatalogManagerReplicaSet::_runReadCommand(OperationContext* txn,
                                                const BSONObj& cmdObj,
                                                const ReadPreferenceSetting& settings,
                                                BSONObjBuilder* result) {
-    auto targeter = grid.shardRegistry()->getShard(txn, "config")->getTargeter();
-    auto target = targeter->findHost(settings);
-    if (!target.isOK()) {
-        return Command::appendCommandStatus(*result, target.getStatus());
+    Status lastStatus = Status::OK();
+    for (int retry = 0; retry < kMaxReadRetry; retry++) {
+        auto targeter = grid.shardRegistry()->getShard(txn, "config")->getTargeter();
+        auto target = targeter->findHost(settings);
+        if (!target.isOK()) {
+            return Command::appendCommandStatus(*result, target.getStatus());
+        }
+
+        auto resultStatus =
+            grid.shardRegistry()->runCommandOnConfig(target.getValue(), dbname, cmdObj);
+
+        if (ErrorCodes::isNetworkError(resultStatus.getStatus().code())) {
+            lastStatus = resultStatus.getStatus();
+            targeter->markHostUnreachable(target.getValue());
+            continue;
+        }
+
+        if (!resultStatus.isOK()) {
+            return Command::appendCommandStatus(*result, resultStatus.getStatus());
+        }
+
+        result->appendElements(resultStatus.getValue());
+
+        return Command::getStatusFromCommandResult(resultStatus.getValue()).isOK();
     }
 
-    auto resultStatus = grid.shardRegistry()->runCommandOnConfig(target.getValue(), dbname, cmdObj);
-    if (!resultStatus.isOK()) {
-        return Command::appendCommandStatus(*result, resultStatus.getStatus());
-    }
-
-    result->appendElements(resultStatus.getValue());
-
-    return Command::getStatusFromCommandResult(resultStatus.getValue()).isOK();
+    return Command::appendCommandStatus(*result, lastStatus);
 }
 
 }  // namespace mongo
