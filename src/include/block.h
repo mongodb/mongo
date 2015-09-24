@@ -54,7 +54,7 @@ struct __wt_extlist {
 	wt_off_t offset;			/* Written extent offset */
 	uint32_t cksum, size;			/* Written extent cksum, size */
 
-	int	track_size;			/* Maintain per-size skiplist */
+	bool	 track_size;			/* Maintain per-size skiplist */
 
 	WT_EXT	*last;				/* Cached last element */
 

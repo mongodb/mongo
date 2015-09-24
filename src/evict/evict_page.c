@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 
 static int  __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, bool);
-static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, int *, bool);
+static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, bool *, bool);
 
 /*
  * __evict_exclusive_clear --
@@ -55,7 +55,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	int forced_eviction, inmem_split;
+	bool forced_eviction, inmem_split;
 
 	conn = S2C(session);
 
@@ -64,7 +64,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 
 	page = ref->page;
 	forced_eviction = page->read_gen == WT_READGEN_OLDEST;
-	inmem_split = 0;
+	inmem_split = false;
 
 	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
 	    "page %p (%s)", page, __wt_page_type_string(page->type)));
@@ -297,7 +297,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
  */
 static int
 __evict_review(
-    WT_SESSION_IMPL *session, WT_REF *ref, int *inmem_splitp, bool closing)
+    WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp, bool closing)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;

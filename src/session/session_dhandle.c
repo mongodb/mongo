@@ -248,12 +248,12 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	}
 
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_FORCE)) {
-		ret = __wt_conn_btree_sync_and_close(session, 0, 1);
+		ret = __wt_conn_btree_sync_and_close(session, false, true);
 		F_CLR(dhandle, WT_DHANDLE_DISCARD_FORCE);
 	} else if (F_ISSET(dhandle, WT_DHANDLE_DISCARD) ||
 	    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
-		ret = __wt_conn_btree_sync_and_close(session, 0, 0);
+		ret = __wt_conn_btree_sync_and_close(session, false, false);
 		F_CLR(dhandle, WT_DHANDLE_DISCARD);
 	}
 

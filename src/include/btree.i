@@ -1035,14 +1035,14 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static inline bool
 __wt_page_can_evict(WT_SESSION_IMPL *session,
-    WT_PAGE *page, int check_splits, int *inmem_splitp)
+    WT_PAGE *page, int check_splits, bool *inmem_splitp)
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_GLOBAL *txn_global;
 
 	if (inmem_splitp != NULL)
-		*inmem_splitp = 0;
+		*inmem_splitp = false;
 
 	btree = S2BT(session);
 	mod = page->modify;
@@ -1059,7 +1059,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 */
 	if (__wt_page_can_split(session, page)) {
 		if (inmem_splitp != NULL)
-			*inmem_splitp = 1;
+			*inmem_splitp = true;
 		return (true);
 	}
 

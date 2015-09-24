@@ -100,7 +100,7 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 	 * handle. Closing the handle decrements the open file count,
 	 * meaning the close loop won't overrun the configured minimum.
 	 */
-	ret = __wt_conn_btree_sync_and_close(session, 0, 1);
+	ret = __wt_conn_btree_sync_and_close(session, false, true);
 
 	if (evict_reset)
 		__wt_evict_file_exclusive_off(session);
@@ -172,7 +172,7 @@ __sweep_discard_trees(WT_SESSION_IMPL *session, u_int *dead_handlesp)
 
 		/* If the handle is marked "dead", flush it from cache. */
 		WT_WITH_DHANDLE(session, dhandle, ret =
-		    __wt_conn_btree_sync_and_close(session, 0, 0));
+		    __wt_conn_btree_sync_and_close(session, false, false));
 
 		/* We closed the btree handle. */
 		if (ret == 0) {
@@ -207,7 +207,7 @@ __sweep_remove_one(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 		WT_ERR(EBUSY);
 
 	WT_WITH_DHANDLE(session, dhandle,
-	    ret = __wt_conn_dhandle_discard_single(session, 0, 1));
+	    ret = __wt_conn_dhandle_discard_single(session, false, true));
 
 	/*
 	 * If the handle was not successfully discarded, unlock it and

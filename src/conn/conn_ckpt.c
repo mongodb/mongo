@@ -15,7 +15,7 @@ static int __ckpt_server_start(WT_CONNECTION_IMPL *);
  *	Parse and setup the checkpoint server options.
  */
 static int
-__ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *startp)
+__ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, bool *startp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
@@ -38,10 +38,10 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *startp)
 	if ((conn->ckpt_usecs == 0 && conn->ckpt_logsize == 0) ||
 	    (conn->ckpt_logsize && conn->ckpt_usecs == 0 &&
 	     !FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))) {
-		*startp = 0;
+		*startp = false;
 		return (0);
 	}
-	*startp = 1;
+	*startp = true;
 
 	/*
 	 * The application can specify a checkpoint name, which we ignore if
@@ -161,7 +161,7 @@ int
 __wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
-	int start;
+	bool start;
 
 	conn = S2C(session);
 	start = 0;
