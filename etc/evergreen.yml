@@ -4139,6 +4139,8 @@ buildvariants:
 
 - name: ubuntu1410-debug-asan
   display_name: ~ ASAN SSL Ubuntu 14.10 DEBUG
+  modules:
+  - enterprise
   run_on:
   - ubuntu1410-build
   stepback: false
@@ -4156,28 +4158,35 @@ buildvariants:
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
+  - name: audit
+  - name: audit_WT
   - name: auth
   - name: auth_WT
+  - name: bulk_gle_passthrough
+  - name: bulk_gle_passthrough_WT
+  - name: concurrency
+  - name: concurrency_WT
+  - name: concurrency_replication
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded
+  - name: concurrency_sharded_WT
   - name: dbtest
   - name: dbtest_WT
   - name: disk
   - name: durability
+  - name: ese_WT
   - name: failpoints
   - name: failpoints_auth
   - name: gle_auth
   - name: gle_auth_WT
-  - name: gle_auth_write_cmd
-  - name: gle_auth_write_cmd_WT
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_WT
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: gle_auth_write_cmd
+  - name: gle_auth_write_cmd_WT
   - name: integration_tests_standalone
   - name: integration_tests_replset
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_WT
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
@@ -4187,40 +4196,40 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jstestfuzz
   - name: mmap
   - name: mongosTest
   - name: multiversion
   - name: noPassthrough
-  - name: noPassthrough_WT
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
-  - name: bulk_gle_passthrough
-  - name: bulk_gle_passthrough_WT
+  - name: noPassthrough_WT
   - name: parallel
   - name: parallel_WT
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
-  - name: concurrency
-  - name: concurrency_WT
-  - name: concurrency_replication
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded
-  - name: concurrency_sharded_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
   - name: replication
   - name: replication_WT
   - name: replication_auth
+  - name: sasl
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
   - name: slow2_WT
-  - name: sharding_jscore_passthrough
-  - name: sharding_jscore_passthrough_WT
+  - name: snmp
+  - name: snmp_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
