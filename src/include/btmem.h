@@ -374,10 +374,6 @@ struct __wt_page_modify {
 	/*
 	 * The write generation is incremented when a page is modified, a page
 	 * is clean if the write generation is 0.
-	 *
-	 * !!!
-	 * 4B values are probably larger than required, but I'm more confident
-	 * 4B types will always be backed by atomic writes to memory.
 	 */
 	uint32_t write_gen;
 
