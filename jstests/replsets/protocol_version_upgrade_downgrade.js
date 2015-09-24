@@ -37,8 +37,7 @@ assert.writeOK(primaryColl.bar.insert({x: 1}, {writeConcern: {w: 3}}));
 // Check optime format in protocol version 0, which is a Timestamp.
 var res = primary.adminCommand({replSetGetStatus: 1});
 assert.commandWorked(res);
-// Check the optime is a Timestamp { t: ..., i: ...} , not an OpTime { ts: ..., t: ... }
-assert.eq(res.members[0].optime.ts, null);
+assert.eq(res.members[0].optime.term, null);
 
 //
 // Upgrade protocol version
@@ -59,7 +58,7 @@ assert.writeOK(primaryColl.bar.insert({x: 2}, {writeConcern: {w: 3}}));
 // Check optime format in protocol version 1, which is an object including the term.
 res = primary.adminCommand({replSetGetStatus: 1});
 assert.commandWorked(res);
-assert.eq(res.members[0].optime.t, NumberLong(0));
+assert.eq(res.members[0].optime.term, NumberLong(0));
 
 //
 // Downgrade protocol version
@@ -77,6 +76,6 @@ assert.writeOK(primaryColl.bar.insert({x: 3}, {writeConcern: {w: 3}}));
 // Check optime format in protocol version 0, which is a Timestamp.
 res = primary.adminCommand({replSetGetStatus: 1});
 assert.commandWorked(res);
-assert.eq(res.members[0].optime.ts, null);
+assert.eq(res.members[0].optime.term, null);
 
 })();

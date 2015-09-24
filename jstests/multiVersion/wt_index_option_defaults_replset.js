@@ -24,7 +24,6 @@
     // Rig the election so that the 3.2 node becomes the primary.
     var replSetConfig = rst.getReplSetConfig();
     replSetConfig.members[1].priority = 0;
-    replSetConfig.protocolVersion = 0;
 
     rst.initiate(replSetConfig);
 

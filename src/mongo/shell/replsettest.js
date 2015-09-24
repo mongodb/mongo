@@ -478,23 +478,13 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     }
 }
 
-ReplSetTest.prototype.reInitiate = function() {
-    "use strict";
-
-    var master = this.getMaster();
-    var res = master.adminCommand({ replSetGetConfig: 1 });
-    assert.commandWorked(res);
-    var config = this.getReplSetConfig();
-    config.version = res.config.version + 1;
-
-    try {
-        assert.commandWorked(master.adminCommand({replSetReconfig: config}));
-    }
-    catch (e) {
-        if (tojson(e).indexOf("error doing query: failed") < 0) {
-            throw e;
-        }
-    }
+ReplSetTest.prototype.reInitiate = function(timeout) {
+    var master  = this.nodes[0];
+    var c = master.getDB("local")['system.replset'].findOne();
+    var config  = this.getReplSetConfig();
+    var timeout = timeout || 60000;
+    config.version = c.version + 1;
+    this.initiate( config , 'replSetReconfig', timeout );
 }
 
 ReplSetTest.prototype.getLastOpTimeWritten = function() {

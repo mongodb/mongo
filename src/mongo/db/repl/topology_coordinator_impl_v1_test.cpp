@@ -2307,14 +2307,12 @@ TEST_F(HeartbeatResponseTestV1, ShouldRespondNegativelyToPV0ElectionCommands) {
     ASSERT_EQUALS("replset: incompatible replset protocol version: 1", status.reason());
     ASSERT_TRUE(responseBuilder.obj().isEmpty());
 
-    BSONObjBuilder electResponseBuilder;
     ReplicationCoordinator::ReplSetElectArgs electArgs;
     status = internalErrorStatus;
-    getTopoCoord().prepareElectResponse(
-        electArgs, Date_t(), OpTime(), &electResponseBuilder, &status);
+    getTopoCoord().prepareElectResponse(electArgs, Date_t(), OpTime(), &responseBuilder, &status);
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_EQUALS("replset: incompatible replset protocol version: 1", status.reason());
-    ASSERT_TRUE(electResponseBuilder.obj().isEmpty());
+    ASSERT_TRUE(responseBuilder.obj().isEmpty());
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceFresherMemberIsDown) {

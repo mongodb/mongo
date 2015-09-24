@@ -54,14 +54,9 @@ using executor::RemoteCommandResponse;
 
 class ReplCoordElectTest : public ReplCoordTest {
 protected:
-    void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost);
     void simulateEnoughHeartbeatsForElectability();
     void simulateFreshEnoughForElectability();
 };
-
-void ReplCoordElectTest::assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost) {
-    ReplCoordTest::assertStartSuccess(addProtocolVersion(configDoc, 0), selfHost);
-}
 
 void ReplCoordElectTest::simulateEnoughHeartbeatsForElectability() {
     ReplicationCoordinatorImpl* replCoord = getReplCoord();

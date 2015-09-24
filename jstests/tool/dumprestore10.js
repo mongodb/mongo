@@ -33,7 +33,7 @@ step("mongodump from replset");
 
 var data = MongoRunner.dataDir + "/dumprestore10-dump1/";
 
-runMongoProgram( "mongodump", "--host", "127.0.0.1:"+master.port, "--out", data );
+runMongoProgram( "mongodump", "--host", "127.0.0.1:"+replTest.ports[0], "--out", data );
 
 
 {
@@ -48,7 +48,7 @@ runMongoProgram( "mongodump", "--host", "127.0.0.1:"+master.port, "--out", data 
 
 step("try mongorestore with write concern");
 
-runMongoProgram( "mongorestore", "--writeConcern", "2", "--host", "127.0.0.1:"+master.port, "--dir", data );
+runMongoProgram( "mongorestore", "--writeConcern", "2", "--host", "127.0.0.1:"+replTest.ports[0], "--dir", data );
 
 var x = 0;
 

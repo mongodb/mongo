@@ -94,7 +94,7 @@ TEST_F(ReplCoordHBV1Test, JoinExistingReplSet) {
                                               << BSON("_id" << 2 << "host"
                                                             << "h2:1") << BSON("_id" << 3 << "host"
                                                                                      << "h3:1"))
-                                << "protocolVersion" << 1));
+                                << "settings" << BSON("protocolVersion" << 1)));
     init("mySet");
     addSelf(HostAndPort("h2", 1));
     const Date_t startDate = getNet()->now();
@@ -157,7 +157,7 @@ TEST_F(ReplCoordHBV1Test, DoNotJoinReplSetIfNotAMember) {
                                               << BSON("_id" << 2 << "host"
                                                             << "h2:1") << BSON("_id" << 3 << "host"
                                                                                      << "h3:1"))
-                                << "protocolVersion" << 1));
+                                << "settings" << BSON("protocolVersion" << 1)));
     init("mySet");
     addSelf(HostAndPort("h4", 1));
     const Date_t startDate = getNet()->now();

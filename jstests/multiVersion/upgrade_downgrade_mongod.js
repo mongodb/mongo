@@ -258,9 +258,7 @@
     function init_replication(conn){
         var testDB = conn.getDB('test');
         var testName = this.name;
-        var rsconf = {_id: 'oplog',
-                      members: [ {_id: 0, host: 'localhost:' + conn.port}],
-                      protocolVersion: 0};
+        var rsconf = {_id: 'oplog', members: [ {_id: 0, host: 'localhost:' + conn.port}]};
 
         assert.commandWorked(testDB.adminCommand({replSetInitiate : rsconf}),
             testName + ' replSetInitiate');

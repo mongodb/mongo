@@ -20,7 +20,7 @@ print("1. Bring up set");
 // SERVER-7455, this test is called from ssl/auth_x509.js
 var x509_options1;
 var x509_options2;
-var replTest = new ReplSetTest({name: basename,
+var replTest = new ReplSetTest({name: basename, 
                                 nodes : {node0 : x509_options1, node1 : x509_options2}});
 
 var conns = replTest.startSet();
@@ -61,7 +61,7 @@ var admin_s2 = slave2.getDB("admin");
 
 var config = replTest.getReplSetConfig();
 config.version = 2;
-config.members.push({_id:2, host: slave2.host});
+config.members.push({_id:2, host:hostname+":"+slave2.port});
 try {
   admin.runCommand({replSetReconfig:config});
 }
@@ -82,20 +82,37 @@ wait(function() {
       (config3 && config3.version == config.version);
   });
 
-replTest.waitForState(slave2, [replTest.SECONDARY, replTest.RECOVERING], 60 * 1000);
+wait(function() {
+    var status = admin_s2.runCommand({replSetGetStatus:1});
+    printjson(status);
+    return status.members &&
+      (status.members[2].state == 3 || status.members[2].state == 2);
+  });
 
-print("7. Kill the secondary in the middle of syncing");
-replTest.stop(slave1);
+
+print("7. Kill #2 in the middle of syncing");
+replTest.stop(1);
 
 
-print("8. Eventually the new node should become a secondary");
+print("8. Eventually it should become a secondary");
 print("if initial sync has started, this will cause it to fail and sleep for 5 minutes");
-replTest.waitForState(slave2, replTest.SECONDARY, 60 * 1000);
+wait(function() {
+    var status = admin_s2.runCommand({replSetGetStatus:1});
+    occasionally(function() { printjson(status); });
+    return status.members[2].state == 2;
+    }, 350);
 
-print("9. Bring the secondary back up");
-replTest.start(slave1, {}, true);
+
+print("9. Bring #2 back up");
+replTest.start(1, {}, true);
 reconnect(slave1);
-replTest.waitForState(slave1, [replTest.PRIMARY, replTest.SECONDARY], 60 * 1000);
+wait(function() {
+    var status = admin_s1.runCommand({replSetGetStatus:1});
+    printjson(status);
+    return status.ok === 1 && status.members && status.members.length >= 2 &&
+      (status.members[1].state === 2 || status.members[1].state === 1);
+  });
+
 
 print("10. Insert some stuff");
 master = replTest.getMaster();

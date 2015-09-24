@@ -36,13 +36,9 @@ var st;
     var addSlaveDelay = function(rst) {
         var conf = rst.getMaster().getDB('local').system.replset.findOne();
         conf.version++;
-        var secondaryIndex = 0;
-        if (conf.members[secondaryIndex].host === rst.getMaster().host) {
-            secondaryIndex = 1;
-        }
-        conf.members[secondaryIndex].priority = 0;
-        conf.members[secondaryIndex].hidden = true;
-        conf.members[secondaryIndex].slaveDelay = 30;
+        conf.members[1].priority = 0;
+        conf.members[1].hidden = true;
+        conf.members[1].slaveDelay = 30;
         reconfig(rst, conf);
     }
 
@@ -96,6 +92,9 @@ var st;
         version: 1,
         configsvr: true,
         members: [ { _id: 0, host: st.c0.name }],
+        settings: {
+            protocolVersion :1
+        }
     };
     assert.commandWorked(st.c0.adminCommand({replSetInitiate: csrsConfig}));
     var csrs = [];

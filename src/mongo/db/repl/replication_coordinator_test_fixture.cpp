@@ -61,18 +61,6 @@ ReplicaSetConfig ReplCoordTest::assertMakeRSConfig(const BSONObj& configBson) {
     return config;
 }
 
-ReplicaSetConfig ReplCoordTest::assertMakeRSConfigV0(const BSONObj& configBson) {
-    return assertMakeRSConfig(addProtocolVersion(configBson, 0));
-}
-
-BSONObj ReplCoordTest::addProtocolVersion(const BSONObj& configDoc, int protocolVersion) {
-    BSONObjBuilder builder;
-    builder << "protocolVersion" << protocolVersion;
-    builder.appendElementsUnique(configDoc);
-    return builder.obj();
-}
-
-
 void ReplCoordTest::setUp() {
     _settings.replSet = "mySet/node1:12345,node2:54321";
 }
@@ -161,12 +149,7 @@ void ReplCoordTest::start(const HostAndPort& selfHost) {
 }
 
 void ReplCoordTest::assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost) {
-    // Set default protocol version to 1.
-    if (!configDoc.hasField("protocolVersion")) {
-        start(addProtocolVersion(configDoc, 1), selfHost);
-    } else {
-        start(configDoc, selfHost);
-    }
+    start(configDoc, selfHost);
     ASSERT_NE(MemberState::RS_STARTUP, getReplCoord()->getMemberState().s);
 }
 

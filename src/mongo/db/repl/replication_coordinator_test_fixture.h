@@ -67,22 +67,10 @@ public:
      * Constructs a ReplicaSetConfig from the given BSON, or raises a test failure exception.
      */
     static ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBSON);
-    static ReplicaSetConfig assertMakeRSConfigV0(const BSONObj& configBson);
-
-    /**
-     * Adds { protocolVersion: 0 or 1 } to the config.
-     */
-    static BSONObj addProtocolVersion(const BSONObj& configDoc, int protocolVersion);
 
 protected:
     virtual void setUp();
     virtual void tearDown();
-
-    /**
-     * Asserts that calling start(configDoc, selfHost) successfully initiates the
-     * ReplicationCoordinator under test.
-     */
-    virtual void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost);
 
     /**
      * Gets the network mock.
@@ -194,6 +182,12 @@ protected:
      */
     void simulateSuccessfulElection();
     void simulateSuccessfulV1Election();
+
+    /**
+     * Asserts that calling start(configDoc, selfHost) successfully initiates the
+     * ReplicationCoordinator under test.
+     */
+    void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost);
 
     /**
      * Shuts down the objects under test.

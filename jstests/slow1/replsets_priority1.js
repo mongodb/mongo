@@ -33,7 +33,7 @@ var everyoneOkSoon = function() {
 
 var checkPrimaryIs = function (node) {
 
-    print("nreplsets_priority1.js checkPrimaryIs(" + node.host + ")");
+    print("nreplsets_priority1.js checkPrimaryIs(" + node + ")");
 
     var status;
 

@@ -17,7 +17,6 @@ var replTest = new ReplSetTest( {name: name, nodes: 2} );
 var nodes = replTest.startSet();
 replTest.initiate();
 var master = replTest.getMaster();
-var secondary = replTest.getSecondary();
 
 print("Initial sync");
 master.getDB("foo").bar.baz.insert({x:1});
@@ -26,17 +25,11 @@ replTest.awaitReplication();
 
 print("Remove secondary");
 var config = replTest.getReplSetConfig();
-for (var i = 0; i < config.members.length; i++) {
-    if (config.members[i].host == secondary.host) {
-        config.members.splice(i, 1);
-        break;
-    }
-};
+
+config.members.pop();
 config.version = 2;
 
-assert.eq(secondary.getDB("admin").runCommand({ping:1}).ok,
-          1,
-          "we should be connected to the secondary");
+assert.eq(replTest.nodes[1].getDB("admin").runCommand({ping:1}).ok, 1, "we are connected to node[1]");
 
 try {
     master.getDB("admin").runCommand({replSetReconfig:config});
@@ -45,11 +38,11 @@ catch(e) {
     print(e);
 }
 
-// This tests that the secondary disconnects us when it picks up the new config.
+// This test that nodes[1] disconnects us when it picks up the new config
 assert.soon(
     function() {
         try {
-            secondary.getDB("admin").runCommand({ping:1});
+            replTest.nodes[1].getDB("admin").runCommand({ping:1});
         } catch (e) {
             return true;
         }
@@ -57,9 +50,9 @@ assert.soon(
     }
 );
 
-// Now we should successfully reconnect to the secondary.
-assert.eq(secondary.getDB("admin").runCommand({ping:1}).ok, 1,
-          "we aren't connected to the secondary");
+// Now we should successfully reconnect to nodes[1]
+assert.eq(replTest.nodes[1].getDB("admin").runCommand({ping:1}).ok, 1,
+          "we are connected to node[1]");
 
 reconnect(master);
 
@@ -69,7 +62,7 @@ assert.soon(function() {
 });
 
 print("Add it back as a secondary");
-config.members.push({_id:2, host : secondary.host});
+config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
 config.version = 3;
 printjson(config);
 wait(function() {
@@ -112,7 +105,7 @@ wait(function() {
 } , "wait2" );
 
 print("reconfig with minority");
-replTest.stop(secondary);
+replTest.stop(1);
 
 assert.soon(function() {
     try {

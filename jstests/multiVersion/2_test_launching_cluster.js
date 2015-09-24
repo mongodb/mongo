@@ -53,7 +53,7 @@ st = new ShardingTest({ shards : 2,
                                 mongosOptions : { binVersion : versionsToCheck },
                                 configOptions : { binVersion : versionsToCheck },
                                 shardOptions : { binVersion : versionsToCheck }
-
+                                
                             } });
     
 shards = [ st.shard0, st.shard1 ];
@@ -98,7 +98,8 @@ st = new ShardingTest({ shards : 2,
                                 
                                 mongosOptions : { binVersion : versionsToCheck },
                                 configOptions : { binVersion : versionsToCheck },
-                                rsOptions : { binVersion : versionsToCheck, protocolVersion: 0 }
+                                rsOptions : { binVersion : versionsToCheck }
+                                
                             } });
     
 var nodesA = st.rs0.nodes;
