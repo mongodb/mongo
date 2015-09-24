@@ -885,7 +885,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		size = strlen(tablename);
 	else
 		size = WT_PTRDIFF(columns, tablename);
-	WT_RET(__wt_schema_get_table(session, tablename, size, 0, &table));
+	WT_RET(__wt_schema_get_table(session, tablename, size, false, &table));
 
 	if (table->is_simple) {
 		/* Just return a cursor on the underlying data source. */
@@ -912,13 +912,13 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 	if (columns != NULL) {
 		WT_ERR(__wt_struct_reformat(session, table,
-		    columns, strlen(columns), NULL, 1, tmp));
+		    columns, strlen(columns), NULL, true, tmp));
 		WT_ERR(__wt_strndup(
 		    session, tmp->data, tmp->size, &cursor->value_format));
 
 		WT_ERR(__wt_buf_init(session, tmp, 0));
 		WT_ERR(__wt_struct_plan(session, table,
-		    columns, strlen(columns), 0, tmp));
+		    columns, strlen(columns), false, tmp));
 		WT_ERR(__wt_strndup(
 		    session, tmp->data, tmp->size, &ctable->plan));
 	}

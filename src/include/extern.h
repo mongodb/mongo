@@ -553,7 +553,7 @@ extern int __wt_schema_colgroup_source(WT_SESSION_IMPL *session, WT_TABLE *table
 extern int __wt_schema_index_source(WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, const char *config, WT_ITEM *buf);
 extern int __wt_schema_create( WT_SESSION_IMPL *session, const char *uri, const char *config);
 extern int __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[]);
-extern int __wt_schema_get_table(WT_SESSION_IMPL *session, const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep);
+extern int __wt_schema_get_table(WT_SESSION_IMPL *session, const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep);
 extern void __wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE *table);
 extern void __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp);
 extern int __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp);
@@ -564,13 +564,13 @@ extern int __wt_schema_colgroup_name(WT_SESSION_IMPL *session, WT_TABLE *table, 
 extern int __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table);
 extern int __wt_schema_open_index(WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, size_t len, WT_INDEX **indexp);
 extern int __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table);
-extern int __wt_schema_open_table(WT_SESSION_IMPL *session, const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep);
-extern int __wt_schema_get_colgroup(WT_SESSION_IMPL *session, const char *uri, int quiet, WT_TABLE **tablep, WT_COLGROUP **colgroupp);
-extern int __wt_schema_get_index(WT_SESSION_IMPL *session, const char *uri, int quiet, WT_TABLE **tablep, WT_INDEX **indexp);
+extern int __wt_schema_open_table(WT_SESSION_IMPL *session, const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep);
+extern int __wt_schema_get_colgroup(WT_SESSION_IMPL *session, const char *uri, bool quiet, WT_TABLE **tablep, WT_COLGROUP **colgroupp);
+extern int __wt_schema_get_index(WT_SESSION_IMPL *session, const char *uri, bool quiet, WT_TABLE **tablep, WT_INDEX **indexp);
 extern int __wt_schema_colcheck(WT_SESSION_IMPL *session, const char *key_format, const char *value_format, WT_CONFIG_ITEM *colconf, u_int *kcolsp, u_int *vcolsp);
 extern int __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table);
-extern int __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table, const char *columns, size_t len, int value_only, WT_ITEM *plan);
-extern int __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table, const char *columns, size_t len, const char *extra_cols, int value_only, WT_ITEM *format);
+extern int __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table, const char *columns, size_t len, bool value_only, WT_ITEM *plan);
+extern int __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table, const char *columns, size_t len, const char *extra_cols, bool value_only, WT_ITEM *format);
 extern int __wt_struct_truncate(WT_SESSION_IMPL *session, const char *input_fmt, u_int ncols, WT_ITEM *format);
 extern int __wt_schema_project_in(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *proj_arg, va_list ap);
 extern int __wt_schema_project_out(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *proj_arg, va_list ap);

@@ -18,11 +18,11 @@ __drop_file(
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	int remove_files;
+	bool remove_files;
 	const char *filename;
 
 	WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
-	remove_files = (cval.val != 0);
+	remove_files = cval.val != 0;
 
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
@@ -113,7 +113,8 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	(void)WT_PREFIX_SKIP(name, "table:");
 
 	table = NULL;
-	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 1, &table));
+	WT_ERR(__wt_schema_get_table(
+	    session, name, strlen(name), true, &table));
 
 	/* Drop the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
