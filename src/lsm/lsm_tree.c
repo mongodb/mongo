@@ -239,7 +239,7 @@ __lsm_tree_cleanup_old(WT_SESSION_IMPL *session, const char *uri)
 	WT_DECL_RET;
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_drop), "force", NULL };
-	int exists;
+	bool exists;
 
 	WT_RET(__wt_exist(session, uri + strlen("file:"), &exists));
 	if (exists)

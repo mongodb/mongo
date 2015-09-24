@@ -17,7 +17,7 @@ __rename_file(
     WT_SESSION_IMPL *session, const char *uri, const char *newuri)
 {
 	WT_DECL_RET;
-	int exist;
+	bool exist;
 	const char *filename, *newfile;
 	char *newvalue, *oldvalue;
 
@@ -31,7 +31,7 @@ __rename_file(
 
 	/* Close any btree handles in the file. */
 	WT_WITH_HANDLE_LIST_LOCK(session,
-	    ret = __wt_conn_dhandle_close_all(session, uri, 0));
+	    ret = __wt_conn_dhandle_close_all(session, uri, false));
 	WT_ERR(ret);
 
 	/*

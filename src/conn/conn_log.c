@@ -42,7 +42,7 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
  *	Parse and setup the logging server options.
  */
 static int
-__logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
+__logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
@@ -67,7 +67,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
 	/* We are done if logging isn't enabled. */
-	if (*runp == 0)
+	if (!*runp)
 		return (0);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.archive", &cval));
@@ -289,12 +289,12 @@ __log_file_server(void *arg)
 	WT_LSN close_end_lsn, min_lsn;
 	WT_SESSION_IMPL *session;
 	uint32_t filenum;
-	int locked;
+	bool locked;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	locked = 0;
+	locked = false;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * If there is a log file to close, make sure any outstanding
@@ -338,14 +338,14 @@ __log_file_server(void *arg)
 				close_end_lsn.offset = 0;
 				WT_ERR(__wt_fsync(session, close_fh));
 				__wt_spin_lock(session, &log->log_sync_lock);
-				locked = 1;
+				locked = true;
 				WT_ERR(__wt_close(session, &close_fh));
 				WT_ASSERT(session, __wt_log_cmp(
 				    &close_end_lsn, &log->sync_lsn) >= 0);
 				log->sync_lsn = close_end_lsn;
 				WT_ERR(__wt_cond_signal(
 				    session, log->log_sync_cond));
-				locked = 0;
+				locked = false;
 				__wt_spin_unlock(session, &log->log_sync_lock);
 			}
 		}
@@ -366,7 +366,7 @@ __log_file_server(void *arg)
 			if (__wt_log_cmp(&log->bg_sync_lsn, &min_lsn) <= 0) {
 				WT_ERR(__wt_fsync(session, log->log_fh));
 				__wt_spin_lock(session, &log->log_sync_lock);
-				locked = 1;
+				locked = true;
 				/*
 				 * The sync LSN could have advanced while we
 				 * were writing to disk.
@@ -377,7 +377,7 @@ __log_file_server(void *arg)
 					WT_ERR(__wt_cond_signal(
 					    session, log->log_sync_cond));
 				}
-				locked = 0;
+				locked = false;
 				__wt_spin_unlock(session, &log->log_sync_lock);
 			} else {
 				WT_ERR(__wt_cond_signal(
@@ -609,12 +609,13 @@ __log_server(void *arg)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	int freq_per_sec, signalled;
+	int freq_per_sec;
+	bool signalled;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	signalled = 0;
+	signalled = false;
 
 	/*
 	 * Set this to the number of times per second we want to force out the
@@ -649,7 +650,7 @@ __log_server(void *arg)
 		 * we want to force out log buffers.  Only do it once per second
 		 * or if the condition was signalled.
 		 */
-		if (--freq_per_sec <= 0 || signalled != 0) {
+		if (--freq_per_sec <= 0 || signalled) {
 			freq_per_sec = WT_FORCE_PER_SECOND;
 
 			/*
@@ -696,7 +697,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
-	int run;
+	bool run;
 
 	conn = S2C(session);
 

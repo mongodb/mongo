@@ -13,7 +13,7 @@
  *	Configure the underlying cache.
  */
 static int
-__cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
+__cache_config_local(WT_SESSION_IMPL *session, bool shared, const char *cfg[])
 {
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
@@ -76,7 +76,7 @@ __cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
  *	Configure or reconfigure the current cache and shared cache.
  */
 int
-__wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
+__wt_cache_config(WT_SESSION_IMPL *session, bool reconfigure, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
@@ -137,7 +137,7 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 	cache = conn->cache;
 
 	/* Use a common routine for run-time configuration options. */
-	WT_RET(__wt_cache_config(session, 0, cfg));
+	WT_RET(__wt_cache_config(session, false, cfg));
 
 	/*
 	 * The target size must be lower than the trigger size or we will never

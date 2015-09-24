@@ -22,7 +22,7 @@ static int  __inmem_row_leaf_entries(
  */
 int
 __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
-    uint64_t recno, uint32_t alloc_entries, int alloc_refs, WT_PAGE **pagep)
+    uint64_t recno, uint32_t alloc_entries, bool alloc_refs, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
 	WT_DECL_RET;
@@ -192,7 +192,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	/* Allocate and initialize a new WT_PAGE. */
 	WT_RET(__wt_page_alloc(
-	    session, dsk->type, dsk->recno, alloc_entries, 1, &page));
+	    session, dsk->type, dsk->recno, alloc_entries, true, &page));
 	page->dsk = dsk;
 	F_SET_ATOMIC(page, flags);
 

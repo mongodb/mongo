@@ -598,7 +598,7 @@ __log_openfile(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 	    "opening log %s", (const char *)buf->data));
 	WT_ERR(__wt_open(
-	    session, buf->data, ok_create, 0, WT_FILE_TYPE_LOG, fh));
+	    session, buf->data, ok_create, false, WT_FILE_TYPE_LOG, fh));
 	/*
 	 * If we are not creating the log file but opening it for reading,
 	 * check that the magic number and versions are correct.
@@ -991,7 +991,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 		WT_RET(__wt_verbose(session, WT_VERB_LOG,
 		    "log_open: open fh to directory %s", conn->log_path));
 		WT_RET(__wt_open(session, conn->log_path,
-		    0, 0, WT_FILE_TYPE_DIRECTORY, &log->log_dir_fh));
+		    false, false, WT_FILE_TYPE_DIRECTORY, &log->log_dir_fh));
 	}
 	/*
 	 * Clean up any old interim pre-allocated files.

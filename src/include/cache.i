@@ -197,13 +197,13 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
  *	Evict pages if the cache crosses its boundaries.
  */
 static inline int
-__wt_cache_eviction_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
+__wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 {
 	WT_BTREE *btree;
 	u_int pct_full;
 
 	if (didworkp != NULL)
-		*didworkp = 0;
+		*didworkp = false;
 
 	/*
 	 * LSM sets the no-cache-check flag when holding the LSM tree lock, in
@@ -231,7 +231,7 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, int busy, int *didworkp)
 	 * was no cache work to do. After this point, let them skip the sleep.
 	 */
 	if (didworkp != NULL)
-		*didworkp = 1;
+		*didworkp = true;
 
 	return (__wt_cache_eviction_worker(session, busy, pct_full));
 }

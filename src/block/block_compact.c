@@ -20,7 +20,7 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_UNUSED(session);
 
 	/* Switch to first-fit allocation. */
-	__wt_block_configure_first_fit(block, 1);
+	__wt_block_configure_first_fit(block, true);
 
 	block->compact_pct_tenths = 0;
 
@@ -37,7 +37,7 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_UNUSED(session);
 
 	/* Restore the original allocation plan. */
-	__wt_block_configure_first_fit(block, 0);
+	__wt_block_configure_first_fit(block, false);
 
 	block->compact_pct_tenths = 0;
 

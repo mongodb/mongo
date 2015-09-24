@@ -191,7 +191,8 @@ __backup_start(
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	int exist, log_only, target_list;
+	bool exist;
+	int log_only, target_list;
 
 	conn = S2C(session);
 
