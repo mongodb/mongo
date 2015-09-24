@@ -62,6 +62,7 @@ private:
 
     asio::ssl::stream<asio::ip::tcp::socket> _stream;
     ConnectHandler _userHandler;
+    bool _connected = false;
 };
 
 }  // namespace executor

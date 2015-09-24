@@ -34,6 +34,7 @@
 
 #include "mongo/base/system_error.h"
 #include "mongo/config.h"
+#include "mongo/executor/async_stream_common.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
 
@@ -46,12 +47,7 @@ AsyncSecureStream::AsyncSecureStream(asio::io_service* io_service, asio::ssl::co
     : _stream(*io_service, *sslContext) {}
 
 AsyncSecureStream::~AsyncSecureStream() {
-    std::error_code ec;
-    _stream.lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-    _stream.lowest_layer().close();
-    if (ec) {
-        warning() << "Failed to close AsyncSecureStream: " << ec.message();
-    }
+    destroyStream(&_stream.lowest_layer(), _connected);
 }
 
 void AsyncSecureStream::connect(const asio::ip::tcp::resolver::iterator endpoints,
@@ -65,16 +61,17 @@ void AsyncSecureStream::connect(const asio::ip::tcp::resolver::iterator endpoint
                             if (ec) {
                                 return _userHandler(ec);
                             }
+                            _connected = true;
                             return _handleConnect(std::move(iter));
                         });
 }
 
 void AsyncSecureStream::write(asio::const_buffer buffer, StreamHandler&& streamHandler) {
-    asio::async_write(_stream, asio::buffer(buffer), std::move(streamHandler));
+    writeStream(&_stream, _connected, buffer, std::move(streamHandler));
 }
 
 void AsyncSecureStream::read(asio::mutable_buffer buffer, StreamHandler&& streamHandler) {
-    asio::async_read(_stream, asio::buffer(buffer), std::move(streamHandler));
+    readStream(&_stream, _connected, buffer, std::move(streamHandler));
 }
 
 void AsyncSecureStream::_handleConnect(asio::ip::tcp::resolver::iterator iter) {
@@ -97,7 +94,7 @@ void AsyncSecureStream::_handleHandshake(std::error_code ec, const std::string& 
 }
 
 void AsyncSecureStream::cancel() {
-    _stream.lowest_layer().cancel();
+    cancelStream(&_stream.lowest_layer(), _connected);
 }
 
 }  // namespace executor

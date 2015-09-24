@@ -30,49 +30,17 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/executor/async_stream.h"
 #include "mongo/executor/async_stream_common.h"
-#include "mongo/util/assert_util.h"
+
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace executor {
 
-using asio::ip::tcp;
-
-AsyncStream::AsyncStream(asio::io_service* io_service) : _stream(*io_service) {}
-
-AsyncStream::~AsyncStream() {
-    destroyStream(&_stream, _connected);
-}
-
-void AsyncStream::connect(tcp::resolver::iterator iter, ConnectHandler&& connectHandler) {
-    asio::async_connect(
-        _stream,
-        std::move(iter),
-        // We need to wrap this with a lambda of the right signature so it compiles, even
-        // if we don't actually use the resolver iterator.
-        [this, connectHandler](std::error_code ec, tcp::resolver::iterator iter) {
-            if (!ec) {
-                // We assume that our owner is responsible for keeping us alive until we call
-                // connectHandler, so _connected should always be a valid memory location.
-                _connected = true;
-            }
-            return connectHandler(ec);
-        });
-}
-
-void AsyncStream::write(asio::const_buffer buffer, StreamHandler&& streamHandler) {
-    writeStream(&_stream, _connected, buffer, std::move(streamHandler));
-}
-
-void AsyncStream::read(asio::mutable_buffer buffer, StreamHandler&& streamHandler) {
-    readStream(&_stream, _connected, buffer, std::move(streamHandler));
-}
-
-void AsyncStream::cancel() {
-    cancelStream(&_stream, _connected);
+void warnCloseFailed(std::error_code ec) {
+    invariant(ec);
+    warning() << "failed to close stream:" << ec.message();
 }
 
 }  // namespace executor
-}  // namespace mongo
+}  // namespace  mongo

@@ -51,6 +51,7 @@ public:
 
 private:
     asio::ip::tcp::socket _stream;
+    bool _connected = false;
 };
 
 }  // namespace executor

@@ -26,52 +26,48 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
+#include <asio.hpp>
+#include <system_error>
+#include <utility>
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/executor/async_stream.h"
-#include "mongo/executor/async_stream_common.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace executor {
 
-using asio::ip::tcp;
+void warnCloseFailed(std::error_code ec);
 
-AsyncStream::AsyncStream(asio::io_service* io_service) : _stream(*io_service) {}
-
-AsyncStream::~AsyncStream() {
-    destroyStream(&_stream, _connected);
+template <typename ASIOStream>
+void destroyStream(ASIOStream* stream, bool connected) {
+    if (!connected) {
+        return;
+    }
+    std::error_code ec;
+    stream->shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+    stream->close();
+    if (ec) {
+        warnCloseFailed(ec);
+    }
 }
 
-void AsyncStream::connect(tcp::resolver::iterator iter, ConnectHandler&& connectHandler) {
-    asio::async_connect(
-        _stream,
-        std::move(iter),
-        // We need to wrap this with a lambda of the right signature so it compiles, even
-        // if we don't actually use the resolver iterator.
-        [this, connectHandler](std::error_code ec, tcp::resolver::iterator iter) {
-            if (!ec) {
-                // We assume that our owner is responsible for keeping us alive until we call
-                // connectHandler, so _connected should always be a valid memory location.
-                _connected = true;
-            }
-            return connectHandler(ec);
-        });
+template <typename ASIOStream, typename Buffer, typename Handler>
+void writeStream(ASIOStream* stream, bool connected, Buffer&& buffer, Handler&& handler) {
+    invariant(connected);
+    asio::async_write(
+        *stream, asio::buffer(std::forward<Buffer>(buffer)), std::forward<Handler>(handler));
 }
 
-void AsyncStream::write(asio::const_buffer buffer, StreamHandler&& streamHandler) {
-    writeStream(&_stream, _connected, buffer, std::move(streamHandler));
+template <typename ASIOStream, typename Buffer, typename Handler>
+void readStream(ASIOStream* stream, bool connected, Buffer&& buffer, Handler&& handler) {
+    invariant(connected);
+    asio::async_read(
+        *stream, asio::buffer(std::forward<Buffer>(buffer)), std::forward<Handler>(handler));
 }
 
-void AsyncStream::read(asio::mutable_buffer buffer, StreamHandler&& streamHandler) {
-    readStream(&_stream, _connected, buffer, std::move(streamHandler));
-}
-
-void AsyncStream::cancel() {
-    cancelStream(&_stream, _connected);
+template <typename ASIOStream>
+void cancelStream(ASIOStream* stream, bool connected) {
+    invariant(connected);
+    stream->cancel();
 }
 
 }  // namespace executor

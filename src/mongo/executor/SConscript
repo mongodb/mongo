@@ -128,6 +128,7 @@ env.Library(
         'async_secure_stream.cpp',
         'async_secure_stream_factory.cpp',
         'async_stream.cpp',
+        'async_stream_common.cpp',
         'async_stream_factory.cpp',
         'connection_pool_asio.cpp',
         'network_interface_asio.cpp',
