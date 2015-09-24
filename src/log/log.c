@@ -1978,6 +1978,11 @@ __wt_log_flush(WT_SESSION_IMPL *session, uint32_t flags)
 	conn = S2C(session);
 	WT_ASSERT(session, FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED));
 	log = conn->log;
+	/*
+	 * We need to flush out the current slot first to get the real
+	 * end of log LSN in log->alloc_lsn.
+	 */
+	WT_RET(__wt_log_flush_lsn(session, &lsn, 0));
 	last_lsn = log->alloc_lsn;
 	lsn = log->write_lsn;
 	/*
