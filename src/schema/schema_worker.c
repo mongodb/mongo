@@ -69,12 +69,12 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		}
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
 		WT_ERR(__wt_schema_get_colgroup(
-		    session, uri, 0, NULL, &colgroup));
+		    session, uri, false, NULL, &colgroup));
 		WT_ERR(__wt_schema_worker(session,
 		    colgroup->source, file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "index:")) {
 		idx = NULL;
-		WT_ERR(__wt_schema_get_index(session, uri, 0, NULL, &idx));
+		WT_ERR(__wt_schema_get_index(session, uri, false, NULL, &idx));
 		WT_ERR(__wt_schema_worker(session, idx->source,
 		    file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
@@ -87,7 +87,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			    uri, file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
 		WT_ERR(__wt_schema_get_table(session,
-		    tablename, strlen(tablename), 0, &table));
+		    tablename, strlen(tablename), false, &table));
 		WT_ASSERT(session, session->dhandle == NULL);
 
 		/*
@@ -98,7 +98,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		 */
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			colgroup = table->cgroups[i];
-			skip = 0;
+			skip = false;
 			if (name_func != NULL)
 				WT_ERR(name_func(
 				    session, colgroup->name, &skip));
@@ -111,7 +111,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_schema_open_indices(session, table));
 		for (i = 0; i < table->nindices; i++) {
 			idx = table->indices[i];
-			skip = 0;
+			skip = false;
 			if (name_func != NULL)
 				WT_ERR(name_func(session, idx->name, &skip));
 			if (!skip)

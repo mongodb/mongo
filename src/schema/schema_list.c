@@ -14,7 +14,7 @@
  */
 static int
 __schema_add_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep)
+    const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep)
 {
 	WT_DECL_RET;
 	WT_TABLE *table;
@@ -86,7 +86,7 @@ restart:
  */
 int
 __wt_schema_get_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep)
+    const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep)
 {
 	WT_DECL_RET;
 	WT_TABLE *table;

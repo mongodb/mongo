@@ -187,17 +187,17 @@ void
 __wt_hazard_close(WT_SESSION_IMPL *session)
 {
 	WT_HAZARD *hp;
-	int found;
+	bool found;
 
 	/*
 	 * Check for a set hazard pointer and complain if we find one.  We could
 	 * just check the session's hazard pointer count, but this is a useful
 	 * diagnostic.
 	 */
-	for (found = 0, hp = session->hazard;
+	for (found = false, hp = session->hazard;
 	    hp < session->hazard + session->hazard_size; ++hp)
 		if (hp->page != NULL) {
-			found = 1;
+			found = true;
 			break;
 		}
 	if (session->nhazard == 0 && !found)

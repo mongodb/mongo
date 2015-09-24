@@ -1067,7 +1067,7 @@ err:	if (!complete)
  * list into a separate page.
  */
 int
-__wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
+__wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_DECL_RET;
 	WT_DECL_ITEM(key);
@@ -1077,8 +1077,6 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	WT_REF *child, *split_ref[2] = { NULL, NULL };
 	size_t page_decr, parent_incr, right_incr;
 	int i;
-
-	*splitp = 0;
 
 	page = ref->page;
 	right = NULL;
@@ -1314,9 +1312,6 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 
 		WT_ERR(ret);
 	}
-
-	/* Let our caller know that we split. */
-	*splitp = 1;
 
 	WT_STAT_FAST_CONN_INCR(session, cache_inmem_split);
 	WT_STAT_FAST_DATA_INCR(session, cache_inmem_split);

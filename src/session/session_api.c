@@ -246,7 +246,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 			 * the underlying data source.
 			 */
 			WT_RET(__wt_schema_get_colgroup(
-			    session, uri, 0, NULL, &colgroup));
+			    session, uri, false, NULL, &colgroup));
 			WT_RET(__wt_open_cursor(
 			    session, colgroup->source, owner, cfg, cursorp));
 		} else if (WT_PREFIX_MATCH(uri, "config:"))
@@ -602,9 +602,10 @@ __session_truncate(WT_SESSION *wt_session,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
-	int cmp, local_start;
+	int cmp;
+	bool local_start;
 
-	local_start = 0;
+	local_start = false;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_TXN_API_CALL(session, truncate, config, cfg);
@@ -708,7 +709,7 @@ __session_truncate(WT_SESSION *wt_session,
 	if (start == NULL) {
 		WT_ERR(__session_open_cursor(
 		    wt_session, stop->uri, NULL, NULL, &start));
-		local_start = 1;
+		local_start = true;
 		WT_ERR(start->next(start));
 	}
 
@@ -982,7 +983,7 @@ __session_strerror(WT_SESSION *wt_session, int error)
  */
 int
 __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
-    int uses_dhandles, int open_metadata, WT_SESSION_IMPL **sessionp)
+    bool uses_dhandles, bool open_metadata, WT_SESSION_IMPL **sessionp)
 {
 	WT_SESSION_IMPL *session;
 
@@ -1097,7 +1098,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
 
-	WT_ERR(__wt_cond_alloc(session, "session", 0, &session_ret->cond));
+	WT_ERR(__wt_cond_alloc(session, "session", false, &session_ret->cond));
 
 	if (WT_SESSION_FIRST_USE(session_ret))
 		__wt_random_init(&session_ret->rnd);

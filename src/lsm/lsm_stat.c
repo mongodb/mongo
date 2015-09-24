@@ -23,7 +23,7 @@ __curstat_lsm_init(
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	u_int i;
-	int locked;
+	bool locked;
 	char config[64];
 	const char *cfg[] = {
 	    WT_CONFIG_BASE(session, session_open_cursor), NULL, NULL };
@@ -31,9 +31,9 @@ __curstat_lsm_init(
 	   WT_CONFIG_BASE(session, session_open_cursor),
 	   "checkpoint=" WT_CHECKPOINT, NULL, NULL };
 
-	locked = 0;
+	locked = false;
 	WT_WITH_HANDLE_LIST_LOCK(session,
-	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
+	    ret = __wt_lsm_tree_get(session, uri, false, &lsm_tree));
 	WT_RET(ret);
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
 
@@ -58,7 +58,7 @@ __curstat_lsm_init(
 
 	/* Hold the LSM lock so that we can safely walk through the chunks. */
 	WT_ERR(__wt_lsm_tree_readlock(session, lsm_tree));
-	locked = 1;
+	locked = true;
 
 	/* Initialize the statistics. */
 	__wt_stat_init_dsrc_stats(stats);

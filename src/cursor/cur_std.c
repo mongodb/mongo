@@ -63,7 +63,7 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
  *	Standard error message for key/values not set.
  */
 int
-__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
+__wt_cursor_kv_not_set(WT_CURSOR *cursor, bool key)
 {
 	WT_SESSION_IMPL *session;
 
@@ -195,7 +195,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT))
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));
+		WT_ERR(__wt_cursor_kv_not_set(cursor, true));
 
 	if (WT_CURSOR_RECNO(cursor)) {
 		if (LF_ISSET(WT_CURSTD_RAW)) {
@@ -344,7 +344,7 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT))
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));
+		WT_ERR(__wt_cursor_kv_not_set(cursor, false));
 
 	/* Fast path some common cases. */
 	fmt = cursor->value_format;

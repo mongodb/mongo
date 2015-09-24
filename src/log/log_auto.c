@@ -52,7 +52,8 @@ __logrec_json_unpack_str(char *dest, size_t destlen, const char *src,
 
 	total = 0;
 	while (srclen > 0) {
-		n = __wt_json_unpack_char(*src++, (u_char *)dest, destlen, 0);
+		n = __wt_json_unpack_char(
+		    *src++, (u_char *)dest, destlen, false);
 		srclen--;
 		if (n > destlen)
 			destlen = 0;

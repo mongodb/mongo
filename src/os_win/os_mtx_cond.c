@@ -14,7 +14,7 @@
  */
 int
 __wt_cond_alloc(WT_SESSION_IMPL *session,
-    const char *name, int is_signalled, WT_CONDVAR **condp)
+    const char *name, bool is_signalled, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
 
@@ -46,9 +46,9 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 	DWORD milliseconds;
 	WT_DECL_RET;
 	uint64_t milliseconds64;
-	int locked;
+	bool locked;
 
-	locked = 0;
+	locked = false;
 
 	/* Fast path if already signalled. */
 	if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
@@ -65,7 +65,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 	}
 
 	EnterCriticalSection(&cond->mtx);
-	locked = 1;
+	locked = true;
 
 	if (usecs > 0) {
 		milliseconds64 = usecs / 1000;
@@ -114,9 +114,9 @@ int
 __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
 	WT_DECL_RET;
-	int locked;
+	bool locked;
 
-	locked = 0;
+	locked = false;
 
 	/*
 	 * !!!
@@ -132,7 +132,7 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 
 	if (cond->waiters > 0 || !__wt_atomic_casi32(&cond->waiters, 0, -1)) {
 		EnterCriticalSection(&cond->mtx);
-		locked = 1;
+		locked = true;
 		WakeAllConditionVariable(&cond->cond);
 	}
 

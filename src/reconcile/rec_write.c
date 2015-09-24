@@ -280,13 +280,13 @@ typedef struct {
 	uint32_t tested_ref_state;	/* Debugging information */
 } WT_RECONCILE;
 
-static void __rec_bnd_cleanup(WT_SESSION_IMPL *, WT_RECONCILE *, int);
+static void __rec_bnd_cleanup(WT_SESSION_IMPL *, WT_RECONCILE *, bool);
 static void __rec_cell_build_addr(
 		WT_RECONCILE *, const void *, size_t, u_int, uint64_t);
 static int  __rec_cell_build_int_key(WT_SESSION_IMPL *,
-		WT_RECONCILE *, const void *, size_t, int *);
+		WT_RECONCILE *, const void *, size_t, bool *);
 static int  __rec_cell_build_leaf_key(WT_SESSION_IMPL *,
-		WT_RECONCILE *, const void *, size_t, int *);
+		WT_RECONCILE *, const void *, size_t, bool *);
 static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_KV *, uint8_t, uint64_t);
 static int  __rec_cell_build_val(WT_SESSION_IMPL *,
@@ -299,7 +299,7 @@ static int  __rec_col_merge(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_col_var(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_var_helper(WT_SESSION_IMPL *, WT_RECONCILE *,
-		WT_SALVAGE_COOKIE *, WT_ITEM *, int, uint8_t, uint64_t);
+		WT_SALVAGE_COOKIE *, WT_ITEM *, bool, uint8_t, uint64_t);
 static int  __rec_destroy_session(WT_SESSION_IMPL *);
 static int  __rec_root_write(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
@@ -315,7 +315,7 @@ static int  __rec_split_row(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_split_row_promote(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_ITEM *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *,
-		WT_RECONCILE *, WT_BOUNDARY *, WT_ITEM *, int);
+		WT_RECONCILE *, WT_BOUNDARY *, WT_ITEM *, bool);
 static int  __rec_write_init(WT_SESSION_IMPL *,
 		WT_REF *, uint32_t, WT_SALVAGE_COOKIE *, void *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
@@ -463,7 +463,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	 * got roped into doing forced eviction, they won't be discarded for the
 	 * life of the session.
 	 */
-	__rec_bnd_cleanup(session, r, 0);
+	__rec_bnd_cleanup(session, r, false);
 
 	WT_RET(ret);
 
@@ -483,7 +483,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
 	 * set it again as part of that walk.
 	 */
-	return (__wt_page_parent_modify_set(session, ref, 1));
+	return (__wt_page_parent_modify_set(session, ref, true));
 }
 
 /*
@@ -747,7 +747,7 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
 	__wt_free(session, r->raw_recnos);
 	__wt_buf_free(session, &r->raw_destination);
 
-	__rec_bnd_cleanup(session, r, 1);
+	__rec_bnd_cleanup(session, r, true);
 
 	__wt_free(session, r->skip);
 
@@ -777,7 +777,7 @@ __rec_destroy_session(WT_SESSION_IMPL *session)
  *	Cleanup the boundary structure information.
  */
 static void
-__rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
+__rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, bool destroy)
 {
 	WT_BOUNDARY *bnd;
 	uint32_t i, last_used;
@@ -877,7 +877,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	WT_UPDATE *upd, *upd_list, *upd_ovfl;
 	size_t notused;
 	uint64_t max_txn, min_txn, txnid;
-	int skipped;
+	bool skipped;
 
 	*updp = NULL;
 
@@ -888,7 +888,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * list, else is an on-page row-store WT_UPDATE list.
 	 */
 	upd_list = ins == NULL ? WT_ROW_UPDATE(page, rip) : ins->upd;
-	skipped = 0;
+	skipped = false;
 
 	for (max_txn = WT_TXN_NONE, min_txn = UINT64_MAX, upd = upd_list;
 	    upd != NULL; upd = upd->next) {
@@ -1040,7 +1040,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
  */
 #define	WT_CHILD_RELEASE(session, hazard, ref) do {			\
 	if (hazard) {							\
-		hazard = 0;						\
+		hazard = false;						\
 		WT_TRET(						\
 		    __wt_page_release(session, ref, WT_READ_NO_EVICT));	\
 	}								\
@@ -1187,13 +1187,13 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
  */
 static int
 __rec_child_modify(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_REF *ref, int *hazardp, WT_CHILD_STATE *statep)
+    WT_RECONCILE *r, WT_REF *ref, bool *hazardp, WT_CHILD_STATE *statep)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 
 	/* We may acquire a hazard pointer our caller must release. */
-	*hazardp = 0;
+	*hazardp = false;
 
 	/* Default to using the original child address. */
 	*statep = WT_CHILD_ORIGINAL;
@@ -1291,7 +1291,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 				break;
 			}
 			WT_RET(ret);
-			*hazardp = 1;
+			*hazardp = true;
 			goto in_memory;
 
 		case WT_REF_READING:
@@ -1454,7 +1454,7 @@ __rec_dict_replace(
  *	Update prefix and suffix compression based on the last key.
  */
 static inline void
-__rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
+__rec_key_state_update(WT_RECONCILE *r, bool ovfl_key)
 {
 	WT_ITEM *a;
 
@@ -2135,7 +2135,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		dsk->recno = last->recno;
 		dsk->u.entries = r->entries;
 		dsk->mem_size = r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
-		WT_RET(__rec_split_write(session, r, last, &r->dsk, 0));
+		WT_RET(__rec_split_write(session, r, last, &r->dsk, false));
 
 		/*
 		 * Set the caller's entry count and buffer information for the
@@ -2174,7 +2174,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
  */
 static int
 __rec_split_raw_worker(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, size_t next_len, int no_more_rows)
+    WT_RECONCILE *r, size_t next_len, bool no_more_rows)
 {
 	WT_BM *bm;
 	WT_BOUNDARY *last, *next;
@@ -2189,7 +2189,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	size_t corrected_page_size, len, result_len;
 	uint64_t recno;
 	uint32_t entry, i, result_slots, slots;
-	int last_block;
+	bool last_block;
 	uint8_t *dsk_start;
 
 	wt_session = (WT_SESSION *)session;
@@ -2614,7 +2614,7 @@ err:	__wt_scr_free(session, &tmp);
 static inline int
 __rec_split_raw(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 {
-	return (__rec_split_raw_worker(session, r, next_len, 0));
+	return (__rec_split_raw_worker(session, r, next_len, false));
 }
 
 /*
@@ -2677,7 +2677,7 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	/* If this is a checkpoint, we're done, otherwise write the page. */
 	return (
 	    __rec_is_checkpoint(r, bnd) ? 0 :
-	    __rec_split_write(session, r, bnd, &r->dsk, 1));
+	    __rec_split_write(session, r, bnd, &r->dsk, true));
 }
 
 /*
@@ -2690,7 +2690,7 @@ __rec_split_finish(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	/* We're done reconciling - write the final page */
 	if (r->raw_compression && r->entries != 0) {
 		while (r->entries != 0)
-			WT_RET(__rec_split_raw_worker(session, r, 0, 1));
+			WT_RET(__rec_split_raw_worker(session, r, 0, true));
 	} else
 		WT_RET(__rec_split_finish_std(session, r));
 
@@ -2746,7 +2746,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		dsk->u.entries = bnd->entries;
 		dsk->mem_size =
 		    tmp->size = WT_PAGE_HEADER_BYTE_SIZE(btree) + len;
-		WT_ERR(__rec_split_write(session, r, bnd, tmp, 0));
+		WT_ERR(__rec_split_write(session, r, bnd, tmp, false));
 	}
 
 	/*
@@ -2794,7 +2794,7 @@ err:	__wt_scr_free(session, &tmp);
  */
 static int
 __rec_split_write(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf, int last_block)
+    WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf, bool last_block)
 {
 	WT_BTREE *btree;
 	WT_DECL_ITEM(key);
@@ -3078,7 +3078,7 @@ __wt_bulk_insert_row(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
 	WT_CURSOR *cursor;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
-	int ovfl_key;
+	bool ovfl_key;
 
 	r = cbulk->reconcile;
 	btree = S2BT(session);
@@ -3281,11 +3281,11 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_KV *val;
 	WT_PAGE *child;
 	WT_REF *ref;
-	int hazard;
+	bool hazard;
 
 	btree = S2BT(session);
 	child = NULL;
-	hazard = 0;
+	hazard = false;
 
 	val = &r->v;
 	vpack = &_vpack;
@@ -3588,7 +3588,7 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
 static int
 __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_SALVAGE_COOKIE *salvage,
-    WT_ITEM *value, int deleted, uint8_t overflow_type, uint64_t rle)
+    WT_ITEM *value, bool deleted, uint8_t overflow_type, uint64_t rle)
 {
 	WT_BTREE *btree;
 	WT_KV *val;
@@ -3680,7 +3680,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle, src_recno;
 	uint32_t i, size;
-	int deleted, last_deleted, orig_deleted, update_no_copy;
+	bool deleted, last_deleted, orig_deleted, update_no_copy;
 	const void *data;
 
 	btree = S2BT(session);
@@ -3707,11 +3707,11 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	 * helper function's assistance.)
 	 */
 	rle = 0;
-	last_deleted = 0;
+	last_deleted = false;
 	if (salvage != NULL && salvage->missing != 0) {
 		if (salvage->skip == 0) {
 			rle = salvage->missing;
-			last_deleted = 1;
+			last_deleted = true;
 
 			/*
 			 * Correct the number of records we're going to "take",
@@ -3719,8 +3719,8 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			 */
 			salvage->take += salvage->missing;
 		} else
-			WT_ERR(__rec_col_var_helper(
-			    session, r, NULL, NULL, 1, 0, salvage->missing));
+			WT_ERR(__rec_col_var_helper(session,
+			    r, NULL, NULL, true, false, salvage->missing));
 	}
 
 	/*
@@ -3742,7 +3742,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
 			nrepeat = 1;
 			ins = NULL;
-			orig_deleted = 1;
+			orig_deleted = true;
 		} else {
 			__wt_cell_unpack(cell, vpack);
 			nrepeat = __wt_cell_rle(vpack);
@@ -3752,7 +3752,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			 * If the original value is "deleted", there's no value
 			 * to compare, we're done.
 			 */
-			orig_deleted = vpack->type == WT_CELL_DEL ? 1 : 0;
+			orig_deleted = vpack->type == WT_CELL_DEL;
 			if (orig_deleted)
 				goto record_loop;
 
@@ -3805,7 +3805,7 @@ record_loop:	/*
 				ins = WT_SKIP_NEXT(ins);
 			}
 			if (upd != NULL) {
-				update_no_copy = 1;	/* No data copy */
+				update_no_copy = true;	/* No data copy */
 				repeat_count = 1;	/* Single record */
 
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
@@ -3814,10 +3814,10 @@ record_loop:	/*
 					size = upd->size;
 				}
 			} else if (vpack->raw == WT_CELL_VALUE_OVFL_RM) {
-				update_no_copy = 1;	/* No data copy */
+				update_no_copy = true;	/* No data copy */
 				repeat_count = 1;	/* Single record */
 
-				deleted = 0;
+				deleted = false;
 
 				/*
 				 * If doing update save and restore, there's an
@@ -3846,7 +3846,7 @@ record_loop:	/*
 				data = "@";
 				size = 1;
 			} else {
-				update_no_copy = 0;	/* Maybe data copy */
+				update_no_copy = false;	/* Maybe data copy */
 
 				/*
 				 * The repeat count is the number of records up
@@ -3890,7 +3890,7 @@ record_loop:	/*
 					last->data = vpack->data;
 					last->size = vpack->size;
 					WT_ERR(__rec_col_var_helper(
-					    session, r, salvage, last, 0,
+					    session, r, salvage, last, false,
 					    WT_CELL_VALUE_OVFL, repeat_count));
 
 					/* Track if page has overflow items. */
@@ -3996,7 +3996,7 @@ compare:		/*
 			 * gaps in the name space.
 			 */
 			if (src_recno < n)
-				deleted = 1;
+				deleted = true;
 			else {
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
 				if (!deleted) {
@@ -4068,12 +4068,12 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_REF *ref;
 	size_t size;
 	u_int vtype;
-	int hazard, key_onpage_ovfl, ovfl_key;
+	bool hazard, key_onpage_ovfl, ovfl_key;
 	const void *p;
 
 	btree = S2BT(session);
 	child = NULL;
-	hazard = 0;
+	hazard = false;
 
 	key = &r->k;
 	kpack = &_kpack;
@@ -4116,7 +4116,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		ikey = __wt_ref_key_instantiated(ref);
 		if (ikey == NULL || ikey->cell_offset == 0) {
 			cell = NULL;
-			key_onpage_ovfl = 0;
+			key_onpage_ovfl = false;
 		} else {
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
 			__wt_cell_unpack(cell, kpack);
@@ -4231,7 +4231,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			key->buf.size = __wt_cell_total_len(kpack);
 			key->cell_len = 0;
 			key->len = key->buf.size;
-			ovfl_key = 1;
+			ovfl_key = true;
 		} else {
 			__wt_ref_key(page, ref, &p, &size);
 			WT_ERR(__rec_cell_build_int_key(
@@ -4254,7 +4254,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				if (key_onpage_ovfl) {
 					WT_ERR(__wt_buf_set(session, r->cur,
 					    WT_IKEY_DATA(ikey), ikey->size));
-					key_onpage_ovfl = 0;
+					key_onpage_ovfl = false;
 				}
 				WT_ERR(__rec_split(
 				    session, r, key->len + val->len));
@@ -4288,7 +4288,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_MULTI *multi;
 	WT_PAGE_MODIFY *mod;
 	uint32_t i;
-	int ovfl_key;
+	bool ovfl_key;
 
 	mod = page->modify;
 
@@ -4346,7 +4346,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	size_t size;
 	uint64_t slvg_skip;
 	uint32_t i;
-	int dictionary, key_onpage_ovfl, ovfl_key;
+	bool dictionary, key_onpage_ovfl, ovfl_key;
 	const void *p;
 	void *copy;
 
@@ -4414,7 +4414,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		WT_ERR(__rec_txn_read(session, r, NULL, rip, vpack, &upd));
 
 		/* Build value cell. */
-		dictionary = 0;
+		dictionary = false;
 		if (upd == NULL) {
 			/*
 			 * When the page was read into memory, there may not
@@ -4443,7 +4443,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				}
 				WT_ERR(__rec_cell_build_val(
 				    session, r, p, size, (uint64_t)0));
-				dictionary = 1;
+				dictionary = true;
 			} else if (vpack->raw == WT_CELL_VALUE_OVFL_RM) {
 				/*
 				 * If doing update save and restore in service
@@ -4565,7 +4565,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				WT_ERR(__rec_cell_build_val(session, r,
 				    WT_UPDATE_DATA(upd), upd->size,
 				    (uint64_t)0));
-				dictionary = 1;
+				dictionary = true;
 			}
 		}
 
@@ -4582,7 +4582,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			key->buf.size = __wt_cell_total_len(kpack);
 			key->cell_len = 0;
 			key->len = key->buf.size;
-			ovfl_key = 1;
+			ovfl_key = true;
 
 			/*
 			 * We aren't creating a key so we can't use this key as
@@ -4655,7 +4655,7 @@ build:
 				if (key_onpage_ovfl) {
 					WT_ERR(__wt_dsk_cell_data_ref(session,
 					    WT_PAGE_ROW_LEAF, kpack, r->cur));
-					key_onpage_ovfl = 0;
+					key_onpage_ovfl = false;
 				}
 
 				/*
@@ -4715,7 +4715,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 	WT_BTREE *btree;
 	WT_KV *key, *val;
 	WT_UPDATE *upd;
-	int ovfl_key;
+	bool ovfl_key;
 
 	btree = S2BT(session);
 
@@ -5272,12 +5272,12 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
  */
 static int
 __rec_cell_build_int_key(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, const void *data, size_t size, int *is_ovflp)
+    WT_RECONCILE *r, const void *data, size_t size, bool *is_ovflp)
 {
 	WT_BTREE *btree;
 	WT_KV *key;
 
-	*is_ovflp = 0;
+	*is_ovflp = false;
 
 	btree = S2BT(session);
 
@@ -5291,7 +5291,7 @@ __rec_cell_build_int_key(WT_SESSION_IMPL *session,
 	if (size > btree->maxintlkey) {
 		WT_STAT_FAST_DATA_INCR(session, rec_overflow_key_internal);
 
-		*is_ovflp = 1;
+		*is_ovflp = true;
 		return (__rec_cell_build_ovfl(
 		    session, r, key, WT_CELL_KEY_OVFL, (uint64_t)0));
 	}
@@ -5309,7 +5309,7 @@ __rec_cell_build_int_key(WT_SESSION_IMPL *session,
  */
 static int
 __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, const void *data, size_t size, int *is_ovflp)
+    WT_RECONCILE *r, const void *data, size_t size, bool *is_ovflp)
 {
 	WT_BTREE *btree;
 	WT_KV *key;
@@ -5317,7 +5317,7 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
 	uint8_t pfx;
 	const uint8_t *a, *b;
 
-	*is_ovflp = 0;
+	*is_ovflp = false;
 
 	btree = S2BT(session);
 
@@ -5391,7 +5391,7 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
 		if (pfx == 0) {
 			WT_STAT_FAST_DATA_INCR(session, rec_overflow_key_leaf);
 
-			*is_ovflp = 1;
+			*is_ovflp = true;
 			return (__rec_cell_build_ovfl(
 			    session, r, key, WT_CELL_KEY_OVFL, (uint64_t)0));
 		}

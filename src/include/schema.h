@@ -65,7 +65,7 @@ struct __wt_table {
 	TAILQ_ENTRY(__wt_table) q;
 	TAILQ_ENTRY(__wt_table) hashq;
 
-	int cg_complete, idx_complete, is_simple;
+	bool cg_complete, idx_complete, is_simple;
 	u_int ncolgroups, nindices, nkey_columns;
 
 	uint32_t refcnt;	/* Number of open cursors */

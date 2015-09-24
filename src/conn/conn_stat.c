@@ -254,8 +254,8 @@ __statlog_lsm_apply(WT_SESSION_IMPL *session)
 			break;
 		for (p = S2C(session)->stat_sources; *p != NULL; ++p)
 			if (WT_PREFIX_MATCH(lsm_tree->name, *p)) {
-				WT_ERR(__wt_lsm_tree_get(
-				    session, lsm_tree->name, 0, &list[cnt++]));
+				WT_ERR(__wt_lsm_tree_get(session,
+				    lsm_tree->name, false, &list[cnt++]));
 				break;
 			}
 	}
@@ -443,11 +443,11 @@ __statlog_start(WT_CONNECTION_IMPL *conn)
 	F_SET(conn, WT_CONN_SERVER_STATISTICS);
 	/* The statistics log server gets its own session. */
 	WT_RET(__wt_open_internal_session(
-	    conn, "statlog-server", 1, 1, &conn->stat_session));
+	    conn, "statlog-server", true, true, &conn->stat_session));
 	session = conn->stat_session;
 
 	WT_RET(__wt_cond_alloc(
-	    session, "statistics log server", 0, &conn->stat_cond));
+	    session, "statistics log server", false, &conn->stat_cond));
 
 	/*
 	 * Start the thread.
@@ -477,7 +477,7 @@ __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
 	bool start;
 
 	conn = S2C(session);
-	start = 0;
+	start = false;
 
 	/*
 	 * Stop any server that is already running. This means that each time

@@ -536,7 +536,7 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
 		WT_SAVE_DHANDLE(session,
 		    ret = func(session, cfg));
 		if (WT_META_TRACKING(session))
-			WT_TRET(__wt_meta_track_handle_lock(session, 0));
+			WT_TRET(__wt_meta_track_handle_lock(session, false));
 		else
 			WT_TRET(__wt_session_release_btree(session));
 	} else if (ret == EBUSY)
@@ -715,7 +715,7 @@ __wt_conn_dhandle_close_all(
 		    dhandle->name, dhandle->checkpoint,
 		    NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 		if (WT_META_TRACKING(session))
-			WT_ERR(__wt_meta_track_handle_lock(session, 0));
+			WT_ERR(__wt_meta_track_handle_lock(session, false));
 
 		/*
 		 * We have an exclusive lock, which means there are no cursors

@@ -67,9 +67,9 @@ static int
 __txn_commit_printlog(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
 {
-	int firstrecord;
+	bool firstrecord;
 
-	firstrecord = 1;
+	firstrecord = true;
 	fprintf(out, "    \"ops\": [\n");
 
 	/* The logging subsystem zero-pads records. */
@@ -78,7 +78,7 @@ __txn_commit_printlog(
 			fprintf(out, ",\n");
 		fprintf(out, "      {");
 
-		firstrecord = 0;
+		firstrecord = false;
 
 		WT_RET(__wt_txn_op_printlog(session, pp, end, out));
 		fprintf(out, "\n      }");
@@ -221,7 +221,8 @@ __txn_log_file_sync(WT_SESSION_IMPL *session, uint32_t flags, WT_LSN *lsnp)
 	WT_DECL_RET;
 	size_t header_size;
 	uint32_t rectype = WT_LOGREC_FILE_SYNC;
-	int start, need_sync;
+	int start;
+	bool need_sync;
 	const char *fmt = WT_UNCHECKED_STRING(III);
 
 	btree = S2BT(session);
@@ -271,7 +272,7 @@ __wt_txn_checkpoint_logread(
  */
 int
 __wt_txn_checkpoint_log(
-    WT_SESSION_IMPL *session, int full, uint32_t flags, WT_LSN *lsnp)
+    WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_LSN *lsnp)
 {
 	WT_DECL_ITEM(logrec);
 	WT_DECL_RET;

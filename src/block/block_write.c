@@ -269,10 +269,10 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * the block-extend function may release the lock).
 	 * Release any locally acquired lock.
 	 */
-	local_locked = 0;
+	local_locked = false;
 	if (!caller_locked) {
 		__wt_spin_lock(session, &block->live_lock);
-		local_locked = 1;
+		local_locked = true;
 	}
 	ret = __wt_block_alloc(session, block, &offset, (wt_off_t)align_size);
 	if (ret == 0)

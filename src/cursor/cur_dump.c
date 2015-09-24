@@ -33,7 +33,7 @@ __raw_to_dump(
  */
 static int
 __dump_to_raw(
-    WT_SESSION_IMPL *session, const char *src_arg, WT_ITEM *item, int hexonly)
+    WT_SESSION_IMPL *session, const char *src_arg, WT_ITEM *item, bool hexonly)
 {
 	if (hexonly)
 		WT_RET(__wt_hex_to_raw(session, src_arg, item));
@@ -85,8 +85,8 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 			else
 				fmt = cursor->key_format;
 		}
-		ret = __wt_json_alloc_unpack(session, buffer, size, fmt,
-		    json, 1, ap);
+		ret = __wt_json_alloc_unpack(
+		    session, buffer, size, fmt, json, true, ap);
 	} else {
 		if (WT_CURSOR_RECNO(cursor) &&
 		    !F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -175,7 +175,7 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 	} else {
 		if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
 			WT_ERR(__wt_json_to_item(session, p, cursor->key_format,
-			    (WT_CURSOR_JSON *)cursor->json_private, 1,
+			    (WT_CURSOR_JSON *)cursor->json_private, true,
 			    &cursor->key));
 		else
 			WT_ERR(__dump_to_raw(session, p, &cursor->key,
@@ -219,8 +219,8 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 		WT_ERR(__wt_cursor_get_raw_value(child, &item));
 		fmt = F_ISSET(cursor, WT_CURSTD_RAW) ?
 		    "u" : cursor->value_format;
-		ret = __wt_json_alloc_unpack(session, item.data,
-		    item.size, fmt, json, 0, ap);
+		ret = __wt_json_alloc_unpack(
+		    session, item.data, item.size, fmt, json, false, ap);
 	} else {
 		WT_ERR(child->get_value(child, &item));
 
@@ -266,7 +266,8 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
 		WT_ERR(__wt_json_to_item(session, p, cursor->value_format,
-		    (WT_CURSOR_JSON *)cursor->json_private, 0, &cursor->value));
+		    (WT_CURSOR_JSON *)cursor->json_private, false,
+		    &cursor->value));
 	else
 		WT_ERR(__dump_to_raw(session, p, &cursor->value,
 		    F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));

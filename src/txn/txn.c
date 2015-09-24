@@ -168,7 +168,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
  * past the last committed transaction.
 */
 void
-__wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
+__wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *oldest_session;
@@ -177,7 +177,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	uint64_t current_id, id, oldest_id, prev_oldest_id, snap_min;
 	uint32_t i, session_cnt;
 	int32_t count;
-	int last_running_moved;
+	bool last_running_moved;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;

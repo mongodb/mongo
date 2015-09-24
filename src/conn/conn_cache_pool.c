@@ -92,7 +92,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		WT_ERR(__wt_spin_init(
 		    session, &cp->cache_pool_lock, "cache shared pool"));
 		WT_ERR(__wt_cond_alloc(session,
-		    "cache pool server", 0, &cp->cache_pool_cond));
+		    "cache pool server", false, &cp->cache_pool_cond));
 
 		__wt_process.cache_pool = cp;
 		WT_ERR(__wt_verbose(session,
@@ -229,7 +229,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	 * it in the main thread to avoid shutdown races
 	 */
 	if ((ret = __wt_open_internal_session(
-		conn, "cache-pool", 0, 0, &cache->cp_session)) != 0)
+		conn, "cache-pool", false, false, &cache->cp_session)) != 0)
 		WT_RET_MSG(NULL, ret,
 		    "Failed to create session for cache pool");
 
@@ -397,7 +397,7 @@ __cache_pool_balance(WT_SESSION_IMPL *session)
 	bool adjusted;
 
 	cp = __wt_process.cache_pool;
-	adjusted = 0;
+	adjusted = false;
 	highest = 0;
 
 	__wt_spin_lock(NULL, &cp->cache_pool_lock);
