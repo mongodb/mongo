@@ -519,7 +519,12 @@ void syncFixUp(OperationContext* txn,
             BSONObj curObj;
             PlanExecutor::ExecState execState;
             while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, NULL))) {
-                removeSaver.goingToDelete(curObj);
+                auto status = removeSaver.goingToDelete(curObj);
+                if (!status.isOK()) {
+                    severe() << "rolling back createCollection on " << *it
+                             << " failed to write document to remove saver file:" << status;
+                    throw RSFatalException();
+                }
             }
             if (execState != PlanExecutor::IS_EOF) {
                 if (execState == PlanExecutor::FAILURE &&
@@ -626,7 +631,12 @@ void syncFixUp(OperationContext* txn,
                     BSONObj obj;
                     bool found = Helpers::findOne(txn, collection, pattern, obj, false);
                     if (found) {
-                        removeSaver->goingToDelete(obj);
+                        auto status = removeSaver->goingToDelete(obj);
+                        if (!status.isOK()) {
+                            severe() << "rollback cannot write document in namespace " << doc.ns
+                                     << " to archive file: " << status;
+                            throw RSFatalException();
+                        }
                     } else {
                         error() << "rollback cannot find object: " << pattern << " in namespace "
                                 << doc.ns;
