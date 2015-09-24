@@ -409,10 +409,11 @@ __backup_uri(WT_SESSION_IMPL *session,
 	WT_RET(__wt_config_gets(session, cfg, "target", &cval));
 	WT_RET(__wt_config_subinit(session, &targetconf, &cval));
 	for (cb->list_next = 0, target_list = false;
-	    (ret = __wt_config_next(&targetconf, &k, &v)) == 0;) {
+	    (ret = __wt_config_next(&targetconf, &k, &v)) == 0;
+	    target_list = true) {
 		/* If it is our first time through, allocate. */
 		if (!target_list) {
-			*foundp = target_list = true;
+			*foundp = true;
 			WT_ERR(__wt_scr_alloc(session, 512, &tmp));
 		}
 
@@ -429,12 +430,8 @@ __backup_uri(WT_SESSION_IMPL *session,
 		 * Set log_only only if it is our only URI target.
 		 */
 		if (WT_PREFIX_MATCH(uri, "log:")) {
-			if (target_list)
-				*log_only = false;
-			else
-				*log_only = true;
-			WT_ERR(__wt_backup_list_uri_append(
-			    session, uri, NULL));
+			*log_only = !target_list;
+			WT_ERR(__wt_backup_list_uri_append(session, uri, NULL));
 		} else
 			WT_ERR(__wt_schema_worker(session,
 			    uri, NULL, __wt_backup_list_uri_append, cfg, 0));
