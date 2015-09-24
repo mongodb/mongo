@@ -16,9 +16,6 @@ db.foo.drop();
 // stop the balancer
 s.stopBalancer()
 
-// TODO: SERVER-20194. This test forces use of the old mongos query path.
-assert.commandWorked(s.s0.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-
 // shard test.foo and add a split point
 s.adminCommand({enablesharding: "test"});
 s.ensurePrimaryShard('test', 'shard0001');
@@ -81,7 +78,7 @@ function getMine(printInprog) {
     // Find all the where queries
     var mine = [];
     for (var x=0; x<inprog.length; x++) {
-        if (inprog[x].query && inprog[x].query.$where) {
+        if (inprog[x].query && inprog[x].query.filter && inprog[x].query.filter.$where) {
             mine.push(inprog[x]);
         }
     }
