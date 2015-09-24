@@ -471,7 +471,18 @@ __log_server(void *arg)
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	locked = false;
+
+	/*
+	 * The log server thread does a variety of work.  It forces out any
+	 * buffered log writes.  It pre-allocates log files and it performs
+	 * log archiving.  The reason the wrlsn thread does not force out
+	 * the buffered writes is because we want to process and move the
+	 * write_lsn forward as quickly as possible.  The same reason applies
+	 * to why the log file server thread does not force out the writes.
+	 * That thread does fsync calls which can take a long time and we
+	 * don't want log records sitting in the buffer over the time it
+	 * takes to sync out an earlier file.
+	 */
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Perform log pre-allocation.

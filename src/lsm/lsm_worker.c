@@ -35,7 +35,7 @@ __lsm_worker_general_op(
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORK_UNIT *entry;
-	int force;
+	bool force;
 
 	*completed = 0;
 	/*

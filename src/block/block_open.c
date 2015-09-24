@@ -213,8 +213,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strdup(session, filename, &block->name));
 
 	WT_ERR(__wt_config_gets(session, cfg, "block_allocation", &cval));
-	block->allocfirst =
-	    WT_STRING_MATCH("first", cval.str, cval.len) ? 1 : 0;
+	block->allocfirst = WT_STRING_MATCH("first", cval.str, cval.len);
 
 	/* Configuration: optional OS buffer cache maximum size. */
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));

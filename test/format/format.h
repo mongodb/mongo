@@ -98,10 +98,6 @@ extern WT_EXTENSION_API *wt_api;
 #undef	GIGABYTE
 #define	GIGABYTE(v)	((v) * 1073741824ULL)
 
-#define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)(mask)))
-#define	F_ISSET(p, mask)	((p)->flags & ((uint32_t)(mask)))
-#define	F_SET(p, mask)		((p)->flags |= ((uint32_t)(mask)))
-
 #define	WT_NAME	"wt"				/* Object name */
 
 #define	DATASOURCE(v)	(strcmp(v, g.c_data_source) == 0 ? 1 : 0)

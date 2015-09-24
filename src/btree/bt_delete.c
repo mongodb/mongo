@@ -61,12 +61,12 @@
  *	If deleting a range, try to delete the page without instantiating it.
  */
 int
-__wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
+__wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
 	WT_DECL_RET;
 	WT_PAGE *parent;
 
-	*skipp = 0;
+	*skipp = false;
 
 	/* If we have a clean page in memory, attempt to evict it. */
 	if (ref->state == WT_REF_MEM &&
@@ -137,7 +137,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 
 	WT_ERR(__wt_txn_modify_ref(session, ref));
 
-	*skipp = 1;
+	*skipp = true;
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	return (0);
 

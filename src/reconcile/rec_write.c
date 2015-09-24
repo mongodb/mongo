@@ -3312,6 +3312,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			/* Deleted child we don't have to write. */
 			WT_CHILD_RELEASE_ERR(session, hazard, ref);
 			continue;
+
 		case WT_CHILD_MODIFIED:
 			/*
 			 * Modified child. Empty pages are merged into the
@@ -4143,9 +4144,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				    session, page, kpack->cell));
 			WT_CHILD_RELEASE_ERR(session, hazard, ref);
 			continue;
+
 		case WT_CHILD_MODIFIED:
 			/*
-			 * Modified child. Empty pages are merged into the
+			 * Modified child.  Empty pages are merged into the
 			 * parent and discarded.
 			 */
 			switch (child->modify->rec_result) {
@@ -5707,7 +5709,7 @@ __rec_dictionary_lookup(
 {
 	WT_DICTIONARY *dp, *next;
 	uint64_t hash;
-	int match;
+	bool match;
 
 	*dpp = NULL;
 

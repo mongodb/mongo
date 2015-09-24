@@ -99,7 +99,7 @@ err:
  *	must be run in the given variable.
  */
 int
-__wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec)
+__wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, bool *recp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *c;
@@ -116,7 +116,7 @@ __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec)
 	 * Default is to run recovery always (regardless of whether this
 	 * connection has logging enabled).
 	 */
-	*rec = 1;
+	*recp = true;
 	if (log == NULL)
 		return (0);
 
@@ -142,7 +142,7 @@ __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, int *rec)
 		 * If we get to the end of the log, we can skip recovery.
 		 */
 		if (ret == WT_NOTFOUND) {
-			*rec = 0;
+			*recp = false;
 			ret = 0;
 		}
 	} else if (ret == WT_NOTFOUND)

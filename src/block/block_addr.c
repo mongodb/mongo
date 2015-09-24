@@ -35,7 +35,7 @@ __block_buffer_to_addr(WT_BLOCK *block,
 	 * can be invalid offsets, that's simpler than testing sizes of 0 all
 	 * over the place.
 	 */
-	if (s == 0) {
+		if (s == 0) {
 		*offsetp = 0;
 		*sizep = *cksump = 0;
 	} else {

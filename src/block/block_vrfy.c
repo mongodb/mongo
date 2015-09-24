@@ -90,7 +90,7 @@ __wt_block_verify_start(WT_SESSION_IMPL *session,
 	 * Set this before reading any extent lists: don't panic if we see
 	 * corruption.
 	 */
-	block->verify = 1;
+	block->verify = true;
 
 	/*
 	 * We maintain an allocation list that is rolled forward through the
@@ -107,7 +107,7 @@ __wt_block_verify_start(WT_SESSION_IMPL *session,
 
 	/* Configuration: strict behavior on any error. */
 	WT_RET(__wt_config_gets(session, cfg, "strict", &cval));
-	block->verify_strict = cval.val ? 1 : 0;
+	block->verify_strict = cval.val != 0;
 	return (0);
 }
 
@@ -174,8 +174,8 @@ __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	/* Confirm we verified every file block. */
 	ret = __verify_filefrag_chk(session, block);
 
-	block->verify = 0;
-	block->verify_strict = 0;
+	block->verify = false;
+	block->verify_strict = false;
 	block->verify_size = 0;
 
 	/* Discard the accumulated allocation list. */

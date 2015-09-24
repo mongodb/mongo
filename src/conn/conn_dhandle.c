@@ -448,7 +448,7 @@ __conn_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 	WT_RET(__conn_btree_config_set(session));
 
 	/* Set any special flags on the handle. */
-	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
+	F_SET(btree, LF_MASK(WT_BTREE_SPECIAL_FLAGS));
 
 	do {
 		WT_ERR(__wt_btree_open(session, cfg));

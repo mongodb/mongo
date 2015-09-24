@@ -481,7 +481,7 @@ __wt_backup_file_remove(WT_SESSION_IMPL *session)
  */
 int
 __wt_backup_list_uri_append(
-    WT_SESSION_IMPL *session, const char *name, int *skip)
+    WT_SESSION_IMPL *session, const char *name, bool *skip)
 {
 	WT_CURSOR_BACKUP *cb;
 	char *value;

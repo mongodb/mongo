@@ -145,16 +145,16 @@ __wt_split_stash_discard_all(
  */
 static int
 __split_safe_free(WT_SESSION_IMPL *session,
-    uint64_t split_gen, int exclusive, void *p, size_t s)
+    uint64_t split_gen, bool closing, void *p, size_t s)
 {
 	/*
-	 * We have swapped something in a page: if we don't have exclusive
+	 * We have swapped something in a page: if we don't have closing
 	 * access, check whether there are other threads in the same tree.
 	 */
-	if (!exclusive && __split_oldest_gen(session) > split_gen)
-		exclusive = 1;
+	if (!closing && __split_oldest_gen(session) > split_gen)
+		closing = true;
 
-	if (exclusive) {
+	if (closing) {
 		__wt_free(session, p);
 		return (0);
 	}
@@ -352,7 +352,6 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		first = true;
 		WT_INTL_FOREACH_BEGIN_SAFE(session, page, ref) {
-		WT_INTL_FOREACH_BEGIN(session, page, ref) {
 			__wt_ref_key(page, ref, &next->data, &next->size);
 			if (last->size == 0) {
 				if (first)
@@ -793,7 +792,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
  */
 static int
 __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
-    WT_REF **ref_new, uint32_t new_entries, size_t parent_incr, int exclusive)
+    WT_REF **ref_new, uint32_t new_entries, size_t parent_incr, bool closing)
 {
 	WT_DECL_RET;
 	WT_IKEY *ikey;
@@ -1009,7 +1008,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * Add it to the session discard list, to be freed when it's safe.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	WT_TRET(__split_safe_free(session, split_gen, exclusive, pindex, size));
+	WT_TRET(__split_safe_free(session, split_gen, closing, pindex, size));
 	parent_decr += size;
 
 	/*
@@ -1034,7 +1033,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 *	Do the check here because we've just grown the parent page and
 	 * are holding it locked.
 	 */
-	if (ret == 0 && !exclusive &&
+	if (ret == 0 && !closing &&
 	    __split_should_deepen(session, parent_ref, &children))
 		ret = __split_deepen(session, parent, children);
 
@@ -1293,7 +1292,7 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref, int *splitp)
 	 */
 	page = NULL;
 	if ((ret = __split_parent(
-	    session, ref, split_ref, 2, parent_incr, 0)) != 0) {
+	    session, ref, split_ref, 2, parent_incr, false)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
@@ -1387,7 +1386,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Resolve a page split.
  */
 int
-__wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+__wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -1413,7 +1412,7 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 
 	/* Split into the parent. */
 	WT_ERR(__split_parent(
-	    session, ref, ref_new, new_entries, parent_incr, exclusive));
+	    session, ref, ref_new, new_entries, parent_incr, closing));
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split);

@@ -168,8 +168,8 @@ struct __wt_bm {
 	int (*close)(WT_BM *, WT_SESSION_IMPL *);
 	int (*compact_end)(WT_BM *, WT_SESSION_IMPL *);
 	int (*compact_page_skip)
-	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t, int *);
-	int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, int *);
+	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t, bool *);
+	int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, bool *);
 	int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
 	int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
 	int (*preload)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
@@ -246,8 +246,8 @@ struct __wt_block {
 	wt_off_t	slvg_off;	/* Salvage file offset */
 
 				/* Verification support */
-	int	   verify;		/* If performing verification */
-	int	   verify_strict;	/* Fail hard on any error */
+	bool	   verify;		/* If performing verification */
+	bool	   verify_strict;	/* Fail hard on any error */
 	wt_off_t   verify_size;		/* Checkpoint's file size */
 	WT_EXTLIST verify_alloc;	/* Verification allocation list */
 	uint64_t   frags;		/* Maximum frags in the file */

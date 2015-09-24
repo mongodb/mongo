@@ -100,15 +100,15 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	WT_LSM_CHUNK *primary_chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	int hard_limit, have_primary, ovfl;
+	bool hard_limit, have_primary, ovfl;
 
 	lsm_tree = clsm->lsm_tree;
-	ovfl = 0;
+	ovfl = false;
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 
 	if (clsm->nchunks == 0) {
 		primary = NULL;
-		have_primary = 0;
+		have_primary = false;
 	} else {
 		primary = clsm->cursors[clsm->nchunks - 1];
 		primary_chunk = clsm->primary_chunk;
@@ -129,7 +129,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	 * chunk grows twice as large as the configured size, block until it
 	 * can be switched.
 	 */
-	hard_limit = F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH) ? 1 : 0;
+	hard_limit = F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 
 	if (have_primary) {
 		WT_ENTER_PAGE_INDEX(session);

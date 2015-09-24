@@ -15,7 +15,7 @@
  */
 static int
 __raw_to_dump(
-    WT_SESSION_IMPL *session, WT_ITEM *from, WT_ITEM *to, int hexonly)
+    WT_SESSION_IMPL *session, WT_ITEM *from, WT_ITEM *to, bool hexonly)
 {
 	if (hexonly)
 		WT_RET(__wt_raw_to_hex(session, from->data, from->size, to));
@@ -98,7 +98,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 			WT_ERR(child->get_key(child, &item));
 
 			WT_ERR(__raw_to_dump(session, &item, &cursor->key,
-			    F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
+			    F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));
 		}
 
 		if (F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -179,7 +179,7 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 			    &cursor->key));
 		else
 			WT_ERR(__dump_to_raw(session, p, &cursor->key,
-			    F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
+			    F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));
 
 		child->set_key(child, &cursor->key);
 	}
@@ -225,7 +225,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 		WT_ERR(child->get_value(child, &item));
 
 		WT_ERR(__raw_to_dump(session, &item, &cursor->value,
-		    F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
+		    F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));
 
 		if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 			itemp = va_arg(ap, WT_ITEM *);
@@ -269,7 +269,7 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 		    (WT_CURSOR_JSON *)cursor->json_private, 0, &cursor->value));
 	else
 		WT_ERR(__dump_to_raw(session, p, &cursor->value,
-		    F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
+		    F_ISSET(cursor, WT_CURSTD_DUMP_HEX)));
 
 	child->set_value(child, &cursor->value);
 
@@ -384,7 +384,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	cdump->child = child;
 
 	/* Copy the dump flags from the child cursor. */
-	F_SET(cursor, F_ISSET(child,
+	F_SET(cursor, F_MASK(child,
 	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_JSON | WT_CURSTD_DUMP_PRINT));
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON)) {
 		WT_ERR(__wt_calloc_one(session, &json));

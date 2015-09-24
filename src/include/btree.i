@@ -1079,7 +1079,8 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int locked, too_big;
+	int locked;
+	bool too_big;
 
 	btree = S2BT(session);
 	page = ref->page;

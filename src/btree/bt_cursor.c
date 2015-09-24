@@ -63,7 +63,7 @@ static inline int
 __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 {
 	return (btree->type == BTREE_COL_FIX &&
-	    !F_ISSET(cbt, WT_CBT_MAX_RECORD) ? 1 : 0);
+	    !F_ISSET(cbt, WT_CBT_MAX_RECORD));
 }
 
 /*
