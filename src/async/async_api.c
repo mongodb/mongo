@@ -171,7 +171,7 @@ retry:
  */
 static int
 __async_config(WT_SESSION_IMPL *session,
-    WT_CONNECTION_IMPL *conn, const char **cfg, int *runp)
+    WT_CONNECTION_IMPL *conn, const char **cfg, bool *runp)
 {
 	WT_CONFIG_ITEM cval;
 
@@ -278,12 +278,12 @@ int
 __wt_async_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
-	int run;
+	bool run;
 
 	conn = S2C(session);
 
 	/* Handle configuration. */
-	run = 0;
+	run = false;
 	WT_RET(__async_config(session, conn, cfg, &run));
 
 	/* If async is not configured, we're done. */
@@ -303,7 +303,7 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn, tmp_conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	int run;
+	bool run;
 	uint32_t i;
 
 	conn = S2C(session);
