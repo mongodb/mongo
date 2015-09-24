@@ -288,10 +288,10 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	int last_ckpt;
+	bool last_ckpt;
 	const char *checkpoint;
 
-	last_ckpt = 0;
+	last_ckpt = false;
 	checkpoint = NULL;
 
 	/*
@@ -306,7 +306,7 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
 		 * unnamed checkpoint of the object.
 		 */
 		if (WT_STRING_MATCH(WT_CHECKPOINT, cval.str, cval.len)) {
-			last_ckpt = 1;
+			last_ckpt = true;
 retry:			WT_RET(__wt_meta_checkpoint_last_name(
 			    session, uri, &checkpoint));
 		} else
@@ -571,7 +571,7 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	dhandle = session->dhandle;
 	F_SET(dhandle, WT_DHANDLE_DISCARD);
 
-	WT_ERR(__wt_meta_track_handle_lock(session, 0));
+	WT_ERR(__wt_meta_track_handle_lock(session, false));
 
 	/* Restore the original btree in the session. */
 err:	session->dhandle = saved_dhandle;

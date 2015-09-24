@@ -24,7 +24,7 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	WT_DECL_RET;
 	size_t dirallocsz;
 	u_int count, dirsz;
-	int match;
+	bool match;
 	char **entries, *path;
 
 	*dirlist = NULL;
@@ -54,13 +54,13 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 		if (strcmp(dp->d_name, ".") == 0 ||
 		    strcmp(dp->d_name, "..") == 0)
 			continue;
-		match = 0;
+		match = false;
 		if (prefix != NULL &&
 		    ((LF_ISSET(WT_DIRLIST_INCLUDE) &&
 		    WT_PREFIX_MATCH(dp->d_name, prefix)) ||
 		    (LF_ISSET(WT_DIRLIST_EXCLUDE) &&
 		    !WT_PREFIX_MATCH(dp->d_name, prefix))))
-			match = 1;
+			match = true;
 		if (prefix == NULL || match) {
 			/*
 			 * We have a file name we want to return.

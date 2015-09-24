@@ -21,14 +21,14 @@ __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_RET;
 	u_int cg, col, foundcg, foundcol, matchcg, matchcol;
-	int getnext;
+	bool getnext;
 
 	foundcg = foundcol = UINT_MAX;
 	matchcg = *cgnump;
 	matchcol = (*coltype == WT_PROJ_KEY) ?
 	    *colnump : *colnump + table->nkey_columns;
 
-	getnext = 1;
+	getnext = true;
 	for (colgroup = NULL, cg = 0; cg < WT_COLGROUPS(table); cg++) {
 		colgroup = table->cgroups[cg];
 
@@ -53,7 +53,7 @@ cgcols:			cval = colgroup->colconf;
 					foundcg = cg;
 					foundcol = col;
 				}
-				getnext = (cg == matchcg && col == matchcol);
+				getnext = cg == matchcg && col == matchcol;
 			}
 			if (cg == 0 && table->ncolgroups > 0 &&
 			    col == table->nkey_columns - 1)
@@ -174,13 +174,13 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
  */
 int
 __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
-    const char *columns, size_t len, int value_only, WT_ITEM *plan)
+    const char *columns, size_t len, bool value_only, WT_ITEM *plan)
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
 	WT_DECL_RET;
 	u_int cg, col, current_cg, current_col, i, start_cg, start_col;
-	int have_it;
+	bool have_it;
 	char coltype, current_coltype;
 
 	start_cg = start_col = UINT_MAX;	/* -Wuninitialized */
@@ -195,7 +195,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	current_col = col = INT_MAX;
 	current_coltype = coltype = WT_PROJ_KEY; /* Keep lint quiet. */
 	for (i = 0; (ret = __wt_config_next(&conf, &k, &v)) == 0; i++) {
-		have_it = 0;
+		have_it = false;
 
 		while ((ret = __find_next_col(session, table,
 		    &k, &cg, &col, &coltype)) == 0 &&
@@ -242,7 +242,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 
 				start_cg = cg;
 				start_col = col;
-				have_it = 1;
+				have_it = true;
 			} else
 				WT_RET(__wt_buf_catfmt(session,
 				    plan, "%c", WT_PROJ_REUSE));
@@ -272,25 +272,25 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
  *	Find the format of the named column.
  */
 static int
-__find_column_format(WT_SESSION_IMPL *session,
-    WT_TABLE *table, WT_CONFIG_ITEM *colname, int value_only, WT_PACK_VALUE *pv)
+__find_column_format(WT_SESSION_IMPL *session, WT_TABLE *table,
+    WT_CONFIG_ITEM *colname, bool value_only, WT_PACK_VALUE *pv)
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
 	WT_DECL_RET;
 	WT_PACK pack;
-	int inkey;
+	bool inkey;
 
 	WT_RET(__wt_config_subinit(session, &conf, &table->colconf));
 	WT_RET(__pack_init(session, &pack, table->key_format));
-	inkey = 1;
+	inkey = true;
 
 	while ((ret = __wt_config_next(&conf, &k, &v)) == 0) {
 		if ((ret = __pack_next(&pack, pv)) == WT_NOTFOUND && inkey) {
 			ret = __pack_init(session, &pack, table->value_format);
 			if (ret == 0)
 				ret = __pack_next(&pack, pv);
-			inkey = 0;
+			inkey = false;
 		}
 		if (ret != 0)
 			return (ret);
@@ -314,14 +314,14 @@ __find_column_format(WT_SESSION_IMPL *session,
  */
 int
 __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
-    const char *columns, size_t len, const char *extra_cols, int value_only,
+    const char *columns, size_t len, const char *extra_cols, bool value_only,
     WT_ITEM *format)
 {
 	WT_CONFIG config;
 	WT_CONFIG_ITEM k, next_k, next_v;
 	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
-	int have_next;
+	bool have_next;
 
 	WT_RET(__wt_config_initn(session, &config, columns, len));
 	/*
@@ -344,12 +344,12 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 		ret = __wt_config_next(&config, &next_k, &next_v);
 		if (ret != 0 && ret != WT_NOTFOUND)
 			return (ret);
-		have_next = (ret == 0);
+		have_next = ret == 0;
 
 		if (!have_next && extra_cols != NULL) {
 			WT_RET(__wt_config_init(session, &config, extra_cols));
 			WT_RET(__wt_config_next(&config, &next_k, &next_v));
-			have_next = 1;
+			have_next = true;
 			extra_cols = NULL;
 		}
 

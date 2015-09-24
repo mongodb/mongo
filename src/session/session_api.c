@@ -17,7 +17,7 @@ static int __session_rollback_transaction(WT_SESSION *, const char *);
  *	Reset all open cursors.
  */
 int
-__wt_session_reset_cursors(WT_SESSION_IMPL *session, int free_buffers)
+__wt_session_reset_cursors(WT_SESSION_IMPL *session, bool free_buffers)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -203,7 +203,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
-	WT_TRET(__wt_session_reset_cursors(session, 0));
+	WT_TRET(__wt_session_reset_cursors(session, false));
 
 	WT_ERR(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
 	if (cval.len != 0)
@@ -253,7 +253,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 			 * the underlying data source.
 			 */
 			WT_RET(__wt_schema_get_colgroup(
-			    session, uri, 0, NULL, &colgroup));
+			    session, uri, false, NULL, &colgroup));
 			WT_RET(__wt_open_cursor(
 			    session, colgroup->source, owner, cfg, cursorp));
 		} else if (WT_PREFIX_MATCH(uri, "config:"))
@@ -545,7 +545,7 @@ __session_reset(WT_SESSION *wt_session)
 	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
-	WT_TRET(__wt_session_reset_cursors(session, 1));
+	WT_TRET(__wt_session_reset_cursors(session, true));
 
 	WT_ASSERT(session, session->ncursors == 0);
 
@@ -650,9 +650,10 @@ __session_truncate(WT_SESSION *wt_session,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
-	int cmp, local_start;
+	int cmp;
+	bool local_start;
 
-	local_start = 0;
+	local_start = false;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_TXN_API_CALL(session, truncate, config, cfg);
@@ -752,7 +753,7 @@ __session_truncate(WT_SESSION *wt_session,
 	if (start == NULL) {
 		WT_ERR(__session_open_cursor(
 		    wt_session, stop->uri, NULL, NULL, &start));
-		local_start = 1;
+		local_start = true;
 		WT_ERR(start->next(start));
 	}
 
@@ -872,7 +873,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);
 	else {
-		WT_TRET(__wt_session_reset_cursors(session, 0));
+		WT_TRET(__wt_session_reset_cursors(session, false));
 		WT_TRET(__wt_txn_rollback(session, cfg));
 	}
 
@@ -893,7 +894,7 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, rollback_transaction, config, cfg);
 	WT_STAT_FAST_CONN_INCR(session, txn_rollback);
 
-	WT_TRET(__wt_session_reset_cursors(session, 0));
+	WT_TRET(__wt_session_reset_cursors(session, false));
 
 	WT_TRET(__wt_txn_rollback(session, cfg));
 
@@ -947,7 +948,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	WT_TXN *txn;
 	struct timespec now, start;
 	uint64_t timeout_ms, waited_ms;
-	int forever;
+	bool forever;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, transaction_sync, config, cfg);
@@ -966,7 +967,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 
 	log = conn->log;
 	timeout_ms = waited_ms = 0;
-	forever = 1;
+	forever = true;
 
 	/*
 	 * If there is no background sync LSN in this session, there
@@ -990,7 +991,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	    session, cfg, "timeout_ms", (int)UINT_MAX, &cval));
 	if ((unsigned int)cval.val != UINT_MAX) {
 		timeout_ms = (uint64_t)cval.val;
-		forever = 0;
+		forever = false;
 	}
 
 	if (timeout_ms == 0)
@@ -1056,7 +1057,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * checkpoint code will acquire the schema lock before we do that, and
 	 * some implementation of WT_CURSOR::reset might need the schema lock.
 	 */
-	WT_ERR(__wt_session_reset_cursors(session, 0));
+	WT_ERR(__wt_session_reset_cursors(session, false));
 
 	/*
 	 * Don't highjack the session checkpoint thread for eviction.
@@ -1095,9 +1096,9 @@ __session_snapshot(WT_SESSION *wt_session, const char *config)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_TXN_GLOBAL *txn_global;
-	int has_create, has_drop;
+	bool has_create, has_drop;
 
-	has_create = has_drop = 0;
+	has_create = has_drop = false;
 	session = (WT_SESSION_IMPL *)wt_session;
 	txn_global = &S2C(session)->txn_global;
 
@@ -1141,7 +1142,7 @@ __session_strerror(WT_SESSION *wt_session, int error)
  */
 int
 __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
-    int uses_dhandles, int open_metadata, WT_SESSION_IMPL **sessionp)
+    bool uses_dhandles, bool open_metadata, WT_SESSION_IMPL **sessionp)
 {
 	WT_SESSION_IMPL *session;
 
@@ -1176,7 +1177,7 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
  */
 int
 __wt_open_session(WT_CONNECTION_IMPL *conn,
-    WT_EVENT_HANDLER *event_handler, const char *config, int open_metadata,
+    WT_EVENT_HANDLER *event_handler, const char *config, bool open_metadata,
     WT_SESSION_IMPL **sessionp)
 {
 	static const WT_SESSION stds = {
@@ -1246,7 +1247,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
 
-	WT_ERR(__wt_cond_alloc(session, "session", 0, &session_ret->cond));
+	WT_ERR(__wt_cond_alloc(session, "session", false, &session_ret->cond));
 
 	if (WT_SESSION_FIRST_USE(session_ret))
 		__wt_random_init(&session_ret->rnd);
