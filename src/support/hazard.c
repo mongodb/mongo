@@ -17,7 +17,7 @@ static void __hazard_dump(WT_SESSION_IMPL *);
  *	Set a hazard pointer.
  */
 int
-__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
+__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -30,7 +30,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 
 	btree = S2BT(session);
 	conn = S2C(session);
-	*busyp = 0;
+	*busyp = false;
 
 	/* If a file can never be evicted, hazard pointers aren't required. */
 	if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
@@ -117,7 +117,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 		 * prevent some random page from being evicted.
 		 */
 		hp->page = NULL;
-		*busyp = 1;
+		*busyp = true;
 		return (0);
 	}
 

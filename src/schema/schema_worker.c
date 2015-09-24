@@ -49,9 +49,9 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			 * any open file handles, including checkpoints.
 			 */
 			if (FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE)) {
-				WT_WITH_DHANDLE_LOCK(session,
+				WT_WITH_HANDLE_LIST_LOCK(session,
 				    ret = __wt_conn_dhandle_close_all(
-				    session, uri, 0));
+				    session, uri, false));
 				WT_ERR(ret);
 			}
 
@@ -62,7 +62,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 				WT_TRET(__wt_session_release_btree(session));
 			} else if (ret == EBUSY)
 				/* TODO: Decode checkpoint from cfg. */
-				WT_WITH_DHANDLE_LOCK(session,
+				WT_WITH_HANDLE_LIST_LOCK(session,
 				    ret = __wt_conn_btree_apply_single_ckpt(
 				    session, uri, file_func, cfg));
 			WT_ERR(ret);

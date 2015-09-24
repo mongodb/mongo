@@ -44,13 +44,13 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	 * If the page is a 1-to-1 replacement, test the replacement addresses.
 	 * Ignore empty pages, they get merged into the parent.
 	 */
-	if (mod == NULL || F_ISSET(mod, WT_PM_REC_MASK) == 0) {
+	if (mod == NULL || mod->rec_result == 0) {
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		if (addr == NULL)
 			return (0);
 		WT_RET(
 		    bm->compact_page_skip(bm, session, addr, addr_size, skipp));
-	} else if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_REPLACE) {
+	} else if (mod->rec_result == WT_PM_REC_REPLACE) {
 		/*
 		 * The page's modification information can change underfoot if
 		 * the page is being reconciled, lock the page down.
@@ -110,7 +110,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	 *
 	 * We're holding the schema lock which serializes with checkpoints.
 	 */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
 
 	/*
 	 * Get the tree handle's flush lock which blocks threads writing leaf

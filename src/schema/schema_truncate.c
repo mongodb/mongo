@@ -33,8 +33,8 @@ __truncate_file(WT_SESSION_IMPL *session, const char *name)
 	WT_RET(__wt_session_release_btree(session));
 
 	/* Close any btree handles in the file. */
-	WT_WITH_DHANDLE_LOCK(session,
-	    ret = __wt_conn_dhandle_close_all(session, name, 0));
+	WT_WITH_HANDLE_LIST_LOCK(session,
+	    ret = __wt_conn_dhandle_close_all(session, name, false));
 	WT_RET(ret);
 
 	/* Delete the root address and truncate the file. */

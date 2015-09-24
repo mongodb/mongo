@@ -191,7 +191,8 @@ __backup_start(
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	int exist, log_only, target_list;
+	bool exist;
+	int log_only, target_list;
 
 	conn = S2C(session);
 
@@ -376,7 +377,7 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Build a list of the file objects that need to be copied. */
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_meta_btree_apply(
 	    session, __backup_list_all_append, NULL));
 

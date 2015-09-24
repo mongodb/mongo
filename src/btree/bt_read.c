@@ -10,7 +10,7 @@
 
 /*
  * __wt_cache_read --
- *	Read a page from the file.
+ *	Read a page from the file into cache.
  */
 int
 __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)

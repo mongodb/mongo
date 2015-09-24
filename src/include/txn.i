@@ -234,6 +234,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		 * eviction, it's better to do it beforehand.
 		 */
 		WT_RET(__wt_cache_full_check(session));
+
 		__wt_txn_get_snapshot(session);
 	}
 

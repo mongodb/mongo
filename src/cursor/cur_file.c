@@ -110,7 +110,7 @@ __curfile_next(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	if ((ret = __wt_btcur_next(cbt, 0)) == 0)
+	if ((ret = __wt_btcur_next(cbt, false)) == 0)
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END_RET(session, ret);
@@ -153,7 +153,7 @@ __curfile_prev(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	if ((ret = __wt_btcur_prev(cbt, 0)) == 0)
+	if ((ret = __wt_btcur_prev(cbt, false)) == 0)
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END_RET(session, ret);

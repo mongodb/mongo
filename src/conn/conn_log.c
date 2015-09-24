@@ -42,7 +42,7 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
  *	Parse and setup the logging server options.
  */
 static int
-__logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
+__logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
@@ -67,7 +67,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
 	/* We are done if logging isn't enabled. */
-	if (*runp == 0)
+	if (!*runp)
 		return (0);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.archive", &cval));
@@ -281,12 +281,12 @@ __log_file_server(void *arg)
 	WT_LOG *log;
 	WT_LSN close_end_lsn, close_lsn;
 	WT_SESSION_IMPL *session;
-	int locked;
+	bool locked;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	locked = 0;
+	locked = false;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * If there is a log file to close, make sure any outstanding
@@ -314,13 +314,13 @@ __log_file_server(void *arg)
 			close_end_lsn.file++;
 			WT_ERR(__wt_fsync(session, close_fh));
 			__wt_spin_lock(session, &log->log_sync_lock);
-			locked = 1;
+			locked = true;
 			WT_ERR(__wt_close(session, &close_fh));
 			WT_ASSERT(session,
 			    LOG_CMP(&close_end_lsn, &log->sync_lsn) >= 0);
 			log->sync_lsn = close_end_lsn;
 			WT_ERR(__wt_cond_signal(session, log->log_sync_cond));
-			locked = 0;
+			locked = false;
 			__wt_spin_unlock(session, &log->log_sync_lock);
 		} else
 			/* Wait until the next event. */
@@ -466,12 +466,12 @@ __log_server(void *arg)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	u_int locked;
+	bool locked;
 
 	session = arg;
 	conn = S2C(session);
 	log = conn->log;
-	locked = 0;
+	locked = false;
 	while (F_ISSET(conn, WT_CONN_LOG_SERVER_RUN)) {
 		/*
 		 * Perform log pre-allocation.
@@ -485,11 +485,11 @@ __log_server(void *arg)
 		if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE)) {
 			if (__wt_try_writelock(
 			    session, log->log_archive_lock) == 0) {
-				locked = 1;
+				locked = true;
 				WT_ERR(__log_archive_once(session, 0));
 				WT_ERR(	__wt_writeunlock(
 				    session, log->log_archive_lock));
-				locked = 0;
+				locked = false;
 			} else
 				WT_ERR(__wt_verbose(session, WT_VERB_LOG,
 				    "log_archive: Blocked due to open log "
@@ -516,7 +516,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
-	int run;
+	bool run;
 
 	conn = S2C(session);
 

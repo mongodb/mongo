@@ -13,7 +13,7 @@
  *	Return the next entry on the append list.
  */
 static inline int
-__cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_fix_append_next(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
@@ -72,7 +72,7 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
  *	Move to the next, fixed-length column-store item.
  */
 static inline int
-__cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_fix_next(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_BTREE *btree;
 	WT_ITEM *val;
@@ -121,7 +121,7 @@ new_page:
  *	Return the next variable-length entry on the append list.
  */
 static inline int
-__cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_var_append_next(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
@@ -160,7 +160,7 @@ new_page:	if (cbt->ins == NULL)
  *	Move to the next, variable-length column-store item.
  */
 static inline int
-__cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_var_next(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
@@ -241,7 +241,7 @@ new_page:	/* Find the matching WT_COL slot. */
  *	Move to the next row-store item.
  */
 static inline int
-__cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage)
 {
 	WT_INSERT *ins;
 	WT_ITEM *key, *val;
@@ -335,11 +335,9 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
  *	Initialize a cursor for iteration, usually based on a search.
  */
 void
-__wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
+__wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt)
 {
 	WT_PAGE *page;
-
-	WT_UNUSED(next);
 
 	/*
 	 * We don't currently have to do any setup when we switch between next
@@ -399,13 +397,13 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
  *	Move to the next record in the tree.
  */
 int
-__wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating)
+__wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	uint32_t flags;
-	int newpage;
+	bool newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
@@ -423,14 +421,14 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating)
 	 * some setup to do.
 	 */
 	if (!F_ISSET(cbt, WT_CBT_ITERATE_NEXT))
-		__wt_btcur_iterate_setup(cbt, 1);
+		__wt_btcur_iterate_setup(cbt);
 
 	/*
 	 * Walk any page we're holding until the underlying call returns not-
 	 * found.  Then, move to the next page, until we reach the end of the
 	 * file.
 	 */
-	for (newpage = 0;; newpage = 1) {
+	for (newpage = false;; newpage = true) {
 		page = cbt->ref == NULL ? NULL : cbt->ref->page;
 		WT_ASSERT(session, page == NULL || !WT_PAGE_IS_INTERNAL(page));
 

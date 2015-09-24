@@ -20,7 +20,8 @@
 /* Balancing passes after a reduction before a connection is a candidate. */
 #define	WT_CACHE_POOL_REDUCE_SKIPS	5
 
-static int __cache_pool_adjust(WT_SESSION_IMPL *, uint64_t, uint64_t, int *);
+static int __cache_pool_adjust(
+    WT_SESSION_IMPL *, uint64_t, uint64_t, bool *);
 static int __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
 static int __cache_pool_balance(WT_SESSION_IMPL *);
 
@@ -36,17 +37,17 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	WT_CONNECTION_IMPL *conn, *entry;
 	WT_DECL_RET;
 	char *pool_name;
-	int created, updating;
+	bool created, updating;
 	uint64_t chunk, reserve, size, used_cache;
 
 	conn = S2C(session);
-	created = updating = 0;
+	created = updating = false;
 	pool_name = NULL;
 	cp = NULL;
 	size = 0;
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
-		updating = 1;
+		updating = true;
 	else {
 		WT_RET(__wt_config_gets_none(
 		    session, cfg, "shared_cache.name", &cval));
@@ -84,7 +85,7 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		WT_ASSERT(session, !updating);
 		/* Create a cache pool. */
 		WT_ERR(__wt_calloc_one(session, &cp));
-		created = 1;
+		created = true;
 		cp->name = pool_name;
 		pool_name = NULL; /* Belongs to the cache pool now. */
 		TAILQ_INIT(&cp->cache_pool_qh);
@@ -274,21 +275,21 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn, *entry;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	int cp_locked, found;
+	bool cp_locked, found;
 
 	conn = S2C(session);
 	cache = conn->cache;
-	cp_locked = found = 0;
+	cp_locked = found = false;
 	cp = __wt_process.cache_pool;
 
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL))
 		return (0);
 
 	__wt_spin_lock(session, &cp->cache_pool_lock);
-	cp_locked = 1;
+	cp_locked = true;
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq)
 		if (entry == conn) {
-			found = 1;
+			found = true;
 			break;
 		}
 
@@ -311,7 +312,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 		 * operation.
 		 */
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
-		cp_locked = 0;
+		cp_locked = false;
 
 		F_CLR(cache, WT_CACHE_POOL_RUN);
 		WT_TRET(__wt_cond_signal(session, cp->cache_pool_cond));
@@ -326,7 +327,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 		 * participant.
 		 */
 		__wt_spin_lock(session, &cp->cache_pool_lock);
-		cp_locked = 1;
+		cp_locked = true;
 	}
 
 	/*
@@ -358,7 +359,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 		__wt_process.cache_pool = NULL;
 		__wt_spin_unlock(session, &__wt_process.spinlock);
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
-		cp_locked = 0;
+		cp_locked = false;
 
 		/* Now free the pool. */
 		__wt_free(session, cp->name);
@@ -392,8 +393,8 @@ __cache_pool_balance(WT_SESSION_IMPL *session)
 {
 	WT_CACHE_POOL *cp;
 	WT_DECL_RET;
-	int adjusted;
 	uint64_t bump_threshold, highest;
+	bool adjusted;
 
 	cp = __wt_process.cache_pool;
 	adjusted = 0;
@@ -482,18 +483,18 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
  */
 static int
 __cache_pool_adjust(WT_SESSION_IMPL *session,
-    uint64_t highest, uint64_t bump_threshold, int *adjustedp)
+    uint64_t highest, uint64_t bump_threshold, bool *adjustedp)
 {
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
 	uint64_t adjusted, reserved, read_pressure;
-	int force, grew;
+	bool force, grew;
 
-	*adjustedp = 0;
+	*adjustedp = false;
 	cp = __wt_process.cache_pool;
 	force = (cp->currently_used > cp->size);
-	grew = 0;
+	grew = false;
 	if (WT_VERBOSE_ISSET(session, WT_VERB_SHARED_CACHE)) {
 		WT_RET(__wt_verbose(session,
 		    WT_VERB_SHARED_CACHE, "Cache pool distribution: "));
@@ -521,7 +522,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 *  - The reserved size has been adjusted
 		 */
 		if (entry->cache_size < reserved) {
-			grew = 1;
+			grew = true;
 			adjusted = reserved - entry->cache_size;
 		/*
 		 * Conditions for reducing the amount of resources for an
@@ -537,7 +538,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		    (read_pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
 		     highest > 1 && entry->cache_size > reserved &&
 		     cp->currently_used >= cp->size)) {
-			grew = 0;
+			grew = false;
 			/*
 			 * Shrink by a chunk size if that doesn't drop us
 			 * below the reserved size.
@@ -561,7 +562,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		     (entry->cache_size * cache->eviction_target) / 100 &&
 		     cp->currently_used < cp->size &&
 		     read_pressure > bump_threshold) {
-			grew = 1;
+			grew = true;
 			adjusted = WT_MIN(cp->chunk,
 			    cp->size - cp->currently_used);
 		}

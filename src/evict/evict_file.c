@@ -18,7 +18,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
-	int evict_reset;
+	bool evict_reset;
 
 	/*
 	 * We need exclusive access to the file -- disable ordinary eviction

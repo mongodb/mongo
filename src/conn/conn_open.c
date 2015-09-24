@@ -114,7 +114,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	F_SET(conn, WT_CONN_CLOSING);
 
 	WT_TRET(__wt_checkpoint_server_destroy(session));
-	WT_TRET(__wt_statlog_destroy(session, 1));
+	WT_TRET(__wt_statlog_destroy(session, true));
 	WT_TRET(__wt_sweep_destroy(session));
 	WT_TRET(__wt_evict_destroy(session));
 

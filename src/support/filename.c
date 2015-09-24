@@ -56,7 +56,7 @@ __wt_nfilename(
 int
 __wt_remove_if_exists(WT_SESSION_IMPL *session, const char *name)
 {
-	int exist;
+	bool exist;
 
 	WT_RET(__wt_exist(session, name, &exist));
 	if (exist)

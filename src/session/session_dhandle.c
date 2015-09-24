@@ -208,13 +208,13 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	}
 
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_FORCE)) {
-		WT_WITH_DHANDLE_LOCK(session,
-		    ret = __wt_conn_btree_sync_and_close(session, 0, 1));
+		WT_WITH_HANDLE_LIST_LOCK(session,
+		    ret = __wt_conn_btree_sync_and_close(session, false, true));
 		F_CLR(dhandle, WT_DHANDLE_DISCARD_FORCE);
 	} else if (F_ISSET(dhandle, WT_DHANDLE_DISCARD) ||
 	    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
-		ret = __wt_conn_btree_sync_and_close(session, 0, 0);
+		ret = __wt_conn_btree_sync_and_close(session, false, false);
 		F_CLR(dhandle, WT_DHANDLE_DISCARD);
 	}
 
@@ -391,7 +391,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * We didn't find a match in the session cache, now search the
 		 * shared handle list and cache any handle we find.
 		 */
-		WT_WITH_DHANDLE_LOCK(session, ret =
+		WT_WITH_HANDLE_LIST_LOCK(session, ret =
 		    __session_find_shared_dhandle(
 		    session, uri, checkpoint, flags));
 		dhandle = (ret == 0) ? session->dhandle : NULL;
@@ -414,9 +414,9 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * lock - they do so on purpose and will handle error returns.
 		 */
 		if ((LF_ISSET(WT_DHANDLE_LOCK_ONLY) && ret == EBUSY) ||
-		    (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
+		    (!F_ISSET(session, WT_SESSION_LOCKED_SCHEMA) &&
 		    F_ISSET(session,
-		    WT_SESSION_HANDLE_LIST_LOCKED | WT_SESSION_TABLE_LOCKED)))
+		    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_TABLE)))
 			return (ret);
 
 		/* If we found the handle and it isn't dead, reopen it. */
@@ -441,7 +441,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	 */
 retry:	is_dead = 0;
 	WT_WITH_SCHEMA_LOCK(session,
-	    WT_WITH_DHANDLE_LOCK(session, ret =
+	    WT_WITH_HANDLE_LIST_LOCK(session, ret =
 		(is_dead = (dhandle != NULL &&
 		    F_ISSET(dhandle, WT_DHANDLE_DEAD))) ?
 		0 : __wt_conn_btree_get(session, uri, checkpoint, cfg, flags)));

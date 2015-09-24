@@ -646,9 +646,9 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		 */
 		btree = ((WT_CURSOR_BTREE *)(primary))->btree;
 		if (btree->bulk_load_ok) {
-			btree->bulk_load_ok = 0;
+			btree->bulk_load_ok = false;
 			WT_WITH_BTREE(session, btree,
-			    __wt_btree_evictable(session, 0));
+			    __wt_btree_evictable(session, false));
 		}
 	}
 
@@ -1525,7 +1525,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 		bulk = 1;
 
 	/* Get the LSM tree. */
-	WT_WITH_DHANDLE_LOCK(session,
+	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, uri, bulk, &lsm_tree));
 	/*
 	 * Check whether the exclusive open for a bulk load succeeded, and

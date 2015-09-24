@@ -8,8 +8,8 @@
 
 #include "wt_internal.h"
 
-static int  __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, int);
-static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, int, int *);
+static int  __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, bool);
+static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, bool, bool *);
 
 /*
  * __evict_exclusive_clear --
@@ -49,13 +49,13 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Evict a page.
  */
 int
-__wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+__wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	int forced_eviction, inmem_split;
+	bool forced_eviction, inmem_split;
 
 	conn = S2C(session);
 
@@ -63,8 +63,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	WT_ASSERT(session, !WT_SESSION_IS_CHECKPOINT(session));
 
 	page = ref->page;
-	forced_eviction = (page->read_gen == WT_READGEN_OLDEST);
-	inmem_split = 0;
+	forced_eviction = page->read_gen == WT_READGEN_OLDEST;
+	inmem_split = false;
 
 	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
 	    "page %p (%s)", page, __wt_page_type_string(page->type)));
@@ -76,7 +76,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * to make this check for clean pages, too: while unlikely eviction
 	 * would choose an internal page with children, it's not disallowed.
 	 */
-	WT_ERR(__evict_review(session, ref, exclusive, &inmem_split));
+	WT_ERR(__evict_review(session, ref, closing, &inmem_split));
 
 	/*
 	 * If there was an in-memory split, the tree has been left in the state
@@ -92,7 +92,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	mod = page->modify;
 
 	/* Count evictions of internal pages during normal operation. */
-	if (!exclusive && WT_PAGE_IS_INTERNAL(page)) {
+	if (!closing && WT_PAGE_IS_INTERNAL(page)) {
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_internal);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_internal);
 	}
@@ -106,7 +106,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		conn->cache->evict_max_page_size = page->memory_footprint;
 
 	/* Update the reference and discard the page. */
-	if (mod == NULL || !F_ISSET(mod, WT_PM_REC_MASK)) {
+	if (mod == NULL || mod->rec_result == 0) {
 		if (__wt_ref_is_root(ref))
 			__wt_ref_out(session, ref);
 		else
@@ -119,14 +119,14 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 			__wt_ref_out(session, ref);
 		else
 			WT_ERR(
-			    __evict_page_dirty_update(session, ref, exclusive));
+			    __evict_page_dirty_update(session, ref, closing));
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_dirty);
 		WT_STAT_FAST_DATA_INCR(session, cache_eviction_dirty);
 	}
 
 	if (0) {
-err:		if (!exclusive)
+err:		if (!closing)
 			__evict_exclusive_clear(session, ref);
 
 		WT_STAT_FAST_CONN_INCR(session, cache_eviction_fail);
@@ -164,7 +164,7 @@ __wt_evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Update a dirty page's reference on eviction.
  */
 static int
-__evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
+__evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_ADDR *addr;
 	WT_PAGE *parent;
@@ -173,7 +173,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	parent = ref->home;
 	mod = ref->page->modify;
 
-	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
+	switch (mod->rec_result) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
@@ -201,7 +201,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		 * A real split where we reconciled a page and it turned into a
 		 * lot of pages.
 		 */
-		WT_RET(__wt_split_multi(session, ref, exclusive));
+		WT_RET(__wt_split_multi(session, ref, closing));
 		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
 		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
@@ -273,7 +273,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
  */
 static int
 __evict_review(
-    WT_SESSION_IMPL *session, WT_REF *ref, int exclusive, int *inmem_splitp)
+    WT_SESSION_IMPL *session, WT_REF *ref, bool closing, bool *inmem_splitp)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -284,7 +284,7 @@ __evict_review(
 	 * Get exclusive access to the page if our caller doesn't have the tree
 	 * locked down.
 	 */
-	if (!exclusive) {
+	if (!closing) {
 		WT_RET(__evict_exclusive(session, ref));
 
 		/*
@@ -314,7 +314,7 @@ __evict_review(
 	}
 
 	/* Check if the page can be evicted. */
-	if (!exclusive) {
+	if (!closing) {
 		/*
 		 * Update the oldest ID to avoid wasted effort should it have
 		 * fallen behind current.
@@ -363,7 +363,7 @@ __evict_review(
 	 */
 	reconcile_flags = WT_EVICTING;
 	if (__wt_page_is_modified(page)) {
-		if (exclusive)
+		if (closing)
 			FLD_SET(reconcile_flags, WT_SKIP_UPDATE_ERR);
 		else if (!WT_PAGE_IS_INTERNAL(page) &&
 		    page->read_gen == WT_READGEN_OLDEST)
@@ -378,7 +378,7 @@ __evict_review(
 	 * If the page was ever modified, make sure all of the updates
 	 * on the page are old enough they can be discarded from cache.
 	 */
-	if (!exclusive && mod != NULL &&
+	if (!closing && mod != NULL &&
 	    !__wt_txn_visible_all(session, mod->rec_max_txn) &&
 	    !FLD_ISSET(reconcile_flags, WT_SKIP_UPDATE_RESTORE))
 		return (EBUSY);

@@ -24,7 +24,7 @@ static int __block_append(WT_SESSION_IMPL *,
 static int __block_ext_overlap(WT_SESSION_IMPL *,
 	WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
 static int __block_extlist_dump(
-	WT_SESSION_IMPL *, const char *, WT_EXTLIST *, int);
+	WT_SESSION_IMPL *, const char *, WT_EXTLIST *, bool);
 static int __block_merge(WT_SESSION_IMPL *,
 	WT_BLOCK *, WT_EXTLIST *, wt_off_t, wt_off_t);
 
@@ -59,7 +59,7 @@ __block_off_srch_last(WT_EXT **head, WT_EXT ***stack)
  * by-offset list referenced by a size entry), for the specified offset.
  */
 static inline void
-__block_off_srch(WT_EXT **head, wt_off_t off, WT_EXT ***stack, int skip_off)
+__block_off_srch(WT_EXT **head, wt_off_t off, WT_EXT ***stack, bool skip_off)
 {
 	WT_EXT **extp;
 	int i;
@@ -102,7 +102,7 @@ __block_first_srch(WT_EXT **head, wt_off_t size, WT_EXT ***stack)
 		return (false);
 
 	/* Build a stack for the offset we want. */
-	__block_off_srch(head, ext->off, stack, 0);
+	__block_off_srch(head, ext->off, stack, false);
 	return (true);
 }
 
@@ -199,7 +199,7 @@ __block_ext_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 		 * Insert the new WT_EXT structure into the size element's
 		 * offset skiplist.
 		 */
-		__block_off_srch(szp->off, ext->off, astack, 1);
+		__block_off_srch(szp->off, ext->off, astack, true);
 		for (i = 0; i < ext->depth; ++i) {
 			ext->next[i + ext->depth] = *astack[i];
 			*astack[i] = ext;
@@ -212,7 +212,7 @@ __block_ext_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 #endif
 
 	/* Insert the new WT_EXT structure into the offset skiplist. */
-	__block_off_srch(el->off, ext->off, astack, 0);
+	__block_off_srch(el->off, ext->off, astack, false);
 	for (i = 0; i < ext->depth; ++i) {
 		ext->next[i] = *astack[i];
 		*astack[i] = ext;
@@ -273,7 +273,7 @@ __block_off_match(WT_EXTLIST *el, wt_off_t off, wt_off_t size)
  */
 int
 __wt_block_misplaced(WT_SESSION_IMPL *session,
-   WT_BLOCK *block, const char *tag, wt_off_t offset, uint32_t size, int live)
+   WT_BLOCK *block, const char *tag, wt_off_t offset, uint32_t size, bool live)
 {
 	const char *name;
 
@@ -329,7 +329,7 @@ __block_off_remove(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	u_int i;
 
 	/* Find and remove the record from the by-offset skiplist. */
-	__block_off_srch(el->off, off, astack, 0);
+	__block_off_srch(el->off, off, astack, false);
 	ext = *astack[0];
 	if (ext == NULL || ext->off != off)
 		goto corrupt;
@@ -345,7 +345,7 @@ __block_off_remove(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		szp = *sstack[0];
 		if (szp == NULL || szp->size != ext->size)
 			return (EINVAL);
-		__block_off_srch(szp->off, off, astack, 1);
+		__block_off_srch(szp->off, off, astack, true);
 		ext = *astack[0];
 		if (ext == NULL || ext->off != off)
 			goto corrupt;
@@ -359,11 +359,11 @@ __block_off_remove(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	}
 #ifdef HAVE_DIAGNOSTIC
 	if (!el->track_size) {
-		int not_null;
-		for (i = 0, not_null = 0; i < ext->depth; ++i)
+		bool not_null;
+		for (i = 0, not_null = false; i < ext->depth; ++i)
 			if (ext->next[i + ext->depth] != NULL)
-				not_null = 1;
-		WT_ASSERT(session, not_null == 0);
+				not_null = true;
+		WT_ASSERT(session, not_null == false);
 	}
 #endif
 
@@ -603,7 +603,8 @@ __wt_block_free(WT_SESSION_IMPL *session,
 	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)offset, (intmax_t)size));
 
 #ifdef HAVE_DIAGNOSTIC
-	WT_RET(__wt_block_misplaced(session, block, "free", offset, size, 1));
+	WT_RET(
+	    __wt_block_misplaced(session, block, "free", offset, size, true));
 #endif
 	WT_RET(__wt_block_ext_prealloc(session, 5));
 	__wt_spin_lock(session, &block->live_lock);
@@ -1315,8 +1316,8 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 #endif
 
 	/* Write the extent list to disk. */
-	WT_ERR(__wt_block_write_off(
-	    session, block, tmp, &el->offset, &el->size, &el->cksum, 1, 1));
+	WT_ERR(__wt_block_write_off(session,
+	    block, tmp, &el->offset, &el->size, &el->cksum, true, true));
 
 	/*
 	 * Remove the allocated blocks from the system's allocation list, extent
@@ -1386,7 +1387,7 @@ __wt_block_extlist_truncate(
  */
 int
 __wt_block_extlist_init(WT_SESSION_IMPL *session,
-    WT_EXTLIST *el, const char *name, const char *extname, int track_size)
+    WT_EXTLIST *el, const char *name, const char *extname, bool track_size)
 {
 	size_t size;
 
@@ -1434,7 +1435,7 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
  */
 static int
 __block_extlist_dump(
-    WT_SESSION_IMPL *session, const char *tag, WT_EXTLIST *el, int show_size)
+    WT_SESSION_IMPL *session, const char *tag, WT_EXTLIST *el, bool show_size)
 {
 	WT_EXT *ext;
 	WT_SIZE *szp;

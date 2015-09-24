@@ -1015,7 +1015,7 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 	 * pool creates its sessions, let our caller decline this work.
 	 */
 	if (open_metadata) {
-		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
 		WT_RET(__wt_metadata_open(session));
 	}
 
