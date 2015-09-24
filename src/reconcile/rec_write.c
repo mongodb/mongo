@@ -476,7 +476,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
 	 * set it again as part of that walk.
 	 */
-	return (__wt_page_parent_modify_set(session, ref, 1));
+	return (__wt_page_parent_modify_set(session, ref, true));
 }
 
 /*

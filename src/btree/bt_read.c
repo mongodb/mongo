@@ -311,7 +311,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_txn_update_oldest(session, 0);
 
 	/* If eviction cannot succeed, don't try. */
-	return (__wt_page_can_evict(session, page, 1, NULL));
+	return (__wt_page_can_evict(session, page, true, NULL));
 }
 
 /*
