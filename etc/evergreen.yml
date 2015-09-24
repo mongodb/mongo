@@ -1182,6 +1182,14 @@ tasks:
       resmoke_args: --suites=replica_sets_auth
 
 - <<: *task_template
+  name: replicasets_legacy
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_legacy
+
+- <<: *task_template
   name: replication
   commands:
   - func: "do setup"
@@ -1892,6 +1900,7 @@ buildvariants:
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
+  - name: replicasets_legacy
   - name: replication
   - name: replication_WT
   - name: replication_auth
@@ -2008,6 +2017,7 @@ buildvariants:
   - name: replicasets
   - name: replicasets_WT
   - name: replicasets_auth
+  - name: replicasets_legacy
   - name: replication
   - name: replication_WT
   - name: replication_auth

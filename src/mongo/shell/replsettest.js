@@ -181,6 +181,9 @@ ReplSetTest.prototype.getReplSetConfig = function() {
         cfg.members.push(member);
     }
 
+    if (jsTestOptions().useLegacyReplicationProtocol) {
+        cfg.protocolVersion = 0;
+    }
     return cfg;
 }
 
@@ -452,6 +455,9 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     var cmdKey  = initCmd || 'replSetInitiate';
     var timeout = timeout || 60000;
     var ex;
+    if (jsTestOptions().useLegacyReplicationProtocol && !config.hasOwnProperty("protocolVersion")) {
+        config.protocolVersion = 0;
+    }
     cmd[cmdKey] = config;
     printjson(cmd);
 
@@ -487,6 +493,9 @@ ReplSetTest.prototype.reInitiate = function() {
     var config = this.getReplSetConfig();
     config.version = res.config.version + 1;
 
+    if (jsTestOptions().useLegacyReplicationProtocol && !config.hasOwnProperty("protocolVersion")) {
+        config.protocolVersion = 0;
+    }
     try {
         assert.commandWorked(master.adminCommand({replSetReconfig: config}));
     }

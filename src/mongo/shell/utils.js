@@ -192,6 +192,8 @@ jsTestOptions = function(){
                               adminUser : TestData.adminUser || "admin",
                               adminPassword : TestData.adminPassword || "password",
                               useLegacyConfigServers: TestData.useLegacyConfigServers || false,
+                              useLegacyReplicationProtocol:
+                                    TestData.useLegacyReplicationProtocol || false,
                               enableEncryption: TestData.enableEncryption,
                               encryptionKeyFile: TestData.encryptionKeyFile,
                               minPort: TestData.minPort,
