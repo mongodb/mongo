@@ -118,28 +118,8 @@ var doTest = function(useDollarQuerySyntax) {
     };
 
     var getExplainServer = function(explain) {
-        var serverInfo;
-
-        // TODO: Remove this when SERVER-20194 is resolved. The resolution of this ticket will unify
-        // the formats returned by queries routed through mongos with the $explain flag and explain
-        // commands routed through mongos.
-        var cmdRes = coll.getDB("test").adminCommand({
-            getParameter: 1,
-            useClusterClientCursor: 1
-        });
-        assert.commandWorked(cmdRes);
-        var useCCC = cmdRes.useClusterClientCursor;
-
-        // TODO: Remove the if block and unconditionally use the code in the else block under
-        // SERVER-20194.
-        if (useDollarQuerySyntax && !useCCC) {
-            serverInfo = explain.serverInfo;
-        }
-        else {
-            assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
-            serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
-        }
-
+        assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
+        var serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
         return serverInfo.host + ":" + serverInfo.port.toString();
     };
 

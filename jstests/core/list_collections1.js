@@ -117,51 +117,46 @@
     // Test basic usage of "cursor.batchSize" option.
     //
 
-    // TODO: When SERVER-20194 is done, we should be able to run this test regardless of whether we
-    // are using the find/getMore commands, both against a standalone server and passed through
-    // mongos.
-    if (!mydb.getMongo().useReadCommands()) {
-        assert.commandWorked(mydb.dropDatabase());
-        assert.commandWorked(mydb.createCollection("foo"));
-        assert.commandWorked(mydb.createCollection("bar"));
-        cursor = getListCollectionsCursor({cursor: {batchSize: 2}});
-        assert.eq(2, cursor.objsLeftInBatch());
-        assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
-                                                                      c.name === "bar"; }));
-        cursor = getListCollectionsCursor({cursor: {batchSize: 1}});
-        assert.eq(1, cursor.objsLeftInBatch());
-        assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
-                                                                      c.name === "bar"; }));
-        cursor = getListCollectionsCursor({cursor: {batchSize: 0}});
-        assert.eq(0, cursor.objsLeftInBatch());
-        assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
-                                                                      c.name === "bar"; }));
+    assert.commandWorked(mydb.dropDatabase());
+    assert.commandWorked(mydb.createCollection("foo"));
+    assert.commandWorked(mydb.createCollection("bar"));
+    cursor = getListCollectionsCursor({cursor: {batchSize: 2}});
+    assert.eq(2, cursor.objsLeftInBatch());
+    assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
+                                                                  c.name === "bar"; }));
+    cursor = getListCollectionsCursor({cursor: {batchSize: 1}});
+    assert.eq(1, cursor.objsLeftInBatch());
+    assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
+                                                                  c.name === "bar"; }));
+    cursor = getListCollectionsCursor({cursor: {batchSize: 0}});
+    assert.eq(0, cursor.objsLeftInBatch());
+    assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
+                                                                  c.name === "bar"; }));
 
-        cursor = getListCollectionsCursor({cursor: {batchSize: NumberInt(2)}});
-        assert.eq(2, cursor.objsLeftInBatch());
-        assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
-                                                                      c.name === "bar"; }));
-        cursor = getListCollectionsCursor({cursor: {batchSize: NumberLong(2)}});
-        assert.eq(2, cursor.objsLeftInBatch());
-        assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
-                                                                      c.name === "bar"; }));
+    cursor = getListCollectionsCursor({cursor: {batchSize: NumberInt(2)}});
+    assert.eq(2, cursor.objsLeftInBatch());
+    assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
+                                                                  c.name === "bar"; }));
+    cursor = getListCollectionsCursor({cursor: {batchSize: NumberLong(2)}});
+    assert.eq(2, cursor.objsLeftInBatch());
+    assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
+                                                                  c.name === "bar"; }));
 
-        // Test a large batch size, and assert that at least 2 results are returned in the initial
-        // batch.
-        cursor = getListCollectionsCursor({cursor: {batchSize: Math.pow(2, 62)}});
-        assert.lte(2, cursor.objsLeftInBatch());
-        assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
-                                                                      c.name === "bar"; }));
+    // Test a large batch size, and assert that at least 2 results are returned in the initial
+    // batch.
+    cursor = getListCollectionsCursor({cursor: {batchSize: Math.pow(2, 62)}});
+    assert.lte(2, cursor.objsLeftInBatch());
+    assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
+                                                                  c.name === "bar"; }));
 
-        // Ensure that the server accepts an empty object for "cursor".  This is equivalent to not
-        // specifying "cursor" at all.
-        //
-        // We do not test for objsLeftInBatch() here, since the default batch size for this command
-        // is not specified.
-        cursor = getListCollectionsCursor({cursor: {}});
-        assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
-                                                                      c.name === "bar"; }));
-    }
+    // Ensure that the server accepts an empty object for "cursor".  This is equivalent to not
+    // specifying "cursor" at all.
+    //
+    // We do not test for objsLeftInBatch() here, since the default batch size for this command
+    // is not specified.
+    cursor = getListCollectionsCursor({cursor: {}});
+    assert.eq(2, cursorCountMatching(cursor, function(c) { return c.name === "foo" ||
+                                                                  c.name === "bar"; }));
 
     //
     // Test for invalid values of "cursor" and "cursor.batchSize".
@@ -180,29 +175,24 @@
     // Test more than 2 batches of results.
     //
 
-    // TODO: When SERVER-20194 is done, we should be able to run this test regardless of whether we
-    // are using the find/getMore commands, both against a standalone server and passed through
-    // mongos.
-    if (!mydb.getMongo().useReadCommands()) {
-        assert.commandWorked(mydb.dropDatabase());
-        assert.commandWorked(mydb.createCollection("foo"));
-        assert.commandWorked(mydb.createCollection("bar"));
-        assert.commandWorked(mydb.createCollection("baz"));
-        assert.commandWorked(mydb.createCollection("quux"));
-        cursor = getListCollectionsCursor({cursor: {batchSize: 0}}, 2);
-        assert.eq(0, cursor.objsLeftInBatch());
-        assert(cursor.hasNext());
-        assert.eq(2, cursor.objsLeftInBatch());
-        cursor.next();
-        assert(cursor.hasNext());
-        assert.eq(1, cursor.objsLeftInBatch());
-        cursor.next();
-        assert(cursor.hasNext());
-        assert.eq(2, cursor.objsLeftInBatch());
-        cursor.next();
-        assert(cursor.hasNext());
-        assert.eq(1, cursor.objsLeftInBatch());
-    }
+    assert.commandWorked(mydb.dropDatabase());
+    assert.commandWorked(mydb.createCollection("foo"));
+    assert.commandWorked(mydb.createCollection("bar"));
+    assert.commandWorked(mydb.createCollection("baz"));
+    assert.commandWorked(mydb.createCollection("quux"));
+    cursor = getListCollectionsCursor({cursor: {batchSize: 0}}, 2);
+    assert.eq(0, cursor.objsLeftInBatch());
+    assert(cursor.hasNext());
+    assert.eq(2, cursor.objsLeftInBatch());
+    cursor.next();
+    assert(cursor.hasNext());
+    assert.eq(1, cursor.objsLeftInBatch());
+    cursor.next();
+    assert(cursor.hasNext());
+    assert.eq(2, cursor.objsLeftInBatch());
+    cursor.next();
+    assert(cursor.hasNext());
+    assert.eq(1, cursor.objsLeftInBatch());
 
     //
     // Test on non-existent database.
