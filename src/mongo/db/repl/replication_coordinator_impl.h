@@ -1301,6 +1301,11 @@ private:
     // Callback Handle used to cancel a scheduled PriorityTakover callback.
     ReplicationExecutor::CallbackHandle _priorityTakeoverCbh;  // (M)
 
+    // Callback handle used by waitForStartUpComplete() to block until configuration
+    // is loaded and external state threads have been started (unless this node is an arbiter).
+    // Used for testing only.
+    CallbackHandle _finishLoadLocalConfigCbh;  // (M)
+
     // The id of the earliest member, for which the handleLivenessTimeout callback has been
     // scheduled.  We need this so that we don't needlessly cancel and reschedule the callback on
     // every liveness update.

@@ -240,9 +240,16 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
 ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
 void ReplicationCoordinatorImpl::waitForStartUpComplete() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
-        _rsConfigStateChange.wait(lk);
+    CallbackHandle handle;
+    {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
+            _rsConfigStateChange.wait(lk);
+        }
+        handle = _finishLoadLocalConfigCbh;
+    }
+    if (handle.isValid()) {
+        _replExecutor.wait(handle);
     }
 }
 
@@ -302,12 +309,17 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
     // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
     // that the server's networking layer be up and running and accepting connections, which
     // doesn't happen until startReplication finishes.
-    _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
-                                          this,
-                                          stdx::placeholders::_1,
-                                          localConfig,
-                                          lastOpTimeStatus,
-                                          lastVote));
+    auto handle = _scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
+                                           this,
+                                           stdx::placeholders::_1,
+                                           localConfig,
+                                           lastOpTimeStatus,
+                                           lastVote));
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _finishLoadLocalConfigCbh = handle;
+    }
+
     return false;
 }
 
