@@ -256,7 +256,7 @@ __log_get_files(WT_SESSION_IMPL *session,
  */
 int
 __wt_log_get_all_files(WT_SESSION_IMPL *session,
-    char ***filesp, u_int *countp, uint32_t *maxid, int active_only)
+    char ***filesp, u_int *countp, uint32_t *maxid, bool active_only)
 {
 	WT_DECL_RET;
 	WT_LOG *log;

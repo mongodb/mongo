@@ -627,14 +627,14 @@ dup_json_string(const char *str, char **result)
 
 	nchars = 0;
 	for (p = str; *p; p++, nchars++)
-		nchars += __wt_json_unpack_char(*p, NULL, 0, 0);
+		nchars += __wt_json_unpack_char(*p, NULL, 0, false);
 	q = malloc(nchars + 1);
 	if (q == NULL)
 		return (1);
 	*result = q;
 	left = nchars;
 	for (p = str; *p; p++, nchars++) {
-		nchars = __wt_json_unpack_char(*p, (u_char *)q, left, 0);
+		nchars = __wt_json_unpack_char(*p, (u_char *)q, left, false);
 		left -= nchars;
 		q += nchars;
 	}

@@ -393,7 +393,7 @@ err:	API_END_RET(session, ret);
  */
 int
 __wt_curfile_create(WT_SESSION_IMPL *session,
-    WT_CURSOR *owner, const char *cfg[], int bulk, int bitmap,
+    WT_CURSOR *owner, const char *cfg[], bool bulk, bool bitmap,
     WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
@@ -489,20 +489,20 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	int bitmap, bulk;
 	uint32_t flags;
+	bool bitmap, bulk;
 
-	bitmap = bulk = 0;
+	bitmap = bulk = false;
 	flags = 0;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "bulk", 0, &cval));
 	if (cval.type == WT_CONFIG_ITEM_BOOL ||
 	    (cval.type == WT_CONFIG_ITEM_NUM &&
 	    (cval.val == 0 || cval.val == 1))) {
-		bitmap = 0;
-		bulk = (cval.val != 0);
+		bitmap = false;
+		bulk = cval.val != 0;
 	} else if (WT_STRING_MATCH("bitmap", cval.str, cval.len))
-		bitmap = bulk = 1;
+		bitmap = bulk = true;
 		/*
 		 * Unordered bulk insert is a special case used internally by
 		 * index creation on existing tables. It doesn't enforce

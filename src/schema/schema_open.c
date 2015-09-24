@@ -105,7 +105,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		    session, buf->data, buf->size, &table->plan));
 	}
 
-	table->cg_complete = 1;
+	table->cg_complete = true;
 
 err:	__wt_scr_free(session, &buf);
 	__wt_schema_destroy_colgroup(session, &colgroup);
@@ -374,7 +374,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 	/* If we did a full pass, we won't need to do it again. */
 	if (idxname == NULL) {
 		table->nindices = i;
-		table->idx_complete = 1;
+		table->idx_complete = true;
 	}
 
 err:	__wt_scr_free(session, &tmp);
@@ -448,9 +448,9 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	 * are not named.
 	 */
 	WT_ERR(__wt_config_subinit(session, &cparser, &table->colconf));
-	table->is_simple = 1;
+	table->is_simple = true;
 	while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
-		table->is_simple = 0;
+		table->is_simple = false;
 	if (ret != WT_NOTFOUND)
 		goto err;
 

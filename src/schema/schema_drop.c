@@ -64,7 +64,7 @@ __drop_colgroup(
 	/* If we can get the colgroup, detach it from the table. */
 	if ((ret = __wt_schema_get_colgroup(
 	    session, uri, force, &table, &colgroup)) == 0) {
-		table->cg_complete = 0;
+		table->cg_complete = false;
 		WT_TRET(__wt_schema_drop(session, colgroup->source, cfg));
 	}
 
@@ -87,7 +87,7 @@ __drop_index(
 	/* If we can get the colgroup, detach it from the table. */
 	if ((ret = __wt_schema_get_index(
 	    session, uri, force, &table, &idx)) == 0) {
-		table->idx_complete = 0;
+		table->idx_complete = false;
 		WT_TRET(__wt_schema_drop(session, idx->source, cfg));
 	}
 
