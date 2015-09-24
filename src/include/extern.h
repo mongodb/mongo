@@ -401,10 +401,10 @@ extern int __wt_lsm_tree_chunk_name(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_t
 extern int __wt_lsm_tree_set_chunk_size( WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_tree_setup_chunk( WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_tree_setup_bloom( WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk);
-extern int __wt_lsm_tree_create(WT_SESSION_IMPL *session, const char *uri, int exclusive, const char *config);
-extern int __wt_lsm_tree_get(WT_SESSION_IMPL *session, const char *uri, int exclusive, WT_LSM_TREE **treep);
+extern int __wt_lsm_tree_create(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config);
+extern int __wt_lsm_tree_get(WT_SESSION_IMPL *session, const char *uri, bool exclusive, WT_LSM_TREE **treep);
 extern void __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
-extern void __wt_lsm_tree_throttle( WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int decrease_only);
+extern void __wt_lsm_tree_throttle( WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool decrease_only);
 extern int __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_tree_retire_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int start_chunk, u_int nchunks);
 extern int __wt_lsm_tree_drop( WT_SESSION_IMPL *session, const char *name, const char *cfg[]);
@@ -416,8 +416,8 @@ extern int __wt_lsm_tree_writelock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tr
 extern int __wt_lsm_tree_writeunlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp);
 extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session, const char *uri, int (*file_func)(WT_SESSION_IMPL *, const char *[]), int (*name_func)(WT_SESSION_IMPL *, const char *, bool *), const char *cfg[], uint32_t open_flags);
-extern int __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int force, WT_LSM_CHUNK **chunkp);
-extern int __wt_lsm_work_switch( WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT **entryp, int *ran);
+extern int __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, bool force, WT_LSM_CHUNK **chunkp);
+extern int __wt_lsm_work_switch( WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT **entryp, bool *ran);
 extern int __wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);

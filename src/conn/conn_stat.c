@@ -265,8 +265,8 @@ __statlog_lsm_apply(WT_SESSION_IMPL *session)
 			break;
 		for (p = S2C(session)->stat_sources; *p != NULL; ++p)
 			if (WT_PREFIX_MATCH(lsm_tree->name, *p)) {
-				WT_ERR(__wt_lsm_tree_get(
-				    session, lsm_tree->name, 0, &list[cnt++]));
+				WT_ERR(__wt_lsm_tree_get(session,
+				    lsm_tree->name, false, &list[cnt++]));
 				break;
 			}
 	}

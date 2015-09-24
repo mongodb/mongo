@@ -673,11 +673,11 @@ __wt_schema_create(
 	WT_CONFIG_ITEM cval;
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
-	int exclusive;
+	bool exclusive;
 
-	exclusive = (
+	exclusive =
 	    __wt_config_getones(session, config, "exclusive", &cval) == 0 &&
-	    cval.val != 0);
+	    cval.val != 0;
 
 	/*
 	 * We track create operations: if we fail in the middle of creating a
