@@ -37,6 +37,8 @@
 
 #include <wiredtiger.h>
 
+#define	RET_OK(ret)	((ret) == 0 || (ret) == WT_NOTFOUND)
+
 int add_extractor(WT_CONNECTION *conn);
 
 static const char *home;
@@ -144,28 +146,43 @@ read_index(WT_SESSION *session)
 	WT_CURSOR *cursor;
 	int i, ret;
 	char *first_name, *last_name;
-	uint16_t term_end, term_start, year;
+	uint16_t rec_year, term_end, term_start, year;
 
+	year = 0;
 	srand((unsigned int)getpid());
 	ret = session->open_cursor(
 	    session, "index:presidents:term", NULL, NULL, &cursor);
 	/*
 	 * Pick 10 random years and read the data.
 	 */
-	for (i = 0; i < 10; i++) {
+	for (i = 0; i < 10 && RET_OK(ret); i++) {
 		year = (uint16_t)((rand() % YEAR_SPAN) + YEAR_BASE);
+		printf("Year %d:\n", year);
 		cursor->set_key(cursor, year);
-		if ((ret = cursor->search(cursor)) == 0) {
+		if ((ret = cursor->search(cursor)) != 0)
+			break;
+		if ((ret = cursor->get_key(cursor, &rec_year)) != 0)
+			break;
+		if ((ret = cursor->get_value(cursor,
+		    &last_name, &first_name, &term_start, &term_end)) != 0)
+			break;
+
+		/* Report all presidents that served during the chosen year */
+		while (term_start <= year &&
+		    year <= term_end && year == rec_year) {
+			printf("\t%s %s\n", first_name, last_name);
+			if ((ret = cursor->next(cursor)) != 0)
+				break;
+			if ((ret = cursor->get_key(cursor, &rec_year)) != 0)
+				break;
 			if ((ret = cursor->get_value(cursor, &last_name,
 			    &first_name, &term_start, &term_end)) != 0)
 				break;
-			printf("Year %d: %s %s\n", year, first_name, last_name);
-			continue;
 		}
-
-		fprintf(stderr, "Error %d for year %d\n", ret, year);
-		break;
 	}
+	if (!RET_OK(ret))
+		fprintf(stderr, "Error %d for year %d\n", ret, year);
+
 	ret = cursor->close(cursor);
 	return (ret);
 }

@@ -322,6 +322,47 @@ __wt_schema_index_source(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __fill_index --
+ *	Fill the index from the current contents of the table.
+ */
+static int
+__fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
+{
+	WT_DECL_RET;
+	WT_CURSOR *tcur, *icur;
+	WT_SESSION *wt_session;
+
+	wt_session = &session->iface;
+	tcur = NULL;
+	icur = NULL;
+	WT_RET(__wt_schema_open_colgroups(session, table));
+
+	/*
+	 * If the column groups have not been completely created,
+	 * there cannot be data inserted yet, and we're done.
+	 */
+	if (!table->cg_complete)
+		return (0);
+
+	WT_ERR(wt_session->open_cursor(wt_session,
+	    idx->source, NULL, "bulk=unordered", &icur));
+	WT_ERR(wt_session->open_cursor(wt_session,
+	    table->name, NULL, "readonly", &tcur));
+
+	while ((ret = tcur->next(tcur)) == 0)
+		WT_ERR(__wt_apply_single_idx(session, idx,
+		    icur, (WT_CURSOR_TABLE *)tcur, icur->insert));
+
+	WT_ERR_NOTFOUND_OK(ret);
+err:
+	if (icur)
+		WT_TRET(icur->close(icur));
+	if (tcur)
+		WT_TRET(tcur->close(tcur));
+	return (ret);
+}
+
+/*
  * __create_index --
  *	Create an index.
  */
@@ -333,6 +374,7 @@ __create_index(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM ckey, cval, icols, kval;
 	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
+	WT_INDEX *idx;
 	WT_ITEM confbuf, extra_cols, fmt, namebuf;
 	WT_PACK pack;
 	WT_TABLE *table;
@@ -495,7 +537,9 @@ __create_index(WT_SESSION_IMPL *session,
 
 	/* Make sure that the configuration is valid. */
 	WT_ERR(__wt_schema_open_index(
-	    session, table, idxname, strlen(idxname), NULL));
+	    session, table, idxname, strlen(idxname), &idx));
+
+	WT_ERR(__fill_index(session, table, idx));
 
 err:	__wt_free(session, idxconf);
 	__wt_free(session, sourceconf);

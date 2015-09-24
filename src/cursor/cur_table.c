@@ -71,11 +71,13 @@ __curextract_insert(WT_CURSOR *cursor) {
 }
 
 /*
- * __apply_idx --
- *	Apply an operation to all indices of a table.
+ * __wt_apply_single_idx --
+ *	Apply an operation to a single index of a table.
  */
-static int
-__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, bool skip_immutable) {
+int
+__wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx,
+    WT_CURSOR *cur, WT_CURSOR_TABLE *ctable, int (*f)(WT_CURSOR *))
+{
 	WT_CURSOR_STATIC_INIT(iface,
 	    __wt_cursor_get_key,	/* get-key */
 	    __wt_cursor_get_value,	/* get-value */
@@ -93,11 +95,48 @@ __apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, bool skip_immutable) {
 	    __wt_cursor_notsup,		/* reconfigure */
 	    __wt_cursor_notsup,		/* remove */
 	    __wt_cursor_notsup);	/* close */
-	WT_CURSOR **cp;
 	WT_CURSOR_EXTRACTOR extract_cursor;
 	WT_DECL_RET;
-	WT_INDEX *idx;
 	WT_ITEM key, value;
+
+	if (idx->extractor) {
+		extract_cursor.iface = iface;
+		extract_cursor.iface.session = &session->iface;
+		extract_cursor.iface.key_format = idx->exkey_format;
+		extract_cursor.ctable = ctable;
+		extract_cursor.idxc = cur;
+		extract_cursor.f = f;
+
+		WT_RET(__wt_cursor_get_raw_key(&ctable->iface, &key));
+		WT_RET(__wt_cursor_get_raw_value(&ctable->iface, &value));
+		ret = idx->extractor->extract(idx->extractor,
+		    &session->iface, &key, &value,
+		    &extract_cursor.iface);
+
+		__wt_buf_free(session, &extract_cursor.iface.key);
+		WT_RET(ret);
+	} else {
+		WT_RET(__wt_schema_project_merge(session,
+		    ctable->cg_cursors,
+		    idx->key_plan, idx->key_format, &cur->key));
+		/*
+		 * The index key is now set and the value is empty
+		 * (it starts clear and is never set).
+		 */
+		F_SET(cur, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+		WT_RET(f(cur));
+	}
+	return (0);
+}
+
+/*
+ * __apply_idx --
+ *	Apply an operation to all indices of a table.
+ */
+static int
+__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, int skip_immutable) {
+	WT_CURSOR **cp;
+	WT_INDEX *idx;
 	WT_SESSION_IMPL *session;
 	int (*f)(WT_CURSOR *);
 	u_int i;
@@ -111,34 +150,7 @@ __apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, bool skip_immutable) {
 			continue;
 
 		f = *(int (**)(WT_CURSOR *))((uint8_t *)*cp + func_off);
-		if (idx->extractor) {
-			extract_cursor.iface = iface;
-			extract_cursor.iface.session = &session->iface;
-			extract_cursor.iface.key_format = idx->exkey_format;
-			extract_cursor.ctable = ctable;
-			extract_cursor.idxc = *cp;
-			extract_cursor.f = f;
-
-			WT_RET(__wt_cursor_get_raw_key(&ctable->iface, &key));
-			WT_RET(
-			    __wt_cursor_get_raw_value(&ctable->iface, &value));
-			ret = idx->extractor->extract(idx->extractor,
-			    &session->iface, &key, &value,
-			    &extract_cursor.iface);
-
-			__wt_buf_free(session, &extract_cursor.iface.key);
-			WT_RET(ret);
-		} else {
-			WT_RET(__wt_schema_project_merge(session,
-			    ctable->cg_cursors,
-			    idx->key_plan, idx->key_format, &(*cp)->key));
-			/*
-			 * The index key is now set and the value is empty
-			 * (it starts clear and is never set).
-			 */
-			F_SET(*cp, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
-			WT_RET(f(*cp));
-		}
+		WT_RET(__wt_apply_single_idx(session, idx, *cp, ctable, f));
 		WT_RET((*cp)->reset(*cp));
 	}
 
@@ -711,12 +723,13 @@ __curtable_close(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	for (i = 0, cp = ctable->cg_cursors;
-	    i < WT_COLGROUPS(ctable->table); i++, cp++)
-		if (*cp != NULL) {
-			WT_TRET((*cp)->close(*cp));
-			*cp = NULL;
-		}
+	if (ctable->cg_cursors != NULL)
+		for (i = 0, cp = ctable->cg_cursors;
+		     i < WT_COLGROUPS(ctable->table); i++, cp++)
+			if (*cp != NULL) {
+				WT_TRET((*cp)->close(*cp));
+				*cp = NULL;
+			}
 
 	if (ctable->idx_cursors != NULL)
 		for (i = 0, cp = ctable->idx_cursors;

@@ -519,7 +519,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		 */
 		__wt_txn_release_snapshot(session);
 		ret = __wt_txn_log_commit(session, cfg);
-		WT_ASSERT(session, ret == 0);
 	}
 
 	/*
