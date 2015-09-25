@@ -283,11 +283,13 @@ err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
  *	Check if a page matches the criteria for forced eviction.
  */
 static int
-__evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+__evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_BTREE *btree;
+	WT_PAGE *page;
 
 	btree = S2BT(session);
+	page = ref->page;
 
 	/* Pages are usually small enough, check that first. */
 	if (page->memory_footprint < btree->maxmempage)
@@ -311,7 +313,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_txn_update_oldest(session, false);
 
 	/* If eviction cannot succeed, don't try. */
-	return (__wt_page_can_evict(session, page, true, NULL));
+	return (__wt_page_can_evict(session, ref, true, NULL));
 }
 
 /*
@@ -524,9 +526,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			/*
 			 * Forcibly evict pages that are too big.
 			 */
-			page = ref->page;
 			if (force_attempts < 10 &&
-			    __evict_force_check(session, page)) {
+			    __evict_force_check(session, ref)) {
 				++force_attempts;
 				ret = __wt_page_release_evict(session, ref);
 				/* If forced eviction fails, stall. */
@@ -556,6 +557,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 			 *
 			 * Otherwise, update the page's read generation.
 			 */
+			page = ref->page;
 			if (oldgen && page->read_gen == WT_READGEN_NOTSET)
 				__wt_page_evict_soon(page);
 			else if (!LF_ISSET(WT_READ_NO_GEN) &&
