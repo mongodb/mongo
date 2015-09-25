@@ -92,6 +92,10 @@ bool gFirstRuntimeCreated = false;
 
 MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL MozJSImplScope* kCurrentScope;
 
+#ifndef _MSC_EXTENSIONS
+const std::size_t MozJSImplScope::kMaxStackBytes;
+#endif  // _MSC_EXTENSIONS
+
 struct MozJSImplScope::MozJSEntry {
     MozJSEntry(MozJSImplScope* scope) : ar(scope->_context), ac(scope->_context, scope->_global) {}
 
@@ -213,6 +217,10 @@ MozJSImplScope::MozRuntime::MozRuntime() {
         }
 
         _runtime = JS_NewRuntime(kMaxBytesBeforeGC);
+
+        static_assert(kMaxStackBytes > (16 * 1024), "kMaxStackBytes must be larger than 16k");
+
+        JS_SetNativeStackQuota(_runtime, kMaxStackBytes - (16 * 1024));
     }
 
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSRuntime", _runtime);
