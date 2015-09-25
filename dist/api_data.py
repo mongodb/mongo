@@ -271,9 +271,10 @@ file_config = format_meta + [
         leaf pages''',
         min=0),
     Config('split_deepen_min_child', '0', r'''
-        minimum entries in a page to consider deepening the tree. Once
-        there are more than this many entries pages will be immediately
-        considered for splitting''',
+        minimum entries in a page to consider deepening the tree. Pages
+        will be considered for splitting and deepening the search tree
+        as soon as there are more than the configured number of children
+        ''',
         type='int', undoc=True),
     Config('split_deepen_per_child', '0', r'''
         entries allocated per child when deepening the tree''',
