@@ -2,10 +2,6 @@ selector:
   js_test:
     roots:
     - jstests/noPassthrough/*.js
-    exclude_files:
-    # wt_nojournal_toggle.js temporarily disabled due to intermittent failures that are currently
-    # undergoing investigation.  TODO: Re-enable as part of SERVER-20617 work.
-    - jstests/noPassthrough/wt_nojournal_toggle.js
 
 # noPassthrough tests start their own mongod's.
 executor:
