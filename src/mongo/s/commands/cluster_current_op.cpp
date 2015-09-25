@@ -51,7 +51,6 @@ const char kOpIdFieldName[] = "opid";
 const char kClientFieldName[] = "client";
 // awkward underscores used to make this visually distinct from kClientFieldName
 const char kClient_S_FieldName[] = "client_s";
-const char kLegacyInprogCollection[] = "$cmd.sys.inprog";
 
 const char kCommandName[] = "currentOp";
 
@@ -70,64 +69,6 @@ public:
             ResourcePattern::forClusterResource(), ActionType::inprog);
 
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
-    }
-
-    // TODO remove after 3.2
-    BSONObj specialErrorHandler(const std::string& server,
-                                const std::string& db,
-                                const BSONObj& cmdObj,
-                                const BSONObj& originalResult) const final {
-        // it is unfortunate that this logic needs to be duplicated from
-        // DBClientWithCommands::runPseudoCommand
-        // but I don't see a better way to do it without performing heart surgery on
-        // Future/CommandResponse.
-
-        auto status = getStatusFromCommandResult(originalResult);
-        invariant(!status.isOK());
-
-        uassert(28629,
-                str::stream() << "Received bad " << kCommandName << " response from server "
-                              << server << " got: " << originalResult,
-                status != ErrorCodes::CommandResultSchemaViolation);
-
-        // getStatusFromCommandResult handles cooercing "no such command" into the right
-        // Status type
-        if (status == ErrorCodes::CommandNotFound) {
-            // fall back to the old inprog pseudo-command
-            NamespaceString pseudoCommandNss("admin", kLegacyInprogCollection);
-            BSONObj legacyResult;
-
-            BSONObjBuilder legacyCommandBob;
-
-            // need to exclude {currentOp: 1}
-            for (auto&& cmdElem : cmdObj) {
-                if (cmdElem.fieldNameStringData() != kCommandName) {
-                    legacyCommandBob.append(cmdElem);
-                }
-            }
-            auto legacyCommand = legacyCommandBob.done();
-
-            try {
-                ScopedDbConnection conn(server);
-                legacyResult = conn->findOne(pseudoCommandNss.ns(), legacyCommand);
-
-            } catch (const DBException& ex) {
-                // If there is a non-DBException exception the entire operation will be
-                // terminated, as that would be a programmer error.
-
-                // We convert the exception to a BSONObj so that the ordinary
-                // failure path for RunOnAllShardsCommand will handle the failure
-
-                // TODO: consider adding an exceptionToBSONObj utility?
-                BSONObjBuilder b;
-                b.append("errmsg", ex.toString());
-                b.append("code", ex.getCode());
-                return b.obj();
-            }
-            return legacyResult;
-        }
-        // if the command failed for another reason then we don't retry it.
-        return originalResult;
     }
 
     void aggregateResults(const std::vector<ShardAndReply>& results, BSONObjBuilder& output) final {

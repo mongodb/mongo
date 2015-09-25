@@ -41,6 +41,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -114,12 +115,9 @@ public:
         result.append("shardid", opId);
 
         ScopedDbConnection conn(shard->getConnString());
-        BSONObj cmdRes;
-        BSONObjBuilder argsBob;
-        argsBob.append("op", opId);
-        auto args = argsBob.done();
         // intentionally ignore return value - that is how legacy killOp worked.
-        conn->runPseudoCommand("admin", "killOp", "$cmd.sys.killop", args, cmdRes);
+        conn->runCommandWithMetadata(
+            "admin", "killOp", rpc::makeEmptyMetadata(), BSON("killOp" << 1 << "op" << opId));
         conn.done();
 
         // The original behavior of killOp on mongos is to always return success, regardless of
