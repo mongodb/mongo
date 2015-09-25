@@ -116,9 +116,9 @@ bool isMongos() {
     return false;
 }
 
-ShardingState::ShardingState() : _configServerTickets(kMaxConfigServerRefreshThreads) {
-    _initializationState.store(uint64_t(InitializationState::kUninitialized));
-}
+ShardingState::ShardingState()
+    : _initializationState(static_cast<uint32_t>(InitializationState::kUninitialized)),
+      _configServerTickets(kMaxConfigServerRefreshThreads) {}
 
 ShardingState::~ShardingState() = default;
 
@@ -131,7 +131,11 @@ ShardingState* ShardingState::get(OperationContext* operationContext) {
 }
 
 InitializationState ShardingState::_getInitializationState() const {
-    return InitializationState(_initializationState.load());
+    return static_cast<InitializationState>(_initializationState.load());
+}
+
+void ShardingState::_setInitializationState_inlock(InitializationState newState) {
+    _initializationState.store(static_cast<uint32_t>(newState));
 }
 
 bool ShardingState::enabled() const {
@@ -171,7 +175,7 @@ void ShardingState::initialize(OperationContext* txn, const string& server) {
     }
 
     invariant(_getInitializationState() == InitializationState::kUninitialized);
-    _initializationState.store(uint64_t(InitializationState::kInitializing));
+    _setInitializationState_inlock(InitializationState::kInitializing);
 
     ShardedConnectionInfo::addHook();
     ReplicaSetMonitor::setSynchronousConfigChangeHook(
@@ -188,8 +192,23 @@ void ShardingState::initialize(OperationContext* txn, const string& server) {
 
     invariant(_getInitializationState() == InitializationState::kInitializing);
     _updateConfigServerOpTimeFromMetadata_inlock(txn);
-    _initializationState.store(uint64_t(InitializationState::kInitialized));
+    _setInitializationState_inlock(InitializationState::kInitialized);
     _initializationFinishedCondition.notify_all();
+}
+
+void ShardingState::shutDown(OperationContext* txn) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (_getInitializationState() == InitializationState::kUninitialized) {
+        return;
+    }
+    while (_getInitializationState() == InitializationState::kInitializing) {
+        _initializationFinishedCondition.wait(lk);
+    }
+    invariant(_getInitializationState() == InitializationState::kInitialized);
+    auto catalogMgr = grid.catalogManager(txn);
+    if (catalogMgr) {
+        catalogMgr->shutDown(txn);
+    }
 }
 
 void ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* txn) {

@@ -80,6 +80,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/sharded_connection_info.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -1261,10 +1262,7 @@ void exitCleanly(ExitCode code) {
         txn = uniqueTxn.get();
     }
 
-    auto catalogMgr = grid.catalogManager(txn);
-    if (catalogMgr) {
-        catalogMgr->shutDown(txn);
-    }
+    ShardingState::get(txn)->shutDown(txn);
 
     // We should always be able to acquire the global lock at shutdown.
     //

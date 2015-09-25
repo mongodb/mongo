@@ -56,7 +56,7 @@ namespace repl {
 class OpTime;
 }  // namespace repl
 
-enum class InitializationState : uint64_t {
+enum class InitializationState : uint32_t {
     kUninitialized,
     kInitializing,
     kInitialized,
@@ -98,11 +98,16 @@ public:
     }
 
     /**
-     * Initialize sharding state and begin authenticating outgoing connections and handling shard
+     * Initializes sharding state and begins authenticating outgoing connections and handling shard
      * versions. If this is not run before sharded operations occur auth will not work and versions
      * will not be tracked.
      */
     void initialize(OperationContext* txn, const std::string& server);
+
+    /**
+     * Shuts down sharding machinery on the shard.
+     */
+    void shutDown(OperationContext* txn);
 
     /**
      * Updates the ShardRegistry's stored notion of the config server optime based on the
@@ -334,6 +339,8 @@ private:
 
     InitializationState _getInitializationState() const;
 
+    void _setInitializationState_inlock(InitializationState newState);
+
     // Manages the state of the migration donor shard
     MigrationSourceManager _migrationSourceManager;
 
@@ -343,7 +350,7 @@ private:
     // Protects state below
     stdx::mutex _mutex;
 
-    AtomicUInt64 _initializationState;
+    AtomicUInt32 _initializationState;
 
     // Signaled when ::initialize finishes.
     stdx::condition_variable _initializationFinishedCondition;
