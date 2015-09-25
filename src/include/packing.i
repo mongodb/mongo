@@ -42,7 +42,7 @@ typedef struct {
 	WT_CONFIG config;
 	char buf[20];
 	int count;
-	int iskey;
+	bool iskey;
 	int genname;
 } WT_PACK_NAME;
 
@@ -82,7 +82,7 @@ __pack_init(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt)
  */
 static inline int
 __pack_name_init(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *names,
-    int iskey, WT_PACK_NAME *pn)
+    bool iskey, WT_PACK_NAME *pn)
 {
 	WT_CLEAR(*pn);
 	pn->iskey = iskey;

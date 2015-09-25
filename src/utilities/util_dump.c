@@ -8,7 +8,7 @@
 
 #include "util.h"
 
-static int dump_config(WT_SESSION *, const char *, int);
+static int dump_config(WT_SESSION *, const char *, bool);
 static int dump_json_begin(WT_SESSION *);
 static int dump_json_end(WT_SESSION *);
 static int dump_json_separator(WT_SESSION *);
@@ -18,8 +18,8 @@ static int dump_json_table_cg(
     WT_SESSION *, WT_CURSOR *, const char *, const char *, const char *);
 static int dump_json_table_config(WT_SESSION *, const char *);
 static int dump_json_table_end(WT_SESSION *);
-static int dump_prefix(WT_SESSION *, int);
-static int dump_record(WT_CURSOR *, int, int);
+static int dump_prefix(WT_SESSION *, bool);
+static int dump_record(WT_CURSOR *, bool, bool);
 static int dump_suffix(WT_SESSION *);
 static int dump_table_config(WT_SESSION *, WT_CURSOR *, const char *);
 static int dump_table_config_type(
@@ -34,10 +34,11 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	size_t len;
-	int ch, hex, i, json, reverse;
+	int ch, i;
+	bool hex, json, reverse;
 	char *checkpoint, *config, *name;
 
-	hex = json = reverse = 0;
+	hex = json = reverse = false;
 	checkpoint = config = name = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "c:f:jrx")) != EOF)
 		switch (ch) {
@@ -50,13 +51,13 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 				    session, errno, "%s: reopen", __wt_optarg));
 			break;
 		case 'j':
-			json = 1;
+			json = true;
 			break;
 		case 'r':
-			reverse = 1;
+			reverse = true;
 			break;
 		case 'x':
-			hex = 1;
+			hex = true;
 			break;
 		case '?':
 		default:
@@ -141,7 +142,7 @@ err:		ret = 1;
  *	Dump the config for the uri.
  */
 static int
-dump_config(WT_SESSION *session, const char *uri, int hex)
+dump_config(WT_SESSION *session, const char *uri, bool hex)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -270,13 +271,14 @@ static int
 dump_json_table_cg(WT_SESSION *session, WT_CURSOR *cursor,
     const char *name, const char *entry, const char *header)
 {
-	WT_DECL_RET;
-	const char *key, *skip, *value;
-	int exact, once;
-	char *jsonconfig;
 	static const char * const indent = "                ";
+	WT_DECL_RET;
+	int exact;
+	bool once;
+	const char *key, *skip, *value;
+	char *jsonconfig;
 
-	once = 0;
+	once = false;
 	if (printf("            \"%s\" : [", header) < 0)
 		return (util_err(session, EIO, NULL));
 
@@ -328,15 +330,15 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
 		    "%s    \"uri\" : \"%s\",\n"
 		    "%s    \"config\" : \"%s\"\n"
 		    "%s}",
-		    (once == 0 ? "" : ","),
+		    once ? "," : "",
 		    indent, indent, key, indent, jsonconfig, indent);
 		free(jsonconfig);
 		if (ret < 0)
 			return (util_err(session, EIO, NULL));
 
-		once = 1;
+		once = true;
 	}
-	if (printf("%s]", (once == 0 ? "" : "\n            ")) < 0)
+	if (printf("%s]", once ? "\n            " : "") < 0)
 		return (util_err(session, EIO, NULL));
 	if (ret == 0 || ret == WT_NOTFOUND)
 		return (0);
@@ -544,7 +546,7 @@ match:		if ((ret = cursor->get_key(cursor, &key)) != 0)
  *	Output the dump file header prefix.
  */
 static int
-dump_prefix(WT_SESSION *session, int hex)
+dump_prefix(WT_SESSION *session, bool hex)
 {
 	int vmajor, vminor, vpatch;
 
@@ -565,16 +567,16 @@ dump_prefix(WT_SESSION *session, int hex)
  *	with JSON formatting if needed.
  */
 static int
-dump_record(WT_CURSOR *cursor, int reverse, int json)
+dump_record(WT_CURSOR *cursor, bool reverse, bool json)
 {
 	WT_DECL_RET;
 	WT_SESSION *session;
 	const char *infix, *key, *prefix, *suffix, *value;
-	int once;
+	bool once;
 
 	session = cursor->session;
 
-	once = 0;
+	once = false;
 	if (json) {
 		prefix = "\n{\n";
 		infix = ",\n";
@@ -590,10 +592,10 @@ dump_record(WT_CURSOR *cursor, int reverse, int json)
 			return (util_cerr(cursor, "get_key", ret));
 		if ((ret = cursor->get_value(cursor, &value)) != 0)
 			return (util_cerr(cursor, "get_value", ret));
-		if (printf("%s%s%s%s%s%s", (json && once) ? "," : "",
+		if (printf("%s%s%s%s%s%s", json && once ? "," : "",
 		    prefix, key, infix, value, suffix) < 0)
 			return (util_err(session, EIO, NULL));
-		once = 1;
+		once = true;
 	}
 	if (json && once && printf("\n") < 0)
 		return (util_err(session, EIO, NULL));
@@ -627,14 +629,14 @@ dup_json_string(const char *str, char **result)
 
 	nchars = 0;
 	for (p = str; *p; p++, nchars++)
-		nchars += __wt_json_unpack_char(*p, NULL, 0, 0);
+		nchars += __wt_json_unpack_char(*p, NULL, 0, false);
 	q = malloc(nchars + 1);
 	if (q == NULL)
 		return (1);
 	*result = q;
 	left = nchars;
 	for (p = str; *p; p++, nchars++) {
-		nchars = __wt_json_unpack_char(*p, (u_char *)q, left, 0);
+		nchars = __wt_json_unpack_char(*p, (u_char *)q, left, false);
 		left -= nchars;
 		q += nchars;
 	}

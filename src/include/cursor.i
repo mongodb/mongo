@@ -178,7 +178,7 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
  *	Cursor call setup.
  */
 static inline int
-__cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
+__cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 {
 	WT_SESSION_IMPL *session;
 

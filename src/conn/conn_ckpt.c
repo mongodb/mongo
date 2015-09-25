@@ -131,7 +131,7 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 	F_SET(conn, WT_CONN_SERVER_CHECKPOINT);
 	/* The checkpoint server gets its own session. */
 	WT_RET(__wt_open_internal_session(
-	    conn, "checkpoint-server", 1, 1, &conn->ckpt_session));
+	    conn, "checkpoint-server", true, true, &conn->ckpt_session));
 	session = conn->ckpt_session;
 
 	/*
@@ -140,8 +140,8 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 	 */
 	F_SET(session, WT_SESSION_CAN_WAIT);
 
-	WT_RET(
-	    __wt_cond_alloc(session, "checkpoint server", 0, &conn->ckpt_cond));
+	WT_RET(__wt_cond_alloc(
+	    session, "checkpoint server", false, &conn->ckpt_cond));
 
 	/*
 	 * Start the thread.
@@ -164,7 +164,7 @@ __wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
 	bool start;
 
 	conn = S2C(session);
-	start = 0;
+	start = false;
 
 	/* If there is already a server running, shut it down. */
 	if (conn->ckpt_session != NULL)

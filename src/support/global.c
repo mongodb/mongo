@@ -19,10 +19,10 @@ static int
 __system_is_little_endian(void)
 {
 	uint64_t v;
-	int little;
+	bool little;
 
 	v = 1;
-	little = *((uint8_t *)&v) == 0 ? 0 : 1;
+	little = *((uint8_t *)&v) != 0;
 
 	if (little)
 		return (0);
@@ -74,7 +74,7 @@ __wt_global_once(void)
 int
 __wt_library_init(void)
 {
-	static int first = 1;
+	static bool first = true;
 	WT_DECL_RET;
 
 	/*
@@ -86,7 +86,7 @@ __wt_library_init(void)
 	if (first) {
 		if ((ret = __wt_once(__wt_global_once)) != 0)
 			__wt_pthread_once_failed = ret;
-		first = 0;
+		first = false;
 	}
 	return (__wt_pthread_once_failed);
 }

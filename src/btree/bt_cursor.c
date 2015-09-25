@@ -325,7 +325,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		valid = cbt->compare == 0 && __cursor_valid(cbt, &upd);
 	}
 	if (!valid) {
-		WT_ERR(__cursor_func_init(cbt, 1));
+		WT_ERR(__cursor_func_init(cbt, true));
 
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, false) :
@@ -413,7 +413,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 			valid = __cursor_valid(cbt, &upd);
 	}
 	if (!valid) {
-		WT_ERR(__cursor_func_init(cbt, 1));
+		WT_ERR(__cursor_func_init(cbt, true));
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, true) :
 		    __cursor_col_search(session, cbt, NULL));
@@ -500,7 +500,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 		__wt_btree_evictable(session, true);
 	}
 
-retry:	WT_RET(__cursor_func_init(cbt, 1));
+retry:	WT_RET(__cursor_func_init(cbt, true));
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -612,7 +612,7 @@ __wt_btcur_update_check(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-retry:	WT_RET(__cursor_func_init(cbt, 1));
+retry:	WT_RET(__cursor_func_init(cbt, true));
 
 	switch (btree->type) {
 	case BTREE_ROW:
@@ -662,7 +662,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 
-retry:	WT_RET(__cursor_func_init(cbt, 1));
+retry:	WT_RET(__cursor_func_init(cbt, true));
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -761,7 +761,7 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 		__wt_btree_evictable(session, true);
 	}
 
-retry:	WT_RET(__cursor_func_init(cbt, 1));
+retry:	WT_RET(__cursor_func_init(cbt, true));
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -847,7 +847,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
-	WT_RET(__cursor_func_init(cbt, 1));
+	WT_RET(__cursor_func_init(cbt, true));
 
 	WT_WITH_PAGE_INDEX(session,
 	    ret = __wt_row_random(session, cbt));
