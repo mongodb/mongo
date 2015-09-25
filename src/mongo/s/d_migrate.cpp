@@ -436,8 +436,9 @@ void logOpForSharding(OperationContext* txn,
                       const BSONObj& obj,
                       BSONObj* patt,
                       bool notInActiveChunk) {
-    ShardingState::get(txn)->migrationSourceManager()->logOp(
-        txn, opstr, ns, obj, patt, notInActiveChunk);
+    ShardingState* shardingState = ShardingState::get(txn);
+    if (shardingState->enabled())
+        shardingState->migrationSourceManager()->logOp(txn, opstr, ns, obj, patt, notInActiveChunk);
 }
 
 }  // namespace mongo

@@ -116,9 +116,9 @@ bool isMongos() {
     return false;
 }
 
-ShardingState::ShardingState()
-    : _initializationState(InitializationState::kUninitialized),
-      _configServerTickets(kMaxConfigServerRefreshThreads) {}
+ShardingState::ShardingState() : _configServerTickets(kMaxConfigServerRefreshThreads) {
+    _initializationState.store(uint64_t(InitializationState::kUninitialized));
+}
 
 ShardingState::~ShardingState() = default;
 
@@ -130,22 +130,23 @@ ShardingState* ShardingState::get(OperationContext* operationContext) {
     return ShardingState::get(operationContext->getServiceContext());
 }
 
-bool ShardingState::enabled() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _initializationState == InitializationState::kInitialized;
+InitializationState ShardingState::_getInitializationState() const {
+    return InitializationState(_initializationState.load());
+}
+
+bool ShardingState::enabled() const {
+    return _getInitializationState() == InitializationState::kInitialized;
 }
 
 ConnectionString ShardingState::getConfigServer(OperationContext* txn) {
+    invariant(enabled());
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(_initializationState == InitializationState::kInitialized);
-
     return grid.shardRegistry()->getConfigServerConnectionString();
 }
 
 string ShardingState::getShardName() {
+    invariant(enabled());
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(_initializationState == InitializationState::kInitialized);
-
     return _shardName;
 }
 
@@ -154,24 +155,23 @@ void ShardingState::initialize(OperationContext* txn, const string& server) {
             "Unable to obtain host name during sharding initialization.",
             !getHostName().empty());
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-    if (_initializationState == InitializationState::kInitialized) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);  // Take mutex before enabled check to avoid race
+    if (enabled()) {
         // TODO: Do we need to throw exception if the config servers have changed from what we
         // already have in place? How do we test for that?
         return;
     }
 
-    if (_initializationState == InitializationState::kInitializing) {
-        while (_initializationState == InitializationState::kInitializing) {
+    if (_getInitializationState() == InitializationState::kInitializing) {
+        while (_getInitializationState() == InitializationState::kInitializing) {
             _initializationFinishedCondition.wait(lk);
         }
-        invariant(_initializationState == InitializationState::kInitialized);
+        invariant(_getInitializationState() == InitializationState::kInitialized);
         return;
     }
 
-    invariant(_initializationState == InitializationState::kUninitialized);
-    _initializationState = InitializationState::kInitializing;
+    invariant(_getInitializationState() == InitializationState::kUninitialized);
+    _initializationState.store(uint64_t(InitializationState::kInitializing));
 
     ShardedConnectionInfo::addHook();
     ReplicaSetMonitor::setSynchronousConfigChangeHook(
@@ -186,15 +186,15 @@ void ShardingState::initialize(OperationContext* txn, const string& server) {
 
     lk.lock();
 
-    invariant(_initializationState == InitializationState::kInitializing);
+    invariant(_getInitializationState() == InitializationState::kInitializing);
     _updateConfigServerOpTimeFromMetadata_inlock(txn);
-    _initializationState = InitializationState::kInitialized;
+    _initializationState.store(uint64_t(InitializationState::kInitialized));
     _initializationFinishedCondition.notify_all();
 }
 
 void ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* txn) {
+    invariant(enabled());
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    invariant(_initializationState == InitializationState::kInitialized);
 
     _updateConfigServerOpTimeFromMetadata_inlock(txn);
 }
@@ -540,10 +540,8 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
     shared_ptr<CollectionMetadata> beforeMetadata;
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-
         // We can't reload if sharding is not enabled - i.e. without a config server location
-        if (_initializationState != InitializationState::kInitialized) {
+        if (!enabled()) {
             string errMsg = str::stream() << "cannot refresh metadata for " << ns
                                           << " before sharding has been enabled";
 
@@ -551,6 +549,7 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
             return Status(ErrorCodes::NotYetInitialized, errMsg);
         }
 
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         // We also can't reload if a shard name has not yet been set.
         if (_shardName.empty()) {
             string errMsg = str::stream() << "cannot refresh metadata for " << ns
@@ -662,16 +661,16 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
         // Get the metadata now that the load has completed
         //
 
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-
         // Don't reload if our config server has changed or sharding is no longer enabled
-        if (_initializationState != InitializationState::kInitialized) {
+        if (!enabled()) {
             string errMsg = str::stream() << "could not refresh metadata for " << ns
                                           << ", sharding is no longer enabled";
 
             warning() << errMsg;
             return Status(ErrorCodes::NotYetInitialized, errMsg);
         }
+
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         CollectionMetadataMap::iterator it = _collMetadata.find(ns);
         if (it != _collMetadata.end())
@@ -803,13 +802,12 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
 }
 
 void ShardingState::appendInfo(OperationContext* txn, BSONObjBuilder& builder) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    bool enabled = _initializationState == InitializationState::kInitialized;
-    builder.appendBool("enabled", enabled);
-    if (!enabled) {
+    const bool isEnabled = enabled();
+    builder.appendBool("enabled", isEnabled);
+    if (!isEnabled)
         return;
-    }
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     builder.append("configServer",
                    grid.shardRegistry()->getConfigServerConnectionString().toString());
@@ -829,7 +827,7 @@ void ShardingState::appendInfo(OperationContext* txn, BSONObjBuilder& builder) {
 bool ShardingState::needCollectionMetadata(OperationContext* txn, const string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    if (_initializationState != InitializationState::kInitialized)
+    if (!enabled())
         return false;
 
     Client* client = txn->getClient();

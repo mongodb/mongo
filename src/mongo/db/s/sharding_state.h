@@ -56,6 +56,12 @@ namespace repl {
 class OpTime;
 }  // namespace repl
 
+enum class InitializationState : uint64_t {
+    kUninitialized,
+    kInitializing,
+    kInitialized,
+};
+
 /**
  * Represents the sharding state for the running instance. One per instance.
  */
@@ -77,7 +83,7 @@ public:
     static ShardingState* get(ServiceContext* serviceContext);
     static ShardingState* get(OperationContext* operationContext);
 
-    bool enabled();
+    bool enabled() const;
 
     ConnectionString getConfigServer(OperationContext* txn);
 
@@ -326,6 +332,8 @@ private:
 
     void _updateConfigServerOpTimeFromMetadata_inlock(OperationContext* txn);
 
+    InitializationState _getInitializationState() const;
+
     // Manages the state of the migration donor shard
     MigrationSourceManager _migrationSourceManager;
 
@@ -335,13 +343,7 @@ private:
     // Protects state below
     stdx::mutex _mutex;
 
-    enum class InitializationState {
-        kUninitialized,
-        kInitializing,
-        kInitialized,
-    };
-
-    InitializationState _initializationState;
+    AtomicUInt64 _initializationState;
 
     // Signaled when ::initialize finishes.
     stdx::condition_variable _initializationFinishedCondition;
