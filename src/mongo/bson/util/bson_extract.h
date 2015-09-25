@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -186,5 +187,29 @@ Status bsonExtractOIDFieldWithDefault(const BSONObj& object,
                                       StringData fieldName,
                                       const OID& defaultValue,
                                       OID* out);
+
+/**
+ * Finds an element named "fieldName" in "object" that represents an integral value for which
+ * 'pred' is true.
+ *
+ * If a field named "fieldName" is present and is a value of numeric type with an exact 64-bit
+ * integer representation, returns that representation in *out and returns Status::OK().
+ * If there is no field named "fieldName", stores defaultValue into *out and returns Status::OK().
+ * If the field is found, but has non-numeric type, returns ErrorCodes::TypeMismatch.
+ * If the value has numeric type, but cannot be represented as a 64-bit integer, returns BadValue.
+ * If the parsed value (or default) fails the predicate, returns ErrorCodes::BadValue.
+ */
+Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
+                                            StringData fieldName,
+                                            long long defaultValue,
+                                            stdx::function<bool(long long)> pred,
+                                            const std::string& predDescription,
+                                            long long* out);
+
+Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
+                                            StringData fieldName,
+                                            long long defaultValue,
+                                            stdx::function<bool(long long)> pred,
+                                            long long* out);
 
 }  // namespace mongo

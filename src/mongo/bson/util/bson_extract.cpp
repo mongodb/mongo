@@ -196,4 +196,31 @@ Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
     return status;
 }
 
+Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
+                                            StringData fieldName,
+                                            long long defaultValue,
+                                            stdx::function<bool(long long)> pred,
+                                            const std::string& predDescription,
+                                            long long* out) {
+    auto status = bsonExtractIntegerFieldWithDefault(object, fieldName, defaultValue, out);
+    if (!status.isOK()) {
+        return status;
+    }
+    if (!pred(*out)) {
+        return Status(ErrorCodes::BadValue,
+                      mongoutils::str::stream() << "Invalid value in field \"" << fieldName
+                                                << "\": " << *out << ": " << predDescription);
+    }
+    return Status::OK();
+}
+
+Status bsonExtractIntegerFieldWithDefaultIf(const BSONObj& object,
+                                            StringData fieldName,
+                                            long long defaultValue,
+                                            stdx::function<bool(long long)> pred,
+                                            long long* out) {
+    return bsonExtractIntegerFieldWithDefaultIf(
+        object, fieldName, defaultValue, pred, "constraint failed", out);
+}
+
 }  // namespace mongo

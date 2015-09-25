@@ -25,12 +25,14 @@
  *    then also delete it in the license file.
  */
 
+#include <functional>
 #include <limits>
 #include <string>
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;
@@ -163,4 +165,13 @@ TEST(ExtractBSON, ExtractIntegerField) {
     ASSERT_EQUALS(-(1LL << 55), v);
     ASSERT_OK(bsonExtractIntegerField(BSON("a" << 5178), "a", &v));
     ASSERT_EQUALS(5178, v);
+    auto pred = stdx::bind(std::greater<long long>(), stdx::placeholders::_1, 0);
+    ASSERT_OK(bsonExtractIntegerFieldWithDefaultIf(BSON("a" << 1), "a", -1LL, pred, &v));
+    ASSERT_OK(bsonExtractIntegerFieldWithDefaultIf(BSON("a" << 1), "b", 1LL, pred, &v));
+    auto msg = "'a' has to be greater than zero";
+    auto status = bsonExtractIntegerFieldWithDefaultIf(BSON("a" << -1), "a", 1LL, pred, msg, &v);
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(), msg);
+    ASSERT_EQUALS(ErrorCodes::BadValue,
+                  bsonExtractIntegerFieldWithDefaultIf(BSON("a" << 1), "b", -1LL, pred, &v));
 }
