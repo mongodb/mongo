@@ -580,30 +580,30 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
  */
 static int
 __config_getraw(
-    WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value, int top)
+    WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value, bool top)
 {
 	WT_CONFIG sparser;
 	WT_CONFIG_ITEM k, v, subk;
 	WT_DECL_RET;
-	int found;
+	bool found;
 
-	found = 0;
+	found = false;
 	while ((ret = __config_next(cparser, &k, &v)) == 0) {
 		if (k.type != WT_CONFIG_ITEM_STRING &&
 		    k.type != WT_CONFIG_ITEM_ID)
 			continue;
 		if (k.len == key->len && strncmp(key->str, k.str, k.len) == 0) {
 			*value = v;
-			found = 1;
+			found = true;
 		} else if (k.len < key->len && key->str[k.len] == '.' &&
 		    strncmp(key->str, k.str, k.len) == 0) {
 			subk.str = key->str + k.len + 1;
 			subk.len = (key->len - k.len) - 1;
 			WT_RET(__wt_config_initn(
 			    cparser->session, &sparser, v.str, v.len));
-			if ((ret =
-			    __config_getraw(&sparser, &subk, value, 0)) == 0)
-				found = 1;
+			if ((ret = __config_getraw(
+			    &sparser, &subk, value, false)) == 0)
+				found = true;
 			WT_RET_NOTFOUND_OK(ret);
 		}
 	}
@@ -640,7 +640,7 @@ __wt_config_get(WT_SESSION_IMPL *session,
 		--cfg;
 
 		WT_RET(__wt_config_init(session, &cparser, *cfg));
-		if ((ret = __config_getraw(&cparser, key, value, 1)) == 0)
+		if ((ret = __config_getraw(&cparser, key, value, true)) == 0)
 			return (0);
 		WT_RET_NOTFOUND_OK(ret);
 	} while (cfg != cfg_arg);
@@ -689,7 +689,7 @@ __wt_config_getone(WT_SESSION_IMPL *session,
 	WT_CONFIG cparser;
 
 	WT_RET(__wt_config_init(session, &cparser, config));
-	return (__config_getraw(&cparser, key, value, 1));
+	return (__config_getraw(&cparser, key, value, true));
 }
 
 /*
@@ -705,7 +705,7 @@ __wt_config_getones(WT_SESSION_IMPL *session,
 	    { key, strlen(key), 0, WT_CONFIG_ITEM_STRING };
 
 	WT_RET(__wt_config_init(session, &cparser, config));
-	return (__config_getraw(&cparser, &key_item, value, 1));
+	return (__config_getraw(&cparser, &key_item, value, true));
 }
 
 /*
@@ -765,7 +765,7 @@ __wt_config_subgetraw(WT_SESSION_IMPL *session,
 	WT_CONFIG cparser;
 
 	WT_RET(__wt_config_initn(session, &cparser, cfg->str, cfg->len));
-	return (__config_getraw(&cparser, key, value, 1));
+	return (__config_getraw(&cparser, key, value, true));
 }
 
 /*

@@ -74,7 +74,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(
 	    session, &conn->lsm_manager.switch_lock, "LSM switch queue lock"));
 	WT_RET(__wt_cond_alloc(
-	    session, "LSM worker cond", 0, &conn->lsm_manager.work_cond));
+	    session, "LSM worker cond", false, &conn->lsm_manager.work_cond));
 
 	/*
 	 * Generation numbers.

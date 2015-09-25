@@ -83,7 +83,8 @@ config_check(WT_SESSION_IMPL *session,
 	WT_CONFIG parser, cparser, sparser;
 	WT_CONFIG_ITEM k, v, ck, cv, dummy;
 	WT_DECL_RET;
-	int badtype, found, i;
+	int i;
+	bool badtype, found;
 
 	/*
 	 * The config_len parameter is optional, and allows passing in strings
@@ -105,27 +106,26 @@ config_check(WT_SESSION_IMPL *session,
 		    session, checks, checks_entries, k.str, k.len, &i));
 
 		if (strcmp(checks[i].type, "boolean") == 0) {
-			badtype = (v.type != WT_CONFIG_ITEM_BOOL &&
+			badtype = v.type != WT_CONFIG_ITEM_BOOL &&
 			    (v.type != WT_CONFIG_ITEM_NUM ||
-			    (v.val != 0 && v.val != 1)));
+			    (v.val != 0 && v.val != 1));
 		} else if (strcmp(checks[i].type, "category") == 0) {
 			/* Deal with categories of the form: XXX=(XXX=blah). */
 			ret = config_check(session,
 			    checks[i].subconfigs, checks[i].subconfigs_entries,
 			    k.str + strlen(checks[i].name) + 1, v.len);
 			if (ret != EINVAL)
-				badtype = 0;
+				badtype = false;
 			else
-				badtype = 1;
+				badtype = true;
 		} else if (strcmp(checks[i].type, "format") == 0) {
-			badtype = 0;
+			badtype = false;
 		} else if (strcmp(checks[i].type, "int") == 0) {
-			badtype = (v.type != WT_CONFIG_ITEM_NUM);
+			badtype = v.type != WT_CONFIG_ITEM_NUM;
 		} else if (strcmp(checks[i].type, "list") == 0) {
-			badtype = (v.len > 0 &&
-			    v.type != WT_CONFIG_ITEM_STRUCT);
+			badtype = v.len > 0 && v.type != WT_CONFIG_ITEM_STRUCT;
 		} else if (strcmp(checks[i].type, "string") == 0) {
-			badtype = 0;
+			badtype = false;
 		} else
 			WT_RET_MSG(session, EINVAL,
 			    "unknown configuration type: '%s'",
@@ -171,18 +171,18 @@ config_check(WT_SESSION_IMPL *session,
 					 */
 					WT_RET(__wt_config_subinit(session,
 					    &sparser, &v));
-					found = 1;
+					found = true;
 					while (found &&
 					    (ret = __wt_config_next(&sparser,
 					    &v, &dummy)) == 0) {
 						ret = __wt_config_subgetraw(
 						    session, &cv, &v, &dummy);
-						found = (ret == 0);
+						found = ret == 0;
 					}
 				} else  {
 					ret = __wt_config_subgetraw(session,
 					    &cv, &v, &dummy);
-					found = (ret == 0);
+					found = ret == 0;
 				}
 
 				if (ret != 0 && ret != WT_NOTFOUND)

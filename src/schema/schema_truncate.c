@@ -55,7 +55,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_TABLE *table;
 	u_int i;
 
-	WT_RET(__wt_schema_get_table(session, uri, strlen(uri), 0, &table));
+	WT_RET(__wt_schema_get_table(session, uri, strlen(uri), false, &table));
 
 	/* Truncate the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++)

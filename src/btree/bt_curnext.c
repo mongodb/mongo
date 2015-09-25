@@ -452,7 +452,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 	if (truncating)
 		LF_SET(WT_READ_TRUNCATE);
 
-	WT_RET(__cursor_func_init(cbt, 0));
+	WT_RET(__cursor_func_init(cbt, false));
 
 	/*
 	 * If we aren't already iterating in the right direction, there's

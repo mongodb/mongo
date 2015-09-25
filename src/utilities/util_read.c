@@ -16,7 +16,8 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	uint64_t recno;
-	int ch, rkey, rval;
+	int ch;
+	bool rkey, rval;
 	const char *uri, *value;
 
 	while ((ch = __wt_getopt(progname, argc, argv, "")) != EOF)
@@ -51,7 +52,7 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 		    progname);
 		return (1);
 	}
-	rkey = strcmp(cursor->key_format, "r") == 0 ? 1 : 0;
+	rkey = strcmp(cursor->key_format, "r") == 0;
 	if (strcmp(cursor->value_format, "S") != 0) {
 		fprintf(stderr,
 		    "%s: read command only possible when the value format is "
@@ -64,7 +65,7 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 	 * Run through the keys, returning non-zero on error or if any requested
 	 * key isn't found.
 	 */
-	for (rval = 0; *++argv != NULL;) {
+	for (rval = false; *++argv != NULL;) {
 		if (rkey) {
 			if (util_str2recno(session, *argv, &recno))
 				return (1);
@@ -81,14 +82,14 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 			break;
 		case WT_NOTFOUND:
 			(void)util_err(session, 0, "%s: not found", *argv);
-			rval = 1;
+			rval = true;
 			break;
 		default:
 			return (util_cerr(cursor, "search", ret));
 		}
 	}
 
-	return (rval);
+	return (rval ? 1 : 0);
 }
 
 static int

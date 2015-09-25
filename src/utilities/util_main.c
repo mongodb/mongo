@@ -12,7 +12,7 @@ const char *home = ".";				/* Home directory */
 const char *progname;				/* Program name */
 						/* Global arguments */
 const char *usage_prefix = "[-LRVv] [-C config] [-E secretkey] [-h home]";
-int verbose;					/* Verbose flag */
+bool verbose = false;				/* Verbose flag */
 
 static const char *command;			/* Command name */
 
@@ -30,7 +30,7 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	size_t len;
 	int ch, major_v, minor_v, tret, (*func)(WT_SESSION *, int, char *[]);
-	int logoff, recover;
+	bool logoff, recover;
 	char *p, *secretkey;
 	const char *cmd_config, *config, *p1, *p2, *p3, *rec_config;
 
@@ -66,7 +66,7 @@ main(int argc, char *argv[])
 	 * needed, the user can specify -R to run recovery.
 	 */
 	rec_config = REC_ERROR;
-	logoff = recover = 0;
+	logoff = recover = false;
 	/* Check for standard options. */
 	while ((ch = __wt_getopt(progname, argc, argv, "C:E:h:LRVv")) != EOF)
 		switch (ch) {
@@ -85,17 +85,17 @@ main(int argc, char *argv[])
 			break;
 		case 'L':			/* no logging */
 			rec_config = REC_LOGOFF;
-			logoff = 1;
+			logoff = true;
 			break;
 		case 'R':			/* recovery */
 			rec_config = REC_RECOVER;
-			recover = 1;
+			recover = true;
 			break;
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
 			return (EXIT_SUCCESS);
 		case 'v':			/* verbose */
-			verbose = 1;
+			verbose = true;
 			break;
 		case '?':
 		default:

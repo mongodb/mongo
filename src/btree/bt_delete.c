@@ -126,7 +126,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	 * future reconciliation of the child leaf page that will dirty it as
 	 * we write the tree.
 	 */
-	WT_ERR(__wt_page_parent_modify_set(session, ref, 0));
+	WT_ERR(__wt_page_parent_modify_set(session, ref, false));
 
 	/*
 	 * Record the change in the transaction structure and set the change's

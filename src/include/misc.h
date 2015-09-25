@@ -168,14 +168,14 @@
  */
 #define	WT_BINARY_SEARCH(key, arrayp, n, found) do {			\
 	uint32_t __base, __indx, __limit;				\
-	found = 0;							\
+	found = false;							\
 	for (__base = 0, __limit = (n); __limit != 0; __limit >>= 1) {	\
 		__indx = __base + (__limit >> 1);			\
 		if ((arrayp)[__indx] < key) {				\
 			__base = __indx + 1;				\
 			--__limit;					\
 		} else if ((arrayp)[__indx] == key) {			\
-			found = 1;					\
+			found = true;					\
 			break;						\
 		}							\
 	}								\
