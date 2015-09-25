@@ -235,6 +235,14 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell)
 	bm = btree->bm;
 	unpack = &_unpack;
 
+	/*
+	 * Eviction cannot free overflow items once a checkpoint is running in
+	 * a tree: that can corrupt the checkpoint's block management.  We
+	 * check for this in eviction, assert it here to make sure we're
+	 * catching all paths and to avoid regressions.
+	 */
+	WT_ASSERT(session, btree->checkpointing != WT_CKPT_RUNNING);
+
 	__wt_cell_unpack(cell, unpack);
 
 	/*

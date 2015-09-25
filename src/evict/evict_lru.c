@@ -1008,7 +1008,8 @@ retry:	while (slot < max_entries && ret == 0) {
 		 * Also skip files that are checkpointing or configured to
 		 * stick in cache until we get aggressive.
 		 */
-		if ((btree->checkpointing || btree->evict_priority != 0) &&
+		if ((btree->checkpointing != WT_CKPT_OFF ||
+		    btree->evict_priority != 0) &&
 		    !FLD_ISSET(cache->state, WT_EVICT_PASS_AGGRESSIVE))
 			continue;
 
