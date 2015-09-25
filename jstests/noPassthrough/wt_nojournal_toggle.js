@@ -6,7 +6,7 @@
     'use strict';
 
     // Skip this test if not running with the "wiredTiger" storage engine.
-    if (jsTest.options().storageEngine && jsTest.options().storageEngine !== 'wiredTiger') {
+    if (jsTest.options().storageEngine !== 'wiredTiger') {
         jsTest.log('Skipping test because storageEngine is not "wiredTiger"');
         return;
     }
