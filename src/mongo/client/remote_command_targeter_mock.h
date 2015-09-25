@@ -42,7 +42,8 @@ public:
     /**
      * Shortcut for unit-tests.
      */
-    static RemoteCommandTargeterMock* get(RemoteCommandTargeter* targeter);
+    static std::shared_ptr<RemoteCommandTargeterMock> get(
+        std::shared_ptr<RemoteCommandTargeter> targeter);
 
     /**
      * Returns the value last set by setConnectionStringReturnValue.

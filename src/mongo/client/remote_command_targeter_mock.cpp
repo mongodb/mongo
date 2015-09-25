@@ -40,8 +40,9 @@ RemoteCommandTargeterMock::RemoteCommandTargeterMock()
 
 RemoteCommandTargeterMock::~RemoteCommandTargeterMock() = default;
 
-RemoteCommandTargeterMock* RemoteCommandTargeterMock::get(RemoteCommandTargeter* targeter) {
-    auto mock = dynamic_cast<RemoteCommandTargeterMock*>(targeter);
+std::shared_ptr<RemoteCommandTargeterMock> RemoteCommandTargeterMock::get(
+    std::shared_ptr<RemoteCommandTargeter> targeter) {
+    auto mock = std::dynamic_pointer_cast<RemoteCommandTargeterMock>(targeter);
     invariant(mock);
 
     return mock;

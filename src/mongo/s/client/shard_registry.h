@@ -287,11 +287,12 @@ private:
                                                         const BSONObj& cmdObj,
                                                         const BSONObj& metadata);
 
-    StatusWith<CommandResponse> _runCommandWithNotMasterRetries(executor::TaskExecutor* executor,
-                                                                RemoteCommandTargeter* targeter,
-                                                                const std::string& dbname,
-                                                                const BSONObj& cmdObj,
-                                                                const BSONObj& metadata);
+    StatusWith<CommandResponse> _runCommandWithNotMasterRetries(
+        executor::TaskExecutor* executor,
+        const std::shared_ptr<RemoteCommandTargeter>& targeter,
+        const std::string& dbname,
+        const BSONObj& cmdObj,
+        const BSONObj& metadata);
 
     // Factory to obtain remote command targeters for shards
     const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;

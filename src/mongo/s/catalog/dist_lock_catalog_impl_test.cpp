@@ -87,7 +87,7 @@ public:
         _networkTestEnv->onFindCommand(func);
     }
 
-    RemoteCommandTargeterMock* targeter() {
+    std::shared_ptr<RemoteCommandTargeterMock> targeter() {
         return RemoteCommandTargeterMock::get(_shardRegistry->getConfigShard()->getTargeter());
     }
 

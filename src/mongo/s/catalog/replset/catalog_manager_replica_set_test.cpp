@@ -1925,7 +1925,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
 
     setupShards(vector<ShardType>{shard});
 
-    RemoteCommandTargeterMock* shardTargeter = RemoteCommandTargeterMock::get(
+    auto shardTargeter = RemoteCommandTargeterMock::get(
         shardRegistry()->getShard(operationContext(), "shard0")->getTargeter());
     shardTargeter->setFindHostReturnValue(HostAndPort("shard0:12"));
 

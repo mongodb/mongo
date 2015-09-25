@@ -60,7 +60,7 @@ public:
 
     ~Shard();
 
-    const ShardId& getId() const {
+    const ShardId getId() const {
         return _id;
     }
 
@@ -69,12 +69,12 @@ public:
      */
     bool isConfig() const;
 
-    const ConnectionString& getConnString() const {
+    const ConnectionString getConnString() const {
         return _cs;
     }
 
-    RemoteCommandTargeter* getTargeter() const {
-        return _targeter.get();
+    std::shared_ptr<RemoteCommandTargeter> getTargeter() const {
+        return _targeter;
     }
 
     /**
@@ -96,7 +96,7 @@ private:
     /**
      * Targeter for obtaining hosts from which to read or to which to write.
      */
-    const std::unique_ptr<RemoteCommandTargeter> _targeter;
+    const std::shared_ptr<RemoteCommandTargeter> _targeter;
 };
 
 }  // namespace mongo

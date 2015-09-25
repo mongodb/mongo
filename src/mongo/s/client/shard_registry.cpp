@@ -180,7 +180,8 @@ void ShardRegistry::remove(const ShardId& id) {
         shared_ptr<Shard> s = i.second;
         if (s->getId() == id) {
             entriesToRemove.insert(i.first);
-            for (const auto& host : s->getConnString().getServers()) {
+            ConnectionString connStr = s->getConnString();
+            for (const auto& host : connStr.getServers()) {
                 entriesToRemove.insert(host.toString());
             }
         }
@@ -480,7 +481,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationConte
 
 StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMasterRetries(
     TaskExecutor* executor,
-    RemoteCommandTargeter* targeter,
+    const std::shared_ptr<RemoteCommandTargeter>& targeter,
     const std::string& dbname,
     const BSONObj& cmdObj,
     const BSONObj& metadata) {
