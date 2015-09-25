@@ -186,12 +186,6 @@ public:
     void advanceConfigOpTime(repl::OpTime opTime);
 
     /**
-     * Sets the stored opTime to the last known visible opTime if it is greater than the currently
-     * stored opTime.
-     */
-    void advanceToVisibleConfigOpTime();
-
-    /**
      * Returns the last known OpTime of the config servers.
      */
     repl::OpTime getConfigOpTime();
@@ -265,7 +259,6 @@ private:
     struct CommandResponse {
         BSONObj response;
         BSONObj metadata;
-        repl::OpTime committedOpTime;
         repl::OpTime visibleOpTime;
     };
 
@@ -290,11 +283,6 @@ private:
      * advanceConfigOpTime.
      */
     Status _advanceConfigOpTimeFromMetadata(const BSONObj& metadata);
-
-    /**
-     * Update the last known config visible opTime if the given one is newer.
-     */
-    void _advanceCommittedAndVisibleConfigOpTime(const CommandResponse& response);
 
     /**
      * Runs a command against the specified host and returns the result.  It is the responsibility

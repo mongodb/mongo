@@ -888,15 +888,6 @@ void CatalogManagerReplicaSet::writeConfigServerDirect(OperationContext* txn,
                              str::stream() << "Failed to parse config server response: " << errmsg),
                       batchResponse);
     }
-
-    if (batchResponse->isErrDetailsSet()) {
-        // Workaround for SERVER-20487.
-        // If the last write of the batch was an error, assume that the error was caused by
-        // a conflict in write (for example unique key index violation). The next read
-        // should use the uncommitted latest opTime so it will be able to see it (assuming
-        // the write actually gets committed).
-        grid.shardRegistry()->advanceToVisibleConfigOpTime();
-    }
 }
 
 Status CatalogManagerReplicaSet::_checkDbDoesNotExist(OperationContext* txn,

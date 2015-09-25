@@ -323,26 +323,6 @@ void ShardRegistry::advanceConfigOpTime(OpTime opTime) {
     }
 }
 
-void ShardRegistry::_advanceCommittedAndVisibleConfigOpTime(const CommandResponse& response) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    if (_configOpTime < response.committedOpTime) {
-        _configOpTime = response.committedOpTime;
-    }
-
-    if (_configVisibleOpTime < response.visibleOpTime) {
-        _configVisibleOpTime = response.visibleOpTime;
-    }
-}
-
-void ShardRegistry::advanceToVisibleConfigOpTime() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    if (_configOpTime < _configVisibleOpTime) {
-        _configOpTime = _configVisibleOpTime;
-    }
-}
-
 OpTime ShardRegistry::getConfigOpTime() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _configOpTime;
@@ -380,7 +360,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfigNo
                 return;
             }
 
-            response.opTime = replParseStatus.getValue().getLastOpCommitted();
+            response.opTime = replParseStatus.getValue().getLastOpVisible();
         }
 
         for (const BSONObj& doc : data.documents) {
@@ -481,7 +461,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(const HostAndPort& host,
         return response.getStatus();
     }
 
-    _advanceCommittedAndVisibleConfigOpTime(response.getValue());
+    advanceConfigOpTime(response.getValue().visibleOpTime);
     return response.getValue().response;
 }
 
@@ -495,7 +475,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(const 
         return response.getStatus();
     }
 
-    _advanceCommittedAndVisibleConfigOpTime(response.getValue());
+    advanceConfigOpTime(response.getValue().visibleOpTime);
     return response.getValue().response;
 }
 
@@ -606,7 +586,6 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
         }
 
         const auto& replMetadata = replParseStatus.getValue();
-        cmdResponse.committedOpTime = replMetadata.getLastOpCommitted();
         cmdResponse.visibleOpTime = replMetadata.getLastOpVisible();
     }
 
