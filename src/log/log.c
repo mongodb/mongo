@@ -1984,7 +1984,7 @@ __wt_log_flush(WT_SESSION_IMPL *session, uint32_t flags)
 	 */
 	WT_RET(__wt_log_flush_lsn(session, &lsn, 0));
 	last_lsn = log->alloc_lsn;
-	lsn = log->write_lsn;
+
 	/*
 	 * Wait until all current outstanding writes have been written
 	 * to the file system.
