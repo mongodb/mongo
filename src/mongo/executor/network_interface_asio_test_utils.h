@@ -70,6 +70,11 @@ public:
         return _get(_state.get());
     }
 
+    bool hasCompleted() {
+        stdx::unique_lock<stdx::mutex> lk(_state->mtx);
+        return _state->thing.is_initialized();
+    }
+
     template <typename Continuation>
     auto then(ThreadPoolInterface* pool, Continuation&& continuation)
         -> Deferred<decltype(continuation(std::declval<Deferred<T>>().get()))> {

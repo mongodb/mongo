@@ -41,7 +41,6 @@
 #include "mongo/executor/network_interface_asio_test_utils.h"
 #include "mongo/executor/test_network_connection_hook.h"
 #include "mongo/rpc/legacy_reply_builder.h"
-#include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
@@ -88,6 +87,26 @@ public:
         }
     }
 
+    Deferred<StatusWith<RemoteCommandResponse>> startCommand(
+        const TaskExecutor::CallbackHandle& cbHandle, const RemoteCommandRequest& request) {
+        Deferred<StatusWith<RemoteCommandResponse>> deferredResponse;
+        net().startCommand(cbHandle,
+                           request,
+                           [deferredResponse](StatusWith<RemoteCommandResponse> response) mutable {
+                               deferredResponse.emplace(std::move(response));
+                           });
+        return deferredResponse;
+    }
+
+    // Helper to run startCommand and wait for it
+    StatusWith<RemoteCommandResponse> startCommandSync(const RemoteCommandRequest& request) {
+        auto deferred = startCommand(makeCallbackHandle(), request);
+
+        // wait for the operation to complete
+        auto& result = deferred.get();
+        return result;
+    }
+
     NetworkInterfaceASIO& net() {
         return *_net;
     }
@@ -114,14 +133,9 @@ TEST_F(NetworkInterfaceASIOTest, CancelMissingOperation) {
 TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
     auto cbh = makeCallbackHandle();
 
-    stdx::promise<bool> canceled;
-
     // Kick off our operation
-    net().startCommand(cbh,
-                       RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()),
-                       [&canceled](StatusWith<RemoteCommandResponse> response) {
-                           canceled.set_value(response == ErrorCodes::CallbackCanceled);
-                       });
+    auto deferred =
+        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
 
     // Create and initialize a stream so operation can begin
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -141,22 +155,15 @@ TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
     }
 
     // Wait for op to complete, assert that it was canceled.
-    auto canceledFuture = canceled.get_future();
-    ASSERT(canceledFuture.get());
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::CallbackCanceled);
 }
 
 TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
-    stdx::promise<bool> timedOut;
-    auto timedOutFuture = timedOut.get_future();
-
     // Kick off operation
     auto cb = makeCallbackHandle();
     Milliseconds timeout(1000);
-    net().startCommand(cb,
-                       {testHost, "testDB", BSON("a" << 1), BSONObj(), timeout},
-                       [&timedOut](StatusWith<RemoteCommandResponse> response) {
-                           timedOut.set_value(response == ErrorCodes::ExceededTimeLimit);
-                       });
+    auto deferred = startCommand(cb, {testHost, "testDB", BSON("a" << 1), BSONObj(), timeout});
 
     // Create and initialize a stream so operation can begin
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -176,36 +183,20 @@ TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
 
         // Advance clock but not enough to force a timeout, assert still active
         factory.fastForward(Milliseconds(500));
-        ASSERT(timedOutFuture.wait_for(Milliseconds(1)) == stdx::future_status::timeout);
+        ASSERT(!deferred.hasCompleted());
 
         // Advance clock and force timeout
         factory.fastForward(Milliseconds(800));
     }
-    ASSERT(timedOutFuture.get());
+
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::ExceededTimeLimit);
 }
 
 TEST_F(NetworkInterfaceASIOTest, StartCommand) {
-    auto cb = makeCallbackHandle();
-
-    HostAndPort testHost{"localhost", 20000};
-
-    stdx::promise<RemoteCommandResponse> prom{};
-
-    bool callbackCalled = false;
-
-    net().startCommand(cb,
-                       RemoteCommandRequest(testHost, "testDB", BSON("foo" << 1), BSON("bar" << 1)),
-                       [&](StatusWith<RemoteCommandResponse> resp) {
-                           callbackCalled = true;
-
-                           try {
-                               prom.set_value(uassertStatusOK(resp));
-                           } catch (...) {
-                               prom.set_exception(std::current_exception());
-                           }
-                       });
-
-    auto fut = prom.get_future();
+    auto deferred =
+        startCommand(makeCallbackHandle(),
+                     RemoteCommandRequest(testHost, "testDB", BSON("foo" << 1), BSON("bar" << 1)));
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
 
@@ -236,11 +227,11 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
                                return response;
                            });
 
-    auto res = fut.get();
+    auto& res = deferred.get();
 
-    ASSERT(callbackCalled);
-    ASSERT_EQ(res.data, expectedCommandReply);
-    ASSERT_EQ(res.metadata, expectedMetadata);
+    auto response = uassertStatusOK(res);
+    ASSERT_EQ(response.data, expectedCommandReply);
+    ASSERT_EQ(response.metadata, expectedMetadata);
 }
 
 class NetworkInterfaceASIOConnectionHookTest : public NetworkInterfaceASIOTest {
@@ -284,19 +275,11 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
             return Status::OK();
         }));
 
-    stdx::promise<void> done;
-    bool statusCorrect = false;
-    auto doneFuture = done.get_future();
-
-    net().startCommand(makeCallbackHandle(),
-                       {testHost,
-                        "blah",
-                        BSON("foo"
-                             << "bar")},
-                       [&](StatusWith<RemoteCommandResponse> result) {
-                           statusCorrect = (result == validationFailedStatus);
-                           done.set_value();
-                       });
+    auto deferred = startCommand(makeCallbackHandle(),
+                                 {testHost,
+                                  "blah",
+                                  BSON("foo"
+                                       << "bar")});
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
 
@@ -314,8 +297,10 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
                            });
 
     // we should stop here.
-    doneFuture.get();
-    ASSERT(statusCorrect);
+    auto& res = deferred.get();
+
+    // auto result = uassertStatusOK(res);
+    ASSERT(res == validationFailedStatus);
     ASSERT(validateCalled);
     ASSERT(hostCorrect);
     ASSERT(isMasterReplyCorrect);
@@ -342,19 +327,11 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
             return Status::OK();
         }));
 
-    stdx::promise<void> done;
-    bool statusCorrect = false;
-    auto doneFuture = done.get_future();
-
-    net().startCommand(makeCallbackHandle(),
-                       {testHost,
-                        "blah",
-                        BSON("foo"
-                             << "bar")},
-                       [&](StatusWith<RemoteCommandResponse> result) {
-                           statusCorrect = (result == makeRequestError);
-                           done.set_value();
-                       });
+    auto deferred = startCommand(makeCallbackHandle(),
+                                 {testHost,
+                                  "blah",
+                                  BSON("foo"
+                                       << "bar")});
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
@@ -365,8 +342,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
                                -> RemoteCommandResponse { return simulateIsMaster(request); });
 
     // We should stop here.
-    doneFuture.get();
-    ASSERT(statusCorrect);
+    auto& res = deferred.get();
+
+    ASSERT(res == makeRequestError);
     ASSERT(makeRequestCalled);
     ASSERT(!handleReplyCalled);
 }
@@ -387,10 +365,6 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
             return Status::OK();
         }));
 
-    stdx::promise<void> done;
-    auto doneFuture = done.get_future();
-    bool statusCorrect = false;
-
     auto commandRequest = BSON("foo"
                                << "bar");
 
@@ -401,15 +375,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     auto metadata = BSON("aaa"
                          << "bbb");
 
-    net().startCommand(makeCallbackHandle(),
-                       {testHost, "blah", commandRequest},
-                       [&](StatusWith<RemoteCommandResponse> result) {
-                           statusCorrect =
-                               (result.isOK() && (result.getValue().data == commandReply) &&
-                                (result.getValue().metadata == metadata));
-                           done.set_value();
-                       });
-
+    auto deferred = startCommand(makeCallbackHandle(), {testHost, "blah", commandRequest});
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
@@ -431,8 +397,11 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
                            });
 
     // We should get back the reply now.
-    doneFuture.get();
-    ASSERT(statusCorrect);
+    auto& result = deferred.get();
+
+    ASSERT(result.isOK());
+    ASSERT(result.getValue().data == commandReply);
+    ASSERT(result.getValue().metadata == metadata);
 }
 
 TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
@@ -468,17 +437,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
             return handleReplyError;
         }));
 
-    stdx::promise<void> done;
-    auto doneFuture = done.get_future();
-    bool statusCorrect = false;
     auto commandRequest = BSON("foo"
                                << "bar");
-    net().startCommand(makeCallbackHandle(),
-                       {testHost, "blah", commandRequest},
-                       [&](StatusWith<RemoteCommandResponse> result) {
-                           statusCorrect = (result == handleReplyError);
-                           done.set_value();
-                       });
+    auto deferred = startCommand(makeCallbackHandle(), {testHost, "blah", commandRequest});
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
@@ -500,41 +461,38 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
                                return response;
                            });
 
-    doneFuture.get();
-    ASSERT(statusCorrect);
+    auto& result = deferred.get();
+
+    ASSERT(result == handleReplyError);
     ASSERT(makeRequestCalled);
     ASSERT(handleReplyCalled);
     ASSERT(handleReplyArgumentCorrect);
 }
 
 TEST_F(NetworkInterfaceASIOTest, setAlarm) {
-    stdx::promise<bool> nearFuture;
-    stdx::future<bool> executed = nearFuture.get_future();
-
     // set a first alarm, to execute after "expiration"
     Date_t expiration = net().now() + Milliseconds(100);
-    net().setAlarm(
-        expiration,
-        [this, expiration, &nearFuture]() { nearFuture.set_value(net().now() >= expiration); });
 
-    // wait enough time for first alarm to execute
-    auto status = executed.wait_for(Milliseconds(5000));
+    Deferred<Date_t> deferred;
+    net().setAlarm(expiration,
+                   [this, expiration, deferred]() mutable { deferred.emplace(net().now()); });
 
-    // assert that not only did it execute, but executed after "expiration"
-    ASSERT(status == stdx::future_status::ready);
-    ASSERT(executed.get());
+    // Get our timer factory
+    auto& factory = timerFactory();
 
-    // set an alarm for the future, kill interface, ensure it didn't execute
-    stdx::promise<bool> farFuture;
-    stdx::future<bool> executed2 = farFuture.get_future();
+    // force the alarm to fire
+    factory.fastForward(Milliseconds(5000));
+
+    // assert that it executed after "expiration"
+    auto& result = deferred.get();
+    ASSERT(result >= expiration);
 
     expiration = net().now() + Milliseconds(99999999);
-    net().setAlarm(expiration, [this, &farFuture]() { farFuture.set_value(true); });
+    Deferred<bool> deferred2;
+    net().setAlarm(expiration, [this, deferred2]() mutable { deferred2.emplace(true); });
 
     net().shutdown();
-
-    status = executed2.wait_for(Milliseconds(0));
-    ASSERT(status == stdx::future_status::timeout);
+    ASSERT(!deferred2.hasCompleted());
 }
 
 class NetworkInterfaceASIOMetadataTest : public NetworkInterfaceASIOTest {
@@ -579,11 +537,7 @@ TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
     bool gotReplyMetadata = false;
     start(stdx::make_unique<TestMetadataHook>(&wroteRequestMetadata, &gotReplyMetadata));
 
-    stdx::promise<void> done;
-
-    net().startCommand(makeCallbackHandle(),
-                       {testHost, "blah", BSON("ping" << 1)},
-                       [&](StatusWith<RemoteCommandResponse> result) { done.set_value(); });
+    auto deferred = startCommand(makeCallbackHandle(), {testHost, "blah", BSON("ping" << 1)});
 
     auto stream = streamFactory().blockUntilStreamExists(testHost);
     ConnectEvent{stream}.skip();
@@ -603,7 +557,8 @@ TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
                                                         << "garply");
                                return response;
                            });
-    done.get_future().get();
+
+    deferred.get();
     ASSERT(wroteRequestMetadata);
     ASSERT(gotReplyMetadata);
 }
