@@ -113,7 +113,7 @@ public:
      * the reference document is reset.
      */
     bool hasDataToFlush() const {
-        return !_referenceDoc.isEmpty() || _compressedChunkBuffer.len() > 0;
+        return !_referenceDoc.isEmpty();
     }
 
     /**
