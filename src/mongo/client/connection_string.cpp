@@ -53,19 +53,13 @@ ConnectionString::ConnectionString(ConnectionType type,
     _type = type;
     _setName = setName;
     _fillServers(s);
+    _finishInit();
+}
 
-    switch (_type) {
-        case MASTER:
-            verify(_servers.size() == 1);
-            break;
-        case SET:
-            verify(_setName.size());
-            verify(_servers.size() >= 1);  // 1 is ok since we can derive
-            break;
-        default:
-            verify(_servers.size() > 0);
-    }
-
+ConnectionString::ConnectionString(ConnectionType type,
+                                   std::vector<HostAndPort> servers,
+                                   const std::string& setName)
+    : _type(type), _servers(std::move(servers)), _setName(setName) {
     _finishInit();
 }
 
@@ -118,6 +112,18 @@ void ConnectionString::_fillServers(std::string s) {
 }
 
 void ConnectionString::_finishInit() {
+    switch (_type) {
+        case MASTER:
+            verify(_servers.size() == 1);
+            break;
+        case SET:
+            verify(_setName.size());
+            verify(_servers.size() >= 1);  // 1 is ok since we can derive
+            break;
+        default:
+            verify(_servers.size() > 0);
+    }
+
     // Needed here as well b/c the parsing logic isn't used in all constructors
     // TODO: Refactor so that the parsing logic *is* used in all constructors
     if (_type == MASTER && _servers.size() > 0) {

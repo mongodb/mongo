@@ -189,30 +189,40 @@ connect = function(url, user, pass) {
     if (0 == url.length) {
         throw Error("Empty connection string");
     }
-    var colon = url.lastIndexOf(":");
-    var slash = url.lastIndexOf("/");
-    if (0 == colon || 0 == slash) {
-        throw Error("Missing host name in connection string \"" + url + "\"");
-    }
-    if (colon == slash - 1 || colon == url.length - 1) {
-        throw Error("Missing port number in connection string \"" + url + "\"");
-    }
-    if (colon != -1 && colon < slash) {
-        var portNumber = url.substring(colon + 1, slash);
-        if (portNumber.length > 5 || !/^\d*$/.test(portNumber) || parseInt(portNumber) > 65535) {
-            throw Error("Invalid port number \"" + portNumber +
-                        "\" in connection string \"" + url + "\"");
+    if (!url.startsWith("mongodb://")) {
+        var colon = url.lastIndexOf(":");
+        var slash = url.lastIndexOf("/");
+        if (0 == colon || 0 == slash) {
+            throw Error("Missing host name in connection string \"" + url + "\"");
         }
-    }
-    if (slash == url.length - 1) {
-        throw Error("Missing database name in connection string \"" + url + "\"");
+        if (colon == slash - 1 || colon == url.length - 1) {
+            throw Error("Missing port number in connection string \"" + url + "\"");
+        }
+        if (colon != -1 && colon < slash) {
+            var portNumber = url.substring(colon + 1, slash);
+            if (portNumber.length > 5 ||
+                    !/^\d*$/.test(portNumber) ||
+                    parseInt(portNumber) > 65535) {
+                throw Error("Invalid port number \"" + portNumber +
+                            "\" in connection string \"" + url + "\"");
+            }
+        }
+        if (slash == url.length - 1) {
+            throw Error("Missing database name in connection string \"" + url + "\"");
+        }
     }
 
     chatty("connecting to: " + url)
     var db;
-    if (slash == -1)
+    if (url.startsWith("mongodb://")) {
+        db = new Mongo(url);
+        if (db.defaultDB.length == 0) {
+            throw Error("Missing database name in connection string \"" + url + "\"");
+        }
+        db = db.getDB(db.defaultDB);
+    } else if (slash == -1)
         db = new Mongo().getDB(url);
-    else 
+    else
         db = new Mongo(url.substring(0, slash)).getDB(url.substring(slash + 1));
 
     if (user && pass) {

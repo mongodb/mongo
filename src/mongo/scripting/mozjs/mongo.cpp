@@ -32,6 +32,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/global_conn_pool.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
@@ -604,10 +605,9 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
         host = ValueWriter(cx, args.get(0)).toString();
     }
 
-    auto statusWithHost = ConnectionString::parse(host);
+    auto statusWithHost = MongoURI::parse(host);
     uassertStatusOK(statusWithHost);
-
-    const ConnectionString cs(statusWithHost.getValue());
+    auto cs = statusWithHost.getValue();
 
     std::string errmsg;
     std::unique_ptr<DBClientBase> conn(cs.connect(errmsg));
@@ -624,6 +624,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     o.setBoolean(InternedString::slaveOk, false);
     o.setString(InternedString::host, host);
+    o.setString(InternedString::defaultDB, cs.getDatabase());
 
     args.rval().setObjectOrNull(thisv);
 }

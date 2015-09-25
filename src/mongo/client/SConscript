@@ -8,6 +8,7 @@ env.Library(
     target='connection_string',
     source=[
         'connection_string.cpp',
+        'mongo_uri.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/net/hostandport',
@@ -18,6 +19,7 @@ env.CppUnitTest(
     target='connection_string_test',
     source=[
         'connection_string_test.cpp',
+        'mongo_uri_test.cpp',
     ],
     LIBDEPS=[
         'connection_string',
@@ -120,6 +122,7 @@ env.Library(
     target='clientdriver',
     source=[
         'connection_string_connect.cpp',
+        'mongo_uri_connect.cpp',
         'connpool.cpp',
         'dbclient.cpp',
         'dbclient_rs.cpp',
