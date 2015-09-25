@@ -10,7 +10,7 @@
 
 static int __backup_all(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_cleanup_handles(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
-static int __backup_file_create(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, int);
+static int __backup_file_create(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, bool);
 static int __backup_list_all_append(WT_SESSION_IMPL *, const char *[]);
 static int __backup_list_append(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *);
@@ -18,7 +18,7 @@ static int __backup_start(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[]);
 static int __backup_stop(WT_SESSION_IMPL *);
 static int __backup_uri(
-    WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[], int *, int *);
+    WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[], bool *, bool *);
 
 /*
  * __curbackup_next --
@@ -158,7 +158,7 @@ err:		__wt_free(session, cb);
  *	Append log files needed for backup.
  */
 static int
-__backup_log_append(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, int active)
+__backup_log_append(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool active)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -191,7 +191,7 @@ __backup_start(
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	int exist, log_only, target_list;
+	bool exist, log_only, target_list;
 
 	conn = S2C(session);
 
@@ -222,7 +222,7 @@ __backup_start(
 	WT_ERR(__wt_writeunlock(session, conn->hot_backup_lock));
 
 	/* Create the hot backup file. */
-	WT_ERR(__backup_file_create(session, cb, 0));
+	WT_ERR(__backup_file_create(session, cb, false));
 
 	/* Add log files if logging is enabled. */
 
@@ -234,11 +234,11 @@ __backup_start(
 	 * copying data files to avoid rolling the metadata forward across
 	 * a checkpoint that completes during the backup.
 	 */
-	target_list = 0;
+	target_list = false;
 	WT_ERR(__backup_uri(session, cb, cfg, &target_list, &log_only));
 
 	if (!target_list) {
-		WT_ERR(__backup_log_append(session, cb, 1));
+		WT_ERR(__backup_log_append(session, cb, true));
 		WT_ERR(__backup_all(session, cb));
 	}
 
@@ -391,17 +391,16 @@ err:	if (cursor != NULL)
  */
 static int
 __backup_uri(WT_SESSION_IMPL *session,
-    WT_CURSOR_BACKUP *cb, const char *cfg[], int *foundp, int *log_only)
+    WT_CURSOR_BACKUP *cb, const char *cfg[], bool *foundp, bool *log_only)
 {
 	WT_CONFIG targetconf;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	int target_list;
+	bool target_list;
 	const char *uri;
 
-	*foundp = 0;
-	*log_only = 0;
+	*foundp = *log_only = false;
 
 	/*
 	 * If we find a non-empty target configuration string, we have a job,
@@ -409,11 +408,12 @@ __backup_uri(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "target", &cval));
 	WT_RET(__wt_config_subinit(session, &targetconf, &cval));
-	for (cb->list_next = 0, target_list = 0;
-	    (ret = __wt_config_next(&targetconf, &k, &v)) == 0; ++target_list) {
+	for (cb->list_next = 0, target_list = false;
+	    (ret = __wt_config_next(&targetconf, &k, &v)) == 0;
+	    target_list = true) {
 		/* If it is our first time through, allocate. */
-		if (target_list == 0) {
-			*foundp = 1;
+		if (!target_list) {
+			*foundp = true;
 			WT_ERR(__wt_scr_alloc(session, 512, &tmp));
 		}
 
@@ -430,12 +430,8 @@ __backup_uri(WT_SESSION_IMPL *session,
 		 * Set log_only only if it is our only URI target.
 		 */
 		if (WT_PREFIX_MATCH(uri, "log:")) {
-			if (target_list == 0)
-				*log_only = 1;
-			else
-				*log_only = 0;
-			WT_ERR(__wt_backup_list_uri_append(
-			    session, uri, NULL));
+			*log_only = !target_list;
+			WT_ERR(__wt_backup_list_uri_append(session, uri, NULL));
 		} else
 			WT_ERR(__wt_schema_worker(session,
 			    uri, NULL, __wt_backup_list_uri_append, cfg, 0));
@@ -452,7 +448,7 @@ err:	__wt_scr_free(session, &tmp);
  */
 static int
 __backup_file_create(
-    WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, int incremental)
+    WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, bool incremental)
 {
 	return (__wt_fopen(session,
 	    incremental ? WT_INCREMENTAL_BACKUP : WT_METADATA_BACKUP,
@@ -480,7 +476,7 @@ __wt_backup_file_remove(WT_SESSION_IMPL *session)
  */
 int
 __wt_backup_list_uri_append(
-    WT_SESSION_IMPL *session, const char *name, int *skip)
+    WT_SESSION_IMPL *session, const char *name, bool *skip)
 {
 	WT_CURSOR_BACKUP *cb;
 	char *value;
@@ -489,7 +485,7 @@ __wt_backup_list_uri_append(
 	WT_UNUSED(skip);
 
 	if (WT_PREFIX_MATCH(name, "log:")) {
-		WT_RET(__backup_log_append(session, cb, 0));
+		WT_RET(__backup_log_append(session, cb, false));
 		return (0);
 	}
 
@@ -544,8 +540,8 @@ __backup_list_append(
 	WT_CURSOR_BACKUP_ENTRY *p;
 	WT_DATA_HANDLE *old_dhandle;
 	WT_DECL_RET;
+	bool need_handle;
 	const char *name;
-	int need_handle;
 
 	/* Leave a NULL at the end to mark the end of the list. */
 	WT_RET(__wt_realloc_def(session, &cb->list_allocated,
@@ -554,10 +550,10 @@ __backup_list_append(
 	p[0].name = p[1].name = NULL;
 	p[0].handle = p[1].handle = NULL;
 
-	need_handle = 0;
+	need_handle = false;
 	name = uri;
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		need_handle = 1;
+		need_handle = true;
 		name += strlen("file:");
 	}
 

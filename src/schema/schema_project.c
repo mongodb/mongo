@@ -220,7 +220,7 @@ __wt_schema_project_out(WT_SESSION_IMPL *session,
  */
 int
 __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
-    const char *proj_arg, int key_only, const char *vformat, WT_ITEM *value)
+    const char *proj_arg, bool key_only, const char *vformat, WT_ITEM *value)
 {
 	WT_CURSOR *c;
 	WT_DECL_ITEM(buf);
@@ -233,7 +233,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 	uint8_t *end, *p;
 	const uint8_t *next, *vp, *vend;
 	size_t len, offset, old_len;
-	int skip;
+	bool skip;
 
 	p = end = NULL;		/* -Wuninitialized */
 
@@ -259,7 +259,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 
 		switch (*proj) {
 		case WT_PROJ_KEY:
-			skip = 0;
+			skip = false;
 			c = cp[arg];
 			if (WT_CURSOR_RECNO(c)) {
 				c->key.data = &c->recno;
@@ -274,7 +274,8 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 			continue;
 
 		case WT_PROJ_VALUE:
-			if ((skip = key_only) != 0)
+			skip = key_only;
+			if (skip)
 				continue;
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->value_format));

@@ -89,7 +89,7 @@ __wt_block_buffer_to_addr(WT_BLOCK *block,
  */
 int
 __wt_block_addr_invalid(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *addr, size_t addr_size, int live)
+    WT_BLOCK *block, const uint8_t *addr, size_t addr_size, bool live)
 {
 	wt_off_t offset;
 	uint32_t cksum, size;

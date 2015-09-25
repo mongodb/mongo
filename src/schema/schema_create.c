@@ -70,12 +70,12 @@ __wt_direct_io_size_check(WT_SESSION_IMPL *session,
  */
 static int
 __create_file(WT_SESSION_IMPL *session,
-    const char *uri, int exclusive, const char *config)
+    const char *uri, bool exclusive, const char *config)
 {
 	WT_DECL_ITEM(val);
 	WT_DECL_RET;
 	uint32_t allocsize;
-	int is_metadata;
+	bool is_metadata;
 	const char *filename, **p, *filecfg[] =
 	    { WT_CONFIG_BASE(session, file_meta), config, NULL, NULL };
 	char *fileconf;
@@ -135,7 +135,7 @@ __create_file(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_session_get_btree(
 	    session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
 	if (WT_META_TRACKING(session))
-		WT_ERR(__wt_meta_track_handle_lock(session, 1));
+		WT_ERR(__wt_meta_track_handle_lock(session, true));
 	else
 		WT_ERR(__wt_session_release_btree(session));
 
@@ -186,7 +186,7 @@ __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
  */
 static int
 __create_colgroup(WT_SESSION_IMPL *session,
-    const char *name, int exclusive, const char *config)
+    const char *name, bool exclusive, const char *config)
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
@@ -216,7 +216,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 		tlen = strlen(tablename);
 
 	if ((ret =
-	    __wt_schema_get_table(session, tablename, tlen, 1, &table)) != 0)
+	    __wt_schema_get_table(session, tablename, tlen, true, &table)) != 0)
 		WT_RET_MSG(session, (ret == WT_NOTFOUND) ? ENOENT : ret,
 		    "Can't create '%s' for non-existent table '%.*s'",
 		    name, (int)tlen, tablename);
@@ -258,7 +258,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 			    "No 'columns' configuration for '%s'", name);
 		WT_ERR(__wt_buf_catfmt(session, &fmt, ",value_format="));
 		WT_ERR(__wt_struct_reformat(session,
-		    table, cval.str, cval.len, NULL, 1, &fmt));
+		    table, cval.str, cval.len, NULL, true, &fmt));
 	}
 	sourcecfg[1] = fmt.data;
 	WT_ERR(__wt_config_merge(session, sourcecfg, NULL, &sourceconf));
@@ -322,17 +322,59 @@ __wt_schema_index_source(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __fill_index --
+ *	Fill the index from the current contents of the table.
+ */
+static int
+__fill_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
+{
+	WT_DECL_RET;
+	WT_CURSOR *tcur, *icur;
+	WT_SESSION *wt_session;
+
+	wt_session = &session->iface;
+	tcur = NULL;
+	icur = NULL;
+	WT_RET(__wt_schema_open_colgroups(session, table));
+
+	/*
+	 * If the column groups have not been completely created,
+	 * there cannot be data inserted yet, and we're done.
+	 */
+	if (!table->cg_complete)
+		return (0);
+
+	WT_ERR(wt_session->open_cursor(wt_session,
+	    idx->source, NULL, "bulk=unordered", &icur));
+	WT_ERR(wt_session->open_cursor(wt_session,
+	    table->name, NULL, "readonly", &tcur));
+
+	while ((ret = tcur->next(tcur)) == 0)
+		WT_ERR(__wt_apply_single_idx(session, idx,
+		    icur, (WT_CURSOR_TABLE *)tcur, icur->insert));
+
+	WT_ERR_NOTFOUND_OK(ret);
+err:
+	if (icur)
+		WT_TRET(icur->close(icur));
+	if (tcur)
+		WT_TRET(tcur->close(tcur));
+	return (ret);
+}
+
+/*
  * __create_index --
  *	Create an index.
  */
 static int
 __create_index(WT_SESSION_IMPL *session,
-    const char *name, int exclusive, const char *config)
+    const char *name, bool exclusive, const char *config)
 {
 	WT_CONFIG kcols, pkcols;
 	WT_CONFIG_ITEM ckey, cval, icols, kval;
 	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
+	WT_INDEX *idx;
 	WT_ITEM confbuf, extra_cols, fmt, namebuf;
 	WT_PACK pack;
 	WT_TABLE *table;
@@ -342,7 +384,7 @@ __create_index(WT_SESSION_IMPL *session,
 	const char *source, *sourceconf, *idxname, *tablename;
 	char *idxconf;
 	size_t tlen;
-	int have_extractor;
+	bool have_extractor;
 	u_int i, npublic_cols;
 
 	sourceconf = NULL;
@@ -351,7 +393,7 @@ __create_index(WT_SESSION_IMPL *session,
 	WT_CLEAR(fmt);
 	WT_CLEAR(extra_cols);
 	WT_CLEAR(namebuf);
-	have_extractor = 0;
+	have_extractor = false;
 
 	tablename = name;
 	if (!WT_PREFIX_SKIP(tablename, "index:"))
@@ -363,7 +405,7 @@ __create_index(WT_SESSION_IMPL *session,
 
 	tlen = (size_t)(idxname++ - tablename);
 	if ((ret =
-	    __wt_schema_get_table(session, tablename, tlen, 1, &table)) != 0)
+	    __wt_schema_get_table(session, tablename, tlen, true, &table)) != 0)
 		WT_RET_MSG(session, ret,
 		    "Can't create an index for a non-existent table: %.*s",
 		    (int)tlen, tablename);
@@ -388,7 +430,7 @@ __create_index(WT_SESSION_IMPL *session,
 
 	if (__wt_config_getones_none(
 	    session, config, "extractor", &cval) == 0 && cval.len != 0) {
-		have_extractor = 1;
+		have_extractor = true;
 		/* Custom extractors must supply a key format. */
 		if ((ret = __wt_config_getones(
 		    session, config, "key_format", &kval)) != 0)
@@ -463,7 +505,7 @@ __create_index(WT_SESSION_IMPL *session,
 	 * for custom extractors.
 	 */
 	WT_ERR(__wt_struct_reformat(session, table,
-	    icols.str, icols.len, (const char *)extra_cols.data, 0, &fmt));
+	    icols.str, icols.len, (const char *)extra_cols.data, false, &fmt));
 
 	/* Check for a record number index key, which makes no sense. */
 	WT_ERR(__wt_config_getones(session, fmt.data, "key_format", &cval));
@@ -495,7 +537,9 @@ __create_index(WT_SESSION_IMPL *session,
 
 	/* Make sure that the configuration is valid. */
 	WT_ERR(__wt_schema_open_index(
-	    session, table, idxname, strlen(idxname), NULL));
+	    session, table, idxname, strlen(idxname), &idx));
+
+	WT_ERR(__fill_index(session, table, idx));
 
 err:	__wt_free(session, idxconf);
 	__wt_free(session, sourceconf);
@@ -514,7 +558,7 @@ err:	__wt_free(session, idxconf);
  */
 static int
 __create_table(WT_SESSION_IMPL *session,
-    const char *name, int exclusive, const char *config)
+    const char *name, bool exclusive, const char *config)
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM cgkey, cgval, cval;
@@ -536,7 +580,7 @@ __create_table(WT_SESSION_IMPL *session,
 		return (EINVAL);
 
 	if ((ret = __wt_schema_get_table(session,
-	    tablename, strlen(tablename), 0, &table)) == 0) {
+	    tablename, strlen(tablename), false, &table)) == 0) {
 		__wt_schema_release_table(session, table);
 		return (exclusive ? EEXIST : 0);
 	}
@@ -563,7 +607,7 @@ __create_table(WT_SESSION_IMPL *session,
 
 	/* Attempt to open the table now to catch any errors. */
 	WT_ERR(__wt_schema_get_table(
-	    session, tablename, strlen(tablename), 1, &table));
+	    session, tablename, strlen(tablename), true, &table));
 
 	if (ncolgroups == 0) {
 		cgsize = strlen("colgroup:") + strlen(tablename) + 1;
@@ -629,11 +673,11 @@ __wt_schema_create(
 	WT_CONFIG_ITEM cval;
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
-	int exclusive;
+	bool exclusive;
 
-	exclusive = (
+	exclusive =
 	    __wt_config_getones(session, config, "exclusive", &cval) == 0 &&
-	    cval.val != 0);
+	    cval.val != 0;
 
 	/*
 	 * We track create operations: if we fail in the middle of creating a
@@ -659,7 +703,7 @@ __wt_schema_create(
 		ret = __wt_bad_object_type(session, uri);
 
 	session->dhandle = NULL;
-	WT_TRET(__wt_meta_track_off(session, 1, ret != 0));
+	WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
 	return (ret);
 }

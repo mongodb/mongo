@@ -47,7 +47,7 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 int
 __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
-    WT_ITEM *key, WT_ITEM *value, WT_UPDATE *upd_arg, int is_remove)
+    WT_ITEM *key, WT_ITEM *value, WT_UPDATE *upd_arg, bool is_remove)
 {
 	WT_DECL_RET;
 	WT_INSERT *ins;
@@ -57,12 +57,12 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	size_t ins_size, upd_size;
 	uint32_t ins_slot;
 	u_int i, skipdepth;
-	int logged;
+	bool logged;
 
 	ins = NULL;
 	page = cbt->ref->page;
 	upd = upd_arg;
-	logged = 0;
+	logged = false;
 
 	/* This code expects a remove to have a NULL value. */
 	if (is_remove)
@@ -100,7 +100,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			WT_ERR(
 			    __wt_update_alloc(session, value, &upd, &upd_size));
 			WT_ERR(__wt_txn_modify(session, upd));
-			logged = 1;
+			logged = true;
 
 			/* Avoid WT_CURSOR.update data copy. */
 			cbt->modify_update = upd;
@@ -171,7 +171,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			WT_ERR(
 			    __wt_update_alloc(session, value, &upd, &upd_size));
 			WT_ERR(__wt_txn_modify(session, upd));
-			logged = 1;
+			logged = true;
 
 			/* Avoid WT_CURSOR.update data copy. */
 			cbt->modify_update = upd;

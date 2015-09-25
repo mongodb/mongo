@@ -66,7 +66,7 @@ int
 __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	/* Discard the checkpoint. */
-	return (__wt_block_checkpoint_unload(session, block, 0));
+	return (__wt_block_checkpoint_unload(session, block, false));
 }
 
 /*
@@ -94,7 +94,7 @@ __wt_block_offset_invalid(WT_BLOCK *block, wt_off_t offset, uint32_t size)
  */
 int
 __wt_block_salvage_next(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, uint8_t *addr, size_t *addr_sizep, int *eofp)
+    WT_BLOCK *block, uint8_t *addr, size_t *addr_sizep, bool *eofp)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_ITEM(tmp);
@@ -165,7 +165,7 @@ err:	__wt_scr_free(session, &tmp);
  */
 int
 __wt_block_salvage_valid(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, uint8_t *addr, size_t addr_size, int valid)
+    WT_BLOCK *block, uint8_t *addr, size_t addr_size, bool valid)
 {
 	wt_off_t offset;
 	uint32_t size, cksum;

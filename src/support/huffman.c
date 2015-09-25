@@ -790,7 +790,8 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 		symbol = huffman->code2symbol[pattern & mask];
 		len = huffman->codes[symbol].length;
 		valid -= len;
-		WT_ASSERT(session, from_len_bits >= len);
+		if (from_len_bits < len)	/* corrupted */
+			WT_ERR(EINVAL);
 		from_len_bits -= len;
 
 		WT_ASSERT(session,

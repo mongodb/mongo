@@ -16,18 +16,19 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	uint64_t recno;
-	int append, ch, overwrite, rkey;
+	int ch;
+	bool append, overwrite, rkey;
 	const char *uri;
 	char config[100];
 
-	append = overwrite = 0;
+	append = overwrite = false;
 	while ((ch = __wt_getopt(progname, argc, argv, "ao")) != EOF)
 		switch (ch) {
 		case 'a':
-			append = 1;
+			append = true;
 			break;
 		case 'o':
-			overwrite = 1;
+			overwrite = true;
 			break;
 		case '?':
 		default:
@@ -68,7 +69,7 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 		    progname);
 		return (1);
 	}
-	rkey = strcmp(cursor->key_format, "r") == 0 ? 1 : 0;
+	rkey = strcmp(cursor->key_format, "r") == 0;
 	if (strcmp(cursor->value_format, "S") != 0) {
 		fprintf(stderr,
 		    "%s: write command only possible when the value format is "

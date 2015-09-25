@@ -116,12 +116,13 @@ __wt_addr_string(WT_SESSION_IMPL *session,
 {
 	WT_BM *bm;
 
-	bm = S2BT(session)->bm;
+	bm = S2BT_SAFE(session)->bm;
 
 	if (addr == NULL) {
 		buf->data = "[NoAddr]";
 		buf->size = strlen("[NoAddr]");
-	} else if (bm->addr_string(bm, session, buf, addr, addr_size) != 0) {
+	} else if (bm == NULL ||
+	    bm->addr_string(bm, session, buf, addr, addr_size) != 0) {
 		buf->data = "[Error]";
 		buf->size = strlen("[Error]");
 	}
