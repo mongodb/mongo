@@ -28,13 +28,13 @@
 
 #pragma once
 
+#include <deque>
 #include <string>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
@@ -133,7 +133,7 @@ public:
     Stats getStats();
 
 private:
-    using TaskList = stdx::list<Task>;
+    using TaskList = std::deque<Task>;
     using ThreadList = std::vector<stdx::thread>;
 
     /**
