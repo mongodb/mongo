@@ -63,6 +63,7 @@ public:
     static const Milliseconds kDefaultHeartbeatInterval;
     static const Seconds kDefaultHeartbeatTimeoutPeriod;
     static const int kDefaultElectionTimeoutOffsetLimit;
+    static const bool kDefaultChainingAllowed;
 
     /**
      * Initializes this ReplicaSetConfig from the contents of "cfg".
@@ -314,18 +315,18 @@ private:
     void _addInternalWriteConcernModes();
 
     bool _isInitialized = false;
-    long long _version;
+    long long _version = 1;
     std::string _replSetName;
     std::vector<MemberConfig> _members;
     WriteConcernOptions _defaultWriteConcern;
-    Milliseconds _electionTimeoutPeriod = Milliseconds(2000);
+    Milliseconds _electionTimeoutPeriod = kDefaultElectionTimeoutPeriod;
     Milliseconds _heartbeatInterval = kDefaultHeartbeatInterval;
     Seconds _heartbeatTimeoutPeriod = Seconds(0);
-    bool _chainingAllowed;
-    int _electionTimeoutOffsetLimit;
-    int _majorityVoteCount;
-    int _writeMajority;
-    int _totalVotingMembers;
+    bool _chainingAllowed = kDefaultChainingAllowed;
+    int _electionTimeoutOffsetLimit = kDefaultElectionTimeoutOffsetLimit;
+    int _majorityVoteCount = 0;
+    int _writeMajority = 0;
+    int _totalVotingMembers = 0;
     ReplicaSetTagConfig _tagConfig;
     StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
     long long _protocolVersion = 0;

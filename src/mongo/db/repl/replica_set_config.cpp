@@ -53,6 +53,7 @@ const Milliseconds ReplicaSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
 const Milliseconds ReplicaSetConfig::kDefaultElectionTimeoutPeriod(10000);
 const int ReplicaSetConfig::kDefaultElectionTimeoutOffsetLimit(2000);
+const bool ReplicaSetConfig::kDefaultChainingAllowed(true);
 
 namespace {
 
@@ -203,18 +204,19 @@ Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
     //
     // Parse electionTimeoutOffsetLimit
     //
-    BSONElement electionTimeoutOffsetLimitElement = settings[kElectionTimeoutOffsetLimitFieldName];
-    if (electionTimeoutOffsetLimitElement.eoo()) {
-        _electionTimeoutOffsetLimit = kDefaultElectionTimeoutOffsetLimit;
-    } else if (electionTimeoutOffsetLimitElement.isNumber()) {
-        _electionTimeoutOffsetLimit = electionTimeoutOffsetLimitElement.numberInt();
-    } else {
-        return Status(ErrorCodes::TypeMismatch,
-                      str::stream() << "Expected type of " << kSettingsFieldName << "."
-                                    << kElectionTimeoutOffsetLimitFieldName
-                                    << " to be a number, but found a value of type "
-                                    << typeName(electionTimeoutOffsetLimitElement.type()));
+    auto greaterThanZero = stdx::bind(std::greater<long long>(), stdx::placeholders::_1, 0);
+    long long electionTimeoutOffsetLimitMillis;
+    auto electionTimeoutOffsetLimitStatus =
+        bsonExtractIntegerFieldWithDefaultIf(settings,
+                                             kElectionTimeoutOffsetLimitFieldName,
+                                             kDefaultElectionTimeoutOffsetLimit,
+                                             greaterThanZero,
+                                             "election timeout offset limit must be greater than 0",
+                                             &electionTimeoutOffsetLimitMillis);
+    if (!electionTimeoutOffsetLimitStatus.isOK()) {
+        return electionTimeoutOffsetLimitStatus;
     }
+    _electionTimeoutOffsetLimit = electionTimeoutOffsetLimitMillis;
 
     //
     // Parse heartbeatTimeoutSecs
@@ -236,7 +238,7 @@ Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
     // Parse chainingAllowed
     //
     Status status = bsonExtractBooleanFieldWithDefault(
-        settings, kChainingAllowedFieldName, true, &_chainingAllowed);
+        settings, kChainingAllowedFieldName, kDefaultChainingAllowed, &_chainingAllowed);
     if (!status.isOK())
         return status;
 
@@ -342,13 +344,6 @@ Status ReplicaSetConfig::validate() const {
                                     << " field value must be non-negative, "
                                        "but found "
                                     << durationCount<Seconds>(_heartbeatTimeoutPeriod));
-    }
-    if (_electionTimeoutOffsetLimit < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << kSettingsFieldName << '.'
-                                    << kElectionTimeoutOffsetLimitFieldName
-                                    << " field value must be non-negative, "
-                                       "but found " << _electionTimeoutOffsetLimit);
     }
     if (_electionTimeoutPeriod < Milliseconds(0)) {
         return Status(ErrorCodes::BadValue,

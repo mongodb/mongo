@@ -498,6 +498,30 @@ TEST(ReplicaSetConfig, ParseFailsWithNonNumericElectionTimeoutOffsetLimitMillisF
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
+TEST(ReplicaSetConfig, ParseFailsWithZeroElectionTimeoutOffsetLimitMillisField) {
+    ReplicaSetConfig config;
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345")) << "settings"
+                               << BSON("electionTimeoutOffsetLimitMillis" << 0)));
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
+TEST(ReplicaSetConfig, ParseFailsWithNegativeElectionTimeoutOffsetLimitMillisField) {
+    ReplicaSetConfig config;
+    Status status =
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "version" << 1 << "members"
+                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                        << "localhost:12345")) << "settings"
+                               << BSON("electionTimeoutOffsetLimitMillis" << -1000)));
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+}
+
 TEST(ReplicaSetConfig, ParseFailsWithNonNumericHeartbeatTimeoutSecsField) {
     ReplicaSetConfig config;
     Status status = config.initialize(BSON("_id"
@@ -978,7 +1002,7 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityInvalid) {
                                          << "votes" << 0 << "priority" << 0)) << "settings"
              << BSON("heartbeatIntervalMillis" << -5000 << "heartbeatTimeoutSecs" << -20
                                                << "electionTimeoutMillis" << -2
-                                               << "electionTimeoutOffsetLimitMillis" << -2))));
+                                               << "electionTimeoutOffsetLimitMillis" << 2))));
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_NOT_OK(configA.validate());
     ASSERT_NOT_OK(configB.validate());
