@@ -40,10 +40,12 @@
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/executor/network_interface_asio_test_utils.h"
 #include "mongo/executor/test_network_connection_hook.h"
+#include "mongo/rpc/factory.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/message.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -232,6 +234,119 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
     auto response = uassertStatusOK(res);
     ASSERT_EQ(response.data, expectedCommandReply);
     ASSERT_EQ(response.metadata, expectedMetadata);
+}
+
+class MalformedMessageTest : public NetworkInterfaceASIOTest {
+public:
+    using MessageHook = stdx::function<void(MsgData::View)>;
+
+    void runMessageTest(ErrorCodes::Error code, bool loadBody, MessageHook hook) {
+        // Kick off our operation
+        auto deferred =
+            startCommand(makeCallbackHandle(),
+                         RemoteCommandRequest(testHost, "testDB", BSON("ping" << 1), BSONObj()));
+
+        // Wait for it to block waiting for a write
+        auto stream = streamFactory().blockUntilStreamExists(testHost);
+        ConnectEvent{stream}.skip();
+        stream->simulateServer(rpc::Protocol::kOpQuery,
+                               [](RemoteCommandRequest request)
+                                   -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+        uint32_t messageId = 0;
+
+        {
+            // Get the appropriate message id
+            WriteEvent write{stream};
+            std::vector<uint8_t> messageData = stream->popWrite();
+            Message msg(messageData.data(), false);
+            messageId = msg.header().getId();
+        }
+
+        // Build a mock reply message
+        auto replyBuilder = rpc::makeReplyBuilder(rpc::Protocol::kOpCommandV1);
+        replyBuilder->setMetadata(BSONObj());
+        replyBuilder->setCommandReply(BSON("hello!" << 1));
+
+        auto message = replyBuilder->done();
+        message->header().setResponseTo(messageId);
+
+        // Allow caller to mess with the Message
+        hook(message->header());
+
+        {
+            // Load the header
+            ReadEvent read{stream};
+            auto headerBytes = reinterpret_cast<const uint8_t*>(message->header().view2ptr());
+            stream->pushRead({headerBytes, headerBytes + sizeof(MSGHEADER::Value)});
+        }
+
+        if (loadBody) {
+            // Load the body if we need to
+            ReadEvent read{stream};
+            auto dataBytes = reinterpret_cast<const uint8_t*>(message->buf());
+            auto body = dataBytes;
+            std::advance(body, sizeof(MSGHEADER::Value));
+            stream->pushRead({body, dataBytes + static_cast<std::size_t>(message->size())});
+        }
+
+        auto& response = deferred.get();
+        ASSERT(response == code);
+    }
+};
+
+TEST_F(MalformedMessageTest, messageHeaderWrongResponseTo) {
+    runMessageTest(
+        ErrorCodes::ProtocolError,
+        false,
+        [](MsgData::View message) { message.setResponseTo(message.getResponseTo() + 1); });
+}
+
+TEST_F(MalformedMessageTest, messageHeaderlenZero) {
+    runMessageTest(
+        ErrorCodes::InvalidLength, false, [](MsgData::View message) { message.setLen(0); });
+}
+
+TEST_F(MalformedMessageTest, MessageHeaderLenTooSmall) {
+    runMessageTest(ErrorCodes::InvalidLength,
+                   false,
+                   [](MsgData::View message) { message.setLen(6); });  // min is 16
+}
+
+TEST_F(MalformedMessageTest, MessageHeaderLenTooLarge) {
+    runMessageTest(ErrorCodes::InvalidLength,
+                   false,
+                   [](MsgData::View message) { message.setLen(48000001); });  // max is 48000000
+}
+
+TEST_F(MalformedMessageTest, MessageHeaderLenNegative) {
+    runMessageTest(
+        ErrorCodes::InvalidLength, false, [](MsgData::View message) { message.setLen(-1); });
+}
+
+TEST_F(MalformedMessageTest, MessageLenSmallerThanActual) {
+    runMessageTest(ErrorCodes::InvalidBSON,
+                   true,
+                   [](MsgData::View message) { message.setLen(message.getLen() - 10); });
+}
+
+TEST_F(MalformedMessageTest, MessageLenLongerThanActual) {
+    // SERVER-20628
+    // runMessageTest(ErrorCodes::InvalidLength,
+    //               true,
+    //               [](MsgData::View message) { message.setLen(message.getLen() + 100); });
+}
+
+TEST_F(MalformedMessageTest, UnsupportedOpcode) {
+    runMessageTest(ErrorCodes::UnsupportedFormat,
+                   true,
+                   [](MsgData::View message) { message.setOperation(2222); });
+}
+
+TEST_F(MalformedMessageTest, MismatchedOpcode) {
+    runMessageTest(ErrorCodes::UnsupportedFormat,
+                   true,
+                   [](MsgData::View message) { message.setOperation(2006); });
 }
 
 class NetworkInterfaceASIOConnectionHookTest : public NetworkInterfaceASIOTest {
