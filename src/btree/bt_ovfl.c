@@ -235,14 +235,6 @@ __wt_ovfl_discard(WT_SESSION_IMPL *session, WT_CELL *cell)
 	bm = btree->bm;
 	unpack = &_unpack;
 
-	/*
-	 * Evction cannot free overflow items during a checkpoint: that can
-	 * corrupt the checkpoint's block management.  We check for this in
-	 * eviction, assert it here to make sure we're catching all paths
-	 * and to avoid regressions.
-	 */
-	WT_ASSERT(session, !btree->checkpointing);
-
 	__wt_cell_unpack(cell, unpack);
 
 	/*
