@@ -85,7 +85,7 @@ static WT_EVENT_HANDLER __event_handler_default = {
  */
 static void
 __handler_failure(WT_SESSION_IMPL *session,
-    int error, const char *which, int error_handler_failed)
+    int error, const char *which, bool error_handler_failed)
 {
 	WT_EVENT_HANDLER *handler;
 	WT_SESSION *wt_session;
@@ -142,7 +142,7 @@ __wt_event_handler_set(WT_SESSION_IMPL *session, WT_EVENT_HANDLER *handler)
  * 	Report a message to an event handler.
  */
 int
-__wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error,
+__wt_eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
     const char *file_name, int line_number, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
@@ -280,11 +280,11 @@ __wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	if (msg_event) {
 		ret = handler->handle_message(handler, wt_session, s);
 		if (ret != 0)
-			__handler_failure(session, ret, "message", 0);
+			__handler_failure(session, ret, "message", false);
 	} else {
 		ret = handler->handle_error(handler, wt_session, error, s);
 		if (ret != 0 && handler->handle_error != __handle_error_default)
-			__handler_failure(session, ret, "error", 1);
+			__handler_failure(session, ret, "error", true);
 	}
 
 	return (ret);
@@ -305,7 +305,7 @@ __wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
 	 * an error value to return.
 	 */
 	va_start(ap, fmt);
-	(void)__wt_eventv(session, 0, error, NULL, 0, fmt, ap);
+	(void)__wt_eventv(session, false, error, NULL, 0, fmt, ap);
 	va_end(ap);
 }
 
@@ -324,7 +324,7 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
 	 * an error value to return.
 	 */
 	va_start(ap, fmt);
-	(void)__wt_eventv(session, 0, 0, NULL, 0, fmt, ap);
+	(void)__wt_eventv(session, false, 0, NULL, 0, fmt, ap);
 	va_end(ap);
 }
 
@@ -345,7 +345,7 @@ __wt_ext_err_printf(
 		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
 
 	va_start(ap, fmt);
-	ret = __wt_eventv(session, 0, 0, NULL, 0, fmt, ap);
+	ret = __wt_eventv(session, false, 0, NULL, 0, fmt, ap);
 	va_end(ap);
 	return (ret);
 }
@@ -444,7 +444,7 @@ __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
 	if (handler != NULL && handler->handle_progress != NULL)
 		if ((ret = handler->handle_progress(handler,
 		    wt_session, s == NULL ? session->name : s, v)) != 0)
-			__handler_failure(session, ret, "progress", 0);
+			__handler_failure(session, ret, "progress", false);
 	return (0);
 }
 
@@ -461,7 +461,8 @@ __wt_assert(WT_SESSION_IMPL *session,
 	va_list ap;
 
 	va_start(ap, fmt);
-	(void)__wt_eventv(session, 0, error, file_name, line_number, fmt, ap);
+	(void)__wt_eventv(
+	    session, false, error, file_name, line_number, fmt, ap);
 	va_end(ap);
 
 #ifdef HAVE_DIAGNOSTIC

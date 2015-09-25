@@ -15,7 +15,7 @@
  */
 static inline int
 __wt_search_insert_append(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, int *donep)
+    WT_CURSOR_BTREE *cbt, WT_ITEM *srch_key, bool *donep)
 {
 	WT_BTREE *btree;
 	WT_COLLATOR *collator;
@@ -137,7 +137,7 @@ __wt_search_insert(
  */
 int
 __wt_row_search(WT_SESSION_IMPL *session,
-    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt, int insert)
+    WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt, bool insert)
 {
 	WT_BTREE *btree;
 	WT_COLLATOR *collator;
@@ -149,7 +149,8 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	WT_ROW *rip;
 	size_t match, skiphigh, skiplow;
 	uint32_t base, indx, limit;
-	int append_check, cmp, depth, descend_right, done;
+	int cmp, depth;
+	bool append_check, descend_right, done;
 
 	btree = S2BT(session);
 	collator = btree->collator;
@@ -176,7 +177,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	 * the cursor's append history.
 	 */
 	append_check = insert && cbt->append_tree;
-	descend_right = 1;
+	descend_right = true;
 
 	/* We may only be searching a single leaf page, not the full tree. */
 	if (leaf != NULL) {
@@ -213,7 +214,7 @@ restart:	page = current->page;
 				goto descend;
 
 			/* A failed append check turns off append checks. */
-			append_check = 0;
+			append_check = false;
 		}
 
 		/*
@@ -282,7 +283,7 @@ restart:	page = current->page;
 		 * right-side descent.
 		 */
 		if (pindex->entries != base - 1)
-			descend_right = 0;
+			descend_right = false;
 
 descend:	/*
 		 * Swap the current page for the child page. If the page splits
@@ -365,7 +366,8 @@ leaf_only:
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;
-			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
+			WT_ERR(
+			    __wt_row_leaf_key(session, page, rip, item, true));
 
 			match = WT_MIN(skiplow, skiphigh);
 			cmp = __wt_lex_compare_skip(srch_key, item, &match);
@@ -382,7 +384,8 @@ leaf_only:
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;
-			WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
+			WT_ERR(
+			    __wt_row_leaf_key(session, page, rip, item, true));
 
 			WT_ERR(__wt_compare(
 			    session, collator, srch_key, item, &cmp));
@@ -518,7 +521,7 @@ restart:
 		 * have to as well.
 		 */
 		return (__wt_row_leaf_key(session,
-		    page, page->pg_row_d + cbt->slot, cbt->tmp, 0));
+		    page, page->pg_row_d + cbt->slot, cbt->tmp, false));
 	}
 
 	/*

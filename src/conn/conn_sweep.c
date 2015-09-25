@@ -64,11 +64,11 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	int evict_reset;
+	bool evict_reset;
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;
-	evict_reset = 0;
+	evict_reset = false;
 
 	/*
 	 * Acquire an exclusive lock on the handle and mark it dead.
@@ -100,7 +100,7 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 	 * handle. Closing the handle decrements the open file count,
 	 * meaning the close loop won't overrun the configured minimum.
 	 */
-	ret = __wt_conn_btree_sync_and_close(session, 0, 1);
+	ret = __wt_conn_btree_sync_and_close(session, false, true);
 
 	if (evict_reset)
 		__wt_evict_file_exclusive_off(session);
@@ -172,7 +172,7 @@ __sweep_discard_trees(WT_SESSION_IMPL *session, u_int *dead_handlesp)
 
 		/* If the handle is marked "dead", flush it from cache. */
 		WT_WITH_DHANDLE(session, dhandle, ret =
-		    __wt_conn_btree_sync_and_close(session, 0, 0));
+		    __wt_conn_btree_sync_and_close(session, false, false));
 
 		/* We closed the btree handle. */
 		if (ret == 0) {
@@ -207,7 +207,7 @@ __sweep_remove_one(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 		WT_ERR(EBUSY);
 
 	WT_WITH_DHANDLE(session, dhandle,
-	    ret = __wt_conn_dhandle_discard_single(session, 0, 1));
+	    ret = __wt_conn_dhandle_discard_single(session, false, true));
 
 	/*
 	 * If the handle was not successfully discarded, unlock it and
@@ -360,7 +360,7 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 	F_SET(conn, WT_CONN_SERVER_SWEEP);
 
 	WT_RET(__wt_open_internal_session(
-	    conn, "sweep-server", 1, 1, &conn->sweep_session));
+	    conn, "sweep-server", true, true, &conn->sweep_session));
 	session = conn->sweep_session;
 
 	/*
@@ -376,7 +376,7 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 	    WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION);
 
 	WT_RET(__wt_cond_alloc(
-	    session, "handle sweep server", 0, &conn->sweep_cond));
+	    session, "handle sweep server", false, &conn->sweep_cond));
 
 	WT_RET(__wt_thread_create(
 	    session, &conn->sweep_tid, __sweep_server, session));

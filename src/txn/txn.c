@@ -202,7 +202,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
  * past the last committed transaction.
 */
 void
-__wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
+__wt_txn_update_oldest(WT_SESSION_IMPL *session, bool force)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *oldest_session;
@@ -211,7 +211,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, int force)
 	uint64_t current_id, id, last_running, oldest_id, prev_oldest_id;
 	uint32_t i, session_cnt;
 	int32_t count;
-	int last_running_moved;
+	bool last_running_moved;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
@@ -519,7 +519,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		 */
 		__wt_txn_release_snapshot(session);
 		ret = __wt_txn_log_commit(session, cfg);
-		WT_ASSERT(session, ret == 0);
 	}
 
 	/*

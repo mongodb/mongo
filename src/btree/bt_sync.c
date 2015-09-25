@@ -25,7 +25,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	uint64_t internal_bytes, leaf_bytes;
 	uint64_t internal_pages, leaf_pages;
 	uint32_t flags;
-	int evict_reset;
+	bool evict_reset;
 
 	btree = S2BT(session);
 
@@ -99,12 +99,13 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * internal page pass is complete, then wait for any existing
 		 * eviction to complete.
 		 */
-		btree->checkpointing = 1;
-		WT_FULL_BARRIER();
+		WT_PUBLISH(btree->checkpointing, WT_CKPT_PREPARE);
 
 		WT_ERR(__wt_evict_file_exclusive_on(session, &evict_reset));
 		if (evict_reset)
 			__wt_evict_file_exclusive_off(session);
+
+		WT_PUBLISH(btree->checkpointing, WT_CKPT_RUNNING);
 
 		/* Write all dirty in-cache pages. */
 		flags |= WT_READ_NO_EVICT;
@@ -140,7 +141,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			if (!WT_PAGE_IS_INTERNAL(page) &&
 			    F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) &&
 			    WT_TXNID_LT(txn->snap_max, mod->first_dirty_txn) &&
-			    !F_ISSET(mod, WT_PM_REC_REWRITE)) {
+			    mod->rec_result != WT_PM_REC_REWRITE) {
 				__wt_page_modify_set(session, page);
 				continue;
 			}
@@ -177,7 +178,7 @@ err:	/* On error, clear any left-over tree walk. */
 	if (txn->isolation == WT_ISO_READ_COMMITTED && session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
 
-	if (btree->checkpointing) {
+	if (btree->checkpointing != WT_CKPT_OFF) {
 		/*
 		 * Update the checkpoint generation for this handle so visible
 		 * updates newer than the checkpoint can be evicted.
@@ -195,7 +196,7 @@ err:	/* On error, clear any left-over tree walk. */
 		 * but publishing the change means stalled eviction gets moving
 		 * as soon as possible.
 		 */
-		btree->checkpointing = 0;
+		btree->checkpointing = WT_CKPT_OFF;
 		WT_FULL_BARRIER();
 
 		/*
@@ -221,7 +222,7 @@ err:	/* On error, clear any left-over tree walk. */
 	 * but don't wait for it.
 	 */
 	if (ret == 0 && syncop == WT_SYNC_WRITE_LEAVES)
-		WT_RET(btree->bm->sync(btree->bm, session, 1));
+		WT_RET(btree->bm->sync(btree->bm, session, true));
 
 	return (ret);
 }

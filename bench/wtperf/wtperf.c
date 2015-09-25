@@ -1171,7 +1171,7 @@ monitor(void *arg)
 		if (latency_max != 0 &&
 		    (read_max > latency_max || insert_max > latency_max ||
 		     update_max > latency_max))
-			lprintf(cfg, WT_PANIC, 0,
+			lprintf(cfg, 0, 0,
 			    "max latency exceeded: threshold %" PRIu32
 			    " read max %" PRIu32 " insert max %" PRIu32
 			    " update max %" PRIu32, latency_max,

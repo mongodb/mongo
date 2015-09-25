@@ -51,6 +51,12 @@ class test_schema05(wttest.WiredTigerTestCase):
     nentries = 1000
     nindices = 6
 
+    scenarios = number_scenarios([
+        ('index-before', { 'create_index' : 0 }),
+        ('index-during', { 'create_index' : 1 }),
+        ('index-after', { 'create_index' : 2 }),
+    ])
+
     # Return the wiredtiger_open extension argument for a shared library.
     def extensionArg(self, exts):
         extfiles = []
@@ -87,6 +93,10 @@ class test_schema05(wttest.WiredTigerTestCase):
                                 "key_format=S,columns=(key),"
                                 "extractor=csv,app_metadata=" + si)
 
+    def drop_indices(self):
+        for i in range(0, self.nindices):
+            self.session.drop("index:schema05:x" + str(i))
+
     def csv(self, s, i):
         return s.split(',')[i]
 
@@ -98,8 +108,11 @@ class test_schema05(wttest.WiredTigerTestCase):
         if phase == 0:
             range_from = 0
             range_to = self.nentries / 2
-        else:
+        elif phase == 1:
             range_from = self.nentries / 2
+            range_to = self.nentries - 5
+        else:
+            range_from = self.nentries - 5
             range_to = self.nentries
 
         for i in range(range_from, range_to):
@@ -133,13 +146,26 @@ class test_schema05(wttest.WiredTigerTestCase):
                 self.assertEqual(value, expect)
             i += 1
         self.assertEqual(self.nentries, i)
+        for i in range(0, self.nindices):
+            icursor[i].close()
 
     def test_index(self):
         self.session.create("table:schema05", "key_format=i,value_format=S,"
                             "columns=(primarykey,value)")
-        self.create_indices()
+        if self.create_index == 0:
+            self.create_indices()
         self.populate(0)
+        if self.create_index == 1:
+            self.create_indices()
         self.populate(1)
+        if self.create_index == 2:
+            self.create_indices()
+        self.populate(2)
+        self.check_entries()
+
+        # Drop and recreate all indices, everything should be there.
+        self.drop_indices()
+        self.create_indices()
         self.check_entries()
 
 

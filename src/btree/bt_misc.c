@@ -115,13 +115,15 @@ __wt_addr_string(WT_SESSION_IMPL *session,
     const uint8_t *addr, size_t addr_size, WT_ITEM *buf)
 {
 	WT_BM *bm;
+	WT_BTREE *btree;
 
-	bm = S2BT(session)->bm;
+	btree = S2BT_SAFE(session);
 
 	if (addr == NULL) {
 		buf->data = "[NoAddr]";
 		buf->size = strlen("[NoAddr]");
-	} else if (bm->addr_string(bm, session, buf, addr, addr_size) != 0) {
+	} else if (btree == NULL || (bm = btree->bm) == NULL ||
+	    bm->addr_string(bm, session, buf, addr, addr_size) != 0) {
 		buf->data = "[Error]";
 		buf->size = strlen("[Error]");
 	}

@@ -14,15 +14,15 @@
  */
 static int
 __drop_file(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	int remove_files;
+	bool remove_files;
 	const char *filename;
 
 	WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
-	remove_files = (cval.val != 0);
+	remove_files = cval.val != 0;
 
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
@@ -53,7 +53,7 @@ __drop_file(
  */
 static int
 __drop_colgroup(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[])
 {
 	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
@@ -64,7 +64,7 @@ __drop_colgroup(
 	/* If we can get the colgroup, detach it from the table. */
 	if ((ret = __wt_schema_get_colgroup(
 	    session, uri, force, &table, &colgroup)) == 0) {
-		table->cg_complete = 0;
+		table->cg_complete = false;
 		WT_TRET(__wt_schema_drop(session, colgroup->source, cfg));
 	}
 
@@ -78,7 +78,7 @@ __drop_colgroup(
  */
 static int
 __drop_index(
-    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
+    WT_SESSION_IMPL *session, const char *uri, bool force, const char *cfg[])
 {
 	WT_INDEX *idx;
 	WT_DECL_RET;
@@ -87,7 +87,7 @@ __drop_index(
 	/* If we can get the colgroup, detach it from the table. */
 	if ((ret = __wt_schema_get_index(
 	    session, uri, force, &table, &idx)) == 0) {
-		table->idx_complete = 0;
+		table->idx_complete = false;
 		WT_TRET(__wt_schema_drop(session, idx->source, cfg));
 	}
 
@@ -100,8 +100,7 @@ __drop_index(
  *	WT_SESSION::drop for a table.
  */
 static int
-__drop_table(
-    WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+__drop_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
@@ -114,7 +113,8 @@ __drop_table(
 	(void)WT_PREFIX_SKIP(name, "table:");
 
 	table = NULL;
-	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 1, &table));
+	WT_ERR(__wt_schema_get_table(
+	    session, name, strlen(name), true, &table));
 
 	/* Drop the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
@@ -164,10 +164,10 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_CONFIG_ITEM cval;
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
-	int force;
+	bool force;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
-	force = (cval.val != 0);
+	force = cval.val != 0;
 
 	WT_RET(__wt_meta_track_on(session));
 
@@ -202,7 +202,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	/* Bump the schema generation so that stale data is ignored. */
 	++S2C(session)->schema_gen;
 
-	WT_TRET(__wt_meta_track_off(session, 1, ret != 0));
+	WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
 	return (ret);
 }
