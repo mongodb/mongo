@@ -24,7 +24,7 @@ static inline bool
 __wt_page_is_empty(WT_PAGE *page)
 {
 	return (page->modify != NULL &&
-	    F_ISSET(page->modify, WT_PM_REC_MASK) == WT_PM_REC_EMPTY ? 1 : 0);
+	    page->modify->rec_result == WT_PM_REC_EMPTY);
 }
 
 /*
@@ -77,12 +77,12 @@ __wt_cache_decr_check_size(
 	(void)__wt_atomic_addsize(vp, v);
 
 	{
-	static int first = 1;
+	static bool first = true;
 
 	if (!first)
 		return;
 	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
-	first = 0;
+	first = false;
 	}
 #else
 	WT_UNUSED(fld);
@@ -105,12 +105,12 @@ __wt_cache_decr_check_uint64(
 	(void)__wt_atomic_add64(vp, v);
 
 	{
-	static int first = 1;
+	static bool first = true;
 
 	if (!first)
 		return;
 	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
-	first = 0;
+	first = false;
 	}
 #else
 	WT_UNUSED(fld);
@@ -430,7 +430,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static inline int
 __wt_page_parent_modify_set(
-    WT_SESSION_IMPL *session, WT_REF *ref, int page_only)
+    WT_SESSION_IMPL *session, WT_REF *ref, bool page_only)
 {
 	WT_PAGE *parent;
 
@@ -791,7 +791,7 @@ __wt_row_leaf_value_set(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *unpack)
  */
 static inline int
 __wt_row_leaf_key(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, int instantiate)
+    WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, bool instantiate)
 {
 	void *copy;
 
@@ -838,7 +838,7 @@ __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 		session = (WT_SESSION_IMPL *)cbt->iface.session;
 		page = cbt->ref->page;
 		rip = &page->u.row.d[cbt->slot];
-		WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
+		WT_RET(__wt_row_leaf_key(session, page, rip, key, false));
 	} else {
 		key->data = WT_INSERT_KEY(cbt->ins);
 		key->size = WT_INSERT_KEY_SIZE(cbt->ins);
@@ -1035,14 +1035,14 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static inline bool
 __wt_page_can_evict(WT_SESSION_IMPL *session,
-    WT_PAGE *page, int check_splits, int *inmem_splitp)
+    WT_PAGE *page, bool check_splits, bool *inmem_splitp)
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_GLOBAL *txn_global;
 
 	if (inmem_splitp != NULL)
-		*inmem_splitp = 0;
+		*inmem_splitp = false;
 
 	btree = S2BT(session);
 	mod = page->modify;
@@ -1059,9 +1059,32 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 */
 	if (__wt_page_can_split(session, page)) {
 		if (inmem_splitp != NULL)
-			*inmem_splitp = 1;
+			*inmem_splitp = true;
 		return (true);
 	}
+
+	/*
+	 * If the file is being checkpointed, we can't evict dirty pages:
+	 * if we write a page and free the previous version of the page, that
+	 * previous version might be referenced by an internal page already
+	 * been written in the checkpoint, leaving the checkpoint inconsistent.
+	 */
+	if (btree->checkpointing != WT_CKPT_OFF &&
+	    __wt_page_is_modified(page)) {
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
+		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
+		return (false);
+	}
+
+	/*
+	 * We can't evict clean, multiblock row-store pages with overflow keys
+	 * when the file is being checkpointed: the split into the parent frees
+	 * the backing blocks for no-longer-used overflow keys, corrupting the
+	 * checkpoint's block management.
+	 */
+	if (btree->checkpointing &&
+	    mod->rec_result == WT_PM_REC_MULTIBLOCK && mod->mod_multi_row_ovfl)
+		return (false);
 
 	/*
 	 * If the tree was deepened, there's a requirement that newly created
@@ -1075,18 +1098,6 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (false);
-
-	/*
-	 * If the file is being checkpointed, we can't evict dirty pages:
-	 * if we write a page and free the previous version of the page, that
-	 * previous version might be referenced by an internal page already
-	 * been written in the checkpoint, leaving the checkpoint inconsistent.
-	 */
-	if (btree->checkpointing && __wt_page_is_modified(page)) {
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
-		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
-		return (false);
-	}
 
 	/*
 	 * If the page was recently split in-memory, don't evict it immediately:
@@ -1115,7 +1126,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int locked, too_big;
+	bool locked, too_big;
 
 	btree = S2BT(session);
 	page = ref->page;
@@ -1125,7 +1136,8 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * reference without first locking the page, it could be evicted in
 	 * between.
 	 */
-	locked = __wt_atomic_casv32(&ref->state, WT_REF_MEM, WT_REF_LOCKED);
+	locked = __wt_atomic_casv32(
+	    &ref->state, WT_REF_MEM, WT_REF_LOCKED) ? true : false;
 	if ((ret = __wt_hazard_clear(session, page)) != 0 || !locked) {
 		if (locked)
 			ref->state = WT_REF_MEM;
@@ -1134,7 +1146,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	(void)__wt_atomic_addv32(&btree->evict_busy, 1);
 
-	too_big = (page->memory_footprint > btree->maxmempage) ? 1 : 0;
+	too_big = page->memory_footprint > btree->maxmempage;
 	if ((ret = __wt_evict(session, ref, 0)) == 0) {
 		if (too_big)
 			WT_STAT_FAST_CONN_INCR(session, cache_eviction_force);
@@ -1194,7 +1206,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    LF_ISSET(WT_READ_NO_EVICT) ||
 	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    !__wt_page_can_evict(session, page, 1, NULL))
+	    !__wt_page_can_evict(session, page, true, NULL))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
@@ -1215,7 +1227,7 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
     )
 {
 	WT_DECL_RET;
-	int acquired;
+	bool acquired;
 
 	/*
 	 * In rare cases when walking the tree, we try to swap to the same

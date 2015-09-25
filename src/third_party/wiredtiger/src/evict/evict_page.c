@@ -8,8 +8,8 @@
 
 #include "wt_internal.h"
 
-static int  __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, int);
-static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, int *, int);
+static int  __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, bool);
+static int  __evict_review(WT_SESSION_IMPL *, WT_REF *, bool *, bool);
 
 /*
  * __evict_exclusive_clear --
@@ -49,13 +49,13 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
  *	Evict a page.
  */
 int
-__wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
+__wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
-	int forced_eviction, inmem_split;
+	bool forced_eviction, inmem_split;
 
 	conn = S2C(session);
 
@@ -64,7 +64,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 
 	page = ref->page;
 	forced_eviction = page->read_gen == WT_READGEN_OLDEST;
-	inmem_split = 0;
+	inmem_split = false;
 
 	WT_RET(__wt_verbose(session, WT_VERB_EVICT,
 	    "page %p (%s)", page, __wt_page_type_string(page->type)));
@@ -106,7 +106,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 		conn->cache->evict_max_page_size = page->memory_footprint;
 
 	/* Update the reference and discard the page. */
-	if (mod == NULL || !F_ISSET(mod, WT_PM_REC_MASK)) {
+	if (mod == NULL || mod->rec_result == 0) {
 		if (__wt_ref_is_root(ref))
 			__wt_ref_out(session, ref);
 		else
@@ -148,7 +148,8 @@ done:	if (((inmem_split && ret == 0) || (forced_eviction && ret == EBUSY)) &&
  *	Update a clean page's reference on eviction.
  */
 int
-__wt_evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
+__wt_evict_page_clean_update(
+    WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	/*
 	 * If doing normal system eviction, but only in the service of reducing
@@ -174,7 +175,7 @@ __wt_evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
  *	Update a dirty page's reference on eviction.
  */
 static int
-__evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
+__evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_ADDR *addr;
 	WT_PAGE *parent;
@@ -183,7 +184,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 	parent = ref->home;
 	mod = ref->page->modify;
 
-	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
+	switch (mod->rec_result) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 		/* Discard the parent's address. */
 		if (ref->addr != NULL && __wt_off_page(parent, ref->addr)) {
@@ -296,7 +297,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
  */
 static int
 __evict_review(
-    WT_SESSION_IMPL *session, WT_REF *ref, int *inmem_splitp, int closing)
+    WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp, bool closing)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -341,9 +342,9 @@ __evict_review(
 		 * fallen behind current.
 		 */
 		if (__wt_page_is_modified(page))
-			__wt_txn_update_oldest(session, 1);
+			__wt_txn_update_oldest(session, true);
 
-		if (!__wt_page_can_evict(session, page, 0, inmem_splitp))
+		if (!__wt_page_can_evict(session, page, false, inmem_splitp))
 			return (EBUSY);
 
 		/*

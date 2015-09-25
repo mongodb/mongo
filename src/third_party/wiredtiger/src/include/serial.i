@@ -202,8 +202,8 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 {
 	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
-	int simple;
 	u_int i;
+	bool simple;
 
 	/* Check for page write generation wrap. */
 	WT_RET(__page_write_gen_wrapped_check(page));
@@ -211,10 +211,10 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	/* Clear references to memory we now own and must free on error. */
 	*new_insp = NULL;
 
-	simple = 1;
+	simple = true;
 	for (i = 0; i < skipdepth; i++)
 		if (new_ins->next[i] == NULL)
-			simple = 0;
+			simple = false;
 
 	if (simple)
 		ret = __insert_simple_func(
@@ -306,7 +306,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	if ((txn = page->modify->obsolete_check_txn) != WT_TXN_NONE) {
 		if (!__wt_txn_visible_all(session, txn)) {
 			/* Try to move the oldest ID forward and re-check. */
-			__wt_txn_update_oldest(session, 0);
+			__wt_txn_update_oldest(session, false);
 
 			if (!__wt_txn_visible_all(session, txn))
 				return (0);

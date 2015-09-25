@@ -78,7 +78,7 @@ __wt_metadata_cursor(
 {
 	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
-	int is_dead;
+	bool is_dead;
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_open_cursor), config, NULL };
 
@@ -96,7 +96,7 @@ __wt_metadata_cursor(
 	/* The metadata should never be closed. */
 	WT_ASSERT(session, !is_dead);
 
-	WT_ERR(__wt_curfile_create(session, NULL, cfg, 0, 0, cursorp));
+	WT_ERR(__wt_curfile_create(session, NULL, cfg, false, false, cursorp));
 	__wt_cursor_dhandle_incr_use(session);
 
 	/* Restore the caller's btree. */

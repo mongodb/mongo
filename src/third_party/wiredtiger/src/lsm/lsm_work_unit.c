@@ -19,7 +19,7 @@ static int __lsm_discard_handle(WT_SESSION_IMPL *, const char *, const char *);
  */
 static int
 __lsm_copy_chunks(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, WT_LSM_WORKER_COOKIE *cookie, int old_chunks)
+    WT_LSM_TREE *lsm_tree, WT_LSM_WORKER_COOKIE *cookie, bool old_chunks)
 {
 	WT_DECL_RET;
 	u_int i, nchunks;
@@ -68,7 +68,7 @@ err:	WT_TRET(__wt_lsm_tree_readunlock(session, lsm_tree));
  */
 int
 __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, int force, WT_LSM_CHUNK **chunkp)
+    WT_LSM_TREE *lsm_tree, bool force, WT_LSM_CHUNK **chunkp)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk, *evict_chunk, *flush_chunk;
@@ -157,14 +157,14 @@ __lsm_unpin_chunks(WT_SESSION_IMPL *session, WT_LSM_WORKER_COOKIE *cookie)
  */
 int
 __wt_lsm_work_switch(
-    WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT **entryp, int *ran)
+    WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT **entryp, bool *ran)
 {
 	WT_DECL_RET;
 	WT_LSM_WORK_UNIT *entry;
 
 	/* We've become responsible for freeing the work unit. */
 	entry = *entryp;
-	*ran = 0;
+	*ran = false;
 	*entryp = NULL;
 
 	if (F_ISSET(entry->lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
@@ -177,7 +177,7 @@ __wt_lsm_work_switch(
 				    WT_LSM_WORK_SWITCH, 0, entry->lsm_tree));
 			ret = 0;
 		} else
-			*ran = 1;
+			*ran = true;
 	}
 err:	__wt_lsm_manager_free_work_unit(session, entry);
 	return (ret);
@@ -198,7 +198,7 @@ __wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_CLEAR(cookie);
 
-	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
+	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, false));
 
 	/* Create bloom filters in all checkpointed chunks. */
 	merge = 0;
@@ -285,7 +285,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	}
 
 	/* Stop if a running transaction needs the chunk. */
-	__wt_txn_update_oldest(session, 1);
+	__wt_txn_update_oldest(session, true);
 	if (chunk->switch_txn == WT_TXN_NONE ||
 	    !__wt_txn_visible_all(session, chunk->switch_txn)) {
 		WT_RET(__wt_verbose(session, WT_VERB_LSM,
@@ -344,7 +344,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	++lsm_tree->dsk_gen;
 
 	/* Update the throttle time. */
-	__wt_lsm_tree_throttle(session, lsm_tree, 1);
+	__wt_lsm_tree_throttle(session, lsm_tree, true);
 	WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 
 	if (ret != 0)
@@ -357,7 +357,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * forced eviction.
 	 */
 	WT_RET(__wt_session_get_btree(session, chunk->uri, NULL, NULL, 0));
-	__wt_btree_evictable(session, 1);
+	__wt_btree_evictable(session, true);
 	WT_RET(__wt_session_release_btree(session));
 
 	/* Make sure we aren't pinning a transaction ID. */
@@ -519,9 +519,10 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORKER_COOKIE cookie;
 	u_int i, skipped;
-	int flush_metadata, drop_ret;
+	int drop_ret;
+	bool flush_metadata;
 
-	flush_metadata = 0;
+	flush_metadata = false;
 
 	if (lsm_tree->nold_chunks == 0)
 		return (0);
@@ -543,7 +544,7 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * one to keep the non-NULL slots at the beginning of the array.
 	 */
 	WT_CLEAR(cookie);
-	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, 1));
+	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, true));
 	for (i = skipped = 0; i < cookie.nchunks; i++) {
 		chunk = cookie.chunk_array[i];
 		WT_ASSERT(session, chunk != NULL);
@@ -580,7 +581,7 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			} else if (drop_ret != ENOENT)
 				WT_ERR(drop_ret);
 
-			flush_metadata = 1;
+			flush_metadata = true;
 			F_CLR(chunk, WT_LSM_CHUNK_BLOOM);
 		}
 		if (chunk->uri != NULL) {
@@ -590,7 +591,7 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				continue;
 			} else if (drop_ret != ENOENT)
 				WT_ERR(drop_ret);
-			flush_metadata = 1;
+			flush_metadata = true;
 		}
 
 		/* Lock the tree to clear out the old chunk information. */

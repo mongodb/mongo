@@ -13,7 +13,7 @@
  *	Configure the underlying cache.
  */
 static int
-__cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
+__cache_config_local(WT_SESSION_IMPL *session, bool shared, const char *cfg[])
 {
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
@@ -76,11 +76,11 @@ __cache_config_local(WT_SESSION_IMPL *session, int shared, const char *cfg[])
  *	Configure or reconfigure the current cache and shared cache.
  */
 int
-__wt_cache_config(WT_SESSION_IMPL *session, int reconfigure, const char *cfg[])
+__wt_cache_config(WT_SESSION_IMPL *session, bool reconfigure, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	int now_shared, was_shared;
+	bool now_shared, was_shared;
 
 	conn = S2C(session);
 
@@ -137,7 +137,7 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 	cache = conn->cache;
 
 	/* Use a common routine for run-time configuration options. */
-	WT_RET(__wt_cache_config(session, 0, cfg));
+	WT_RET(__wt_cache_config(session, false, cfg));
 
 	/*
 	 * The target size must be lower than the trigger size or we will never
@@ -148,9 +148,9 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 		    "eviction target must be lower than the eviction trigger");
 
 	WT_ERR(__wt_cond_alloc(session,
-	    "cache eviction server", 0, &cache->evict_cond));
+	    "cache eviction server", false, &cache->evict_cond));
 	WT_ERR(__wt_cond_alloc(session,
-	    "eviction waiters", 0, &cache->evict_waiter_cond));
+	    "eviction waiters", false, &cache->evict_waiter_cond));
 	WT_ERR(__wt_spin_init(session, &cache->evict_lock, "cache eviction"));
 	WT_ERR(__wt_spin_init(session, &cache->evict_walk_lock, "cache walk"));
 

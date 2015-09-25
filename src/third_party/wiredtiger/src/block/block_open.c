@@ -22,7 +22,8 @@ __wt_block_manager_truncate(
 	WT_FH *fh;
 
 	/* Open the underlying file handle. */
-	WT_RET(__wt_open(session, filename, 0, 0, WT_FILE_TYPE_DATA, &fh));
+	WT_RET(__wt_open(
+	    session, filename, false, false, WT_FILE_TYPE_DATA, &fh));
 
 	/* Truncate the file. */
 	WT_ERR(__wt_block_truncate(session, fh, (wt_off_t)0));
@@ -53,7 +54,8 @@ __wt_block_manager_create(
 	WT_DECL_RET;
 	WT_DECL_ITEM(tmp);
 	WT_FH *fh;
-	int exists, suffix;
+	int suffix;
+	bool exists;
 	char *path;
 
 	/*
@@ -65,8 +67,8 @@ __wt_block_manager_create(
 	 * in our space. Move any existing files out of the way and complain.
 	 */
 	for (;;) {
-		if ((ret = __wt_open(
-		    session, filename, 1, 1, WT_FILE_TYPE_DATA, &fh)) == 0)
+		if ((ret = __wt_open(session,
+		    filename, true, true, WT_FILE_TYPE_DATA, &fh)) == 0)
 			break;
 		WT_ERR_TEST(ret != EEXIST, ret);
 
@@ -149,7 +151,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
  *	Configure first-fit allocation.
  */
 void
-__wt_block_configure_first_fit(WT_BLOCK *block, int on)
+__wt_block_configure_first_fit(WT_BLOCK *block, bool on)
 {
 	/*
 	 * Switch to first-fit allocation so we rewrite blocks at the start of
@@ -170,7 +172,7 @@ __wt_block_configure_first_fit(WT_BLOCK *block, int on)
 int
 __wt_block_open(WT_SESSION_IMPL *session,
     const char *filename, const char *cfg[],
-    int forced_salvage, int readonly, uint32_t allocsize, WT_BLOCK **blockp)
+    bool forced_salvage, bool readonly, uint32_t allocsize, WT_BLOCK **blockp)
 {
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
@@ -210,8 +212,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strdup(session, filename, &block->name));
 
 	WT_ERR(__wt_config_gets(session, cfg, "block_allocation", &cval));
-	block->allocfirst =
-	    WT_STRING_MATCH("first", cval.str, cval.len) ? 1 : 0;
+	block->allocfirst = WT_STRING_MATCH("first", cval.str, cval.len);
 
 	/* Configuration: optional OS buffer cache maximum size. */
 	WT_ERR(__wt_config_gets(session, cfg, "os_cache_max", &cval));
@@ -248,7 +249,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 #endif
 
 	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(session, filename, 0, 0,
+	WT_ERR(__wt_open(session, filename, false, false,
 	    readonly ? WT_FILE_TYPE_CHECKPOINT : WT_FILE_TYPE_DATA,
 	    &block->fh));
 

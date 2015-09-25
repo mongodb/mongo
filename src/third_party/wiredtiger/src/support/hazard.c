@@ -17,7 +17,7 @@ static void __hazard_dump(WT_SESSION_IMPL *);
  *	Set a hazard pointer.
  */
 int
-__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
+__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -30,7 +30,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 
 	btree = S2BT(session);
 	conn = S2C(session);
-	*busyp = 0;
+	*busyp = false;
 
 	/* If a file can never be evicted, hazard pointers aren't required. */
 	if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
@@ -117,7 +117,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 		 * prevent some random page from being evicted.
 		 */
 		hp->page = NULL;
-		*busyp = 1;
+		*busyp = true;
 		return (0);
 	}
 
@@ -187,17 +187,17 @@ void
 __wt_hazard_close(WT_SESSION_IMPL *session)
 {
 	WT_HAZARD *hp;
-	int found;
+	bool found;
 
 	/*
 	 * Check for a set hazard pointer and complain if we find one.  We could
 	 * just check the session's hazard pointer count, but this is a useful
 	 * diagnostic.
 	 */
-	for (found = 0, hp = session->hazard;
+	for (found = false, hp = session->hazard;
 	    hp < session->hazard + session->hazard_size; ++hp)
 		if (hp->page != NULL) {
-			found = 1;
+			found = true;
 			break;
 		}
 	if (session->nhazard == 0 && !found)

@@ -93,7 +93,7 @@ struct __wt_fh {
 	wt_off_t extend_size;			/* File extended size */
 	wt_off_t extend_len;			/* File extend chunk size */
 
-	int	direct_io;			/* O_DIRECT configured */
+	bool	 direct_io;			/* O_DIRECT configured */
 
 	enum {					/* file extend configuration */
 	    WT_FALLOCATE_AVAILABLE,

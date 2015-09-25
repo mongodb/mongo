@@ -302,6 +302,7 @@ UnixLib
 Unmap
 UnmapViewOfFile
 Unmarshall
+Unordered
 Uryyb
 VARCHAR
 VLDB
@@ -967,6 +968,7 @@ unmarshall
 unmarshalled
 unmerged
 unmodify
+unordered
 unpackv
 unpadded
 unreferenced

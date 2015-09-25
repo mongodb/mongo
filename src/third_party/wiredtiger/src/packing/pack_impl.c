@@ -15,7 +15,7 @@
  */
 int
 __wt_struct_check(WT_SESSION_IMPL *session,
-    const char *fmt, size_t len, int *fixedp, uint32_t *fixed_lenp)
+    const char *fmt, size_t len, bool *fixedp, uint32_t *fixed_lenp)
 {
 	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;

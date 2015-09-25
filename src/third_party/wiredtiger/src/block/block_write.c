@@ -40,10 +40,10 @@ __wt_block_truncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
  */
 static inline int
 __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_FH *fh, wt_off_t offset, size_t align_size, int *release_lockp)
+    WT_FH *fh, wt_off_t offset, size_t align_size, bool *release_lockp)
 {
 	WT_DECL_RET;
-	int locked;
+	bool locked;
 
 	/*
 	 * The locking in this function is messy: by definition, the live system
@@ -58,7 +58,7 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * need a lock after all, we re-acquire the lock and set release_lock so
 	 * our caller knows to release it.
 	 */
-	locked = 1;
+	locked = true;
 
 	/* If not configured to extend the file, we're done. */
 	if (fh->extend_len == 0)
@@ -97,7 +97,7 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * over the extend call.)
 		 */
 		if (!fh->fallocate_requires_locking && *release_lockp) {
-			*release_lockp = locked = 0;
+			*release_lockp = locked = false;
 			__wt_spin_unlock(session, &block->live_lock);
 		}
 
@@ -122,7 +122,7 @@ __wt_block_extend(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 */
 	if (!locked) {
 		__wt_spin_lock(session, &block->live_lock);
-		*release_lockp = 1;
+		*release_lockp = true;
 	}
 
 	/*
@@ -172,14 +172,14 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
  */
 int
 __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, int data_cksum)
+    WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, bool data_cksum)
 {
 	wt_off_t offset;
 	uint32_t size, cksum;
 	uint8_t *endp;
 
 	WT_RET(__wt_block_write_off(
-	    session, block, buf, &offset, &size, &cksum, data_cksum, 0));
+	    session, block, buf, &offset, &size, &cksum, data_cksum, false));
 
 	endp = addr;
 	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
@@ -196,14 +196,14 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 int
 __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump,
-    int data_cksum, int caller_locked)
+    bool data_cksum, bool caller_locked)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_RET;
 	WT_FH *fh;
 	size_t align_size;
 	wt_off_t offset;
-	int local_locked;
+	bool local_locked;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	fh = block->fh;
@@ -272,10 +272,10 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * the block-extend function may release the lock).
 	 * Release any locally acquired lock.
 	 */
-	local_locked = 0;
+	local_locked = false;
 	if (!caller_locked) {
 		__wt_spin_lock(session, &block->live_lock);
-		local_locked = 1;
+		local_locked = true;
 	}
 	ret = __wt_block_alloc(session, block, &offset, (wt_off_t)align_size);
 	if (ret == 0)
