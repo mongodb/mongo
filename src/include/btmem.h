@@ -288,11 +288,9 @@ struct __wt_page_modify {
 		uint32_t cksum;
 	} *multi;
 	uint32_t multi_entries;		/* Multiple blocks element count */
-	bool	 multi_row_ovfl;	/* Row-store overflow key/values */
 	} m;
 #define	mod_multi		u1.m.multi
 #define	mod_multi_entries	u1.m.multi_entries
-#define	mod_multi_row_ovfl	u1.m.multi_row_ovfl
 	} u1;
 
 	/*
