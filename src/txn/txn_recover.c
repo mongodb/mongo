@@ -24,9 +24,8 @@ typedef struct {
 
 	WT_LSN ckpt_lsn;		/* Start LSN for main recovery loop. */
 
-	int missing;			/* Were there missing files? */
-	int modified;			/* Did recovery make any changes? */
-	int metadata_only;		/*
+	bool missing;			/* Were there missing files? */
+	bool metadata_only;		/*
 					 * Set during the first recovery pass,
 					 * when only the metadata is recovered.
 					 */
@@ -38,12 +37,12 @@ typedef struct {
  */
 static int
 __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
-    WT_LSN *lsnp, u_int id, int duplicate, WT_CURSOR **cp)
+    WT_LSN *lsnp, u_int id, bool duplicate, WT_CURSOR **cp)
 {
 	WT_CURSOR *c;
+	bool metadata_op;
 	const char *cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), "overwrite", NULL };
-	int metadata_op;
 
 	c = NULL;
 
@@ -55,7 +54,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	 * is more recent than the last checkpoint.  If there is no entry for a
 	 * file, assume it was dropped or missing after a hot backup.
 	 */
-	metadata_op = (id == WT_METAFILE_ID);
+	metadata_op = id == WT_METAFILE_ID;
 	if (r->metadata_only != metadata_op)
 		;
 	else if (id >= r->nfiles || r->files[id].uri == NULL) {
@@ -64,7 +63,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 			WT_RET(__wt_verbose(session, WT_VERB_RECOVERY,
 			    "No file found with ID %u (max %u)",
 			    id, r->nfiles));
-		r->missing = 1;
+		r->missing = true;
 	} else if (__wt_log_cmp(lsnp, &r->files[id].ckpt_lsn) >= 0) {
 		/*
 		 * We're going to apply the operation.  Get the cursor, opening
@@ -90,7 +89,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
  */
 #define	GET_RECOVERY_CURSOR(session, r, lsnp, fileid, cp)		\
 	WT_ERR(__recovery_cursor(					\
-	    (session), (r), (lsnp), (fileid), 0, (cp)));		\
+	    (session), (r), (lsnp), (fileid), false, (cp)));		\
 	WT_ERR(__wt_verbose((session), WT_VERB_RECOVERY,		\
 	    "%s op %d to file %d at LSN %u/%" PRIuMAX,			\
 	    (cursor == NULL) ? "Skipping" : "Applying",			\
@@ -153,7 +152,7 @@ __txn_op_apply(
 		} else {
 			start = cursor;
 			WT_ERR(__recovery_cursor(
-			    session, r, lsnp, fileid, 1, &stop));
+			    session, r, lsnp, fileid, true, &stop));
 		}
 
 		/* Set the keys. */
@@ -200,7 +199,7 @@ __txn_op_apply(
 		case WT_TXN_TRUNC_BOTH:
 			start = cursor;
 			WT_ERR(__recovery_cursor(
-			    session, r, lsnp, fileid, 1, &stop));
+			    session, r, lsnp, fileid, true, &stop));
 			break;
 		case WT_TXN_TRUNC_START:
 			start = cursor;
@@ -232,8 +231,6 @@ __txn_op_apply(
 	/* Reset the cursor so it doesn't block eviction. */
 	if (cursor != NULL)
 		WT_ERR(cursor->reset(cursor));
-
-	r->modified = 1;
 
 err:	if (ret != 0)
 		__wt_err(session, ret, "Operation failed during recovery");
@@ -415,15 +412,15 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	WT_RECOVERY r;
 	struct WT_RECOVERY_FILE *metafile;
 	char *config;
-	int needs_rec, was_backup;
+	bool needs_rec, was_backup;
 
 	conn = S2C(session);
 	WT_CLEAR(r);
 	WT_INIT_LSN(&r.ckpt_lsn);
-	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP) ? 1 : 0;
+	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP);
 
 	/* We need a real session for recovery. */
-	WT_RET(__wt_open_session(conn, NULL, NULL, 1, &session));
+	WT_RET(__wt_open_session(conn, NULL, NULL, true, &session));
 	F_SET(session, WT_SESSION_NO_LOGGING);
 	r.session = session;
 
@@ -451,7 +448,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * backup: we already have the correct metadata in that case.
 	 */
 	if (!was_backup) {
-		r.metadata_only = 1;
+		r.metadata_only = true;
 		if (WT_IS_INIT_LSN(&metafile->ckpt_lsn))
 			WT_ERR(__wt_log_scan(session,
 			    NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
@@ -485,7 +482,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * Now, recover all the files apart from the metadata.
 	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
 	 */
-	r.metadata_only = 0;
+	r.metadata_only = false;
 	WT_ERR(__wt_verbose(session, WT_VERB_RECOVERY,
 	    "Main recovery loop: starting at %u/%" PRIuMAX,
 	    r.ckpt_lsn.file, (uintmax_t)r.ckpt_lsn.offset));

@@ -20,7 +20,7 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_UNUSED(session);
 
 	/* Switch to first-fit allocation. */
-	__wt_block_configure_first_fit(block, 1);
+	__wt_block_configure_first_fit(block, true);
 
 	block->compact_pct_tenths = 0;
 
@@ -37,7 +37,7 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_UNUSED(session);
 
 	/* Restore the original allocation plan. */
-	__wt_block_configure_first_fit(block, 0);
+	__wt_block_configure_first_fit(block, false);
 
 	block->compact_pct_tenths = 0;
 
@@ -49,7 +49,7 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
  *	Return if compaction will shrink the file.
  */
 int
-__wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
+__wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 {
 	WT_DECL_RET;
 	WT_EXT *ext;
@@ -57,7 +57,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	WT_FH *fh;
 	wt_off_t avail_eighty, avail_ninety, eighty, ninety;
 
-	*skipp = 1;				/* Return a default skip. */
+	*skipp = true;				/* Return a default skip. */
 
 	fh = block->fh;
 
@@ -119,11 +119,11 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	 */
 	if (avail_eighty > WT_MEGABYTE &&
 	    avail_eighty >= ((fh->size / 10) * 2)) {
-		*skipp = 0;
+		*skipp = false;
 		block->compact_pct_tenths = 2;
 	} else if (avail_ninety > WT_MEGABYTE &&
 	    avail_ninety >= fh->size / 10) {
-		*skipp = 0;
+		*skipp = false;
 		block->compact_pct_tenths = 1;
 	}
 
@@ -138,7 +138,7 @@ err:	__wt_spin_unlock(session, &block->live_lock);
  */
 int
 __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *addr, size_t addr_size, int *skipp)
+    WT_BLOCK *block, const uint8_t *addr, size_t addr_size, bool *skipp)
 {
 	WT_DECL_RET;
 	WT_EXT *ext;
@@ -148,7 +148,7 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	uint32_t size, cksum;
 
 	WT_UNUSED(addr_size);
-	*skipp = 1;				/* Return a default skip. */
+	*skipp = true;				/* Return a default skip. */
 
 	fh = block->fh;
 
@@ -170,7 +170,7 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 			if (ext->off >= limit)
 				break;
 			if (ext->size >= size) {
-				*skipp = 0;
+				*skipp = false;
 				break;
 			}
 		}

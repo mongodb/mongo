@@ -31,7 +31,7 @@ static const					/* Output separator */
 static int  __debug_cell(WT_DBG *, const WT_PAGE_HEADER *, WT_CELL_UNPACK *);
 static int  __debug_cell_data(
 	WT_DBG *, WT_PAGE *, int type, const char *, WT_CELL_UNPACK *);
-static void __debug_col_skip(WT_DBG *, WT_INSERT_HEAD *, const char *, int);
+static void __debug_col_skip(WT_DBG *, WT_INSERT_HEAD *, const char *, bool);
 static int  __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __debug_dsk_cell(WT_DBG *, const WT_PAGE_HEADER *);
 static void __debug_dsk_col_fix(WT_DBG *, const WT_PAGE_HEADER *);
@@ -46,7 +46,7 @@ static int  __debug_page_row_leaf(WT_DBG *, WT_PAGE *);
 static int  __debug_ref(WT_DBG *, WT_REF *);
 static void __debug_row_skip(WT_DBG *, WT_INSERT_HEAD *);
 static int  __debug_tree(WT_SESSION_IMPL *, WT_PAGE *, const char *, uint32_t);
-static void __debug_update(WT_DBG *, WT_UPDATE *, int);
+static void __debug_update(WT_DBG *, WT_UPDATE *, bool);
 static void __dmsg(WT_DBG *, const char *, ...)
 	WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 2, 3)));
 static void __dmsg_wrapup(WT_DBG *);
@@ -651,7 +651,7 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", split-insert");
 
 	if (mod != NULL)
-		switch (F_ISSET(mod, WT_PM_REC_MASK)) {
+		switch (mod->rec_result) {
 		case WT_PM_REC_EMPTY:
 			__dmsg(ds, ", empty");
 			break;
@@ -707,7 +707,7 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 				__dmsg(ds,
 				    "\tupdate %" PRIu64 "\n",
 				    WT_INSERT_RECNO(ins));
-				__debug_update(ds, ins->upd, 1);
+				__debug_update(ds, ins->upd, true);
 				ins = WT_SKIP_NEXT(ins);
 			}
 			++recno;
@@ -716,11 +716,12 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 
 	if (WT_COL_UPDATE_SINGLE(page) != NULL) {
 		__dmsg(ds, "%s", sep);
-		__debug_col_skip(ds, WT_COL_UPDATE_SINGLE(page), "update", 1);
+		__debug_col_skip(
+		    ds, WT_COL_UPDATE_SINGLE(page), "update", true);
 	}
 	if (WT_COL_APPEND(page) != NULL) {
 		__dmsg(ds, "%s", sep);
-		__debug_col_skip(ds, WT_COL_APPEND(page), "append", 1);
+		__debug_col_skip(ds, WT_COL_APPEND(page), "append", true);
 	}
 }
 
@@ -783,13 +784,13 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 		    __debug_cell_data(ds, page, WT_PAGE_COL_VAR, tag, unpack));
 
 		if ((update = WT_COL_UPDATE(page, cip)) != NULL)
-			__debug_col_skip(ds, update, "update", 0);
+			__debug_col_skip(ds, update, "update", false);
 		recno += rle;
 	}
 
 	if (WT_COL_APPEND(page) != NULL) {
 		__dmsg(ds, "%s", sep);
-		__debug_col_skip(ds, WT_COL_APPEND(page), "append", 0);
+		__debug_col_skip(ds, WT_COL_APPEND(page), "append", false);
 	}
 
 	return (0);
@@ -855,7 +856,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
-		WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
+		WT_RET(__wt_row_leaf_key(session, page, rip, key, false));
 		__debug_item(ds, "K", key->data, key->size);
 
 		if ((cell = __wt_row_leaf_value_cell(page, rip, NULL)) == NULL)
@@ -867,7 +868,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 		}
 
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
-			__debug_update(ds, upd, 0);
+			__debug_update(ds, upd, false);
 
 		if ((insert = WT_ROW_INSERT(page, rip)) != NULL)
 			__debug_row_skip(ds, insert);
@@ -882,7 +883,8 @@ err:	__wt_scr_free(session, &key);
  *	Dump a column-store skiplist.
  */
 static void
-__debug_col_skip(WT_DBG *ds, WT_INSERT_HEAD *head, const char *tag, int hexbyte)
+__debug_col_skip(
+    WT_DBG *ds, WT_INSERT_HEAD *head, const char *tag, bool hexbyte)
 {
 	WT_INSERT *ins;
 
@@ -905,7 +907,7 @@ __debug_row_skip(WT_DBG *ds, WT_INSERT_HEAD *head)
 	WT_SKIP_FOREACH(ins, head) {
 		__debug_item(ds,
 		    "insert", WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins));
-		__debug_update(ds, ins->upd, 0);
+		__debug_update(ds, ins->upd, false);
 	}
 }
 
@@ -914,7 +916,7 @@ __debug_row_skip(WT_DBG *ds, WT_INSERT_HEAD *head)
  *	Dump an update list.
  */
 static void
-__debug_update(WT_DBG *ds, WT_UPDATE *upd, int hexbyte)
+__debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
 {
 	for (; upd != NULL; upd = upd->next)
 		if (WT_UPDATE_DELETED_ISSET(upd))

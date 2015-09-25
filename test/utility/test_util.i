@@ -100,7 +100,8 @@ static inline void
 testutil_clean_work_dir(char *dir)
 {
 	size_t inputSize;
-	int exist, ret;
+	int ret;
+	bool exist;
 	char *buffer;
 
 	/* Additional bytes for the Windows rd command. */

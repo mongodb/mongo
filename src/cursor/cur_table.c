@@ -134,7 +134,7 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx,
  *	Apply an operation to all indices of a table.
  */
 static int
-__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, int skip_immutable) {
+__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, bool skip_immutable) {
 	WT_CURSOR **cp;
 	WT_INDEX *idx;
 	WT_SESSION_IMPL *session;
@@ -516,7 +516,7 @@ __curtable_insert(WT_CURSOR *cursor)
 	cp = ctable->cg_cursors;
 	primary = *cp++;
 
-	flag_orig = F_ISSET(primary, WT_CURSTD_OVERWRITE);
+	flag_orig = F_MASK(primary, WT_CURSTD_OVERWRITE);
 	if (ctable->table->nindices > 0)
 		F_CLR(primary, WT_CURSTD_OVERWRITE);
 	ret = primary->insert(primary);
@@ -540,7 +540,7 @@ __curtable_insert(WT_CURSOR *cursor)
 		WT_ERR((*cp)->insert(*cp));
 	}
 
-	WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), 0));
+	WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), false));
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -579,7 +579,7 @@ __curtable_update(WT_CURSOR *cursor)
 		/* Remove only if the key exists. */
 		if (ret == 0) {
 			WT_ERR(__apply_idx(ctable,
-			    offsetof(WT_CURSOR, remove), 1));
+			    offsetof(WT_CURSOR, remove), true));
 			WT_ERR(__wt_schema_project_slice(session,
 			    ctable->cg_cursors, ctable->plan, 0,
 			    cursor->value_format, value_copy));
@@ -591,7 +591,7 @@ __curtable_update(WT_CURSOR *cursor)
 	WT_ERR(ret);
 
 	if (ctable->table->nindices > 0)
-		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), 1));
+		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, insert), true));
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	__wt_scr_free(session, &value_copy);
@@ -617,7 +617,7 @@ __curtable_remove(WT_CURSOR *cursor)
 	if (ctable->table->nindices > 0) {
 		APPLY_CG(ctable, search);
 		WT_ERR(ret);
-		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, remove), 0));
+		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, remove), false));
 	}
 
 	APPLY_CG(ctable, remove);
@@ -668,7 +668,7 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 				APPLY_CG(stop, search);
 				WT_ERR(ret);
 				WT_ERR(__apply_idx(
-				    stop, offsetof(WT_CURSOR, remove), 0));
+				    stop, offsetof(WT_CURSOR, remove), false));
 			} while ((ret = wt_stop->prev(wt_stop)) == 0);
 			WT_ERR_NOTFOUND_OK(ret);
 
@@ -683,7 +683,7 @@ __wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 				APPLY_CG(start, search);
 				WT_ERR(ret);
 				WT_ERR(__apply_idx(
-				    start, offsetof(WT_CURSOR, remove), 0));
+				    start, offsetof(WT_CURSOR, remove), false));
 				if (stop != NULL)
 					WT_ERR(wt_start->compare(
 					    wt_start, wt_stop,
@@ -777,7 +777,7 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 		cfg_arg[0], cfg_arg[1], "dump=\"\",readonly=0", NULL, NULL
 	};
 	u_int i;
-	int complete;
+	bool complete;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
@@ -885,7 +885,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		size = strlen(tablename);
 	else
 		size = WT_PTRDIFF(columns, tablename);
-	WT_RET(__wt_schema_get_table(session, tablename, size, 0, &table));
+	WT_RET(__wt_schema_get_table(session, tablename, size, false, &table));
 
 	if (table->is_simple) {
 		/* Just return a cursor on the underlying data source. */
@@ -912,13 +912,13 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 	if (columns != NULL) {
 		WT_ERR(__wt_struct_reformat(session, table,
-		    columns, strlen(columns), NULL, 1, tmp));
+		    columns, strlen(columns), NULL, true, tmp));
 		WT_ERR(__wt_strndup(
 		    session, tmp->data, tmp->size, &cursor->value_format));
 
 		WT_ERR(__wt_buf_init(session, tmp, 0));
 		WT_ERR(__wt_struct_plan(session, table,
-		    columns, strlen(columns), 0, tmp));
+		    columns, strlen(columns), false, tmp));
 		WT_ERR(__wt_strndup(
 		    session, tmp->data, tmp->size, &ctable->plan));
 	}

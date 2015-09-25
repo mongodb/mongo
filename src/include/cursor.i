@@ -60,7 +60,7 @@ __cursor_enter(WT_SESSION_IMPL *session)
 	 * whether the cache is full.
 	 */
 	if (session->ncursors == 0)
-		WT_RET(__wt_cache_eviction_check(session, 0, NULL));
+		WT_RET(__wt_cache_eviction_check(session, false, NULL));
 	++session->ncursors;
 	return (0);
 }
@@ -178,7 +178,7 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
  *	Cursor call setup.
  */
 static inline int
-__cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
+__cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 {
 	WT_SESSION_IMPL *session;
 
@@ -296,7 +296,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 		 * already did __wt_row_leaf_key's fast-path checks inline.
 		 */
 slow:		WT_RET(__wt_row_leaf_key_work(
-		    session, page, rip, cbt->row_key, 0));
+		    session, page, rip, cbt->row_key, false));
 	}
 	kb->data = cbt->row_key->data;
 	kb->size = cbt->row_key->size;

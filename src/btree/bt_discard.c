@@ -147,7 +147,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	mod = page->modify;
 
-	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
+	switch (mod->rec_result) {
 	case WT_PM_REC_MULTIBLOCK:
 	case WT_PM_REC_REWRITE:
 		/* Free list of replacement blocks. */
@@ -209,7 +209,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	__wt_free_ref_index(session, page, WT_INTL_INDEX_GET_SAFE(page), 0);
+	__wt_free_ref_index(session, page, WT_INTL_INDEX_GET_SAFE(page), false);
 }
 
 /*
@@ -219,7 +219,7 @@ __free_page_int(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 void
 __wt_free_ref(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int free_pages)
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, bool free_pages)
 {
 	WT_IKEY *ikey;
 
@@ -268,7 +268,7 @@ __wt_free_ref(
  */
 void
 __wt_free_ref_index(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_PAGE_INDEX *pindex, int free_pages)
+    WT_PAGE *page, WT_PAGE_INDEX *pindex, bool free_pages)
 {
 	uint32_t i;
 

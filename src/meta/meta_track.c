@@ -25,7 +25,7 @@ typedef struct __wt_meta_track {
 	} op;
 	char *a, *b;			/* Strings */
 	WT_DATA_HANDLE *dhandle;	/* Locked handle */
-	int created;			/* Handle on newly created file */
+	bool created;			/* Handle on newly created file */
 } WT_META_TRACK;
 
 /*
@@ -274,7 +274,7 @@ __wt_meta_track_find_handle(
  *	Turn off metadata operation tracking, unrolling on error.
  */
 int
-__wt_meta_track_off(WT_SESSION_IMPL *session, int need_sync, int unroll)
+__wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 {
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
@@ -317,8 +317,8 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int need_sync, int unroll)
 	/* If we're logging, make sure the metadata update was flushed. */
 	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED)) {
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
-		    ret = __wt_txn_checkpoint_log(session,
-		    0, WT_TXN_LOG_CKPT_SYNC, NULL));
+		    ret = __wt_txn_checkpoint_log(
+			session, false, WT_TXN_LOG_CKPT_SYNC, NULL));
 		WT_RET(ret);
 	} else {
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
@@ -490,7 +490,7 @@ err:	__meta_track_err(session);
  *	Track a locked handle.
  */
 int
-__wt_meta_track_handle_lock(WT_SESSION_IMPL *session, int created)
+__wt_meta_track_handle_lock(WT_SESSION_IMPL *session, bool created)
 {
 	WT_META_TRACK *trk;
 

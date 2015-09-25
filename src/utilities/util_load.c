@@ -9,25 +9,25 @@
 #include "util.h"
 #include "util_load.h"
 
-static int config_read(WT_SESSION *, char ***, int *);
+static int config_read(WT_SESSION *, char ***, bool *);
 static int config_rename(WT_SESSION *, char **, const char *);
 static int format(WT_SESSION *);
 static int insert(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
 static int usage(void);
 
-static int	append;		/* -a append (ignore record number keys) */
-static char    *cmdname;	/* -r rename */
-static char   **cmdconfig;	/* configuration pairs */
-static int	json;		/* -j input is JSON format */
-static int	no_overwrite;	/* -n don't overwrite existing data */
+static bool   append = false;		/* -a append (ignore number keys) */
+static char  *cmdname;			/* -r rename */
+static char **cmdconfig;		/* configuration pairs */
+static bool   json = false;		/* -j input is JSON format */
+static bool   no_overwrite = false;	/* -n don't overwrite existing data */
 
 int
 util_load(WT_SESSION *session, int argc, char *argv[])
 {
+	uint32_t flags;
 	int ch;
 	const char *filename;
-	uint32_t flags;
 
 	flags = 0;
 
@@ -35,7 +35,7 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	while ((ch = __wt_getopt(progname, argc, argv, "af:jnr:")) != EOF)
 		switch (ch) {
 		case 'a':	/* append (ignore record number keys) */
-			append = 1;
+			append = true;
 			break;
 		case 'f':	/* input file */
 			if (freopen(__wt_optarg, "r", stdin) == NULL)
@@ -46,10 +46,10 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 				filename = __wt_optarg;
 			break;
 		case 'j':	/* input is JSON */
-			json = 1;
+			json = true;
 			break;
 		case 'n':	/* don't overwrite existing data */
-			no_overwrite = 1;
+			no_overwrite = true;
 			break;
 		case 'r':	/* rename */
 			cmdname = __wt_optarg;
@@ -62,7 +62,7 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	argv += __wt_optind;
 
 	/* -a and -o are mutually exclusive. */
-	if (append == 1 && no_overwrite == 1)
+	if (append && no_overwrite)
 		return (util_err(session, EINVAL,
 		    "the -a (append) and -n (no-overwrite) flags are mutually "
 		    "exclusive"));
@@ -93,12 +93,13 @@ load_dump(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	int hex, tret;
+	int tret;
+	bool hex;
 	char **list, **tlist, *uri, config[64];
 
 	cursor = NULL;
 	list = NULL;		/* -Wuninitialized */
-	hex = 0;		/* -Wuninitialized */
+	hex = false;		/* -Wuninitialized */
 	uri = NULL;
 
 	/* Read the metadata file. */
@@ -217,11 +218,12 @@ config_list_free(CONFIG_LIST *clp)
  *	Read the config lines and do some basic validation.
  */
 static int
-config_read(WT_SESSION *session, char ***listp, int *hexp)
+config_read(WT_SESSION *session, char ***listp, bool *hexp)
 {
 	ULINE l;
 	WT_DECL_RET;
-	int entry, eof, max_entry;
+	int entry, max_entry;
+	bool eof;
 	const char *s;
 	char **list, **tlist;
 
@@ -229,31 +231,31 @@ config_read(WT_SESSION *session, char ***listp, int *hexp)
 	memset(&l, 0, sizeof(l));
 
 	/* Header line #1: "WiredTiger Dump" and a WiredTiger version. */
-	if (util_read_line(session, &l, 0, &eof))
+	if (util_read_line(session, &l, false, &eof))
 		return (1);
 	s = "WiredTiger Dump ";
 	if (strncmp(l.mem, s, strlen(s)) != 0)
 		return (format(session));
 
 	/* Header line #2: "Format={hex,print}". */
-	if (util_read_line(session, &l, 0, &eof))
+	if (util_read_line(session, &l, false, &eof))
 		return (1);
 	if (strcmp(l.mem, "Format=print") == 0)
-		*hexp = 0;
+		*hexp = false;
 	else if (strcmp(l.mem, "Format=hex") == 0)
-		*hexp = 1;
+		*hexp = true;
 	else
 		return (format(session));
 
 	/* Header line #3: "Header". */
-	if (util_read_line(session, &l, 0, &eof))
+	if (util_read_line(session, &l, false, &eof))
 		return (1);
 	if (strcmp(l.mem, "Header") != 0)
 		return (format(session));
 
 	/* Now, read in lines until we get to the end of the headers. */
 	for (entry = max_entry = 0, list = NULL;; ++entry) {
-		if ((ret = util_read_line(session, &l, 0, &eof)) != 0)
+		if ((ret = util_read_line(session, &l, false, &eof)) != 0)
 			goto err;
 		if (strcmp(l.mem, "Data") == 0)
 			break;
@@ -350,8 +352,8 @@ int
 config_update(WT_SESSION *session, char **list)
 {
 	WT_DECL_RET;
-	int found;
 	size_t cnt;
+	int found;
 	const char *p, **cfg;
 	char **configp, **listp;
 
@@ -513,7 +515,7 @@ insert(WT_CURSOR *cursor, const char *name)
 	WT_DECL_RET;
 	WT_SESSION *session;
 	uint64_t insert_count;
-	int eof;
+	bool eof;
 
 	session = cursor->session;
 
@@ -528,14 +530,14 @@ insert(WT_CURSOR *cursor, const char *name)
 		 * and ignore it (a dump with "append" set), or not read it at
 		 * all (flat-text load).
 		 */
-		if (util_read_line(session, &key, 1, &eof))
+		if (util_read_line(session, &key, true, &eof))
 			return (1);
-		if (eof == 1)
+		if (eof)
 			break;
 		if (!append)
 			cursor->set_key(cursor, key.mem);
 
-		if (util_read_line(session, &value, 0, &eof))
+		if (util_read_line(session, &value, false, &eof))
 			return (1);
 		cursor->set_value(cursor, value.mem);
 

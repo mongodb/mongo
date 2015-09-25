@@ -74,7 +74,7 @@ __col_instantiate(WT_SESSION_IMPL *session,
 {
 	/* Search the page and add updates. */
 	WT_RET(__wt_col_search(session, recno, ref, cbt));
-	WT_RET(__wt_col_modify(session, cbt, recno, NULL, upd, 0));
+	WT_RET(__wt_col_modify(session, cbt, recno, NULL, upd, false));
 	return (0);
 }
 
@@ -87,8 +87,8 @@ __row_instantiate(WT_SESSION_IMPL *session,
     WT_ITEM *key, WT_REF *ref, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
 	/* Search the page and add updates. */
-	WT_RET(__wt_row_search(session, key, ref, cbt, 1));
-	WT_RET(__wt_row_modify(session, cbt, key, NULL, upd, 0));
+	WT_RET(__wt_row_search(session, key, ref, cbt, true));
+	WT_RET(__wt_row_modify(session, cbt, key, NULL, upd, false));
 	return (0);
 }
 
@@ -259,7 +259,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session,
 	}
 
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
-	WT_TRET(__wt_btcur_close(&cbt, 1));
+	WT_TRET(__wt_btcur_close(&cbt, true));
 
 	/*
 	 * On error, upd points to a single unlinked WT_UPDATE structure,
@@ -308,10 +308,10 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_page_evict_soon(page);
 
 	/* Bump the oldest ID, we're about to do some visibility checks. */
-	__wt_txn_update_oldest(session, 0);
+	__wt_txn_update_oldest(session, false);
 
 	/* If eviction cannot succeed, don't try. */
-	return (__wt_page_can_evict(session, page, 1, NULL));
+	return (__wt_page_can_evict(session, page, true, NULL));
 }
 
 /*
@@ -438,12 +438,13 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	WT_DECL_RET;
 	WT_PAGE *page;
 	u_int sleep_cnt, wait_cnt;
-	int busy, cache_work, force_attempts, oldgen, stalled;
+	bool busy, cache_work, oldgen, stalled;
+	int force_attempts;
 
 	btree = S2BT(session);
-	stalled = 0;
 
-	for (force_attempts = oldgen = 0, sleep_cnt = wait_cnt = 0;;) {
+	for (oldgen = stalled = false,
+	    force_attempts = 0, sleep_cnt = wait_cnt = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
@@ -470,7 +471,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
 			/* Waiting on another thread's read, stall. */
 			WT_STAT_FAST_CONN_INCR(session, page_read_blocked);
-			stalled = 1;
+			stalled = true;
 			break;
 		case WT_REF_LOCKED:
 			if (LF_ISSET(WT_READ_NO_WAIT))
@@ -478,7 +479,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 
 			/* Waiting on eviction, stall. */
 			WT_STAT_FAST_CONN_INCR(session, page_locked_blocked);
-			stalled = 1;
+			stalled = true;
 			break;
 		case WT_REF_SPLIT:
 			return (WT_RESTART);
@@ -533,7 +534,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 					ret = 0;
 					WT_STAT_FAST_CONN_INCR(session,
 					    page_forcible_evict_blocked);
-					stalled = 1;
+					stalled = true;
 					break;
 				}
 				WT_RET(ret);

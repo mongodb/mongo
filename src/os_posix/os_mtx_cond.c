@@ -14,7 +14,7 @@
  */
 int
 __wt_cond_alloc(WT_SESSION_IMPL *session,
-    const char *name, int is_signalled, WT_CONDVAR **condp)
+    const char *name, bool is_signalled, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
 	WT_DECL_RET;
@@ -47,16 +47,16 @@ err:	__wt_free(session, cond);
  */
 int
 __wt_cond_wait_signal(
-    WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, int *signalled)
+    WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, bool *signalled)
 {
 	struct timespec ts;
 	WT_DECL_RET;
-	int locked;
+	bool locked;
 
-	locked = 0;
+	locked = false;
 
 	/* Fast path if already signalled. */
-	*signalled = 1;
+	*signalled = true;
 	if (__wt_atomic_addi32(&cond->waiters, 1) == 0)
 		return (0);
 
@@ -71,7 +71,7 @@ __wt_cond_wait_signal(
 	}
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
-	locked = 1;
+	locked = true;
 
 	if (usecs > 0) {
 		WT_ERR(__wt_epoch(session, &ts));
@@ -92,7 +92,7 @@ __wt_cond_wait_signal(
 	    ret == ETIME ||
 #endif
 	    ret == ETIMEDOUT) {
-		*signalled = 0;
+		*signalled = false;
 		ret = 0;
 	}
 
@@ -113,9 +113,9 @@ int
 __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
 	WT_DECL_RET;
-	int locked;
+	bool locked;
 
-	locked = 0;
+	locked = false;
 
 	/*
 	 * !!!
@@ -131,7 +131,7 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 
 	if (cond->waiters > 0 || !__wt_atomic_casi32(&cond->waiters, 0, -1)) {
 		WT_ERR(pthread_mutex_lock(&cond->mtx));
-		locked = 1;
+		locked = true;
 		WT_ERR(pthread_cond_broadcast(&cond->cond));
 	}
 
