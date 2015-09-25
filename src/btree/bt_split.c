@@ -787,30 +787,22 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 }
 
 /*
- * __split_parent --
- *	Resolve a multi-page split, inserting new information into the parent.
+ * __split_parent_lock --
+ *	Lock the parent page.
  */
 static int
-__split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
-    WT_REF **ref_new, uint32_t new_entries, size_t parent_incr, bool closing)
+__split_parent_lock(
+    WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE **parentp, bool *hazardp)
 {
 	WT_DECL_RET;
-	WT_IKEY *ikey;
 	WT_PAGE *parent;
-	WT_PAGE_INDEX *alloc_index, *pindex;
-	WT_REF **alloc_refp, *next_ref, *parent_ref;
-	size_t parent_decr, size;
-	uint64_t split_gen;
-	uint32_t children, i, j;
-	uint32_t deleted_entries, parent_entries, result_entries;
-	bool complete, hazard;
+	WT_REF *parent_ref;
 
 	parent = NULL;			/* -Wconditional-uninitialized */
-	alloc_index = pindex = NULL;
 	parent_ref = NULL;
-	parent_decr = 0;
-	parent_entries = 0;
-	complete = hazard = false;
+
+	*hazardp = false;
+	*parentp = NULL;
 
 	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
@@ -850,9 +842,63 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	if (!__wt_ref_is_root(parent_ref = parent->pg_intl_parent_ref)) {
 		WT_ERR(__wt_page_in(session, parent_ref, WT_READ_NO_EVICT));
-		hazard = true;
+		*hazardp = true;
 	}
 
+	*parentp = parent;
+	return (0);
+
+err:	F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
+	return (ret);
+}
+
+/*
+ * __split_parent_unlock --
+ *	Unlock the parent page.
+ */
+static int
+__split_parent_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
+{
+	WT_DECL_RET;
+
+	if (hazard)
+		ret = __wt_hazard_clear(session, parent);
+
+	F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
+	return (ret);
+}
+
+/*
+ * __split_parent --
+ *	Resolve a multi-page split, inserting new information into the parent.
+ */
+static int
+__split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
+    WT_REF **ref_new, uint32_t new_entries, size_t parent_incr, bool closing)
+{
+	WT_DECL_RET;
+	WT_IKEY *ikey;
+	WT_PAGE *parent;
+	WT_PAGE_INDEX *alloc_index, *pindex;
+	WT_REF **alloc_refp, *next_ref, *parent_ref;
+	size_t parent_decr, size;
+	uint64_t split_gen;
+	uint32_t i, j;
+	uint32_t children, deleted_entries, parent_entries, result_entries;
+	bool complete;
+
+	parent = ref->home;
+	parent_ref = parent->pg_intl_parent_ref;
+
+	alloc_index = pindex = NULL;
+	parent_decr = 0;
+	parent_entries = 0;
+	complete = false;
+
+	/*
+	 * We've locked the parent, which means it cannot split (which is the
+	 * only reason to worry about split generation values).
+	 */
 	pindex = WT_INTL_INDEX_GET_SAFE(parent);
 	parent_entries = pindex->entries;
 
@@ -1043,10 +1089,6 @@ err:	if (!complete)
 			if (next_ref->state == WT_REF_SPLIT)
 				next_ref->state = WT_REF_DELETED;
 		}
-	F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
-
-	if (hazard)
-		WT_TRET(__wt_hazard_clear(session, parent));
 
 	__wt_free_ref_index(session, NULL, alloc_index, false);
 
@@ -1062,12 +1104,11 @@ err:	if (!complete)
 }
 
 /*
- * __wt_split_insert --
- *	Check for pages with append-only workloads and split their last insert
- * list into a separate page.
+ * __split_insert --
+ *	Split a page's last insert list entries into a separate page.
  */
-int
-__wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
+static int
+__split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_DECL_RET;
 	WT_DECL_ITEM(key);
@@ -1333,8 +1374,25 @@ err:	if (split_ref[0] != NULL) {
 }
 
 /*
+ * __wt_split_insert --
+ *	Lock, then split.
+ */
+int
+__wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_DECL_RET;
+	WT_PAGE *parent;
+	bool hazard;
+
+	WT_RET(__split_parent_lock(session, ref, &parent, &hazard));
+	ret = __split_insert(session, ref);
+	WT_TRET(__split_parent_unlock(session, parent, hazard));
+	return (ret);
+}
+
+/*
  * __wt_split_rewrite --
- *	Resolve a failed reconciliation by replacing a page with a new version.
+ *	Rewrite an in-memory page with a new version.
  */
 int
 __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
@@ -1377,11 +1435,11 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 }
 
 /*
- * __wt_split_multi --
- *	Resolve a page split.
+ * __split_multi --
+ *	Split a page into multiple pages.
  */
-int
-__wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
+static int
+__split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -1443,5 +1501,22 @@ err:	/*
 	for (i = 0; i < new_entries; ++i)
 		__wt_free_ref(session, page, ref_new[i], false);
 	__wt_free(session, ref_new);
+	return (ret);
+}
+
+/*
+ * __wt_split_multi --
+ *	Lock, then split.
+ */
+int
+__wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
+{
+	WT_DECL_RET;
+	WT_PAGE *parent;
+	bool hazard;
+
+	WT_RET(__split_parent_lock(session, ref, &parent, &hazard));
+	ret = __split_multi(session, ref, closing);
+	WT_TRET(__split_parent_unlock(session, parent, hazard));
 	return (ret);
 }
