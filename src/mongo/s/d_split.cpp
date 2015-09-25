@@ -626,12 +626,12 @@ public:
         // 2. lock the collection's metadata and get highest version for the current shard
         //
 
-        const string whyMessage(str::stream() << "splitting chunk [" << minKey << ", " << maxKey
+        const string whyMessage(str::stream() << "splitting chunk [" << min << ", " << max
                                               << ") in " << nss.toString());
         auto scopedDistLock = grid.forwardingCatalogManager()->distLock(txn, nss.ns(), whyMessage);
         if (!scopedDistLock.isOK()) {
             errmsg = str::stream() << "could not acquire collection lock for " << nss.toString()
-                                   << " to split chunk [" << minKey << "," << maxKey << ")"
+                                   << " to split chunk [" << min << "," << max << ")"
                                    << causedBy(scopedDistLock.getStatus());
             warning() << errmsg;
             return false;
@@ -643,7 +643,7 @@ public:
 
         if (!refreshStatus.isOK()) {
             errmsg = str::stream() << "splitChunk cannot split chunk "
-                                   << "[" << minKey << "," << maxKey << ")"
+                                   << "[" << min << "," << max << ")"
                                    << causedBy(refreshStatus.reason());
 
             warning() << errmsg;
@@ -653,7 +653,7 @@ public:
         if (shardVersion.majorVersion() == 0) {
             // It makes no sense to split if our version is zero and we have no chunks
             errmsg = str::stream() << "splitChunk cannot split chunk "
-                                   << "[" << minKey << "," << maxKey << ")"
+                                   << "[" << min << "," << max << ")"
                                    << " with zero shard version";
 
             warning() << errmsg;
@@ -666,13 +666,13 @@ public:
             OID cmdEpoch = epochElem.OID();
 
             if (cmdEpoch != shardVersion.epoch()) {
-                errmsg = str::stream() << "splitChunk cannot split chunk "
-                                       << "[" << minKey << "," << maxKey << "), "
-                                       << "collection may have been dropped. "
-                                       << "current epoch: " << shardVersion.epoch()
-                                       << ", cmd epoch: " << cmdEpoch;
-                warning() << errmsg;
-                return false;
+                std::string msg = str::stream() << "splitChunk cannot split chunk "
+                                                << "[" << min << "," << max << "), "
+                                                << "collection may have been dropped. "
+                                                << "current epoch: " << shardVersion.epoch()
+                                                << ", cmd epoch: " << cmdEpoch;
+                warning() << msg;
+                return appendCommandStatus(result, Status(ErrorCodes::SendStaleConfig, msg));
             }
         }
 
@@ -690,12 +690,11 @@ public:
         if (!collMetadata->getNextChunk(min, &origChunk) || origChunk.getMin().woCompare(min) ||
             origChunk.getMax().woCompare(max)) {
             // Our boundaries are different from those passed in
-            errmsg = str::stream() << "splitChunk cannot find chunk "
-                                   << "[" << minKey << "," << maxKey << ")"
-                                   << " to split, the chunk boundaries may be stale";
-
-            warning() << errmsg;
-            return false;
+            std::string msg = str::stream() << "splitChunk cannot find chunk "
+                                            << "[" << min << "," << max << ")"
+                                            << " to split, the chunk boundaries may be stale";
+            warning() << msg;
+            return appendCommandStatus(result, Status(ErrorCodes::SendStaleConfig, msg));
         }
 
         log() << "splitChunk accepted at version " << shardVersion;
