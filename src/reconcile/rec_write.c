@@ -5673,6 +5673,15 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	}
 	mod->mod_multi_entries = r->bnd_next;
 
+	/*
+	 * We can't evict clean, multiblock row-store pages with overflow keys
+	 * when the file is being checkpointed: the split into the parent frees
+	 * the backing blocks for no-longer-used overflow keys, corrupting the
+	 * checkpoint's block management. Column-store pages have no overflow
+	 * keys, so they're not a problem, track overflow items for row-store.
+	 */
+	mod->mod_multi_row_ovfl = r->ovfl_items;
+
 	return (0);
 }
 
