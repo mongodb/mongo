@@ -80,7 +80,10 @@ public:
             // Add config server optime to metadata sent to shards.
             std::string targetStr = target.toString();
             auto shard = grid.shardRegistry()->getShardNoReload(targetStr);
-            invariant(shard);
+            if (!shard) {
+                return Status(ErrorCodes::ShardNotFound,
+                              str::stream() << "Shard not found for server: " << targetStr);
+            }
             if (shard->isConfig()) {
                 return Status::OK();
             }

@@ -97,7 +97,10 @@ Status _shardingRequestMetadataWriter(bool shardedConn,
     // Add config server optime to metadata sent to shards.
     std::string hostString = hostStringData.toString();
     auto shard = grid.shardRegistry()->getShardNoReload(hostString);
-    invariant(shard);
+    if (!shard) {
+        return Status(ErrorCodes::ShardNotFound,
+                      str::stream() << "Shard not found for server: " << hostString);
+    }
     if (shard->isConfig()) {
         return Status::OK();
     }
