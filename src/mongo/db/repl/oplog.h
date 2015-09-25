@@ -102,12 +102,12 @@ void _logOp(OperationContext* txn,
             ReplicationCoordinator::Mode replicationMode,
             bool updateReplOpTime);
 
-void _logOp(OperationContext* txn,
-            const char* opstr,
-            const char* ns,
-            const BSONObj& obj,
-            BSONObj* o2,
-            bool fromMigrate);
+void logOp(OperationContext* txn,
+           const char* opstr,
+           const char* ns,
+           const BSONObj& obj,
+           BSONObj* o2,
+           bool fromMigrate);
 
 // Flush out the cached pointers to the local database and oplog.
 // Used by the closeDatabase command to ensure we don't cache closed things.

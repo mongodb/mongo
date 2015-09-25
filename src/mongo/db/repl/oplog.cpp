@@ -99,6 +99,7 @@ namespace mongo {
 using std::endl;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 
 namespace repl {
 std::string rsOplogName = "local.oplog.rs";
@@ -138,7 +139,6 @@ void checkOplogInsert(Status result) {
  */
 std::pair<OpTime, long long> getNextOpTime(OperationContext* txn,
                                            Collection* oplog,
-                                           const char* ns,
                                            ReplicationCoordinator* replCoord,
                                            const char* opstr,
                                            ReplicationCoordinator::Mode replicationMode) {
@@ -235,6 +235,42 @@ void setOplogCollectionName() {
     }
 }
 
+namespace {
+void createOplog(OperationContext* txn, const std::string& oplogCollectionName) {
+    Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
+    Lock::CollectionLock lk2(txn->lockState(), oplogCollectionName, MODE_IX);
+
+    OldClientContext ctx(txn, oplogCollectionName);
+    _localDB = ctx.db();
+    invariant(_localDB);
+    _localOplogCollection = _localDB->getCollection(oplogCollectionName);
+    massert(13347,
+            "the oplog collection " + oplogCollectionName +
+                " missing. did you drop it? if so, restart the server",
+            _localOplogCollection);
+}
+
+bool oplogDisabled(OperationContext* txn,
+                   ReplicationCoordinator::Mode replicationMode,
+                   NamespaceString& nss) {
+    if (replicationMode == ReplicationCoordinator::modeNone)
+        return true;
+
+    if (nss.db() == "local")
+        return true;
+
+    if (nss.isSystemDotProfile())
+        return true;
+
+    if (!txn->writesAreReplicated())
+        return true;
+
+    fassert(28626, txn->recoveryUnit());
+
+    return false;
+}
+}  // end anon namespace
+
 /* we write to local.oplog.rs:
      { ts : ..., h: ..., v: ..., op: ..., etc }
    ts: an OpTime timestamp
@@ -251,9 +287,7 @@ void setOplogCollectionName() {
    bb param:
      if not null, specifies a boolean to pass along to the other side as b: param.
      used for "justOne" or "upsert" flags on 'd', 'u'
-
 */
-
 void _logOp(OperationContext* txn,
             const char* opstr,
             const char* ns,
@@ -264,61 +298,36 @@ void _logOp(OperationContext* txn,
             ReplicationCoordinator::Mode replicationMode,
             bool updateReplOpTime) {
     NamespaceString nss(ns);
-    if (nss.db() == "local") {
+    if (oplogDisabled(txn, replicationMode, nss))
         return;
-    }
 
-    if (nss.isSystemDotProfile()) {
-        return;
-    }
-
-    if (replicationMode == ReplicationCoordinator::modeNone) {
-        return;
-    }
-
-    if (!txn->writesAreReplicated()) {
-        return;
-    }
-
-    fassert(28626, txn->recoveryUnit());
+    if (_localOplogCollection == nullptr)
+        createOplog(txn, oplogCollectionName);
 
     Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
 
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
-    if (ns[0] && replicationMode == ReplicationCoordinator::modeReplSet &&
+    if (nss.size() && replicationMode == ReplicationCoordinator::modeReplSet &&
         !replCoord->canAcceptWritesFor(nss)) {
-        severe() << "logOp() but can't accept write to collection " << ns;
+        severe() << "logOp() but can't accept write to collection " << nss.ns();
         fassertFailed(17405);
     }
     Lock::CollectionLock lk2(txn->lockState(), oplogCollectionName, MODE_IX);
 
+    auto slot = getNextOpTime(txn, _localOplogCollection, replCoord, opstr, replicationMode);
+    OpTime optime = slot.first;
+    long long hashNew = slot.second;
 
-    if (_localOplogCollection == nullptr) {
-        OldClientContext ctx(txn, oplogCollectionName);
-        _localDB = ctx.db();
-        invariant(_localDB);
-        _localOplogCollection = _localDB->getCollection(oplogCollectionName);
-        massert(13347,
-                "the oplog collection " + oplogCollectionName +
-                    " missing. did you drop it? if so, restart the server",
-                _localOplogCollection);
-    }
-
-    std::pair<OpTime, long long> slot =
-        getNextOpTime(txn, _localOplogCollection, ns, replCoord, opstr, replicationMode);
-
-    /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
-       instead we do a single copy to the destination position in the memory mapped file.
-    */
-
+    // we jump through a bunch of hoops here to avoid copying the obj buffer twice --
+    // instead we do a single copy to the destination in the record store.
     BSONObjBuilder b(256);
 
-    b.append("ts", slot.first.getTimestamp());
-    if (slot.first.getTerm() != -1) {
-        b.append("t", slot.first.getTerm());
+    b.append("ts", optime.getTimestamp());
+    if (optime.getTerm() != -1) {
+        b.append("t", optime.getTerm());
     }
-    b.append("h", slot.second);
+    b.append("h", hashNew);
     b.append("v", OPLOG_VERSION);
     b.append("op", opstr);
     b.append("ns", ns);
@@ -343,12 +352,12 @@ void _logOp(OperationContext* txn,
     ReplClientInfo::forClient(txn->getClient()).setLastOp(slot.first);
 }
 
-void _logOp(OperationContext* txn,
-            const char* opstr,
-            const char* ns,
-            const BSONObj& obj,
-            BSONObj* o2,
-            bool fromMigrate) {
+void logOp(OperationContext* txn,
+           const char* opstr,
+           const char* ns,
+           const BSONObj& obj,
+           BSONObj* o2,
+           bool fromMigrate) {
     _logOp(txn,
            opstr,
            ns,
