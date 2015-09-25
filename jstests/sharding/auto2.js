@@ -118,7 +118,7 @@ for ( i =0; i<100; i++ )
     t.save( { _id : i } );
 for ( i=0; i<100; i++ ){
     t.find().batchSize( 2 ).next();
-    // TODO: Re-eneble when SERVER-19405 is imlpemented.
+    // TODO: Re-enable when SERVER-20194 is implemented.
     //assert.lt(0 , db.serverStatus().metrics.cursor.open.total, "cursor1");
     gc();
 }
@@ -126,7 +126,7 @@ for ( i=0; i<100; i++ ){
 for ( i=0; i<100; i++ ){
     gc();
 }
-// TODO: Re-enable when SERVER-19405 is implemented.
+// TODO: Re-enable when SERVER-20194 is implemented.
 //assert.eq(0, db.serverStatus().metrics.cursor.open.total, "cursor2");
 
 // Stop the balancer, otherwise it may grab some connections from the pool for itself

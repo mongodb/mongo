@@ -78,14 +78,6 @@ public:
 
 static CursorStatsSum cursorStatsTotalOpen;
 
-static ServerStatusMetricField<Counter64> dCursorStatsMultiTarget("cursor.open.multiTarget",
-                                                                  &cursorStatsMultiTarget);
-static ServerStatusMetricField<Counter64> dCursorStatsSingleTarget("cursor.open.singleTarget",
-                                                                   &cursorStatsSingleTarget);
-static ServerStatusMetricField<CursorStatsSum> dCursorStatsTotalOpen("cursor.open.total",
-                                                                     &cursorStatsTotalOpen);
-
-
 // --------  ShardedCursor -----------
 
 ShardedClientCursor::ShardedClientCursor(QueryMessage& q, ParallelSortClusteredCursor* cursor) {

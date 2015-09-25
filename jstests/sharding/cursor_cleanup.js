@@ -46,8 +46,7 @@ jsTest.log("Check whether the cursor is registered in the cursor info.");
 var cursorInfo = admin.serverStatus().metrics.cursor;
 printjson(cursorInfo);
 
-// TODO: Re-enable when SERVER-19405 is implemented.
-//assert.eq(cursorInfo.open.multiTarget, 1);
+assert.eq(cursorInfo.open.multiTarget, 1);
 
 jsTest.log("End the cursors.");
 
@@ -57,8 +56,7 @@ unshardedCursor.itcount();
 var cursorInfo = admin.serverStatus().metrics.cursor;;
 printjson(cursorInfo);
 
-// TODO: Re-enable when SERVER-19405 is implemented.
-//assert.eq(cursorInfo.open.multiTarget, 0);
+assert.eq(cursorInfo.open.multiTarget, 0);
 
 jsTest.log("DONE!");
 
