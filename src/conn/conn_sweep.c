@@ -68,7 +68,7 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;
-	evict_reset = 0;
+	evict_reset = false;
 
 	/*
 	 * Acquire an exclusive lock on the handle and mark it dead.
@@ -360,7 +360,7 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 	F_SET(conn, WT_CONN_SERVER_SWEEP);
 
 	WT_RET(__wt_open_internal_session(
-	    conn, "sweep-server", 1, 1, &conn->sweep_session));
+	    conn, "sweep-server", true, true, &conn->sweep_session));
 	session = conn->sweep_session;
 
 	/*
@@ -376,7 +376,7 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 	    WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION);
 
 	WT_RET(__wt_cond_alloc(
-	    session, "handle sweep server", 0, &conn->sweep_cond));
+	    session, "handle sweep server", false, &conn->sweep_cond));
 
 	WT_RET(__wt_thread_create(
 	    session, &conn->sweep_tid, __sweep_server, session));

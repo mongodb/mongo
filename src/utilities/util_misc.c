@@ -44,14 +44,14 @@ util_err(WT_SESSION *session, int e, const char *fmt, ...)
  *	Read a line from stdin into a ULINE.
  */
 int
-util_read_line(WT_SESSION *session, ULINE *l, int eof_expected, int *eofp)
+util_read_line(WT_SESSION *session, ULINE *l, bool eof_expected, bool *eofp)
 {
 	static uint64_t line = 0;
 	size_t len;
 	int ch;
 
 	++line;
-	*eofp = 0;
+	*eofp = false;
 
 	if (l->memsize == 0) {
 		if ((l->mem = realloc(l->mem, l->memsize + 1024)) == NULL)
@@ -62,7 +62,7 @@ util_read_line(WT_SESSION *session, ULINE *l, int eof_expected, int *eofp)
 		if ((ch = getchar()) == EOF) {
 			if (len == 0) {
 				if (eof_expected) {
-					*eofp = 1;
+					*eofp = true;
 					return (0);
 				}
 				return (util_err(session, 0,

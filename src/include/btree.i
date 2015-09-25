@@ -77,12 +77,12 @@ __wt_cache_decr_check_size(
 	(void)__wt_atomic_addsize(vp, v);
 
 	{
-	static int first = 1;
+	static bool first = true;
 
 	if (!first)
 		return;
 	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
-	first = 0;
+	first = false;
 	}
 #else
 	WT_UNUSED(fld);
@@ -105,12 +105,12 @@ __wt_cache_decr_check_uint64(
 	(void)__wt_atomic_add64(vp, v);
 
 	{
-	static int first = 1;
+	static bool first = true;
 
 	if (!first)
 		return;
 	__wt_errx(session, "%s underflow: decrementing %" WT_SIZET_FMT, fld, v);
-	first = 0;
+	first = false;
 	}
 #else
 	WT_UNUSED(fld);
@@ -430,7 +430,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static inline int
 __wt_page_parent_modify_set(
-    WT_SESSION_IMPL *session, WT_REF *ref, int page_only)
+    WT_SESSION_IMPL *session, WT_REF *ref, bool page_only)
 {
 	WT_PAGE *parent;
 
@@ -1035,7 +1035,7 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static inline bool
 __wt_page_can_evict(WT_SESSION_IMPL *session,
-    WT_PAGE *page, int check_splits, bool *inmem_splitp)
+    WT_PAGE *page, bool check_splits, bool *inmem_splitp)
 {
 	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
@@ -1115,8 +1115,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int locked;
-	bool too_big;
+	bool locked, too_big;
 
 	btree = S2BT(session);
 	page = ref->page;
@@ -1126,7 +1125,8 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * reference without first locking the page, it could be evicted in
 	 * between.
 	 */
-	locked = __wt_atomic_casv32(&ref->state, WT_REF_MEM, WT_REF_LOCKED);
+	locked = __wt_atomic_casv32(
+	    &ref->state, WT_REF_MEM, WT_REF_LOCKED) ? true : false;
 	if ((ret = __wt_hazard_clear(session, page)) != 0 || !locked) {
 		if (locked)
 			ref->state = WT_REF_MEM;
@@ -1195,7 +1195,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    LF_ISSET(WT_READ_NO_EVICT) ||
 	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    !__wt_page_can_evict(session, page, 1, NULL))
+	    !__wt_page_can_evict(session, page, true, NULL))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
@@ -1216,7 +1216,7 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
     )
 {
 	WT_DECL_RET;
-	int acquired;
+	bool acquired;
 
 	/*
 	 * In rare cases when walking the tree, we try to swap to the same

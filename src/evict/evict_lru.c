@@ -247,7 +247,7 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 
 	for (i = conn->evict_workers_alloc; i < conn->evict_workers_max; i++) {
 		WT_ERR(__wt_open_internal_session(conn,
-		    "eviction-worker", 1, 0, &workers[i].session));
+		    "eviction-worker", true, false, &workers[i].session));
 		workers[i].id = i;
 
 		/*
@@ -286,7 +286,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 
 	/* We need a session handle because we're reading/writing pages. */
 	WT_RET(__wt_open_internal_session(
-	    conn, "eviction-server", 1, 0, &conn->evict_session));
+	    conn, "eviction-server", true, false, &conn->evict_session));
 	session = conn->evict_session;
 
 	/*
@@ -523,7 +523,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * of whether the cache is full, to prevent the oldest ID
 		 * falling too far behind.
 		 */
-		__wt_txn_update_oldest(session, 1);
+		__wt_txn_update_oldest(session, true);
 
 		if (!__evict_update_work(session))
 			break;
@@ -1220,7 +1220,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 			page->read_gen = __wt_cache_read_gen_new(session);
 
 fast:		/* If the page can't be evicted, give up. */
-		if (!__wt_page_can_evict(session, page, 1, NULL))
+		if (!__wt_page_can_evict(session, page, true, NULL))
 			continue;
 
 		/*

@@ -8,7 +8,7 @@
 
 #include "util.h"
 
-static int insert(WT_CURSOR *, const char *, int);
+static int insert(WT_CURSOR *, const char *, bool);
 static int text(WT_SESSION *, const char *);
 static int usage(void);
 
@@ -50,7 +50,8 @@ text(WT_SESSION *session, const char *uri)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	int readkey, tret;
+	int tret;
+	bool readkey;
 
 	/*
 	 * Open the cursor, configured to append new records (in the case of
@@ -74,7 +75,7 @@ text(WT_SESSION *session, const char *uri)
 		return (util_err(session, EINVAL,
 		    "the loadtext command can only load objects configured "
 		    "for record number or string keys, and string values"));
-	readkey = strcmp(cursor->key_format, "r") == 0 ? 0 : 1;
+	readkey = strcmp(cursor->key_format, "r") != 0;
 
 	/* Insert the records */
 	ret = insert(cursor, uri, readkey);
@@ -100,13 +101,13 @@ text(WT_SESSION *session, const char *uri)
  *	Read and insert data.
  */
 static int
-insert(WT_CURSOR *cursor, const char *name, int readkey)
+insert(WT_CURSOR *cursor, const char *name, bool readkey)
 {
 	ULINE key, value;
 	WT_DECL_RET;
 	WT_SESSION *session;
 	uint64_t insert_count;
-	int eof;
+	bool eof;
 
 	session = cursor->session;
 
@@ -122,15 +123,15 @@ insert(WT_CURSOR *cursor, const char *name, int readkey)
 		 * all (flat-text load).
 		 */
 		if (readkey) {
-			if (util_read_line(session, &key, 1, &eof))
+			if (util_read_line(session, &key, true, &eof))
 				return (1);
-			if (eof == 1)
+			if (eof)
 				break;
 			cursor->set_key(cursor, key.mem);
 		}
-		if (util_read_line(session, &value, readkey ? 0 : 1, &eof))
+		if (util_read_line(session, &value, !readkey, &eof))
 			return (1);
-		if (eof == 1)
+		if (eof)
 			break;
 		cursor->set_value(cursor, value.mem);
 

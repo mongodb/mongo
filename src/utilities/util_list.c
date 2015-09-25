@@ -8,7 +8,7 @@
 
 #include "util.h"
 
-static int list_print(WT_SESSION *, const char *, int, int);
+static int list_print(WT_SESSION *, const char *, bool, bool);
 static int list_print_checkpoint(WT_SESSION *, const char *);
 static int usage(void);
 
@@ -16,18 +16,19 @@ int
 util_list(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
-	int cflag, ch, vflag;
+	int ch;
+	bool cflag, vflag;
 	char *name;
 
-	cflag = vflag = 0;
+	cflag = vflag = false;
 	name = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "cv")) != EOF)
 		switch (ch) {
 		case 'c':
-			cflag = 1;
+			cflag = true;
 			break;
 		case 'v':
-			vflag = 1;
+			vflag = true;
 			break;
 		case '?':
 		default:
@@ -59,11 +60,11 @@ util_list(WT_SESSION *session, int argc, char *argv[])
  *	List the high-level objects in the database.
  */
 static int
-list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
+list_print(WT_SESSION *session, const char *name, bool cflag, bool vflag)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	int found;
+	bool found;
 	const char *key, *value;
 
 	/* Open the metadata file. */
@@ -93,7 +94,7 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 		if (name != NULL) {
 			if (!WT_PREFIX_MATCH(key, name))
 				continue;
-			found = 1;
+			found = true;
 		}
 
 		/*

@@ -843,11 +843,12 @@ __conn_load_extension(
 	 */
 	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &init_name));
-	WT_ERR(__wt_dlsym(session, dlh, init_name, 1, &load));
+	WT_ERR(__wt_dlsym(session, dlh, init_name, true, &load));
 
 	WT_ERR(__wt_config_gets(session, cfg, "terminate", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &terminate_name));
-	WT_ERR(__wt_dlsym(session, dlh, terminate_name, 0, &dlh->terminate));
+	WT_ERR(
+	    __wt_dlsym(session, dlh, terminate_name, false, &dlh->terminate));
 
 	/* Call the load function last, it simplifies error handling. */
 	WT_ERR(load(wt_conn, (WT_CONFIG_ARG *)cfg));
@@ -1086,7 +1087,8 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, open_session, config, cfg);
 	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_open_session(conn, event_handler, config, 1, &session_ret));
+	WT_ERR(__wt_open_session(
+	    conn, event_handler, config, true, &session_ret));
 	*wt_sessionp = &session_ret->iface;
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
@@ -1446,7 +1448,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * is holding it, we're done.  The file may be zero-length, and that's
 	 * OK, the underlying call supports locking past the end-of-file.
 	 */
-	if (__wt_bytelock(conn->lock_fh, (wt_off_t)0, 1) != 0)
+	if (__wt_bytelock(conn->lock_fh, (wt_off_t)0, true) != 0)
 		WT_ERR_MSG(session, EBUSY,
 		    "WiredTiger database is already being managed by another "
 		    "process");
@@ -1473,12 +1475,12 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Lock the WiredTiger file (for backward compatibility reasons as
 	 * described above).  Immediately release the lock, it's just a test.
 	 */
-	if (__wt_bytelock(fh, (wt_off_t)0, 1) != 0) {
+	if (__wt_bytelock(fh, (wt_off_t)0, true) != 0) {
 		WT_ERR_MSG(session, EBUSY,
 		    "WiredTiger database is already being managed by another "
 		    "process");
 	}
-	WT_ERR(__wt_bytelock(fh, (wt_off_t)0, 0));
+	WT_ERR(__wt_bytelock(fh, (wt_off_t)0, false));
 
 	/*
 	 * We own the database home, figure out if we're creating it. There are
