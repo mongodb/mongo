@@ -17,6 +17,8 @@ MongoRunner.stopMongod(conn);
 var SERVER_CERT = "jstests/libs/server.pem"
 var CA_CERT = "jstests/libs/ca.pem" 
 
+var SERVER_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=server"
+var INTERNAL_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=internal"
 var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client"
 var INVALID_CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=invalid"
 
@@ -24,10 +26,28 @@ function authAndTest(mongo) {
     external = mongo.getDB("$external")
     test = mongo.getDB("test");
 
+    // It should be impossible to create users with the same name as the server's subject
+    assert.throws( function() {
+        external.createUser({user: SERVER_USER,
+                             roles: [{'role':'userAdminAnyDatabase', 'db':'admin'}]
+                            })
+    }, {}, "Created user with same name as the server's x.509 subject")
+
+    // It should be impossible to create users with names recognized as cluster members
+    assert.throws( function() {
+        external.createUser({user: INTERNAL_USER,
+                             roles: [{'role':'userAdminAnyDatabase', 'db':'admin'}]
+                            })
+    }, {}, "Created user which would be recognized as a cluster member")
+
     // Add user using localhost exception
     external.createUser({user: CLIENT_USER, roles:[
             {'role':'userAdminAnyDatabase', 'db':'admin'}, 
             {'role':'readWriteAnyDatabase', 'db':'admin'}]})
+
+    // It should be impossible to create users with an internal name
+    assert.throws( function() {external.createUser({user: SERVER_USER, roles: [
+            {'role':'userAdminAnyDatabase', 'db':'admin'}]})})
 
     // Localhost exception should not be in place anymore
     assert.throws( function() { test.foo.findOne()}, {}, "read without login" )

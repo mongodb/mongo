@@ -31,6 +31,7 @@
 
 #include "mongo/util/net/ssl_manager.h"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/tss.hpp>
@@ -45,14 +46,15 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/exit.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_expiration.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/text.h"
 
 #ifdef MONGO_CONFIG_SSL
 #include <openssl/evp.h>
@@ -407,6 +409,42 @@ SSLConnection::~SSLConnection() {
     if (networkBIO) {
         BIO_free(networkBIO);
     }
+}
+
+namespace {
+void canonicalizeClusterDN(std::vector<std::string>* dn) {
+    // remove all RDNs we don't care about
+    for (size_t i = 0; i < dn->size(); i++) {
+        std::string& comp = dn->at(i);
+        boost::algorithm::trim(comp);
+        if (!mongoutils::str::startsWith(comp.c_str(), "DC=") &&
+            !mongoutils::str::startsWith(comp.c_str(), "O=") &&
+            !mongoutils::str::startsWith(comp.c_str(), "OU=")) {
+            dn->erase(dn->begin() + i);
+            i--;
+        }
+    }
+    std::stable_sort(dn->begin(), dn->end());
+}
+}
+
+bool SSLConfiguration::isClusterMember(StringData subjectName) const {
+    std::vector<std::string> clientRDN = StringSplitter::split(subjectName.toString(), ",");
+    std::vector<std::string> serverRDN = StringSplitter::split(serverSubjectName, ",");
+
+    canonicalizeClusterDN(&clientRDN);
+    canonicalizeClusterDN(&serverRDN);
+
+    if (clientRDN.size() == 0 || clientRDN.size() != serverRDN.size()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < serverRDN.size(); i++) {
+        if (clientRDN[i] != serverRDN[i]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 BSONObj SSLConfiguration::getServerStatusBSON() const {

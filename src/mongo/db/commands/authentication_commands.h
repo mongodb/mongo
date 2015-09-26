@@ -81,7 +81,6 @@ private:
                          const BSONObj& cmdObj);
     Status _authenticateCR(OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
     Status _authenticateX509(OperationContext* txn, const UserName& user, const BSONObj& cmdObj);
-    bool _clusterIdMatch(const std::string& subjectName, const std::string& srvSubjectName);
 };
 
 extern CmdAuthenticate cmdAuthenticate;

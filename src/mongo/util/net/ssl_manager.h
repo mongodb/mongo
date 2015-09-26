@@ -36,6 +36,7 @@
 #ifdef MONGO_CONFIG_SSL
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
@@ -79,6 +80,7 @@ struct SSLConfiguration {
           serverCertificateExpirationDate(serverCertificateExpirationDate),
           hasCA(hasCA) {}
 
+    bool isClusterMember(StringData subjectName) const;
     BSONObj getServerStatusBSON() const;
     std::string serverSubjectName;
     std::string clientSubjectName;

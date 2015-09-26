@@ -32,7 +32,6 @@
 
 #include "mongo/db/commands/authentication_commands.h"
 
-#include <boost/algorithm/string.hpp>
 #include <string>
 #include <vector>
 
@@ -299,41 +298,6 @@ Status CmdAuthenticate::_authenticateCR(OperationContext* txn,
 }
 
 #ifdef MONGO_CONFIG_SSL
-void canonicalizeClusterDN(std::vector<std::string>* dn) {
-    // remove all RDNs we don't care about
-    for (size_t i = 0; i < dn->size(); i++) {
-        std::string& comp = dn->at(i);
-        boost::algorithm::trim(comp);
-        if (!mongoutils::str::startsWith(comp.c_str(), "DC=") &&
-            !mongoutils::str::startsWith(comp.c_str(), "O=") &&
-            !mongoutils::str::startsWith(comp.c_str(), "OU=")) {
-            dn->erase(dn->begin() + i);
-            i--;
-        }
-    }
-    std::stable_sort(dn->begin(), dn->end());
-}
-
-bool CmdAuthenticate::_clusterIdMatch(const std::string& subjectName,
-                                      const std::string& srvSubjectName) {
-    std::vector<string> clientRDN = StringSplitter::split(subjectName, ",");
-    std::vector<string> serverRDN = StringSplitter::split(srvSubjectName, ",");
-
-    canonicalizeClusterDN(&clientRDN);
-    canonicalizeClusterDN(&serverRDN);
-
-    if (clientRDN.size() == 0 || clientRDN.size() != serverRDN.size()) {
-        return false;
-    }
-
-    for (size_t i = 0; i < serverRDN.size(); i++) {
-        if (clientRDN[i] != serverRDN[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
 Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
                                           const UserName& user,
                                           const BSONObj& cmdObj) {
@@ -348,19 +312,17 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
 
     ClientBasic* client = ClientBasic::getCurrent();
     AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
-    std::string subjectName = client->port()->getX509SubjectName();
+    std::string clientSubjectName = client->port()->getX509SubjectName();
 
     if (!getSSLManager()->getSSLConfiguration().hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "Unable to verify x.509 certificate, as no CA has been provided.");
-    } else if (user.getUser() != subjectName) {
+    } else if (user.getUser() != clientSubjectName) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "There is no x.509 client certificate matching the user.");
     } else {
-        std::string srvSubjectName = getSSLManager()->getSSLConfiguration().serverSubjectName;
-
         // Handle internal cluster member auth, only applies to server-server connections
-        if (_clusterIdMatch(subjectName, srvSubjectName)) {
+        if (getSSLManager()->getSSLConfiguration().isClusterMember(clientSubjectName)) {
             int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
             if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_undefined ||
                 clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile) {

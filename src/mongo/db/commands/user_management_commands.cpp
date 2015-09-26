@@ -659,11 +659,12 @@ public:
 
 #ifdef MONGO_CONFIG_SSL
         if (args.userName.getDB() == "$external" && getSSLManager() &&
-            getSSLManager()->getSSLConfiguration().serverSubjectName == args.userName.getUser()) {
+            getSSLManager()->getSSLConfiguration().isClusterMember(args.userName.getUser())) {
             return appendCommandStatus(result,
                                        Status(ErrorCodes::BadValue,
-                                              "Cannot create an x.509 user with the same "
-                                              "subjectname as the server"));
+                                              "Cannot create an x.509 user with a subjectname "
+                                              "that would be recognized as an internal "
+                                              "cluster member."));
         }
 #endif
 
