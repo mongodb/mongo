@@ -1492,19 +1492,23 @@ TEST_F(StepDownTest, StepDownCatchUp) {
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime1));
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 2, optime1));
 
-    // stepDown where the secondary actually has to catch up before the stepDown can succeed
-    StepDownRunner runner(getReplCoord());
-    runner.setForce(false);
-    runner.setWaitTime(Milliseconds(10000));
-    runner.setStepDownTime(Milliseconds(60000));
-
     simulateSuccessfulElection();
 
-    runner.start(&txn);
+    // Step down where the secondary actually has to catch up before the stepDown can succeed.
+    // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
+    // T + 2 seconds and send out a new round of heartbeats immediately.
+    // This makes it unnecessary to advance the clock after entering the network to process
+    // the heartbeat requests.
+    auto repl = getReplCoord();
+    Status result(ErrorCodes::InternalError, "not mutated");
+    auto globalReadLockAndEventHandle =
+        repl->stepDown_nonBlocking(&txn, false, Milliseconds(10000), Milliseconds(60000), &result);
+    const auto& eventHandle = globalReadLockAndEventHandle.second;
+    ASSERT_TRUE(eventHandle);
+    ASSERT_TRUE(txn.lockState()->isReadLocked());
 
     // Make a secondary actually catch up
     enterNetwork();
-    getNet()->runUntil(getNet()->now() + Milliseconds(2000));
     ASSERT(getNet()->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
     RemoteCommandRequest request = noi->getRequest();
@@ -1527,7 +1531,8 @@ TEST_F(StepDownTest, StepDownCatchUp) {
     getNet()->runReadyNetworkOperations();
     exitNetwork();
 
-    ASSERT_OK(runner.getResult());
+    getReplExec()->waitForEvent(eventHandle);
+    ASSERT_OK(result);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
 
