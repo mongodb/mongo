@@ -1355,6 +1355,12 @@ void ReplicationCoordinatorImpl::_stepDownContinue(
         return;
     }
     allFinishedGuard.Dismiss();
+
+    // We send out a fresh round of heartbeats because stepping down successfully without
+    // {force: true} is dependent on timely heartbeat data.
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _cancelHeartbeats();
+    _startHeartbeats_inlock(cbData);
 }
 
 void ReplicationCoordinatorImpl::_handleTimePassing(
