@@ -80,6 +80,7 @@ namespace repl {
 using executor::NetworkInterface;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
+using EventHandle = executor::TaskExecutor::EventHandle;
 
 namespace {
 
@@ -1199,10 +1200,14 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
     return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
 }
 
-Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
-                                            bool force,
-                                            const Milliseconds& waitTime,
-                                            const Milliseconds& stepdownTime) {
+ReplicationCoordinatorImpl::StepDownNonBlockingResult
+ReplicationCoordinatorImpl::stepDown_nonBlocking(OperationContext* txn,
+                                                 bool force,
+                                                 const Milliseconds& waitTime,
+                                                 const Milliseconds& stepdownTime,
+                                                 Status* result) {
+    invariant(result);
+
     const Date_t startTime = _replExecutor.now();
     const Date_t stepDownUntil = startTime + stepdownTime;
     const Date_t waitUntil = startTime + waitTime;
@@ -1211,33 +1216,36 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
         // Note this check is inherently racy - it's always possible for the node to
         // stepdown from some other path before we acquire the global shared lock, but
         // that's okay because we are resiliant to that happening in _stepDownContinue.
-        return Status(ErrorCodes::NotMaster, "not primary so can't step down");
+        *result = Status(ErrorCodes::NotMaster, "not primary so can't step down");
+        return StepDownNonBlockingResult();
     }
 
-    LockResult lockState = txn->lockState()->lockGlobalBegin(MODE_S);
+    auto globalReadLock = stdx::make_unique<Lock::GlobalLock>(
+        txn->lockState(), MODE_S, Lock::GlobalLock::EnqueueOnly());
+
     // We've requested the global shared lock which will stop new writes from coming in,
     // but existing writes could take a long time to finish, so kill all user operations
     // to help us get the global lock faster.
     _externalState->killAllUserOperations(txn);
 
-    if (lockState == LOCK_WAITING) {
-        lockState = txn->lockState()->lockGlobalComplete(durationCount<Milliseconds>(stepdownTime));
-        if (lockState == LOCK_TIMEOUT) {
-            return Status(ErrorCodes::ExceededTimeLimit,
-                          "Could not acquire the global shared lock within the amount of time "
-                          "specified that we should step down for");
-        }
+    globalReadLock->waitForLock(durationCount<Milliseconds>(stepdownTime));
+
+    if (!globalReadLock->isLocked()) {
+        *result = Status(ErrorCodes::ExceededTimeLimit,
+                         "Could not acquire the global shared lock within the amount of time "
+                         "specified that we should step down for");
+        return StepDownNonBlockingResult();
     }
-    invariant(lockState == LOCK_OK);
-    ON_BLOCK_EXIT(&Locker::unlockAll, txn->lockState());
-    // From this point onward we are guaranteed to be holding the global shared lock.
+
+    // This is done by GlobalRead after acquiring the lock successfully.
+    txn->lockState()->lockMMAPV1Flush();
 
     StatusWith<ReplicationExecutor::EventHandle> finishedEvent = _replExecutor.makeEvent();
     if (finishedEvent.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return finishedEvent.getStatus();
+        *result = finishedEvent.getStatus();
+        return StepDownNonBlockingResult();
     }
     fassert(26000, finishedEvent.getStatus());
-    Status result(ErrorCodes::InternalError, "didn't set status in _stepDownContinue");
     CBHStatus cbh =
         _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_stepDownContinue,
                                               this,
@@ -1247,14 +1255,28 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
                                               waitUntil,
                                               stepDownUntil,
                                               force,
-                                              &result));
+                                              result));
     if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-        return cbh.getStatus();
+        *result = cbh.getStatus();
+        return StepDownNonBlockingResult();
     }
     fassert(18809, cbh.getStatus());
     _scheduleWorkAt(waitUntil,
                     stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters, this));
-    _replExecutor.waitForEvent(finishedEvent.getValue());
+    return std::make_pair(std::move(globalReadLock), finishedEvent.getValue());
+}
+
+Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
+                                            bool force,
+                                            const Milliseconds& waitTime,
+                                            const Milliseconds& stepdownTime) {
+    Status result(ErrorCodes::InternalError, "didn't set status in _stepDownContinue");
+    auto globalReadLockAndEventHandle =
+        stepDown_nonBlocking(txn, force, waitTime, stepdownTime, &result);
+    const auto& eventHandle = globalReadLockAndEventHandle.second;
+    if (eventHandle.isValid()) {
+        _replExecutor.waitForEvent(eventHandle);
+    }
     return result;
 }
 

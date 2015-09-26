@@ -30,9 +30,11 @@
 
 #include <vector>
 #include <memory>
+#include <utility>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/data_replicator.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
@@ -81,6 +83,10 @@ class ReplicationCoordinatorImpl : public ReplicationCoordinator, public KillOpL
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorImpl);
 
 public:
+    // For testing only.
+    using StepDownNonBlockingResult =
+        std::pair<std::unique_ptr<mongo::Lock::GlobalLock>, ReplicationExecutor::EventHandle>;
+
     // Takes ownership of the "externalState", "topCoord" and "network" objects.
     ReplicationCoordinatorImpl(const ReplSettings& settings,
                                ReplicationCoordinatorExternalState* externalState,
@@ -313,6 +319,22 @@ public:
      * Simple wrapper around _setLastOptime_inlock to make it easier to test.
      */
     Status setLastOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
+
+    /**
+     * Non-blocking version of stepDown.
+     * Returns a pair of global shared lock and event handle which are used to wait for the step
+     * down operation to complete. The global shared lock prevents writes until the step down has
+     * completed (or failed).
+     * When the operation is complete (wait() returns), 'result' will be set to the
+     * final status of the operation.
+     * If the handle is invalid, step down failed before we could schedule the rest of
+     * the step down processing and the error will be available immediately in 'result'.
+     */
+    StepDownNonBlockingResult stepDown_nonBlocking(OperationContext* txn,
+                                                   bool force,
+                                                   const Milliseconds& waitTime,
+                                                   const Milliseconds& stepdownTime,
+                                                   Status* result);
 
     /**
      * Non-blocking version of setFollowerMode.
