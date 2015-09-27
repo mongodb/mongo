@@ -277,11 +277,11 @@ struct __wt_connection_impl {
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
 
 	WT_RWLOCK *hot_backup_lock;	/* Hot backup serialization */
-	int hot_backup;
+	bool hot_backup;
 
 	WT_SESSION_IMPL *ckpt_session;	/* Checkpoint thread session */
 	wt_thread_t	 ckpt_tid;	/* Checkpoint thread */
-	int		 ckpt_tid_set;	/* Checkpoint thread set */
+	bool		 ckpt_tid_set;	/* Checkpoint thread set */
 	WT_CONDVAR	*ckpt_cond;	/* Checkpoint wait mutex */
 	const char	*ckpt_config;	/* Checkpoint configuration */
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
@@ -317,7 +317,7 @@ struct __wt_connection_impl {
 
 	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
 	wt_thread_t	 evict_tid;	/* Eviction server thread ID */
-	int		 evict_tid_set;	/* Eviction server thread ID set */
+	bool		 evict_tid_set;	/* Eviction server thread ID set */
 
 	uint32_t	 evict_workers_alloc;/* Allocated eviction workers */
 	uint32_t	 evict_workers_max;/* Max eviction workers */
@@ -327,7 +327,7 @@ struct __wt_connection_impl {
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	wt_thread_t	 stat_tid;	/* Statistics log thread */
-	int		 stat_tid_set;	/* Statistics log thread set */
+	bool		 stat_tid_set;	/* Statistics log thread set */
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
 	const char	*stat_format;	/* Statistics log timestamp format */
 	FILE		*stat_fp;	/* Statistics log file handle */
@@ -346,15 +346,15 @@ struct __wt_connection_impl {
 	WT_CONDVAR	*log_cond;	/* Log server wait mutex */
 	WT_SESSION_IMPL *log_session;	/* Log server session */
 	wt_thread_t	 log_tid;	/* Log server thread */
-	int		 log_tid_set;	/* Log server thread set */
+	bool		 log_tid_set;	/* Log server thread set */
 	WT_CONDVAR	*log_file_cond;	/* Log file thread wait mutex */
 	WT_SESSION_IMPL *log_file_session;/* Log file thread session */
 	wt_thread_t	 log_file_tid;	/* Log file thread thread */
-	int		 log_file_tid_set;/* Log file thread set */
+	bool		 log_file_tid_set;/* Log file thread set */
 	WT_CONDVAR	*log_wrlsn_cond;/* Log write lsn thread wait mutex */
 	WT_SESSION_IMPL *log_wrlsn_session;/* Log write lsn thread session */
 	wt_thread_t	 log_wrlsn_tid;	/* Log write lsn thread thread */
-	int		 log_wrlsn_tid_set;/* Log write lsn thread set */
+	bool		 log_wrlsn_tid_set;/* Log write lsn thread set */
 	WT_LOG		*log;		/* Logging structure */
 	WT_COMPRESSOR	*log_compressor;/* Logging compressor */
 	wt_off_t	 log_file_max;	/* Log file max size */
@@ -411,7 +411,7 @@ struct __wt_connection_impl {
 	wt_off_t log_extend_len;	/* file_extend log length */
 
 	uint32_t direct_io;		/* O_DIRECT file type flags */
-	int	 mmap;			/* mmap configuration */
+	bool	 mmap;			/* mmap configuration */
 	uint32_t verbose;
 
 	uint32_t flags;

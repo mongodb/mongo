@@ -715,7 +715,7 @@ __rec_raw_compression_config(
 		return (false);
 
 	/* Raw compression cannot support prefix compression. */
-	if (btree->prefix_compression != 0)
+	if (btree->prefix_compression)
 		return (false);
 
 	/*
@@ -4091,7 +4091,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 				salvage->take = 0;
 			}
 			if (salvage->take == 0)
-				salvage->done = 1;
+				salvage->done = true;
 		}
 	}
 
