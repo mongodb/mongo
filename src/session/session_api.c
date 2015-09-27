@@ -69,12 +69,6 @@ __session_release_resources(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 
-	/* Discard metadata tracking. */
-	__wt_meta_track_discard(session);
-
-	/* Free transaction information. */
-	__wt_txn_destroy(session);
-
 	/* Block manager cleanup */
 	if (session->block_manager_cleanup != NULL)
 		WT_TRET(session->block_manager_cleanup(session));
@@ -169,6 +163,12 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	/* Confirm we're not holding any hazard pointers. */
 	__wt_hazard_close(session);
+
+	/* Discard metadata tracking. */
+	__wt_meta_track_discard(session);
+
+	/* Free transaction information. */
+	__wt_txn_destroy(session);
 
 	/* Release other resources, shared with reset. */
 	WT_TRET(__session_release_resources(session));
