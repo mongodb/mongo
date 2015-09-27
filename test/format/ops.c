@@ -230,7 +230,7 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t keyno, ckpt_op, session_op;
+	uint64_t keyno, ckpt_op, reset_op, session_op;
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
@@ -258,6 +258,9 @@ ops(void *arg)
 	/* Set the first operation where we'll perform checkpoint operations. */
 	ckpt_op = g.c_checkpoints ? mmrand(&tinfo->rnd, 100, 10000) : 0;
 	ckpt_available = 0;
+
+	/* Set the first operation where we'll reset the session. */
+	reset_op = mmrand(&tinfo->rnd, 100, 10000);
 
 	for (intxn = 0; !tinfo->quit; ++tinfo->ops) {
 		/*
@@ -382,6 +385,19 @@ ops(void *arg)
 
 			/* Pick the next checkpoint operation. */
 			ckpt_op += mmrand(&tinfo->rnd, 5000, 20000);
+		}
+
+		/*
+		 * Reset the session every now and then, just to make sure that
+		 * operation gets tested. Note the test is not for equality, we
+		 * have to do the reset outside of a transaction.
+		 */
+		if (tinfo->ops > reset_op && !intxn) {
+			if (session->reset(session) != 0)
+				die(ret, "session.reset");
+
+			/* Pick the next reset operation. */
+			reset_op += mmrand(&tinfo->rnd, 20000, 50000);
 		}
 
 		/*
