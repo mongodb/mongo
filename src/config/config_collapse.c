@@ -90,9 +90,9 @@ err:	__wt_scr_free(session, &tmp);
  * the qsort stable.
  */
 typedef struct {
-	char  *k, *v;				/* key, value */
+	char *k, *v;				/* key, value */
 	size_t gen;				/* generation */
-	int    strip;				/* remove the value */
+	bool strip;				/* remove the value */
 } WT_CONFIG_MERGE_ENTRY;
 
 /*
@@ -111,7 +111,7 @@ typedef struct {
  */
 static int
 __config_merge_scan(WT_SESSION_IMPL *session,
-    const char *key, const char *value, int strip, WT_CONFIG_MERGE *cp)
+    const char *key, const char *value, bool strip, WT_CONFIG_MERGE *cp)
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
@@ -385,10 +385,10 @@ __wt_config_merge(WT_SESSION_IMPL *session,
 	 * so their generation numbers are the highest.
 	 */
 	for (; *cfg != NULL; ++cfg)
-		WT_ERR(__config_merge_scan(session, NULL, *cfg, 0, &merge));
+		WT_ERR(__config_merge_scan(session, NULL, *cfg, false, &merge));
 	if (cfg_strip != NULL)
-		WT_ERR(
-		    __config_merge_scan(session, NULL, cfg_strip, 1, &merge));
+		WT_ERR(__config_merge_scan(
+		    session, NULL, cfg_strip, true, &merge));
 
 	/*
 	 * Sort the array by key and, in the case of identical keys, by

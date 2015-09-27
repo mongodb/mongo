@@ -818,12 +818,12 @@ __conn_load_extension(
 	WT_DLH *dlh;
 	WT_SESSION_IMPL *session;
 	int (*load)(WT_CONNECTION *, WT_CONFIG_ARG *);
-	int is_local;
+	bool is_local;
 	const char *init_name, *terminate_name;
 
 	dlh = NULL;
 	init_name = terminate_name = NULL;
-	is_local = (strcmp(path, "local") == 0);
+	is_local = strcmp(path, "local") == 0;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
@@ -843,11 +843,12 @@ __conn_load_extension(
 	 */
 	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &init_name));
-	WT_ERR(__wt_dlsym(session, dlh, init_name, 1, &load));
+	WT_ERR(__wt_dlsym(session, dlh, init_name, true, &load));
 
 	WT_ERR(__wt_config_gets(session, cfg, "terminate", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &terminate_name));
-	WT_ERR(__wt_dlsym(session, dlh, terminate_name, 0, &dlh->terminate));
+	WT_ERR(
+	    __wt_dlsym(session, dlh, terminate_name, false, &dlh->terminate));
 
 	/* Call the load function last, it simplifies error handling. */
 	WT_ERR(load(wt_conn, (WT_CONFIG_ARG *)cfg));
@@ -1048,7 +1049,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	/* Second, reconfigure the system. */
 	WT_ERR(__conn_statistics_config(session, cfg));
 	WT_ERR(__wt_async_reconfig(session, cfg));
-	WT_ERR(__wt_cache_config(session, 1, cfg));
+	WT_ERR(__wt_cache_config(session, true, cfg));
 	WT_ERR(__wt_checkpoint_server_create(session, cfg));
 	WT_ERR(__wt_lsm_manager_reconfig(session, cfg));
 	WT_ERR(__wt_statlog_create(session, cfg));
@@ -1086,7 +1087,8 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	CONNECTION_API_CALL(conn, session, open_session, config, cfg);
 	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_open_session(conn, event_handler, config, 1, &session_ret));
+	WT_ERR(__wt_open_session(
+	    conn, event_handler, config, true, &session_ret));
 	*wt_sessionp = &session_ret->iface;
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
@@ -1139,13 +1141,13 @@ __conn_config_check_version(WT_SESSION_IMPL *session, const char *config)
  */
 static int
 __conn_config_file(WT_SESSION_IMPL *session,
-    const char *filename, int is_user, const char **cfg, WT_ITEM *cbuf)
+    const char *filename, bool is_user, const char **cfg, WT_ITEM *cbuf)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
 	size_t len;
 	wt_off_t size;
-	int exist, quoted;
+	bool exist, quoted;
 	char *p, *t;
 
 	fh = NULL;
@@ -1156,7 +1158,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 		return (0);
 
 	/* Open the configuration file. */
-	WT_RET(__wt_open(session, filename, 0, 0, 0, &fh));
+	WT_RET(__wt_open(session, filename, false, false, 0, &fh));
 	WT_ERR(__wt_filesize(session, fh, &size));
 	if (size == 0)
 		goto err;
@@ -1193,7 +1195,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	 * escaped.  Comment lines (an unescaped newline where the next non-
 	 * white-space character is a hash), are discarded.
 	 */
-	for (quoted = 0, p = t = cbuf->mem; len > 0;) {
+	for (quoted = false, p = t = cbuf->mem; len > 0;) {
 		/*
 		 * Backslash pairs pass through untouched, unless immediately
 		 * preceding a newline, in which case both the backslash and
@@ -1372,14 +1374,14 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_FH *fh;
 	size_t len;
 	wt_off_t size;
-	int exist, is_create;
+	bool exist, is_create;
 	char buf[256];
 
 	conn = S2C(session);
 	fh = NULL;
 
 	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
-	is_create = cval.val == 0 ? 0 : 1;
+	is_create = cval.val != 0;
 
 	__wt_spin_lock(session, &__wt_process.spinlock);
 
@@ -1435,18 +1437,18 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * file exists in the directory, create the lock file, covering the case
 	 * of a hot backup.
 	 */
-	exist = 0;
+	exist = false;
 	if (!is_create)
 		WT_ERR(__wt_exist(session, WT_WIREDTIGER, &exist));
 	WT_ERR(__wt_open(session,
-	    WT_SINGLETHREAD, is_create || exist, 0, 0, &conn->lock_fh));
+	    WT_SINGLETHREAD, is_create || exist, false, 0, &conn->lock_fh));
 
 	/*
 	 * Lock a byte of the file: if we don't get the lock, some other process
 	 * is holding it, we're done.  The file may be zero-length, and that's
 	 * OK, the underlying call supports locking past the end-of-file.
 	 */
-	if (__wt_bytelock(conn->lock_fh, (wt_off_t)0, 1) != 0)
+	if (__wt_bytelock(conn->lock_fh, (wt_off_t)0, true) != 0)
 		WT_ERR_MSG(session, EBUSY,
 		    "WiredTiger database is already being managed by another "
 		    "process");
@@ -1467,18 +1469,18 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		    strlen(WT_SINGLETHREAD_STRING), WT_SINGLETHREAD_STRING));
 
 	/* We own the lock file, optionally create the WiredTiger file. */
-	WT_ERR(__wt_open(session, WT_WIREDTIGER, is_create, 0, 0, &fh));
+	WT_ERR(__wt_open(session, WT_WIREDTIGER, is_create, false, 0, &fh));
 
 	/*
 	 * Lock the WiredTiger file (for backward compatibility reasons as
 	 * described above).  Immediately release the lock, it's just a test.
 	 */
-	if (__wt_bytelock(fh, (wt_off_t)0, 1) != 0) {
+	if (__wt_bytelock(fh, (wt_off_t)0, true) != 0) {
 		WT_ERR_MSG(session, EBUSY,
 		    "WiredTiger database is already being managed by another "
 		    "process");
 	}
-	WT_ERR(__wt_bytelock(fh, (wt_off_t)0, 0));
+	WT_ERR(__wt_bytelock(fh, (wt_off_t)0, false));
 
 	/*
 	 * We own the database home, figure out if we're creating it. There are
@@ -1650,7 +1652,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG parser;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_RET;
-	int exist;
+	bool exist;
 	const char *base_config;
 
 	fp = NULL;
@@ -1881,9 +1883,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/* Ignore the base_config file if we config_base set to false. */
 	if (config_base_set != 0)
-		WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, i1));
+		WT_ERR(
+		    __conn_config_file(session, WT_BASECONFIG, false, cfg, i1));
 	__conn_config_append(cfg, config);
-	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, i2));
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, true, cfg, i2));
 	WT_ERR(__conn_config_env(session, cfg, i3));
 
 	/*

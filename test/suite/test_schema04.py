@@ -47,6 +47,12 @@ class test_schema04(wttest.WiredTigerTestCase):
     """
     nentries = 100
 
+    scenarios = number_scenarios([
+        ('index-before', { 'create_index' : 0 }),
+        ('index-during', { 'create_index' : 1 }),
+        ('index-after', { 'create_index' : 2 }),
+    ])
+
     def create_indices(self):
         # Create 6 index files, each with a column from the main table
         for i in range(0, 6):
@@ -106,9 +112,14 @@ class test_schema04(wttest.WiredTigerTestCase):
         self.session.create("table:schema04",
                             "key_format=i,value_format=iiiiii,"
                             "columns=(primarykey,v0,v1,v2,v3,v4,v5)")
-        self.create_indices()
+        if self.create_index == 0:
+            self.create_indices()
         self.populate(0)
+        if self.create_index == 1:
+            self.create_indices()
         self.populate(1)
+        if self.create_index == 2:
+            self.create_indices()
         self.check_entries()
 
 

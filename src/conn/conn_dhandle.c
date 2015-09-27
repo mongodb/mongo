@@ -125,7 +125,7 @@ __wt_conn_dhandle_find(
 static int
 __conn_dhandle_mark_dead(WT_SESSION_IMPL *session)
 {
-	int evict_reset;
+	bool evict_reset;
 
 	/*
 	 * Handle forced discard (e.g., when dropping a file).
@@ -145,16 +145,16 @@ __conn_dhandle_mark_dead(WT_SESSION_IMPL *session)
  *	Sync and close the underlying btree handle.
  */
 int
-__wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int final, int force)
+__wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 {
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	int marked_dead, no_schema_lock;
+	bool marked_dead, no_schema_lock;
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;
-	marked_dead = 0;
+	marked_dead = false;
 
 	if (!F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		return (0);
@@ -166,9 +166,9 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int final, int force)
 	 * we might deadlock with a thread that has the schema lock and wants
 	 * a handle lock (specifically, checkpoint).
 	 */
-	no_schema_lock = 0;
+	no_schema_lock = false;
 	if (!F_ISSET(session, WT_SESSION_LOCKED_SCHEMA)) {
-		no_schema_lock = 1;
+		no_schema_lock = true;
 		F_SET(session, WT_SESSION_NO_SCHEMA_LOCK);
 	}
 
@@ -193,7 +193,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, int final, int force)
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		if (force && (btree->bm == NULL || btree->bm->map == NULL))  {
 			WT_ERR(__conn_dhandle_mark_dead(session));
-			marked_dead = 1;
+			marked_dead = true;
 		} else
 			WT_ERR(__wt_checkpoint_close(session, final));
 	}
@@ -321,16 +321,27 @@ __wt_conn_btree_open(
 	 * in the tree that can block the close.
 	 */
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-		WT_RET(__wt_conn_btree_sync_and_close(session, 0, 0));
+		WT_RET(__wt_conn_btree_sync_and_close(session, false, false));
 
 	/* Discard any previous configuration, set up the new configuration. */
 	__conn_btree_config_clear(session);
 	WT_RET(__conn_btree_config_set(session));
 
 	/* Set any special flags on the handle. */
-	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
+	F_SET(btree, LF_MASK(WT_BTREE_SPECIAL_FLAGS));
 
 	WT_ERR(__wt_btree_open(session, cfg));
+
+	/*
+	 * Bulk handles require true exclusive access, otherwise, handles
+	 * marked as exclusive are allowed to be relocked by the same
+	 * session.
+	 */
+	if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
+	    !LF_ISSET(WT_BTREE_BULK)) {
+		dhandle->excl_session = session;
+		dhandle->excl_ref = 1;
+	}
 	F_SET(dhandle, WT_DHANDLE_OPEN);
 
 	/*
@@ -368,7 +379,7 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
 		WT_SAVE_DHANDLE(session,
 		    ret = func(session, cfg));
 		if (WT_META_TRACKING(session))
-			WT_TRET(__wt_meta_track_handle_lock(session, 0));
+			WT_TRET(__wt_meta_track_handle_lock(session, false));
 		else
 			WT_TRET(__wt_session_release_btree(session));
 	} else if (ret == EBUSY)
@@ -383,7 +394,7 @@ __conn_btree_apply_internal(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle,
  */
 int
 __wt_conn_btree_apply(WT_SESSION_IMPL *session,
-    int apply_checkpoints, const char *uri,
+    bool apply_checkpoints, const char *uri,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
@@ -522,7 +533,7 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
  */
 int
 __wt_conn_dhandle_close_all(
-    WT_SESSION_IMPL *session, const char *uri, int force)
+    WT_SESSION_IMPL *session, const char *uri, bool force)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -547,7 +558,7 @@ __wt_conn_dhandle_close_all(
 		    dhandle->name, dhandle->checkpoint,
 		    NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 		if (WT_META_TRACKING(session))
-			WT_ERR(__wt_meta_track_handle_lock(session, 0));
+			WT_ERR(__wt_meta_track_handle_lock(session, false));
 
 		/*
 		 * We have an exclusive lock, which means there are no cursors
@@ -556,7 +567,7 @@ __wt_conn_dhandle_close_all(
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			if ((ret = __wt_meta_track_sub_on(session)) == 0)
 				ret = __wt_conn_btree_sync_and_close(
-				    session, 0, force);
+				    session, false, force);
 
 			/*
 			 * If the close succeeded, drop any locks it acquired.
@@ -582,7 +593,7 @@ err:	session->dhandle = NULL;
  *	Remove a handle from the shared list.
  */
 static int
-__conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
+__conn_dhandle_remove(WT_SESSION_IMPL *session, bool final)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -610,7 +621,8 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, int final)
  *	Close/discard a single data handle.
  */
 int
-__wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, int final, int force)
+__wt_conn_dhandle_discard_single(
+    WT_SESSION_IMPL *session, bool final, bool force)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -678,7 +690,8 @@ restart:
 			continue;
 
 		WT_WITH_DHANDLE(session, dhandle,
-		    WT_TRET(__wt_conn_dhandle_discard_single(session, 1, 0)));
+		    WT_TRET(__wt_conn_dhandle_discard_single(
+		    session, true, false)));
 		goto restart;
 	}
 
@@ -694,7 +707,8 @@ restart:
 	/* Close the metadata file handle. */
 	while ((dhandle = TAILQ_FIRST(&conn->dhqh)) != NULL)
 		WT_WITH_DHANDLE(session, dhandle,
-		    WT_TRET(__wt_conn_dhandle_discard_single(session, 1, 0)));
+		    WT_TRET(__wt_conn_dhandle_discard_single(
+		    session, true, false)));
 
 	return (ret);
 }

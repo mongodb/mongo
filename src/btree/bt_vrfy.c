@@ -23,10 +23,10 @@ typedef struct {
 #define	WT_VRFY_DUMP(vs)						\
 	((vs)->dump_address ||						\
 	    (vs)->dump_blocks || (vs)->dump_pages || (vs)->dump_shape)
-	int dump_address;			/* Configure: dump special */
-	int dump_blocks;
-	int dump_pages;
-	int dump_shape;
+	bool dump_address;			/* Configure: dump special */
+	bool dump_blocks;
+	bool dump_pages;
+	bool dump_shape;
 
 	u_int depth, depth_internal[100], depth_leaf[100];
 
@@ -38,7 +38,7 @@ static void __verify_checkpoint_reset(WT_VSTUFF *);
 static int  __verify_overflow(
 	WT_SESSION_IMPL *, const uint8_t *, size_t, WT_VSTUFF *);
 static int  __verify_overflow_cell(
-	WT_SESSION_IMPL *, WT_REF *, int *, WT_VSTUFF *);
+	WT_SESSION_IMPL *, WT_REF *, bool *, WT_VSTUFF *);
 static int  __verify_row_int_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, uint32_t, WT_VSTUFF *);
 static int  __verify_row_leaf_key_order(
@@ -79,14 +79,15 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
  *	Debugging: optionally dump specific blocks from the file.
  */
 static int
-__verify_config_offsets(WT_SESSION_IMPL *session, const char *cfg[], int *quitp)
+__verify_config_offsets(
+    WT_SESSION_IMPL *session, const char *cfg[], bool *quitp)
 {
 	WT_CONFIG list;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_RET;
 	u_long offset;
 
-	*quitp = 0;
+	*quitp = false;
 
 	WT_RET(__wt_config_gets(session, cfg, "dump_offsets", &cval));
 	WT_RET(__wt_config_subinit(session, &list, &cval));
@@ -96,7 +97,7 @@ __verify_config_offsets(WT_SESSION_IMPL *session, const char *cfg[], int *quitp)
 		 * what the user wanted, all of this stuff is just hooked into
 		 * verify because that's where we "dump blocks" for debugging.)
 		 */
-		*quitp = 1;
+		*quitp = true;
 		if (v.len != 0 || sscanf(k.str, "%lu", &offset) != 1)
 			WT_RET_MSG(session, EINVAL,
 			    "unexpected dump offset format");
@@ -156,12 +157,12 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_VSTUFF *vs, _vstuff;
 	size_t root_addr_size;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
-	int bm_start, quit;
+	bool bm_start, quit;
 
 	btree = S2BT(session);
 	bm = btree->bm;
 	ckptbase = NULL;
-	bm_start = 0;
+	bm_start = false;
 
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
@@ -184,7 +185,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Inform the underlying block manager we're verifying. */
 	WT_ERR(bm->verify_start(bm, session, ckptbase, cfg));
-	bm_start = 1;
+	bm_start = true;
 
 	/* Loop through the file's checkpoints, verifying each one. */
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
@@ -205,7 +206,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		/* Load the checkpoint. */
 		WT_ERR(bm->checkpoint_load(bm, session,
 		    ckpt->raw.data, ckpt->raw.size,
-		    root_addr, &root_addr_size, 1));
+		    root_addr, &root_addr_size, true));
 
 		/*
 		 * Ignore trees with no root page.
@@ -293,7 +294,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	WT_REF *child_ref;
 	uint64_t recno;
 	uint32_t entry, i;
-	int found;
+	bool found;
 
 	bm = S2BT(session)->bm;
 	page = ref->page;
@@ -648,7 +649,7 @@ __verify_row_leaf_key_order(
  */
 static int
 __verify_overflow_cell(
-    WT_SESSION_IMPL *session, WT_REF *ref, int *found, WT_VSTUFF *vs)
+    WT_SESSION_IMPL *session, WT_REF *ref, bool *found, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -659,7 +660,7 @@ __verify_overflow_cell(
 
 	btree = S2BT(session);
 	unpack = &_unpack;
-	*found = 0;
+	*found = false;
 
 	/*
 	 * If a tree is empty (just created), it won't have a disk image;
@@ -676,7 +677,7 @@ __verify_overflow_cell(
 		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:
-			*found = 1;
+			*found = true;
 			WT_ERR(__verify_overflow(
 			    session, unpack->data, unpack->size, vs));
 			break;

@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn10.py
+# test_txn14.py
 #   Transactions: commits and rollbacks
 #
 
@@ -36,16 +36,22 @@ from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios, prune_scenarios
 import wttest
 
-class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
-    t1 = 'table:test_txn10_1'
-    t2 = 'table:test_txn10_2'
+class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
+    t1 = 'table:test_txn14_1'
     create_params = 'key_format=i,value_format=i'
+    entries = 10000
+    extra_entries = 5
+
+    sync_list = [
+        ('write', dict(sync='off')),
+        ('sync', dict(sync='on')),
+        ('bg', dict(sync='background')),
+    ]
+    scenarios = multiply_scenarios('.', sync_list)
 
     # Overrides WiredTigerTestCase, add extra config params
     def setUpConnectionOpen(self, dir):
-        self.conn_config = \
-                'log=(archive=false,enabled,file_max=100K),' + \
-                'transaction_sync=(method=dsync,enabled)'
+        self.conn_config = 'log=(archive=false,enabled,file_max=100K),'
         return wttest.WiredTigerTestCase.setUpConnectionOpen(self, dir)
 
     def simulate_crash_restart(self, olddir, newdir):
@@ -61,44 +67,48 @@ class test_txn10(wttest.WiredTigerTestCase, suite_subprocess):
                 "Tmplog" not in fullname and \
                 "Preplog" not in fullname:
                 shutil.copy(fullname, newdir)
+        #
         # close the original connection and open to new directory
+        # NOTE:  This really cannot test the difference between the
+        # write-no-sync (off) version of log_flush and the sync
+        # version since we're not crashing the system itself.
+        #
         self.close_conn()
         self.conn = self.setUpConnectionOpen(newdir)
         self.session = self.setUpSessionOpen(self.conn)
 
-    def test_recovery(self):
-        ''' Check for bugs in file ID allocation. '''
-
+    def test_log_flush(self):
         # Here's the strategy:
-        #    - Create a table (t1).
-        #    - Do a clean restart.
-        #    - Create another table (t2).
-        #    - Insert data into t2.
+        #    - Create a table.
+        #    - Insert data into table.
+        #    - Call log_flush.
+        #    - Simulate a crash and restart
         #    - Make recovery run.
+        #    - Confirm flushed data is in the table.
         #
-        # If we aren't tracking file IDs properly, it's possible that
-        # we'd end up apply the log records for t2 to table t1.
         self.session.create(self.t1, self.create_params)
-        self.reopen_conn()
-        self.session.create(self.t2, self.create_params)
-        c = self.session.open_cursor(self.t2, None, None)
-        for i in range(10000):
+        c = self.session.open_cursor(self.t1, None, None)
+        for i in range(self.entries):
             c[i] = i + 1
+        cfgarg='sync=%s' % self.sync
+        self.pr('cfgarg ' + cfgarg)
+        self.session.log_flush(cfgarg)
+        for i in range(self.extra_entries):
+            c[i+self.entries] = i + self.entries + 1
         c.close()
+        self.session.log_flush(cfgarg)
+        if self.sync == 'background':
+            # If doing a background flush, wait 1 second for it
+            self.session.transaction_sync('timeout_ms=1000')
         self.simulate_crash_restart(".", "RESTART")
-        c = self.session.open_cursor(self.t2, None, None)
+        c = self.session.open_cursor(self.t1, None, None)
         i = 0
         for key, value in c:
             self.assertEqual(i, key)
             self.assertEqual(i+1, value)
             i += 1
-        self.assertEqual(i, 10000)
-        c.close()
-        c = self.session.open_cursor(self.t1, None, None)
-        i = 0
-        for key, value in c:
-            i += 1
-        self.assertEqual(i, 0)
+        all = self.entries + self.extra_entries
+        self.assertEqual(i, all)
         c.close()
 
 if __name__ == '__main__':

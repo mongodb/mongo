@@ -119,7 +119,7 @@ struct __wt_btree {
 
 	WT_REF root;			/* Root page reference */
 	int modified;			/* If the tree ever modified */
-	int bulk_load_ok;		/* Bulk-load is a possibility */
+	bool bulk_load_ok;		/* Bulk-load is a possibility */
 
 	WT_BM	*bm;			/* Block manager reference */
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
@@ -134,7 +134,9 @@ struct __wt_btree {
 	u_int    evict_walk_skips;	/* Number of walks skipped */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
 
-	int checkpointing;		/* Checkpoint in progress */
+	enum {
+		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING
+	} checkpointing;		/* Checkpoint in progress */
 
 	/*
 	 * We flush pages from the tree (in order to make checkpoint faster),

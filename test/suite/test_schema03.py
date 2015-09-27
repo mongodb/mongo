@@ -348,7 +348,6 @@ class test_schema03(wttest.WiredTigerTestCase):
 
         # Report known limitations in the test,
         # we'll work around these later, in a loop where we don't want to print.
-        self.KNOWN_LIMITATION('Indices created after data population will have no entries')
         self.KNOWN_LIMITATION('Column groups created after indices confuses things')
 
         # Column groups are created in two different times.
@@ -471,12 +470,11 @@ class test_schema03(wttest.WiredTigerTestCase):
 
         self.finished_step('populate0')
 
-#TODO
         # Create indices in third set
-#        for tc in tabconfigs:
-#            for idx in tc.idxlist:
-#                if idx.createset == 2:
-#                    self.create('index', tc.tablename, idx.idxname, idx.columns)
+        for tc in tabconfigs:
+            for idx in tc.idxlist:
+                if idx.createset == 2:
+                    self.create('index', tc.tablename, idx.idxname, idx.columns)
 
         self.finished_step('index2')
 
@@ -543,13 +541,6 @@ class test_schema03(wttest.WiredTigerTestCase):
 
         # for each index, check each entry
         for idx in tc.idxlist:
-            # KNOWN LIMITATION: Indices created after data population
-            # will have no entries, so don't bother with them here
-            # Remove these statements when the limitation is fixed.
-            if idx.createset == 2:
-                continue
-            # END KNOWN LIMITATION
-
             # Although it's possible to open an index on some partial
             # list of columns, we'll keep it simple here, and always
             # use all columns.

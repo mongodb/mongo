@@ -14,9 +14,10 @@ int
 util_printlog(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
-	int ch, printable;
+	int ch;
+	bool printable;
 
-	printable = 0;
+	printable = false;
 	while ((ch = __wt_getopt(progname, argc, argv, "f:p")) != EOF)
 		switch (ch) {
 		case 'f':			/* output file */
@@ -27,7 +28,7 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 			}
 			break;
 		case 'p':
-			printable = 1;
+			printable = true;
 			break;
 		case '?':
 		default:

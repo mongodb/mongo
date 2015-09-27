@@ -263,7 +263,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		 * We're about to allocate a snapshot: if we need to block for
 		 * eviction, it's better to do it beforehand.
 		 */
-		WT_RET(__wt_cache_eviction_check(session, 0, NULL));
+		WT_RET(__wt_cache_eviction_check(session, false, NULL));
 
 		__wt_txn_get_snapshot(session);
 	}
@@ -327,7 +327,7 @@ __wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
 	 */
 	if (F_ISSET(txn, WT_TXN_RUNNING) &&
 	    !F_ISSET(txn, WT_TXN_HAS_ID) && txn_state->snap_min == WT_TXN_NONE)
-		WT_RET(__wt_cache_eviction_check(session, 0, NULL));
+		WT_RET(__wt_cache_eviction_check(session, false, NULL));
 
 	return (0);
 }

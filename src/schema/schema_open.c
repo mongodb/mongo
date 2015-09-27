@@ -100,12 +100,12 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 
 		WT_ERR(__wt_buf_init(session, buf, 0));
 		WT_ERR(__wt_struct_plan(session,
-		    table, table->colconf.str, table->colconf.len, 1, buf));
+		    table, table->colconf.str, table->colconf.len, true, buf));
 		WT_ERR(__wt_strndup(
 		    session, buf->data, buf->size, &table->plan));
 	}
 
-	table->cg_complete = 1;
+	table->cg_complete = true;
 
 err:	__wt_scr_free(session, &buf);
 	__wt_schema_destroy_colgroup(session, &colgroup);
@@ -228,7 +228,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 		goto err;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &plan));
-	WT_ERR(__wt_struct_plan(session, table, buf->data, buf->size, 0, plan));
+	WT_ERR(__wt_struct_plan(
+	    session, table, buf->data, buf->size, false, plan));
 	WT_ERR(__wt_strndup(session, plan->data, plan->size, &idx->key_plan));
 
 	/* Set up the cursor key format (the visible columns). */
@@ -250,7 +251,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	/* TODO Optimize to use index columns in preference to table lookups. */
 	WT_ERR(__wt_buf_init(session, plan, 0));
 	WT_ERR(__wt_struct_plan(session,
-	    table, table->colconf.str, table->colconf.len, 1, plan));
+	    table, table->colconf.str, table->colconf.len, true, plan));
 	WT_ERR(__wt_strndup(session, plan->data, plan->size, &idx->value_plan));
 
 err:	__wt_scr_free(session, &buf);
@@ -271,7 +272,8 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_INDEX *idx;
 	u_int i;
-	int cmp, match;
+	int cmp;
+	bool match;
 	const char *idxconf, *name, *tablename, *uri;
 
 	/* Check if we've already done the work. */
@@ -280,7 +282,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 
 	cursor = NULL;
 	idx = NULL;
-	match = 0;
+	match = false;
 
 	/* Build a search key. */
 	tablename = table->name;
@@ -374,7 +376,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 	/* If we did a full pass, we won't need to do it again. */
 	if (idxname == NULL) {
 		table->nindices = i;
-		table->idx_complete = 1;
+		table->idx_complete = true;
 	}
 
 err:	__wt_scr_free(session, &tmp);
@@ -400,7 +402,7 @@ __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table)
  */
 int
 __wt_schema_open_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep)
+    const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep)
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
@@ -448,9 +450,9 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	 * are not named.
 	 */
 	WT_ERR(__wt_config_subinit(session, &cparser, &table->colconf));
-	table->is_simple = 1;
+	table->is_simple = true;
 	while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
-		table->is_simple = 0;
+		table->is_simple = false;
 	if (ret != WT_NOTFOUND)
 		goto err;
 
@@ -505,7 +507,7 @@ err:		WT_TRET(__wt_schema_destroy_table(session, &table));
  */
 int
 __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
-    const char *uri, int quiet, WT_TABLE **tablep, WT_COLGROUP **colgroupp)
+    const char *uri, bool quiet, WT_TABLE **tablep, WT_COLGROUP **colgroupp)
 {
 	WT_COLGROUP *colgroup;
 	WT_TABLE *table;
@@ -522,7 +524,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 		tend = tablename + strlen(tablename);
 
 	WT_RET(__wt_schema_get_table(session,
-	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));
+	    tablename, WT_PTRDIFF(tend, tablename), false, &table));
 
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
 		colgroup = table->cgroups[i];
@@ -548,7 +550,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
  */
 int
 __wt_schema_get_index(WT_SESSION_IMPL *session,
-    const char *uri, int quiet, WT_TABLE **tablep, WT_INDEX **indexp)
+    const char *uri, bool quiet, WT_TABLE **tablep, WT_INDEX **indexp)
 {
 	WT_DECL_RET;
 	WT_INDEX *idx;
@@ -564,7 +566,7 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 		return (__wt_bad_object_type(session, uri));
 
 	WT_RET(__wt_schema_get_table(session,
-	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));
+	    tablename, WT_PTRDIFF(tend, tablename), false, &table));
 
 	/* Try to find the index in the table. */
 	for (i = 0; i < table->nindices; i++) {
