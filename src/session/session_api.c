@@ -33,6 +33,8 @@ __wt_session_reset_cursors(WT_SESSION_IMPL *session, bool free_buffers)
 			__wt_buf_free(session, &cursor->value);
 		}
 	}
+
+	WT_ASSERT(session, session->ncursors == 0);
 	return (ret);
 }
 
@@ -54,6 +56,39 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
 			    cursor->value.data, cursor->value.size));
 			F_SET(cursor, WT_CURSTD_VALUE_EXT);
 		}
+
+	return (ret);
+}
+
+/*
+ * __session_release_resources --
+ *	Release the session's resources, shared by close and reset.
+ */
+static int
+__session_release_resources(WT_SESSION_IMPL *session)
+{
+	WT_DECL_RET;
+
+	/* Discard metadata tracking. */
+	__wt_meta_track_discard(session);
+
+	/* Free transaction information. */
+	__wt_txn_destroy(session);
+
+	/* Block manager cleanup */
+	if (session->block_manager_cleanup != NULL)
+		WT_TRET(session->block_manager_cleanup(session));
+
+	/* Reconciliation cleanup */
+	if (session->reconcile_cleanup != NULL)
+		WT_TRET(session->reconcile_cleanup(session));
+
+	/*
+	 * Discard scratch buffers, error memory; last, just in case a cleanup
+	 * routine uses scratch buffers.
+	 */
+	__wt_scr_discard(session);
+	__wt_buf_free(session, &session->err);
 
 	return (ret);
 }
@@ -132,24 +167,11 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Close all tables. */
 	WT_TRET(__wt_schema_close_tables(session));
 
-	/* Discard metadata tracking. */
-	__wt_meta_track_discard(session);
-
-	/* Discard scratch buffers, error memory. */
-	__wt_scr_discard(session);
-	__wt_buf_free(session, &session->err);
-
-	/* Free transaction information. */
-	__wt_txn_destroy(session);
-
 	/* Confirm we're not holding any hazard pointers. */
 	__wt_hazard_close(session);
 
-	/* Cleanup */
-	if (session->block_manager_cleanup != NULL)
-		WT_TRET(session->block_manager_cleanup(session));
-	if (session->reconcile_cleanup != NULL)
-		WT_TRET(session->reconcile_cleanup(session));
+	/* Release other resources, shared with reset. */
+	WT_TRET(__session_release_resources(session));
 
 	/* Destroy the thread's mutex. */
 	WT_TRET(__wt_cond_destroy(session, &session->cond));
@@ -547,10 +569,8 @@ __session_reset(WT_SESSION *wt_session)
 
 	WT_TRET(__wt_session_reset_cursors(session, true));
 
-	WT_ASSERT(session, session->ncursors == 0);
-
-	__wt_scr_discard(session);
-	__wt_buf_free(session, &session->err);
+	/* Release other resources, shared with close. */
+	WT_TRET(__session_release_resources(session));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }

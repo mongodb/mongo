@@ -957,9 +957,10 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, bool destroy)
 	 *
 	 * During some big-page evictions we have seen boundary arrays that have
 	 * millions of elements.  That should not be a normal event, but if the
-	 * memory is associated with a random session, it won't be discarded
-	 * until the session is closed. If there are more than 10,000 boundary
-	 * structure elements, destroy the boundary array and we'll start over.
+	 * memory is associated with a random application session, it won't be
+	 * discarded until the session is closed or reset. If there are more
+	 * than 10,000 boundary structure elements, discard the boundary array
+	 * entirely and start over next time.
 	 */
 	if (destroy || r->bnd_entries > 10 * 1000) {
 		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
