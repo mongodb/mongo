@@ -341,20 +341,23 @@ public:
         // Needs to be locked exclusively, because creates the system.profile collection
         // in the local database.
         ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-        OldClientContext ctx(txn, dbname);
+        AutoGetDb ctx(txn, dbname, MODE_X);
+        Database* db = ctx.getDb();
 
         BSONElement e = cmdObj.firstElement();
-        result.append("was", ctx.db()->getProfilingLevel());
+        result.append("was", db ? db->getProfilingLevel() : serverGlobalParams.defaultProfile);
         result.append("slowms", serverGlobalParams.slowMS);
 
         int p = (int)e.number();
         Status status = Status::OK();
 
-        if (p == -1)
-            status = Status::OK();
-        else if (p >= 0 && p <= 2) {
-            status = ctx.db()->setProfilingLevel(txn, p);
+        if (p >= 0 && p <= 2) {
+            if (!db) {
+                // When setting the profiling level, create the database if it didn't already exist.
+                // When just reading the profiling level, we do not create the database.
+                db = dbHolder().openDb(txn, dbname);
+            }
+            status = db->setProfilingLevel(txn, p);
         }
 
         const BSONElement slow = cmdObj["slowms"];
