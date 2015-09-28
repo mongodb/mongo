@@ -89,9 +89,9 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
         newNToReturn = *lpq.getNToReturn() + lpq.getSkip().value_or(0);
     }
 
-    // If there is a sort, we send a sortKey meta-projection to the remote node.
+    // If there is a sort other than $natural, we send a sortKey meta-projection to the remote node.
     BSONObj newProjection = lpq.getProj();
-    if (!lpq.getSort().isEmpty()) {
+    if (!lpq.getSort().isEmpty() && !lpq.getSort()["$natural"]) {
         BSONObjBuilder projectionBuilder;
         projectionBuilder.appendElements(lpq.getProj());
         projectionBuilder.append(ClusterClientCursorParams::kSortKeyField, kSortKeyMetaProjection);
