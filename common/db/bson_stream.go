@@ -91,7 +91,8 @@ func (bs *BSONSource) LoadNextInto(into []byte) (bool, int32) {
 	// Verify that the size of the BSON object we are about to read can
 	// actually fit into the buffer that was provided. If not, either the BSON is
 	// invalid, or the buffer passed in is too small.
-	if bsonSize > int32(len(into)) {
+	// Verify that we do not have an invalid BSON document with size < 5.
+	if bsonSize > int32(len(into)) || bsonSize < 5 {
 		bs.err = fmt.Errorf("invalid BSONSize: %v bytes", bsonSize)
 		return false, 0
 	}
