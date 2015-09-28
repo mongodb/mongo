@@ -366,7 +366,7 @@ __log_file_server(void *arg)
 			 *
 			 * We also have to wait for the written LSN and the
 			 * sync LSN to be in the same file so that we know we
-			 * have sync'ed all earlier log files.
+			 * have synchronized all earlier log files.
 			 */
 			if (__wt_log_cmp(&log->bg_sync_lsn, &min_lsn) <= 0) {
 				/*
