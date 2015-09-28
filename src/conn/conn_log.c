@@ -363,8 +363,23 @@ __log_file_server(void *arg)
 			 * We have to wait until the LSN we asked for is
 			 * written.  If it isn't signal the wrlsn thread
 			 * to get it written.
+			 *
+			 * We also have to wait for the written LSN and the
+			 * sync LSN to be in the same file so that we know we
+			 * have sync'ed all earlier log files.
 			 */
 			if (__wt_log_cmp(&log->bg_sync_lsn, &min_lsn) <= 0) {
+				/*
+				 * If the sync file is behind either the one
+				 * wanted for a background sync or the write LSN
+				 * has moved to another file continue to let
+				 * this worker thread process that older file
+				 * immediately.
+				 */
+				if ((log->sync_lsn.file <
+				    log->bg_sync_lsn.file) ||
+				    (log->sync_lsn.file < min_lsn.file))
+					continue;
 				WT_ERR(__wt_fsync(session, log->log_fh));
 				__wt_spin_lock(session, &log->log_sync_lock);
 				locked = true;
@@ -374,6 +389,8 @@ __log_file_server(void *arg)
 				 */
 				if (__wt_log_cmp(
 				    &log->sync_lsn, &min_lsn) <= 0) {
+					WT_ASSERT(session,
+					    min_lsn.file == log->sync_lsn.file);
 					log->sync_lsn = min_lsn;
 					WT_ERR(__wt_cond_signal(
 					    session, log->log_sync_cond));
@@ -395,7 +412,7 @@ __log_file_server(void *arg)
 		}
 		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait(
-		    session, conn->log_file_cond, WT_MILLION));
+		    session, conn->log_file_cond, WT_MILLION / 10));
 	}
 
 	if (0) {
