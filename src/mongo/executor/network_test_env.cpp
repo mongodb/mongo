@@ -53,13 +53,14 @@ void NetworkTestEnv::onCommand(OnCommandFunction func) {
 
     if (resultStatus.isOK()) {
         result.appendElements(resultStatus.getValue());
+        Command::appendCommandStatus(result, resultStatus.getStatus());
+        const RemoteCommandResponse response(result.obj(), BSONObj(), Milliseconds(1));
+
+        _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
+    } else {
+        _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), resultStatus.getStatus());
     }
 
-    Command::appendCommandStatus(result, resultStatus.getStatus());
-
-    const RemoteCommandResponse response(result.obj(), BSONObj(), Milliseconds(1));
-
-    _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
     _mockNetwork->runReadyNetworkOperations();
     _mockNetwork->exitNetwork();
 }
@@ -77,13 +78,14 @@ void NetworkTestEnv::onCommandWithMetadata(OnCommandWithMetadataFunction func) {
 
     if (cmdResponseStatus.isOK()) {
         result.appendElements(cmdResponse.data);
+        Command::appendCommandStatus(result, cmdResponseStatus.getStatus());
+        const RemoteCommandResponse response(result.obj(), cmdResponse.metadata, Milliseconds(1));
+
+        _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
+    } else {
+        _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), cmdResponseStatus.getStatus());
     }
 
-    Command::appendCommandStatus(result, cmdResponseStatus.getStatus());
-
-    const RemoteCommandResponse response(result.obj(), cmdResponse.metadata, Milliseconds(1));
-
-    _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
     _mockNetwork->runReadyNetworkOperations();
     _mockNetwork->exitNetwork();
 }
