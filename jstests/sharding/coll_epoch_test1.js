@@ -4,11 +4,6 @@ var st = new ShardingTest({ shards : 3, mongos : 3, verbose : 1 })
 // Stop balancer, it'll interfere
 st.stopBalancer()
 
-// TODO: SERVER-20194. This test forces use of the old mongos query path.
-assert.commandWorked(st.s0.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-assert.commandWorked(st.s1.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-assert.commandWorked(st.s2.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-
 // Use separate mongoses for admin, inserting data, and validating results, so no
 // single-mongos tricks will work
 var insertMongos = st.s2
@@ -80,9 +75,13 @@ var getOtherShard = function( shard ){
     }
 }
 
-admin.runCommand({ movePrimary : coll.getDB() + "", 
-                   to : getOtherShard( config.databases.findOne({ _id : coll.getDB() + "" }).primary ) })
-
+var otherShard = getOtherShard(config.databases.findOne({_id: coll.getDB() + ""}).primary);
+assert.commandWorked(admin.runCommand({movePrimary: coll.getDB() + "", to: otherShard}));
+if (st.configRS) {
+    // If we are in CSRS mode need to make sure that staleMongos will actually get
+    // the most recent config data.
+    st.configRS.awaitLastOpCommitted();
+}
 jsTest.log( "moved primary..." )
 
 bulk = insertMongos.getCollection( coll + "" ).initializeUnorderedBulkOp();
