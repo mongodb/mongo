@@ -52,6 +52,15 @@ struct __wt_rwlock {
 };
 
 /*
+ * A light weight lock that can be used to replace spinlocks if fairness is
+ * necessasry. Implements a ticket-based backoff spin lock.
+ */
+struct __wt_fair_lock {
+	uint16_t owner;		/* Ticket number for current owner */
+	uint16_t waiter;	/* Ticket number of last allocated */
+};
+
+/*
  * Spin locks:
  *
  * WiredTiger uses spinlocks for fast mutual exclusion (where operations done

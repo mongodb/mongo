@@ -56,8 +56,8 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 		 * the page is being reconciled, serialize with reconciliation.
 		 */
 		if (WT_PAGE_IS_INTERNAL(page))
-			WT_RET(__wt_writelock(
-			    session, page->pg_intl_split_lock));
+			WT_RET(__wt_fair_lock(
+			    session, &page->pg_intl_split_lock));
 		else
 			F_CAS_ATOMIC_WAIT(page, WT_PAGE_RECONCILIATION);
 
@@ -65,8 +65,8 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 		    mod->mod_replace.addr, mod->mod_replace.size, skipp);
 
 		if (WT_PAGE_IS_INTERNAL(page))
-			WT_TRET(__wt_writeunlock(
-			    session, page->pg_intl_split_lock));
+			WT_TRET(__wt_fair_unlock(
+			    session, &page->pg_intl_split_lock));
 		else
 			F_CLR_ATOMIC(page, WT_PAGE_RECONCILIATION);
 		WT_RET(ret);

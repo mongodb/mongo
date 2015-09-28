@@ -94,8 +94,6 @@ __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
 				    session, &pindex->index[i]));
 				size += sizeof(WT_REF);
 			}
-		WT_ERR(__wt_rwlock_alloc(session,
-		    &page->pg_intl_split_lock, "internal page split lock"));
 		if (0) {
 err:			if ((pindex = WT_INTL_INDEX_GET_SAFE(page)) != NULL) {
 				for (i = 0; i < pindex->entries; ++i)

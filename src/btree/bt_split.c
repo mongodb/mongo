@@ -890,11 +890,11 @@ __split_parent_lock(
 	 */
 	for (;;) {
 		parent = ref->home;
-		WT_RET(__wt_writelock(session, parent->u.intl.split_lock));
+		WT_RET(__wt_fair_lock(session, &parent->pg_intl_split_lock));
 		if (parent == ref->home)
 			break;
 		/* Try again if the page deepened while we were waiting */
-		WT_RET(__wt_writeunlock(session, parent->pg_intl_split_lock));
+		WT_RET(__wt_fair_unlock(session, &parent->pg_intl_split_lock));
 	}
 
 	/*
@@ -1174,7 +1174,7 @@ err:	if (!complete)
 			if (next_ref->state == WT_REF_SPLIT)
 				next_ref->state = WT_REF_DELETED;
 		}
-	WT_TRET(__wt_writeunlock(session, parent->pg_intl_split_lock));
+	WT_TRET(__wt_fair_unlock(session, &parent->pg_intl_split_lock));
 
 	__wt_free_ref_index(session, NULL, alloc_index, false);
 

@@ -453,7 +453,7 @@ struct __wt_page {
 			 * Used to protect and fairly co-ordinate splits into
 			 * this page.
 			 */
-			WT_RWLOCK *split_lock;
+			WT_FAIR_LOCK split_lock;
 		} intl;
 #undef	pg_intl_recno
 #define	pg_intl_recno			u.intl.recno
