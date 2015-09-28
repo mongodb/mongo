@@ -54,13 +54,15 @@ struct __wt_rwlock {
 /*
  * A light weight lock that can be used to replace spinlocks if fairness is
  * necessary. Implements a ticket-based back off spin lock.
+ * The fields are available as a union to allow for atomically setting
+ * the state of the entire lock.
  */
 struct __wt_fair_lock {
 	union {
-		uint32_t lock;  /* Used when needing to atomically switch */
+		uint32_t lock;
 		struct {
-			uint16_t owner;	/* Ticket number for current owner */
-			uint16_t waiter;/* Ticket number of last allocated */
+			uint16_t owner;		/* Ticket for current owner */
+			uint16_t waiter;	/* Last allocated ticket */
 		} s;
 	} u;
 #define	fair_lock_owner u.s.owner
