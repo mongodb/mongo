@@ -86,7 +86,12 @@ std::unique_ptr<LiteParsedQuery> transformQueryForShards(const LiteParsedQuery& 
     // Similarly, if nToReturn is set, we forward the sum of nToReturn and the skip.
     boost::optional<long long> newNToReturn;
     if (lpq.getNToReturn()) {
-        newNToReturn = *lpq.getNToReturn() + lpq.getSkip().value_or(0);
+        // !wantMore and ntoreturn mean the same as !wantMore and limit, so perform the conversion.
+        if (!lpq.wantMore()) {
+            newLimit = *lpq.getNToReturn() + lpq.getSkip().value_or(0);
+        } else {
+            newNToReturn = *lpq.getNToReturn() + lpq.getSkip().value_or(0);
+        }
     }
 
     // If there is a sort other than $natural, we send a sortKey meta-projection to the remote node.
