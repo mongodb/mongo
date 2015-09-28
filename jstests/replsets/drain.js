@@ -4,7 +4,8 @@
 // 3. Insert data to ensure the SECONDARY has ops to apply in its queue.
 // 4. Shutdown PRIMARY.
 // 5. Wait for SECONDARY to become PRIMARY.
-// 6. Confirm that the new PRIMARY cannot accept writes until its queue is empty.
+// 6. Confirm that the new PRIMARY cannot accept writes while in drain mode.
+// 6a. Confirm that the new PRIMARY cannot accept reads while in drain mode.
 // 7. Enable applying ops.
 // 8. Ensure the ops in queue are applied and that the PRIMARY begins to accept writes as usual.
 
@@ -62,6 +63,21 @@
     assert.writeError(secondary.getDB("foo").flag.insert({sentinel:2}));
     assert(!secondary.getDB("admin").runCommand({"isMaster": 1}).ismaster);
 
+    // Ensure new primary is not yet readable without slaveOk bit.
+    secondary.slaveOk = false;
+    jsTestLog('New primary should not be readable yet, without slaveOk bit');
+    var res = secondary.getDB("foo").runCommand({find: "foo"});
+    assert.commandFailed(res);
+    assert.eq(ErrorCodes.NotMasterNoSlaveOkCode, res.code,
+            "find failed with unexpected error code: " + tojson(res));
+    // Nor should it be readable with the slaveOk bit.
+    secondary.slaveOk = true;
+    res = secondary.getDB("foo").runCommand({find: "foo"});
+    assert.commandFailed(res);
+    assert.eq(ErrorCodes.NotMasterOrSecondaryCode, res.code,
+            "find failed with unexpected error code: " + tojson(res));
+    secondary.slaveOk = false;
+    
     // Allow draining to complete
     jsTestLog('Enabling fail point on new primary to allow draining to complete');
     assert.commandWorked(
