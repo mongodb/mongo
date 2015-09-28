@@ -110,19 +110,32 @@ public:
      */
     class GlobalLock {
     public:
+        class EnqueueOnly {};
+
         explicit GlobalLock(Locker* locker);
         GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs);
+
+        /**
+         * Enqueues lock but does not block on lock acquisition.
+         * Call waitForLock() to complete locking process.
+         */
+        GlobalLock(Locker* locker, LockMode lockMode, EnqueueOnly enqueueOnly);
 
         ~GlobalLock() {
             _unlock();
         }
+
+        /**
+         * Waits for lock to be granted.
+         */
+        void waitForLock(unsigned timeoutMs);
 
         bool isLocked() const {
             return _result == LOCK_OK;
         }
 
     private:
-        void _lock(LockMode lockMode, unsigned timeoutMs);
+        void _enqueue(LockMode lockMode);
         void _unlock();
 
         Locker* const _locker;

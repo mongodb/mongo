@@ -62,17 +62,24 @@ Lock::GlobalLock::GlobalLock(Locker* locker)
     : _locker(locker), _result(LOCK_INVALID), _pbwm(locker, resourceIdParallelBatchWriterMode) {}
 
 Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)
-    : _locker(locker), _result(LOCK_INVALID), _pbwm(locker, resourceIdParallelBatchWriterMode) {
-    _lock(lockMode, timeoutMs);
+    : GlobalLock(locker, lockMode, EnqueueOnly()) {
+    waitForLock(timeoutMs);
 }
 
+Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, EnqueueOnly enqueueOnly)
+    : _locker(locker), _result(LOCK_INVALID), _pbwm(locker, resourceIdParallelBatchWriterMode) {
+    _enqueue(lockMode);
+}
 
-void Lock::GlobalLock::_lock(LockMode lockMode, unsigned timeoutMs) {
+void Lock::GlobalLock::_enqueue(LockMode lockMode) {
     if (!_locker->isBatchWriter()) {
         _pbwm.lock(MODE_IS);
     }
 
     _result = _locker->lockGlobalBegin(lockMode);
+}
+
+void Lock::GlobalLock::waitForLock(unsigned timeoutMs) {
     if (_result == LOCK_WAITING) {
         _result = _locker->lockGlobalComplete(timeoutMs);
     }
