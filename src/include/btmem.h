@@ -449,18 +449,12 @@ struct __wt_page {
 			 */
 			uint32_t deepen_split_append;
 			uint32_t deepen_split_last;
-			/*
-			 * Used to protect and fairly co-ordinate splits into
-			 * this page.
-			 */
-			WT_FAIR_LOCK split_lock;
 		} intl;
 #undef	pg_intl_recno
 #define	pg_intl_recno			u.intl.recno
 #define	pg_intl_parent_ref		u.intl.parent_ref
 #define	pg_intl_deepen_split_append	u.intl.deepen_split_append
 #define	pg_intl_deepen_split_last	u.intl.deepen_split_last
-#define	pg_intl_split_lock		u.intl.split_lock
 
 	/*
 	 * Macros to copy/set the index because the name is obscured to ensure
@@ -585,8 +579,7 @@ struct __wt_page {
 #define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
-#define	WT_PAGE_RECONCILIATION	0x10	/* Page reconciliation lock */
-#define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
+#define	WT_PAGE_SPLIT_INSERT	0x10	/* A leaf page was split for append */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	/*
@@ -609,6 +602,12 @@ struct __wt_page {
 #define	WT_READGEN_OLDEST	1
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
+
+	/*
+	 * Used to protect and co-ordinate splits for internal pages and
+	 * reconciliation for all pages.
+	 */
+	WT_FAIR_LOCK page_lock;
 
 	size_t memory_footprint;	/* Memory attached to the page */
 

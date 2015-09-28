@@ -253,6 +253,26 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 #endif
 
 /*
+ * __wt_fair_trylock --
+ *	Try to get a lock - give up if it is not immediately available.
+ */
+static inline int
+__wt_fair_trylock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
+{
+	uint16_t ticket;
+
+	WT_UNUSED(session);
+
+	/* Do the cheap test first. */
+	if (lock->waiter != lock->owner)
+		return (EBUSY);
+
+	ticket = lock->owner;
+	return (__wt_atomic_cas16(
+	    &lock->waiter, ticket, ticket + 1) ? 0 : EBUSY);
+}
+
+/*
  * __wt_fair_lock --
  *	Get a lock.
  */
