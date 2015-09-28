@@ -818,6 +818,7 @@ putK
 putV
 pv
 py
+qcompare
 qdown
 qrrSS
 qsort
