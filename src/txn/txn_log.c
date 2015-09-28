@@ -302,7 +302,7 @@ __wt_txn_checkpoint_log(
 
 	switch (flags) {
 	case WT_TXN_LOG_CKPT_PREPARE:
-		txn->full_ckpt = 1;
+		txn->full_ckpt = true;
 		*ckpt_lsn = S2C(session)->log->write_start_lsn;
 		/*
 		 * We need to make sure that the log records in the checkpoint
@@ -371,7 +371,7 @@ __wt_txn_checkpoint_log(
 		WT_INIT_LSN(ckpt_lsn);
 		txn->ckpt_nsnapshot = 0;
 		__wt_scr_free(session, &txn->ckpt_snapshot);
-		txn->full_ckpt = 0;
+		txn->full_ckpt = false;
 		break;
 
 	WT_ILLEGAL_VALUE_ERR(session);

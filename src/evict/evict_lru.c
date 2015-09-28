@@ -304,7 +304,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 	 */
 	WT_RET(__wt_thread_create(
 	    session, &conn->evict_tid, __evict_server, session));
-	conn->evict_tid_set = 1;
+	conn->evict_tid_set = true;
 
 	return (0);
 }
@@ -340,7 +340,7 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 	if (conn->evict_tid_set) {
 		WT_TRET(__wt_evict_server_wake(session));
 		WT_TRET(__wt_thread_join(session, conn->evict_tid));
-		conn->evict_tid_set = 0;
+		conn->evict_tid_set = false;
 	}
 
 	WT_TRET(__wt_verbose(

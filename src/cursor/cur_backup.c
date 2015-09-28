@@ -218,7 +218,7 @@ __backup_start(
 	 * checkpoint.
 	 */
 	__wt_spin_lock(session, &conn->hot_backup_lock);
-	conn->hot_backup = 1;
+	conn->hot_backup = true;
 	__wt_spin_unlock(session, &conn->hot_backup_lock);
 
 	/* Create the hot backup file. */
@@ -319,7 +319,7 @@ __backup_stop(WT_SESSION_IMPL *session)
 
 	/* Checkpoint deletion can proceed, as can the next hot backup. */
 	__wt_spin_lock(session, &conn->hot_backup_lock);
-	conn->hot_backup = 0;
+	conn->hot_backup = false;
 	__wt_spin_unlock(session, &conn->hot_backup_lock);
 
 	return (ret);

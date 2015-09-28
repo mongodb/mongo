@@ -43,7 +43,7 @@
 
 /* An API call wrapped in a transaction if necessary. */
 #define	TXN_API_CALL(s, h, n, cur, bt, config, cfg) do {		\
-	int __autotxn = 0;						\
+	bool __autotxn = false;						\
 	API_CALL(s, h, n, bt, cur, config, cfg);			\
 	__autotxn = !F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING);\
 	if (__autotxn)							\
@@ -51,7 +51,7 @@
 
 /* An API call wrapped in a transaction if necessary. */
 #define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
-	int __autotxn = 0;						\
+	bool __autotxn = false;						\
 	API_CALL_NOCONF(s, h, n, cur, bt);				\
 	__autotxn = !F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING);\
 	if (__autotxn)							\
