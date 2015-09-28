@@ -38,29 +38,12 @@
 #include "mongo/executor/async_timer_asio.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/network_interface_impl.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
 namespace executor {
-
-namespace {
-
-const char kNetworkImplASIO[] = "ASIO";
-const char kNetworkImplThreadPool[] = "threadPool";
-
-}  // namespace
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(outboundNetworkImpl, std::string, kNetworkImplASIO);
-MONGO_INITIALIZER(outboundNetworkImpl)(InitializerContext*) {
-    if (outboundNetworkImpl != kNetworkImplThreadPool && outboundNetworkImpl != kNetworkImplASIO) {
-        return Status(ErrorCodes::BadValue,
-                      "unsupported networking option: " + outboundNetworkImpl);
-    }
-    return Status::OK();
-}
 
 std::unique_ptr<NetworkInterface> makeNetworkInterface() {
     return makeNetworkInterface(nullptr, nullptr);
@@ -69,22 +52,21 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface() {
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
     std::unique_ptr<NetworkConnectionHook> hook,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
-    if (outboundNetworkImpl == kNetworkImplASIO) {
-        NetworkInterfaceASIO::Options options{};
-        options.networkConnectionHook = std::move(hook);
-        options.metadataHook = std::move(metadataHook);
-        options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+    NetworkInterfaceASIO::Options options{};
+    options.networkConnectionHook = std::move(hook);
+    options.metadataHook = std::move(metadataHook);
+    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+
 #ifdef MONGO_CONFIG_SSL
-        if (SSLManagerInterface* manager = getSSLManager()) {
-            options.streamFactory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
-            return stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
-        }
-#endif
-        options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
-        return stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
-    } else {
-        return stdx::make_unique<NetworkInterfaceImpl>(std::move(hook));
+    if (SSLManagerInterface* manager = getSSLManager()) {
+        options.streamFactory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
     }
+#endif
+
+    if (!options.streamFactory)
+        options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
+
+    return stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
 }
 
 }  // namespace executor
