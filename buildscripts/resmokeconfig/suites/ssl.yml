@@ -13,3 +13,4 @@ executor:
         sslAllowInvalidCertificates: ''
         sslCAFile: jstests/libs/ca.pem
         sslPEMKeyFile: jstests/libs/client.pem
+        readMode: commands

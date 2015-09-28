@@ -156,7 +156,7 @@ Status addMongoShellOptions(moe::OptionSection* options) {
                                "readMode",
                                moe::String,
                                "mode to determine how .find() queries are done:"
-                               " commands, compatibility").hidden();
+                               " commands, compatibility, legacy").hidden();
 
     options->addOptionChaining("rpcProtocols",
                                "rpcProtocols",
@@ -279,11 +279,12 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
     if (params.count("readMode")) {
         std::string mode = params["readMode"].as<string>();
-        if (mode != "commands" && mode != "compatibility") {
-            throw MsgAssertionException(17397,
-                                        mongoutils::str::stream()
-                                            << "Unknown readMode option: '" << mode
-                                            << "'. Valid modes are: {commands, compatibility}");
+        if (mode != "commands" && mode != "compatibility" && mode != "legacy") {
+            throw MsgAssertionException(
+                17397,
+                mongoutils::str::stream()
+                    << "Unknown readMode option: '" << mode
+                    << "'. Valid modes are: {commands, compatibility, legacy}");
         }
         shellGlobalParams.readMode = mode;
     }

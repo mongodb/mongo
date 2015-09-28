@@ -28,6 +28,7 @@ executor:
         authenticationMechanism: SCRAM-SHA-1
         password: *keyFileData
         username: __system
+        readMode: commands
     hooks:
     - class: CleanEveryN
       n: 20

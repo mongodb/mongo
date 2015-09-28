@@ -7,7 +7,9 @@ selector:
 
 executor:
   js_test:
-    config: {}
+    config:
+      shell_options:
+        readMode: commands
     hooks:
     - class: CleanEveryN
       n: 20

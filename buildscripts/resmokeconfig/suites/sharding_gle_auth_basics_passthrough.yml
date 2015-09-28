@@ -27,6 +27,7 @@ executor:
         authenticationMechanism: SCRAM-SHA-1
         password: *keyFileData
         username: __system
+        readMode: commands
 
     fixture:
       class: ShardedClusterFixture

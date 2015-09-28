@@ -11,7 +11,7 @@
     t.insert({});
     t.insert({});
 
-    var oldReadMode = db.getMongo()._readMode;
+    var oldReadMode = db.getMongo().readMode();
 
     assert.throws(function(){
         (new _rand())();
@@ -23,7 +23,7 @@
     }, [], "invoke constructor on BSON");
 
     assert.throws(function(){
-        db.getMongo()._readMode = "commands";
+        db.getMongo().forceReadMode("commands");
         var cursor = t.find();
         cursor.next();
 
@@ -31,12 +31,12 @@
     }, [], "invoke constructor on CursorHandle");
 
     assert.throws(function(){
-        db.getMongo()._readMode = "compatibility";
+        db.getMongo().forceReadMode("legacy");
         var cursor = t.find();
         cursor.next();
 
         new cursor._cursor();
     }, [], "invoke constructor on Cursor");
 
-    db.getMongo()._readMode = oldReadMode;
+    db.getMongo().forceReadMode(oldReadMode);
 })();

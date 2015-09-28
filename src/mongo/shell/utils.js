@@ -402,7 +402,7 @@ if (typeof(_writeMode) == 'undefined') {
 
 if (typeof(_readMode) == 'undefined') {
     // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
-    _readMode = function() { return "compatibility"; };
+    _readMode = function() { return "legacy"; };
 };
 
 shellPrintHelper = function (x) {

@@ -9,6 +9,7 @@ executor:
   js_test:
     config:
       shell_options:
+        readMode: legacy
         writeMode: legacy
     hooks:
     - class: CleanEveryN

@@ -1,7 +1,7 @@
 // Test that we validate nToReturn when upconverting pseudoCommands.
 (function() {
     "use strict";
-    if (db.getMongo().readMode() === "compatibility") {
+    if (!db.getMongo().useReadCommands()) {
         var inprog = db.$cmd.sys.inprog;
         // nToReturn must be 1 or -1.
         assert.doesNotThrow(function() { inprog.find().limit(-1).next(); });

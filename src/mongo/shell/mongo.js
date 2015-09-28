@@ -297,27 +297,61 @@ Mongo.prototype.useReadCommands = function() {
 }
 
 /**
- * Get the readMode string (either "commands" for find/getMore commands or "compatibility" for
- * OP_QUERY find and OP_GET_MORE).
+ * For testing, forces the shell to use the readMode specified in 'mode'. Must be either "commands"
+ * (use the find/getMore commands), "legacy" (use legacy OP_QUERY/OP_GET_MORE wire protocol reads),
+ * or "compatibility" (auto-detect mode based on wire version).
+ */
+Mongo.prototype.forceReadMode = function(mode) {
+    if (mode !== "commands" && mode !== "compatibility" && mode !== "legacy") {
+        throw new Error("Mode must be one of {commands, compatibility, legacy}, but got: " + mode);
+    }
+
+    this._readMode = mode;
+};
+
+/**
+ * Get the readMode string (either "commands" for find/getMore commands, "legacy" for OP_QUERY find
+ * and OP_GET_MORE, or "compatibility" for detecting based on wire version).
  */
 Mongo.prototype.readMode = function() {
-    if ("_readMode" in this) {
+    if ("_readMode" in this && this._readMode !== "compatibility") {
         // We already have determined our read mode. Just return it.
         return this._readMode;
     }
 
-    // Determine read mode based on shell params.
-    //
-    // TODO: Detect what to use based on wire protocol version.
-    if (_readMode) {
+    // Get the readMode from the shell params.
+    if (typeof _readMode === "function") {
         this._readMode = _readMode();
     }
-    else {
-        this._readMode = "compatibility";
+
+    // If we're in compatibility mode, determine whether the server supports the find/getMore
+    // commands. If it does, use commands mode. If not, degrade to legacy mode.
+    if (this._readMode === "compatibility") {
+        try {
+            var isMaster = this.getDB("admin").runCommand({isMaster: 1});
+            var hasReadCommands = (isMaster.ok && 'minWireVersion' in isMaster &&
+                                                  'maxWireVersion' in isMaster &&
+                                                  isMaster.minWireVersion <= 4 &&
+                                                  4 <= isMaster.maxWireVersion);
+
+            if (hasReadCommands) {
+                this._readMode = "commands";
+            }
+            else {
+                print("Cannot use 'commands' readMode, degrading to 'legacy' mode");
+                this._readMode = "legacy";
+            }
+        }
+        catch (e) {
+            // We failed trying to determine whether the remote node supports the find/getMore
+            // commands. In this case, we keep _readMode as "compatibility" and the shell should
+            // issue legacy reads. Next time around we will issue another isMaster to try to
+            // determine the readMode decisively.
+        }
     }
 
     return this._readMode;
-}
+};
 
 //
 // Write Concern can be set at the connection level, and is used for all write operations unless

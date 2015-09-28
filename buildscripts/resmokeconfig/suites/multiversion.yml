@@ -9,4 +9,5 @@ executor:
     config:
       shell_options:
         nodb: ''
+        readMode: legacy
         writeMode: legacy

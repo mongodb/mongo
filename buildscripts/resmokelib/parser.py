@@ -149,7 +149,7 @@ def parse_command_line():
                             " --shuffle option for producing a consistent test execution order."))
 
     parser.add_option("--shellReadMode", type="choice", action="store", dest="shell_read_mode",
-                      choices=("commands", "compatibility"), metavar="READ_MODE",
+                      choices=("commands", "compatibility", "legacy"), metavar="READ_MODE",
                       help="The read mode used by the mongo shell.")
 
     parser.add_option("--shellWriteMode", type="choice", action="store", dest="shell_write_mode",

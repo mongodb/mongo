@@ -32,3 +32,4 @@ executor:
             keyFile: *keyFile
             keyFileData: *keyFileData
         nodb: ''
+        readMode: commands
