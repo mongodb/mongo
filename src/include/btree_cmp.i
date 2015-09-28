@@ -40,6 +40,34 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	userp = user_item->data;
 	treep = tree_item->data;
 
+	/*
+	 * The maximum packed uint64_t is 9B, catch row-store objects using
+	 * packed record numbers as keys.
+	 */
+#undef	WT_COMPARE_SHORT
+#define	WT_COMPARE_SHORT(n)						\
+	case n:								\
+		if (*userp != *treep)					\
+			break;						\
+		++userp, ++treep
+	if (len < 10) {
+		switch (len) {
+		WT_COMPARE_SHORT(9);
+		WT_COMPARE_SHORT(8);
+		WT_COMPARE_SHORT(7);
+		WT_COMPARE_SHORT(6);
+		WT_COMPARE_SHORT(5);
+		WT_COMPARE_SHORT(4);
+		WT_COMPARE_SHORT(3);
+		WT_COMPARE_SHORT(2);
+		case 1:
+			if (*userp != *treep)
+				break;
+			return ((usz == tsz) ?  0 : (usz < tsz) ? -1 : 1);
+		}
+		return (*userp < *treep ? -1 : 1);
+	}
+
 #ifdef HAVE_X86INTRIN_H
 	/* Use vector instructions if we'll execute at least 2 of them. */
 	if (len >= WT_VECTOR_SIZE * 2) {
@@ -125,6 +153,34 @@ __wt_lex_compare_skip(
 
 	userp = (uint8_t *)user_item->data + *matchp;
 	treep = (uint8_t *)tree_item->data + *matchp;
+
+	/*
+	 * The maximum packed uint64_t is 9B, catch row-store objects using
+	 * packed record numbers as keys.
+	 */
+#undef	WT_COMPARE_SHORT
+#define	WT_COMPARE_SHORT(n)						\
+	case n:								\
+		if (*userp != *treep)					\
+			break;						\
+		++userp, ++treep, ++*matchp
+	if (len < 10) {
+		switch (len) {
+		WT_COMPARE_SHORT(9);
+		WT_COMPARE_SHORT(8);
+		WT_COMPARE_SHORT(7);
+		WT_COMPARE_SHORT(6);
+		WT_COMPARE_SHORT(5);
+		WT_COMPARE_SHORT(4);
+		WT_COMPARE_SHORT(3);
+		WT_COMPARE_SHORT(2);
+		case 1:
+			if (*userp != *treep)
+				break;
+			return ((usz == tsz) ?  0 : (usz < tsz) ? -1 : 1);
+		}
+		return (*userp < *treep ? -1 : 1);
+	}
 
 #ifdef HAVE_X86INTRIN_H
 	/* Use vector instructions if we'll execute at least 2 of them. */
