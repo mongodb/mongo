@@ -1007,6 +1007,13 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 		WT_ERR(__wt_epoch(session, &now));
 		waited_ms = WT_TIMEDIFF(now, start) / WT_MILLION;
 		if (forever || waited_ms < timeout_ms)
+			/*
+			 * Note, we will wait an increasing amount of time
+			 * each iteration, likely doubling.  Also note that
+			 * the function timeout value is in usecs (we are
+			 * computing the wait time in msecs and passing that
+			 * in, unchanged, as the usecs to wait).
+			 */
 			WT_ERR(__wt_cond_wait(
 			    session, log->log_sync_cond, waited_ms));
 		else
