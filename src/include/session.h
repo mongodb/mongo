@@ -134,7 +134,7 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	void	*reconcile;		/* Reconciliation support */
 	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
 
-	int compaction;			/* Compaction did some work */
+	bool compaction;		/* Compaction did some work */
 
 	uint32_t flags;
 

@@ -148,7 +148,7 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 	 */
 	WT_RET(__wt_thread_create(
 	    session, &conn->ckpt_tid, __ckpt_server, session));
-	conn->ckpt_tid_set = 1;
+	conn->ckpt_tid_set = true;
 
 	return (0);
 }
@@ -194,7 +194,7 @@ __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
 	if (conn->ckpt_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->ckpt_cond));
 		WT_TRET(__wt_thread_join(session, conn->ckpt_tid));
-		conn->ckpt_tid_set = 0;
+		conn->ckpt_tid_set = false;
 	}
 	WT_TRET(__wt_cond_destroy(session, &conn->ckpt_cond));
 
@@ -211,7 +211,7 @@ __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
 	 * get confused.
 	 */
 	conn->ckpt_session = NULL;
-	conn->ckpt_tid_set = 0;
+	conn->ckpt_tid_set = false;
 	conn->ckpt_cond = NULL;
 	conn->ckpt_config = NULL;
 	conn->ckpt_usecs = 0;

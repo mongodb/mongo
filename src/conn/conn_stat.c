@@ -467,7 +467,7 @@ __statlog_start(WT_CONNECTION_IMPL *conn)
 	 */
 	WT_RET(__wt_thread_create(
 	    session, &conn->stat_tid, __statlog_server, session));
-	conn->stat_tid_set = 1;
+	conn->stat_tid_set = true;
 
 	return (0);
 }
@@ -517,7 +517,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, bool is_close)
 	if (conn->stat_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->stat_cond));
 		WT_TRET(__wt_thread_join(session, conn->stat_tid));
-		conn->stat_tid_set = 0;
+		conn->stat_tid_set = false;
 	}
 
 	/* Log a set of statistics on shutdown if configured. */
@@ -538,7 +538,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, bool is_close)
 
 	/* Clear connection settings so reconfigure is reliable. */
 	conn->stat_session = NULL;
-	conn->stat_tid_set = 0;
+	conn->stat_tid_set = false;
 	conn->stat_format = NULL;
 	WT_TRET(__wt_fclose(&conn->stat_fp, WT_FHANDLE_APPEND));
 	conn->stat_path = NULL;
