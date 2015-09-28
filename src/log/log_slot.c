@@ -33,7 +33,6 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	slot->slot_fh = log->log_fh;
 	slot->slot_error = 0;
 	slot->slot_unbuffered = 0;
-	slot->flags = WT_SLOT_INIT_FLAGS;
 }
 
 /*
@@ -484,6 +483,13 @@ __wt_log_slot_release(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, int64_t size)
 void
 __wt_log_slot_free(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 {
+	/*
+	 * Make sure flags don't get retained between uses.
+	 * We have to reset them them here because multiple threads may
+	 * change the flags when joining the slot.
+	 */
 	WT_UNUSED(session);
+	slot->flags = WT_SLOT_INIT_FLAGS;
+	slot->slot_error = 0;
 	slot->slot_state = WT_LOG_SLOT_FREE;
 }
