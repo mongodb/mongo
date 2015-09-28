@@ -144,6 +144,11 @@ public:
     virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn) = 0;
 
     /**
+     * Gets the last optime of the last applied batch, from stable storage.
+     */
+    virtual StatusWith<OpTime> loadLastBatchOpTime(OperationContext* txn) = 0;
+
+    /**
      * Returns the HostAndPort of the remote client connected to us that initiated the operation
      * represented by "txn".
      */
