@@ -4,8 +4,7 @@
 // 3. Insert data to ensure the SECONDARY has ops to apply in its queue.
 // 4. Shutdown PRIMARY.
 // 5. Wait for SECONDARY to become PRIMARY.
-// 6. Confirm that the new PRIMARY cannot accept writes while in drain mode.
-// 6a. Confirm that the new PRIMARY cannot accept non-slaveOK reads while in drain mode.
+// 6. Confirm that the new PRIMARY cannot accept writes until its queue is empty.
 // 7. Enable applying ops.
 // 8. Ensure the ops in queue are applied and that the PRIMARY begins to accept writes as usual.
 
@@ -63,14 +62,6 @@
     assert.writeError(secondary.getDB("foo").flag.insert({sentinel:2}));
     assert(!secondary.getDB("admin").runCommand({"isMaster": 1}).ismaster);
 
-    // Ensure new primary is not yet readable without slaveOk bit.
-    jsTestLog('New primary should not be readable yet, without slaveOk bit');
-    assert.throws(function() { secondary.getDB("foo").foo.find({ big: 1 }).next(); });
-    // But can read if slaveOk.
-    secondary.slaveOk = true;
-    assert.eq(1, secondary.getDB("foo").foo.find().itcount());
-    secondary.slaveOk = false;
-    
     // Allow draining to complete
     jsTestLog('Enabling fail point on new primary to allow draining to complete');
     assert.commandWorked(
