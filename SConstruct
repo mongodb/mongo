@@ -1193,6 +1193,8 @@ elif env.TargetOSIs('solaris'):
 # ---- other build setup -----
 if debugBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_DEBUG_BUILD")
+else:
+    env.AppendUnique( CPPDEFINES=[ 'NDEBUG' ] )
 
 if env.TargetOSIs('linux'):
     env.Append( LIBS=['m'] )
