@@ -69,7 +69,7 @@ files.forEach(function(x) {
         'apitest_db|' +
         'cursor6|' +
         'copydb-auth|' +
-        'profile\\d*|' +
+        'profile.*|' +
         'dbhash|' +
         'dbhash2|' +
         'median|' +
@@ -91,7 +91,7 @@ files.forEach(function(x) {
         'shellkillop|' +
         'update4|' +
         'update_setOnInsert|' +
-        'profile\\d*|' +
+        'profile.*|' +
         'max_time_ms|' + // Will be fixed when SERVER-2212 is resolved.
         'fts_querylang|' + // Will be fixed when SERVER-9063 is resolved.
         'fts_projection' +

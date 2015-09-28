@@ -154,7 +154,7 @@ DB.prototype.createCollection = function(name, opt) {
  *  @return SOMETHING_FIXME or null on error
  */
 DB.prototype.getProfilingLevel  = function() {
-    var res = this._dbCommand( { profile: -1 } );
+    var res = assert.commandWorked(this._dbCommand( { profile: -1 } ));
     return res ? res.was : null;
 }
 
@@ -426,7 +426,7 @@ DB.prototype.setProfilingLevel = function(level,slowms) {
     var cmd = { profile: level };
     if ( isNumber( slowms ) )
         cmd["slowms"] = slowms;
-    return this._dbCommand( cmd );
+    return assert.commandWorked(this._dbCommand( cmd ));
 }
 
 /**
