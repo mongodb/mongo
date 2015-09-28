@@ -41,6 +41,7 @@
  *        as the replica set name (overrides the name property). Default: false
  *     keyFile {string}
  *     shardSvr {boolean}: Whether this replica set serves as a shard in a cluster. Default: false.
+ *     protocolVersion {number}: protocol version of replset used by the replset initiation.
  *   }
  * 
  * Member variables:
@@ -55,6 +56,7 @@ ReplSetTest = function(opts) {
     this.useSeedList = opts.useSeedList || false;
     this.keyFile = opts.keyFile;
     this.shardSvr = opts.shardSvr || false;
+    this.protocolVersion = opts.protocolVersion;
 
     this.nodeOptions = {};
 
@@ -154,6 +156,10 @@ ReplSetTest.prototype.getReplSetConfig = function() {
     var cfg = {};
 
     cfg['_id']  = this.name;
+    if (this.protocolVersion !== undefined && this.protocolVersion !== null) {
+        cfg.protocolVersion = this.protocolVersion;
+    }
+
     cfg.members = [];
 
     for (var i=0; i<this.ports.length; i++) {
@@ -472,13 +478,23 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     }
 }
 
-ReplSetTest.prototype.reInitiate = function(timeout) {
-    var master  = this.nodes[0];
-    var c = master.getDB("local")['system.replset'].findOne();
-    var config  = this.getReplSetConfig();
-    var timeout = timeout || 60000;
-    config.version = c.version + 1;
-    this.initiate( config , 'replSetReconfig', timeout );
+ReplSetTest.prototype.reInitiate = function() {
+    "use strict";
+
+    var master = this.getMaster();
+    var res = master.adminCommand({ replSetGetConfig: 1 });
+    assert.commandWorked(res);
+    var config = this.getReplSetConfig();
+    config.version = res.config.version + 1;
+
+    try {
+        assert.commandWorked(master.adminCommand({replSetReconfig: config}));
+    }
+    catch (e) {
+        if (tojson(e).indexOf("error doing query: failed") < 0) {
+            throw e;
+        }
+    }
 }
 
 ReplSetTest.prototype.getLastOpTimeWritten = function() {

@@ -686,7 +686,9 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
 
     Milliseconds randomOffset =
         Milliseconds(_replExecutor.nextRandomInt64(_rsConfig.getElectionTimeoutOffsetLimit()));
-    auto when = _replExecutor.now() + _rsConfig.getElectionTimeoutPeriod() + randomOffset;
+    auto now = _replExecutor.now();
+    auto when = now + _rsConfig.getElectionTimeoutPeriod() + randomOffset;
+    invariant(when > now);
     _handleElectionTimeoutWhen = when;
     _handleElectionTimeoutCbh = _scheduleWorkAt(
         when, stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this));

@@ -37,6 +37,7 @@ assert.writeOK(primaryColl.bar.insert({x: 1}, {writeConcern: {w: 3}}));
 // Check optime format in protocol version 0, which is a Timestamp.
 var res = primary.adminCommand({replSetGetStatus: 1});
 assert.commandWorked(res);
+// Check the optime is a Timestamp, not an OpTime { ts: Timestamp, t: int }
 assert.eq(res.members[0].optime.ts, null);
 
 //

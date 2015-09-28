@@ -19,6 +19,8 @@
  *       contain:
  *       {
  *         nodes {number}: number of replica members. Defaults to 3.
+ *         protocolVersion {number}: protocol version of replset used by the
+ *             replset initiation.
  *         For other options, @see ReplSetTest#start
  *       }
  * 
@@ -64,10 +66,10 @@
  *         specify options that are common all replica members.
  *       useHostname {boolean}: if true, use hostname of machine,
  *         otherwise use localhost
- *       numReplicas {number} 
+ *       numReplicas {number}
  *     }
  *   }
- * 
+ *
  * Member variables:
  * s {Mongo} - connection to the first mongos
  * s0, s1, ... {Mongo} - connection to different mongos
@@ -193,8 +195,10 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             rsDefaults = Object.merge( rsDefaults, otherParams["rs" + i] )
             rsDefaults.nodes = rsDefaults.nodes || otherParams.numReplicas
 
-            var numReplicas = rsDefaults.nodes || 3
-            delete rsDefaults.nodes
+            var numReplicas = rsDefaults.nodes || 3;
+            delete rsDefaults.nodes;
+            var protocolVersion = rsDefaults.protocolVersion;
+            delete rsDefaults.protocolVersion;
 
             print( "Replica set test!" )
 
@@ -202,6 +206,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                                        nodes : numReplicas,
                                        useHostName : otherParams.useHostname,
                                        keyFile : keyFile,
+                                       protocolVersion: protocolVersion,
                                        shardSvr : true });
 
             this._rs[i] = { setName : setName,

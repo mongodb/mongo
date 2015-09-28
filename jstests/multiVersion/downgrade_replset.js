@@ -14,7 +14,9 @@ var nodes = {n1: {binVersion: newVersion},
 
 var rst = new ReplSetTest({name: name, nodes: nodes, nodeOptions: {storageEngine: 'mmapv1'}});
 rst.startSet();
-rst.initiate();
+var replSetConfig = rst.getReplSetConfig();
+replSetConfig.protocolVersion = 0;
+rst.initiate(replSetConfig);
 
 var primary = rst.getPrimary();
 var coll = "test.foo";

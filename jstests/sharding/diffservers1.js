@@ -1,7 +1,6 @@
 var s = new ShardingTest( "diffservers1" , 2 );
 
 assert.eq( 2 , s.config.shards.count() , "server count wrong" );
-assert.eq( 2 , s._configServers[0].getDB( "config" ).shards.count() , "where are servers!" );
 assert.eq( 0 , s._shardServers[0].getDB( "config" ).shards.count() , "shouldn't be here" );
 assert.eq( 0 , s._shardServers[1].getDB( "config" ).shards.count() , "shouldn't be here" );
 

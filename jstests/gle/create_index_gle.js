@@ -1,3 +1,4 @@
+load('jstests/replsets/rslib.js');
 var st = new ShardingTest({ shards: { rs0: { nodes: 2, oplogSize: 10, verbose: 1 }}});
 var replTest = st.rs0;
 
@@ -9,11 +10,7 @@ config.version = 2;
 
 var priConn = replTest.getPrimary();
 
-try {
-    priConn.getDB('admin').runCommand({ replSetReconfig: config });
-} catch (x) {
-    print('reconfig closed conn');
-}
+reconfig(replTest, config, true);
 
 assert.soon(function() {
     var secConn = replTest.getSecondary();

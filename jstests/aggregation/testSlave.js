@@ -4,15 +4,15 @@ var nodes = replTest.startSet();
 replTest.initiate();
 replTest.awaitReplication();
 
-var mast = nodes[0].getDB('test');
-var slav = nodes[1].getDB('test');
+var primary = replTest.getPrimary().getDB('test');
+var secondary = replTest.getSecondary().getDB('test');
 
 var options = { writeConcern: { w: 2 }};
-mast.agg.insert({}, options);
-mast.agg.insert({}, options);
-mast.agg.insert({}, options);
+primary.agg.insert({}, options);
+primary.agg.insert({}, options);
+primary.agg.insert({}, options);
 
-var res = slav.agg.aggregate({$group: {_id: null, count: {$sum: 1}}});
+var res = secondary.agg.aggregate({$group: {_id: null, count: {$sum: 1}}});
 assert.eq(res.toArray(), [{_id:null, count: 3}]);
 
 replTest.stopSet();
