@@ -79,16 +79,16 @@ FTDCCompressor::addSample(const BSONObj& sample) {
     // Add another sample
     for (std::size_t i = 0; i < _metrics.size(); ++i) {
         // NOTE: This touches a lot of cache lines so that compression code can be more effcient.
-        _deltas[getArrayOffset(_maxSamples, _sampleCount, i)] = _metrics[i] - _prevmetrics[i];
+        _deltas[getArrayOffset(_maxDeltas, _deltaCount, i)] = _metrics[i] - _prevmetrics[i];
     }
 
-    ++_sampleCount;
+    ++_deltaCount;
 
     _prevmetrics.clear();
     swap(_prevmetrics, _metrics);
 
     // If the count is full, flush
-    if (_sampleCount == _maxSamples) {
+    if (_deltaCount == _maxDeltas) {
         auto swCompressedSamples = getCompressedSamples();
 
         if (!swCompressedSamples.isOK()) {
@@ -117,11 +117,11 @@ StatusWith<ConstDataRange> FTDCCompressor::getCompressedSamples() {
     _uncompressedChunkBuffer.appendNum(static_cast<std::uint32_t>(_metricsCount));
 
     // Append count of samples - uint32 little endian
-    _uncompressedChunkBuffer.appendNum(static_cast<std::uint32_t>(_sampleCount));
+    _uncompressedChunkBuffer.appendNum(static_cast<std::uint32_t>(_deltaCount));
 
-    if (_metricsCount != 0 && _sampleCount != 0) {
+    if (_metricsCount != 0 && _deltaCount != 0) {
         // On average, we do not need all 10 bytes for every sample, worst case, we grow the buffer
-        DataBuilder db(_metricsCount * _sampleCount * FTDCVarInt::kMaxSizeBytes64 / 2);
+        DataBuilder db(_metricsCount * _deltaCount * FTDCVarInt::kMaxSizeBytes64 / 2);
 
         std::uint32_t zeroesCount = 0;
 
@@ -139,8 +139,8 @@ StatusWith<ConstDataRange> FTDCCompressor::getCompressedSamples() {
         // These byte arrays are added to a buffer which is then concatenated with other chunks and
         // compressed with ZLIB.
         for (std::uint32_t i = 0; i < _metricsCount; i++) {
-            for (std::uint32_t j = 0; j < _sampleCount; j++) {
-                std::uint64_t delta = _deltas[getArrayOffset(_maxSamples, j, i)];
+            for (std::uint32_t j = 0; j < _deltaCount; j++) {
+                std::uint64_t delta = _deltas[getArrayOffset(_maxDeltas, j, i)];
 
                 if (delta == 0) {
                     ++zeroesCount;
@@ -216,12 +216,15 @@ void FTDCCompressor::_reset(const BSONObj& referenceDoc) {
     _referenceDoc = referenceDoc;
 
     _metricsCount = _metrics.size();
-    _sampleCount = 0;
+    _deltaCount = 0;
     _prevmetrics.clear();
     swap(_prevmetrics, _metrics);
 
-    _maxSamples = _config->maxSamplesPerArchiveMetricChunk;
-    _deltas.resize(_metricsCount * _maxSamples);
+    // The reference document counts as the first sample, remaining samples
+    // are delta encoded, so the maximum number of deltas is one less than
+    // the configured number of samples.
+    _maxDeltas = _config->maxSamplesPerArchiveMetricChunk - 1;
+    _deltas.resize(_metricsCount * _maxDeltas);
 }
 
 }  // namespace mongo

@@ -370,7 +370,7 @@ TEST(FTDCCompressor, TestFull) {
                                    << "key1" << 33 << "key2" << 42));
         ASSERT_HAS_SPACE(st);
 
-        for (size_t i = 0; i <= FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault - 2; i++) {
+        for (size_t i = 0; i != FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault - 2; i++) {
             st = c.addSample(BSON("name"
                                   << "joe"
                                   << "key1" << static_cast<long long int>(i * j) << "key2" << 45));
@@ -416,7 +416,7 @@ TEST(ZFTDCCompressor, TestManyMetrics) {
         auto st = c.addSample(generateSample(rd, genValues, metrics));
         ASSERT_HAS_SPACE(st);
 
-        for (size_t i = 0; i <= FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault - 2; i++) {
+        for (size_t i = 0; i != FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault - 2; i++) {
             st = c.addSample(generateSample(rd, genValues, metrics));
             ASSERT_HAS_SPACE(st);
         }

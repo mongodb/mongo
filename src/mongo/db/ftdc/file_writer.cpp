@@ -158,7 +158,7 @@ Status FTDCFileWriter::writeSample(const BSONObj& sample) {
 
     if (_compressor.getSampleCount() != 0 &&
         (_compressor.getSampleCount() % _config->maxSamplesPerInterimMetricChunk) == 0) {
-        // Check if we want to do a partial write to the intrim buffer
+        // Check if we want to do a partial write to the interim buffer
         auto swBuf = _compressor.getCompressedSamples();
         if (!swBuf.isOK()) {
             return swBuf.getStatus();
