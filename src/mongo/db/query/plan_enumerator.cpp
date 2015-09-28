@@ -589,40 +589,50 @@ void PlanEnumerator::enumerateOneIndex(const IndexToPredMap& idxToFirst,
 
     // For each FIRST, we assign nodes to it.
     for (IndexToPredMap::const_iterator it = idxToFirst.begin(); it != idxToFirst.end(); ++it) {
-        // The assignment we're filling out.
-        OneIndexAssignment indexAssign;
-
-        // This is the index we assign to.
-        indexAssign.index = it->first;
-
         const IndexEntry& thisIndex = (*_indices)[it->first];
 
         // If the index is multikey, we only assign one pred to it.  We also skip
         // compounding.  TODO: is this also true for 2d and 2dsphere indices?  can they be
         // multikey but still compoundable?
         if (thisIndex.multikey) {
-            // TODO: could pick better pred than first but not too worried since we should
-            // really be isecting indices here.  Just take the first pred.  We don't assign
-            // any other preds to this index.  The planner will intersect the preds and this
-            // enumeration strategy is just one index at a time.
-            indexAssign.preds.push_back(it->second[0]);
-            indexAssign.positions.push_back(0);
+            // Since the index is multikey, we can only use one of the predicates over the leading
+            // field of the index. However, we do not know which of these predicates is most
+            // selective. Therefore, we will generate a plan for each so that they can be ranked
+            // against each other.
+            for (auto pred : it->second) {
+                OneIndexAssignment indexAssign;
+                indexAssign.index = it->first;
 
-            // If there are any preds that could possibly be compounded with this
-            // index...
-            IndexToPredMap::const_iterator compIt = idxToNotFirst.find(indexAssign.index);
-            if (compIt != idxToNotFirst.end()) {
-                const vector<MatchExpression*>& couldCompound = compIt->second;
-                vector<MatchExpression*> tryCompound;
+                indexAssign.preds.push_back(pred);
+                indexAssign.positions.push_back(0);
 
-                // ...select the predicates that are safe to compound and try to
-                // compound them.
-                getMultikeyCompoundablePreds(indexAssign.preds, couldCompound, &tryCompound);
-                if (tryCompound.size()) {
-                    compound(tryCompound, thisIndex, &indexAssign);
+                // If there are any preds that could possibly be compounded with this
+                // index...
+                IndexToPredMap::const_iterator compIt = idxToNotFirst.find(indexAssign.index);
+                if (compIt != idxToNotFirst.end()) {
+                    const vector<MatchExpression*>& couldCompound = compIt->second;
+                    vector<MatchExpression*> tryCompound;
+
+                    // ...select the predicates that are safe to compound and try to
+                    // compound them.
+                    getMultikeyCompoundablePreds(indexAssign.preds, couldCompound, &tryCompound);
+                    if (tryCompound.size()) {
+                        compound(tryCompound, thisIndex, &indexAssign);
+                    }
                 }
+
+                // Output the assignment.
+                AndEnumerableState state;
+                state.assignments.push_back(indexAssign);
+                andAssignment->choices.push_back(state);
             }
         } else {
+            // The assignment we're filling out.
+            OneIndexAssignment indexAssign;
+
+            // This is the index we assign to.
+            indexAssign.index = it->first;
+
             // The index isn't multikey.  Assign all preds to it.  The planner will
             // intersect the bounds.
             indexAssign.preds = it->second;
@@ -637,11 +647,12 @@ void PlanEnumerator::enumerateOneIndex(const IndexToPredMap& idxToFirst,
             if (compIt != idxToNotFirst.end()) {
                 compound(compIt->second, thisIndex, &indexAssign);
             }
-        }
 
-        AndEnumerableState state;
-        state.assignments.push_back(indexAssign);
-        andAssignment->choices.push_back(state);
+            // Output the assignment.
+            AndEnumerableState state;
+            state.assignments.push_back(indexAssign);
+            andAssignment->choices.push_back(state);
+        }
     }
 }
 

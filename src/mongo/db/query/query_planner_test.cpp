@@ -938,13 +938,21 @@ TEST_F(QueryPlannerTest, OrElemMatchObjectBeneathAnd) {
         "{$or: [{'a.b': 0, a: {$elemMatch: {b: {$lte: 1}}}},"
         "{a: {$elemMatch: {b: {$gte: 4}}}}]}"));
 
-    assertNumSolutions(2U);
+    assertNumSolutions(3U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
         "{or: {nodes: ["
         "{fetch: {filter: {$and:[{a:{$elemMatch:{b:{$lte:1}}}},{'a.b':0}]},"
         "node: {ixscan: {filter: null, pattern: {'a.b': 1}, "
         "bounds: {'a.b': [[-Infinity,1,true,true]]}}}}},"
+        "{fetch: {filter: {a:{$elemMatch:{b:{$gte:4}}}}, node: "
+        "{ixscan: {filter: null, pattern: {'a.b': 1},"
+        "bounds: {'a.b': [[4,Infinity,true,true]]}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: ["
+        "{fetch: {filter: {a:{$elemMatch:{b:{$lte:1}}}},"
+        "node: {ixscan: {filter: null, pattern: {'a.b': 1}, "
+        "bounds: {'a.b': [[0,0,true,true]]}}}}},"
         "{fetch: {filter: {a:{$elemMatch:{b:{$gte:4}}}}, node: "
         "{ixscan: {filter: null, pattern: {'a.b': 1},"
         "bounds: {'a.b': [[4,Infinity,true,true]]}}}}}]}}");
@@ -2247,11 +2255,15 @@ TEST_F(QueryPlannerTest, HintElemMatch) {
     addIndex(fromjson("{'a.b': 1}"), true);
     runQueryHint(fromjson("{'a.b': 1, a: {$elemMatch: {b: 2}}}"), fromjson("{'a.b': 1}"));
 
-    assertNumSolutions(1U);
+    assertNumSolutions(2U);
     assertSolutionExists(
         "{fetch: {filter: {$and: [{a:{$elemMatch:{b:2}}}, {'a.b': 1}]}, "
         "node: {ixscan: {filter: null, pattern: {'a.b': 1}, bounds: "
         "{'a.b': [[2, 2, true, true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:{$elemMatch:{b:2}}}, "
+        "node: {ixscan: {filter: null, pattern: {'a.b': 1}, bounds: "
+        "{'a.b': [[1, 1, true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, HintInvalid) {
@@ -2470,11 +2482,20 @@ TEST_F(QueryPlannerTest, ThreeRegexSameFieldMultikey) {
     addIndex(BSON("a" << 1), true);
     runQuery(fromjson("{$and: [{a: /0/}, {a: /1/}, {a: /2/}]}"));
 
-    ASSERT_EQUALS(getNumSolutions(), 2U);
+    ASSERT_EQUALS(getNumSolutions(), 4U);
     assertSolutionExists("{cscan: {filter: {$and:[{a:/0/},{a:/1/},{a:/2/}]}, dir: 1}}");
     assertSolutionExists(
         "{fetch: {filter: {$and:[{a:/0/},{a:/1/},{a:/2/}]}, node: {ixscan: "
-        "{pattern: {a: 1}, filter: null}}}}");
+        "{pattern: {a: 1}, filter: null, "
+        "bounds: {a: [['', {}, true, false], [/0/, /0/, true, true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$and:[{a:/1/},{a:/0/},{a:/2/}]}, node: {ixscan: "
+        "{pattern: {a: 1}, filter: null, "
+        "bounds: {a: [['', {}, true, false], [/1/, /1/, true, true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$and:[{a:/2/},{a:/0/},{a:/1/}]}, node: {ixscan: "
+        "{pattern: {a: 1}, filter: null, "
+        "bounds: {a: [['', {}, true, false], [/2/, /2/, true, true]]}}}}}");
 }
 
 //
@@ -3826,7 +3847,13 @@ TEST_F(QueryPlannerTest, CannotTrimIxisectParamSelfIntersection) {
 
     runQuery(fromjson("{a: {$all: [1, 2, 3]}}"));
 
-    assertNumSolutions(2U);
+    assertNumSolutions(4U);
+    assertSolutionExists(
+        "{fetch: {filter: {$and: [{a:2}, {a:3}]}, node: "
+        "{ixscan: {filter: null, pattern: {a: 1}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$and: [{a:1}, {a:3}]}, node: "
+        "{ixscan: {filter: null, pattern: {a: 1}}}}}");
     assertSolutionExists(
         "{fetch: {filter: {$and: [{a:2}, {a:3}]}, node: "
         "{ixscan: {filter: null, pattern: {a: 1}}}}}");
