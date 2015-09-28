@@ -108,6 +108,7 @@ public:
     virtual ~ReplicationExecutor();
 
     std::string getDiagnosticString() override;
+    BSONObj getDiagnosticBSON();
     Date_t now() override;
     void startup() override;
     void shutdown() override;
@@ -343,6 +344,7 @@ private:
     // All members other than _executor are protected by the executor's _mutex.
     CallbackFn _callbackFn;
     bool _isCanceled;
+    bool _isSleeper;
     WorkQueue::iterator _iter;
     EventHandle _finishedEvent;
 };

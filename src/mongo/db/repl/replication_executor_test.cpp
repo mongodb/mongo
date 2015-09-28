@@ -150,6 +150,27 @@ TEST_F(ReplicationExecutorTest, ShutdownBeforeRunningSecondExclusiveLockOperatio
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status2.code());
 }
 
+TEST_F(ReplicationExecutorTest, CancelBeforeRunningFutureWork) {
+    ReplicationExecutor& executor = getReplExecutor();
+    using CallbackData = ReplicationExecutor::CallbackArgs;
+    Status status1 = getDetectableErrorStatus();
+    auto cbhWithStatus =
+        executor.scheduleWorkAt(executor.now() + Milliseconds(1000),
+                                [&](const CallbackData& cbData) {
+                                    status1 = cbData.status;
+                                    if (cbData.status != ErrorCodes::CallbackCanceled)
+                                        cbData.executor->shutdown();
+                                });
+    ASSERT_OK(cbhWithStatus.getStatus());
+
+    ASSERT_EQUALS(1, executor.getDiagnosticBSON()["sleeperQueue"].Int());
+    ASSERT_EQUALS(0, executor.getDiagnosticBSON()["ready"].Int());
+    executor.cancel(cbhWithStatus.getValue());
+
+    ASSERT_EQUALS(0, executor.getDiagnosticBSON()["sleeperQueue"].Int());
+    ASSERT_EQUALS(1, executor.getDiagnosticBSON()["ready"].Int());
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

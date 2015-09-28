@@ -72,6 +72,22 @@ ReplicationExecutor::~ReplicationExecutor() {
     invariant(!_executorThread.joinable());
 }
 
+BSONObj ReplicationExecutor::getDiagnosticBSON() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    BSONObjBuilder builder;
+    builder.appendIntOrLL("networkInProgress", _networkInProgressQueue.size());
+    builder.appendIntOrLL("dbWorkInProgress", _dbWorkInProgressQueue.size());
+    builder.appendIntOrLL("exclusiveInProgress", _exclusiveLockInProgressQueue.size());
+    builder.appendIntOrLL("sleeperQueue", _sleepersQueue.size());
+    builder.appendIntOrLL("ready", _readyQueue.size());
+    builder.appendIntOrLL("free", _freeQueue.size());
+    builder.appendIntOrLL("unsignaledEvents", _unsignaledEvents.size());
+    builder.appendIntOrLL("eventWaiters", _totalEventWaiters);
+    builder.append("shuttingDown", _inShutdown);
+    builder.append("networkInterface", _networkInterface->getDiagnosticString());
+    return builder.obj();
+}
+
 std::string ReplicationExecutor::getDiagnosticString() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _getDiagnosticString_inlock();
@@ -144,7 +160,9 @@ void ReplicationExecutor::shutdown() {
         _readyQueue.splice(_readyQueue.end(), _getEventFromHandle(event)->_waiters);
     }
     for (auto readyWork : _readyQueue) {
-        _getCallbackFromHandle(readyWork.callback)->_isCanceled = true;
+        auto callback = _getCallbackFromHandle(readyWork.callback);
+        callback->_isCanceled = true;
+        callback->_isSleeper = false;
     }
 
     _networkInterface->signalWorkAvailable();
@@ -329,7 +347,9 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleWor
     StatusWith<CallbackHandle> cbHandle = enqueueWork_inlock(&temp, work);
     if (!cbHandle.isOK())
         return cbHandle;
-    _getCallbackFromHandle(cbHandle.getValue())->_iter->readyDate = when;
+    auto callback = _getCallbackFromHandle(cbHandle.getValue());
+    callback->_iter->readyDate = when;
+    callback->_isSleeper = true;
     WorkQueue::iterator insertBefore = _sleepersQueue.begin();
     while (insertBefore != _sleepersQueue.end() && insertBefore->readyDate <= when)
         ++insertBefore;
@@ -451,6 +471,8 @@ int64_t ReplicationExecutor::nextRandomInt64(int64_t limit) {
 Date_t ReplicationExecutor::scheduleReadySleepers_inlock(const Date_t now) {
     WorkQueue::iterator iter = _sleepersQueue.begin();
     while ((iter != _sleepersQueue.end()) && (iter->readyDate <= now)) {
+        auto callback = ReplicationExecutor::_getCallbackFromHandle(iter->callback);
+        callback->_isSleeper = false;
         ++iter;
     }
     _readyQueue.splice(_readyQueue.end(), _sleepersQueue, _sleepersQueue.begin(), iter);
@@ -533,6 +555,7 @@ ReplicationExecutor::Callback::Callback(ReplicationExecutor* executor,
       _executor(executor),
       _callbackFn(callbackFn),
       _isCanceled(false),
+      _isSleeper(false),
       _iter(iter),
       _finishedEvent(finishedEvent) {}
 
@@ -541,6 +564,13 @@ ReplicationExecutor::Callback::~Callback() {}
 void ReplicationExecutor::Callback::cancel() {
     stdx::unique_lock<stdx::mutex> lk(_executor->_mutex);
     _isCanceled = true;
+
+    if (_isSleeper) {
+        _isSleeper = false;
+        _executor->_readyQueue.splice(
+            _executor->_readyQueue.end(), _executor->_sleepersQueue, _iter);
+    }
+
     if (_iter->isNetworkOperation) {
         lk.unlock();
         _executor->_networkInterface->cancelCommand(_iter->callback);
@@ -567,6 +597,8 @@ void callNoExcept(const stdx::function<void()>& fn) {
     try {
         fn();
     } catch (...) {
+        auto status = exceptionToStatus();
+        log() << "Exception thrown in ReplicationExecutor callback: " << status;
         std::terminate();
     }
 }
