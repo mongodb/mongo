@@ -53,7 +53,7 @@ struct __wt_rwlock {
 
 /*
  * A light weight lock that can be used to replace spinlocks if fairness is
- * necessasry. Implements a ticket-based backoff spin lock.
+ * necessary. Implements a ticket-based back off spin lock.
  */
 struct __wt_fair_lock {
 	uint16_t owner;		/* Ticket number for current owner */

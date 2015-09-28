@@ -262,7 +262,7 @@ __wt_fair_lock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 	uint16_t ticket;
 	int pause_cnt;
 
-        WT_UNUSED(session);
+	WT_UNUSED(session);
 
 	/*
 	 * Possibly wrap: if we have more than 64K lockers waiting, the ticket
@@ -293,7 +293,7 @@ __wt_fair_lock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 static inline int
 __wt_fair_unlock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 {
-        WT_UNUSED(session);
+	WT_UNUSED(session);
 
 	/*
 	 * We have exclusive access - the update does not need to be atomic.
