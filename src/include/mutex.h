@@ -56,8 +56,15 @@ struct __wt_rwlock {
  * necessary. Implements a ticket-based back off spin lock.
  */
 struct __wt_fair_lock {
-	uint16_t owner;		/* Ticket number for current owner */
-	uint16_t waiter;	/* Ticket number of last allocated */
+	union {
+		uint32_t lock;  /* Used when needing to atomically switch */
+		struct {
+			uint16_t owner;	/* Ticket number for current owner */
+			uint16_t waiter;/* Ticket number of last allocated */
+		} s;
+	} u;
+#define	fair_lock_owner u.s.owner
+#define	fair_lock_waiter u.s.waiter
 };
 
 /*

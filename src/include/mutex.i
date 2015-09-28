@@ -259,17 +259,20 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static inline int
 __wt_fair_trylock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 {
-	uint16_t ticket;
+	WT_FAIR_LOCK new, old;
 
 	WT_UNUSED(session);
 
-	/* Do the cheap test first. */
-	if (lock->waiter != lock->owner)
+	old = new = *lock;
+
+	/* Exit early if there is no chance we can get the lock. */
+	if (old.fair_lock_waiter != old.fair_lock_owner)
 		return (EBUSY);
 
-	ticket = lock->owner;
-	return (__wt_atomic_cas16(
-	    &lock->waiter, ticket, ticket + 1) ? 0 : EBUSY);
+	/* The replacement lock value is a result of allocating a new ticket. */
+	++new.fair_lock_waiter;
+	return (__wt_atomic_cas32(
+	    &lock->u.lock, old.u.lock, new.u.lock) ? 0 : EBUSY);
 }
 
 /*
@@ -289,8 +292,8 @@ __wt_fair_lock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 	 * value will wrap and two lockers will simultaneously be granted the
 	 * lock.
 	 */
-	ticket = __wt_atomic_fetch_add16(&lock->waiter, 1);
-	for (pause_cnt = 0; ticket != lock->owner;) {
+	ticket = __wt_atomic_fetch_add16(&lock->fair_lock_waiter, 1);
+	for (pause_cnt = 0; ticket != lock->fair_lock_owner;) {
 		/*
 		 * We failed to get the lock; pause before retrying and if we've
 		 * paused enough, sleep so we don't burn CPU to no purpose. This
@@ -318,7 +321,7 @@ __wt_fair_unlock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 	/*
 	 * We have exclusive access - the update does not need to be atomic.
 	 */
-	++lock->owner;
+	++lock->fair_lock_owner;
 
 	return (0);
 }
