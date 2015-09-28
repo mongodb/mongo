@@ -161,12 +161,15 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         StatusWith<ConnectionPool::ConnectionHandle> swConn) {
 
         if (!swConn.isOK()) {
+            bool wasPreviouslyCanceled = false;
             {
                 stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
-                _inGetConnection.erase(cbHandle);
+                wasPreviouslyCanceled = _inGetConnection.erase(cbHandle) == 0;
             }
 
-            onFinish(swConn.getStatus());
+            onFinish(wasPreviouslyCanceled
+                         ? Status(ErrorCodes::CallbackCanceled, "Callback canceled")
+                         : swConn.getStatus());
             signalWorkAvailable();
             return;
         }
