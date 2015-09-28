@@ -264,7 +264,7 @@ void ShardRegistry::_addShard_inlock(const ShardType& shardType) {
     } else {
         // Non-SYNC shards use targeter factory.
         shard = std::make_shared<Shard>(
-            shardType.getName(), shardHost, std::move(_targeterFactory->create(shardHost)));
+            shardType.getName(), shardHost, _targeterFactory->create(shardHost));
     }
 
     _updateLookupMapsForShard_inlock(std::move(shard), shardHost);
