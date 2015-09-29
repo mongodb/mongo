@@ -595,6 +595,7 @@ static const char * const __stats_connection_desc[] = {
 	"log: log sync_dir operations",
 	"log: log server thread advances write LSN",
 	"log: log write operations",
+	"log: log files manually zero-filled",
 	"LSM: sleep for LSM checkpoint throttle",
 	"LSM: sleep for LSM merge throttle",
 	"LSM: rows merged in an LSM tree",
@@ -760,6 +761,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->log_slot_unbuffered = 0;
 	stats->log_bytes_payload = 0;
 	stats->log_bytes_written = 0;
+	stats->log_zero_fills = 0;
 	stats->log_flush = 0;
 	stats->log_compress_writes = 0;
 	stats->log_compress_write_fails = 0;
@@ -944,6 +946,7 @@ __wt_stat_connection_aggregate(
 	to->log_slot_unbuffered += WT_STAT_READ(from, log_slot_unbuffered);
 	to->log_bytes_payload += WT_STAT_READ(from, log_bytes_payload);
 	to->log_bytes_written += WT_STAT_READ(from, log_bytes_written);
+	to->log_zero_fills += WT_STAT_READ(from, log_zero_fills);
 	to->log_flush += WT_STAT_READ(from, log_flush);
 	to->log_compress_writes += WT_STAT_READ(from, log_compress_writes);
 	to->log_compress_write_fails +=

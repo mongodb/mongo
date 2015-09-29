@@ -386,6 +386,7 @@ __log_zero(WT_SESSION_IMPL *session,
 		bufsz = conn->log_file_max;
 	WT_RET(__wt_scr_alloc(session, bufsz, &zerobuf));
 	memset(zerobuf->mem, 0, zerobuf->size);
+	WT_STAT_FAST_CONN_INCR(session, log_zero_fills);
 
 	/*
 	 * Read in a chunk starting at the end of the file.  Keep going until
@@ -435,7 +436,7 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 	 * manually.  Otherwise use either fallocate or ftruncate to create
 	 * and zero the log file based on what is available.
 	 */
-	if (F_ISSET(conn, WT_CONN_LOG_ZERO_FILL))
+	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ZERO_FILL))
 		ret = __log_zero(session, fh,
 		    WT_LOG_FIRST_RECORD, conn->log_file_max);
 	else if (fh->fallocate_available == WT_FALLOCATE_NOT_AVAILABLE ||
