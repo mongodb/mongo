@@ -92,11 +92,6 @@ public:
 
     static Status syncApply(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert);
 
-    /**
-     * Runs _applyOplogUntil(stopOpTime)
-     */
-    virtual void oplogApplication(OperationContext* txn, const OpTime& stopOpTime);
-
     void oplogApplication();
     bool peek(BSONObj* obj);
 
@@ -160,27 +155,13 @@ protected:
 
     // SyncTail base class always supports awaiting commit if any op has j:true flag
     // that indicates awaiting commit before updating last OpTime.
-    virtual bool supportsWaitingUntilDurable() {
+    virtual bool shouldEnsureDurability() {
         return true;
     }
 
-    // Prefetch and write a deque of operations, using the supplied function.
-    // Initial Sync and Sync Tail each use a different function.
-    // Returns the last OpTime applied.
-    static OpTime multiApply(OperationContext* txn,
-                             const OpQueue& ops,
-                             OldThreadPool* prefetcherPool,
-                             OldThreadPool* writerPool,
-                             MultiSyncApplyFunc func,
-                             SyncTail* sync,
-                             bool supportsAwaitingCommit);
-
-    /**
-     * Applies oplog entries until reaching "endOpTime".
-     *
-     * NOTE:Will not transition or check states
-     */
-    void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
+    // Apply a batch of operations, using multiple threads.
+    // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
+    OpTime multiApply(OperationContext* txn, const OpQueue& ops);
 
 private:
     std::string _hostname;

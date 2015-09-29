@@ -61,6 +61,8 @@ void clearInitialSyncFlag(OperationContext* txn) {
         Helpers::putSingleton(txn, minvalidNS, BSON("$unset" << initialSyncFlag));
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "clearInitialSyncFlags", minvalidNS);
+
+    txn->recoveryUnit()->waitUntilDurable();
     LOG(3) << "clearing initial sync flag";
 }
 
@@ -71,35 +73,43 @@ void setInitialSyncFlag(OperationContext* txn) {
         Helpers::putSingleton(txn, minvalidNS, BSON("$set" << initialSyncFlag));
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "setInitialSyncFlags", minvalidNS);
+
+    txn->recoveryUnit()->waitUntilDurable();
     LOG(3) << "setting initial sync flag";
 }
 
-void setMinValid(OperationContext* ctx, const OpTime& endOpTime) {
+void setMinValid(OperationContext* txn, const OpTime& endOpTime, const DurableRequirement durReq) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(ctx, MODE_IX);
-        Lock::DBLock dblk(ctx->lockState(), "local", MODE_X);
+        ScopedTransaction transaction(txn, MODE_IX);
+        Lock::DBLock dblk(txn->lockState(), "local", MODE_X);
         Helpers::putSingleton(
-            ctx,
+            txn,
             minvalidNS,
             BSON("$set" << BSON("ts" << endOpTime.getTimestamp() << "t" << endOpTime.getTerm())
                         << "$unset" << BSON(beginFieldName << 1)));
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(ctx, "setMinValid", minvalidNS);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "setMinValid", minvalidNS);
+
+    if (durReq == DurableRequirement::Strong) {
+        txn->recoveryUnit()->waitUntilDurable();
+    }
     LOG(3) << "setting minvalid: " << endOpTime.toString() << "(" << endOpTime.toBSON() << ")";
 }
 
-void setMinValid(OperationContext* ctx, const BatchBoundaries& boundaries) {
+void setMinValid(OperationContext* txn, const BatchBoundaries& boundaries) {
     const OpTime& start(boundaries.start);
     const OpTime& end(boundaries.end);
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(ctx, MODE_IX);
-        Lock::DBLock dblk(ctx->lockState(), "local", MODE_X);
-        Helpers::putSingleton(ctx,
+        ScopedTransaction transaction(txn, MODE_IX);
+        Lock::DBLock dblk(txn->lockState(), "local", MODE_X);
+        Helpers::putSingleton(txn,
                               minvalidNS,
                               BSON("$set" << BSON("ts" << end.getTimestamp() << "t" << end.getTerm()
                                                        << beginFieldName << start.toBSON())));
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(ctx, "setMinValid", minvalidNS);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "setMinValid", minvalidNS);
+    // NOTE: No need to ensure durability here since starting a batch isn't a problem unless
+    // writes happen after, in which case this marker (minvalid) will be written already.
     LOG(3) << "setting minvalid: " << boundaries.start.toString() << "("
            << boundaries.start.toBSON() << ") -> " << boundaries.end.toString() << "("
            << boundaries.end.toBSON() << ")";

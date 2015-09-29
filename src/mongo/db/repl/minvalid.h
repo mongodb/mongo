@@ -42,6 +42,11 @@ struct BatchBoundaries {
     const OpTime end;
 };
 
+enum class DurableRequirement {
+    None,    // Does not require any durability of the write.
+    Strong,  // Requires journal or checkpoint write.
+};
+
 /**
  * Helper functions for maintaining a single document in the local.replset.minvalid collection.
  *
@@ -65,9 +70,15 @@ struct BatchBoundaries {
 
 /**
  * The initial sync flag is used to durably record that initial sync has not completed.
+ *
+ * These operations wait for durable writes (which will block on journaling/checkpointing).
  */
 void clearInitialSyncFlag(OperationContext* txn);
 void setInitialSyncFlag(OperationContext* txn);
+
+/**
+ * Returns true if the initial sync flag is set (and presumed active).
+ */
 bool getInitialSyncFlag();
 
 
@@ -82,8 +93,11 @@ BatchBoundaries getMinValid(OperationContext* txn);
  * consider the dataset consistent.
  *
  * This is called when a batch finishes.
+ *
+ * Wait for durable writes (which will block on journaling/checkpointing) when specified.
+ *
  */
-void setMinValid(OperationContext* ctx, const OpTime& endOpTime);
+void setMinValid(OperationContext* ctx, const OpTime& endOpTime, const DurableRequirement durReq);
 
 /**
  * The bounds indicate an apply is active and we are not in a consistent state to allow reads
