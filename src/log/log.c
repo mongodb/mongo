@@ -1257,7 +1257,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 		 * and more walking of the slot pool for a very small number
 		 * of slots to process.  Don't signal here.
 		 */
-		goto done;
+		return (0);
 	}
 
 	/*
@@ -1361,7 +1361,6 @@ err:	if (locked)
 		__wt_spin_unlock(session, &log->log_sync_lock);
 	if (ret != 0 && slot->slot_error == 0)
 		slot->slot_error = ret;
-done:
 	return (ret);
 }
 
