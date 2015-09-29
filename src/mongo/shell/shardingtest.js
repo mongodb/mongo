@@ -1067,14 +1067,23 @@ ShardingTest.prototype.awaitBalance = function( collName , dbName , timeToWait )
 
 }
 
+ShardingTest.prototype.getShardNames = function() {
+    var shards = [];
+    this.s.getCollection("config.shards").find().forEach(function(shardDoc) {
+                                                             shards.push(shardDoc._id);
+                                                         });
+    return shards;
+}
+
+
 ShardingTest.prototype.getShard = function( coll, query, includeEmpty ){
-    var shards = this.getShards( coll, query, includeEmpty )
+    var shards = this.getShardsForQuery( coll, query, includeEmpty )
     assert.eq( shards.length, 1 )
     return shards[0]
 }
 
 // Returns the shards on which documents matching a particular query reside
-ShardingTest.prototype.getShards = function( coll, query, includeEmpty ){
+ShardingTest.prototype.getShardsForQuery = function( coll, query, includeEmpty ){
     if( ! coll.getDB )
         coll = this.s.getCollection( coll )
 
