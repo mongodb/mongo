@@ -738,9 +738,8 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 		/*
 		 * If we get any error other than WT_NOTFOUND, return it.
 		 */
-		if (ret != 0 && ret != WT_NOTFOUND)
-			return (ret);
-		ret = 0;
+		WT_RET_NOTFOUND_OK(ret);
+
 		if (create_log) {
 			WT_STAT_FAST_CONN_INCR(session, log_prealloc_missed);
 			if (conn->log_cond != NULL)
