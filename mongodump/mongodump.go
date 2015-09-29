@@ -91,6 +91,8 @@ func (dump *MongoDump) ValidateOptions() error {
 		return fmt.Errorf("--out not allowed when --archive is specified")
 	case dump.OutputOptions.Out == "-" && dump.OutputOptions.Gzip:
 		return fmt.Errorf("compression can't be used when dumping a single collection to standard output")
+	case dump.OutputOptions.NumParallelCollections <= 0:
+		return fmt.Errorf("numParallelCollections must be positive")
 	}
 	return nil
 }
@@ -395,18 +397,18 @@ func (dump *MongoDump) Dump() (err error) {
 func (dump *MongoDump) DumpIntents() error {
 	resultChan := make(chan error)
 
-	var jobs int
-	if dump.ToolOptions != nil && dump.ToolOptions.HiddenOptions != nil {
-		jobs = dump.ToolOptions.HiddenOptions.MaxProcs
+	jobs := dump.OutputOptions.NumParallelCollections
+	if numIntents := len(dump.manager.Intents()); jobs > numIntents {
+		jobs = numIntents
 	}
-	jobs = util.MaxInt(jobs, 1)
+
 	if jobs > 1 {
 		dump.manager.Finalize(intents.LongestTaskFirst)
 	} else {
 		dump.manager.Finalize(intents.Legacy)
 	}
 
-	log.Logf(log.Info, "dumping with %v job threads", jobs)
+	log.Logf(log.Info, "dumping up to %v collections in parallel", jobs)
 
 	// start a goroutine for each job thread
 	for i := 0; i < jobs; i++ {
