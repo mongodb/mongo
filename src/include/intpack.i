@@ -38,8 +38,8 @@
 #define	POS_2BYTE_MARKER (uint8_t)0xc0
 #define	POS_MULTI_MARKER (uint8_t)0xe0
 
-#define	NEG_1BYTE_MIN ((-1) << 6)
-#define	NEG_2BYTE_MIN (((-1) << 13) + NEG_1BYTE_MIN)
+#define	NEG_1BYTE_MIN (-(1 << 6))
+#define	NEG_2BYTE_MIN (-(1 << 13) + NEG_1BYTE_MIN)
 #define	POS_1BYTE_MAX ((1 << 6) - 1)
 #define	POS_2BYTE_MAX ((1 << 13) + POS_1BYTE_MAX)
 
