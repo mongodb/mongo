@@ -2212,6 +2212,8 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery
  * or error if recovery needs to run after an unclean shutdown., a string\,
  * chosen from the following options: \c "error"\, \c "on"; default \c on.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into log
+ * files., a boolean flag; default \c false.}
  * @config{ ),,}
  * @config{lsm_manager = (, configure database wide options for LSM tree
  * management.  The LSM manager is started automatically the first time an LSM

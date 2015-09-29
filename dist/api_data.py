@@ -642,6 +642,9 @@ common_wiredtiger_open = [
             run recovery or error if recovery needs to run after an
             unclean shutdown.''',
             choices=['error','on']),
+        Config('zero_fill', 'false', r'''
+            manually write zeroes into log files''',
+            type='boolean'),
         ]),
     Config('mmap', 'true', r'''
         Use memory mapping to access files when possible''',

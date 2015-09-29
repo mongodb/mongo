@@ -342,6 +342,7 @@ struct __wt_connection_impl {
 #define	WT_CONN_LOG_PREALLOC	0x08	/* Pre-allocation is enabled */
 #define	WT_CONN_LOG_RECOVER_DONE	0x10	/* Recovery completed */
 #define	WT_CONN_LOG_RECOVER_ERR	0x20	/* Error if recovery required */
+#define	WT_CONN_LOG_ZERO_FILL	0x40	/* Manually zero files */
 	uint32_t	 log_flags;	/* Global logging configuration */
 	WT_CONDVAR	*log_cond;	/* Log server wait mutex */
 	WT_SESSION_IMPL *log_session;	/* Log server session */
