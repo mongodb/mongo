@@ -24,7 +24,11 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/forwarding_catalog_manager',
         'client/sharding_connection_hook',
         'coreshard',
-    ]
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on saveGLEStats, which lacks a unique definition
+        'incomplete',
+    ],
 )
 
 # Functionality shared between mongod and mongos
