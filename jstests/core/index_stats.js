@@ -10,7 +10,7 @@
             var doc = cursor.next();
 
             if (doc.name === indexName) {
-                return doc.usageStats.operations;
+                return doc.accesses.ops;
             }
         }
 
