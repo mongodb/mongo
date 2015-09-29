@@ -74,10 +74,6 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	if (cval.val != 0)
 		FLD_SET(conn->log_flags, WT_CONN_LOG_ARCHIVE);
 
-	WT_RET(__wt_config_gets(session, cfg, "log.zero_fill", &cval));
-	if (cval.val != 0)
-		FLD_SET(conn->log_flags, WT_CONN_LOG_ZERO_FILL);
-
 	WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
 	conn->log_file_max = (wt_off_t)cval.val;
 	WT_STAT_FAST_CONN_SET(session, log_max_filesize, conn->log_file_max);
@@ -94,6 +90,10 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	WT_RET(__wt_config_gets_def(session, cfg, "log.recover", 0, &cval));
 	if (cval.len != 0  && WT_STRING_MATCH("error", cval.str, cval.len))
 		FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR);
+
+	WT_RET(__wt_config_gets(session, cfg, "log.zero_fill", &cval));
+	if (cval.val != 0)
+		FLD_SET(conn->log_flags, WT_CONN_LOG_ZERO_FILL);
 
 	WT_RET(__logmgr_sync_cfg(session, cfg));
 	return (0);
