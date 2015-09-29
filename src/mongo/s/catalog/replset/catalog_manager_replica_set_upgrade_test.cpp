@@ -65,7 +65,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
 
         const auto& findCmd = request.cmdObj;
         ASSERT_EQ("version", findCmd["find"].str());
-        checkReadConcern(findCmd, Timestamp(0, 0), 0);
+        checkReadConcern(findCmd, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         BSONObj versionDoc(BSON("_id" << 1 << "minCompatibleVersion"
                                       << MIN_COMPATIBLE_CONFIG_VERSION << "currentVersion"
@@ -359,7 +359,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoOpAfterRetry) 
 
         const auto& findCmd = request.cmdObj;
         ASSERT_EQ("version", findCmd["find"].str());
-        checkReadConcern(findCmd, Timestamp(0, 0), 0);
+        checkReadConcern(findCmd, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         BSONObj versionDoc(fromjson(R"({
                 _id: 1,
@@ -490,7 +490,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyTooNewAfterRetry
 
         const auto& findCmd = request.cmdObj;
         ASSERT_EQ("version", findCmd["find"].str());
-        checkReadConcern(findCmd, Timestamp(0, 0), 0);
+        checkReadConcern(findCmd, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         BSONObj versionDoc(fromjson(R"({
                 _id: 1,
@@ -575,7 +575,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoOpAfterRetry)
 
         const auto& findCmd = request.cmdObj;
         ASSERT_EQ("version", findCmd["find"].str());
-        checkReadConcern(findCmd, Timestamp(0, 0), 0);
+        checkReadConcern(findCmd, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         BSONObj versionDoc(fromjson(R"({
                 _id: 1,

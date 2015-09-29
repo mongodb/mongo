@@ -108,7 +108,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionExisting) {
         ASSERT_EQ(query->getSort(), BSONObj());
         ASSERT_EQ(query->getLimit().get(), 1);
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, 30);
         BSONObjBuilder builder;
@@ -164,7 +164,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseExisting) {
         ASSERT_EQ(query->getSort(), BSONObj());
         ASSERT_EQ(query->getLimit().get(), 1);
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, 30);
         BSONObjBuilder builder;
@@ -342,7 +342,7 @@ TEST_F(CatalogManagerReplSetTest, GetAllShardsValid) {
         ASSERT_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{s1.toBSON(), s2.toBSON(), s3.toBSON()};
     });
@@ -441,7 +441,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
         ASSERT_EQ(query->getSort(), BSON(ChunkType::version() << -1));
         ASSERT_EQ(query->getLimit().get(), 1);
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, 30);
         BSONObjBuilder builder;
@@ -488,7 +488,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSNoSortNoLimit) {
         ASSERT_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{};
     });
@@ -772,7 +772,7 @@ TEST_F(CatalogManagerReplSetTest, GetGlobalSettingsBalancerDoc) {
         ASSERT_EQ(query->ns(), SettingsType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(SettingsType::key(SettingsType::BalancerDocKey)));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{st1.toBSON()};
     });
@@ -805,7 +805,7 @@ TEST_F(CatalogManagerReplSetTest, GetGlobalSettingsChunkSizeDoc) {
         ASSERT_EQ(query->ns(), SettingsType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{st1.toBSON()};
     });
@@ -835,7 +835,7 @@ TEST_F(CatalogManagerReplSetTest, GetGlobalSettingsInvalidDoc) {
         ASSERT_EQ(query->ns(), SettingsType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(SettingsType::key("invalidKey")));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{
             BSON("invalidKey"
@@ -867,7 +867,7 @@ TEST_F(CatalogManagerReplSetTest, GetGlobalSettingsNonExistent) {
         ASSERT_EQ(query->ns(), SettingsType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{};
     });
@@ -930,7 +930,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsNoDb) {
         ASSERT_EQ(query->getFilter(), BSONObj());
         ASSERT_EQ(query->getSort(), BSONObj());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         ReplSetMetadata metadata(10, OpTime(), newOpTime, 100, 30);
         BSONObjBuilder builder;
@@ -990,7 +990,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsValidResultsWithDb) {
             ASSERT_EQ(query->getFilter(), b.obj());
         }
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{coll1.toBSON(), coll2.toBSON()};
     });
@@ -1038,7 +1038,7 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionsInvalidCollectionType) {
             ASSERT_EQ(query->getFilter(), b.obj());
         }
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{
             validColl.toBSON(),
@@ -1081,7 +1081,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabasesForShardValid) {
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::primary(dbt1.getPrimary())));
         ASSERT_EQ(query->getSort(), BSONObj());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{dbt1.toBSON(), dbt2.toBSON()};
     });
@@ -1155,7 +1155,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagsForCollection) {
         ASSERT_EQ(query->getFilter(), BSON(TagsType::ns("TestDB.TestColl")));
         ASSERT_EQ(query->getSort(), BSON(TagsType::min() << 1));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{tagA.toBSON(), tagB.toBSON()};
     });
@@ -1244,7 +1244,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkOneTagFound) {
                        << TagsType::min() << BSON("$lte" << chunk.getMin()) << TagsType::max()
                        << BSON("$gte" << chunk.getMax())));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         TagsType tt;
         tt.setNS("test.coll");
@@ -1289,7 +1289,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkNoTagFound) {
                        << TagsType::min() << BSON("$lte" << chunk.getMin()) << TagsType::max()
                        << BSON("$gte" << chunk.getMax())));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{};
     });
@@ -1331,7 +1331,7 @@ TEST_F(CatalogManagerReplSetTest, GetTagForChunkInvalidTagDoc) {
                        << TagsType::min() << BSON("$lte" << chunk.getMin()) << TagsType::max()
                        << BSON("$gte" << chunk.getMax())));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         // Return a tag document missing the min key
         return vector<BSONObj>{BSON(TagsType::ns("test.mycol") << TagsType::tag("tag")
@@ -1512,7 +1512,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
         ASSERT_EQ(BSONObj(), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{s0.toBSON(), s1.toBSON(), s2.toBSON()};
     });
@@ -1551,7 +1551,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseSuccess) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
         ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
         return vector<BSONObj>{};
     });
 
@@ -1675,7 +1675,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDBExists) {
 
         ASSERT_EQ(DatabaseType::ConfigNS, query->ns());
         ASSERT_EQ(queryBuilder.obj(), query->getFilter());
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{BSON("_id" << dbname)};
     });
@@ -1714,7 +1714,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDBExistsDifferentCase) {
 
         ASSERT_EQ(DatabaseType::ConfigNS, query->ns());
         ASSERT_EQ(queryBuilder.obj(), query->getFilter());
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{BSON("_id" << dbnameDiffCase)};
     });
@@ -1745,7 +1745,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseNoShards) {
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
         return vector<BSONObj>{};
     });
 
@@ -1760,7 +1760,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseNoShards) {
         ASSERT_EQ(BSONObj(), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{};
     });
@@ -1799,7 +1799,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
         ASSERT_EQ(BSONObj(), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{s0.toBSON(), s1.toBSON(), s2.toBSON()};
     });
@@ -1838,7 +1838,7 @@ TEST_F(CatalogManagerReplSetTest, createDatabaseDuplicateKeyOnInsert) {
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
         return vector<BSONObj>{};
     });
 
@@ -1961,7 +1961,7 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
         ASSERT_EQ(BSONObj(), query->getSort());
         ASSERT_EQ(1, query->getLimit().get());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{};
     });

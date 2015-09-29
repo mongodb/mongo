@@ -41,6 +41,8 @@ namespace repl {
 const char OpTime::kTimestampFieldName[] = "ts";
 const char OpTime::kTermFieldName[] = "t";
 
+OpTime::OpTime() : _timestamp(Timestamp(0, 0)), _term(OpTime::kUninitializedTerm) {}
+
 OpTime::OpTime(Timestamp ts, long long term) : _timestamp(std::move(ts)), _term(term) {}
 
 Timestamp OpTime::getTimestamp() const {

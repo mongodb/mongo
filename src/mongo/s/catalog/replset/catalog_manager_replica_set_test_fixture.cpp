@@ -234,7 +234,7 @@ void CatalogManagerReplSetTestFixture::expectGetShards(const std::vector<ShardTy
         ASSERT_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         vector<BSONObj> shardsToReturn;
 
@@ -412,7 +412,7 @@ void CatalogManagerReplSetTestFixture::expectCount(const HostAndPort& configHost
             return BSON("ok" << 1 << "n" << response.getValue());
         }
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         BSONObjBuilder responseBuilder;
         Command::appendCommandStatus(responseBuilder, response.getStatus());

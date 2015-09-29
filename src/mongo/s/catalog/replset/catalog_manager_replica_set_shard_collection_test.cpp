@@ -95,7 +95,7 @@ public:
             ASSERT_EQ(BSONObj(), query->getSort());
             ASSERT_EQ(1, query->getLimit().get());
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
             return vector<BSONObj>{expectedDb.toBSON()};
         });
@@ -168,7 +168,7 @@ public:
             ASSERT_EQ(expectedSort, query->getSort());
             ASSERT_FALSE(query->getLimit().is_initialized());
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
             vector<BSONObj> chunksToReturn;
 
@@ -229,7 +229,7 @@ public:
             }
             ASSERT_EQ(BSONObj(), query->getSort());
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
             return vector<BSONObj>{collection.toBSON()};
         });
@@ -253,7 +253,7 @@ public:
             ASSERT_EQ(expectedSort, query->getSort());
             ASSERT_EQ(1, query->getLimit().get());
 
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
             return vector<BSONObj>{chunk.toBSON()};
         });

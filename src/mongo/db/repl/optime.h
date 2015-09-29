@@ -62,7 +62,7 @@ public:
     static const long long kInitialTerm = 0;
 
     // Default OpTime, also the smallest one.
-    OpTime() = default;
+    OpTime();
     OpTime(Timestamp ts, long long term);
 
     Timestamp getTimestamp() const;

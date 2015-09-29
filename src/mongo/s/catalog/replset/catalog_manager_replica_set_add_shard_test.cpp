@@ -225,7 +225,7 @@ TEST_F(AddShardTest, AddShardStandalone) {
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB1")));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{};
     });
@@ -240,7 +240,7 @@ TEST_F(AddShardTest, AddShardStandalone) {
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB2")));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{};
     });
@@ -339,7 +339,7 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB1")));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{};
     });
@@ -354,7 +354,7 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
         ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
         ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB2")));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{};
     });
@@ -373,7 +373,7 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
 
         ASSERT_EQ(query->ns(), ShardType::ConfigNS);
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         return vector<BSONObj>{existingShard.toBSON()};
     });

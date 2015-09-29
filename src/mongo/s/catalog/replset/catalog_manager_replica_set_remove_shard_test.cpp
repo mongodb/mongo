@@ -182,7 +182,7 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
         ASSERT_EQ(BSONObj(), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         ShardType remainingShard;
         remainingShard.setHost("host1");
@@ -358,7 +358,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
         ASSERT_EQ(BSONObj(), query->getSort());
         ASSERT_FALSE(query->getLimit().is_initialized());
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), 0);
+        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         ShardType remainingShard;
         remainingShard.setHost("host1");
