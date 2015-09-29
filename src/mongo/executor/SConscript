@@ -174,20 +174,6 @@ env.CppIntegrationTest(
     ],
 )
 
-env.CppIntegrationTest(
-    target='network_interface_perf_test',
-    source=[
-        'network_interface_perf_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        'network_interface_asio',
-        'network_interface_impl',
-    ],
-)
-
-
 env.Library(
     target='network_interface_factory',
     source=[
