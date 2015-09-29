@@ -160,10 +160,10 @@ Status ChunkMoveOperationState::initialize(OperationContext* txn, const BSONObj&
     }
 
     {
-        std::shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(txn, getFromShard());
+        std::shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(txn, _fromShard);
         if (!fromShard) {
             return {ErrorCodes::ShardNotFound,
-                    stream() << "Source shard " << getFromShard()
+                    stream() << "Source shard " << _fromShard
                              << " is missing. This indicates metadata corruption."};
         }
 
@@ -171,10 +171,10 @@ Status ChunkMoveOperationState::initialize(OperationContext* txn, const BSONObj&
     }
 
     {
-        std::shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(txn, getToShard());
+        std::shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(txn, _toShard);
         if (!toShard) {
             return {ErrorCodes::ShardNotFound,
-                    stream() << "Destination shard " << getToShard()
+                    stream() << "Destination shard " << _toShard
                              << " is missing. This indicates metadata corruption."};
         }
 
@@ -187,13 +187,13 @@ Status ChunkMoveOperationState::initialize(OperationContext* txn, const BSONObj&
 StatusWith<ForwardingCatalogManager::ScopedDistLock*> ChunkMoveOperationState::acquireMoveMetadata(
     OperationContext* txn) {
     // Get the distributed lock
-    const string whyMessage(stream() << "migrating chunk [" << minKey << ", " << maxKey << ") in "
+    const string whyMessage(stream() << "migrating chunk [" << _minKey << ", " << _maxKey << ") in "
                                      << _nss.ns());
     _distLockStatus = grid.forwardingCatalogManager()->distLock(txn, _nss.ns(), whyMessage);
 
     if (!_distLockStatus->isOK()) {
         const string msg = stream() << "could not acquire collection lock for " << _nss.ns()
-                                    << " to migrate chunk [" << minKey << "," << maxKey << ")"
+                                    << " to migrate chunk [" << _minKey << "," << _maxKey << ")"
                                     << causedBy(_distLockStatus->getStatus());
         warning() << msg;
         return Status(_distLockStatus->getStatus().code(), msg);
@@ -205,7 +205,7 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock*> ChunkMoveOperationState::a
     Status refreshStatus = shardingState->refreshMetadataNow(txn, _nss.ns(), &_shardVersion);
     if (!refreshStatus.isOK()) {
         const string msg = stream() << "moveChunk cannot start migrate of chunk "
-                                    << "[" << minKey << "," << maxKey << ")"
+                                    << "[" << _minKey << "," << _maxKey << ")"
                                     << causedBy(refreshStatus.reason());
         warning() << msg;
         return Status(refreshStatus.code(), msg);
@@ -214,7 +214,7 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock*> ChunkMoveOperationState::a
     if (_shardVersion.majorVersion() == 0) {
         // It makes no sense to migrate if our version is zero and we have no chunks
         const string msg = stream() << "moveChunk cannot start migrate of chunk "
-                                    << "[" << minKey << "," << maxKey << ")"
+                                    << "[" << _minKey << "," << _maxKey << ")"
                                     << " with zero shard version";
         warning() << msg;
         return Status(ErrorCodes::IncompatibleShardingMetadata, msg);
@@ -222,7 +222,7 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock*> ChunkMoveOperationState::a
 
     if (_collectionEpoch != _shardVersion.epoch()) {
         const string msg = stream() << "moveChunk cannot move chunk "
-                                    << "[" << minKey << "," << maxKey << "), "
+                                    << "[" << _minKey << "," << _maxKey << "), "
                                     << "collection may have been dropped. "
                                     << "current epoch: " << _shardVersion.epoch()
                                     << ", cmd epoch: " << _collectionEpoch;
@@ -239,11 +239,11 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock*> ChunkMoveOperationState::a
     invariant(!_collMetadata->getKeyPattern().isEmpty());
 
     ChunkType origChunk;
-    if (!_collMetadata->getNextChunk(getMinKey(), &origChunk) ||
-        origChunk.getMin().woCompare(getMinKey()) || origChunk.getMax().woCompare(getMaxKey())) {
+    if (!_collMetadata->getNextChunk(_minKey, &origChunk) ||
+        origChunk.getMin().woCompare(_minKey) || origChunk.getMax().woCompare(_maxKey)) {
         // Our boundaries are different from those passed in
         const string msg = stream() << "moveChunk cannot find chunk "
-                                    << "[" << minKey << "," << maxKey << ")"
+                                    << "[" << _minKey << "," << _maxKey << ")"
                                     << " to migrate, the chunk boundaries may be stale";
         warning() << msg;
         return Status(ErrorCodes::IncompatibleShardingMetadata, msg);
@@ -277,7 +277,7 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
         // Bump the metadata's version up and "forget" about the chunk being moved. This is
         // not the commit point, but in practice the state in this shard won't change until
         // the commit it done.
-        shardingState->donateChunk(txn, _nss.ns(), getMinKey(), getMaxKey(), myVersion);
+        shardingState->donateChunk(txn, _nss.ns(), _minKey, _maxKey, myVersion);
     }
 
     log() << "moveChunk setting version to: " << myVersion << migrateLog;
@@ -288,14 +288,13 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
     Status recvChunkCommitStatus{ErrorCodes::InternalError, "status not set"};
 
     try {
-        ScopedDbConnection connTo(getToShardCS(), 35.0);
+        ScopedDbConnection connTo(_toShardCS, 35.0);
         connTo->runCommand("admin", BSON("_recvChunkCommit" << 1), res);
         connTo.done();
         recvChunkCommitStatus = getStatusFromCommandResult(res);
     } catch (const DBException& e) {
-        const string msg = stream() << "moveChunk could not contact to shard "
-                                    << getToShardCS().toString() << " to commit transfer"
-                                    << causedBy(e);
+        const string msg = stream() << "moveChunk could not contact to shard " << _toShard
+                                    << " to commit transfer" << causedBy(e);
         warning() << msg;
         recvChunkCommitStatus = Status(e.toStatus().code(), msg);
     }
@@ -339,16 +338,16 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
         op.append("ns", ChunkType::ConfigNS);
 
         BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ChunkType::name(), Chunk::genID(_nss.ns(), getMinKey()));
+        n.append(ChunkType::name(), Chunk::genID(_nss.ns(), _minKey));
         myVersion.addToBSON(n, ChunkType::DEPRECATED_lastmod());
         n.append(ChunkType::ns(), _nss.ns());
-        n.append(ChunkType::min(), getMinKey());
-        n.append(ChunkType::max(), getMaxKey());
-        n.append(ChunkType::shard(), getToShard());
+        n.append(ChunkType::min(), _minKey);
+        n.append(ChunkType::max(), _maxKey);
+        n.append(ChunkType::shard(), _toShard);
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ChunkType::name(), Chunk::genID(_nss.ns(), getMinKey()));
+        q.append(ChunkType::name(), Chunk::genID(_nss.ns(), _minKey));
         q.done();
 
         updates.append(op.obj());
@@ -371,7 +370,7 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
         BSONObj bumpMin = bumpChunk.getMin();
         BSONObj bumpMax = bumpChunk.getMax();
 
-        dassert(bumpMin.woCompare(getMinKey()) != 0);
+        dassert(bumpMin.woCompare(_minKey) != 0);
 
         BSONObjBuilder op;
         op.append("op", "u");
@@ -386,7 +385,7 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
         n.append(ChunkType::ns(), _nss.ns());
         n.append(ChunkType::min(), bumpMin);
         n.append(ChunkType::max(), bumpMax);
-        n.append(ChunkType::shard(), getFromShard());
+        n.append(ChunkType::shard(), _fromShard);
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));
@@ -517,8 +516,8 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
     shardingState->migrationSourceManager()->setInCriticalSection(false);
 
     // Migration is done, just log some diagnostics information
-    BSONObj chunkInfo = BSON("min" << getMinKey() << "max" << getMaxKey() << "from"
-                                   << getFromShard() << "to" << getToShard());
+    BSONObj chunkInfo =
+        BSON("min" << _minKey << "max" << _maxKey << "from" << _fromShard << "to" << _toShard);
 
     BSONObjBuilder commitInfo;
     commitInfo.appendElements(chunkInfo);
