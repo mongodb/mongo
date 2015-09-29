@@ -601,11 +601,6 @@ static void finishCurrentOp(OperationContext* txn, WriteErrorDetail* opError) {
 // - error
 //
 
-static void singleInsert(OperationContext* txn,
-                         const BSONObj& docToInsert,
-                         Collection* collection,
-                         WriteOpResult* result);
-
 static void singleCreateIndex(OperationContext* txn,
                               const BSONObj& indexDesc,
                               WriteOpResult* result);
@@ -967,7 +962,8 @@ void WriteBatchExecutor::ExecInsertsState::unlock() {
 
 static void insertOne(WriteBatchExecutor::ExecInsertsState* state, WriteOpResult* result) {
     // we have to be top level so we can retry
-    invariant(!state->txn->lockState()->inAWriteUnitOfWork());
+    OperationContext* txn = state->txn;
+    invariant(!txn->lockState()->inAWriteUnitOfWork());
     invariant(state->currIndex < state->normalizedInserts.size());
 
     const StatusWith<BSONObj>& normalizedInsert(state->normalizedInserts[state->currIndex]);
@@ -981,43 +977,44 @@ static void insertOne(WriteBatchExecutor::ExecInsertsState* state, WriteOpResult
         ? state->request->getInsertRequest()->getDocumentsAt(state->currIndex)
         : normalizedInsert.getValue();
 
-    int attempt = 0;
-    while (true) {
-        try {
-            if (!state->request->isInsertIndexRequest()) {
-                if (state->lockAndCheck(result)) {
-                    singleInsert(state->txn, insertDoc, state->getCollection(), result);
-                }
+    try {
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            if (state->request->isInsertIndexRequest()) {
+                singleCreateIndex(txn, insertDoc, result);
             } else {
-                singleCreateIndex(state->txn, insertDoc, result);
+                if (state->lockAndCheck(result)) {
+                    dassert(txn->lockState()->isCollectionLockedForMode(
+                        state->getCollection()->ns().ns(), MODE_IX));
+
+                    WriteUnitOfWork wunit(txn);
+                    Status status = state->getCollection()->insertDocument(txn, insertDoc, true);
+
+                    if (status.isOK()) {
+                        result->getStats().n = 1;
+                        wunit.commit();
+                    } else {
+                        result->setError(toWriteError(status));
+                    }
+                }
             }
-            break;
-        } catch (const WriteConflictException& wce) {
-            state->unlock();
-            CurOp::get(state->txn)->debug().writeConflicts++;
-            state->txn->recoveryUnit()->abandonSnapshot();
-            WriteConflictException::logAndBackoff(
-                attempt++,
-                "insert",
-                state->getCollection() ? state->getCollection()->ns().ns() : "index");
-        } catch (const StaleConfigException& staleExcep) {
-            result->setError(new WriteErrorDetail);
-            result->getError()->setErrCode(ErrorCodes::StaleShardVersion);
-            buildStaleError(
-                staleExcep.getVersionReceived(), staleExcep.getVersionWanted(), result->getError());
-            break;
-        } catch (const DBException& ex) {
-            Status status(ex.toStatus());
-            if (ErrorCodes::isInterruption(status.code()))
-                throw;
-            result->setError(toWriteError(status));
-            break;
         }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
+            txn, "insert", state->getCollection() ? state->getCollection()->ns().ns() : "index");
+    } catch (const StaleConfigException& staleExcep) {
+        result->setError(new WriteErrorDetail);
+        result->getError()->setErrCode(ErrorCodes::StaleShardVersion);
+        buildStaleError(
+            staleExcep.getVersionReceived(), staleExcep.getVersionWanted(), result->getError());
+    } catch (const DBException& ex) {
+        Status status(ex.toStatus());
+        if (ErrorCodes::isInterruption(status.code()))
+            throw;
+        result->setError(toWriteError(status));
     }
 
     // Errors release the write lock, as a matter of policy.
     if (result->getError()) {
-        state->txn->recoveryUnit()->abandonSnapshot();
+        txn->recoveryUnit()->abandonSnapshot();
         state->unlock();
     }
 }
@@ -1036,30 +1033,6 @@ void WriteBatchExecutor::execOneInsert(ExecInsertsState* state, WriteErrorDetail
 
     if (result.getError()) {
         *error = result.releaseError();
-    }
-}
-
-/**
- * Perform a single insert into a collection.  Requires the insert be preprocessed and the
- * collection already has been created.
- *
- * Might fault or error, otherwise populates the result.
- */
-static void singleInsert(OperationContext* txn,
-                         const BSONObj& docToInsert,
-                         Collection* collection,
-                         WriteOpResult* result) {
-    const string& insertNS = collection->ns().ns();
-    dassert(txn->lockState()->isCollectionLockedForMode(insertNS, MODE_IX));
-
-    WriteUnitOfWork wunit(txn);
-    Status status = collection->insertDocument(txn, docToInsert, true);
-
-    if (!status.isOK()) {
-        result->setError(toWriteError(status));
-    } else {
-        result->getStats().n = 1;
-        wunit.commit();
     }
 }
 
