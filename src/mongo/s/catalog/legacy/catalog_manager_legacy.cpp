@@ -75,6 +75,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/log.h"
@@ -82,6 +83,8 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+MONGO_FP_DECLARE(setSCCCDropCollDistLockWait);
 
 using std::set;
 using std::shared_ptr;
@@ -555,7 +558,11 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
     LOG(1) << "dropCollection " << ns << " started";
 
     // Lock the collection globally so that split/migrate cannot run
-    const stdx::chrono::seconds waitFor(2);
+    stdx::chrono::seconds waitFor(2);
+    MONGO_FAIL_POINT_BLOCK(setSCCCDropCollDistLockWait, customWait) {
+        const BSONObj& data = customWait.getData();
+        waitFor = stdx::chrono::seconds(data["waitForSecs"].numberInt());
+    }
     const stdx::chrono::milliseconds lockTryInterval(500);
     auto scopedDistLock = getDistLockManager()->lock(ns.ns(), "drop", waitFor, lockTryInterval);
     if (!scopedDistLock.isOK()) {
