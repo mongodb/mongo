@@ -555,7 +555,9 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
     LOG(1) << "dropCollection " << ns << " started";
 
     // Lock the collection globally so that split/migrate cannot run
-    auto scopedDistLock = getDistLockManager()->lock(ns.ns(), "drop");
+    const stdx::chrono::seconds waitFor(2);
+    const stdx::chrono::milliseconds lockTryInterval(500);
+    auto scopedDistLock = getDistLockManager()->lock(ns.ns(), "drop", waitFor, lockTryInterval);
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
