@@ -189,7 +189,21 @@ void AsyncMockStreamFactory::MockStream::read(asio::mutable_buffer buf,
                log() << "read " << nToCopy << " bytes, " << (nextRead.size() - nToCopy)
                      << " remaining in buffer";
 
-               checkCanceled(_io_service, &_state, std::move(readHandler), nToCopy);
+               auto handler = readHandler;
+
+               // If we did not receive all the bytes, we should return an error
+               if (nToCopy < asio::buffer_size(buf)) {
+                   handler = [readHandler](std::error_code ec, size_t len) {
+                       // If we have an error here we've been canceled, and that takes precedence
+                       if (ec)
+                           return readHandler(ec, len);
+
+                       // Call the original handler with an error
+                       readHandler(make_error_code(ErrorCodes::InvalidLength), len);
+                   };
+               }
+
+               checkCanceled(_io_service, &_state, std::move(handler), nToCopy);
            });
 }
 

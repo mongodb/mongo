@@ -271,6 +271,8 @@ public:
         auto message = replyBuilder->done();
         message->header().setResponseTo(messageId);
 
+        auto actualSize = message->header().getLen();
+
         // Allow caller to mess with the Message
         hook(message->header());
 
@@ -287,7 +289,7 @@ public:
             auto dataBytes = reinterpret_cast<const uint8_t*>(message->buf());
             auto body = dataBytes;
             std::advance(body, sizeof(MSGHEADER::Value));
-            stream->pushRead({body, dataBytes + static_cast<std::size_t>(message->size())});
+            stream->pushRead({body, dataBytes + static_cast<std::size_t>(actualSize)});
         }
 
         auto& response = deferred.get();
@@ -330,11 +332,10 @@ TEST_F(MalformedMessageTest, MessageLenSmallerThanActual) {
                    [](MsgData::View message) { message.setLen(message.getLen() - 10); });
 }
 
-TEST_F(MalformedMessageTest, MessageLenLongerThanActual) {
-    // SERVER-20628
-    // runMessageTest(ErrorCodes::InvalidLength,
-    //               true,
-    //               [](MsgData::View message) { message.setLen(message.getLen() + 100); });
+TEST_F(MalformedMessageTest, FailedToReadAllBytesForMessage) {
+    runMessageTest(ErrorCodes::InvalidLength,
+                   true,
+                   [](MsgData::View message) { message.setLen(message.getLen() + 100); });
 }
 
 TEST_F(MalformedMessageTest, UnsupportedOpcode) {
