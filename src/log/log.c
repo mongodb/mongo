@@ -738,9 +738,8 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 		/*
 		 * If we get any error other than WT_NOTFOUND, return it.
 		 */
-		if (ret != 0 && ret != WT_NOTFOUND)
-			return (ret);
-		ret = 0;
+		WT_RET_NOTFOUND_OK(ret);
+
 		if (create_log) {
 			WT_STAT_FAST_CONN_INCR(session, log_prealloc_missed);
 			if (conn->log_cond != NULL)
@@ -1206,11 +1205,11 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 	WT_LSN sync_lsn;
 	int64_t release_buffered, release_bytes;
 	int yield_count;
-	bool locked, need_relock;
+	bool locked;
 
 	conn = S2C(session);
 	log = conn->log;
-	locked = need_relock = false;
+	locked = false;
 	yield_count = 0;
 	if (freep != NULL)
 		*freep = 1;
@@ -1257,7 +1256,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 		 * and more walking of the slot pool for a very small number
 		 * of slots to process.  Don't signal here.
 		 */
-		goto done;
+		return (0);
 	}
 
 	/*
@@ -1271,19 +1270,15 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 		 * unlock in case an earlier thread is trying to switch its
 		 * slot and complete its operation.
 		 */
-		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT)) {
+		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT))
 			__wt_spin_unlock(session, &log->log_slot_lock);
-			need_relock = true;
-		}
 		if (++yield_count < 1000)
 			__wt_yield();
 		else
-			WT_ERR(__wt_cond_wait(
-			    session, log->log_write_cond, 200));
-		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT)) {
+			ret = __wt_cond_wait(session, log->log_write_cond, 200);
+		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT))
 			__wt_spin_lock(session, &log->log_slot_lock);
-			need_relock = false;
-		}
+		WT_ERR(ret);
 	}
 
 	log->write_start_lsn = slot->slot_start_lsn;
@@ -1363,11 +1358,8 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 	}
 err:	if (locked)
 		__wt_spin_unlock(session, &log->log_sync_lock);
-	if (need_relock)
-		__wt_spin_lock(session, &log->log_slot_lock);
 	if (ret != 0 && slot->slot_error == 0)
 		slot->slot_error = ret;
-done:
 	return (ret);
 }
 
