@@ -548,6 +548,9 @@ bool MigrationSourceManager::waitTillNotInCriticalSection(int maxSecondsToWait) 
     const auto deadline = stdx::chrono::system_clock::now() + Seconds(maxSecondsToWait);
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     while (_inCriticalSection) {
+        log() << "Waiting for " << maxSecondsToWait
+              << " seconds for the migration critical section to end";
+
         if (stdx::cv_status::timeout == _inCriticalSectionCV.wait_until(lk, deadline)) {
             return false;
         }

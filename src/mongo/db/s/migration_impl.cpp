@@ -78,6 +78,7 @@ WriteConcernOptions getDefaultWriteConcernForMigration() {
 }
 
 MONGO_FP_DECLARE(failMigrationCommit);
+MONGO_FP_DECLARE(hangBeforeLeavingCriticalSection);
 MONGO_FP_DECLARE(failMigrationConfigWritePrepare);
 MONGO_FP_DECLARE(failMigrationApplyOps);
 
@@ -510,6 +511,8 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
             dbexit(EXIT_SHARDING_ERROR);
         }
     }
+
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
     shardingState->migrationSourceManager()->setInCriticalSection(false);
 

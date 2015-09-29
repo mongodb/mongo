@@ -5,9 +5,6 @@
 s = new ShardingTest( "slow_sharding_balance4" , 2 , 1 , 1 , { chunksize : 1 } )
 s.stopBalancer();
 
-// TODO: SERVER-20194. This test forces use of the old mongos query path.
-assert.commandWorked(s.s0.adminCommand({setParameter: 1, useClusterClientCursor: false}));
-
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
