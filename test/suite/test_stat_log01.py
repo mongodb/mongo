@@ -84,4 +84,3 @@ class test_stat_log01(wttest.WiredTigerTestCase):
 
 if __name__ == '__main__':
     wttest.run()
-

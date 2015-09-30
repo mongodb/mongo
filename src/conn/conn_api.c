@@ -1967,7 +1967,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 
 	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
-	conn->mmap = cval.val == 0 ? 0 : 1;
+	conn->mmap = cval.val != 0;
 
 	WT_ERR(__conn_statistics_config(session, cfg));
 	WT_ERR(__wt_lsm_manager_config(session, cfg));

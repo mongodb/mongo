@@ -142,7 +142,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	 */
 	WT_RET(__wt_readlock(session, conn->hot_backup_lock));
 	locked = true;
-	if (conn->hot_backup == 0 || backup_file != 0) {
+	if (!conn->hot_backup || backup_file != 0) {
 		for (i = 0; i < logcount; i++) {
 			WT_ERR(__wt_log_extract_lognum(
 			    session, logfiles[i], &lognum));
@@ -363,8 +363,23 @@ __log_file_server(void *arg)
 			 * We have to wait until the LSN we asked for is
 			 * written.  If it isn't signal the wrlsn thread
 			 * to get it written.
+			 *
+			 * We also have to wait for the written LSN and the
+			 * sync LSN to be in the same file so that we know we
+			 * have synchronized all earlier log files.
 			 */
 			if (__wt_log_cmp(&log->bg_sync_lsn, &min_lsn) <= 0) {
+				/*
+				 * If the sync file is behind either the one
+				 * wanted for a background sync or the write LSN
+				 * has moved to another file continue to let
+				 * this worker thread process that older file
+				 * immediately.
+				 */
+				if ((log->sync_lsn.file <
+				    log->bg_sync_lsn.file) ||
+				    (log->sync_lsn.file < min_lsn.file))
+					continue;
 				WT_ERR(__wt_fsync(session, log->log_fh));
 				__wt_spin_lock(session, &log->log_sync_lock);
 				locked = true;
@@ -374,6 +389,8 @@ __log_file_server(void *arg)
 				 */
 				if (__wt_log_cmp(
 				    &log->sync_lsn, &min_lsn) <= 0) {
+					WT_ASSERT(session,
+					    min_lsn.file == log->sync_lsn.file);
 					log->sync_lsn = min_lsn;
 					WT_ERR(__wt_cond_signal(
 					    session, log->log_sync_cond));
@@ -395,7 +412,7 @@ __log_file_server(void *arg)
 		}
 		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait(
-		    session, conn->log_file_cond, WT_MILLION));
+		    session, conn->log_file_cond, WT_MILLION / 10));
 	}
 
 	if (0) {
@@ -781,7 +798,7 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 	 */
 	WT_RET(__wt_thread_create(conn->log_file_session,
 	    &conn->log_file_tid, __log_file_server, conn->log_file_session));
-	conn->log_file_tid_set = 1;
+	conn->log_file_tid_set = true;
 
 	/*
 	 * Start the log write LSN thread.  It is not configurable.
@@ -793,7 +810,7 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 	    "log write lsn server", false, &conn->log_wrlsn_cond));
 	WT_RET(__wt_thread_create(conn->log_wrlsn_session,
 	    &conn->log_wrlsn_tid, __log_wrlsn_server, conn->log_wrlsn_session));
-	conn->log_wrlsn_tid_set = 1;
+	conn->log_wrlsn_tid_set = true;
 
 	/* If no log thread services are configured, we're done. */ 
 	if (!FLD_ISSET(conn->log_flags,
@@ -808,7 +825,7 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 	 */
 	if (conn->log_session != NULL) {
 		WT_ASSERT(session, conn->log_cond != NULL);
-		WT_ASSERT(session, conn->log_tid_set != 0);
+		WT_ASSERT(session, conn->log_tid_set == true);
 		WT_RET(__wt_cond_signal(session, conn->log_cond));
 	} else {
 		/* The log server gets its own session. */
@@ -822,7 +839,7 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 		 */
 		WT_RET(__wt_thread_create(conn->log_session,
 		    &conn->log_tid, __log_server, conn->log_session));
-		conn->log_tid_set = 1;
+		conn->log_tid_set = true;
 	}
 
 	return (0);
@@ -853,12 +870,12 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	if (conn->log_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->log_cond));
 		WT_TRET(__wt_thread_join(session, conn->log_tid));
-		conn->log_tid_set = 0;
+		conn->log_tid_set = false;
 	}
 	if (conn->log_file_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->log_file_cond));
 		WT_TRET(__wt_thread_join(session, conn->log_file_tid));
-		conn->log_file_tid_set = 0;
+		conn->log_file_tid_set = false;
 	}
 	if (conn->log_file_session != NULL) {
 		wt_session = &conn->log_file_session->iface;
@@ -868,7 +885,7 @@ __wt_logmgr_destroy(WT_SESSION_IMPL *session)
 	if (conn->log_wrlsn_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->log_wrlsn_cond));
 		WT_TRET(__wt_thread_join(session, conn->log_wrlsn_tid));
-		conn->log_wrlsn_tid_set = 0;
+		conn->log_wrlsn_tid_set = false;
 	}
 	if (conn->log_wrlsn_session != NULL) {
 		wt_session = &conn->log_wrlsn_session->iface;

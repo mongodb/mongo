@@ -184,7 +184,7 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	for (i = 0; i < 100; ++i) {
 		WT_ERR(wt_session->checkpoint(wt_session, t->data));
 
-		session->compaction = 0;
+		session->compaction = false;
 		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_schema_worker(
 		    session, uri, __wt_compact, NULL, cfg, 0));

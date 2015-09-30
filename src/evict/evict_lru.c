@@ -313,7 +313,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 	 */
 	WT_RET(__wt_thread_create(
 	    session, &conn->evict_tid, __evict_server, session));
-	conn->evict_tid_set = 1;
+	conn->evict_tid_set = true;
 
 	return (0);
 }
@@ -349,7 +349,7 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 	if (conn->evict_tid_set) {
 		WT_TRET(__wt_evict_server_wake(session));
 		WT_TRET(__wt_thread_join(session, conn->evict_tid));
-		conn->evict_tid_set = 0;
+		conn->evict_tid_set = false;
 	}
 
 	WT_TRET(__wt_verbose(
@@ -1221,7 +1221,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 			page->read_gen = __wt_cache_read_gen_new(session);
 
 fast:		/* If the page can't be evicted, give up. */
-		if (!__wt_page_can_evict(session, page, true, NULL))
+		if (!__wt_page_can_evict(session, ref, true, NULL))
 			continue;
 
 		/*

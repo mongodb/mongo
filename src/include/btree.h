@@ -102,9 +102,9 @@ struct __wt_btree {
 	 * Reconciliation...
 	 */
 	u_int dictionary;		/* Dictionary slots */
-	int   internal_key_truncate;	/* Internal key truncate */
+	bool  internal_key_truncate;	/* Internal key truncate */
 	int   maximum_depth;		/* Maximum tree depth */
-	int   prefix_compression;	/* Prefix compression */
+	bool  prefix_compression;	/* Prefix compression */
 	u_int prefix_compression_min;	/* Prefix compression min */
 #define	WT_SPLIT_DEEPEN_MIN_CHILD_DEF	10000
 	u_int split_deepen_min_child;	/* Minimum entries to deepen tree */
@@ -172,5 +172,5 @@ struct __wt_salvage_cookie {
 	uint64_t skip;				/* Initial items to skip */
 	uint64_t take;				/* Items to take */
 
-	int	 done;				/* Ignore the rest */
+	bool	 done;				/* Ignore the rest */
 };
