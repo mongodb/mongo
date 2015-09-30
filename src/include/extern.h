@@ -182,11 +182,11 @@ extern int __wt_search_insert( WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, W
 extern int __wt_row_search(WT_SESSION_IMPL *session, WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt, bool insert);
 extern int __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern void __wt_las_stats_update(WT_SESSION_IMPL *session);
-extern int __wt_las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
 extern int __wt_las_create(WT_SESSION_IMPL *session);
 extern int __wt_las_destroy(WT_SESSION_IMPL *session);
 extern void __wt_las_set_written(WT_SESSION_IMPL *session);
 extern bool __wt_las_is_written(WT_SESSION_IMPL *session);
+extern int __wt_las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
 extern int __wt_las_cursor( WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t *session_flags);
 extern int __wt_las_cursor_close( 	WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t session_flags);
 extern int __wt_las_sweep(WT_SESSION_IMPL *session);

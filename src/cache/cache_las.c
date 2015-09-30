@@ -45,40 +45,6 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_las_cursor_create --
- *	Open a new lookaside table cursor.
- */
-int
-__wt_las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
-{
-	WT_BTREE *btree;
-	const char *open_cursor_cfg[] = {
-	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
-
-	WT_RET(__wt_open_cursor(
-	    session, WT_LAS_URI, NULL, open_cursor_cfg, cursorp));
-
-	/*
-	 * Set special flags for the lookaside table: the lookaside flag (used,
-	 * for example, to avoid writing records during reconciliation), also
-	 * turn off checkpoints and logging.
-	 *
-	 * Test flags before setting them so updates can't race in subsequent
-	 * opens (the first update is safe because it's single-threaded from
-	 * wiredtiger_open).
-	 */
-	btree = S2BT(session);
-	if (!F_ISSET(btree, WT_BTREE_LOOKASIDE))
-		F_SET(btree, WT_BTREE_LOOKASIDE);
-	if (!F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
-		F_SET(btree, WT_BTREE_NO_CHECKPOINT);
-	if (!F_ISSET(btree, WT_BTREE_NO_LOGGING))
-		F_SET(btree, WT_BTREE_NO_LOGGING);
-
-	return (0);
-}
-
-/*
  * __wt_las_create --
  *	Initialize the database's lookaside store.
  */
@@ -168,6 +134,40 @@ bool
 __wt_las_is_written(WT_SESSION_IMPL *session)
 {
 	return (S2C(session)->las_written);
+}
+
+/*
+ * __wt_las_cursor_create --
+ *	Open a new lookaside table cursor.
+ */
+int
+__wt_las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
+{
+	WT_BTREE *btree;
+	const char *open_cursor_cfg[] = {
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
+
+	WT_RET(__wt_open_cursor(
+	    session, WT_LAS_URI, NULL, open_cursor_cfg, cursorp));
+
+	/*
+	 * Set special flags for the lookaside table: the lookaside flag (used,
+	 * for example, to avoid writing records during reconciliation), also
+	 * turn off checkpoints and logging.
+	 *
+	 * Test flags before setting them so updates can't race in subsequent
+	 * opens (the first update is safe because it's single-threaded from
+	 * wiredtiger_open).
+	 */
+	btree = S2BT(session);
+	if (!F_ISSET(btree, WT_BTREE_LOOKASIDE))
+		F_SET(btree, WT_BTREE_LOOKASIDE);
+	if (!F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
+		F_SET(btree, WT_BTREE_NO_CHECKPOINT);
+	if (!F_ISSET(btree, WT_BTREE_NO_LOGGING))
+		F_SET(btree, WT_BTREE_NO_LOGGING);
+
+	return (0);
 }
 
 /*
