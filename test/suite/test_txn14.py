@@ -62,7 +62,10 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         for fname in os.listdir(olddir):
             fullname = os.path.join(olddir, fname)
             # Skip lock file on Windows since it is locked
-            if os.path.isfile(fullname) and "WiredTiger.lock" not in fullname:
+            if os.path.isfile(fullname) and \
+                "WiredTiger.lock" not in fullname and \
+                "Tmplog" not in fullname and \
+                "Preplog" not in fullname:
                 shutil.copy(fullname, newdir)
         #
         # close the original connection and open to new directory
@@ -95,8 +98,10 @@ class test_txn14(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
         self.session.log_flush(cfgarg)
         if self.sync == 'background':
-            # If doing a background flush, wait 1 second for it
-            self.session.transaction_sync('timeout_ms=1000')
+            # If doing a background flush, wait a few seconds.  I have
+            # seen an individual log file's fsync take more than a second
+            # on some systems.  So give it time to flush perhaps a few files.
+            self.session.transaction_sync('timeout_ms=4000')
         self.simulate_crash_restart(".", "RESTART")
         c = self.session.open_cursor(self.t1, None, None)
         i = 0
