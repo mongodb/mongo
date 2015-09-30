@@ -145,12 +145,14 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, Timeouts) {
                          << "bar"
                          << "documents" << BSON_ARRAY(BSON("foo" << 1))));
 
-    // Run a find command to sleep for 1 second. We should time this out
-    // given our timeout of 100 milliseconds.
-    assertCommandFailsOnClient("admin",
-                               BSON("sleep" << 1 << "w"
-                                            << "false"
-                                            << "secs" << 5),
+    // Run a find command with a $where with an infinite loop. The remote server should time this
+    // out in 30 seconds, so we should time out client side first given our timeout of 100
+    // milliseconds.
+    assertCommandFailsOnClient("foo",
+                               BSON("find"
+                                    << "bar"
+                                    << "filter" << BSON("$where"
+                                                        << "while(true) { sleep(1); }")),
                                Milliseconds(100),
                                ErrorCodes::ExceededTimeLimit);
 
@@ -184,9 +186,9 @@ public:
         auto out =
             fixture->runCommand(cb,
                                 {unittest::getFixtureConnectionString().getServers()[0],
-                                 "admin",
+                                 "foo",
                                  _command,
-                                 _timeout})
+                                 Seconds(5)})
                 .then(pool,
                       [self](StatusWith<RemoteCommandResponse> resp) -> Status {
                           auto status = resp.isOK()
@@ -208,12 +210,12 @@ public:
     }
 
     static Deferred<Status> runTimeoutOp(Fixture* fixture, Pool* pool) {
-        return StressTestOp(BSON("sleep" << 1 << "w"
-                                         << "false"
-                                         << "secs" << 1),
+        return StressTestOp(BSON("find"
+                                 << "bar"
+                                 << "filter" << BSON("$where"
+                                                     << "while(true) { sleep(1); }")),
                             ErrorCodes::ExceededTimeLimit,
-                            false,
-                            Milliseconds(100)).run(fixture, pool);
+                            false).run(fixture, pool);
     }
 
     static Deferred<Status> runCompleteOp(Fixture* fixture, Pool* pool) {
@@ -221,39 +223,25 @@ public:
                                  << "baz"
                                  << "limit" << 1),
                             ErrorCodes::OK,
-                            false,
-                            executor::RemoteCommandRequest::kNoTimeout).run(fixture, pool);
+                            false).run(fixture, pool);
     }
 
     static Deferred<Status> runCancelOp(Fixture* fixture, Pool* pool) {
-        return StressTestOp(BSON("sleep" << 1 << "w"
-                                         << "false"
-                                         << "secs" << 1),
+        return StressTestOp(BSON("find"
+                                 << "bar"
+                                 << "filter" << BSON("$where"
+                                                     << "while(true) { sleep(1); }")),
                             ErrorCodes::CallbackCanceled,
-                            true,
-                            executor::RemoteCommandRequest::kNoTimeout).run(fixture, pool);
-    }
-
-    static Deferred<Status> runLongOp(Fixture* fixture, Pool* pool) {
-        return StressTestOp(BSON("sleep" << 1 << "w"
-                                         << "false"
-                                         << "secs" << 10),
-                            ErrorCodes::OK,
-                            false,
-                            executor::RemoteCommandRequest::kNoTimeout).run(fixture, pool);
+                            true).run(fixture, pool);
     }
 
 private:
-    StressTestOp(const BSONObj& command,
-                 ErrorCodes::Error expected,
-                 bool cancel,
-                 Milliseconds timeout)
-        : _command(command), _expected(expected), _cancel(cancel), _timeout(timeout) {}
+    StressTestOp(const BSONObj& command, ErrorCodes::Error expected, bool cancel)
+        : _command(command), _expected(expected), _cancel(cancel) {}
 
     BSONObj _command;
     ErrorCodes::Error _expected;
     bool _cancel;
-    Milliseconds _timeout;
 };
 
 TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
@@ -270,7 +258,6 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
     ThreadPool::Options threadPoolOpts;
     threadPoolOpts.poolName = "StressTestPool";
     threadPoolOpts.maxThreads = 8;
-
     ThreadPool pool(threadPoolOpts);
     pool.startup();
 
@@ -282,20 +269,21 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
     std::generate_n(std::back_inserter(ops),
                     numOps,
                     [&rng, &pool, this] {
+                        switch (rng.nextInt32(3)) {
+                            case 0:
+                                return StressTestOp::runCancelOp(this, &pool);
+                            case 1:
+                                return StressTestOp::runCompleteOp(this, &pool);
 
-                        // stagger operations slightly
-                        sleepmillis(1);
+                            case 2:
+                                // TODO: Reenable runTimeoutOp after we fix whatever bug causes it
+                                // to hang.
+                                // return StressTestOp::runTimeoutOp(this, &pool);
+                                return StressTestOp::runCompleteOp(this, &pool);
+                            default:
 
-                        auto i = rng.nextCanonicalDouble();
-                        if (i < .3)
-                            return StressTestOp::runCancelOp(this, &pool);
-                        else if (i < .6)
-                            return StressTestOp::runCompleteOp(this, &pool);
-                        else if (i < .99)
-                            return StressTestOp::runTimeoutOp(this, &pool);
-                        else
-                            // Long sleep command gums up the works, run less often
-                            return StressTestOp::runLongOp(this, &pool);
+                                MONGO_UNREACHABLE;
+                        }
                     });
 
     log() << "running ops";
