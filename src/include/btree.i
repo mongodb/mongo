@@ -977,6 +977,7 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_INSERT_HEAD *ins_head;
 	WT_INSERT *ins;
+	uint64_t mem;
 	int i;
 
 	btree = S2BT(session);
@@ -1007,25 +1008,33 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (false);
 
 	/*
-	 * There is no point splitting if the list is small, no deep items is
-	 * our heuristic for that. A 1/4 probability of adding a new skiplist
-	 * level, with level-0 always created, means there will be a 5th level
-	 * entry for roughly every 1024 entries in the list. If there are at
-	 * least 4 5th level entries (4K items), the list is large enough.
+	 * There is no point in splitting in-memory if the insert list doesn't 
+	 * represent most of the page footprint. Split if there are many items,
+	 * or if there are enough items and the items are a significant part
+	 * of the page's footprint. A 1/4 probability of adding a new skiplist
+	 * level (with level-0 always created), implies a 2nd level entry for
+	 * every 16 entries in the list. If there are at least 256 2nd level
+	 * entries (4K items), or if the update list hits the maximum leaf page
+	 * size, split. The reason we're walking the 2nd level list (rather than
+	 * walking, for example, the 5th level list and looking for at least 4
+	 * entries), is it combines the number of entries test and the size of
+	 * the entries test in one loop.
 	 */
-#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(5, WT_SKIP_MAXDEPTH - 1)
+#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(2, WT_SKIP_MAXDEPTH - 1)
 	ins_head = page->pg_row_entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
 	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
 	if (ins_head == NULL)
 		return (false);
-	for (i = 0, ins = ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH];
-	    ins != NULL; ins = ins->next[WT_MIN_SPLIT_SKIPLIST_DEPTH])
-		if (++i == 4) {
+	for (i = 0, mem = 0, ins = ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH];
+	    ins != NULL; ins = ins->next[WT_MIN_SPLIT_SKIPLIST_DEPTH]) {
+		mem += WT_UPDATE_MEMSIZE(ins->upd);
+		if (++i == 256 || mem > btree->maxleafpage) {
 			WT_STAT_FAST_CONN_INCR(session, cache_inmem_splittable);
 			WT_STAT_FAST_DATA_INCR(session, cache_inmem_splittable);
 			return (true);
 		}
+	}
 	return (false);
 }
 
