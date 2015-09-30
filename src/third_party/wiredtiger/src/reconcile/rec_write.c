@@ -715,7 +715,7 @@ __rec_raw_compression_config(
 		return (false);
 
 	/* Raw compression cannot support prefix compression. */
-	if (btree->prefix_compression != 0)
+	if (btree->prefix_compression)
 		return (false);
 
 	/*
@@ -4091,7 +4091,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 				salvage->take = 0;
 			}
 			if (salvage->take == 0)
-				salvage->done = 1;
+				salvage->done = true;
 		}
 	}
 
@@ -4564,6 +4564,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	vpack = &_vpack;
 	WT_CLEAR(*vpack);	/* -Wuninitialized */
 
+	ikey = NULL;		/* -Wuninitialized */
+	cell = NULL;
+	key_onpage_ovfl = false;
+
 	WT_RET(__rec_split_init(session, r, page, 0ULL, btree->maxintlpage));
 
 	/*
@@ -4593,17 +4597,20 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * things up.
 		 *
 		 * Note the cell reference and unpacked key cell are available
-		 * only in the case of an instantiated, off-page key.
+		 * only in the case of an instantiated, off-page key, we don't
+		 * bother setting them if that's not possible.
 		 */
-		ikey = __wt_ref_key_instantiated(ref);
-		if (ikey == NULL || ikey->cell_offset == 0) {
+		if (F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_KEYS)) {
 			cell = NULL;
 			key_onpage_ovfl = false;
-		} else {
-			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-			__wt_cell_unpack(cell, kpack);
-			key_onpage_ovfl =
-			    kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM;
+			ikey = __wt_ref_key_instantiated(ref);
+			if (ikey != NULL && ikey->cell_offset != 0) {
+				cell =
+				    WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
+				__wt_cell_unpack(cell, kpack);
+				key_onpage_ovfl = kpack->ovfl &&
+				    kpack->raw != WT_CELL_KEY_OVFL_RM;
+			}
 		}
 
 		WT_ERR(__rec_child_modify(session, r, ref, &hazard, &state));
@@ -5666,15 +5673,6 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		}
 	}
 	mod->mod_multi_entries = r->bnd_next;
-
-	/*
-	 * We can't evict clean, multiblock row-store pages with overflow keys
-	 * when the file is being checkpointed: the split into the parent frees
-	 * the backing blocks for no-longer-used overflow keys, corrupting the
-	 * checkpoint's block management. Column-store pages have no overflow
-	 * keys, so they're not a problem, track overflow items for row-store.
-	 */
-	mod->mod_multi_row_ovfl = r->ovfl_items;
 
 	return (0);
 }

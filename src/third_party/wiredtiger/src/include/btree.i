@@ -1035,9 +1035,10 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static inline bool
 __wt_page_can_evict(WT_SESSION_IMPL *session,
-    WT_PAGE *page, bool check_splits, bool *inmem_splitp)
+    WT_REF *ref, bool check_splits, bool *inmem_splitp)
 {
 	WT_BTREE *btree;
+	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_GLOBAL *txn_global;
 
@@ -1045,6 +1046,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 		*inmem_splitp = false;
 
 	btree = S2BT(session);
+	page = ref->page;
 	mod = page->modify;
 
 	/* Pages that have never been modified can always be evicted. */
@@ -1077,13 +1079,13 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * We can't evict clean, multiblock row-store pages with overflow keys
-	 * when the file is being checkpointed: the split into the parent frees
-	 * the backing blocks for no-longer-used overflow keys, corrupting the
-	 * checkpoint's block management.
+	 * We can't evict clean, multiblock row-store pages where the parent's
+	 * key for the page is an overflow item, because the split into the
+	 * parent frees the backing blocks for any no-longer-used overflow keys,
+	 * which will corrupt the checkpoint's block management.
 	 */
 	if (btree->checkpointing &&
-	    mod->rec_result == WT_PM_REC_MULTIBLOCK && mod->mod_multi_row_ovfl)
+	    F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS))
 		return (false);
 
 	/*
@@ -1206,7 +1208,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    LF_ISSET(WT_READ_NO_EVICT) ||
 	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    !__wt_page_can_evict(session, page, true, NULL))
+	    !__wt_page_can_evict(session, ref, true, NULL))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));

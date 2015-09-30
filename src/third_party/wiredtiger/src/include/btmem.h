@@ -288,11 +288,9 @@ struct __wt_page_modify {
 		uint32_t cksum;
 	} *multi;
 	uint32_t multi_entries;		/* Multiple blocks element count */
-	bool	 multi_row_ovfl;	/* Row-store overflow key/values */
 	} m;
 #define	mod_multi		u1.m.multi
 #define	mod_multi_entries	u1.m.multi_entries
-#define	mod_multi_row_ovfl	u1.m.multi_row_ovfl
 	} u1;
 
 	/*
@@ -579,8 +577,9 @@ struct __wt_page {
 #define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
-#define	WT_PAGE_RECONCILIATION	0x10	/* Page reconciliation lock */
-#define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
+#define	WT_PAGE_OVERFLOW_KEYS	0x10	/* Page has overflow keys */
+#define	WT_PAGE_RECONCILIATION	0x20	/* Page reconciliation lock */
+#define	WT_PAGE_SPLIT_INSERT	0x40	/* A leaf page was split for append */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	/*

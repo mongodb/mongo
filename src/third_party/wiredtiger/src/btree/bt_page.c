@@ -405,6 +405,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_PAGE_INDEX *pindex;
 	WT_REF *ref, **refp;
 	uint32_t i;
+	bool overflow_keys;
 
 	btree = S2BT(session);
 	unpack = &_unpack;
@@ -419,6 +420,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	 */
 	pindex = WT_INTL_INDEX_GET_SAFE(page);
 	refp = pindex->index;
+	overflow_keys = false;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		ref = *refp;
 		ref->home = page;
@@ -433,7 +435,12 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 			__wt_ref_key_onpage_set(page, ref, unpack);
 			break;
 		case WT_CELL_KEY_OVFL:
-			/* Instantiate any overflow records. */
+			/*
+			 * Instantiate any overflow keys; WiredTiger depends on
+			 * this, assuming any overflow key is instantiated, and
+			 * any keys that aren't instantiated cannot be overflow
+			 * items.
+			 */
 			WT_ERR(__wt_dsk_cell_data_ref(
 			    session, page->type, unpack, current));
 
@@ -442,6 +449,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 			    current->data, current->size, ref));
 
 			*sizep += sizeof(WT_IKEY) + current->size;
+			overflow_keys = true;
 			break;
 		case WT_CELL_ADDR_DEL:
 			/*
@@ -486,6 +494,13 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
 	}
+
+	/*
+	 * We track if an internal page has backing overflow keys, as overflow
+	 * keys limit the eviction we can do during a checkpoint.
+	 */
+	if (overflow_keys)
+		F_SET_ATOMIC(page, WT_PAGE_OVERFLOW_KEYS);
 
 err:	__wt_scr_free(session, &current);
 	return (ret);
