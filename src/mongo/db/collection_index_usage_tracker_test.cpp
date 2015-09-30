@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/collection_index_usage_tracker.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 
@@ -65,7 +66,7 @@ TEST_F(CollectionIndexUsageTrackerTest, Empty) {
 
 // Test that recording of a single index hit is reflected in returned stats map.
 TEST_F(CollectionIndexUsageTrackerTest, SingleHit) {
-    getTracker()->registerIndex("foo");
+    getTracker()->registerIndex("foo", BSON("foo" << 1));
     getTracker()->recordIndexAccess("foo");
     CollectionIndexUsageMap statsMap = getTracker()->getUsageStats();
     ASSERT(statsMap.find("foo") != statsMap.end());
@@ -74,7 +75,7 @@ TEST_F(CollectionIndexUsageTrackerTest, SingleHit) {
 
 // Test that recording of multiple index hits are reflected in stats map.
 TEST_F(CollectionIndexUsageTrackerTest, MultipleHit) {
-    getTracker()->registerIndex("foo");
+    getTracker()->registerIndex("foo", BSON("foo" << 1));
     getTracker()->recordIndexAccess("foo");
     getTracker()->recordIndexAccess("foo");
     CollectionIndexUsageMap statsMap = getTracker()->getUsageStats();
@@ -82,18 +83,25 @@ TEST_F(CollectionIndexUsageTrackerTest, MultipleHit) {
     ASSERT_EQUALS(2, statsMap["foo"].accesses.loadRelaxed());
 }
 
+TEST_F(CollectionIndexUsageTrackerTest, IndexKey) {
+    getTracker()->registerIndex("foo", BSON("foo" << 1));
+    CollectionIndexUsageMap statsMap = getTracker()->getUsageStats();
+    ASSERT(statsMap.find("foo") != statsMap.end());
+    ASSERT_EQUALS(BSON("foo" << 1), statsMap["foo"].indexKey);
+}
+
 // Test that index registration generates an entry in the stats map.
 TEST_F(CollectionIndexUsageTrackerTest, Register) {
-    getTracker()->registerIndex("foo");
+    getTracker()->registerIndex("foo", BSON("foo" << 1));
     ASSERT_EQUALS(1U, getTracker()->getUsageStats().size());
-    getTracker()->registerIndex("bar");
+    getTracker()->registerIndex("bar", BSON("bar" << 1));
     ASSERT_EQUALS(2U, getTracker()->getUsageStats().size());
 }
 
 // Test that index deregistration results in removal of an entry from the stats map.
 TEST_F(CollectionIndexUsageTrackerTest, Deregister) {
-    getTracker()->registerIndex("foo");
-    getTracker()->registerIndex("bar");
+    getTracker()->registerIndex("foo", BSON("foo" << 1));
+    getTracker()->registerIndex("bar", BSON("bar" << 1));
     ASSERT_EQUALS(2U, getTracker()->getUsageStats().size());
     getTracker()->unregisterIndex("foo");
     ASSERT_EQUALS(1U, getTracker()->getUsageStats().size());
@@ -103,7 +111,7 @@ TEST_F(CollectionIndexUsageTrackerTest, Deregister) {
 
 // Test that index deregistration results in reset of the usage counter.
 TEST_F(CollectionIndexUsageTrackerTest, HitAfterDeregister) {
-    getTracker()->registerIndex("foo");
+    getTracker()->registerIndex("foo", BSON("foo" << 1));
     getTracker()->recordIndexAccess("foo");
     getTracker()->recordIndexAccess("foo");
     CollectionIndexUsageMap statsMap = getTracker()->getUsageStats();
@@ -114,7 +122,7 @@ TEST_F(CollectionIndexUsageTrackerTest, HitAfterDeregister) {
     statsMap = getTracker()->getUsageStats();
     ASSERT(statsMap.find("foo") == statsMap.end());
 
-    getTracker()->registerIndex("foo");
+    getTracker()->registerIndex("foo", BSON("foo" << 1));
     getTracker()->recordIndexAccess("foo");
     statsMap = getTracker()->getUsageStats();
     ASSERT(statsMap.find("foo") != statsMap.end());
@@ -123,7 +131,7 @@ TEST_F(CollectionIndexUsageTrackerTest, HitAfterDeregister) {
 
 // Test that index tracker start date/time is reset on index deregistration/registration.
 TEST_F(CollectionIndexUsageTrackerTest, DateTimeAfterDeregister) {
-    getTracker()->registerIndex("foo");
+    getTracker()->registerIndex("foo", BSON("foo" << 1));
     CollectionIndexUsageMap statsMap = getTracker()->getUsageStats();
     ASSERT(statsMap.find("foo") != statsMap.end());
     ASSERT_EQUALS(statsMap["foo"].trackerStartTime, getClockSource()->now());
@@ -135,7 +143,7 @@ TEST_F(CollectionIndexUsageTrackerTest, DateTimeAfterDeregister) {
     // Increment clock source so that a new index registration has different start time.
     getClockSource()->advance(stdx::chrono::milliseconds(1));
 
-    getTracker()->registerIndex("foo");
+    getTracker()->registerIndex("foo", BSON("foo" << 1));
     statsMap = getTracker()->getUsageStats();
     ASSERT(statsMap.find("foo") != statsMap.end());
     ASSERT_EQUALS(statsMap["foo"].trackerStartTime, getClockSource()->now());

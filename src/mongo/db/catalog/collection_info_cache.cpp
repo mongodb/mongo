@@ -175,18 +175,20 @@ void CollectionInfoCache::init(OperationContext* txn) {
         _collection->getIndexCatalog()->getIndexIterator(txn, includeUnfinishedIndexes);
     while (ii.more()) {
         const IndexDescriptor* desc = ii.next();
-        _indexUsageTracker.registerIndex(desc->indexName());
+        _indexUsageTracker.registerIndex(desc->indexName(), desc->keyPattern());
     }
 
     rebuildIndexData(txn);
 }
 
-void CollectionInfoCache::addedIndex(OperationContext* txn, StringData indexName) {
+void CollectionInfoCache::addedIndex(OperationContext* txn, const IndexDescriptor* desc) {
     // Requires exclusive collection lock.
     invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().ns(), MODE_X));
+    invariant(desc);
 
     rebuildIndexData(txn);
-    _indexUsageTracker.registerIndex(indexName);
+
+    _indexUsageTracker.registerIndex(desc->indexName(), desc->keyPattern());
 }
 
 void CollectionInfoCache::droppedIndex(OperationContext* txn, StringData indexName) {

@@ -49,12 +49,12 @@ void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) {
     _indexUsageMap[indexName].accesses.fetchAndAdd(1);
 }
 
-void CollectionIndexUsageTracker::registerIndex(StringData indexName) {
+void CollectionIndexUsageTracker::registerIndex(StringData indexName, const BSONObj& indexKey) {
     invariant(!indexName.empty());
     dassert(_indexUsageMap.find(indexName) == _indexUsageMap.end());
 
     // Create map entry.
-    _indexUsageMap[indexName] = IndexUsageStats(_clockSource->now());
+    _indexUsageMap[indexName] = IndexUsageStats(_clockSource->now(), indexKey);
 }
 
 void CollectionIndexUsageTracker::unregisterIndex(StringData indexName) {

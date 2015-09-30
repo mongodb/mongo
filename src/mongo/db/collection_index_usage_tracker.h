@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
@@ -51,14 +52,18 @@ class CollectionIndexUsageTracker {
 public:
     struct IndexUsageStats {
         IndexUsageStats() = default;
-        explicit IndexUsageStats(Date_t now) : trackerStartTime(now) {}
+        explicit IndexUsageStats(Date_t now, const BSONObj& key)
+            : trackerStartTime(now), indexKey(key.getOwned()) {}
 
         IndexUsageStats(const IndexUsageStats& other)
-            : accesses(other.accesses.load()), trackerStartTime(other.trackerStartTime) {}
+            : accesses(other.accesses.load()),
+              trackerStartTime(other.trackerStartTime),
+              indexKey(other.indexKey) {}
 
         IndexUsageStats& operator=(const IndexUsageStats& other) {
             accesses.store(other.accesses.load());
             trackerStartTime = other.trackerStartTime;
+            indexKey = other.indexKey;
             return *this;
         }
 
@@ -67,6 +72,9 @@ public:
 
         // Date/Time that we started tracking index usage.
         Date_t trackerStartTime;
+
+        // An owned copy of the associated IndexDescriptor's index key.
+        BSONObj indexKey;
     };
 
     /**
@@ -87,7 +95,7 @@ public:
      * Add map entry for 'indexName' stats collection. Must be called under exclusive collection
      * lock.
      */
-    void registerIndex(StringData indexName);
+    void registerIndex(StringData indexName, const BSONObj& indexKey);
 
     /**
      * Erase statistics for index 'indexName'. Must be called under exclusive collection lock.

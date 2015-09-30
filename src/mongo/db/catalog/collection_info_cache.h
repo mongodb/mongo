@@ -38,6 +38,7 @@
 namespace mongo {
 
 class Collection;
+class IndexDescriptor;
 class OperationContext;
 
 /**
@@ -83,7 +84,7 @@ public:
      *
      * Must be called under exclusive collection lock.
      */
-    void addedIndex(OperationContext* txn, StringData indexName);
+    void addedIndex(OperationContext* txn, const IndexDescriptor* desc);
 
     /**
      * Deregister a newly-dropped index with the cache.  Must be called whenever an index is

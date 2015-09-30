@@ -414,7 +414,7 @@ void IndexCatalog::IndexBuildBlock::success() {
 
     entry->setIsReady(true);
 
-    collection->infoCache()->addedIndex(_txn, _indexName);
+    collection->infoCache()->addedIndex(_txn, desc);
 }
 
 namespace {
@@ -792,7 +792,7 @@ public:
 
     void rollback() final {
         _entries->add(_entry);
-        _collection->infoCache()->addedIndex(_txn, _entry->descriptor()->indexName());
+        _collection->infoCache()->addedIndex(_txn, _entry->descriptor());
     }
 
 private:

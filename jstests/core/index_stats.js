@@ -17,6 +17,19 @@
         return undefined;
     }
 
+    var getIndexKey = function (indexName) {
+        var cursor = col.aggregate([{$indexStats: {}}]);
+        while (cursor.hasNext()) {
+            var doc = cursor.next();
+
+            if (doc.name === indexName) {
+                return doc.key;
+            }
+        }
+
+        return undefined;
+    }
+
     assert.writeOK(col.insert({a: 1, b: 1, c: 1}));
     assert.writeOK(col.insert({a: 2, b: 2, c: 2}));
     assert.writeOK(col.insert({a: 3, b: 3, c: 3}));
@@ -33,6 +46,7 @@
 
     // Confirm a stats object exists post index creation (with 0 count).
     assert.eq(countA, getUsageCount("a_1"));
+    assert.eq({a: 1}, getIndexKey("a_1"));
 
     // Confirm index stats tick on find().
     col.findOne({a: 1});

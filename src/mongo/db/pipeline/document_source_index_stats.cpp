@@ -52,6 +52,7 @@ boost::optional<Document> DocumentSourceIndexStats::getNext() {
         const auto& stats = _indexStatsIter->second;
         MutableDocument doc;
         doc["name"] = Value(_indexStatsIter->first);
+        doc["key"] = Value(stats.indexKey);
         doc["host"] = Value(_processName);
         doc["accesses"]["ops"] = Value(stats.accesses.loadRelaxed());
         doc["accesses"]["since"] = Value(stats.trackerStartTime);
