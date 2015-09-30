@@ -145,13 +145,13 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, Timeouts) {
                          << "bar"
                          << "documents" << BSON_ARRAY(BSON("foo" << 1))));
 
-    // Run a find command to sleep for 1 second. We should time this out
-    // given our timeout of 100 milliseconds.
+    // Run a find command to sleep for 3 seconds. We should time this out
+    // given our timeout of 500 milliseconds.
     assertCommandFailsOnClient("admin",
                                BSON("sleep" << 1 << "w"
                                             << "false"
-                                            << "secs" << 5),
-                               Milliseconds(100),
+                                            << "secs" << 3),
+                               Milliseconds(500),
                                ErrorCodes::ExceededTimeLimit);
 
     // Run a find command with a $where with an infinite loop. The server should time out the
@@ -237,7 +237,7 @@ public:
     static Deferred<Status> runLongOp(Fixture* fixture, Pool* pool) {
         return StressTestOp(BSON("sleep" << 1 << "w"
                                          << "false"
-                                         << "secs" << 10),
+                                         << "secs" << 3),
                             ErrorCodes::OK,
                             false,
                             executor::RemoteCommandRequest::kNoTimeout).run(fixture, pool);
