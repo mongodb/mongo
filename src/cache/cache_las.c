@@ -179,7 +179,6 @@ __wt_las_cursor(
     WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t *session_flags)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 
 	*cursorp = NULL;
 
