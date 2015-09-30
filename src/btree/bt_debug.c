@@ -645,10 +645,13 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", disk-mapped");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 		__dmsg(ds, ", evict-lru");
-	if (F_ISSET_ATOMIC(page, WT_PAGE_RECONCILIATION))
-		__dmsg(ds, ", reconciliation");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
 		__dmsg(ds, ", split-insert");
+
+	if (__wt_fair_trylock(session, &page->page_lock) != 0)
+		__dmsg(ds, ", locked");
+	else
+		WT_RET(__wt_fair_unlock(session, &page->page_lock));
 
 	if (mod != NULL)
 		switch (mod->rec_result) {
