@@ -101,5 +101,5 @@ struct __wt_fh {
 	    WT_FALLOCATE_POSIX,
 	    WT_FALLOCATE_STD,
 	    WT_FALLOCATE_SYS } fallocate_available;
-	int	fallocate_requires_locking;
+	bool fallocate_requires_locking;
 };

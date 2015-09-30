@@ -22,7 +22,7 @@ __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
 	WT_UNUSED(session);
 
 	fh->fallocate_available = WT_FALLOCATE_NOT_AVAILABLE;
-	fh->fallocate_requires_locking = 0;
+	fh->fallocate_requires_locking = false;
 
 	/*
 	 * Check for the availability of some form of fallocate; in all cases,
@@ -31,11 +31,11 @@ __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
 	 */
 #if defined(HAVE_FALLOCATE) || defined(HAVE_POSIX_FALLOCATE)
 	fh->fallocate_available = WT_FALLOCATE_AVAILABLE;
-	fh->fallocate_requires_locking = 1;
+	fh->fallocate_requires_locking = true;
 #endif
 #if defined(__linux__) && defined(SYS_fallocate)
 	fh->fallocate_available = WT_FALLOCATE_AVAILABLE;
-	fh->fallocate_requires_locking = 1;
+	fh->fallocate_requires_locking = true;
 #endif
 }
 
@@ -155,18 +155,18 @@ __wt_fallocate(
 		 */
 		if ((ret = __wt_std_fallocate(fh, offset, len)) == 0) {
 			fh->fallocate_available = WT_FALLOCATE_STD;
-			fh->fallocate_requires_locking = 0;
+			fh->fallocate_requires_locking = false;
 			return (0);
 		}
 		if ((ret = __wt_sys_fallocate(fh, offset, len)) == 0) {
 			fh->fallocate_available = WT_FALLOCATE_SYS;
-			fh->fallocate_requires_locking = 0;
+			fh->fallocate_requires_locking = false;
 			return (0);
 		}
 		if ((ret = __wt_posix_fallocate(fh, offset, len)) == 0) {
 			fh->fallocate_available = WT_FALLOCATE_POSIX;
 #if !defined(__linux__)
-			fh->fallocate_requires_locking = 0;
+			fh->fallocate_requires_locking = false;
 #endif
 			return (0);
 		}

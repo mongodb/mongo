@@ -153,7 +153,7 @@ struct __wt_txn {
 
 	/* Checkpoint status. */
 	WT_LSN		ckpt_lsn;
-	int		full_ckpt;
+	bool		full_ckpt;
 	uint32_t	ckpt_nsnapshot;
 	WT_ITEM		*ckpt_snapshot;
 

@@ -24,7 +24,7 @@ __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
 	 * support the call.
 	 */
 	fh->fallocate_available = WT_FALLOCATE_NOT_AVAILABLE;
-	fh->fallocate_requires_locking = 0;
+	fh->fallocate_requires_locking = false;
 }
 
 /*

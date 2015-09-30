@@ -202,12 +202,12 @@ __curstat_next(WT_CURSOR *cursor)
 	if (cst->notinitialized) {
 		WT_ERR(__wt_curstat_init(
 		    session, cursor->internal_uri, cst->cfg, cst));
-		cst->notinitialized = 0;
+		cst->notinitialized = false;
 	}
 
 	/* Move to the next item. */
 	if (cst->notpositioned) {
-		cst->notpositioned = 0;
+		cst->notpositioned = false;
 		cst->key = WT_STAT_KEY_MIN(cst);
 	} else if (cst->key < WT_STAT_KEY_MAX(cst))
 		++cst->key;
@@ -240,12 +240,12 @@ __curstat_prev(WT_CURSOR *cursor)
 	if (cst->notinitialized) {
 		WT_ERR(__wt_curstat_init(
 		    session, cursor->internal_uri, cst->cfg, cst));
-		cst->notinitialized = 0;
+		cst->notinitialized = false;
 	}
 
 	/* Move to the previous item. */
 	if (cst->notpositioned) {
-		cst->notpositioned = 0;
+		cst->notpositioned = false;
 		cst->key = WT_STAT_KEY_MAX(cst);
 	} else if (cst->key > WT_STAT_KEY_MIN(cst))
 		--cst->key;
@@ -275,7 +275,7 @@ __curstat_reset(WT_CURSOR *cursor)
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 
-	cst->notinitialized = cst->notpositioned = 1;
+	cst->notinitialized = cst->notpositioned = true;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	API_END_RET(session, ret);
@@ -302,7 +302,7 @@ __curstat_search(WT_CURSOR *cursor)
 	if (cst->notinitialized) {
 		WT_ERR(__wt_curstat_init(
 		    session, cursor->internal_uri, cst->cfg, cst));
-		cst->notinitialized = 0;
+		cst->notinitialized = false;
 	}
 
 	if (cst->key < WT_STAT_KEY_MIN(cst) || cst->key > WT_STAT_KEY_MAX(cst))
@@ -582,10 +582,10 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	 * the open returns.
 	 */
 	WT_ERR(__wt_curstat_init(session, uri, cst->cfg, cst));
-	cst->notinitialized = 0;
+	cst->notinitialized = false;
 
 	/* The cursor isn't yet positioned. */
-	cst->notpositioned = 1;
+	cst->notpositioned = true;
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));

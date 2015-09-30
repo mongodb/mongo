@@ -293,11 +293,11 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	case BTREE_ROW:
 		WT_RET(__wt_config_gets(
 		    session, cfg, "internal_key_truncate", &cval));
-		btree->internal_key_truncate = cval.val == 0 ? 0 : 1;
+		btree->internal_key_truncate = cval.val != 0;
 
 		WT_RET(__wt_config_gets(
 		    session, cfg, "prefix_compression", &cval));
-		btree->prefix_compression = cval.val == 0 ? 0 : 1;
+		btree->prefix_compression = cval.val != 0;
 		WT_RET(__wt_config_gets(
 		    session, cfg, "prefix_compression_min", &cval));
 		btree->prefix_compression_min = (u_int)cval.val;
@@ -342,8 +342,9 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	    session, &btree->ovfl_lock, "btree overflow lock"));
 	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush lock"));
 
-	btree->write_gen = ckpt->write_gen;		/* Write generation */
+	btree->checkpointing = WT_CKPT_OFF;		/* Not checkpointing */
 	btree->modified = 0;				/* Clean */
+	btree->write_gen = ckpt->write_gen;		/* Write generation */
 
 	return (0);
 }

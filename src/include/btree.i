@@ -1035,9 +1035,10 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static inline bool
 __wt_page_can_evict(WT_SESSION_IMPL *session,
-    WT_PAGE *page, bool check_splits, bool *inmem_splitp)
+    WT_REF *ref, bool check_splits, bool *inmem_splitp)
 {
 	WT_BTREE *btree;
+	WT_PAGE *page;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN_GLOBAL *txn_global;
 
@@ -1045,6 +1046,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 		*inmem_splitp = false;
 
 	btree = S2BT(session);
+	page = ref->page;
 	mod = page->modify;
 
 	/* Pages that have never been modified can always be evicted. */
@@ -1064,6 +1066,29 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	}
 
 	/*
+	 * If the file is being checkpointed, we can't evict dirty pages:
+	 * if we write a page and free the previous version of the page, that
+	 * previous version might be referenced by an internal page already
+	 * been written in the checkpoint, leaving the checkpoint inconsistent.
+	 */
+	if (btree->checkpointing != WT_CKPT_OFF &&
+	    __wt_page_is_modified(page)) {
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
+		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
+		return (false);
+	}
+
+	/*
+	 * We can't evict clean, multiblock row-store pages where the parent's
+	 * key for the page is an overflow item, because the split into the
+	 * parent frees the backing blocks for any no-longer-used overflow keys,
+	 * which will corrupt the checkpoint's block management.
+	 */
+	if (btree->checkpointing &&
+	    F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS))
+		return (false);
+
+	/*
 	 * If the tree was deepened, there's a requirement that newly created
 	 * internal pages not be evicted until all threads are known to have
 	 * exited the original page index array, because evicting an internal
@@ -1075,18 +1100,6 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	if (check_splits && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
 		return (false);
-
-	/*
-	 * If the file is being checkpointed, we can't evict dirty pages:
-	 * if we write a page and free the previous version of the page, that
-	 * previous version might be referenced by an internal page already
-	 * been written in the checkpoint, leaving the checkpoint inconsistent.
-	 */
-	if (btree->checkpointing && __wt_page_is_modified(page)) {
-		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
-		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
-		return (false);
-	}
 
 	/*
 	 * If the page was recently split in-memory, don't evict it immediately:
@@ -1195,7 +1208,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    LF_ISSET(WT_READ_NO_EVICT) ||
 	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    !__wt_page_can_evict(session, page, true, NULL))
+	    !__wt_page_can_evict(session, ref, true, NULL))
 		return (__wt_hazard_clear(session, page));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
