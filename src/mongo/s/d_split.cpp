@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -508,6 +509,10 @@ public:
             result.append("timeMillis", timer.millis());
         }
 
+        // Make sure splitKeys is in ascending order
+        std::sort(splitKeys.begin(),
+                  splitKeys.end(),
+                  [](const BSONObj& lhs, const BSONObj& rhs) -> bool { return lhs < rhs; });
         result.append("splitKeys", splitKeys);
         return true;
     }

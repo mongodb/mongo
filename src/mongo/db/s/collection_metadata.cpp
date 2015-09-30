@@ -323,7 +323,21 @@ CollectionMetadata* CollectionMetadata::cloneSplit(const ChunkType& chunk,
     BSONObj startKey = chunk.getMin();
     for (vector<BSONObj>::const_iterator it = splitKeys.begin(); it != splitKeys.end(); ++it) {
         BSONObj split = *it;
-        invariant(split.woCompare(startKey) > 0);
+        if (split.woCompare(startKey) <= 0) {
+            // The split keys came in out of order, this probably indicates a bug, so fail the
+            // operation.  Re-iterate splitKeys to build a useful error message including the
+            // array of splitKeys in the order received.
+            std::stringstream ss;
+            ss << "Invalid input to splitChunk, split keys must be in order, got: [";
+            for (auto it2 = splitKeys.cbegin(); it2 != splitKeys.cend(); ++it2) {
+                if (it2 != splitKeys.begin()) {
+                    ss << ", ";
+                }
+                ss << it2->toString();
+            }
+            ss << "]";
+            uasserted(28821, ss.str());
+        }
         metadata->_chunksMap[startKey] = split.getOwned();
         metadata->_chunksMap.insert(make_pair(split.getOwned(), chunk.getMax().getOwned()));
         metadata->_shardVersion.incMinor();
