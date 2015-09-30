@@ -529,8 +529,8 @@ func (cluster *mongoCluster) syncServersIteration(direct bool) {
 	}
 
 	cluster.Lock()
-	ml := cluster.masters.Len()
-	logf("SYNC Synchronization completed: %d master(s) and %d slave(s) alive.", ml, cluster.servers.Len()-ml)
+	mastersLen := cluster.masters.Len()
+	logf("SYNC Synchronization completed: %d master(s) and %d slave(s) alive.", mastersLen, cluster.servers.Len()-mastersLen)
 
 	// Update dynamic seeds, but only if we have any good servers. Otherwise,
 	// leave them alone for better chances of a successful sync in the future.
@@ -548,17 +548,17 @@ func (cluster *mongoCluster) syncServersIteration(direct bool) {
 // AcquireSocket returns a socket to a server in the cluster.  If slaveOk is
 // true, it will attempt to return a socket to a slave server.  If it is
 // false, the socket will necessarily be to a master server.
-func (cluster *mongoCluster) AcquireSocket(slaveOk bool, syncTimeout time.Duration, socketTimeout time.Duration, serverTags []bson.D, poolLimit int) (s *mongoSocket, err error) {
+func (cluster *mongoCluster) AcquireSocket(mode Mode, slaveOk bool, syncTimeout time.Duration, socketTimeout time.Duration, serverTags []bson.D, poolLimit int) (s *mongoSocket, err error) {
 	var started time.Time
 	var syncCount uint
 	warnedLimit := false
 	for {
 		cluster.RLock()
 		for {
-			ml := cluster.masters.Len()
-			sl := cluster.servers.Len()
-			debugf("Cluster has %d known masters and %d known slaves.", ml, sl-ml)
-			if ml > 0 || slaveOk && sl > 0 {
+			mastersLen := cluster.masters.Len()
+			slavesLen := cluster.servers.Len() - mastersLen
+			debugf("Cluster has %d known masters and %d known slaves.", mastersLen, slavesLen)
+			if !(slaveOk && mode == Secondary) && mastersLen > 0 || slaveOk && slavesLen > 0 {
 				break
 			}
 			if started.IsZero() {
@@ -578,9 +578,9 @@ func (cluster *mongoCluster) AcquireSocket(slaveOk bool, syncTimeout time.Durati
 
 		var server *mongoServer
 		if slaveOk {
-			server = cluster.servers.BestFit(serverTags)
+			server = cluster.servers.BestFit(mode, serverTags)
 		} else {
-			server = cluster.masters.BestFit(nil)
+			server = cluster.masters.BestFit(mode, nil)
 		}
 		cluster.RUnlock()
 

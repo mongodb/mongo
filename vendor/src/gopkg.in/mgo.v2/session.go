@@ -44,12 +44,23 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-type mode int
+type Mode int
 
 const (
-	Eventual  mode = 0
-	Monotonic mode = 1
-	Strong    mode = 2
+	// Relevant documentation on read preference modes:
+	//
+	//     http://docs.mongodb.org/manual/reference/read-preference/
+	//
+	Primary            Mode = 2 // Default mode. All operations read from the current replica set primary.
+	PrimaryPreferred   Mode = 3 // Read from the primary if available. Read from the secondary otherwise.
+	Secondary          Mode = 4 // Read from one of the nearest secondary members of the replica set.
+	SecondaryPreferred Mode = 5 // Read from one of the nearest secondaries if available. Read from primary otherwise.
+	Nearest            Mode = 6 // Read from one of the nearest members, irrespective of it being primary or secondary.
+
+	// Read preference modes are specific to mgo:
+	Eventual  Mode = 0 // Same as Nearest, but may change servers between reads.
+	Monotonic Mode = 1 // Same as SecondaryPreferred before first write. Same as Primary after first write.
+	Strong    Mode = 2 // Same as Primary.
 )
 
 // When changing the Session type, check if newSession and copySession
@@ -61,7 +72,7 @@ type Session struct {
 	slaveSocket  *mongoSocket
 	masterSocket *mongoSocket
 	slaveOk      bool
-	consistency  mode
+	consistency  Mode
 	queryConfig  query
 	safeOp       *queryOp
 	syncTimeout  time.Duration
@@ -481,7 +492,7 @@ func extractURL(s string) (*urlInfo, error) {
 	return info, nil
 }
 
-func newSession(consistency mode, cluster *mongoCluster, timeout time.Duration) (session *Session) {
+func newSession(consistency Mode, cluster *mongoCluster, timeout time.Duration) (session *Session) {
 	cluster.Acquire()
 	session = &Session{
 		cluster_:    cluster,
@@ -1489,7 +1500,7 @@ func (s *Session) Refresh() {
 // Shifting between Monotonic and Strong modes will keep a previously
 // reserved connection for the session unless refresh is true or the
 // connection is unsuitable (to a secondary server in a Strong session).
-func (s *Session) SetMode(consistency mode, refresh bool) {
+func (s *Session) SetMode(consistency Mode, refresh bool) {
 	s.m.Lock()
 	debugf("Session %p: setting mode %d with refresh=%v (master=%p, slave=%p)", s, consistency, refresh, s.masterSocket, s.slaveSocket)
 	s.consistency = consistency
@@ -1505,7 +1516,7 @@ func (s *Session) SetMode(consistency mode, refresh bool) {
 }
 
 // Mode returns the current consistency mode for the session.
-func (s *Session) Mode() mode {
+func (s *Session) Mode() Mode {
 	s.m.RLock()
 	mode := s.consistency
 	s.m.RUnlock()
@@ -3909,14 +3920,16 @@ func (s *Session) acquireSocket(slaveOk bool) (*mongoSocket, error) {
 
 	// Read-only lock to check for previously reserved socket.
 	s.m.RLock()
-	if s.masterSocket != nil {
-		socket := s.masterSocket
+	// If there is a slave socket reserved and its use is acceptable, take it as long
+	// as there isn't a master socket which would be preferred by the read preference mode.
+	if s.slaveSocket != nil && s.slaveOk && slaveOk && (s.masterSocket == nil || s.consistency != PrimaryPreferred && s.consistency != Monotonic) {
+		socket := s.slaveSocket
 		socket.Acquire()
 		s.m.RUnlock()
 		return socket, nil
 	}
-	if s.slaveSocket != nil && s.slaveOk && slaveOk {
-		socket := s.slaveSocket
+	if s.masterSocket != nil {
+		socket := s.masterSocket
 		socket.Acquire()
 		s.m.RUnlock()
 		return socket, nil
@@ -3928,17 +3941,17 @@ func (s *Session) acquireSocket(slaveOk bool) (*mongoSocket, error) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
+	if s.slaveSocket != nil && s.slaveOk && slaveOk && (s.masterSocket == nil || s.consistency != PrimaryPreferred && s.consistency != Monotonic) {
+		s.slaveSocket.Acquire()
+		return s.slaveSocket, nil
+	}
 	if s.masterSocket != nil {
 		s.masterSocket.Acquire()
 		return s.masterSocket, nil
 	}
-	if s.slaveSocket != nil && s.slaveOk && slaveOk {
-		s.slaveSocket.Acquire()
-		return s.slaveSocket, nil
-	}
 
 	// Still not good.  We need a new socket.
-	sock, err := s.cluster().AcquireSocket(slaveOk && s.slaveOk, s.syncTimeout, s.sockTimeout, s.queryConfig.op.serverTags, s.poolLimit)
+	sock, err := s.cluster().AcquireSocket(s.consistency, slaveOk && s.slaveOk, s.syncTimeout, s.sockTimeout, s.queryConfig.op.serverTags, s.poolLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -4188,7 +4201,7 @@ func (c *Collection) writeCommand(socket *mongoSocket, safeOp *queryOp, op inter
 	debugf("Write command result: %#v (err=%v)", result, err)
 	lerr = &LastError{
 		UpdatedExisting: result.N > 0 && len(result.Upserted) == 0,
-		N: result.N,
+		N:               result.N,
 	}
 	if len(result.Upserted) > 0 {
 		lerr.UpsertedId = result.Upserted[0].Id

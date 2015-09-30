@@ -158,7 +158,7 @@ func (s *S) TestCloneSession(c *C) {
 	c.Assert(stats.ReceivedDocs, Equals, 1)
 }
 
-func (s *S) TestSetModeStrong(c *C) {
+func (s *S) TestModeStrong(c *C) {
 	session, err := mgo.Dial("localhost:40012")
 	c.Assert(err, IsNil)
 	defer session.Close()
@@ -195,7 +195,7 @@ func (s *S) TestSetModeStrong(c *C) {
 	c.Assert(stats.SocketsInUse, Equals, 0)
 }
 
-func (s *S) TestSetModeMonotonic(c *C) {
+func (s *S) TestModeMonotonic(c *C) {
 	// Must necessarily connect to a slave, otherwise the
 	// master connection will be available first.
 	session, err := mgo.Dial("localhost:40012")
@@ -206,20 +206,19 @@ func (s *S) TestSetModeMonotonic(c *C) {
 
 	c.Assert(session.Mode(), Equals, mgo.Monotonic)
 
-	result := M{}
+	var result struct{ IsMaster bool }
 	cmd := session.DB("admin").C("$cmd")
 	err = cmd.Find(M{"ismaster": 1}).One(&result)
 	c.Assert(err, IsNil)
-	c.Assert(result["ismaster"], Equals, false)
+	c.Assert(result.IsMaster, Equals, false)
 
 	coll := session.DB("mydb").C("mycoll")
 	err = coll.Insert(M{"a": 1})
 	c.Assert(err, IsNil)
 
-	result = M{}
 	err = cmd.Find(M{"ismaster": 1}).One(&result)
 	c.Assert(err, IsNil)
-	c.Assert(result["ismaster"], Equals, true)
+	c.Assert(result.IsMaster, Equals, true)
 
 	// Wait since the sync also uses sockets.
 	for len(session.LiveServers()) != 3 {
@@ -238,7 +237,7 @@ func (s *S) TestSetModeMonotonic(c *C) {
 	c.Assert(stats.SocketsInUse, Equals, 0)
 }
 
-func (s *S) TestSetModeMonotonicAfterStrong(c *C) {
+func (s *S) TestModeMonotonicAfterStrong(c *C) {
 	// Test that a strong session shifting to a monotonic
 	// one preserves the socket untouched.
 
@@ -271,7 +270,7 @@ func (s *S) TestSetModeMonotonicAfterStrong(c *C) {
 	c.Assert(result["ismaster"], Equals, true)
 }
 
-func (s *S) TestSetModeStrongAfterMonotonic(c *C) {
+func (s *S) TestModeStrongAfterMonotonic(c *C) {
 	// Test that shifting from Monotonic to Strong while
 	// using a slave socket will keep the socket reserved
 	// until the master socket is necessary, so that no
@@ -311,7 +310,7 @@ func (s *S) TestSetModeStrongAfterMonotonic(c *C) {
 	c.Assert(result["ismaster"], Equals, true)
 }
 
-func (s *S) TestSetModeMonotonicWriteOnIteration(c *C) {
+func (s *S) TestModeMonotonicWriteOnIteration(c *C) {
 	// Must necessarily connect to a slave, otherwise the
 	// master connection will be available first.
 	session, err := mgo.Dial("localhost:40012")
@@ -356,7 +355,7 @@ func (s *S) TestSetModeMonotonicWriteOnIteration(c *C) {
 	c.Assert(i, Equals, len(ns))
 }
 
-func (s *S) TestSetModeEventual(c *C) {
+func (s *S) TestModeEventual(c *C) {
 	// Must necessarily connect to a slave, otherwise the
 	// master connection will be available first.
 	session, err := mgo.Dial("localhost:40012")
@@ -393,7 +392,7 @@ func (s *S) TestSetModeEventual(c *C) {
 	c.Assert(stats.SocketsInUse, Equals, 0)
 }
 
-func (s *S) TestSetModeEventualAfterStrong(c *C) {
+func (s *S) TestModeEventualAfterStrong(c *C) {
 	// Test that a strong session shifting to an eventual
 	// one preserves the socket untouched.
 
@@ -431,7 +430,7 @@ func (s *S) TestSetModeEventualAfterStrong(c *C) {
 	c.Assert(stats.SocketsInUse, Equals, 0)
 }
 
-func (s *S) TestPrimaryShutdownStrong(c *C) {
+func (s *S) TestModeStrongFallover(c *C) {
 	if *fast {
 		c.Skip("-fast")
 	}
@@ -472,7 +471,7 @@ func (s *S) TestPrimaryShutdownStrong(c *C) {
 	c.Assert(err, IsNil)
 }
 
-func (s *S) TestPrimaryHiccup(c *C) {
+func (s *S) TestModePrimaryHiccup(c *C) {
 	if *fast {
 		c.Skip("-fast")
 	}
@@ -523,7 +522,7 @@ func (s *S) TestPrimaryHiccup(c *C) {
 	c.Assert(err, IsNil)
 }
 
-func (s *S) TestPrimaryShutdownMonotonic(c *C) {
+func (s *S) TestModeMonotonicFallover(c *C) {
 	if *fast {
 		c.Skip("-fast")
 	}
@@ -566,7 +565,7 @@ func (s *S) TestPrimaryShutdownMonotonic(c *C) {
 	c.Assert(result.Host, Not(Equals), host)
 }
 
-func (s *S) TestPrimaryShutdownMonotonicWithSlave(c *C) {
+func (s *S) TestModeMonotonicWithSlaveFallover(c *C) {
 	if *fast {
 		c.Skip("-fast")
 	}
@@ -645,7 +644,7 @@ func (s *S) TestPrimaryShutdownMonotonicWithSlave(c *C) {
 	c.Assert(ssresult.Host, Not(Equals), master)
 }
 
-func (s *S) TestPrimaryShutdownEventual(c *C) {
+func (s *S) TestModeEventualFallover(c *C) {
 	if *fast {
 		c.Skip("-fast")
 	}
@@ -680,6 +679,192 @@ func (s *S) TestPrimaryShutdownEventual(c *C) {
 	err = session.Run("serverStatus", result)
 	c.Assert(err, IsNil)
 	c.Assert(result.Host, Not(Equals), master)
+}
+
+func (s *S) TestModeSecondaryJustPrimary(c *C) {
+	if *fast {
+		c.Skip("-fast")
+	}
+
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	session.SetMode(mgo.Secondary, true)
+
+	err = session.Ping()
+	c.Assert(err, ErrorMatches, "no reachable servers")
+}
+
+func (s *S) TestModeSecondaryPreferredJustPrimary(c *C) {
+	if *fast {
+		c.Skip("-fast")
+	}
+
+	session, err := mgo.Dial("localhost:40001")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	session.SetMode(mgo.SecondaryPreferred, true)
+
+	result := &struct{ Host string }{}
+	err = session.Run("serverStatus", result)
+	c.Assert(err, IsNil)
+}
+
+func (s *S) TestModeSecondaryPreferredFallover(c *C) {
+	if *fast {
+		c.Skip("-fast")
+	}
+
+	session, err := mgo.Dial("localhost:40011")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	// Ensure secondaries are available for being picked up.
+	for len(session.LiveServers()) != 3 {
+		c.Log("Waiting for cluster sync to finish...")
+		time.Sleep(5e8)
+	}
+
+	session.SetMode(mgo.SecondaryPreferred, true)
+
+	result := &struct{ Host string }{}
+	err = session.Run("serverStatus", result)
+	c.Assert(err, IsNil)
+	c.Assert(supvName(result.Host), Not(Equals), "rs1a")
+	secondary := result.Host
+
+	// Should connect to the primary when needed.
+	coll := session.DB("mydb").C("mycoll")
+	err = coll.Insert(M{"a": 1})
+	c.Assert(err, IsNil)
+
+	// Wait a bit for this to be synchronized to slaves.
+	time.Sleep(3 * time.Second)
+
+	// Kill the primary.
+	s.Stop("localhost:40011")
+
+	// It can still talk to the selected secondary.
+	err = session.Run("serverStatus", result)
+	c.Assert(err, IsNil)
+	c.Assert(result.Host, Equals, secondary)
+
+	// But cannot speak to the primary until reset.
+	coll = session.DB("mydb").C("mycoll")
+	err = coll.Insert(M{"a": 1})
+	c.Assert(err, Equals, io.EOF)
+
+	session.Refresh()
+
+	// Can still talk to a secondary.
+	err = session.Run("serverStatus", result)
+	c.Assert(err, IsNil)
+	c.Assert(supvName(result.Host), Not(Equals), "rs1a")
+
+	s.StartAll()
+
+	// Should now be able to talk to the primary again.
+	coll = session.DB("mydb").C("mycoll")
+	err = coll.Insert(M{"a": 1})
+	c.Assert(err, IsNil)
+}
+
+func (s *S) TestModePrimaryPreferredFallover(c *C) {
+	if *fast {
+		c.Skip("-fast")
+	}
+
+	session, err := mgo.Dial("localhost:40011")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	session.SetMode(mgo.PrimaryPreferred, true)
+
+	result := &struct{ Host string }{}
+	err = session.Run("serverStatus", result)
+	c.Assert(err, IsNil)
+	c.Assert(supvName(result.Host), Equals, "rs1a")
+
+	// Kill the primary.
+	s.Stop("localhost:40011")
+
+	// Should now fail as there was a primary socket in use already.
+	err = session.Run("serverStatus", result)
+	c.Assert(err, Equals, io.EOF)
+
+	// Refresh so the reserved primary socket goes away.
+	session.Refresh()
+
+	// Should be able to talk to the secondary.
+	err = session.Run("serverStatus", result)
+	c.Assert(err, IsNil)
+
+	s.StartAll()
+
+	// Should wait for the new primary to become available.
+	coll := session.DB("mydb").C("mycoll")
+	err = coll.Insert(M{"a": 1})
+	c.Assert(err, IsNil)
+
+	// And should use the new primary in general, as it is preferred.
+	err = session.Run("serverStatus", result)
+	c.Assert(err, IsNil)
+	c.Assert(supvName(result.Host), Equals, "rs1a")
+}
+
+func (s *S) TestModePrimaryFallover(c *C) {
+	if *fast {
+		c.Skip("-fast")
+	}
+
+	session, err := mgo.Dial("localhost:40011")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	session.SetSyncTimeout(3 * time.Second)
+
+	session.SetMode(mgo.Primary, true)
+
+	result := &struct{ Host string }{}
+	err = session.Run("serverStatus", result)
+	c.Assert(err, IsNil)
+	c.Assert(supvName(result.Host), Equals, "rs1a")
+
+	// Kill the primary.
+	s.Stop("localhost:40011")
+
+	session.Refresh()
+
+	err = session.Ping()
+	c.Assert(err, ErrorMatches, "no reachable servers")
+}
+
+func (s *S) TestModeSecondary(c *C) {
+	if *fast {
+		c.Skip("-fast")
+	}
+
+	session, err := mgo.Dial("localhost:40011")
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	session.SetMode(mgo.Secondary, true)
+
+	result := &struct{ Host string }{}
+	err = session.Run("serverStatus", result)
+	c.Assert(err, IsNil)
+	c.Assert(supvName(result.Host), Not(Equals), "rs1a")
+	secondary := result.Host
+
+	coll := session.DB("mydb").C("mycoll")
+	err = coll.Insert(M{"a": 1})
+	c.Assert(err, IsNil)
+
+	err = session.Run("serverStatus", result)
+	c.Assert(err, IsNil)
+	c.Assert(result.Host, Equals, secondary)
 }
 
 func (s *S) TestPreserveSocketCountOnSync(c *C) {
@@ -1519,6 +1704,68 @@ func (s *S) TestNearestSecondary(c *C) {
 		err = session.Run("serverStatus", &result)
 		c.Assert(err, IsNil)
 		c.Assert(hostPort(result.Host), Equals, hostPort(rs1b))
+	}
+}
+
+func (s *S) TestNearestServer(c *C) {
+	defer mgo.HackPingDelay(300 * time.Millisecond)()
+
+	rs1a := "127.0.0.1:40011"
+	rs1b := "127.0.0.1:40012"
+	rs1c := "127.0.0.1:40013"
+
+	session, err := mgo.Dial(rs1a)
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	s.Freeze(rs1a)
+	s.Freeze(rs1b)
+
+	// Extra delay to ensure the first two servers get penalized.
+	time.Sleep(500 * time.Millisecond)
+
+	// Release them.
+	s.Thaw(rs1a)
+	s.Thaw(rs1b)
+
+	// Wait for everyone to come up.
+	for len(session.LiveServers()) != 3 {
+		c.Log("Waiting for all servers to be alive...")
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	session.SetMode(mgo.Nearest, true)
+	var result struct{ Host string }
+
+	// See which server picks the line, several times to avoid chance.
+	for i := 0; i < 10; i++ {
+		session.Refresh()
+		err = session.Run("serverStatus", &result)
+		c.Assert(err, IsNil)
+		c.Assert(hostPort(result.Host), Equals, hostPort(rs1c))
+	}
+
+	if *fast {
+		// Don't hold back for several seconds.
+		return
+	}
+
+	// Now hold the two secondaries for long enough to penalize them.
+	s.Freeze(rs1b)
+	s.Freeze(rs1c)
+	time.Sleep(5 * time.Second)
+	s.Thaw(rs1b)
+	s.Thaw(rs1c)
+
+	// Wait for the ping to be processed.
+	time.Sleep(500 * time.Millisecond)
+
+	// Repeating the test should now pick the primary server consistently.
+	for i := 0; i < 10; i++ {
+		session.Refresh()
+		err = session.Run("serverStatus", &result)
+		c.Assert(err, IsNil)
+		c.Assert(hostPort(result.Host), Equals, hostPort(rs1a))
 	}
 }
 
