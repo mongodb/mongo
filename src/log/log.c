@@ -385,7 +385,7 @@ __log_zero(WT_SESSION_IMPL *session,
 	if (conn->log_file_max < bufsz)
 		bufsz = conn->log_file_max;
 	WT_RET(__wt_scr_alloc(session, bufsz, &zerobuf));
-	memset(zerobuf->mem, 0, zerobuf->size);
+	memset(zerobuf->mem, 0, zerobuf->memsize);
 	WT_STAT_FAST_CONN_INCR(session, log_zero_fills);
 
 	/*
