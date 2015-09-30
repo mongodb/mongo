@@ -112,7 +112,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	} else {
 		primary = clsm->cursors[clsm->nchunks - 1];
 		primary_chunk = clsm->primary_chunk;
-		WT_ASSERT(session, F_ISSET(&session->txn, TXN_HAS_ID));
+		WT_ASSERT(session, F_ISSET(&session->txn, WT_TXN_HAS_ID));
 		have_primary = (primary != NULL && primary_chunk != NULL &&
 		    (primary_chunk->switch_txn == WT_TXN_NONE ||
 		    WT_TXNID_LT(session->txn.id, primary_chunk->switch_txn)));
@@ -222,8 +222,8 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 			clsm->nupdates = 1;
 			if (session->txn.isolation == WT_ISO_SNAPSHOT &&
 			    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
-				WT_ASSERT(session,
-				    F_ISSET(&session->txn, TXN_HAS_SNAPSHOT));
+				WT_ASSERT(session, F_ISSET(&session->txn,
+				    WT_TXN_HAS_SNAPSHOT));
 				snap_min = session->txn.snap_min;
 				for (switch_txnp =
 				    &clsm->switch_txn[clsm->nchunks - 2];
@@ -1291,7 +1291,7 @@ __clsm_put(WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm,
 	lsm_tree = clsm->lsm_tree;
 
 	WT_ASSERT(session,
-	    F_ISSET(&session->txn, TXN_HAS_ID) &&
+	    F_ISSET(&session->txn, WT_TXN_HAS_ID) &&
 	    clsm->primary_chunk != NULL &&
 	    (clsm->primary_chunk->switch_txn == WT_TXN_NONE ||
 	    WT_TXNID_LE(session->txn.id, clsm->primary_chunk->switch_txn)));

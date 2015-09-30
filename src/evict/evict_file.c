@@ -80,7 +80,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			break;
 		case WT_SYNC_DISCARD:
 			WT_ASSERT(session,
-			    __wt_page_can_evict(session, page, 0));
+			    __wt_page_can_evict(session, page, 0, NULL));
 			__wt_evict_page_clean_update(session, ref);
 			break;
 		case WT_SYNC_DISCARD_FORCE:
