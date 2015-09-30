@@ -51,8 +51,7 @@
     replTest.waitForState(master, replTest.RECOVERING, 90000);
 
     // Slave is now master... so do a write to get a minvalid entry on the secondary.
-    assert.writeOK(replTest.getMaster().getDB("test").foo.save({}), {writeConcern:{w:2}});
-    replTest.awaitReplication();
+    assert.writeOK(replTest.getMaster().getDB("test").foo.save({}), {writeConcern:{w:3}});
 
     assert.soon(function() {
         var mv;
