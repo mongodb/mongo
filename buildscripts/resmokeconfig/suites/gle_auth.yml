@@ -10,9 +10,6 @@ selector:
     exclude_files:
     # Skip any tests that run with auth explicitly.
     - jstests/gle/*[aA]uth*.js
-    # Skip the passthrough tests because those are run separately.
-    - jstests/gle/0_gle_basics_passthrough.js
-    - jstests/gle/1_sharding_gle_basics_passthrough.js
 
 executor:
   js_test:

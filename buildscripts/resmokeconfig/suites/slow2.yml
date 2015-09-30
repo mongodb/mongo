@@ -6,7 +6,6 @@ selector:
     # Skip the passthrough tests because each passthrough
     # is run as its own independent suite.
     - jstests/slow2/readmajority_jscore_passthrough.js
-    - jstests/slow2/sharding_jscore_passthrough.js
 
 executor:
   js_test:

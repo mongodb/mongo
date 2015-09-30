@@ -3,8 +3,6 @@ selector:
     roots:
     - jstests/noPassthroughWithMongod/*.js
     exclude_files:
-    # Skip the passthrough test because it is run separately.
-    - jstests/noPassthroughWithMongod/fluent_gle_passthrough.js
     # SERVER-19093
     - jstests/noPassthroughWithMongod/httpinterface.js
     # stale_clustered.js temporarily disabled due to intermittent failures that are currently
