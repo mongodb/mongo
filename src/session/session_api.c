@@ -1149,8 +1149,10 @@ __session_strerror(WT_SESSION *wt_session, int error)
  */
 int
 __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
-    bool uses_dhandles, bool open_metadata, WT_SESSION_IMPL **sessionp)
+    bool open_metadata, uint32_t session_flags, WT_SESSION_IMPL **sessionp)
 {
+	WT_DECL_RET;
+	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 
 	*sessionp = NULL;
@@ -1164,17 +1166,26 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 	 * list, there would be complex ordering issues during close.  Set a
 	 * flag to avoid this: internal sessions are not closed automatically.
 	 */
-	F_SET(session, WT_SESSION_INTERNAL);
+	F_SET(session, session_flags | WT_SESSION_INTERNAL);
 
 	/*
-	 * Some internal threads must keep running after we close all data
-	 * handles.  Make sure these threads don't open their own handles.
+	 * Acquiring the lookaside table cursor requires various locks; we've
+	 * seen problems in the past where deadlocks happened because sessions
+	 * deadlocked getting the cursor late in the process.  Be defensive,
+	 * get it now.
 	 */
-	if (!uses_dhandles)
-		F_SET(session, WT_SESSION_NO_DATA_HANDLES);
+	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR)) {
+		WT_WITHOUT_DHANDLE(session, ret =
+		    __wt_las_cursor_create(session, &session->las_cursor));
+		WT_ERR(ret);
+	}
 
 	*sessionp = session;
 	return (0);
+
+err:	wt_session = &session->iface;
+	WT_TRET(wt_session->close(wt_session, NULL));
+	return (ret);
 }
 
 /*

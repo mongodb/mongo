@@ -377,7 +377,6 @@ struct __wt_connection_impl {
 	 */
 	WT_SPINLOCK	 las_lock;	/* Lookaside table spinlock */
 	WT_SESSION_IMPL *las_session;	/* Lookaside table session */
-	WT_CURSOR	*las_cursor;	/* Lookaside table cursor */
 	bool		 las_written;	/* Lookaside table has been written */
 
 	WT_ITEM		 las_sweep_key;	/* Sweep server's saved key */
