@@ -321,27 +321,22 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
     bulkExecute(request, &upserted, &writeErrors);
 
     //
-    // Try to enforce the write concern if everything succeeded (unordered or ordered)
-    // OR if something succeeded and we're unordered.
-    //
+    // Always try to enforce the write concern, even if everything failed.
+    // If something failed, we have already set the lastOp to be the last op to have succeeded
+    // and written to the oplog.
 
     unique_ptr<WCErrorDetail> wcError;
-    bool needToEnforceWC = writeErrors.empty() ||
-        (!request.getOrdered() && writeErrors.size() < request.sizeWriteOps());
+    {
+        stdx::lock_guard<Client> lk(*_txn->getClient());
+        CurOp::get(_txn)->setMessage_inlock("waiting for write concern");
+    }
 
-    if (needToEnforceWC) {
-        {
-            stdx::lock_guard<Client> lk(*_txn->getClient());
-            CurOp::get(_txn)->setMessage_inlock("waiting for write concern");
-        }
+    WriteConcernResult res;
+    Status status = waitForWriteConcern(
+        _txn, repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp(), &res);
 
-        WriteConcernResult res;
-        Status status = waitForWriteConcern(
-            _txn, repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp(), &res);
-
-        if (!status.isOK()) {
-            wcError.reset(toWriteConcernError(status, res));
-        }
+    if (!status.isOK()) {
+        wcError.reset(toWriteConcernError(status, res));
     }
 
     //

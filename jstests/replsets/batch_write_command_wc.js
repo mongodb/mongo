@@ -85,7 +85,7 @@ assert(result.writeConcernError);
 assert.eq(1, coll.count());
 
 //
-// Two ordered inserts, write error and wc error not reported
+// Two ordered inserts, write error and wc error both reported
 coll.remove({});
 printjson( request = {insert : coll.getName(),
                       documents: [{a:1},{$invalid:'doc'}],
@@ -95,7 +95,7 @@ assert(result.ok);
 assert.eq(1, result.n);
 assert.eq(result.writeErrors.length, 1);
 assert.eq(result.writeErrors[0].index, 1);
-assert(!result.writeConcernError);
+assert(result.writeConcernError);
 assert.eq(1, coll.count());
 
 //
