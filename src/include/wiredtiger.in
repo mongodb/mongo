@@ -1750,6 +1750,33 @@ struct __wt_connection {
 	 * seconds at which to check for files that are inactive and close
 	 * them., an integer between 1 and 100000; default \c 10.}
 	 * @config{ ),,}
+	 * @config{log = (, enable logging.  Enabling logging uses three
+	 * sessions from the configured session_max., a set of related
+	 * configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically archive
+	 * unneeded log files., a boolean flag; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;compressor, configure a compressor
+	 * for log records.  Permitted values are \c "none" or custom
+	 * compression engine name created with WT_CONNECTION::add_compressor.
+	 * If WiredTiger has builtin support for \c "bzip2"\, \c "snappy"\, \c
+	 * "lz4" or \c "zlib" compression\, these names are also available.  See
+	 * @ref compression for more information., a string; default \c none.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging subsystem., a
+	 * boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum size of log
+	 * files., an integer between 100KB and 2GB; default \c 100MB.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into
+	 * which the log files are written.  If the value is not an absolute
+	 * path name\, the files are created relative to the database home., a
+	 * string; default empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;prealloc,
+	 * pre-allocate log files., a boolean flag; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;recover, run recovery or error if
+	 * recovery needs to run after an unclean shutdown., a string\, chosen
+	 * from the following options: \c "error"\, \c "on"; default \c on.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;zero_fill, manually write zeroes into
+	 * log files., a boolean flag; default \c false.}
+	 * @config{ ),,}
 	 * @config{lsm_manager = (, configure database wide options for LSM tree
 	 * management.  The LSM manager is started automatically the first time
 	 * an LSM tree is opened.  The LSM manager uses a session from the

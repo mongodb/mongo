@@ -66,6 +66,21 @@ static const WT_CONFIG_CHECK
 };
 
 static const WT_CONFIG_CHECK
+    confchk_wiredtiger_open_log_subconfigs[] = {
+	{ "archive", "boolean", NULL, NULL, NULL, 0 },
+	{ "compressor", "string", NULL, NULL, NULL, 0 },
+	{ "enabled", "boolean", NULL, NULL, NULL, 0 },
+	{ "file_max", "int", NULL, "min=100KB,max=2GB", NULL, 0 },
+	{ "path", "string", NULL, NULL, NULL, 0 },
+	{ "prealloc", "boolean", NULL, NULL, NULL, 0 },
+	{ "recover", "string",
+	    NULL, "choices=[\"error\",\"on\"]",
+	    NULL, 0 },
+	{ "zero_fill", "boolean", NULL, NULL, NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
+static const WT_CONFIG_CHECK
     confchk_wiredtiger_open_lsm_manager_subconfigs[] = {
 	{ "merge", "boolean", NULL, NULL, NULL, 0 },
 	{ "worker_thread_max", "int", NULL, "min=3,max=20", NULL, 0 },
@@ -116,6 +131,9 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
 	{ "file_manager", "category",
 	    NULL, NULL,
 	    confchk_wiredtiger_open_file_manager_subconfigs, 3 },
+	{ "log", "category",
+	    NULL, NULL,
+	    confchk_wiredtiger_open_log_subconfigs, 8 },
 	{ "lsm_manager", "category",
 	    NULL, NULL,
 	    confchk_wiredtiger_open_lsm_manager_subconfigs, 2 },
@@ -449,21 +467,6 @@ static const WT_CONFIG_CHECK
 	{ "keyid", "string", NULL, NULL, NULL, 0 },
 	{ "name", "string", NULL, NULL, NULL, 0 },
 	{ "secretkey", "string", NULL, NULL, NULL, 0 },
-	{ NULL, NULL, NULL, NULL, NULL, 0 }
-};
-
-static const WT_CONFIG_CHECK
-    confchk_wiredtiger_open_log_subconfigs[] = {
-	{ "archive", "boolean", NULL, NULL, NULL, 0 },
-	{ "compressor", "string", NULL, NULL, NULL, 0 },
-	{ "enabled", "boolean", NULL, NULL, NULL, 0 },
-	{ "file_max", "int", NULL, "min=100KB,max=2GB", NULL, 0 },
-	{ "path", "string", NULL, NULL, NULL, 0 },
-	{ "prealloc", "boolean", NULL, NULL, NULL, 0 },
-	{ "recover", "string",
-	    NULL, "choices=[\"error\",\"on\"]",
-	    NULL, 0 },
-	{ "zero_fill", "boolean", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -815,12 +818,14 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
 	  "eviction_dirty_trigger=95,eviction_target=80,eviction_trigger=95"
 	  ",file_manager=(close_handle_minimum=250,close_idle_time=30,"
-	  "close_scan_interval=10),lsm_manager=(merge=,worker_thread_max=4)"
-	  ",lsm_merge=,shared_cache=(chunk=10MB,name=,quota=0,reserve=0,"
-	  "size=500MB),statistics=none,statistics_log=(on_close=0,"
+	  "close_scan_interval=10),log=(archive=,compressor=,enabled=0,"
+	  "file_max=100MB,path=,prealloc=,recover=on,zero_fill=0),"
+	  "lsm_manager=(merge=,worker_thread_max=4),lsm_merge=,"
+	  "shared_cache=(chunk=10MB,name=,quota=0,reserve=0,size=500MB),"
+	  "statistics=none,statistics_log=(on_close=0,"
 	  "path=\"WiredTigerStat.%d.%H\",sources=,"
 	  "timestamp=\"%b %d %H:%M:%S\",wait=0),verbose=",
-	  confchk_WT_CONNECTION_reconfigure, 17
+	  confchk_WT_CONNECTION_reconfigure, 18
 	},
 	{ "WT_CURSOR.close",
 	  "",
