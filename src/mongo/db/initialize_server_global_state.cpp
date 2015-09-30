@@ -89,10 +89,6 @@ void launchSignal(int sig) {
     }
 }
 
-static void setupLaunchSignals() {
-    verify(signal(SIGUSR2, launchSignal) != SIG_ERR);
-}
-
 void signalForkSuccess() {
     if (serverGlobalParams.doFork) {
         // killing leader will propagate to parent
@@ -112,8 +108,14 @@ static bool forkServer() {
 
         serverGlobalParams.parentProc = ProcessId::getCurrent();
 
+        // We need to make sure that all signals are unmasked so we can signal ourself
+        // that we're fully initialized later on.
+        sigset_t unblockSignalMask;
+        verify(sigemptyset(&unblockSignalMask) == 0);
+        verify(sigprocmask(SIG_SETMASK, &unblockSignalMask, NULL) == 0);
+
         // facilitate clean exit when child starts successfully
-        setupLaunchSignals();
+        verify(signal(SIGUSR2, launchSignal) != SIG_ERR);
 
         cout << "about to fork child process, waiting until server is ready for connections."
              << endl;
