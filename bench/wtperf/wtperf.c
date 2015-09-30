@@ -385,7 +385,7 @@ worker(void *arg)
 	size_t i;
 	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
-	int measure_latency, ret, truncated;
+	int hit_rollback, measure_latency, ret, truncated;
 	char *value_buf, *key_buf, *value;
 	char buf[512];
 
@@ -393,6 +393,7 @@ worker(void *arg)
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	cursors = NULL;
+	hit_rollback = 0;
 	ops = 0;
 	ops_per_txn = thread->workload->ops_per_txn;
 	session = NULL;
@@ -603,7 +604,20 @@ worker(void *arg)
 op_err:			lprintf(cfg, ret, 0,
 			    "%s failed for: %s, range: %"PRIu64,
 			    op_name(op), key_buf, wtperf_value_range(cfg));
-			goto err;
+			/*
+			 * If we get a rollback error we rollback and continue
+			 */
+			if (ret == WT_ROLLBACK) {
+				if ((ret = session->rollback_transaction(
+				    session, NULL)) != 0) {
+					lprintf(cfg, ret, 0,
+					     "Failed rollback_transaction");
+					goto err;
+				}
+				hit_rollback = 1;
+				break;
+			} else 
+				goto err;
 		default:
 			goto err;		/* can't happen */
 		}
@@ -635,12 +649,14 @@ op_err:			lprintf(cfg, ret, 0,
 
 		/* Commit our work if configured for explicit transactions */
 		if (ops_per_txn != 0 && ops++ % ops_per_txn == 0) {
-			if ((ret = session->commit_transaction(
+			
+			if (!hit_rollback && (ret = session->commit_transaction(
 			    session, NULL)) != 0) {
 				lprintf(cfg, ret, 0,
 				    "Worker transaction commit failed");
 				goto err;
 			}
+			hit_rollback = 0;
 			if ((ret = session->begin_transaction(
 			    session, NULL)) != 0) {
 				lprintf(cfg, ret, 0,
@@ -892,6 +908,7 @@ populate_thread(void *arg)
 				goto err;
 			}
 			intxn = 0;
+printf("next\n");
 			continue;
 		} else if (ret != 0) {
 			lprintf(cfg, ret, 0, "Failed inserting");
