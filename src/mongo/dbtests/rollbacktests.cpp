@@ -1,5 +1,3 @@
-// rollbacktests.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -125,7 +123,7 @@ size_t getNumIndexEntries(OperationContext* txn,
     if (desc) {
         auto cursor = catalog->getIndex(desc)->newCursor(txn);
 
-        for (auto kv = cursor->seek(minKey, true); kv; kv = cursor->next()) {
+        for (auto kv = cursor->seek(kMinBSONKey, true); kv; kv = cursor->next()) {
             numEntries++;
         }
     }

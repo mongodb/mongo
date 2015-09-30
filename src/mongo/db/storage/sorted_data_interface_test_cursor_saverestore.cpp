@@ -1,5 +1,3 @@
-// sorted_data_interface_test_cursor_saverestore.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -27,6 +25,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
@@ -70,7 +70,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
         const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
-        for (auto entry = cursor->seek(minKey, true); entry; i++, entry = cursor->next()) {
+        for (auto entry = cursor->seek(kMinBSONKey, true); entry; i++, entry = cursor->next()) {
             ASSERT_LT(i, nToInsert);
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
@@ -116,7 +116,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
-        for (auto entry = cursor->seek(maxKey, true); entry; i--, entry = cursor->next()) {
+        for (auto entry = cursor->seek(kMaxBSONKey, true); entry; i--, entry = cursor->next()) {
             ASSERT_GTE(i, 0);
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
@@ -161,7 +161,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
         const std::unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
-        for (auto entry = cursor->seek(minKey, true); entry; i++, entry = cursor->next()) {
+        for (auto entry = cursor->seek(kMinBSONKey, true); entry; i++, entry = cursor->next()) {
             ASSERT_LT(i, nToInsert);
             ASSERT_EQ(entry, IndexKeyEntry(key1, RecordId(42, i * 2)));
 
@@ -207,7 +207,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysRev
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
-        for (auto entry = cursor->seek(maxKey, true); entry; i--, entry = cursor->next()) {
+        for (auto entry = cursor->seek(kMaxBSONKey, true); entry; i--, entry = cursor->next()) {
             ASSERT_GTE(i, 0);
             ASSERT_EQ(entry, IndexKeyEntry(key1, RecordId(42, i * 2)));
 
