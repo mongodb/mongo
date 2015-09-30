@@ -246,7 +246,9 @@ TEST(FTDCFileTest, TestFull) {
 
 // Test a bad file
 TEST(FTDCFileTest, TestBadFile) {
-    boost::filesystem::path p(kTestFile);
+    unittest::TempDir tempdir("metrics_testpath");
+    boost::filesystem::path p(tempdir.path());
+    p /= kTestFile;
 
     std::ofstream stream(p.c_str());
     // This test case caused us to allocate more memory then the size of the file the first time I
