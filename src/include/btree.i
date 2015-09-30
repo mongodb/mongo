@@ -1008,7 +1008,7 @@ __wt_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (false);
 
 	/*
-	 * There is no point in splitting in-memory if the insert list doesn't 
+	 * There is no point in splitting in-memory if the insert list doesn't
 	 * represent most of the page footprint. Split if there are many items,
 	 * or if there are enough items and the items are a significant part
 	 * of the page's footprint. A 1/4 probability of adding a new skiplist
