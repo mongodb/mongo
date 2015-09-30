@@ -3,6 +3,7 @@
 /.jsdbshell
 /.dbshell
 /perf.data
+/perf.data.old
 /massif.out.*
 /smoke-last.json
 
