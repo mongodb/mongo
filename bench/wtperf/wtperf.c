@@ -649,7 +649,6 @@ op_err:			lprintf(cfg, ret, 0,
 
 		/* Commit our work if configured for explicit transactions */
 		if (ops_per_txn != 0 && ops++ % ops_per_txn == 0) {
-			
 			if (!hit_rollback && (ret = session->commit_transaction(
 			    session, NULL)) != 0) {
 				lprintf(cfg, ret, 0,
@@ -908,7 +907,6 @@ populate_thread(void *arg)
 				goto err;
 			}
 			intxn = 0;
-printf("next\n");
 			continue;
 		} else if (ret != 0) {
 			lprintf(cfg, ret, 0, "Failed inserting");
