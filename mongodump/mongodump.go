@@ -51,7 +51,9 @@ type MongoDump struct {
 	// channel on which to notify if/when a termination signal is received
 	termChan chan struct{}
 	// the value of stdout gets initizlied to os.Stdout if it's unset
-	stdout io.Writer
+	stdout       io.Writer
+	readPrefMode mgo.Mode
+	readPrefTags []bson.D
 }
 
 // ValidateOptions checks for any incompatible sets of options.
@@ -111,8 +113,8 @@ func (dump *MongoDump) Init() error {
 		return fmt.Errorf("can't create session: %v", err)
 	}
 
-	// allow secondary reads for the isMongos check
-	dump.sessionProvider.SetFlags(db.Monotonic)
+	// temporarily allow secondary reads for the isMongos check
+	dump.sessionProvider.SetReadPreference(mgo.Nearest)
 	dump.isMongos, err = dump.sessionProvider.IsMongos()
 	if err != nil {
 		return err
@@ -122,14 +124,34 @@ func (dump *MongoDump) Init() error {
 		return fmt.Errorf("can't use --oplog option when dumping from a mongos")
 	}
 
+	var mode mgo.Mode = mgo.Nearest
+	var tags bson.D
+
+	if dump.InputOptions.ReadPreference != "" {
+		mode, tags, err = db.ParseReadPreference(dump.InputOptions.ReadPreference)
+		if err != nil {
+			return fmt.Errorf("error parsing --readPreference : %v", err)
+		}
+		if len(tags) > 0 {
+			dump.sessionProvider.SetTags(tags)
+		}
+	}
+
 	// ensure we allow secondary reads on mongods and disable TCP timeouts
-	flags := db.DisableSocketTimeout
 	if dump.isMongos {
 		log.Logf(log.Info, "connecting to mongos; secondary reads disabled")
-	} else {
-		flags |= db.Monotonic
+		if mode != mgo.Primary {
+			mode = mgo.Primary
+			if dump.InputOptions.ReadPreference != "" {
+				log.Logf(log.Always, "overwriting specified readPreference with "+
+					"'primary' because connected to mongos")
+			}
+		}
 	}
-	dump.sessionProvider.SetFlags(flags)
+
+	dump.sessionProvider.SetReadPreference(mode)
+	dump.sessionProvider.SetTags(tags)
+	dump.sessionProvider.SetFlags(db.DisableSocketTimeout)
 
 	// return a helpful error message for mongos --repair
 	if dump.OutputOptions.Repair && dump.isMongos {
@@ -143,6 +165,7 @@ func (dump *MongoDump) Init() error {
 
 // Dump handles some final options checking and executes MongoDump.
 func (dump *MongoDump) Dump() (err error) {
+
 	if dump.InputOptions.HasQuery() {
 		// parse JSON then convert extended JSON values
 		var asJSON interface{}

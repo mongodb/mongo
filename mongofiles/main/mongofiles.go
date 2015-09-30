@@ -19,6 +19,8 @@ func main() {
 
 	storageOpts := &mongofiles.StorageOptions{}
 	opts.AddOptions(storageOpts)
+	inputOpts := &mongofiles.InputOptions{}
+	opts.AddOptions(inputOpts)
 
 	args, err := opts.Parse()
 	if err != nil {
@@ -56,6 +58,7 @@ func main() {
 		ToolOptions:     opts,
 		StorageOptions:  storageOpts,
 		SessionProvider: provider,
+		InputOptions:    inputOpts,
 	}
 
 	if err := mf.ValidateCommand(args); err != nil {
