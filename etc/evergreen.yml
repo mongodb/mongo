@@ -239,9 +239,9 @@ functions:
 
         cp mongodb*/bin/* .
         if [ ${run_multiple_jobs|false} = true ]; then
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${num_cores|1} ${test_flags} --log=buildlogger --reportFile=report.json
+          ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${num_cores|1} ${test_flags} --log=buildlogger --reportFile=report.json
         else
-          ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=1 ${test_flags} --log=buildlogger --reportFile=report.json
+          ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=1 ${test_flags} --log=buildlogger --reportFile=report.json
         fi
 
   "setup release credentials":
@@ -365,12 +365,19 @@ tasks:
           ${python|python} buildscripts/generate_compile_expansions.py version.json | \
             tee compile_expansions.yml
 
-          ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py --jobs=${num_jobs_unittests|1} --suites=unittests ${test_flags} --log=buildlogger --reportFile=report.json
-
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
           mv mongodb-*.${ext|tgz} mongodb-binaries.tgz
 
+          # If strip is on the path (everywhere except windows) then we should strip the unit test binaries
+          # before tarring them up
+          if [ -x ${strip_path|/usr/bin/strip} ]; then
+            cat build/unittests.txt | xargs ${strip_command|/usr/bin/strip}
+          fi
+
+          # On windows we need to make sure the paths in unittests.txt are compatible with cygwin tar
+          sed 's|\\|/|g' build/unittests.txt > build/unittests-tarlist.txt
+          ${tar|tar} -czvf mongodb-unittests.tgz -T build/unittests-tarlist.txt build/unittests.txt
     - command: expansions.update
       params:
         file: src/compile_expansions.yml
@@ -406,6 +413,7 @@ tasks:
           - "./build/integration_tests/**"
           - "./build/integration_tests.txt"
           - "repo/**"
+          - "src/mongo/util/options_parser/test_config_files/**"
         exclude_files:
           - "*_test.pdb"
     - func: "upload debugsymbols"
@@ -429,6 +437,17 @@ tasks:
         permissions: public-read
         content_type: application/tar
         display_name: Artifacts
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb-unittests.tgz
+        remote_file: mongodb-mongo-master/${build_variant}/${revision}/unittests/${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: Unit tests (stripped)
+
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -533,6 +552,22 @@ tasks:
     - func: "run tests"
       vars:
         resmoke_args: --suites=jstestfuzz
+
+## unit tests ##
+- <<: *task_template
+  name: unittests
+  commands:
+  - func: "do setup"
+  - command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: mongodb-mongo-master/${build_variant}/${revision}/unittests/${build_id}.tgz
+      bucket: mciuploads
+      extract_to: src
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=unittests
 
 ## integration test suites ##
 
@@ -1831,7 +1866,6 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -1918,6 +1952,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -1934,7 +1969,6 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --repeat=10 --shuffle
   tasks:
   - name: compile
@@ -1952,6 +1986,7 @@ buildvariants:
   - name: concurrency_WT
   - name: concurrency_replication_WT
   - name: concurrency_sharded_WT
+  - name: unittests
 
 - name: linux-64-debug
   display_name: Linux DEBUG
@@ -1968,7 +2003,6 @@ buildvariants:
     push_name: linux-debug
     push_arch: x86_64
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
   tasks:
@@ -2035,6 +2069,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
+  - name: unittests
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -2052,7 +2087,6 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --nojournal
   tasks:
   - name: compile
@@ -2093,6 +2127,7 @@ buildvariants:
   - name: slow2
   - name: sharding_jscore_passthrough
   - name: tool
+  - name: unittests
 
 - name: linux-64-lsm
   stepback: false
@@ -2106,7 +2141,6 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm
   tasks:
   - name: compile
@@ -2142,6 +2176,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_WT
   - name: tool_WT
+  - name: unittests
 
 - name: ubuntu1204
   display_name: SSL Ubuntu 12.04
@@ -2157,7 +2192,6 @@ buildvariants:
     push_arch: x86_64-ubuntu1204
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1204 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -2238,6 +2272,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -2256,7 +2291,6 @@ buildvariants:
     push_arch: x86_64-ubuntu1404
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -2337,6 +2371,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -2355,7 +2390,6 @@ buildvariants:
     push_arch: x86_64-enterprise-amzn64
     compile_flags: --ssl MONGO_DISTMOD=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -2404,6 +2438,7 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -2422,7 +2457,6 @@ buildvariants:
     push_arch: x86_64-amazon
     compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -2502,6 +2536,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -2521,7 +2556,6 @@ buildvariants:
     push_arch: i686
     compile_flags: --release MONGO_DISTARCH=i686 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --wiredtiger=off CCFLAGS="-m32" LINKFLAGS="-m32"
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
   tasks:
   - name: compile
@@ -2532,6 +2566,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_compatibility
   - name: mmap
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -2551,7 +2586,6 @@ buildvariants:
     push_arch: x86_64-decimal
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release --experimental-decimal-support=on
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -2563,6 +2597,7 @@ buildvariants:
   - name: jsDecimalCore
   - name: jsDecimalCore_WT
   - name: jstestfuzz
+  - name: unittests
 
 ###########################################
 #         Windows buildvariants           #
@@ -2584,7 +2619,6 @@ buildvariants:
     content_type: application/zip
     compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) VARIANT_DIR=win32
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
   tasks:
@@ -2654,6 +2688,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -2674,7 +2709,6 @@ buildvariants:
     content_type: application/zip
     compile_flags: --release --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) MONGO_DISTMOD=2008plus VARIANT_DIR=win32
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
   tasks:
@@ -2745,6 +2779,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -2762,7 +2797,6 @@ buildvariants:
     push_arch: x86_64-2008plus
     content_type: application/zip
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) MONGO_DISTMOD=2008plus
     ext: zip
@@ -2816,6 +2850,7 @@ buildvariants:
   - name: sharding_WT
   - name: tool
   - name: tool_WT
+  - name: unittests
 
 - name: enterprise-windows-64
   display_name: Enterprise Windows
@@ -2835,7 +2870,6 @@ buildvariants:
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
   tasks:
@@ -2859,6 +2893,7 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -2881,7 +2916,6 @@ buildvariants:
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     ext: zip
   tasks:
@@ -2939,6 +2973,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: ssl
   - name: sslSpecial
   - name: push
@@ -2962,7 +2997,6 @@ buildvariants:
     content_type: application/zip
     compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) --wiredtiger=off TARGET_ARCH=i386 VARIANT_DIR=win32
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
     ext: zip
   tasks:
@@ -2974,6 +3008,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_compatibility
   - name: mmap
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -2995,7 +3030,6 @@ buildvariants:
     push_arch: x86_64
     compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
     num_cores: $(sysctl -n hw.logicalcpu)
-    num_jobs_unittests: $(sysctl -n hw.logicalcpu)
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -3062,6 +3096,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3080,7 +3115,6 @@ buildvariants:
     tooltags: "-tags ssl"
     compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
     num_cores: $(sysctl -n hw.logicalcpu)
-    num_jobs_unittests: $(sysctl -n hw.logicalcpu)
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -3148,6 +3182,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3163,7 +3198,6 @@ buildvariants:
     push_name: osx-debug
     push_arch: x86_64
     num_cores: $(sysctl -n hw.logicalcpu)
-    num_jobs_unittests: $(sysctl -n hw.logicalcpu)
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --osx-version-min=10.7 --libc++
   tasks:
@@ -3191,6 +3225,7 @@ buildvariants:
   - name: sharding_WT
   - name: tool
   - name: tool_WT
+  - name: unittests
 
 - name: enterprise-osx-108
   display_name: Enterprise OS X 10.8
@@ -3207,7 +3242,6 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
     num_cores: $(sysctl -n hw.logicalcpu)
-    num_jobs_unittests: $(sysctl -n hw.logicalcpu)
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -3225,6 +3259,7 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3250,7 +3285,6 @@ buildvariants:
     push_arch: x86_64-enterprise-rhel57
     compile_flags: --ssl MONGO_DISTMOD=rhel57 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3274,6 +3308,7 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3295,7 +3330,6 @@ buildvariants:
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3321,6 +3355,7 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3341,7 +3376,6 @@ buildvariants:
     push_arch: x86_64-enterprise-rhel70
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3363,6 +3397,7 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3384,7 +3419,6 @@ buildvariants:
     push_arch: x86_64-rhel55
     compile_flags: --ssl MONGO_DISTMOD=rhel55 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -3465,6 +3499,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3484,7 +3519,6 @@ buildvariants:
     push_arch: x86_64-rhel62
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -3565,6 +3599,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3584,7 +3619,6 @@ buildvariants:
     push_arch: x86_64-rhel70
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -3665,6 +3699,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3689,7 +3724,6 @@ buildvariants:
     push_arch: x86_64-enterprise-ubuntu1204
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1204 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3713,6 +3747,7 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3733,7 +3768,6 @@ buildvariants:
     push_arch: x86_64-enterprise-ubuntu1404
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3757,6 +3791,7 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3781,7 +3816,6 @@ buildvariants:
     push_arch: x86_64-enterprise-suse11
     compile_flags: --ssl MONGO_DISTMOD=suse11 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3805,6 +3839,7 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3824,7 +3859,6 @@ buildvariants:
     push_arch: x86_64-suse11
     compile_flags: --ssl MONGO_DISTMOD=suse11 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -3905,6 +3939,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -3925,7 +3960,6 @@ buildvariants:
     push_arch: x86_64
     compile_flags: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ -j$(kstat cpu | sort -u | grep -c "^module") --release CCFLAGS="-m64" LINKFLAGS="-m64 -static-libstdc++ -static-libgcc" OBJCOPY=/opt/mongodbtoolchain/bin/objcopy
     num_cores: $(kstat cpu | sort -u | grep -c "^module")
-    num_jobs_unittests: $(kstat cpu | sort -u | grep -c "^module")
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -3980,6 +4014,7 @@ buildvariants:
   - name: slow2_WT
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -4004,7 +4039,6 @@ buildvariants:
     push_arch: x86_64-enterprise-debian71
     compile_flags: --ssl MONGO_DISTMOD=debian71 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -4028,6 +4062,7 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -4047,7 +4082,6 @@ buildvariants:
     push_arch: x86_64-debian71
     compile_flags: --ssl MONGO_DISTMOD=debian71 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -4130,6 +4164,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
@@ -4149,7 +4184,6 @@ buildvariants:
     build_rocksdb: true
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ VARIANT_DIR=release
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=rocksdb
   tasks:
   - name: compile
@@ -4194,6 +4228,7 @@ buildvariants:
   - name: slow1
   - name: slow2
   - name: sharding_jscore_passthrough
+  - name: unittests
 
 ###########################################
 #     Experimental buildvariants          #
@@ -4213,7 +4248,6 @@ buildvariants:
     enable_lsan: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
     compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: -j1 --continueOnFailure  # Avoid starting too many mongod's under ASAN build.
   tasks:
   - name: compile
@@ -4296,6 +4330,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: unittests
 
 - name: ubuntu1410-asan
   display_name: ~ ASAN SSL Ubuntu 14.10
@@ -4309,7 +4344,6 @@ buildvariants:
     enable_lsan: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
     compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: -j1 --continueOnFailure  # Avoid starting too many mongod's under ASAN build.
   tasks:
   - name: compile
@@ -4325,7 +4359,6 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --libc++ --ssl -j$(grep -c ^processor /proc/cpuinfo) VARIANT_DIR=build MONGO_DISTMOD=ubuntu1410-clang
     num_cores: $(grep -c ^processor /proc/cpuinfo)
-    num_jobs_unittests: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -4409,6 +4442,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
+  - name: unittests
   - name: push
     distros:
     - rhel55-test
