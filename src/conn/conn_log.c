@@ -109,7 +109,7 @@ __logmgr_config(
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "log.prealloc", &cval));
 	if (cval.val != 0)
-		conn->log_prealloc = 5;
+		conn->log_prealloc = 1;
 
 	/*
 	 * Note that it is meaningless to reconfigure this value during
