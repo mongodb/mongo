@@ -436,10 +436,8 @@ StatusWith<RecordId> InMemoryRecordStore::updateRecord(OperationContext* txn,
     InMemoryRecord* oldRecord = recordFor(loc);
     int oldLen = oldRecord->size;
 
-    if (_isCapped && len > oldLen) {
-        return {ErrorCodes::CannotGrowDocumentInCappedNamespace,
-                "failing update: objects in a capped ns cannot grow"};
-    }
+    // Documents in capped collections cannot change size. We check that above the storage layer.
+    invariant(!_isCapped || len == oldLen);
 
     if (notifier) {
         // The in-memory KV engine uses the invalidation framework (does not support

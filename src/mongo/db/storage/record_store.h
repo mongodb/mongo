@@ -393,6 +393,8 @@ public:
      *                   In the case of an in-place update, this is called just before the
      *                   in-place write occurs.
      * @return Status or RecordId, RecordId might be different
+     *
+     * For capped record stores, the record size will never change.
      */
     virtual StatusWith<RecordId> updateRecord(OperationContext* txn,
                                               const RecordId& oldLocation,

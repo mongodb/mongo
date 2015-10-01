@@ -533,6 +533,19 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
         return StatusWith<RecordId>(
             ErrorCodes::InternalError, "in Collection::updateDocument _id mismatch", 13596);
 
+    // The MMAPv1 storage engine implements capped collections in a way that does not allow records
+    // to grow beyond their original size. If MMAPv1 part of a replicaset with storage engines that
+    // do not have this limitation, replication could result in errors, so it is necessary to set a
+    // uniform rule here. Similarly, it is not sufficient to disallow growing records, because this
+    // happens when secondaries roll back an update shrunk a record. Exactly replicating legacy
+    // MMAPv1 behavior would require padding shrunk documents on all storage engines. Instead forbid
+    // all size changes.
+    const auto oldSize = oldDoc.value().objsize();
+    if (_recordStore->isCapped() && oldSize != newDoc.objsize())
+        return {ErrorCodes::CannotGrowDocumentInCappedNamespace,
+                str::stream() << "Cannot change the size of a document in a capped collection: "
+                              << oldSize << " != " << newDoc.objsize()};
+
     // At the end of this step, we will have a map of UpdateTickets, one per index, which
     // represent the index updates needed to be done, based on the changes between oldDoc and
     // newDoc.

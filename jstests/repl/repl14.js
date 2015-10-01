@@ -15,8 +15,8 @@ function testWithCollectionIndexIds( capped, sparse, useIds ) {
     mc.ensureIndex( {a:1}, {sparse:sparse} );
     toInsert = {};
     if ( capped ) {
-        // Add some padding, so there will be space to push an array.
-        toInsert = {padding:new Array( 500 ).toString()};
+        // Add a singleton array as padding, so the push later on will not change document size.
+        toInsert = {p:[1]};
     }
     if ( useIds ) { // Insert wiith an auto generated _id.
         mc.insert( toInsert );
@@ -34,10 +34,10 @@ function testWithCollectionIndexIds( capped, sparse, useIds ) {
     
     modifiers = {$push:{a:1}};
     if ( capped ) {
-        // If padding was added, clear it.
-        modifiers['$unset'] = {padding:1};
+        // Delete our singleton array to balance the new singleton array we're going to create.
+        modifiers['$unset'] = {p:1};
     }
-    mc.update( {}, modifiers );
+    assert.writeOK(mc.update( {}, modifiers ));
     
     // Wait for the update to be replicated.
     assert.soon( function() { return sc.count( {a:1} ) > 0; } );
