@@ -49,8 +49,12 @@ SASLGlobalParams::SASLGlobalParams() {
     authenticationMechanisms.push_back("MONGODB-CR");
     authenticationMechanisms.push_back("MONGODB-X509");
     authenticationMechanisms.push_back("SCRAM-SHA-1");
+
     // Default iteration count for SCRAM authentication.
     scramIterationCount = defaultScramIterationCount;
+
+    // Default value for auth failed delay
+    authFailedDelay = 0;
 }
 
 Status addSASLOptions(moe::OptionSection* options) {

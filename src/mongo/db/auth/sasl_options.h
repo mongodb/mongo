@@ -49,6 +49,7 @@ struct SASLGlobalParams {
     std::string serviceName;
     std::string authdPath;
     std::atomic<int> scramIterationCount;
+    std::atomic<int> authFailedDelay;
 
     SASLGlobalParams();
 };

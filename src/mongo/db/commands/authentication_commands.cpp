@@ -48,6 +48,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/mongo_authentication_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
@@ -187,6 +188,7 @@ bool CmdAuthenticate::run(OperationContext* txn,
         } else {
             appendCommandStatus(result, status);
         }
+        sleepmillis(saslGlobalParams.authFailedDelay);
         return false;
     }
     result.append("dbname", user.getDB());
