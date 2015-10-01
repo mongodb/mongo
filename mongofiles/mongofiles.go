@@ -37,9 +37,6 @@ type MongoFiles struct {
 	// mongofiles-specific storage options
 	StorageOptions *StorageOptions
 
-	// mongofiles-specific input options
-	InputOptions *InputOptions
-
 	// for connecting to the db
 	SessionProvider *db.SessionProvider
 
@@ -273,24 +270,6 @@ func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 		connUrl = fmt.Sprintf("%s:%s", connUrl, mf.ToolOptions.Port)
 	}
 
-	var mode mgo.Mode = mgo.Nearest
-	var tags bson.D
-
-	if mf.InputOptions.ReadPreference != "" {
-		var err error
-		mode, tags, err = db.ParseReadPreference(mf.InputOptions.ReadPreference)
-		if err != nil {
-			return "", fmt.Errorf("error parsing --readPreference : %v", err)
-		}
-		if len(tags) > 0 {
-			mf.SessionProvider.SetTags(tags)
-		}
-	}
-
-	mf.SessionProvider.SetReadPreference(mode)
-	mf.SessionProvider.SetTags(tags)
-	mf.SessionProvider.SetFlags(db.DisableSocketTimeout)
-
 	// get session
 	session, err := mf.SessionProvider.GetSession()
 	if err != nil {
@@ -314,6 +293,7 @@ func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 	// configure the session with the appropriate write concern and ensure the
 	// socket does not timeout
 	session.SetSafe(safety)
+	session.SetSocketTimeout(0)
 
 	if displayHost {
 		log.Logf(log.Always, "connected to: %v", connUrl)

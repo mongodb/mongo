@@ -41,8 +41,7 @@ func (*OutputFormatOptions) Name() string {
 type InputOptions struct {
 	Query          string `long:"query" value-name:"<json>" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
 	QueryFile      string `long:"queryFile" value-name:"<filename>" description:"path to a file containing a query filter (JSON)"`
-	SlaveOk        bool   `long:"slaveOk" short:"k" description:"allow secondary reads if available (default true)" default:"false" default-mask:"-"`
-	ReadPreference string `long:"readPreference" value-name:"<string>|<json>" description:"specify either a preference name or a preference json object"`
+	SlaveOk        bool   `long:"slaveOk" short:"k" description:"allow secondary reads if available (default true)" default:"true" default-mask:"-"`
 	ForceTableScan bool   `long:"forceTableScan" description:"force a table scan (do not use $snapshot)"`
 	Skip           int    `long:"skip" value-name:"<count>" description:"number of documents to skip"`
 	Limit          int    `long:"limit" value-name:"<count>" description:"limit the number of documents to export"`
