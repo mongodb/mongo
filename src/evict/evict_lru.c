@@ -1521,7 +1521,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 			cache->app_evicts++;
 			if (txn_busy)
 				return (0);
-			/* Fallthrough */
+			/* FALLTHROUGH */
 		case EBUSY:
 			break;
 		case WT_NOTFOUND:
