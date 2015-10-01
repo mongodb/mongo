@@ -1145,14 +1145,14 @@ TEST_F(QueryPlannerTest, OrElemMatchObjectBeneathAnd) {
         "{fetch: {filter: {a:{$elemMatch:{b:{$gte:4}}}}, node: "
         "{ixscan: {filter: null, pattern: {'a.b': 1},"
         "bounds: {'a.b': [[4,Infinity,true,true]]}}}}}]}}");
-     assertSolutionExists(
-         "{or: {nodes: ["
-         "{fetch: {filter: {a:{$elemMatch:{b:{$lte:1}}}},"
-         "node: {ixscan: {filter: null, pattern: {'a.b': 1}, "
-         "bounds: {'a.b': [[0,0,true,true]]}}}}},"
-         "{fetch: {filter: {a:{$elemMatch:{b:{$gte:4}}}}, node: "
-         "{ixscan: {filter: null, pattern: {'a.b': 1},"
-         "bounds: {'a.b': [[4,Infinity,true,true]]}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: ["
+        "{fetch: {filter: {a:{$elemMatch:{b:{$lte:1}}}},"
+        "node: {ixscan: {filter: null, pattern: {'a.b': 1}, "
+        "bounds: {'a.b': [[0,0,true,true]]}}}}},"
+        "{fetch: {filter: {a:{$elemMatch:{b:{$gte:4}}}}, node: "
+        "{ixscan: {filter: null, pattern: {'a.b': 1},"
+        "bounds: {'a.b': [[4,Infinity,true,true]]}}}}}]}}");
 }
 
 // SERVER-13960: $or below $elemMatch with an inexact covered predicate.
@@ -1921,9 +1921,9 @@ TEST_F(QueryPlannerTest, ElemMatchWithAllElemMatchChild2) {
     assertSolutionExists(
         "{fetch: {node: {ixscan: {pattern: {'a.b.c.d': 1}, "
         "bounds: {'a.b.c.d': [[-Infinity,3,true,false]]}}}}}");
-     assertSolutionExists(
-         "{fetch: {node: {ixscan: {pattern: {'a.b.c.d': 1}, "
-         "bounds: {'a.b.c.d': [[1,Infinity,false,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b.c.d': 1}, "
+        "bounds: {'a.b.c.d': [[1,Infinity,false,true]]}}}}}");
 }
 
 // SERVER-13677
@@ -1937,12 +1937,12 @@ TEST_F(QueryPlannerTest, ElemMatchWithAllChild) {
     assertSolutionExists(
         "{fetch: {node: {ixscan: {pattern: {'a.b.c': 1}, "
         "bounds: {'a.b.c': [[4,4,true,true]]}}}}}");
-     assertSolutionExists(
-         "{fetch: {node: {ixscan: {pattern: {'a.b.c': 1}, "
-         "bounds: {'a.b.c': [[5,5,true,true]]}}}}}");
-     assertSolutionExists(
-         "{fetch: {node: {ixscan: {pattern: {'a.b.c': 1}, "
-         "bounds: {'a.b.c': [[6,6,true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b.c': 1}, "
+        "bounds: {'a.b.c': [[5,5,true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b.c': 1}, "
+        "bounds: {'a.b.c': [[6,6,true,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, ElemMatchValueMatch) {
@@ -2036,11 +2036,11 @@ TEST_F(QueryPlannerTest, ElemMatchEmbeddedAnd) {
         "{ixscan: {filter: null, pattern: {'a.b': 1, 'a.c': 1}, "
         "bounds: {'a.b': [[-Infinity,4,true,false]], "
         "'a.c': [[25,25,true,true]]}}}}}");
-     assertSolutionExists(
-         "{fetch: {filter: {a:{$elemMatch:{b:{$gte:2,$lt: 4},c:25}}}, node: "
-         "{ixscan: {filter: null, pattern: {'a.b': 1, 'a.c': 1}, "
-         "bounds: {'a.b': [[2,Infinity,true,true]], "
-         "'a.c': [[25,25,true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a:{$elemMatch:{b:{$gte:2,$lt: 4},c:25}}}, node: "
+        "{ixscan: {filter: null, pattern: {'a.b': 1, 'a.c': 1}, "
+        "bounds: {'a.b': [[2,Infinity,true,true]], "
+        "'a.c': [[25,25,true,true]]}}}}}");
 }
 
 // SERVER-13664
@@ -4531,10 +4531,10 @@ TEST_F(QueryPlannerTest, MultikeySharedPrefixNoIntersectOutsideElemMatch) {
         "{fetch: {node: {ixscan: {pattern: {'a.b':1,'a.c':1}, bounds: "
         "{'a.b': [[0,Infinity,false,true]], "
         " 'a.c': [[1,1,true,true]]}}}}}");
-     assertSolutionExists(
-         "{fetch: {node: {ixscan: {pattern: {'a.b':1,'a.c':1}, bounds: "
-         "{'a.b': [[1,1,true,true]], "
-         " 'a.c': [['MinKey','MaxKey',true,true]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'a.b':1,'a.c':1}, bounds: "
+        "{'a.b': [[1,1,true,true]], "
+        " 'a.c': [['MinKey','MaxKey',true,true]]}}}}}");
 }
 
 // Bounds for the predicates joined by the $elemMatch over the shared prefix
