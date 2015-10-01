@@ -95,8 +95,14 @@ std::string NetworkInterfaceASIO::getHostName() {
 
 void NetworkInterfaceASIO::startup() {
     _serviceRunner = stdx::thread([this]() {
-        asio::io_service::work work(_io_service);
-        _io_service.run();
+        try {
+            asio::io_service::work work(_io_service);
+            _io_service.run();
+        } catch (...) {
+            severe() << "Uncaught exception in NetworkInterfaceASIO IO worker thread of type: "
+                     << exceptionToStatus();
+            fassertFailed(28820);
+        }
     });
     _state.store(State::kRunning);
 }
