@@ -1389,94 +1389,24 @@ TEST_F(ReplCoordTest, StepDownAndBackUpSingleNode) {
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 }
 
-/**
- * Used to run wait for stepDown() to finish in a separate thread without blocking execution of
- * the test. To use, set the values of "force", "waitTime", and "stepDownTime", which will be
- * used as the arguments passed to stepDown, and then call
- * start(), which will spawn a thread that calls stepDown.  No calls may be made
- * on the StepDownRunner instance between calling start and getResult().  After returning
- * from getResult(), you can call reset() to allow the StepDownRunner to be reused for another
- * stepDown call.
- */
-class StepDownRunner {
-public:
-    StepDownRunner(ReplicationCoordinatorImpl* replCoord)
-        : _replCoord(replCoord),
-          _finished(false),
-          _result(Status::OK()),
-          _force(false),
-          _waitTime(0),
-          _stepDownTime(0) {}
-
-    // may block
-    Status getResult() {
-        _thread->join();
-        ASSERT(_finished);
-        return _result;
-    }
-
-    void start(OperationContext* txn) {
-        ASSERT(!_finished);
-        _thread.reset(new stdx::thread(stdx::bind(&StepDownRunner::_stepDown, this, txn)));
-    }
-
-    void reset() {
-        ASSERT(_finished);
-        _finished = false;
-        _result = Status(ErrorCodes::InternalError, "Result Status never set");
-    }
-
-    void setForce(bool force) {
-        _force = force;
-    }
-
-    void setWaitTime(const Milliseconds& waitTime) {
-        _waitTime = waitTime;
-    }
-
-    void setStepDownTime(const Milliseconds& stepDownTime) {
-        _stepDownTime = stepDownTime;
-    }
-
-private:
-    void _stepDown(OperationContext* txn) {
-        _result = _replCoord->stepDown(txn, _force, _waitTime, _stepDownTime);
-        _finished = true;
-    }
-
-    ReplicationCoordinatorImpl* _replCoord;
-    bool _finished;
-    Status _result;
-    std::unique_ptr<stdx::thread> _thread;
-    bool _force;
-    Milliseconds _waitTime;
-    Milliseconds _stepDownTime;
-};
-
 TEST_F(StepDownTest, StepDownNotCaughtUp) {
     OperationContextReplMock txn;
     OpTimeWithTermZero optime1(100, 1);
     OpTimeWithTermZero optime2(100, 2);
     // No secondary is caught up
-    getReplCoord()->setMyLastOptime(optime2);
+    auto repl = getReplCoord();
+    repl->setMyLastOptime(optime2);
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime1));
     ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 2, optime1));
 
-    // Try to stepDown but time out because no secondaries are caught up
-    StepDownRunner runner(getReplCoord());
-    runner.setForce(false);
-    runner.setWaitTime(Milliseconds(0));
-    runner.setStepDownTime(Milliseconds(1000));
-
     simulateSuccessfulV1Election();
 
-    runner.start(&txn);
-    Status status = runner.getResult();
+    // Try to stepDown but time out because no secondaries are caught up.
+    auto status = repl->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000));
     ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
-    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+    ASSERT_TRUE(repl->getMemberState().primary());
 
     // Now use "force" to force it to step down even though no one is caught up
-    runner.reset();
     getNet()->enterNetwork();
     const Date_t startDate = getNet()->now();
     while (startDate + Milliseconds(1000) < getNet()->now()) {
@@ -1486,12 +1416,10 @@ TEST_F(StepDownTest, StepDownNotCaughtUp) {
         getNet()->runUntil(startDate + Milliseconds(1000));
     }
     getNet()->exitNetwork();
-    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
-    runner.setForce(true);
-    runner.start(&txn);
-    status = runner.getResult();
+    ASSERT_TRUE(repl->getMemberState().primary());
+    status = repl->stepDown(&txn, true, Milliseconds(0), Milliseconds(1000));
     ASSERT_OK(status);
-    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+    ASSERT_TRUE(repl->getMemberState().secondary());
 }
 
 TEST_F(StepDownTest, StepDownCatchUp) {
@@ -1499,15 +1427,10 @@ TEST_F(StepDownTest, StepDownCatchUp) {
     OpTimeWithTermZero optime1(100, 1);
     OpTimeWithTermZero optime2(100, 2);
     // No secondary is caught up
-    getReplCoord()->setMyLastOptime(optime2);
-    ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime1));
-    ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 2, optime1));
-
-    // stepDown where the secondary actually has to catch up before the stepDown can succeed
-    StepDownRunner runner(getReplCoord());
-    runner.setForce(false);
-    runner.setWaitTime(Milliseconds(10000));
-    runner.setStepDownTime(Milliseconds(60000));
+    auto repl = getReplCoord();
+    repl->setMyLastOptime(optime2);
+    ASSERT_OK(repl->setLastOptime_forTest(1, 1, optime1));
+    ASSERT_OK(repl->setLastOptime_forTest(1, 2, optime1));
 
     simulateSuccessfulV1Election();
 
@@ -1516,7 +1439,6 @@ TEST_F(StepDownTest, StepDownCatchUp) {
     // T + 2 seconds and send out a new round of heartbeats immediately.
     // This makes it unnecessary to advance the clock after entering the network to process
     // the heartbeat requests.
-    auto repl = getReplCoord();
     Status result(ErrorCodes::InternalError, "not mutated");
     auto globalReadLockAndEventHandle =
         repl->stepDown_nonBlocking(&txn, false, Milliseconds(10000), Milliseconds(60000), &result);
@@ -1550,7 +1472,7 @@ TEST_F(StepDownTest, StepDownCatchUp) {
 
     getReplExec()->waitForEvent(eventHandle);
     ASSERT_OK(result);
-    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+    ASSERT_TRUE(repl->getMemberState().secondary());
 }
 
 TEST_F(StepDownTest, InterruptStepDown) {
@@ -1559,26 +1481,28 @@ TEST_F(StepDownTest, InterruptStepDown) {
     OpTimeWithTermZero optime1(100, 1);
     OpTimeWithTermZero optime2(100, 2);
     // No secondary is caught up
-    getReplCoord()->setMyLastOptime(optime2);
-    ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 1, optime1));
-    ASSERT_OK(getReplCoord()->setLastOptime_forTest(1, 2, optime1));
-
-    // stepDown where the secondary actually has to catch up before the stepDown can succeed
-    StepDownRunner runner(getReplCoord());
-    runner.setForce(false);
-    runner.setWaitTime(Milliseconds(10000));
-    runner.setStepDownTime(Milliseconds(60000));
+    auto repl = getReplCoord();
+    repl->setMyLastOptime(optime2);
+    ASSERT_OK(repl->setLastOptime_forTest(1, 1, optime1));
+    ASSERT_OK(repl->setLastOptime_forTest(1, 2, optime1));
 
     simulateSuccessfulV1Election();
-    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+    ASSERT_TRUE(repl->getMemberState().primary());
 
-    runner.start(&txn);
+    // stepDown where the secondary actually has to catch up before the stepDown can succeed.
+    Status result(ErrorCodes::InternalError, "not mutated");
+    auto globalReadLockAndEventHandle =
+        repl->stepDown_nonBlocking(&txn, false, Milliseconds(10000), Milliseconds(60000), &result);
+    const auto& eventHandle = globalReadLockAndEventHandle.second;
+    ASSERT_TRUE(eventHandle);
+    ASSERT_TRUE(txn.lockState()->isReadLocked());
 
     txn.setCheckForInterruptStatus(kInterruptedStatus);
     getReplCoord()->interrupt(opID);
 
-    ASSERT_EQUALS(ErrorCodes::Interrupted, runner.getResult());
-    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+    getReplExec()->waitForEvent(eventHandle);
+    ASSERT_EQUALS(ErrorCodes::Interrupted, result);
+    ASSERT_TRUE(repl->getMemberState().primary());
 }
 
 TEST_F(ReplCoordTest, GetReplicationModeNone) {
