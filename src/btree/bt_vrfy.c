@@ -352,7 +352,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs)
 	if (vs->dump_blocks)
 		WT_RET(__wt_debug_disk(session, page->dsk, NULL));
 	if (vs->dump_pages)
-		WT_RET(__wt_debug_page(session, page, NULL));
+		WT_RET(__wt_debug_page(session, S2BT(session), page, NULL));
 #endif
 
 	/*
