@@ -66,7 +66,7 @@ func main() {
 		inputOpts.ReadPreference = "nearest"
 	}
 
-	var mode mgo.Mode = mgo.Nearest
+	var mode = mgo.Nearest
 	var tags bson.D
 	if inputOpts.ReadPreference != "" {
 		mode, tags, err = db.ParseReadPreference(inputOpts.ReadPreference)

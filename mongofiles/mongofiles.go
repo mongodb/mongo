@@ -273,7 +273,7 @@ func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 		connUrl = fmt.Sprintf("%s:%s", connUrl, mf.ToolOptions.Port)
 	}
 
-	var mode mgo.Mode = mgo.Nearest
+	var mode = mgo.Nearest
 	var tags bson.D
 
 	if mf.InputOptions.ReadPreference != "" {

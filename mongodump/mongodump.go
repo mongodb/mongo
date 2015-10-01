@@ -124,7 +124,7 @@ func (dump *MongoDump) Init() error {
 		return fmt.Errorf("can't use --oplog option when dumping from a mongos")
 	}
 
-	var mode mgo.Mode = mgo.Nearest
+	var mode = mgo.Nearest
 	var tags bson.D
 
 	if dump.InputOptions.ReadPreference != "" {
