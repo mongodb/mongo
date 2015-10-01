@@ -12,6 +12,7 @@ selector:
     exclude_files:
     - jstests/sharding/csrs_upgrade.js                   # SERVER-20694
     - jstests/sharding/csrs_upgrade_during_migrate.js    # flaky - SERVER-20580
+    - jstests/sharding/multi_mongos2.js                  # SERVER-20676
     # Skip any tests that run with auth explicitly.
     - jstests/sharding/*[aA]uth*.js
     - jstests/sharding/replset_config/*[aA]uth*.js
