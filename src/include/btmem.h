@@ -578,8 +578,7 @@ struct __wt_page {
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
 #define	WT_PAGE_OVERFLOW_KEYS	0x10	/* Page has overflow keys */
-#define	WT_PAGE_RECONCILIATION	0x20	/* Page reconciliation lock */
-#define	WT_PAGE_SPLIT_INSERT	0x40	/* A leaf page was split for append */
+#define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	/*
@@ -602,6 +601,12 @@ struct __wt_page {
 #define	WT_READGEN_OLDEST	1
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
+
+	/*
+	 * Used to protect and co-ordinate splits for internal pages and
+	 * reconciliation for all pages.
+	 */
+	WT_FAIR_LOCK page_lock;
 
 	size_t memory_footprint;	/* Memory attached to the page */
 
