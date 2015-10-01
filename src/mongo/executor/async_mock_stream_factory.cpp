@@ -66,17 +66,17 @@ StringData stateToString(AsyncMockStreamFactory::MockStream::StreamState state) 
     MONGO_UNREACHABLE;
 }
 
-template <typename Handler, typename... Args>
+template <typename Handler>
 void checkCanceled(asio::io_service* io_service,
                    AsyncMockStreamFactory::MockStream::StreamState* state,
                    Handler&& handler,
-                   std::size_t bytes) {
+                   std::size_t bytes,
+                   std::error_code ec = std::error_code()) {
     auto wasCancelled = (*state == AsyncMockStreamFactory::MockStream::StreamState::kCanceled);
     *state = AsyncMockStreamFactory::MockStream::StreamState::kRunning;
     asio::post(*io_service,
-               [handler, wasCancelled, bytes] {
-                   handler(wasCancelled ? make_error_code(asio::error::operation_aborted)
-                                        : std::error_code(),
+               [handler, wasCancelled, bytes, ec] {
+                   handler(wasCancelled ? make_error_code(asio::error::operation_aborted) : ec,
                            bytes);
                });
 }
@@ -174,25 +174,29 @@ void AsyncMockStreamFactory::MockStream::read(asio::mutable_buffer buf,
     _defer(kBlockedBeforeRead,
            [this, buf, readHandler]() {
                stdx::unique_lock<stdx::mutex> lk(_mutex);
+               int nToCopy = 0;
 
-               auto nextRead = std::move(_readQueue.front());
-               _readQueue.pop();
+               // If we've set an error, return that instead of a read.
+               if (!_error) {
+                   auto nextRead = std::move(_readQueue.front());
+                   _readQueue.pop();
 
-               auto beginDst = asio::buffer_cast<uint8_t*>(buf);
-               auto nToCopy = std::min(nextRead.size(), asio::buffer_size(buf));
+                   auto beginDst = asio::buffer_cast<uint8_t*>(buf);
+                   nToCopy = std::min(nextRead.size(), asio::buffer_size(buf));
 
-               auto endSrc = std::begin(nextRead);
-               std::advance(endSrc, nToCopy);
+                   auto endSrc = std::begin(nextRead);
+                   std::advance(endSrc, nToCopy);
 
-               auto endDst = std::copy(std::begin(nextRead), endSrc, beginDst);
-               invariant((endDst - beginDst) == static_cast<std::ptrdiff_t>(nToCopy));
-               log() << "read " << nToCopy << " bytes, " << (nextRead.size() - nToCopy)
-                     << " remaining in buffer";
+                   auto endDst = std::copy(std::begin(nextRead), endSrc, beginDst);
+                   invariant((endDst - beginDst) == static_cast<std::ptrdiff_t>(nToCopy));
+                   log() << "read " << nToCopy << " bytes, " << (nextRead.size() - nToCopy)
+                         << " remaining in buffer";
+               }
 
                auto handler = readHandler;
 
                // If we did not receive all the bytes, we should return an error
-               if (nToCopy < asio::buffer_size(buf)) {
+               if (static_cast<size_t>(nToCopy) < asio::buffer_size(buf)) {
                    handler = [readHandler](std::error_code ec, size_t len) {
                        // If we have an error here we've been canceled, and that takes precedence
                        if (ec)
@@ -203,7 +207,8 @@ void AsyncMockStreamFactory::MockStream::read(asio::mutable_buffer buf,
                    };
                }
 
-               checkCanceled(_io_service, &_state, std::move(handler), nToCopy);
+               checkCanceled(_io_service, &_state, std::move(handler), nToCopy, _error);
+               _error.clear();
            });
 }
 
@@ -211,6 +216,10 @@ void AsyncMockStreamFactory::MockStream::pushRead(std::vector<uint8_t> toRead) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_state != kRunning && _state != kCanceled);
     _readQueue.emplace(std::move(toRead));
+}
+
+void AsyncMockStreamFactory::MockStream::setError(std::error_code ec) {
+    _error = ec;
 }
 
 std::vector<uint8_t> AsyncMockStreamFactory::MockStream::popWrite() {

@@ -161,6 +161,161 @@ TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
     ASSERT(result == ErrorCodes::CallbackCanceled);
 }
 
+TEST_F(NetworkInterfaceASIOTest, ImmediateCancel) {
+    auto cbh = makeCallbackHandle();
+
+    auto deferred =
+        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+
+    // Cancel immediately
+    net().cancelCommand(cbh);
+
+    // Allow stream to connect so operation can return
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(NetworkInterfaceASIOTest, LateCancel) {
+    auto cbh = makeCallbackHandle();
+    auto deferred =
+        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+
+    // Allow stream to connect so operation can return
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    // Simulate user command
+    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               RemoteCommandResponse response;
+                               response.data = BSONObj();
+                               response.metadata = BSONObj();
+                               return response;
+                           });
+
+    // Allow to complete, then cancel, nothing should happen.
+    deferred.get();
+    net().cancelCommand(cbh);
+}
+
+TEST_F(NetworkInterfaceASIOTest, CancelWithNetworkError) {
+    auto cbh = makeCallbackHandle();
+    auto deferred =
+        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+
+    // Create and initialize a stream so operation can begin
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // simulate isMaster reply.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    {
+        WriteEvent{stream}.skip();
+        ReadEvent read{stream};
+
+        // Trigger both a cancellation and a network error
+        stream->setError(make_error_code(ErrorCodes::HostUnreachable));
+        net().cancelCommand(cbh);
+    }
+
+    // Wait for op to complete, assert that cancellation error had precedence.
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(NetworkInterfaceASIOTest, CancelWithTimeout) {
+    auto cbh = makeCallbackHandle();
+    auto deferred =
+        startCommand(cbh, RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj()));
+
+    // Create and initialize a stream so operation can begin
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    {
+        WriteEvent write{stream};
+
+        // Trigger both a cancellation and a timeout
+        net().cancelCommand(cbh);
+        timerFactory().fastForward(Milliseconds(500));
+    }
+
+    // Wait for op to complete, assert that cancellation error had precedence.
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
+    auto cbh = makeCallbackHandle();
+    auto deferred = startCommand(
+        cbh,
+        RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj(), Milliseconds(100)));
+
+    // Create and initialize a stream so operation can begin
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    {
+        WriteEvent{stream}.skip();
+        ReadEvent read{stream};
+
+        // Trigger both a timeout and a network error
+        stream->setError(make_error_code(ErrorCodes::HostUnreachable));
+        timerFactory().fastForward(Milliseconds(500));
+    }
+
+    // Wait for op to complete, assert that timeout had precedence.
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::ExceededTimeLimit);
+}
+
+TEST_F(NetworkInterfaceASIOTest, CancelWithTimeoutAndNetworkError) {
+    auto cbh = makeCallbackHandle();
+    auto deferred = startCommand(
+        cbh,
+        RemoteCommandRequest(testHost, "testDB", BSON("a" << 1), BSONObj(), Milliseconds(100)));
+
+    // Create and initialize a stream so operation can begin
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request)
+                               -> RemoteCommandResponse { return simulateIsMaster(request); });
+
+    {
+        WriteEvent{stream}.skip();
+        ReadEvent read{stream};
+
+        // Trigger a timeout, a cancellation, and a network error
+        stream->setError(make_error_code(ErrorCodes::HostUnreachable));
+        timerFactory().fastForward(Milliseconds(500));
+        net().cancelCommand(cbh);
+    }
+
+    // Wait for op to complete, assert that the cancellation had precedence.
+    auto& result = deferred.get();
+    ASSERT(result == ErrorCodes::CallbackCanceled);
+}
+
 TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
     // Kick off operation
     auto cb = makeCallbackHandle();

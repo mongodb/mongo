@@ -88,6 +88,8 @@ public:
         std::vector<uint8_t> popWrite();
         void pushRead(std::vector<uint8_t> toRead);
 
+        void setError(std::error_code ec);
+
         void unblock();
 
         void simulateServer(
@@ -113,6 +115,8 @@ public:
 
         std::queue<std::vector<uint8_t>> _readQueue;
         std::queue<std::vector<uint8_t>> _writeQueue;
+
+        std::error_code _error;
 
         Action _deferredAction;
     };
