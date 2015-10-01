@@ -309,9 +309,11 @@ func TestMongoDumpKerberos(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		mongoDump := MongoDump{
-			ToolOptions:   opts,
-			InputOptions:  &InputOptions{},
-			OutputOptions: &OutputOptions{},
+			ToolOptions:  opts,
+			InputOptions: &InputOptions{},
+			OutputOptions: &OutputOptions{
+				NumParallelCollections: 1,
+			},
 		}
 
 		mongoDump.OutputOptions.Out = KerberosDumpDirectory
