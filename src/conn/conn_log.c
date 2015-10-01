@@ -50,15 +50,14 @@ __logmgr_config(
 
 	conn = S2C(session);
 
-	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
 	/*
 	 * If we're reconfiguring, enabled must match the already
 	 * existing setting.
-	 */
-	/*
+	 *
 	 * If it is off and the user it turning it on, or it is on
 	 * and the user is turning it off, return an error.
 	 */
+	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
 	if (reconfig &&
 	    ((cval.val != 0 &&
 	    !FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) ||
@@ -104,20 +103,19 @@ __logmgr_config(
 		    log_max_filesize, conn->log_file_max);
 	}
 
-	WT_RET(__wt_config_gets(session, cfg, "log.prealloc", &cval));
 	/*
 	 * If pre-allocation is configured, set the initial number to a few.
 	 * We'll adapt as load dictates.
 	 */
-	if (cval.val != 0) {
-		FLD_SET(conn->log_flags, WT_CONN_LOG_PREALLOC);
+	WT_RET(__wt_config_gets(session, cfg, "log.prealloc", &cval));
+	if (cval.val != 0)
 		conn->log_prealloc = 5;
-	}
-	WT_RET(__wt_config_gets_def(session, cfg, "log.recover", 0, &cval));
+
 	/*
 	 * Note that it is meaningless to reconfigure this value during
 	 * runtime.  It only matters on create before recovery runs.
 	 */
+	WT_RET(__wt_config_gets_def(session, cfg, "log.recover", 0, &cval));
 	if (cval.len != 0  && WT_STRING_MATCH("error", cval.str, cval.len))
 		FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR);
 
@@ -857,11 +855,6 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 	WT_RET(__wt_thread_create(conn->log_wrlsn_session,
 	    &conn->log_wrlsn_tid, __log_wrlsn_server, conn->log_wrlsn_session));
 	conn->log_wrlsn_tid_set = true;
-
-	/* If no log thread services are configured, we're done. */ 
-	if (!FLD_ISSET(conn->log_flags,
-	    (WT_CONN_LOG_ARCHIVE | WT_CONN_LOG_PREALLOC)))
-		return (0);
 
 	/*
 	 * If a log server thread exists, the user may have reconfigured

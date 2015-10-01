@@ -866,6 +866,18 @@ __split_parent_lock(
 	*parentp = NULL;
 
 	/*
+	 * A checkpoint reconciling this parent page can deadlock with
+	 * our split. We have an exclusive page lock on the child before
+	 * we acquire the page's reconciliation lock, and reconciliation
+	 * acquires the page's reconciliation lock before it encounters
+	 * the child's exclusive lock (which causes reconciliation to
+	 * loop until the exclusive lock is resolved). If we want to split
+	 * the parent, give up to avoid that deadlock.
+	 */
+	if (S2BT(session)->checkpointing != WT_CKPT_OFF)
+		return (EBUSY);
+
+	/*
 	 * Get a page-level lock on the parent to single-thread splits into the
 	 * page because we need to single-thread sizing/growing the page index.
 	 * It's OK to queue up multiple splits as the child pages split, but the
@@ -882,32 +894,11 @@ __split_parent_lock(
 	 */
 	for (;;) {
 		parent = ref->home;
-		F_CAS_ATOMIC(parent, WT_PAGE_RECONCILIATION, ret);
-		if (ret == 0) {
-			/*
-			 * We can race with another thread deepening our parent.
-			 * To deal with that, read the parent pointer each time
-			 * we try to lock it, and check it's still correct after
-			 * it's locked.
-			 */
-			if (parent == ref->home)
-				break;
-			F_CLR_ATOMIC(parent, WT_PAGE_RECONCILIATION);
-			continue;
-		}
-
-		/*
-		 * A checkpoint reconciling this parent page can deadlock with
-		 * our split. We have an exclusive page lock on the child before
-		 * we acquire the page's reconciliation lock, and reconciliation
-		 * acquires the page's reconciliation lock before it encounters
-		 * the child's exclusive lock (which causes reconciliation to
-		 * loop until the exclusive lock is resolved). If we can't lock
-		 * the parent, give up to avoid that deadlock.
-		 */
-		if (S2BT(session)->checkpointing != WT_CKPT_OFF)
-			return (EBUSY);
-		__wt_yield();
+		WT_RET(__wt_fair_lock(session, &parent->page_lock));
+		if (parent == ref->home)
+			break;
+		/* Try again if the page deepened while we were waiting */
+		WT_RET(__wt_fair_unlock(session, &parent->page_lock));
 	}
 
 	/*
@@ -930,7 +921,7 @@ __split_parent_lock(
 	*parentp = parent;
 	return (0);
 
-err:	F_CLR_ATOMIC(parent, WT_PAGE_RECONCILIATION);
+err:	WT_TRET(__wt_fair_unlock(session, &parent->page_lock));
 	return (ret);
 }
 
@@ -946,7 +937,7 @@ __split_parent_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
 	if (hazard)
 		ret = __wt_hazard_clear(session, parent);
 
-	F_CLR_ATOMIC(parent, WT_PAGE_RECONCILIATION);
+	WT_TRET(__wt_fair_unlock(session, &parent->page_lock));
 	return (ret);
 }
 
