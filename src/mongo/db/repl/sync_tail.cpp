@@ -314,7 +314,6 @@ void applyOps(const std::vector<std::vector<BSONObj>>& writerVectors,
             writerPool->schedule(func, stdx::cref(*it), sync);
         }
     }
-    writerPool->join();
 }
 
 void fillWriterVectors(const std::deque<BSONObj>& ops,
@@ -382,11 +381,12 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
 
     applyOps(writerVectors, &_writerPool, _applyFunc, this);
 
+    OpTime lastOpTime = writeOpsToOplog(txn, ops.getDeque());
     if (inShutdown()) {
         return OpTime();
     }
-
-    OpTime lastOpTime = writeOpsToOplog(txn, ops.getDeque());
+    _writerPool.join();
+    // We have now written all database writes and updated the oplog to match.
 
     ReplClientInfo::forClient(txn->getClient()).setLastOp(lastOpTime);
     replCoord->setMyLastOptime(lastOpTime);
