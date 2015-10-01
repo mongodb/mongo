@@ -164,7 +164,9 @@ func (self *SessionProvider) SetTags(tags bson.D) {
 // create the initial session.
 func NewSessionProvider(opts options.ToolOptions) (*SessionProvider, error) {
 	// create the provider
-	provider := &SessionProvider{}
+	provider := &SessionProvider{
+		readPreference: mgo.Primary,
+	}
 
 	// finalize auth options, filling in missing passwords
 	if opts.Auth.ShouldAskForPassword() {
