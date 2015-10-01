@@ -28,7 +28,7 @@ __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
 	 * We use a separate handle for file size changes, so there's no need
 	 * for locking.
 	 */
-	fh->fallocate_requires_locking = 0;
+	fh->fallocate_requires_locking = false;
 }
 
 /*

@@ -18,7 +18,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
-	int evict_reset;
+	bool evict_reset;
 
 	/*
 	 * We need exclusive access to the file -- disable ordinary eviction
@@ -27,7 +27,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_RET(__wt_evict_file_exclusive_on(session, &evict_reset));
 
 	/* Make sure the oldest transaction ID is up-to-date. */
-	__wt_txn_update_oldest(session, 1);
+	__wt_txn_update_oldest(session, true);
 
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;
@@ -80,7 +80,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			break;
 		case WT_SYNC_DISCARD:
 			WT_ASSERT(session,
-			    __wt_page_can_evict(session, page, 0));
+			    __wt_page_can_evict(session, page, 0, NULL));
 			__wt_evict_page_clean_update(session, ref);
 			break;
 		case WT_SYNC_DISCARD_FORCE:

@@ -21,7 +21,7 @@ static char *cbuf;
 static int
 append_target(WT_SESSION *session, const char *target, char **bufp)
 {
-	static int first = 1;
+	static bool first = true;
 	static size_t len = 0, remain = 0;
 	static char *buf = NULL;
 
@@ -34,7 +34,7 @@ append_target(WT_SESSION *session, const char *target, char **bufp)
 		*bufp = buf;
 	}
 	if (first) {
-		first = 0;
+		first = false;
 		strcpy(buf, "target=(");
 	} else
 		buf[strlen(buf) - 1] = ',';	/* overwrite previous ")" */

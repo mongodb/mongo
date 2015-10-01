@@ -159,7 +159,8 @@ __logrec_json_unpack_str(char *dest, size_t destlen, const char *src,
 
 \ttotal = 0;
 \twhile (srclen > 0) {
-\t\tn = __wt_json_unpack_char(*src++, (u_char *)dest, destlen, 0);
+\t\tn = __wt_json_unpack_char(
+\t\t    *src++, (u_char *)dest, destlen, false);
 \t\tsrclen--;
 \t\tif (n > destlen)
 \t\t\tdestlen = 0;

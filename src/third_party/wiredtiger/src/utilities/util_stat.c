@@ -16,11 +16,12 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	size_t urilen;
-	int ch, objname_free;
+	int ch;
+	bool objname_free;
 	const char *config, *pval, *desc;
 	char *objname, *uri;
 
-	objname_free = 0;
+	objname_free = false;
 	objname = uri = NULL;
 	config = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "af")) != EOF)
@@ -56,7 +57,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	case 1:
 		if ((objname = util_name(session, *argv, "table")) == NULL)
 			return (1);
-		objname_free = 1;
+		objname_free = true;
 		break;
 	default:
 		return (usage());

@@ -134,7 +134,7 @@ static int __wt_huffman_read(WT_SESSION_IMPL *,
  */
 static int
 __huffman_confchk_file(
-    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v, int *is_utf8p, FILE **fpp)
+    WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v, bool *is_utf8p, FILE **fpp)
 {
 	FILE *fp;
 	WT_DECL_RET;
@@ -302,7 +302,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	WT_DECL_RET;
 	int64_t symbol, frequency;
 	u_int entries, lineno;
-	int is_utf8;
+	bool is_utf8;
 
 	*tablep = NULL;
 	*entriesp = *numbytesp = 0;

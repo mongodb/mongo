@@ -15,18 +15,19 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
 	size_t size;
-	int ch, dump_address, dump_blocks, dump_pages, dump_shape;
+	int ch;
+	bool dump_address, dump_blocks, dump_pages, dump_shape;
 	char *config, *dump_offsets, *name;
 
-	dump_address = dump_blocks = dump_pages = dump_shape = 0;
+	dump_address = dump_blocks = dump_pages = dump_shape = false;
 	config = dump_offsets = name = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "d:")) != EOF)
 		switch (ch) {
 		case 'd':
 			if (strcmp(__wt_optarg, "dump_address") == 0)
-				dump_address = 1;
+				dump_address = true;
 			else if (strcmp(__wt_optarg, "dump_blocks") == 0)
-				dump_blocks = 1;
+				dump_blocks = true;
 			else if (
 			    WT_PREFIX_MATCH(__wt_optarg, "dump_offsets=")) {
 				if (dump_offsets != NULL) {
@@ -38,9 +39,9 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 				dump_offsets =
 				    __wt_optarg + strlen("dump_offsets=");
 			} else if (strcmp(__wt_optarg, "dump_pages") == 0)
-				dump_pages = 1;
+				dump_pages = true;
 			else if (strcmp(__wt_optarg, "dump_shape") == 0)
-				dump_shape = 1;
+				dump_shape = true;
 			else
 				return (usage());
 			break;

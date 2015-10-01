@@ -12,10 +12,10 @@
  * __wt_absolute_path --
  *	Return if a filename is an absolute path.
  */
-int
+bool
 __wt_absolute_path(const char *path)
 {
-	return (path[0] == '/' ? 1 : 0);
+	return (path[0] == '/');
 }
 
 /*

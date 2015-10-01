@@ -53,7 +53,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	__wt_txn_update_oldest(session, 0);
 
 	/* If eviction cannot succeed, don't try. */
-	return (__wt_page_can_evict(session, page, 1));
+	return (__wt_page_can_evict(session, page, 1, NULL));
 }
 
 /*
@@ -71,9 +71,10 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	WT_DECL_RET;
 	WT_PAGE *page;
 	u_int sleep_cnt, wait_cnt;
-	int busy, force_attempts, oldgen;
+	int force_attempts;
+	bool busy, oldgen;
 
-	for (force_attempts = oldgen = 0, wait_cnt = 0;;) {
+	for (force_attempts = 0, oldgen = false, wait_cnt = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
@@ -208,7 +209,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
  */
 int
 __wt_page_alloc(WT_SESSION_IMPL *session, uint8_t type,
-    uint64_t recno, uint32_t alloc_entries, int alloc_refs, WT_PAGE **pagep)
+    uint64_t recno, uint32_t alloc_entries, bool alloc_refs, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
 	WT_DECL_RET;
@@ -378,7 +379,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	/* Allocate and initialize a new WT_PAGE. */
 	WT_RET(__wt_page_alloc(
-	    session, dsk->type, dsk->recno, alloc_entries, 1, &page));
+	    session, dsk->type, dsk->recno, alloc_entries, true, &page));
 	page->dsk = dsk;
 	F_SET_ATOMIC(page, flags);
 

@@ -90,7 +90,7 @@ err:	__wt_scr_free(session, &tmp);
  * the qsort stable.
  */
 typedef struct {
-	char  *k, *v;				/* key, value */
+	char *k, *v;				/* key, value */
 	size_t gen;				/* generation */
 } WT_CONFIG_MERGE_ENTRY;
 

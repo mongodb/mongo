@@ -16,7 +16,7 @@ typedef struct {
 extern const char *home;			/* Home directory */
 extern const char *progname;			/* Program name */
 extern const char *usage_prefix;		/* Global arguments */
-extern int verbose;				/* Verbose flag */
+extern bool verbose;				/* Verbose flag */
 
 extern WT_EVENT_HANDLER *verbose_handler;
 
@@ -41,7 +41,7 @@ int	 util_loadtext(WT_SESSION *, int, char *[]);
 char	*util_name(WT_SESSION *, const char *, const char *);
 int	 util_printlog(WT_SESSION *, int, char *[]);
 int	 util_read(WT_SESSION *, int, char *[]);
-int	 util_read_line(WT_SESSION *, ULINE *, int, int *);
+int	 util_read_line(WT_SESSION *, ULINE *, bool, bool *);
 int	 util_rename(WT_SESSION *, int, char *[]);
 int	 util_salvage(WT_SESSION *, int, char *[]);
 int	 util_stat(WT_SESSION *, int, char *[]);

@@ -56,7 +56,7 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
  *	Parse and setup the statistics server options.
  */
 static int
-__statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
+__statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 {
 	WT_CONFIG objectconf;
 	WT_CONFIG_ITEM cval, k, v;
@@ -70,7 +70,7 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.wait", &cval));
 	/* Only start the server if wait time is non-zero */
-	*runp = (cval.val == 0) ? 0 : 1;
+	*runp = cval.val != 0;
 	conn->stat_usecs = (uint64_t)cval.val * 1000000;
 
 	WT_RET(__wt_config_gets(
@@ -82,7 +82,7 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	 * Statistics logging configuration requires either a wait time or an
 	 * on-close setting.
 	 */
-	if (*runp == 0 && !FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
+	if (!*runp && !FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
 		return (0);
 
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
@@ -133,7 +133,7 @@ err:	__stat_sources_free(session, &sources);
  *	Dump out handle/connection statistics.
  */
 static int
-__statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
+__statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
@@ -207,8 +207,8 @@ __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Check for a match on the set of sources. */
 	for (p = S2C(session)->stat_sources; *p != NULL; ++p)
 		if (WT_PREFIX_MATCH(dhandle->name, *p)) {
-			WT_WITHOUT_DHANDLE(session,
-			    ret = __statlog_dump(session, dhandle->name, 0));
+			WT_WITHOUT_DHANDLE(session, ret =
+			    __statlog_dump(session, dhandle->name, false));
 			return (ret);
 		}
 	return (0);
@@ -227,7 +227,8 @@ __statlog_lsm_apply(WT_SESSION_IMPL *session)
 #define	WT_LSM_TREE_LIST_SLOTS	100
 	WT_LSM_TREE *lsm_tree, *list[WT_LSM_TREE_LIST_SLOTS];
 	WT_DECL_RET;
-	int cnt, locked;
+	int cnt;
+	bool locked;
 	char **p;
 
 	cnt = locked = 0;
@@ -247,23 +248,23 @@ __statlog_lsm_apply(WT_SESSION_IMPL *session)
 	 * will bump a reference count, so the tree won't go away.
 	 */
 	__wt_spin_lock(session, &S2C(session)->schema_lock);
-	locked = 1;
+	locked = true;
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q) {
 		if (cnt == WT_LSM_TREE_LIST_SLOTS)
 			break;
 		for (p = S2C(session)->stat_sources; *p != NULL; ++p)
 			if (WT_PREFIX_MATCH(lsm_tree->name, *p)) {
-				WT_ERR(__wt_lsm_tree_get(
-				    session, lsm_tree->name, 0, &list[cnt++]));
+				WT_ERR(__wt_lsm_tree_get(session,
+				    lsm_tree->name, false, &list[cnt++]));
 				break;
 			}
 	}
 	__wt_spin_unlock(session, &S2C(session)->schema_lock);
-	locked = 0;
+	locked = false;
 
 	while (cnt > 0) {
 		--cnt;
-		WT_TRET(__statlog_dump(session, list[cnt]->name, 0));
+		WT_TRET(__statlog_dump(session, list[cnt]->name, false));
 		__wt_lsm_tree_release(session, list[cnt]);
 	}
 
@@ -318,7 +319,7 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	conn->stat_stamp = tmp->mem;
 
 	/* Dump the connection statistics. */
-	WT_RET(__statlog_dump(session, conn->home, 1));
+	WT_RET(__statlog_dump(session, conn->home, true));
 
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 	/* Dump the spinlock statistics. */
@@ -330,9 +331,9 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	 * any that match the list of object sources.
 	 */
 	if (conn->stat_sources != NULL) {
-		WT_WITH_DHANDLE_LOCK(session, ret =
+		WT_WITH_HANDLE_LIST_LOCK(session, ret =
 		    __wt_conn_btree_apply(
-		    session, 0, NULL, __statlog_apply, NULL));
+		    session, false, NULL, __statlog_apply, NULL));
 		WT_RET(ret);
 	}
 
@@ -442,11 +443,11 @@ __statlog_start(WT_CONNECTION_IMPL *conn)
 	F_SET(conn, WT_CONN_SERVER_STATISTICS);
 	/* The statistics log server gets its own session. */
 	WT_RET(__wt_open_internal_session(
-	    conn, "statlog-server", 1, 1, &conn->stat_session));
+	    conn, "statlog-server", true, true, &conn->stat_session));
 	session = conn->stat_session;
 
 	WT_RET(__wt_cond_alloc(
-	    session, "statistics log server", 0, &conn->stat_cond));
+	    session, "statistics log server", false, &conn->stat_cond));
 
 	/*
 	 * Start the thread.
@@ -460,7 +461,7 @@ __statlog_start(WT_CONNECTION_IMPL *conn)
 	 */
 	WT_RET(__wt_thread_create(
 	    session, &conn->stat_tid, __statlog_server, session));
-	conn->stat_tid_set = 1;
+	conn->stat_tid_set = true;
 
 	return (0);
 }
@@ -473,10 +474,10 @@ int
 __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
-	int start;
+	bool start;
 
 	conn = S2C(session);
-	start = 0;
+	start = false;
 
 	/*
 	 * Stop any server that is already running. This means that each time
@@ -484,7 +485,7 @@ __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
 	 * configuration changes - but that makes our lives easier.
 	 */
 	if (conn->stat_session != NULL)
-		WT_RET(__wt_statlog_destroy(session, 0));
+		WT_RET(__wt_statlog_destroy(session, false));
 
 	WT_RET(__statlog_config(session, cfg, &start));
 	if (start)
@@ -498,7 +499,7 @@ __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
  *	Destroy the statistics server thread.
  */
 int
-__wt_statlog_destroy(WT_SESSION_IMPL *session, int is_close)
+__wt_statlog_destroy(WT_SESSION_IMPL *session, bool is_close)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -510,7 +511,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, int is_close)
 	if (conn->stat_tid_set) {
 		WT_TRET(__wt_cond_signal(session, conn->stat_cond));
 		WT_TRET(__wt_thread_join(session, conn->stat_tid));
-		conn->stat_tid_set = 0;
+		conn->stat_tid_set = false;
 	}
 
 	/* Log a set of statistics on shutdown if configured. */
@@ -531,7 +532,7 @@ __wt_statlog_destroy(WT_SESSION_IMPL *session, int is_close)
 
 	/* Clear connection settings so reconfigure is reliable. */
 	conn->stat_session = NULL;
-	conn->stat_tid_set = 0;
+	conn->stat_tid_set = false;
 	conn->stat_format = NULL;
 	WT_TRET(__wt_fclose(session, &conn->stat_fp, WT_FHANDLE_APPEND));
 	conn->stat_path = NULL;

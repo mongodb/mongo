@@ -20,7 +20,7 @@ __wt_verbose(WT_SESSION_IMPL *session, int flag, const char *fmt, ...)
 
 	if (WT_VERBOSE_ISSET(session, flag)) {
 		va_start(ap, fmt);
-		ret = __wt_eventv(session, 1, 0, NULL, 0, fmt, ap);
+		ret = __wt_eventv(session, true, 0, NULL, 0, fmt, ap);
 		va_end(ap);
 	}
 	return (ret);

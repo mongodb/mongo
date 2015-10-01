@@ -25,7 +25,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	uint64_t internal_bytes, leaf_bytes;
 	uint64_t internal_pages, leaf_pages;
 	uint32_t flags;
-	int evict_reset;
+	bool evict_reset;
 
 	btree = S2BT(session);
 
@@ -117,7 +117,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			 */
 			if (walk != NULL && walk->page != NULL &&
 			    (mod = walk->page->modify) != NULL &&
-			    TXNID_LT(btree->rec_max_txn, mod->rec_max_txn))
+			    WT_TXNID_LT(btree->rec_max_txn, mod->rec_max_txn))
 				btree->rec_max_txn = mod->rec_max_txn;
 
 			WT_ERR(__wt_tree_walk(session, &walk, NULL, flags));
@@ -149,9 +149,9 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			 * is written.
 			 */
 			if (!WT_PAGE_IS_INTERNAL(page) &&
-			    F_ISSET(txn, TXN_HAS_SNAPSHOT) &&
-			    TXNID_LT(txn->snap_max, mod->first_dirty_txn) &&
-			    !F_ISSET(mod, WT_PM_REC_REWRITE)) {
+			    F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) &&
+			    WT_TXNID_LT(txn->snap_max, mod->first_dirty_txn) &&
+			    mod->rec_result != WT_PM_REC_REWRITE) {
 				__wt_page_modify_set(session, page);
 				continue;
 			}
@@ -232,7 +232,7 @@ err:	/* On error, clear any left-over tree walk. */
 	 * but don't wait for it.
 	 */
 	if (ret == 0 && syncop == WT_SYNC_WRITE_LEAVES)
-		WT_RET(btree->bm->sync(btree->bm, session, 1));
+		WT_RET(btree->bm->sync(btree->bm, session, true));
 
 	return (ret);
 }

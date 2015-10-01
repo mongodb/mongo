@@ -178,7 +178,7 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
  *	Cursor call setup.
  */
 static inline int
-__cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
+__cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 {
 	WT_SESSION_IMPL *session;
 
@@ -295,8 +295,8 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 		 * Call __wt_row_leaf_key_work instead of __wt_row_leaf_key: we
 		 * already did __wt_row_leaf_key's fast-path checks inline.
 		 */
-slow:		WT_RET(
-		    __wt_row_leaf_key_work(session, page, rip, &cbt->tmp, 0));
+slow:		WT_RET(__wt_row_leaf_key_work(
+		    session, page, rip, &cbt->tmp, false));
 	}
 	kb->data = cbt->tmp.data;
 	kb->size = cbt->tmp.size;

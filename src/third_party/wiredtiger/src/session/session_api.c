@@ -95,7 +95,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_UNUSED(cfg);
 
 	/* Rollback any active transaction. */
-	if (F_ISSET(&session->txn, TXN_RUNNING))
+	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_TRET(__session_rollback_transaction(wt_session, NULL));
 
 	/*
@@ -193,7 +193,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, reconfigure, config, cfg);
 
-	if (F_ISSET(&session->txn, TXN_RUNNING))
+	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
 	WT_TRET(__wt_session_reset_cursors(session));
@@ -246,7 +246,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 			 * the underlying data source.
 			 */
 			WT_RET(__wt_schema_get_colgroup(
-			    session, uri, 0, NULL, &colgroup));
+			    session, uri, false, NULL, &colgroup));
 			WT_RET(__wt_open_cursor(
 			    session, colgroup->source, owner, cfg, cursorp));
 		} else if (WT_PREFIX_MATCH(uri, "config:"))
@@ -602,9 +602,10 @@ __session_truncate(WT_SESSION *wt_session,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
-	int cmp, local_start;
+	int cmp;
+	bool local_start;
 
-	local_start = 0;
+	local_start = false;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_TXN_API_CALL(session, truncate, config, cfg);
@@ -708,7 +709,7 @@ __session_truncate(WT_SESSION *wt_session,
 	if (start == NULL) {
 		WT_ERR(__session_open_cursor(
 		    wt_session, stop->uri, NULL, NULL, &start));
-		local_start = 1;
+		local_start = true;
 		WT_ERR(start->next(start));
 	}
 
@@ -798,7 +799,7 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, begin_transaction, config, cfg);
 	WT_STAT_FAST_CONN_INCR(session, txn_begin);
 
-	if (F_ISSET(&session->txn, TXN_RUNNING))
+	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "Transaction already running");
 
 	ret = __wt_txn_begin(session, cfg);
@@ -822,7 +823,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	WT_STAT_FAST_CONN_INCR(session, txn_commit);
 
 	txn = &session->txn;
-	if (F_ISSET(txn, TXN_ERROR)) {
+	if (F_ISSET(txn, WT_TXN_ERROR)) {
 		__wt_errx(session, "failed transaction requires rollback");
 		ret = EINVAL;
 	}
@@ -877,7 +878,7 @@ __session_transaction_pinned_range(WT_SESSION *wt_session, uint64_t *prange)
 
 	/* Assign pinned to the lesser of id or snap_min */
 	if (txn_state->id != WT_TXN_NONE &&
-	    TXNID_LT(txn_state->id, txn_state->snap_min))
+	    WT_TXNID_LT(txn_state->id, txn_state->snap_min))
 		pinned = txn_state->id;
 	else
 		pinned = txn_state->snap_min;
@@ -921,7 +922,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * from evicting anything newer than this because we track the oldest
 	 * transaction ID in the system that is not visible to all readers.
 	 */
-	if (F_ISSET(txn, TXN_RUNNING))
+	if (F_ISSET(txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL,
 		    "Checkpoint not permitted in a transaction");
 
@@ -982,7 +983,7 @@ __session_strerror(WT_SESSION *wt_session, int error)
  */
 int
 __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
-    int uses_dhandles, int open_metadata, WT_SESSION_IMPL **sessionp)
+    bool uses_dhandles, bool open_metadata, WT_SESSION_IMPL **sessionp)
 {
 	WT_SESSION_IMPL *session;
 
@@ -1015,7 +1016,7 @@ __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
 	 * pool creates its sessions, let our caller decline this work.
 	 */
 	if (open_metadata) {
-		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
 		WT_RET(__wt_metadata_open(session));
 	}
 
@@ -1097,7 +1098,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
 
-	WT_ERR(__wt_cond_alloc(session, "session", 0, &session_ret->cond));
+	WT_ERR(__wt_cond_alloc(session, "session", false, &session_ret->cond));
 
 	if (WT_SESSION_FIRST_USE(session_ret))
 		__wt_random_init(&session_ret->rnd);

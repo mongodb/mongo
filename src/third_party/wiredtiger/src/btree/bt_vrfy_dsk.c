@@ -42,8 +42,8 @@ static int __verify_dsk_row(
  *	Verify a single block as read from disk.
  */
 int
-__wt_verify_dsk_image(WT_SESSION_IMPL *session,
-    const char *addr, const WT_PAGE_HEADER *dsk, size_t size, int empty_page_ok)
+__wt_verify_dsk_image(WT_SESSION_IMPL *session, const char *addr,
+    const WT_PAGE_HEADER *dsk, size_t size, bool empty_page_ok)
 {
 	const uint8_t *p, *end;
 	u_int i;
@@ -173,7 +173,8 @@ __wt_verify_dsk_image(WT_SESSION_IMPL *session,
 int
 __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 {
-	return (__wt_verify_dsk_image(session, addr, buf->data, buf->size, 0));
+	return (
+	    __wt_verify_dsk_image(session, addr, buf->data, buf->size, false));
 }
 
 /*
@@ -534,7 +535,7 @@ __verify_dsk_col_var(
 	WT_CELL_UNPACK *unpack, _unpack;
 	size_t last_size;
 	uint32_t cell_num, cell_type, i;
-	int last_deleted;
+	bool last_deleted;
 	const uint8_t *last_data;
 	uint8_t *end;
 
@@ -545,7 +546,7 @@ __verify_dsk_col_var(
 
 	last_data = NULL;
 	last_size = 0;
-	last_deleted = 0;
+	last_deleted = false;
 
 	cell_num = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
@@ -572,7 +573,7 @@ __verify_dsk_col_var(
 		 * a chance for RLE encoding.  We don't have to care about data
 		 * encoding or anything else, a byte comparison is enough.
 		 */
-		if (last_deleted == 1) {
+		if (last_deleted) {
 			if (cell_type == WT_CELL_DEL)
 				goto match_err;
 		} else
@@ -588,15 +589,15 @@ match_err:			WT_RET_VRFY(session,
 
 		switch (cell_type) {
 		case WT_CELL_DEL:
-			last_deleted = 1;
+			last_deleted = true;
 			last_data = NULL;
 			break;
 		case WT_CELL_VALUE_OVFL:
-			last_deleted = 0;
+			last_deleted = false;
 			last_data = NULL;
 			break;
 		case WT_CELL_VALUE:
-			last_deleted = 0;
+			last_deleted = false;
 			last_data = unpack->data;
 			last_size = unpack->size;
 			break;

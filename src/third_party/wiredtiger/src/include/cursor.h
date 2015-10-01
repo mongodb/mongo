@@ -218,7 +218,7 @@ struct __wt_cursor_bulk {
 	uint32_t nrecs;			/* Max records per chunk */
 
 	/* Special bitmap bulk load for fixed-length column stores. */
-	int	bitmap;
+	bool	bitmap;
 
 	void	*reconcile;		/* Reconciliation information */
 };
@@ -289,8 +289,8 @@ struct __wt_cursor_metadata {
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
 
-	int	notinitialized;		/* Cursor not initialized */
-	int	notpositioned;		/* Cursor not positioned */
+	bool	notinitialized;		/* Cursor not initialized */
+	bool	notpositioned;		/* Cursor not positioned */
 
 	WT_STATS *stats;		/* Stats owned by the cursor */
 	WT_STATS *stats_first;		/* First stats reference */
@@ -360,11 +360,11 @@ struct __wt_cursor_table {
  */
 #define	WT_CURSOR_CHECKKEY(cursor) do {					\
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))			\
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));		\
+		WT_ERR(__wt_cursor_kv_not_set(cursor, true));		\
 } while (0)
 #define	WT_CURSOR_CHECKVALUE(cursor) do {				\
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))			\
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
+		WT_ERR(__wt_cursor_kv_not_set(cursor, false));		\
 } while (0)
 #define	WT_CURSOR_NEEDKEY(cursor) do {					\
 	if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {			\

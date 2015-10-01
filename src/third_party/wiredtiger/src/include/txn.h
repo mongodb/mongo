@@ -17,11 +17,11 @@
  * transaction), WT_TXN_NONE is smaller than any possible ID (visible to all
  * running transactions).
  */
-#define	TXNID_LE(t1, t2)						\
+#define	WT_TXNID_LE(t1, t2)						\
 	((t1) <= (t2))
 
-#define	TXNID_LT(t1, t2)						\
-	((t1) != (t2) && TXNID_LE(t1, t2))
+#define	WT_TXNID_LT(t1, t2)						\
+	((t1) != (t2) && WT_TXNID_LE(t1, t2))
 
 #define	WT_SESSION_TXN_STATE(s) (&S2C(s)->txn_global.states[(s)->id])
 
@@ -139,14 +139,14 @@ struct __wt_txn {
 
 	/* Checkpoint status. */
 	WT_LSN		ckpt_lsn;
-	int		full_ckpt;
+	bool		full_ckpt;
 	uint32_t	ckpt_nsnapshot;
 	WT_ITEM		*ckpt_snapshot;
 
-#define	TXN_AUTOCOMMIT		0x01
-#define	TXN_ERROR		0x02
-#define	TXN_HAS_ID	        0x04
-#define	TXN_HAS_SNAPSHOT	0x08
-#define	TXN_RUNNING		0x10
+#define	WT_TXN_AUTOCOMMIT	0x01
+#define	WT_TXN_ERROR		0x02
+#define	WT_TXN_HAS_ID	        0x04
+#define	WT_TXN_HAS_SNAPSHOT	0x08
+#define	WT_TXN_RUNNING		0x10
 	uint32_t flags;
 };

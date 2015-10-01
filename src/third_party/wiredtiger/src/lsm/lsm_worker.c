@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 
 static int __lsm_worker_general_op(
-    WT_SESSION_IMPL *, WT_LSM_WORKER_ARGS *, int *);
+    WT_SESSION_IMPL *, WT_LSM_WORKER_ARGS *, bool *);
 static WT_THREAD_RET __lsm_worker(void *);
 
 /*
@@ -30,14 +30,14 @@ __wt_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
  */
 static int
 __lsm_worker_general_op(
-    WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *cookie, int *completed)
+    WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *cookie, bool *completed)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORK_UNIT *entry;
-	int force;
+	bool force;
 
-	*completed = 0;
+	*completed = false;
 	/*
 	 * Return if this thread cannot process a bloom, drop or flush.
 	 */
@@ -72,7 +72,7 @@ __lsm_worker_general_op(
 		WT_ERR(__wt_lsm_free_chunks(session, entry->lsm_tree));
 	else if (entry->type == WT_LSM_WORK_BLOOM)
 		WT_ERR(__wt_lsm_work_bloom(session, entry->lsm_tree));
-	*completed = 1;
+	*completed = true;
 
 err:	__wt_lsm_manager_free_work_unit(session, entry);
 	return (ret);
@@ -90,7 +90,7 @@ __lsm_worker(void *arg)
 	WT_LSM_WORK_UNIT *entry;
 	WT_LSM_WORKER_ARGS *cookie;
 	WT_SESSION_IMPL *session;
-	int progress, ran;
+	bool progress, ran;
 
 	cookie = (WT_LSM_WORKER_ARGS *)arg;
 	session = cookie->session;
@@ -99,7 +99,7 @@ __lsm_worker(void *arg)
 	entry = NULL;
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
 	    F_ISSET(cookie, WT_LSM_WORKER_RUN)) {
-		progress = 0;
+		progress = false;
 
 		/*
 		 * Workers process the different LSM work queues.  Some workers
@@ -148,7 +148,7 @@ __lsm_worker(void *arg)
 
 			__wt_lsm_manager_free_work_unit(session, entry);
 			entry = NULL;
-			progress = 1;
+			progress = true;
 		}
 		/* Flag an error if the pop failed. */
 		WT_ERR(ret);

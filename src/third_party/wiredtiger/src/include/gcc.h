@@ -123,7 +123,7 @@ __wt_atomic_sub##name(type *vp, type v)					\
 {									\
 	return (__sync_sub_and_fetch(vp, v));				\
 }									\
-static inline int							\
+static inline bool							\
 __wt_atomic_cas##name(type *vp, type old, type new)			\
 {									\
 	return (WT_ATOMIC_CAS(vp, old, new));				\
@@ -145,7 +145,7 @@ WT_ATOMIC_FUNC(size, size_t, size_t)
  * __wt_atomic_cas_ptr --
  *	Pointer compare and swap.
  */
-static inline int
+static inline bool
 __wt_atomic_cas_ptr(void *vp, void *old, void *new)
 {
 	return (WT_ATOMIC_CAS((void **)vp, old, new));

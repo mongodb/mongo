@@ -65,7 +65,7 @@ struct __wt_table {
 	TAILQ_ENTRY(__wt_table) q;
 	TAILQ_ENTRY(__wt_table) hashq;
 
-	int cg_complete, idx_complete, is_simple;
+	bool cg_complete, idx_complete, is_simple;
 	u_int ncolgroups, nindices, nkey_columns;
 
 	uint32_t refcnt;	/* Number of open cursors */
@@ -95,12 +95,12 @@ struct __wt_table {
 } while (0)
 
 /*
- * WT_WITH_DHANDLE_LOCK --
+ * WT_WITH_HANDLE_LIST_LOCK --
  *	Acquire the data handle list lock, perform an operation, drop the lock.
  */
-#define	WT_WITH_DHANDLE_LOCK(session, op)				\
+#define	WT_WITH_HANDLE_LIST_LOCK(session, op)				\
 	WT_WITH_LOCK(session,						\
-	    &S2C(session)->dhandle_lock, WT_SESSION_HANDLE_LIST_LOCKED, op)
+	    &S2C(session)->dhandle_lock, WT_SESSION_LOCKED_HANDLE_LIST, op)
 /*
  * WT_WITH_SCHEMA_LOCK --
  *	Acquire the schema lock, perform an operation, drop the lock.
@@ -109,11 +109,11 @@ struct __wt_table {
  */
 #define	WT_WITH_SCHEMA_LOCK(session, op) do {				\
 	WT_ASSERT(session,						\
-	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||		\
-	    !F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED |		\
-	    WT_SESSION_NO_SCHEMA_LOCK | WT_SESSION_TABLE_LOCKED));	\
+	    F_ISSET(session, WT_SESSION_LOCKED_SCHEMA) ||		\
+	    !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST |		\
+	    WT_SESSION_NO_SCHEMA_LOCK | WT_SESSION_LOCKED_TABLE));	\
 	WT_WITH_LOCK(session,						\
-	    &S2C(session)->schema_lock, WT_SESSION_SCHEMA_LOCKED, op);	\
+	    &S2C(session)->schema_lock, WT_SESSION_LOCKED_SCHEMA, op);	\
 } while (0)
 
 /*
@@ -121,39 +121,39 @@ struct __wt_table {
  *	Drop the schema lock and/or the handle list lock, perform an operation,
  *	re-acquire the lock(s).
  */
-#define	WT_WITHOUT_LOCKS(session, op) do {			\
-	WT_CONNECTION_IMPL *__conn = S2C(session);		\
-	int __handle_locked =					\
-		F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED);\
-	int __table_locked =					\
-		F_ISSET(session, WT_SESSION_TABLE_LOCKED);	\
-	int __schema_locked =					\
-		F_ISSET(session, WT_SESSION_SCHEMA_LOCKED);	\
-	if (__handle_locked) {					\
-		F_CLR(session, WT_SESSION_HANDLE_LIST_LOCKED);	\
-		__wt_spin_unlock(session, &__conn->dhandle_lock);\
-	}							\
-	if (__table_locked) {					\
-		F_CLR(session, WT_SESSION_TABLE_LOCKED);	\
-		__wt_spin_unlock(session, &__conn->table_lock);\
-	}							\
-	if (__schema_locked) {					\
-		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);	\
-		__wt_spin_unlock(session, &__conn->schema_lock);\
-	}							\
-	op;							\
-	if (__schema_locked) {					\
-		__wt_spin_lock(session, &__conn->schema_lock);	\
-		F_SET(session, WT_SESSION_SCHEMA_LOCKED);	\
-	}							\
-	if (__table_locked) {					\
-		__wt_spin_lock(session, &__conn->table_lock);	\
-		F_SET(session, WT_SESSION_TABLE_LOCKED);	\
-	}							\
-	if (__handle_locked) {					\
-		__wt_spin_lock(session, &__conn->dhandle_lock);	\
-		F_SET(session, WT_SESSION_HANDLE_LIST_LOCKED);	\
-	}							\
+#define	WT_WITHOUT_LOCKS(session, op) do {				\
+	WT_CONNECTION_IMPL *__conn = S2C(session);			\
+	bool __handle_locked =						\
+	    F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST);		\
+	bool __table_locked =						\
+	    F_ISSET(session, WT_SESSION_LOCKED_TABLE);			\
+	bool __schema_locked =						\
+	    F_ISSET(session, WT_SESSION_LOCKED_SCHEMA);			\
+	if (__handle_locked) {						\
+		F_CLR(session, WT_SESSION_LOCKED_HANDLE_LIST);		\
+		__wt_spin_unlock(session, &__conn->dhandle_lock);	\
+	}								\
+	if (__table_locked) {						\
+		F_CLR(session, WT_SESSION_LOCKED_TABLE);		\
+		__wt_spin_unlock(session, &__conn->table_lock);		\
+	}								\
+	if (__schema_locked) {						\
+		F_CLR(session, WT_SESSION_LOCKED_SCHEMA);		\
+		__wt_spin_unlock(session, &__conn->schema_lock);	\
+	}								\
+	op;								\
+	if (__schema_locked) {						\
+		__wt_spin_lock(session, &__conn->schema_lock);		\
+		F_SET(session, WT_SESSION_LOCKED_SCHEMA);		\
+	}								\
+	if (__table_locked) {						\
+		__wt_spin_lock(session, &__conn->table_lock);		\
+		F_SET(session, WT_SESSION_LOCKED_TABLE);		\
+	}								\
+	if (__handle_locked) {						\
+		__wt_spin_lock(session, &__conn->dhandle_lock);		\
+		F_SET(session, WT_SESSION_LOCKED_HANDLE_LIST);		\
+	}								\
 } while (0)
 
 /*
@@ -162,8 +162,8 @@ struct __wt_table {
  */
 #define	WT_WITH_TABLE_LOCK(session, op) do {				\
 	WT_ASSERT(session,						\
-	    F_ISSET(session, WT_SESSION_TABLE_LOCKED) ||		\
-	    !F_ISSET(session, WT_SESSION_HANDLE_LIST_LOCKED));		\
+	    F_ISSET(session, WT_SESSION_LOCKED_TABLE) ||		\
+	    !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));		\
 	WT_WITH_LOCK(session,						\
-	    &S2C(session)->table_lock, WT_SESSION_TABLE_LOCKED, op);	\
+	    &S2C(session)->table_lock, WT_SESSION_LOCKED_TABLE, op);	\
 } while (0)

@@ -36,7 +36,8 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 * threads because those may allocate and use session resources that
 	 * need to get cleaned up on close.
 	 */
-	WT_RET(__wt_open_internal_session(conn, "connection", 1, 0, &session));
+	WT_RET(__wt_open_internal_session(
+	    conn, "connection", true, false, &session));
 
 	/*
 	 * The connection's default session is originally a static structure,
@@ -92,7 +93,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * transaction ID will catch up with the current ID.
 	 */
 	for (;;) {
-		__wt_txn_update_oldest(session, 1);
+		__wt_txn_update_oldest(session, true);
 		if (txn_global->oldest_id == txn_global->current)
 			break;
 		__wt_yield();
@@ -114,7 +115,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	F_SET(conn, WT_CONN_CLOSING);
 
 	WT_TRET(__wt_checkpoint_server_destroy(session));
-	WT_TRET(__wt_statlog_destroy(session, 1));
+	WT_TRET(__wt_statlog_destroy(session, true));
 	WT_TRET(__wt_sweep_destroy(session));
 	WT_TRET(__wt_evict_destroy(session));
 
@@ -130,7 +131,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 */
 	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
 		WT_TRET(__wt_txn_checkpoint_log(
-		    session, 1, WT_TXN_LOG_CKPT_STOP, NULL));
+		    session, true, WT_TXN_LOG_CKPT_STOP, NULL));
 	F_CLR(conn, WT_CONN_LOG_SERVER_RUN);
 	WT_TRET(__wt_logmgr_destroy(session));
 

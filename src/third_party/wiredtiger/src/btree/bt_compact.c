@@ -13,7 +13,7 @@
  *	Return if a page needs to be re-written.
  */
 static int
-__compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
+__compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
 	WT_BM *bm;
 	WT_DECL_RET;
@@ -22,7 +22,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	size_t addr_size;
 	const uint8_t *addr;
 
-	*skipp = 1;					/* Default skip. */
+	*skipp = true;					/* Default skip. */
 
 	bm = S2BT(session)->bm;
 	page = ref->page;
@@ -44,13 +44,13 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	 * If the page is a 1-to-1 replacement, test the replacement addresses.
 	 * Ignore empty pages, they get merged into the parent.
 	 */
-	if (mod == NULL || F_ISSET(mod, WT_PM_REC_MASK) == 0) {
+	if (mod == NULL || mod->rec_result == 0) {
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		if (addr == NULL)
 			return (0);
 		WT_RET(
 		    bm->compact_page_skip(bm, session, addr, addr_size, skipp));
-	} else if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_REPLACE) {
+	} else if (mod->rec_result == WT_PM_REC_REPLACE) {
 		/*
 		 * The page's modification information can change underfoot if
 		 * the page is being reconciled, lock the page down.
@@ -76,7 +76,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_REF *ref;
-	int block_manager_begin, evict_reset, skip;
+	bool block_manager_begin, evict_reset, skip;
 
 	WT_UNUSED(cfg);
 
@@ -84,7 +84,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	btree = S2BT(session);
 	bm = btree->bm;
 	ref = NULL;
-	block_manager_begin = 0;
+	block_manager_begin = false;
 
 	WT_STAT_FAST_DATA_INCR(session, session_compact);
 
@@ -110,7 +110,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	 *
 	 * We're holding the schema lock which serializes with checkpoints.
 	 */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
 
 	/*
 	 * Get the tree handle's flush lock which blocks threads writing leaf
@@ -139,7 +139,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Start compaction. */
 	WT_ERR(bm->compact_start(bm, session));
-	block_manager_begin = 1;
+	block_manager_begin = true;
 
 	/* Walk the tree reviewing pages to see if they should be re-written. */
 	for (;;) {
@@ -158,7 +158,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		if (skip)
 			continue;
 
-		session->compaction = 1;
+		session->compaction = true;
 		/* Rewrite the page: mark the page and tree dirty. */
 		WT_ERR(__wt_page_modify_init(session, ref->page));
 		__wt_page_modify_set(session, ref->page);
@@ -187,14 +187,14 @@ err:	if (ref != NULL)
  *	Return if compaction requires we read this page.
  */
 int
-__wt_compact_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
+__wt_compact_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 {
 	WT_BM *bm;
 	size_t addr_size;
 	u_int type;
 	const uint8_t *addr;
 
-	*skipp = 0;				/* Default to reading. */
+	*skipp = false;				/* Default to reading. */
 	type = 0;				/* Keep compiler quiet. */
 
 	bm = S2BT(session)->bm;
