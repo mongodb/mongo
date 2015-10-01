@@ -710,7 +710,7 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 	uint32_t i;
 	uint8_t v;
 
-	WT_ASSERT(session, ds->session->dhandle != NULL);
+	WT_ASSERT(ds->session, ds->session->dhandle != NULL);
 
 	session = ds->session;
 	btree = S2BT(session);
