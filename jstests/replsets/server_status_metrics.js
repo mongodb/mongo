@@ -24,7 +24,7 @@ function testSecondaryMetrics(secondary, opCount, offset) {
     assert(ss.metrics.repl.preload.indexes.totalMillis >= 0, "preload.indexes time missing")
 
     assert(ss.metrics.repl.apply.batches.num > 0, "no batches")
-    assert(ss.metrics.repl.apply.batches.totalMillis > 0, "no batch time")
+    assert(ss.metrics.repl.apply.batches.totalMillis >= 0, "missing batch time")
     assert.eq(ss.metrics.repl.apply.ops, opCount + offset, "wrong number of applied ops")
 }
 
