@@ -2034,9 +2034,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_turtle_init(session));
 	WT_ERR(__wt_metadata_open(session));
 
-	/* Create the lookaside table. */
-	WT_ERR(__wt_las_create(session));
-
 	/* Start the worker threads and run recovery. */
 	WT_ERR(__wt_connection_workers(session, cfg));
 
