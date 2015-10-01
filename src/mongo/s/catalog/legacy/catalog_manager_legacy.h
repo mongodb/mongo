@@ -131,11 +131,11 @@ public:
 
     void logAction(OperationContext* txn, const ActionLogType& actionLog);
 
-    void logChange(OperationContext* txn,
-                   const std::string& clientAddress,
-                   const std::string& what,
-                   const std::string& ns,
-                   const BSONObj& detail) override;
+    Status logChange(OperationContext* txn,
+                     const std::string& clientAddress,
+                     const std::string& what,
+                     const std::string& ns,
+                     const BSONObj& detail) override;
 
     StatusWith<SettingsType> getGlobalSettings(OperationContext* txn,
                                                const std::string& key) override;

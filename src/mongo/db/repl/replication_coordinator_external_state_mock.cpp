@@ -190,6 +190,8 @@ void ReplicationCoordinatorExternalStateMock::killAllUserOperations(OperationCon
 
 void ReplicationCoordinatorExternalStateMock::clearShardingState() {}
 
+void ReplicationCoordinatorExternalStateMock::recoverShardingState(OperationContext* txn) {}
+
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToCancelFetcher() {

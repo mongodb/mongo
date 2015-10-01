@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"

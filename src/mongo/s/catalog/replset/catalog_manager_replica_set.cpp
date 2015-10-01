@@ -592,11 +592,11 @@ void CatalogManagerReplicaSet::logAction(OperationContext* txn, const ActionLogT
     }
 }
 
-void CatalogManagerReplicaSet::logChange(OperationContext* txn,
-                                         const string& clientAddress,
-                                         const string& what,
-                                         const string& ns,
-                                         const BSONObj& detail) {
+Status CatalogManagerReplicaSet::logChange(OperationContext* txn,
+                                           const string& clientAddress,
+                                           const string& what,
+                                           const string& ns,
+                                           const BSONObj& detail) {
     if (_changeLogCollectionCreated.load() == 0) {
         BSONObj createCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true << "size"
                                           << kChangeLogCollectionSize);
@@ -604,7 +604,7 @@ void CatalogManagerReplicaSet::logChange(OperationContext* txn,
             grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries("config", createCmd);
         if (!result.isOK()) {
             LOG(1) << "couldn't create changelog collection: " << causedBy(result.getStatus());
-            return;
+            return result.getStatus();
         }
 
         Status commandStatus = Command::getStatusFromCommandResult(result.getValue());
@@ -612,12 +612,12 @@ void CatalogManagerReplicaSet::logChange(OperationContext* txn,
             _changeLogCollectionCreated.store(1);
         } else {
             LOG(1) << "couldn't create changelog collection: " << causedBy(commandStatus);
-            return;
+            return commandStatus;
         }
     }
 
     Date_t now = grid.shardRegistry()->getExecutor()->now();
-    std::string hostName = grid.shardRegistry()->getNetwork()->getHostName();
+    const std::string hostName = grid.shardRegistry()->getNetwork()->getHostName();
     const string changeId = str::stream() << hostName << "-" << now.toString() << "-" << OID::gen();
 
     ChangeLogType changeLog;
@@ -637,6 +637,8 @@ void CatalogManagerReplicaSet::logChange(OperationContext* txn,
         warning() << "Error encountered while logging config change with ID " << changeId << ": "
                   << result;
     }
+
+    return result;
 }
 
 StatusWith<SettingsType> CatalogManagerReplicaSet::getGlobalSettings(OperationContext* txn,

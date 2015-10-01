@@ -1,11 +1,14 @@
-//
 // Tests the state of sharding data after a replica set reconfig
-//
 
-var options = { rs : true, rsOptions : { nodes : 1 } };
+(function() {
 
-var st = new ShardingTest({ shards : 2, mongos : 1, other : options });
-st.stopBalancer();
+var st = new ShardingTest({ shards: 2,
+                            mongos: 1,
+                            other: {
+                                rs: true,
+                                rsOptions: { nodes : 1 }
+                            }
+                          });
 
 var mongos = st.s0;
 var admin = mongos.getDB("admin");
@@ -30,7 +33,6 @@ st.printShardingStatus();
 
 // Restart both primaries to reset our sharding data
 var restartPrimaries = function() {
-
     var rs0Primary = st.rs0.getPrimary();
     var rs1Primary = st.rs1.getPrimary();
 
@@ -47,20 +49,18 @@ var restartPrimaries = function() {
 
 restartPrimaries();
 
-//
-//
-// No sharding data until shards are hit by a query
-assert.eq("",
-          st.rs0.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
+// Sharding data gets initialized either when shards are hit by an unsharded query or if some
+// metadata operation was run before the step down, which wrote a minOpTime recovery record. In
+// this case we did a moveChunk above from shard0 to shard1, so we will have this record on
+// shard0.
+assert.neq("",
+           st.rs0.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
 assert.eq("",
           st.rs1.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
 
-//
-//
-// Sharding data initialized when shards are hit by an unsharded query
+// Doing a find only accesses the primary (rs0), which is already recovered. Ensure that the
+// secondary still has no sharding knowledge.
 assert.neq(null, coll.findOne({}));
-assert.neq("",
-          st.rs0.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
 assert.eq("",
           st.rs1.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
 
@@ -149,3 +149,5 @@ assert.neq({},
 jsTest.log( "DONE!" );
 
 st.stop();
+
+})();

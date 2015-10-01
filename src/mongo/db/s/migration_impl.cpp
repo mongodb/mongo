@@ -40,6 +40,7 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -271,6 +272,10 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
     // We're under the collection distributed lock here, so no other migrate can change maxVersion
     // or CollectionMetadata state.
     ShardingState* const shardingState = ShardingState::get(txn);
+
+    Status startStatus = ShardingStateRecovery::startMetadataOp(txn);
+    if (!startStatus.isOK())
+        return startStatus;
 
     shardingState->migrationSourceManager()->setInCriticalSection(true);
 
@@ -526,6 +531,7 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
     shardingState->migrationSourceManager()->setInCriticalSection(false);
+    ShardingStateRecovery::endMetadataOp(txn);
 
     // Migration is done, just log some diagnostics information
     BSONObj chunkInfo =

@@ -617,8 +617,12 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
         return;
     }
     lk.unlock();
+
+    _externalState->recoverShardingState(txn);
+
     ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite globalWriteLock(txn->lockState());
+
     lk.lock();
     if (!_isWaitingForDrainToComplete) {
         return;

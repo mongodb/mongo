@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <iosfwd>
 #include <memory>
 #include <boost/filesystem/path.hpp>
 

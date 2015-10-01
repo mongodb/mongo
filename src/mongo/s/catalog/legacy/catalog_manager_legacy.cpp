@@ -700,11 +700,11 @@ void CatalogManagerLegacy::logAction(OperationContext* txn, const ActionLogType&
     }
 }
 
-void CatalogManagerLegacy::logChange(OperationContext* txn,
-                                     const string& clientAddress,
-                                     const string& what,
-                                     const string& ns,
-                                     const BSONObj& detail) {
+Status CatalogManagerLegacy::logChange(OperationContext* txn,
+                                       const string& clientAddress,
+                                       const string& what,
+                                       const string& ns,
+                                       const BSONObj& detail) {
     // Create the change log collection and ensure that it is capped. Wrap in try/catch,
     // because creating an existing collection throws.
     if (_changeLogCollectionCreated.load() == 0) {
@@ -721,7 +721,7 @@ void CatalogManagerLegacy::logChange(OperationContext* txn,
                 LOG(1) << "couldn't create changelog collection: " << ex;
                 // If we couldn't create the collection don't attempt the insert otherwise we might
                 // implicitly create the collection without it being capped.
-                return;
+                return ex.toStatus();
             }
         }
     }
@@ -751,6 +751,8 @@ void CatalogManagerLegacy::logChange(OperationContext* txn,
         warning() << "Error encountered while logging config change with ID "
                   << changeLog.getChangeId() << ": " << result;
     }
+
+    return result;
 }
 
 StatusWith<SettingsType> CatalogManagerLegacy::getGlobalSettings(OperationContext* txn,

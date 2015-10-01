@@ -167,11 +167,13 @@ Status CatalogManagerMock::applyChunkOpsDeprecated(OperationContext* txn,
 
 void CatalogManagerMock::logAction(OperationContext* txn, const ActionLogType& actionLog) {}
 
-void CatalogManagerMock::logChange(OperationContext* txn,
-                                   const string& clientAddress,
-                                   const string& what,
-                                   const string& ns,
-                                   const BSONObj& detail) {}
+Status CatalogManagerMock::logChange(OperationContext* txn,
+                                     const string& clientAddress,
+                                     const string& what,
+                                     const string& ns,
+                                     const BSONObj& detail) {
+    return Status::OK();
+}
 
 StatusWith<SettingsType> CatalogManagerMock::getGlobalSettings(OperationContext* txn,
                                                                const string& key) {

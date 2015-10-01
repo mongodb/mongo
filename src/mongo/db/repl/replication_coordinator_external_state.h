@@ -170,6 +170,14 @@ public:
     virtual void clearShardingState() = 0;
 
     /**
+     * Called when the instance transitions to primary in order to notify a potentially sharded
+     * host to recover its sharding state.
+     *
+     * Throws on errors.
+     */
+    virtual void recoverShardingState(OperationContext* txn) = 0;
+
+    /**
      * Notifies the bgsync and syncSourceFeedback threads to choose a new sync source.
      */
     virtual void signalApplierToChooseNewSyncSource() = 0;

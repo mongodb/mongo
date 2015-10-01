@@ -540,16 +540,12 @@ void ForwardingCatalogManager::logAction(OperationContext* txn, const ActionLogT
           });
 }
 
-void ForwardingCatalogManager::logChange(OperationContext* txn,
-                                         const std::string& clientAddress,
-                                         const std::string& what,
-                                         const std::string& ns,
-                                         const BSONObj& detail) {
-    retry(txn,
-          [&] {
-              _actual->logChange(txn, clientAddress, what, ns, detail);
-              return 1;
-          });
+Status ForwardingCatalogManager::logChange(OperationContext* txn,
+                                           const std::string& clientAddress,
+                                           const std::string& what,
+                                           const std::string& ns,
+                                           const BSONObj& detail) {
+    return retry(txn, [&] { return _actual->logChange(txn, clientAddress, what, ns, detail); });
 }
 
 StatusWith<SettingsType> ForwardingCatalogManager::getGlobalSettings(OperationContext* txn,

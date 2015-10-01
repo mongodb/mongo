@@ -50,12 +50,12 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/db.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
@@ -70,7 +70,7 @@
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repair_database.h"
@@ -82,6 +82,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/restapi.h"
+#include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -164,10 +165,11 @@ public:
 
             DbResponse dbresponse;
             {
-                OperationContextImpl txn;
-                assembleResponse(&txn, m, dbresponse, port->remote());
-                // txn must go out of scope here so that the operation cannot show up in
-                // currentOp results after the response reaches the client.
+                auto opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+                assembleResponse(opCtx.get(), m, dbresponse, port->remote());
+
+                // opCtx must go out of scope here so that the operation cannot show up in currentOp
+                // results after the response reaches the client
             }
 
             if (dbresponse.response) {
@@ -191,7 +193,7 @@ public:
                         b.appendNum(cursorid);
                         m.appendData(b.buf(), b.len());
                         b.decouple();
-                        DEV log() << "exhaust=true sending more" << endl;
+                        DEV log() << "exhaust=true sending more";
                         continue;  // this goes back to top loop
                     }
                 }
@@ -201,7 +203,7 @@ public:
     }
 };
 
-static void logStartup() {
+static void logStartup(OperationContext* txn) {
     BSONObjBuilder toLog;
     stringstream id;
     id << getHostNameCached() << "-" << jsTime().asInt64();
@@ -222,25 +224,23 @@ static void logStartup() {
 
     BSONObj o = toLog.obj();
 
-    OperationContextImpl txn;
-
-    ScopedTransaction transaction(&txn, MODE_X);
-    Lock::GlobalWrite lk(txn.lockState());
-    AutoGetOrCreateDb autoDb(&txn, "local", mongo::MODE_X);
+    ScopedTransaction transaction(txn, MODE_X);
+    Lock::GlobalWrite lk(txn->lockState());
+    AutoGetOrCreateDb autoDb(txn, "local", mongo::MODE_X);
     Database* db = autoDb.getDb();
     const std::string ns = "local.startup_log";
     Collection* collection = db->getCollection(ns);
-    WriteUnitOfWork wunit(&txn);
+    WriteUnitOfWork wunit(txn);
     if (!collection) {
         BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
-        bool shouldReplicateWrites = txn.writesAreReplicated();
-        txn.setReplicatedWrites(false);
-        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, &txn, shouldReplicateWrites);
-        uassertStatusOK(userCreateNS(&txn, db, ns, options));
+        bool shouldReplicateWrites = txn->writesAreReplicated();
+        txn->setReplicatedWrites(false);
+        ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
+        uassertStatusOK(userCreateNS(txn, db, ns, options));
         collection = db->getCollection(ns);
     }
     invariant(collection);
-    uassertStatusOK(collection->insertDocument(&txn, o, false));
+    uassertStatusOK(collection->insertDocument(txn, o, false));
     wunit.commit();
 }
 
@@ -293,12 +293,11 @@ static unsigned long long checkIfReplMissingFromCommandLine(OperationContext* tx
     return 0;
 }
 
-static void repairDatabasesAndCheckVersion() {
+static void repairDatabasesAndCheckVersion(OperationContext* txn) {
     LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
-    OperationContextImpl txn;
-    ScopedTransaction transaction(&txn, MODE_X);
-    Lock::GlobalWrite lk(txn.lockState());
+    ScopedTransaction transaction(txn, MODE_X);
+    Lock::GlobalWrite lk(txn->lockState());
 
     vector<string> dbNames;
 
@@ -311,7 +310,7 @@ static void repairDatabasesAndCheckVersion() {
             const string dbName = *i;
             LOG(1) << "    Repairing database: " << dbName << endl;
 
-            fassert(18506, repairDatabase(&txn, storageEngine, dbName));
+            fassert(18506, repairDatabase(txn, storageEngine, dbName));
         }
     }
 
@@ -322,19 +321,19 @@ static void repairDatabasesAndCheckVersion() {
     // to. The local DB is special because it is not replicated.  See SERVER-10927 for more
     // details.
     const bool shouldClearNonLocalTmpCollections =
-        !(checkIfReplMissingFromCommandLine(&txn) || replSettings.usingReplSets() ||
+        !(checkIfReplMissingFromCommandLine(txn) || replSettings.usingReplSets() ||
           replSettings.slave == repl::SimpleSlave);
 
     for (vector<string>::const_iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
         const string dbName = *i;
         LOG(1) << "    Recovering database: " << dbName << endl;
 
-        Database* db = dbHolder().openDb(&txn, dbName);
+        Database* db = dbHolder().openDb(txn, dbName);
         invariant(db);
 
         // First thing after opening the database is to check for file compatibility,
         // otherwise we might crash if this is a deprecated format.
-        if (!db->getDatabaseCatalogEntry()->currentFilesCompatible(&txn)) {
+        if (!db->getDatabaseCatalogEntry()->currentFilesCompatible(txn)) {
             log() << "****";
             log() << "cannot do this upgrade without an upgrade in the middle";
             log() << "please do a --repair with 2.6 and then start this version";
@@ -347,7 +346,7 @@ static void repairDatabasesAndCheckVersion() {
 
         Collection* coll = db->getCollection(systemIndexes);
         unique_ptr<PlanExecutor> exec(
-            InternalPlanner::collectionScan(&txn, systemIndexes, coll, PlanExecutor::YIELD_MANUAL));
+            InternalPlanner::collectionScan(txn, systemIndexes, coll, PlanExecutor::YIELD_MANUAL));
 
         BSONObj index;
         PlanExecutor::ExecState state;
@@ -355,7 +354,7 @@ static void repairDatabasesAndCheckVersion() {
             const BSONObj key = index.getObjectField("key");
             const string plugin = IndexNames::findPluginName(key);
 
-            if (db->getDatabaseCatalogEntry()->isOlderThan24(&txn)) {
+            if (db->getDatabaseCatalogEntry()->isOlderThan24(txn)) {
                 if (IndexNames::existedBefore24(plugin)) {
                     continue;
                 }
@@ -390,11 +389,11 @@ static void repairDatabasesAndCheckVersion() {
 
         if (replSettings.usingReplSets()) {
             // We only care about the _id index if we are in a replset
-            checkForIdIndexes(&txn, db);
+            checkForIdIndexes(txn, db);
         }
 
         if (shouldClearNonLocalTmpCollections || dbName == "local") {
-            db->clearTmpCollections(&txn);
+            db->clearTmpCollections(txn);
         }
     }
 
@@ -520,17 +519,16 @@ static void _initAndListen(int listenPort) {
         ScriptEngine::setup();
     }
 
-    repairDatabasesAndCheckVersion();
+    auto startupOpCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+
+    repairDatabasesAndCheckVersion(startupOpCtx.get());
 
     if (storageGlobalParams.upgrade) {
         log() << "finished checking dbs" << endl;
         exitCleanly(EXIT_CLEAN);
     }
 
-    {
-        OperationContextImpl txn;
-        uassertStatusOK(getGlobalAuthorizationManager()->initialize(&txn));
-    }
+    uassertStatusOK(getGlobalAuthorizationManager()->initialize(startupOpCtx.get()));
 
     /* this is for security on certain platforms (nonce generation) */
     srand((unsigned)(curTimeMicros64() ^ startupSrandTimer.micros()));
@@ -546,13 +544,11 @@ static void _initAndListen(int listenPort) {
     }
 
     {
-        OperationContextImpl txn;
-
 #ifndef _WIN32
         mongo::signalForkSuccess();
 #endif
 
-        Status status = authindex::verifySystemIndexes(&txn);
+        Status status = authindex::verifySystemIndexes(startupOpCtx.get());
         if (!status.isOK()) {
             log() << status.reason();
             exitCleanly(EXIT_NEED_UPGRADE);
@@ -560,8 +556,8 @@ static void _initAndListen(int listenPort) {
 
         // SERVER-14090: Verify that auth schema version is schemaVersion26Final.
         int foundSchemaVersion;
-        status =
-            getGlobalAuthorizationManager()->getAuthorizationVersion(&txn, &foundSchemaVersion);
+        status = getGlobalAuthorizationManager()->getAuthorizationVersion(startupOpCtx.get(),
+                                                                          &foundSchemaVersion);
         if (!status.isOK()) {
             log() << "Auth schema version is incompatible: "
                   << "User and role management commands require auth data to have "
@@ -581,11 +577,12 @@ static void _initAndListen(int listenPort) {
 
         getDeleter()->startWorkers();
 
-        restartInProgressIndexesFromLastShutdown(&txn);
+        restartInProgressIndexesFromLastShutdown(startupOpCtx.get());
 
-        repl::getGlobalReplicationCoordinator()->startReplication(&txn);
+        repl::getGlobalReplicationCoordinator()->startReplication(startupOpCtx.get());
 
-        const unsigned long long missingRepl = checkIfReplMissingFromCommandLine(&txn);
+        const unsigned long long missingRepl =
+            checkIfReplMissingFromCommandLine(startupOpCtx.get());
         if (missingRepl) {
             log() << startupWarningsLog;
             log() << "** WARNING: mongod started without --replSet yet " << missingRepl
@@ -608,9 +605,15 @@ static void _initAndListen(int listenPort) {
 
     startFTDC();
 
-    logStartup();
+    if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
+        uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
+    }
 
-    // MessageServer::run will return when exit code closes its socket
+    logStartup(startupOpCtx.get());
+
+    // MessageServer::run will return when exit code closes its socket and we don't need the
+    // operation context anymore
+    startupOpCtx.reset();
     server->run();
 }
 
