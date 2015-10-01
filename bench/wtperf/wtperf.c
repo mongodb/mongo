@@ -385,7 +385,7 @@ worker(void *arg)
 	size_t i;
 	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
-	int hit_rollback, measure_latency, ret, truncated;
+	int measure_latency, ret, truncated;
 	char *value_buf, *key_buf, *value;
 	char buf[512];
 
@@ -393,7 +393,6 @@ worker(void *arg)
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	cursors = NULL;
-	hit_rollback = 0;
 	ops = 0;
 	ops_per_txn = thread->workload->ops_per_txn;
 	session = NULL;
@@ -601,23 +600,36 @@ worker(void *arg)
 			if (ret == WT_NOTFOUND)
 				break;
 
-op_err:			lprintf(cfg, ret, 0,
-			    "%s failed for: %s, range: %"PRIu64,
-			    op_name(op), key_buf, wtperf_value_range(cfg));
+op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 			/*
-			 * If we get a rollback error we rollback and continue
-			 */
-			if (ret == WT_ROLLBACK) {
+                         * If we are runnibg with explicit eplicit transactions
+                         * configured and we hit a WT_ROLLBACK, then we should
+                         * rollback the current transaction and attmpt to
+			 * continue.
+			 * This does break the guarantee of insertion order in
+			 * cases of ordered inserts, as we aren't retrying here.
+                         */
+				lprintf(cfg, ret, 1,
+				    "%s for: %s, range: %"PRIu64, op_name(op),
+				    key_buf, wtperf_value_range(cfg));
 				if ((ret = session->rollback_transaction(
 				    session, NULL)) != 0) {
 					lprintf(cfg, ret, 0,
 					     "Failed rollback_transaction");
 					goto err;
 				}
-				hit_rollback = 1;
+				if ((ret = session->begin_transaction(
+				    session, NULL)) != 0) {
+					lprintf(cfg, ret, 0,
+					    "Worker transaction commit failed");
+					goto err;
+				}
 				break;
-			} else 
-				goto err;
+			}
+			lprintf(cfg, ret, 0,
+			    "%s failed for: %s, range: %"PRIu64,
+			    op_name(op), key_buf, wtperf_value_range(cfg));
+			goto err;
 		default:
 			goto err;		/* can't happen */
 		}
@@ -649,13 +661,12 @@ op_err:			lprintf(cfg, ret, 0,
 
 		/* Commit our work if configured for explicit transactions */
 		if (ops_per_txn != 0 && ops++ % ops_per_txn == 0) {
-			if (!hit_rollback && (ret = session->commit_transaction(
+			if ((ret = session->commit_transaction(
 			    session, NULL)) != 0) {
 				lprintf(cfg, ret, 0,
 				    "Worker transaction commit failed");
 				goto err;
 			}
-			hit_rollback = 0;
 			if ((ret = session->begin_transaction(
 			    session, NULL)) != 0) {
 				lprintf(cfg, ret, 0,
