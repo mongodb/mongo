@@ -30,9 +30,9 @@ import time
 import wiredtiger, wttest
 from helper import simple_populate
 
-# test_reconfig.py
+# test_reconfig01.py
 #    Smoke-test the connection reconfiguration operations.
-class test_reconfig(wttest.WiredTigerTestCase):
+class test_reconfig01(wttest.WiredTigerTestCase):
 
     def test_reconfig_shared_cache(self):
         self.conn.reconfigure("shared_cache=(name=pool,size=300M)")

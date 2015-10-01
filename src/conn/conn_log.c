@@ -42,7 +42,8 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
  *	Parse and setup the logging server options.
  */
 static int
-__logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
+__logmgr_config(
+    WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool reconfig)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
@@ -50,22 +51,37 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	conn = S2C(session);
 
 	/*
-	 * The logging configuration is off by default.
+	 * If we're reconfiguring, enabled must match the already
+	 * existing setting.
+	 *
+	 * If it is off and the user it turning it on, or it is on
+	 * and the user is turning it off, return an error.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
+	if (reconfig &&
+	    ((cval.val != 0 &&
+	    !FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) ||
+	    (cval.val == 0 &&
+	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))))
+		return (EINVAL);
 	*runp = cval.val != 0;
 
 	/*
-	 * Setup a log path, compression and encryption even if logging is
-	 * disabled in case we are going to print a log.
+	 * Setup a log path and compression even if logging is disabled in case
+	 * we are going to print a log.  Only do this on creation.  Once a
+	 * compressor or log path are set they cannot be changed.
 	 */
-	conn->log_compressor = NULL;
-	WT_RET(__wt_config_gets_none(session, cfg, "log.compressor", &cval));
-	WT_RET(__wt_compressor_config(session, &cval, &conn->log_compressor));
+	if (!reconfig) {
+		conn->log_compressor = NULL;
+		WT_RET(__wt_config_gets_none(
+		    session, cfg, "log.compressor", &cval));
+		WT_RET(__wt_compressor_config(
+		    session, &cval, &conn->log_compressor));
 
-	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
-	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
-
+		WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
+		WT_RET(__wt_strndup(
+		    session, cval.str, cval.len, &conn->log_path));
+	}
 	/* We are done if logging isn't enabled. */
 	if (!*runp)
 		return (0);
@@ -74,23 +90,53 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	if (cval.val != 0)
 		FLD_SET(conn->log_flags, WT_CONN_LOG_ARCHIVE);
 
-	WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
-	conn->log_file_max = (wt_off_t)cval.val;
-	WT_STAT_FAST_CONN_SET(session, log_max_filesize, conn->log_file_max);
+	if (!reconfig) {
+		/*
+		 * Ignore if the user tries to change the file size.  The
+		 * amount of memory allocated to the log slots may be based
+		 * on the log file size at creation and we don't want to
+		 * re-allocate that memory while running.
+		 */
+		WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
+		conn->log_file_max = (wt_off_t)cval.val;
+		WT_STAT_FAST_CONN_SET(session,
+		    log_max_filesize, conn->log_file_max);
+	}
 
-	WT_RET(__wt_config_gets(session, cfg, "log.prealloc", &cval));
 	/*
-	 * If pre-allocation is configured, set the initial number to one.
+	 * If pre-allocation is configured, set the initial number to a few.
 	 * We'll adapt as load dictates.
 	 */
+	WT_RET(__wt_config_gets(session, cfg, "log.prealloc", &cval));
 	if (cval.val != 0)
 		conn->log_prealloc = 1;
+
+	/*
+	 * Note that it is meaningless to reconfigure this value during
+	 * runtime.  It only matters on create before recovery runs.
+	 */
 	WT_RET(__wt_config_gets_def(session, cfg, "log.recover", 0, &cval));
 	if (cval.len != 0  && WT_STRING_MATCH("error", cval.str, cval.len))
 		FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR);
 
+	WT_RET(__wt_config_gets(session, cfg, "log.zero_fill", &cval));
+	if (cval.val != 0)
+		FLD_SET(conn->log_flags, WT_CONN_LOG_ZERO_FILL);
+
 	WT_RET(__logmgr_sync_cfg(session, cfg));
 	return (0);
+}
+
+/*
+ * __wt_logmgr_reconfig --
+ *	Reconfigure logging.
+ */
+int
+__wt_logmgr_reconfig(WT_SESSION_IMPL *session, const char **cfg)
+{
+	bool dummy;
+
+	return (__logmgr_config(session, cfg, &dummy, true));
 }
 
 /*
@@ -720,7 +766,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	conn = S2C(session);
 
 	/* Handle configuration. */
-	WT_RET(__logmgr_config(session, cfg, &run));
+	WT_RET(__logmgr_config(session, cfg, &run, false));
 
 	/* If logging is not configured, we're done. */
 	if (!run)
