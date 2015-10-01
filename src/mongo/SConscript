@@ -236,24 +236,29 @@ generateConfigHeaderFile = env.Substfile(
 )
 env.Alias('generated-sources', generateConfigHeaderFile)
 
+mongodLibDeps = [
+    "db/coredb",
+    "db/conn_pool_options",
+    "db/mongod_options",
+    "db/mongodandmongos",
+    "db/mongodwebserver",
+    "db/serveronly",
+    "db/repl/storage_interface_impl",
+    "executor/network_interface_factory",
+    's/commands/shared_cluster_commands',
+    "util/ntservice",
+]
+
+if has_option('use-cpu-profiler'):
+    mongodLibDeps.append('db/cpuprofiler')
+
 mongod = env.Program(
     target="mongod",
     source=[
         "db/db.cpp",
         "db/mongod_options_init.cpp",
     ],
-    LIBDEPS=[
-        "db/coredb",
-        "db/conn_pool_options",
-        "db/mongod_options",
-        "db/mongodandmongos",
-        "db/mongodwebserver",
-        "db/serveronly",
-        "db/repl/storage_interface_impl",
-        "executor/network_interface_factory",
-        's/commands/shared_cluster_commands',
-        "util/ntservice",
-    ],
+    LIBDEPS=mongodLibDeps,
 )
 
 env.Default(env.Install('#/', mongod))

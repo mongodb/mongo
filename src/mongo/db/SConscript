@@ -657,15 +657,16 @@ serverOnlyFiles = [
 ]
 
 if has_option('use-cpu-profiler'):
-    serverOnlyFiles.append('commands/cpuprofile.cpp')
-    # If we are building with our internal gperftools, add the necessary include path.
-    #
-    # NOTE: This is pretty bad because it will spam this include path into many files that
-    # don't require it, but because of the way things are currently set up, it is not easy to
-    # scope it more narrowly. Better would be if the commands were a library, and could be
-    # conditionally made to depend on this file, as a library and then we could easily scope
-    # just to this file.
-    env.InjectThirdPartyIncludePaths('gperftools')
+    profEnv = env.Clone()
+    profEnv.Library('cpuprofiler',
+        source=[
+            'commands/cpuprofile.cpp',
+        ],
+        LIBDEPS=[
+            'serveronly',
+        ]
+    )
+    profEnv.InjectThirdPartyIncludePaths('gperftools')
 
 serveronlyEnv = env.Clone()
 serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
