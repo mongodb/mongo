@@ -8,6 +8,8 @@ import (
 	"github.com/mongodb/mongo-tools/common/signals"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoexport"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 	"os"
 )
 
@@ -53,11 +55,30 @@ func main() {
 
 	provider, err := db.NewSessionProvider(*opts)
 
-	providerFlags := db.DisableSocketTimeout
+	provider.SetFlags(db.DisableSocketTimeout)
+
 	if inputOpts.SlaveOk {
-		providerFlags = providerFlags | db.Monotonic
+		if inputOpts.ReadPreference != "" {
+			log.Logf(log.Always, "--slaveOk can't be specified when --readPreference is specified")
+			os.Exit(util.ExitBadOptions)
+		}
+		log.Logf(log.Always, "--slaveOk is depriciated and being internally rewritten as --readPreference=nearest")
+		inputOpts.ReadPreference = "nearest"
 	}
-	provider.SetFlags(providerFlags)
+
+	var mode mgo.Mode = mgo.Nearest
+	var tags bson.D
+	if inputOpts.ReadPreference != "" {
+		mode, tags, err = db.ParseReadPreference(inputOpts.ReadPreference)
+		if err != nil {
+			log.Logf(log.Always, "error parsing --ReadPreference: %v", err)
+			os.Exit(util.ExitBadOptions)
+		}
+		if len(tags) > 0 {
+			provider.SetTags(tags)
+		}
+	}
+	provider.SetReadPreference(mode)
 
 	if err != nil {
 		log.Logf(log.Always, "error connecting to host: %v", err)

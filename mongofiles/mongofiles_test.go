@@ -98,6 +98,7 @@ func simpleMongoFilesInstance(args []string) (*MongoFiles, error) {
 
 	mongofiles := MongoFiles{
 		ToolOptions:     toolOptions,
+		InputOptions:    &InputOptions{},
 		StorageOptions:  &StorageOptions{GridFSPrefix: "fs", DB: testDB},
 		SessionProvider: sessionProvider,
 		Command:         args[0],

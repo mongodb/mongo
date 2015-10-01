@@ -59,7 +59,9 @@ type SessionProvider struct {
 	masterSession *mgo.Session
 
 	// flags for generating the master session
-	flags sessionFlag
+	flags          sessionFlag
+	readPreference mgo.Mode
+	tags           bson.D
 }
 
 // ApplyOpsResponse represents the response from an 'applyOps' command.
@@ -98,25 +100,24 @@ func (self *SessionProvider) GetSession() (*mgo.Session, error) {
 	}
 
 	// update masterSession based on flags
-	self.refreshFlags()
+	self.refresh()
 
 	// copy the provider's master session, for connection pooling
 	return self.masterSession.Copy(), nil
 }
 
-// refreshFlags is a helper for modifying the session based on the
+// refresh is a helper for modifying the session based on the
 // session provider flags passed in with SetFlags.
 // This helper assumes a lock is already taken.
-func (self *SessionProvider) refreshFlags() {
-	// handle slaveOK
-	if (self.flags & Monotonic) > 0 {
-		self.masterSession.SetMode(mgo.Monotonic, true)
-	} else {
-		self.masterSession.SetMode(mgo.Strong, true)
-	}
+func (self *SessionProvider) refresh() {
+	// handle readPreference
+	self.masterSession.SetMode(self.readPreference, true)
 	// disable timeouts
 	if (self.flags & DisableSocketTimeout) > 0 {
 		self.masterSession.SetSocketTimeout(0)
+	}
+	if self.tags != nil {
+		self.masterSession.SelectServers(self.tags)
 	}
 }
 
@@ -129,7 +130,33 @@ func (self *SessionProvider) SetFlags(flagBits sessionFlag) {
 
 	// make sure we update the master session if one already exists
 	if self.masterSession != nil {
-		self.refreshFlags()
+		self.refresh()
+	}
+}
+
+// SetReadPreference sets the read preference mode in the SessionProvider
+// and eventually in the masterSession
+func (self *SessionProvider) SetReadPreference(pref mgo.Mode) {
+	self.masterSessionLock.Lock()
+	defer self.masterSessionLock.Unlock()
+
+	self.readPreference = pref
+
+	if self.masterSession != nil {
+		self.refresh()
+	}
+}
+
+// SetTags sets the server selection tags in the SessionProvider
+// and eventually in the masterSession
+func (self *SessionProvider) SetTags(tags bson.D) {
+	self.masterSessionLock.Lock()
+	defer self.masterSessionLock.Unlock()
+
+	self.tags = tags
+
+	if self.masterSession != nil {
+		self.refresh()
 	}
 }
 
