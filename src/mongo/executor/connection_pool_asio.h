@@ -71,14 +71,15 @@ class ASIOConnection final : public ConnectionPool::ConnectionInterface {
 public:
     ASIOConnection(const HostAndPort& hostAndPort, size_t generation, ASIOImpl* global);
 
-    void indicateUsed() override;
-    void indicateFailed(Status status) override;
+    void indicateSuccess() override;
+    void indicateFailure(Status status) override;
     const HostAndPort& getHostAndPort() const override;
 
     std::unique_ptr<NetworkInterfaceASIO::AsyncOp> releaseAsyncOp();
     void bindAsyncOp(std::unique_ptr<NetworkInterfaceASIO::AsyncOp> op);
 
 private:
+    void indicateUsed() override;
     Date_t getLastUsed() const override;
     const Status& getStatus() const override;
 
@@ -86,6 +87,7 @@ private:
     void cancelTimeout() override;
 
     void setup(Milliseconds timeout, SetupCallback cb) override;
+    void resetToUnknown() override;
     void refresh(Milliseconds timeout, RefreshCallback cb) override;
 
     size_t getGeneration() const override;
@@ -99,7 +101,7 @@ private:
     ASIOImpl* const _global;
     ASIOTimer _timer;
     Date_t _lastUsed;
-    Status _status = Status::OK();
+    Status _status = ConnectionPool::kConnectionStateUnknown;
     HostAndPort _hostAndPort;
     size_t _generation;
     std::unique_ptr<NetworkInterfaceASIO::AsyncOp> _impl;

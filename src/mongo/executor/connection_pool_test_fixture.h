@@ -80,9 +80,10 @@ public:
 
     size_t id() const;
 
-    void indicateUsed() override;
+    void indicateSuccess() override;
+    void indicateFailure(Status status) override;
 
-    void indicateFailed(Status status) override;
+    void resetToUnknown() override;
 
     const HostAndPort& getHostAndPort() const override;
 
@@ -98,6 +99,8 @@ public:
     static void pushRefresh(Status status);
 
 private:
+    void indicateUsed() override;
+
     Date_t getLastUsed() const override;
 
     const Status& getStatus() const override;

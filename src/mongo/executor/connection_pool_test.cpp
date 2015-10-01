@@ -48,6 +48,10 @@ protected:
         TimerImpl::clear();
     }
 
+    void doneWith(const ConnectionPool::ConnectionHandle& swConn) {
+        static_cast<ConnectionImpl*>(swConn.get())->indicateSuccess();
+    }
+
 private:
 };
 
@@ -67,18 +71,22 @@ TEST_F(ConnectionPoolTest, SameConn) {
     // Grab and stash an id for the first request
     size_t conn1Id = 0;
     ConnectionImpl::pushSetup(Status::OK());
-    pool.get(
-        HostAndPort(),
-        Milliseconds(5000),
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { conn1Id = CONN2ID(swConn); });
+    pool.get(HostAndPort(),
+             Milliseconds(5000),
+             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                 conn1Id = CONN2ID(swConn);
+                 doneWith(swConn.getValue());
+             });
 
     // Grab and stash an id for the second request
     size_t conn2Id = 0;
     ConnectionImpl::pushSetup(Status::OK());
-    pool.get(
-        HostAndPort(),
-        Milliseconds(5000),
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { conn2Id = CONN2ID(swConn); });
+    pool.get(HostAndPort(),
+             Milliseconds(5000),
+             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                 conn2Id = CONN2ID(swConn);
+                 doneWith(swConn.getValue());
+             });
 
     // Verify that we hit them, and that they're the same
     ASSERT(conn1Id);
@@ -99,16 +107,18 @@ TEST_F(ConnectionPoolTest, FailedConnDifferentConn) {
              Milliseconds(5000),
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  conn1Id = CONN2ID(swConn);
-                 swConn.getValue()->indicateFailed(Status(ErrorCodes::BadValue, "error"));
+                 swConn.getValue()->indicateFailure(Status(ErrorCodes::BadValue, "error"));
              });
 
     // Grab the second id
     size_t conn2Id = 0;
     ConnectionImpl::pushSetup(Status::OK());
-    pool.get(
-        HostAndPort(),
-        Milliseconds(5000),
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { conn2Id = CONN2ID(swConn); });
+    pool.get(HostAndPort(),
+             Milliseconds(5000),
+             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                 conn2Id = CONN2ID(swConn);
+                 doneWith(swConn.getValue());
+             });
 
     // Verify that we hit them, and that they're different
     ASSERT(conn1Id);
@@ -126,18 +136,22 @@ TEST_F(ConnectionPoolTest, DifferentHostDifferentConn) {
     // Conn 1 from port 30000
     size_t conn1Id = 0;
     ConnectionImpl::pushSetup(Status::OK());
-    pool.get(
-        HostAndPort("localhost:30000"),
-        Milliseconds(5000),
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { conn1Id = CONN2ID(swConn); });
+    pool.get(HostAndPort("localhost:30000"),
+             Milliseconds(5000),
+             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                 conn1Id = CONN2ID(swConn);
+                 doneWith(swConn.getValue());
+             });
 
     // Conn 2 from port 30001
     size_t conn2Id = 0;
     ConnectionImpl::pushSetup(Status::OK());
-    pool.get(
-        HostAndPort("localhost:30001"),
-        Milliseconds(5000),
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { conn2Id = CONN2ID(swConn); });
+    pool.get(HostAndPort("localhost:30001"),
+             Milliseconds(5000),
+             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                 conn2Id = CONN2ID(swConn);
+                 doneWith(swConn.getValue());
+             });
 
     // Hit them and not the same
     ASSERT(conn1Id);
@@ -173,6 +187,9 @@ TEST_F(ConnectionPoolTest, DifferentConnWithoutReturn) {
 
     // Verify that the two connections are different
     ASSERT_NE(conn1.get(), conn2.get());
+
+    doneWith(conn1);
+    doneWith(conn2);
 }
 
 /**
@@ -227,7 +244,10 @@ TEST_F(ConnectionPoolTest, refreshHappens) {
     ConnectionImpl::pushSetup(Status::OK());
     pool.get(HostAndPort(),
              Milliseconds(5000),
-             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { ASSERT(swConn.isOK()); });
+             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                 ASSERT(swConn.isOK());
+                 doneWith(swConn.getValue());
+             });
 
     // After 1 second, one refresh has occurred
     PoolImpl::setNow(now + Milliseconds(1000));
@@ -260,19 +280,23 @@ TEST_F(ConnectionPoolTest, refreshTimeoutHappens) {
 
     // Grab a connection and verify it's good
     ConnectionImpl::pushSetup(Status::OK());
-    pool.get(
-        HostAndPort(),
-        Milliseconds(5000),
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { conn1Id = CONN2ID(swConn); });
+    pool.get(HostAndPort(),
+             Milliseconds(5000),
+             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                 conn1Id = CONN2ID(swConn);
+                 doneWith(swConn.getValue());
+             });
 
     PoolImpl::setNow(now + Milliseconds(500));
 
     size_t conn2Id = 0;
     // Make sure we still get the first one
-    pool.get(
-        HostAndPort(),
-        Milliseconds(5000),
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { conn2Id = CONN2ID(swConn); });
+    pool.get(HostAndPort(),
+             Milliseconds(5000),
+             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                 conn2Id = CONN2ID(swConn);
+                 doneWith(swConn.getValue());
+             });
     ASSERT_EQ(conn1Id, conn2Id);
 
     // This should trigger a refresh, but not time it out. So now we have one
@@ -303,6 +327,7 @@ TEST_F(ConnectionPoolTest, refreshTimeoutHappens) {
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  ASSERT_NE(CONN2ID(swConn), conn1Id);
                  reachedB = true;
+                 doneWith(swConn.getValue());
              });
 
     ASSERT(reachedA);
@@ -326,6 +351,7 @@ TEST_F(ConnectionPoolTest, requestsServedByUrgency) {
                  ASSERT(swConn.isOK());
 
                  reachedA = true;
+                 doneWith(swConn.getValue());
              });
 
     pool.get(HostAndPort(),
@@ -344,6 +370,7 @@ TEST_F(ConnectionPoolTest, requestsServedByUrgency) {
     ASSERT(reachedB);
     ASSERT(!reachedA);
 
+    doneWith(conn);
     conn.reset();
 
     // Now that we've returned the connection, we see the second has been
@@ -399,10 +426,14 @@ TEST_F(ConnectionPoolTest, maxPoolRespected) {
 
     // Return 1
     ConnectionPool::ConnectionInterface* conn1Ptr = conn1.get();
+    doneWith(conn1);
     conn1.reset();
 
     // Verify that it's the one that pops out for request 3
     ASSERT_EQ(conn1Ptr, conn3.get());
+
+    doneWith(conn2);
+    doneWith(conn3);
 }
 
 /**
@@ -494,15 +525,15 @@ TEST_F(ConnectionPoolTest, minPoolRespected) {
 
     // Return each connection over 1, 2 and 3 ms
     PoolImpl::setNow(now + Milliseconds(1));
-    conn1->indicateUsed();
+    doneWith(conn1);
     conn1.reset();
 
     PoolImpl::setNow(now + Milliseconds(2));
-    conn2->indicateUsed();
+    doneWith(conn2);
     conn2.reset();
 
     PoolImpl::setNow(now + Milliseconds(3));
-    conn3->indicateUsed();
+    doneWith(conn3);
     conn3.reset();
 
     // Jump 5 seconds and verify that refreshes only two refreshes occurred
@@ -539,6 +570,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappens) {
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  connId = CONN2ID(swConn);
                  reachedA = true;
+                 doneWith(swConn.getValue());
              });
 
     ASSERT(reachedA);
@@ -555,6 +587,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappens) {
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  ASSERT_NE(connId, CONN2ID(swConn));
                  reachedB = true;
+                 doneWith(swConn.getValue());
              });
 
     ASSERT(reachedB);
@@ -587,6 +620,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensMoreGetsDelay) {
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  connId = CONN2ID(swConn);
                  reachedA = true;
+                 doneWith(swConn.getValue());
              });
     ASSERT(reachedA);
 
@@ -600,6 +634,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensMoreGetsDelay) {
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  ASSERT_EQ(connId, CONN2ID(swConn));
                  reachedB = true;
+                 doneWith(swConn.getValue());
              });
     ASSERT(reachedB);
 
@@ -614,6 +649,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensMoreGetsDelay) {
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  ASSERT_NE(connId, CONN2ID(swConn));
                  reachedC = true;
+                 doneWith(swConn.getValue());
              });
 
     ASSERT(reachedC);
@@ -652,10 +688,12 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensCheckoutDelays) {
 
     // return the second
     ConnectionImpl::pushSetup(Status::OK());
-    pool.get(
-        HostAndPort(),
-        Milliseconds(5000),
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { conn2Id = CONN2ID(swConn); });
+    pool.get(HostAndPort(),
+             Milliseconds(5000),
+             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                 conn2Id = CONN2ID(swConn);
+                 doneWith(swConn.getValue());
+             });
 
     ASSERT(conn2Id);
 
@@ -670,11 +708,13 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensCheckoutDelays) {
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  ASSERT_EQ(conn2Id, CONN2ID(swConn));
                  reachedA = true;
+                 doneWith(swConn.getValue());
              });
 
     ASSERT(reachedA);
 
     // return conn 1
+    doneWith(conn1);
     conn1.reset();
 
     // expire the pool
@@ -690,6 +730,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensCheckoutDelays) {
                  ASSERT_NE(conn1Id, CONN2ID(swConn));
                  ASSERT_NE(conn2Id, CONN2ID(swConn));
                  reachedB = true;
+                 doneWith(swConn.getValue());
              });
     ASSERT(reachedB);
 }
@@ -712,10 +753,12 @@ TEST_F(ConnectionPoolTest, dropConnections) {
     // Grab the first connection id
     size_t conn1Id = 0;
     ConnectionImpl::pushSetup(Status::OK());
-    pool.get(
-        HostAndPort(),
-        Milliseconds(5000),
-        [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) { conn1Id = CONN2ID(swConn); });
+    pool.get(HostAndPort(),
+             Milliseconds(5000),
+             [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+                 conn1Id = CONN2ID(swConn);
+                 doneWith(swConn.getValue());
+             });
     ASSERT(conn1Id);
 
     // Grab it and this time keep it out of the pool
@@ -747,6 +790,7 @@ TEST_F(ConnectionPoolTest, dropConnections) {
     ASSERT(reachedA);
 
     // return the connection
+    doneWith(handle);
     handle.reset();
 
     // Make sure that a new connection request properly disposed of the gen1
@@ -757,8 +801,8 @@ TEST_F(ConnectionPoolTest, dropConnections) {
              Milliseconds(5000),
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  conn2Id = CONN2ID(swConn);
-
                  ASSERT_NE(conn2Id, conn1Id);
+                 doneWith(swConn.getValue());
              });
     ASSERT(conn2Id);
 
@@ -780,6 +824,7 @@ TEST_F(ConnectionPoolTest, dropConnections) {
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  ASSERT_NE(CONN2ID(swConn), conn2Id);
                  reachedB = true;
+                 doneWith(swConn.getValue());
              });
 
     ASSERT(reachedB);

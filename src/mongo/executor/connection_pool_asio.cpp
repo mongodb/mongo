@@ -102,16 +102,24 @@ ASIOConnection::ASIOConnection(const HostAndPort& hostAndPort, size_t generation
       _generation(generation),
       _impl(makeAsyncOp(this)) {}
 
-void ASIOConnection::indicateUsed() {
-    _lastUsed = _global->now();
+void ASIOConnection::indicateSuccess() {
+    indicateUsed();
+    _status = Status::OK();
 }
 
-void ASIOConnection::indicateFailed(Status status) {
+void ASIOConnection::indicateFailure(Status status) {
+    invariant(!status.isOK());
     _status = std::move(status);
 }
 
 const HostAndPort& ASIOConnection::getHostAndPort() const {
     return _hostAndPort;
+}
+
+void ASIOConnection::indicateUsed() {
+    // It is illegal to attempt to use a connection after calling indicateFailure().
+    invariant(_status.isOK() || _status == ConnectionPool::kConnectionStateUnknown);
+    _lastUsed = _global->now();
 }
 
 Date_t ASIOConnection::getLastUsed() const {
@@ -161,6 +169,10 @@ void ASIOConnection::setup(Milliseconds timeout, SetupCallback cb) {
     _setupCallback = std::move(cb);
 
     _global->_impl->_connect(_impl.get());
+}
+
+void ASIOConnection::resetToUnknown() {
+    _status = ConnectionPool::kConnectionStateUnknown;
 }
 
 void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {

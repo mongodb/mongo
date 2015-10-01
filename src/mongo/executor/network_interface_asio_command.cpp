@@ -329,9 +329,9 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
 
     asioConn->bindAsyncOp(std::move(ownedOp));
     if (!resp.isOK()) {
-        asioConn->indicateFailed(resp.getStatus());
+        asioConn->indicateFailure(resp.getStatus());
     } else {
-        asioConn->indicateUsed();
+        asioConn->indicateSuccess();
     }
 
     signalWorkAvailable();

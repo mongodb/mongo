@@ -81,8 +81,16 @@ void ConnectionImpl::indicateUsed() {
     _lastUsed = _global->now();
 }
 
-void ConnectionImpl::indicateFailed(Status status) {
+void ConnectionImpl::indicateSuccess() {
+    _status = Status::OK();
+}
+
+void ConnectionImpl::indicateFailure(Status status) {
     _status = std::move(status);
+}
+
+void ConnectionImpl::resetToUnknown() {
+    _status = ConnectionPool::kConnectionStateUnknown;
 }
 
 size_t ConnectionImpl::id() const {

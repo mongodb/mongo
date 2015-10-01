@@ -166,6 +166,9 @@ Milliseconds const ConnectionPool::kDefaultRefreshTimeout = Seconds(20);
 Milliseconds const ConnectionPool::kDefaultRefreshRequirement = Seconds(60);
 Milliseconds const ConnectionPool::kDefaultHostTimeout = Minutes(5);
 
+const Status ConnectionPool::kConnectionStateUnknown =
+    Status(ErrorCodes::InternalError, "Connection is in an unknown state");
+
 ConnectionPool::ConnectionPool(std::unique_ptr<DependentTypeFactoryInterface> impl, Options options)
     : _options(std::move(options)), _factory(std::move(impl)) {}
 
@@ -301,6 +304,10 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
 
     updateStateInLock();
 
+    // Users are required to call indicateSuccess() or indicateFailure() before allowing
+    // a connection to be returned. Otherwise, we have entered an unknown state.
+    invariant(conn->getStatus() != kConnectionStateUnknown);
+
     if (conn->getGeneration() != _generation) {
         // If the connection is from an older generation, just return.
         return;
@@ -384,6 +391,8 @@ void ConnectionPool::SpecificPool::addToReady(stdx::unique_lock<stdx::mutex>& lk
 
                             _checkedOutPool[connPtr] = std::move(conn);
 
+                            connPtr->indicateSuccess();
+
                             returnConnection(connPtr, std::move(lk));
                         });
 
@@ -460,6 +469,7 @@ void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex
         updateStateInLock();
 
         // pass it to the user
+        connPtr->resetToUnknown();
         lk.unlock();
         cb(ConnectionHandle(connPtr, ConnectionHandleDeleter(_parent)));
         lk.lock();
