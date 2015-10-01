@@ -275,7 +275,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	 * in each connection saves having a complex election process when
 	 * the active connection shuts down.
 	 */
-	F_SET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE);
+	F_SET(cp, WT_CACHE_POOL_ACTIVE);
 	F_SET(cache, WT_CACHE_POOL_RUN);
 	WT_RET(__wt_thread_create(session, &cache->cp_tid,
 	    __wt_cache_pool_server, cache->cp_session));
@@ -366,10 +366,10 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 
 	if (--cp->refs == 0) {
 		WT_ASSERT(session, TAILQ_EMPTY(&cp->cache_pool_qh));
-		F_CLR_ATOMIC(cp, WT_CACHE_POOL_ACTIVE);
+		F_CLR(cp, WT_CACHE_POOL_ACTIVE);
 	}
 
-	if (!F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE)) {
+	if (!F_ISSET(cp, WT_CACHE_POOL_ACTIVE)) {
 		WT_TRET(__wt_verbose(
 		    session, WT_VERB_SHARED_CACHE, "Destroying cache pool"));
 		__wt_spin_lock(session, &__wt_process.spinlock);
@@ -398,7 +398,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 
 		/* Notify other participants if we were managing */
 		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER)) {
-			F_CLR_ATOMIC(cp, WT_CACHE_POOL_MANAGED);
+			cp->pool_managed = 0;
 			WT_TRET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 			    "Shutting down shared cache manager connection"));
 		}
@@ -438,7 +438,7 @@ __cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
 	 * - Reduce the amount allocated, if we are over the budget
 	 * - Increase the amount used if there is capacity and any pressure.
 	 */
-	while (F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE) &&
+	while (F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
 	    F_ISSET(S2C(session)->cache, WT_CACHE_POOL_RUN)) {
 		WT_ERR(__cache_pool_adjust(
 		    session, highest, bump_threshold, forward, &adjusted));
@@ -728,7 +728,7 @@ __wt_cache_pool_server(void *arg)
 	cache = S2C(session)->cache;
 	forward = true;
 
-	while (F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE) &&
+	while (F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
 	    F_ISSET(cache, WT_CACHE_POOL_RUN)) {
 		if (cp->currently_used <= cp->size)
 			WT_ERR(__wt_cond_wait(session,
@@ -738,13 +738,12 @@ __wt_cache_pool_server(void *arg)
 		 * Re-check pool run flag - since we want to avoid getting the
 		 * lock on shutdown.
 		 */
-		if (!F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE) &&
+		if (!F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
 		    F_ISSET(cache, WT_CACHE_POOL_RUN))
 			break;
 
 		/* Try to become the managing thread */
-		F_CAS_ATOMIC(cp, WT_CACHE_POOL_MANAGED, ret);
-		if (ret == 0) {
+		if (__wt_atomic_cas8(&cp->pool_managed, 0, 1)) {
 			F_SET(cache, WT_CACHE_POOL_MANAGER);
 			WT_ERR(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 			    "Cache pool switched manager thread"));
