@@ -240,10 +240,13 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	alloc = conn->evict_workers_alloc * sizeof(*workers);
-	WT_RET(__wt_realloc(session, &alloc,
-	    conn->evict_workers_max * sizeof(*workers), &conn->evict_workctx));
-	workers = conn->evict_workctx;
+	if (conn->evict_workers_alloc < conn->evict_workers_max) {
+		alloc = conn->evict_workers_alloc * sizeof(*workers);
+		WT_RET(__wt_realloc(session, &alloc,
+		    conn->evict_workers_max * sizeof(*workers),
+		    &conn->evict_workctx));
+		workers = conn->evict_workctx;
+	}
 
 	for (i = conn->evict_workers_alloc; i < conn->evict_workers_max; i++) {
 		/*
@@ -275,7 +278,7 @@ err:	conn->evict_workers_alloc = conn->evict_workers_max;
  *	Start the eviction server thread.
  */
 int
-__wt_evict_create(WT_SESSION_IMPL *session)
+__wt_evict_create(WT_SESSION_IMPL *session, bool with_las)
 {
 	WT_CONNECTION_IMPL *conn;
 	uint32_t session_flags;
@@ -294,7 +297,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 	 * perform slow operations for the block manager.  (The flag is not
 	 * reset if reconfigured later, but I doubt that's a problem.)
 	 */
-	session_flags = WT_SESSION_LOOKASIDE_CURSOR;
+	session_flags = with_las ? WT_SESSION_LOOKASIDE_CURSOR : 0;
 	if (conn->evict_workers_max == 0)
 		FLD_SET(session_flags, WT_SESSION_CAN_WAIT);
 	WT_RET(__wt_open_internal_session(conn,
