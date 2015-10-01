@@ -77,6 +77,8 @@ void Top::record(StringData ns, int op, int lockType, long long micros, bool com
     if (ns[0] == '?')
         return;
 
+    auto hashedNs = UsageMap::HashedKey(ns);
+
     // cout << "record: " << ns << "\t" << op << "\t" << command << endl;
     stdx::lock_guard<SimpleMutex> lk(_lock);
 
@@ -85,7 +87,7 @@ void Top::record(StringData ns, int op, int lockType, long long micros, bool com
         return;
     }
 
-    CollectionData& coll = _usage[ns];
+    CollectionData& coll = _usage[hashedNs];
     _record(coll, op, lockType, micros, command);
 }
 

@@ -30,35 +30,19 @@
 
 #pragma once
 
-#include "mongo/util/assert_util.h"
 #include "mongo/util/unordered_fast_key_table.h"
 
 namespace mongo {
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::Area(unsigned capacity,
-                                                                     unsigned maxProbe)
-    : _hashMask(capacity - 1),
-      _maxProbe(maxProbe),
-      _entries(capacity ? new Entry[capacity] : nullptr) {
-    // Capacity must be a power of two or zero. See the comment on _hashMask for why.
-    dassert((capacity & (capacity - 1)) == 0);
-}
 
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::Area(const Area& other)
-    : Area(other.capacity(), other._maxProbe) {
-    std::copy(other.begin(), other.end(), begin());
-}
-
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline int UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::find(
-    const K_L& key, uint32_t hash, int* firstEmpty, const UnorderedFastKeyTable& sm) const {
+template <typename K_L, typename K_S, typename V, typename Traits>
+inline int UnorderedFastKeyTable<K_L, K_S, V, Traits>::Area::find(const HashedKey& key,
+                                                                  int* firstEmpty) const {
     dassert(capacity());                        // Caller must special-case empty tables.
     dassert(!firstEmpty || *firstEmpty == -1);  // Caller must initialize *firstEmpty.
 
     unsigned probe = 0;
     do {
-        unsigned pos = (hash + probe) & _hashMask;
+        unsigned pos = (key.hash() + probe) & _hashMask;
 
         if (!_entries[pos].used) {
             // space is empty
@@ -69,12 +53,12 @@ inline int UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::find(
             continue;
         }
 
-        if (_entries[pos].curHash != hash) {
+        if (_entries[pos].curHash != key.hash()) {
             // space has something else
             continue;
         }
 
-        if (!sm._equals(key, sm._convertor(_entries[pos].data.first))) {
+        if (!Traits::equals(key.key(), Traits::toLookup(_entries[pos].data.first))) {
             // hashes match
             // strings are not equals
             continue;
@@ -87,15 +71,15 @@ inline int UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::find(
     return -1;
 }
 
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline bool UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::transfer(
-    Area* newArea, const UnorderedFastKeyTable& sm) const {
+template <typename K_L, typename K_S, typename V, typename Traits>
+inline bool UnorderedFastKeyTable<K_L, K_S, V, Traits>::Area::transfer(Area* newArea) const {
     for (auto&& entry : *this) {
         if (!entry.used)
             continue;
 
         int firstEmpty = -1;
-        int loc = newArea->find(sm._convertor(entry.data.first), entry.curHash, &firstEmpty, sm);
+        int loc = newArea->find(HashedKey(Traits::toLookup(entry.data.first), entry.curHash),
+                                &firstEmpty);
 
         verify(loc == -1);
         if (firstEmpty < 0) {
@@ -107,50 +91,31 @@ inline bool UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::transfer(
     return true;
 }
 
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::UnorderedFastKeyTable(
-    const UnorderedFastKeyTable& other)
-    : _size(other._size),
-      _area(other._area),
-      _hash(other._hash),
-      _equals(other._equals),
-      _convertor(other._convertor),
-      _convertorOther(other._convertorOther) {}
-
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::UnorderedFastKeyTable(
+template <typename K_L, typename K_S, typename V, typename Traits>
+inline UnorderedFastKeyTable<K_L, K_S, V, Traits>::UnorderedFastKeyTable(
     std::initializer_list<std::pair<key_type, mapped_type>> entries)
-    : UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>() {
+    : UnorderedFastKeyTable() {
     for (auto&& entry : entries) {
         // Only insert the entry if the key is not equivalent to the key of any other element
         // already in the table.
-        if (find(entry.first) == end()) {
-            get(entry.first) = entry.second;
+        auto key = HashedKey(entry.first);
+        if (find(key) == end()) {
+            get(key) = entry.second;
         }
     }
 }
 
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::copyTo(
-    UnorderedFastKeyTable* out) const {
-    out->_size = _size;
-    Area x(_area);
-    out->_area.swap(&x);
-}
-
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline V& UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::get(const K_L& key) {
+template <typename K_L, typename K_S, typename V, typename Traits>
+inline V& UnorderedFastKeyTable<K_L, K_S, V, Traits>::get(const HashedKey& key) {
     if (!_area._entries) {
         // This is the first insert ever. Need to allocate initial space.
         dassert(_area.capacity() == 0);
         _grow();
     }
 
-    const uint32_t hash = _hash(key);
-
     for (int numGrowTries = 0; numGrowTries < 5; numGrowTries++) {
         int firstEmpty = -1;
-        int pos = _area.find(key, hash, &firstEmpty, *this);
+        int pos = _area.find(key, &firstEmpty);
         if (pos >= 0)
             return _area._entries[pos].data.second;
 
@@ -160,8 +125,8 @@ inline V& UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::get(const K_L& key)
             _size++;
             _area._entries[firstEmpty].used = true;
             _area._entries[firstEmpty].everUsed = true;
-            _area._entries[firstEmpty].curHash = hash;
-            _area._entries[firstEmpty].data.first = _convertorOther(key);
+            _area._entries[firstEmpty].curHash = key.hash();
+            _area._entries[firstEmpty].data.first = Traits::toStorage(key.key());
             return _area._entries[firstEmpty].data.second;
         }
 
@@ -171,13 +136,12 @@ inline V& UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::get(const K_L& key)
     msgasserted(16471, "UnorderedFastKeyTable couldn't add entry after growing many times");
 }
 
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline size_t UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::erase(const K_L& key) {
+template <typename K_L, typename K_S, typename V, typename Traits>
+inline size_t UnorderedFastKeyTable<K_L, K_S, V, Traits>::erase(const HashedKey& key) {
     if (_size == 0)
         return 0;  // Nothing to delete.
 
-    const uint32_t hash = _hash(key);
-    int pos = _area.find(key, hash, NULL, *this);
+    int pos = _area.find(key, nullptr);
 
     if (pos < 0)
         return 0;
@@ -188,8 +152,8 @@ inline size_t UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::erase(const K_L
     return 1;
 }
 
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::erase(const_iterator it) {
+template <typename K_L, typename K_S, typename V, typename Traits>
+void UnorderedFastKeyTable<K_L, K_S, V, Traits>::erase(const_iterator it) {
     dassert(it._position >= 0);
     dassert(it._area == &_area);
 
@@ -198,8 +162,8 @@ void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::erase(const_iterator it)
     _area._entries[it._position].data.second = V();
 }
 
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::_grow() {
+template <typename K_L, typename K_S, typename V, typename Traits>
+inline void UnorderedFastKeyTable<K_L, K_S, V, Traits>::_grow() {
     unsigned capacity = _area.capacity();
     for (int numGrowTries = 0; numGrowTries < 5; numGrowTries++) {
         if (capacity == 0) {
@@ -213,7 +177,7 @@ inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::_grow() {
         unsigned maxProbes = (capacity * kMaxProbeRatio) + 1;  // Round up
 
         Area newArea(capacity, maxProbes);
-        bool success = _area.transfer(&newArea, *this);
+        bool success = _area.transfer(&newArea);
         if (!success) {
             continue;
         }
@@ -221,26 +185,5 @@ inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::_grow() {
         return;
     }
     msgasserted(16845, "UnorderedFastKeyTable::_grow couldn't add entry after growing many times");
-}
-
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::const_iterator
-UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::find(const K_L& key) const {
-    if (_size == 0)
-        return const_iterator();
-    int pos = _area.find(key, _hash(key), 0, *this);
-    return const_iterator(&_area, pos);
-}
-
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::const_iterator
-UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::end() const {
-    return const_iterator();
-}
-
-template <typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS>
-inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::const_iterator
-UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::begin() const {
-    return const_iterator(&_area);
 }
 }

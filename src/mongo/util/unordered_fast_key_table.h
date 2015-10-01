@@ -32,29 +32,40 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-template <typename K_L, typename K_S>
-struct UnorderedFastKeyTable_LS_C {
-    K_S operator()(const K_L& a) const {
-        return K_S(a);
-    }
-};
-
-template <typename K_L,                                         // key lookup
-          typename K_S,                                         // key storage
-          typename V,                                           // value
-          typename H,                                           // hash of K_L
-          typename E,                                           // equal of K_L
-          typename C,                                           // convertor from K_S -> K_L
-          typename C_LS = UnorderedFastKeyTable_LS_C<K_L, K_S>  // convertor from K_L -> K_S
-          >
+/**
+ * A hash map that allows a different type to be used stored (K_S) than is used for lookups (K_L).
+ *
+ * Takes a Traits class that must have the following:
+ *
+ * static uint32_t hash(K_L); // Computes a 32-bit hash of the key.
+ * static bool equals(K_L, K_L); // Returns true if the keys are equal.
+ * static K_S toStorage(K_L); // Converts from K_L to K_S.
+ * static K_L toLookup(K_S); // Converts from K_S to K_L.
+ * class HashedKey {
+ * public:
+ *     explicit HashedKey(K_L key); // Computes hash of key.
+ *     HashedKey(K_L key, uint32_t hash); // Populates with known hash.
+ *
+ *     const K_L& key() const;
+ *     uint32_t hash() const; // Should be free to call repeatedly.
+ * };
+ */
+template <typename K_L,  // key lookup
+          typename K_S,  // key storage
+          typename V,    // value
+          typename Traits>
 class UnorderedFastKeyTable {
 public:
-    typedef std::pair<K_S, V> value_type;
-    typedef K_L key_type;
-    typedef V mapped_type;
+    // Typedefs for compatibility with std::map.
+    using value_type = std::pair<K_S, V>;
+    using key_type = K_L;
+    using mapped_type = V;
+
+    using HashedKey = typename Traits::HashedKey;
 
 private:
     struct Entry {
@@ -68,15 +79,27 @@ private:
 
     struct Area {
         Area() = default;  // TODO constexpr
-        Area(unsigned capacity, unsigned maxProbe);
-        Area(const Area& other);
 
-        int find(const K_L& key,
-                 uint32_t hash,
-                 int* firstEmpty,
-                 const UnorderedFastKeyTable& sm) const;
+        Area(unsigned capacity, unsigned maxProbe)
+            : _hashMask(capacity - 1),
+              _maxProbe(maxProbe),
+              _entries(capacity ? new Entry[capacity] : nullptr) {
+            // Capacity must be a power of two or zero. See the comment on _hashMask for why.
+            dassert((capacity & (capacity - 1)) == 0);
+        }
 
-        bool transfer(Area* newArea, const UnorderedFastKeyTable& sm) const;
+        Area(const Area& other) : Area(other.capacity(), other._maxProbe) {
+            std::copy(other.begin(), other.end(), begin());
+        }
+
+        Area& operator=(const Area& other) {
+            Area(other).swap(this);
+            return *this;
+        }
+
+        int find(const HashedKey& key, int* firstEmpty) const;
+
+        bool transfer(Area* newArea) const;
 
         void swap(Area* other) {
             using std::swap;
@@ -115,16 +138,7 @@ private:
 public:
     UnorderedFastKeyTable() = default;  // TODO constexpr
 
-    UnorderedFastKeyTable(const UnorderedFastKeyTable& other);
-
     UnorderedFastKeyTable(std::initializer_list<std::pair<key_type, mapped_type>> entries);
-
-    UnorderedFastKeyTable& operator=(const UnorderedFastKeyTable& other) {
-        other.copyTo(this);
-        return *this;
-    }
-
-    void copyTo(UnorderedFastKeyTable* out) const;
 
     /**
      * @return number of elements in map
@@ -144,16 +158,27 @@ public:
         return _area.capacity();
     }
 
+    V& operator[](const HashedKey& key) {
+        return get(key);
+    }
     V& operator[](const K_L& key) {
         return get(key);
     }
 
-    V& get(const K_L& key);
+    V& get(const HashedKey& key);
+    V& get(const K_L& key) {
+        return get(HashedKey(key));
+    }
 
     /**
      * @return number of elements removed
      */
-    size_t erase(const K_L& key);
+    size_t erase(const HashedKey& key);
+    size_t erase(const K_L& key) {
+        if (empty())
+            return 0;  // Don't waste time hashing.
+        return erase(HashedKey(key));
+    }
 
     class const_iterator {
         friend class UnorderedFastKeyTable;
@@ -220,24 +245,31 @@ public:
     /**
      * @return either a one-shot iterator with the key, or end()
      */
-    const_iterator find(const K_L& key) const;
+    const_iterator find(const K_L& key) const {
+        if (empty())
+            return end();  // Don't waste time hashing.
+        return find(HashedKey(key));
+    }
 
-    const_iterator begin() const;
+    const_iterator find(const HashedKey& key) const {
+        if (empty())
+            return end();
+        return const_iterator(&_area, _area.find(key, nullptr));
+    }
 
-    const_iterator end() const;
+    const_iterator begin() const {
+        return const_iterator(&_area);
+    }
+
+    const_iterator end() const {
+        return const_iterator();
+    }
 
 private:
     void _grow();
 
-    // ----
-
     size_t _size = 0;
     Area _area;
-
-    H _hash;
-    E _equals;
-    C _convertor;
-    C_LS _convertorOther;
 };
 }
 

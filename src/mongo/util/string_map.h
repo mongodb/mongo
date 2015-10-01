@@ -32,42 +32,57 @@
 #include <third_party/murmurhash3/MurmurHash3.h>
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/unordered_fast_key_table.h"
 
 namespace mongo {
 
-struct StringMapDefaultHash {
-    uint32_t operator()(StringData a) const {
+struct StringMapTraits {
+    static uint32_t hash(StringData a) {
         uint32_t hash;
         MurmurHash3_x86_32(a.rawData(), a.size(), 0, &hash);
         return hash;
     }
-};
 
-struct StringMapDefaultEqual {
-    bool operator()(StringData a, StringData b) const {
+    static bool equals(StringData a, StringData b) {
         return a == b;
     }
-};
 
-struct StringMapDefaultConvertor {
-    StringData operator()(const std::string& s) const {
-        return StringData(s);
-    }
-};
-
-struct StringMapDefaultConvertorOther {
-    std::string operator()(StringData s) const {
+    static std::string toStorage(StringData s) {
         return s.toString();
     }
+
+    static StringData toLookup(const std::string& s) {
+        return StringData(s);
+    }
+
+    class HashedKey {
+    public:
+        explicit HashedKey(StringData key = "") : _key(key), _hash(StringMapTraits::hash(_key)) {}
+
+        HashedKey(StringData key, uint32_t hash) : _key(key), _hash(hash) {
+            // If you claim to know the hash, it better be correct.
+            dassert(_hash == StringMapTraits::hash(_key));
+        }
+
+        const StringData& key() const {
+            return _key;
+        }
+
+        uint32_t hash() const {
+            return _hash;
+        }
+
+    private:
+        StringData _key;
+        uint32_t _hash;
+    };
 };
 
 template <typename V>
 using StringMap = UnorderedFastKeyTable<StringData,   // K_L
                                         std::string,  // K_S
                                         V,
-                                        StringMapDefaultHash,
-                                        StringMapDefaultEqual,
-                                        StringMapDefaultConvertor,
-                                        StringMapDefaultConvertorOther>;
+                                        StringMapTraits>;
+
 }  // namespace mongo
