@@ -83,10 +83,8 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	 * If pre-allocation is configured, set the initial number to one.
 	 * We'll adapt as load dictates.
 	 */
-	if (cval.val != 0) {
-		FLD_SET(conn->log_flags, WT_CONN_LOG_PREALLOC);
+	if (cval.val != 0)
 		conn->log_prealloc = 1;
-	}
 	WT_RET(__wt_config_gets_def(session, cfg, "log.recover", 0, &cval));
 	if (cval.len != 0  && WT_STRING_MATCH("error", cval.str, cval.len))
 		FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR);
@@ -811,11 +809,6 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 	WT_RET(__wt_thread_create(conn->log_wrlsn_session,
 	    &conn->log_wrlsn_tid, __log_wrlsn_server, conn->log_wrlsn_session));
 	conn->log_wrlsn_tid_set = true;
-
-	/* If no log thread services are configured, we're done. */ 
-	if (!FLD_ISSET(conn->log_flags,
-	    (WT_CONN_LOG_ARCHIVE | WT_CONN_LOG_PREALLOC)))
-		return (0);
 
 	/*
 	 * If a log server thread exists, the user may have reconfigured
