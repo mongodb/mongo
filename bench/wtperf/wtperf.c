@@ -602,13 +602,13 @@ worker(void *arg)
 
 op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
 			/*
-                         * If we are runnibg with explicit eplicit transactions
-                         * configured and we hit a WT_ROLLBACK, then we should
-                         * rollback the current transaction and attmpt to
+			 * If we are running with explicit transactions
+			 * configured and we hit a WT_ROLLBACK, then we should
+			 * rollback the current transaction and attempt to
 			 * continue.
 			 * This does break the guarantee of insertion order in
 			 * cases of ordered inserts, as we aren't retrying here.
-                         */
+			 */
 				lprintf(cfg, ret, 1,
 				    "%s for: %s, range: %"PRIu64, op_name(op),
 				    key_buf, wtperf_value_range(cfg));
