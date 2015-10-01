@@ -325,3 +325,17 @@ __wt_fair_unlock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
 
 	return (0);
 }
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __wt_fair_islocked --
+ *	Test whether the lock is currently held
+ */
+static inline bool
+__wt_fair_islocked(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
+{
+	WT_UNUSED(session);
+
+	return (lock->fair_lock_waiter != lock->fair_lock_owner);
+}
+#endif

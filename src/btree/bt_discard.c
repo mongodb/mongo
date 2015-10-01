@@ -55,11 +55,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	 */
 	WT_ASSERT(session, !__wt_page_is_modified(page));
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
-	/*
-	 * This will leave the page lock held - but that doesn't matter - we
-	 * are about to free the memory anyway.
-	 */
-	WT_ASSERT(session, __wt_fair_trylock(session, &page->page_lock) == 0);
+	WT_ASSERT(session, !__wt_fair_islocked(session, &page->page_lock));
 
 #ifdef HAVE_DIAGNOSTIC
 	{
