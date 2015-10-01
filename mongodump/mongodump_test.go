@@ -53,7 +53,9 @@ func simpleMongoDumpInstance() *MongoDump {
 		HiddenOptions: &options.HiddenOptions{},
 		Verbosity:     &options.Verbosity{},
 	}
-	outputOptions := &OutputOptions{}
+	outputOptions := &OutputOptions{
+		NumParallelCollections: 1,
+	}
 	inputOptions := &InputOptions{}
 
 	log.SetVerbosity(toolOptions.Verbosity)
