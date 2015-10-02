@@ -366,10 +366,24 @@ QueryResult::View getMore(OperationContext* txn,
         // What number result are we starting at?  Used to fill out the reply.
         startingResult = cc->pos();
 
+        uint64_t notifierVersion = 0;
+        std::shared_ptr<CappedInsertNotifier> notifier;
+        if (isCursorAwaitData(cc)) {
+            invariant(ctx->getCollection()->isCapped());
+            // Retrieve the notifier which we will wait on until new data arrives. We make sure
+            // to do this in the lock because once we drop the lock it is possible for the
+            // collection to become invalid. The notifier itself will outlive the collection if
+            // the collection is dropped, as we keep a shared_ptr to it.
+            notifier = ctx->getCollection()->getCappedInsertNotifier();
+
+            // Must get the version before we call generateBatch in case a write comes in after
+            // that call and before we call wait on the notifier.
+            notifierVersion = notifier->getVersion();
+        }
+
         PlanExecutor* exec = cc->getExecutor();
         exec->reattachToOperationContext(txn);
         exec->restoreState();
-
         PlanExecutor::ExecState state;
 
         generateBatch(ntoreturn, cc, &bb, &numResults, &slaveReadTill, &state);
@@ -377,19 +391,13 @@ QueryResult::View getMore(OperationContext* txn,
         // If this is an await data cursor, and we hit EOF without generating any results, then
         // we block waiting for new data to arrive.
         if (isCursorAwaitData(cc) && state == PlanExecutor::IS_EOF && numResults == 0) {
-            // Retrieve the notifier which we will wait on until new data arrives. We make sure
-            // to do this in the lock because once we drop the lock it is possible for the
-            // collection to become invalid. The notifier itself will outlive the collection if
-            // the collection is dropped, as we keep a shared_ptr to it.
-            auto notifier = ctx->getCollection()->getCappedInsertNotifier();
-
             // Save the PlanExecutor and drop our locks.
             exec->saveState();
             ctx.reset();
 
             // Block waiting for data for up to 1 second.
             Seconds timeout(1);
-            notifier->wait(timeout);
+            notifier->wait(notifierVersion, timeout);
             notifier.reset();
 
             // Set expected latency to match wait time. This makes sure the logs aren't spammed

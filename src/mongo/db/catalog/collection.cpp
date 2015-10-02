@@ -125,22 +125,31 @@ void CappedInsertNotifier::notifyAll() {
     _notifier.notify_all();
 }
 
-void CappedInsertNotifier::wait(Microseconds timeout) const {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    const auto startVer = _version;
-    while (!_dead && startVer == _version) {
-        if (stdx::cv_status::timeout == _notifier.wait_for(lk, timeout)) {
+void CappedInsertNotifier::_wait(stdx::unique_lock<std::mutex>& lk,
+                                 uint64_t prevVersion,
+                                 Microseconds timeout) const {
+    while (!_dead && prevVersion == _version) {
+        if (timeout == Microseconds::max()) {
+            _notifier.wait(lk);
+        } else if (stdx::cv_status::timeout == _notifier.wait_for(lk, timeout)) {
             return;
         }
     }
 }
 
+void CappedInsertNotifier::wait(uint64_t prevVersion, Microseconds timeout) const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _wait(lk, prevVersion, timeout);
+}
+
+void CappedInsertNotifier::wait(Microseconds timeout) const {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    _wait(lk, _version, timeout);
+}
+
 void CappedInsertNotifier::wait() const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    const auto startVer = _version;
-    while (!_dead && startVer == _version) {
-        _notifier.wait(lk);
-    }
+    _wait(lk, _version, Microseconds::max());
 }
 
 void CappedInsertNotifier::kill() {

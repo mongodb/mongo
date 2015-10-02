@@ -122,6 +122,18 @@ public:
     void wait(Microseconds timeout) const;
 
     /**
+     * Same as above but also ensures that if the version has changed, it also returns.
+     */
+    void wait(uint64_t prevVersion, Microseconds timeout) const;
+
+    /**
+     * Returns the version for use as an additional wake condition when used above.
+     */
+    uint64_t getVersion() const {
+        return _version;
+    }
+
+    /**
      * Same as above but without a timeout.
      */
     void wait() const;
@@ -137,6 +149,9 @@ public:
     bool isDead();
 
 private:
+    // Helper for wait impls.
+    void _wait(stdx::unique_lock<std::mutex>& lk, uint64_t prevVersion, Microseconds timeout) const;
+
     // Signalled when a successful insert is made into a capped collection.
     mutable stdx::condition_variable _notifier;
 
