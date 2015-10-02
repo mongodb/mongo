@@ -33,10 +33,9 @@
     var stepDownCmd = {replSetStepDown:stepDownSecs, force:true};
 
     // Write op
-    assert.writeOK(mTest.foo.save({}), {writeConcern:{w:2}});
-    replTest.awaitReplication();
+    assert.writeOK(mTest.foo.save({}, {writeConcern:{w:3}}));
     replTest.waitForState(slave, replTest.SECONDARY, 30000);
-    assert.writeOK(mTest.foo.save({}), {writeConcern:{w:2}});
+    assert.writeOK(mTest.foo.save({}, {writeConcern:{w:3}}));
 
     // Set minvalid to something far in the future for the current primary, to simulate recovery.
     // Note: This is so far in the future (5 days) that it will never become secondary.
@@ -51,7 +50,7 @@
     replTest.waitForState(master, replTest.RECOVERING, 90000);
 
     // Slave is now master... so do a write to get a minvalid entry on the secondary.
-    assert.writeOK(replTest.getMaster().getDB("test").foo.save({}), {writeConcern:{w:3}});
+    assert.writeOK(replTest.getMaster().getDB("test").foo.save({}, {writeConcern:{w:3}}));
 
     assert.soon(function() {
         var mv;
