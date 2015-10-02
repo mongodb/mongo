@@ -498,7 +498,8 @@ __wt_debug_tree_shape(
  * __wt_debug_tree_all --
  *	Dump the in-memory information for a tree, including leaf pages.
  *	Takes an explicit btree as an argument, as one may not yet be set on
- *	the session.
+ *	the session. This is often the case as this function will be called
+ *	from within a debugger, which makes setting a btree complicated.
  */
 int
 __wt_debug_tree_all(
@@ -512,7 +513,8 @@ __wt_debug_tree_all(
  * __wt_debug_tree --
  *	Dump the in-memory information for a tree, not including leaf pages.
  *	Takes an explicit btree as an argument, as one may not yet be set on
- *	the session.
+ *	the session. This is often the case as this function will be called
+ *	from within a debugger, which makes setting a btree complicated.
  */
 int
 __wt_debug_tree(
@@ -523,11 +525,10 @@ __wt_debug_tree(
 
 /*
  * __wt_debug_page --
- *	Dump the in-memory information for a page. Assumes that a
+ *	Dump the in-memory information for a page.
  */
 int
-__wt_debug_page(
-    WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile)
+__wt_debug_page(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile)
 {
 	WT_DBG *ds, _ds;
 	WT_DECL_RET;
@@ -547,8 +548,10 @@ __wt_debug_page(
 /*
  * __debug_tree --
  *	Dump the in-memory information for a tree. Takes an explicit btree
- *	as one may not be set on the session here. We mark the session to
- *	the btree here
+ *	as one may not be set on the session here. This function will be called
+ *	by API functions invoked from a debugger, as marking a btree to a
+ *	session is complex, we take one as an argument. We mark the session
+ *	to the btree in this function for use in the callers below.
  */
 static int
 __debug_tree(
