@@ -54,6 +54,15 @@ bool legalClientSystemNS(StringData ns, bool write);
 */
 class NamespaceString {
 public:
+    // Reserved system namespaces
+
+    // Namespace for storing configuration data, which needs to be replicated if the server is
+    // running as a replica set. Documents in this collection should represent some configuration
+    // state of the server, which needs to be recovered/consulted at startup. Each document in this
+    // namespace should have its _id set to some string, which meaningfully describes what it
+    // represents.
+    static const NamespaceString kConfigCollectionNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */
