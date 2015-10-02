@@ -225,7 +225,7 @@ __wt_debug_addr(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
-	WT_ASSERT(session, session->dhandle != NULL);
+	WT_ASSERT(session, S2BT_SAFE(session) != NULL);
 
 	bm = S2BT(session)->bm;
 
@@ -248,7 +248,7 @@ __wt_debug_offset_blind(
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
-	WT_ASSERT(session, session->dhandle != NULL);
+	WT_ASSERT(session, S2BT_SAFE(session) != NULL);
 
 	/*
 	 * This routine depends on the default block manager's view of files,
@@ -279,7 +279,7 @@ __wt_debug_offset(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE], *endp;
 
-	WT_ASSERT(session, session->dhandle != NULL);
+	WT_ASSERT(session, S2BT_SAFE(session) != NULL);
 
 	/*
 	 * This routine depends on the default block manager's view of files,
@@ -384,7 +384,7 @@ __debug_dsk_col_fix(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
 	uint32_t i;
 	uint8_t v;
 
-	WT_ASSERT(ds->session, ds->session->dhandle != NULL);
+	WT_ASSERT(ds->session, S2BT_SAFE(ds->session) != NULL);
 
 	btree = S2BT(ds->session);
 
@@ -407,7 +407,7 @@ __debug_dsk_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
 	WT_CELL_UNPACK *unpack, _unpack;
 	uint32_t i;
 
-	WT_ASSERT(ds->session, ds->session->dhandle != NULL);
+	WT_ASSERT(ds->session, S2BT_SAFE(ds->session) != NULL);
 
 	btree = S2BT(ds->session);
 	unpack = &_unpack;
@@ -476,7 +476,7 @@ __wt_debug_tree_shape(
 {
 	WT_DBG *ds, _ds;
 
-	WT_ASSERT(session, session->dhandle != NULL);
+	WT_ASSERT(session, S2BT_SAFE(session) != NULL);
 
 	ds = &_ds;
 	WT_RET(__debug_config(session, ds, ofile));
@@ -497,6 +497,8 @@ __wt_debug_tree_shape(
 /*
  * __wt_debug_tree_all --
  *	Dump the in-memory information for a tree, including leaf pages.
+ *	Takes an explicit btree as an argument, as one may not yet be set on
+ *	the session.
  */
 int
 __wt_debug_tree_all(
@@ -509,6 +511,8 @@ __wt_debug_tree_all(
 /*
  * __wt_debug_tree --
  *	Dump the in-memory information for a tree, not including leaf pages.
+ *	Takes an explicit btree as an argument, as one may not yet be set on
+ *	the session.
  */
 int
 __wt_debug_tree(
@@ -519,20 +523,21 @@ __wt_debug_tree(
 
 /*
  * __wt_debug_page --
- *	Dump the in-memory information for a page.
+ *	Dump the in-memory information for a page. Assumes that a
  */
 int
 __wt_debug_page(
-    WT_SESSION_IMPL *session, WT_BTREE *btree, WT_PAGE *page, const char *ofile)
+    WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile)
 {
 	WT_DBG *ds, _ds;
 	WT_DECL_RET;
 
+        WT_ASSERT(session, S2BT_SAFE(session) != NULL);
+
 	ds = &_ds;
 	WT_RET(__debug_config(session, ds, ofile));
 
-	WT_WITH_BTREE(session, btree,
-	    ret = __debug_page(ds, page, WT_DEBUG_TREE_LEAF));
+	ret = __debug_page(ds, page, WT_DEBUG_TREE_LEAF);
 
 	__dmsg_wrapup(ds);
 
@@ -541,7 +546,9 @@ __wt_debug_page(
 
 /*
  * __debug_tree --
- *	Dump the in-memory information for a tree.
+ *	Dump the in-memory information for a tree. Takes an explicit btree
+ *	as one may not be set on the session here. We mark the session to 
+ *	the btree here
  */
 static int
 __debug_tree(
@@ -710,7 +717,7 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 	uint32_t i;
 	uint8_t v;
 
-	WT_ASSERT(ds->session, ds->session->dhandle != NULL);
+	WT_ASSERT(ds->session, S2BT_SAFE(ds->session) != NULL);
 
 	session = ds->session;
 	btree = S2BT(session);
