@@ -15,6 +15,7 @@ env.Library(
         'legacy_dist_lock_pinger.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/catalog/catalog_manager',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
     ],

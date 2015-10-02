@@ -1,1 +1,16 @@
-src:src/third_party/*
+# Don't UBSAN most of third_party, but do ubsan WT
+src:src/third_party/IntelRDFPMathLib20U1/*
+src:src/third_party/asio-asio-1-11-0/*
+src:src/third_party/boost-1.56.0/*
+src:src/third_party/gperftools-2.2/*
+src:src/third_party/libstemmer_c/*
+src:src/third_party/mozjs-38/*
+src:src/third_party/murmurhash3/*
+src:src/third_party/pcre-8.36/*
+src:src/third_party/pcre-8.37/*
+src:src/third_party/s2/*
+src:src/third_party/snappy-1.1.2/*
+src:src/third_party/tz/*
+src:src/third_party/unicode-8.0.0/*
+src:src/third_party/yaml-cpp-0.5.1/*
+src:src/third_party/zlib-1.2.8/*
