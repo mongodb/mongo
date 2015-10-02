@@ -356,13 +356,13 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
     if (!initPoints || !initPoints->size()) {
         // discover split points
         const auto primaryShard = grid.shardRegistry()->getShard(txn, primaryShardId);
-        auto targetStatus =
-            primaryShard->getTargeter()->findHost({ReadPreference::PrimaryPreferred, TagSet{}});
-        uassertStatusOK(targetStatus);
-
-        NamespaceString nss(getns());
-        auto result = grid.shardRegistry()->runCommand(
-            txn, targetStatus.getValue(), nss.db().toString(), BSON("count" << nss.coll()));
+        const NamespaceString nss{getns()};
+        auto result = grid.shardRegistry()->runCommandOnShard(
+            txn,
+            primaryShard,
+            ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+            nss.db().toString(),
+            BSON("count" << nss.coll()));
 
         long long numObjects = 0;
         uassertStatusOK(result.getStatus());

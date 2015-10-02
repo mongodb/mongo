@@ -102,7 +102,7 @@ TEST(ReadPreferenceSetting, Roundtrip) {
                                                                 << "ca")
                                                            << BSON("foo"
                                                                    << "bar")))));
-    checkRoundtrip(ReadPreferenceSetting());
+    checkRoundtrip(ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     checkRoundtrip(ReadPreferenceSetting(ReadPreference::PrimaryPreferred, TagSet()));
 

@@ -45,6 +45,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -386,7 +387,8 @@ Status DatabasesCloner::start() {
 
     log() << "starting cloning of all databases";
     // Schedule listDatabase command which will kick off the database cloner per result db.
-    Request listDBsReq(_source, "admin", BSON("listDatabases" << true), BSON("$secondaryOk" << 1));
+    Request listDBsReq(
+        _source, "admin", BSON("listDatabases" << true), BSON(rpc::kSecondaryOkFieldName << 1));
     CBHStatus s = _exec->scheduleRemoteCommand(
         listDBsReq,
         stdx::bind(&DatabasesCloner::_onListDatabaseFinish, this, stdx::placeholders::_1));

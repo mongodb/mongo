@@ -121,8 +121,7 @@ struct ReadPreferenceSetting {
      */
     ReadPreferenceSetting(ReadPreference pref, TagSet tags);
 
-    // TODO: remove when StatusWith supports non-default constructible types (SERVER-18007)
-    ReadPreferenceSetting() = default;
+    explicit ReadPreferenceSetting(ReadPreference pref);
 
     inline bool equals(const ReadPreferenceSetting& other) const {
         return (pref == other.pref) && (tags == other.tags);
@@ -148,8 +147,8 @@ struct ReadPreferenceSetting {
      */
     static StatusWith<ReadPreferenceSetting> fromBSON(const BSONObj& readPrefSettingObj);
 
-    ReadPreference pref{ReadPreference::PrimaryOnly};
-    TagSet tags{TagSet::primaryOnly()};
+    ReadPreference pref;
+    TagSet tags;
 };
 
 }  // namespace mongo

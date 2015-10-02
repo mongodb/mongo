@@ -50,6 +50,7 @@ class OperationContext;
 class RemoteCommandTargeterFactory;
 class Shard;
 class ShardType;
+struct ReadPreferenceSetting;
 
 template <typename T>
 class StatusWith;
@@ -191,16 +192,16 @@ public:
     repl::OpTime getConfigOpTime();
 
     /**
-     * Executes 'find' command against the specified host and fetches *all* the results that
-     * the host will return until there are no more or until an error is returned.
-     * "host" must refer to a config server.
+     * Executes 'find' command against a config server matching the given read preference, and
+     * fetches *all* the results that the host will return until there are no more or until an error
+     * is returned.
      *
      * Returns either the complete set of results or an error, never partial results.
      *
      * Note: should never be used outside of CatalogManagerReplicaSet or DistLockCatalogImpl.
      */
-    StatusWith<QueryResponse> exhaustiveFindOnConfigNode(
-        const HostAndPort& host,
+    StatusWith<QueryResponse> exhaustiveFindOnConfig(
+        const ReadPreferenceSetting& readPref,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
@@ -208,29 +209,38 @@ public:
         boost::optional<repl::ReadConcernArgs> readConcern);
 
     /**
-     * Runs a command against the specified host and returns the result.  It is the responsibility
-     * of the caller to check the returned BSON for command-specific failures.
+     * Runs a command against a host belonging to the specified shard and matching the given
+     * readPref, and returns the result.  It is the responsibility of the caller to check the
+     * returned BSON for command-specific failures.
      */
-    StatusWith<BSONObj> runCommand(OperationContext* txn,
-                                   const HostAndPort& host,
-                                   const std::string& dbName,
-                                   const BSONObj& cmdObj);
+    StatusWith<BSONObj> runCommandOnShard(OperationContext* txn,
+                                          const std::shared_ptr<Shard>& shard,
+                                          const ReadPreferenceSetting& readPref,
+                                          const std::string& dbName,
+                                          const BSONObj& cmdObj);
+    StatusWith<BSONObj> runCommandOnShard(OperationContext* txn,
+                                          ShardId shardId,
+                                          const ReadPreferenceSetting& readPref,
+                                          const std::string& dbName,
+                                          const BSONObj& cmdObj);
+
 
     /**
-     * Same as runCommand above but used for talking to nodes that are not yet in the ShardRegistry.
+     * Same as runCommandOnShard above but used for talking to nodes that are not yet in the
+     * ShardRegistry.
      */
     StatusWith<BSONObj> runCommandForAddShard(OperationContext* txn,
-                                              const HostAndPort& host,
+                                              const std::shared_ptr<Shard>& shard,
+                                              const ReadPreferenceSetting& readPref,
                                               const std::string& dbName,
                                               const BSONObj& cmdObj);
 
     /**
-     * Runs a command against the specified host and returns the result.  It is the responsibility
-     * of the caller to check the returned BSON for command-specific failures.
-     *
-     * "host" must refer to a config server node.
+     * Runs a command against a config server that matches the given read preference, and returns
+     * the result.  It is the responsibility of the caller to check the returned BSON for
+     * command-specific failures.
      */
-    StatusWith<BSONObj> runCommandOnConfig(const HostAndPort& host,
+    StatusWith<BSONObj> runCommandOnConfig(const ReadPreferenceSetting& readPref,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj);
 
@@ -282,17 +292,17 @@ private:
      * of the caller to check the returned BSON for command-specific failures.
      */
     StatusWith<CommandResponse> _runCommandWithMetadata(executor::TaskExecutor* executor,
-                                                        const HostAndPort& host,
+                                                        const std::shared_ptr<Shard>& shard,
+                                                        const ReadPreferenceSetting& readPref,
                                                         const std::string& dbName,
                                                         const BSONObj& cmdObj,
                                                         const BSONObj& metadata);
 
-    StatusWith<CommandResponse> _runCommandWithNotMasterRetries(
-        executor::TaskExecutor* executor,
-        const std::shared_ptr<RemoteCommandTargeter>& targeter,
-        const std::string& dbname,
-        const BSONObj& cmdObj,
-        const BSONObj& metadata);
+    StatusWith<CommandResponse> _runCommandWithNotMasterRetries(executor::TaskExecutor* executor,
+                                                                const std::shared_ptr<Shard>& shard,
+                                                                const std::string& dbname,
+                                                                const BSONObj& cmdObj,
+                                                                const BSONObj& metadata);
 
     // Factory to obtain remote command targeters for shards
     const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;

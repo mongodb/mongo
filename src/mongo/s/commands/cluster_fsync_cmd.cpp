@@ -91,11 +91,12 @@ public:
                 continue;
             }
 
-            const auto shardHost = uassertStatusOK(
-                s->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
-
-            BSONObj x = uassertStatusOK(
-                grid.shardRegistry()->runCommand(txn, shardHost, "admin", BSON("fsync" << 1)));
+            BSONObj x = uassertStatusOK(grid.shardRegistry()->runCommandOnShard(
+                txn,
+                s,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                "admin",
+                BSON("fsync" << 1)));
 
             sub.append(s->getId(), x);
 

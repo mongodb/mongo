@@ -1126,21 +1126,14 @@ StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFin
     Status lastStatus = Status::OK();
 
     for (int retry = 0; retry < kMaxReadRetry; retry++) {
-        const auto configShard = grid.shardRegistry()->getShard(txn, "config");
-        const auto readHost = configShard->getTargeter()->findHost(kConfigReadSelector);
-        if (!readHost.isOK()) {
-            return readHost.getStatus();
-        }
+        repl::ReadConcernArgs readConcern{grid.shardRegistry()->getConfigOpTime(),
+                                          repl::ReadConcernLevel::kMajorityReadConcern};
 
-        repl::ReadConcernArgs readConcern(grid.shardRegistry()->getConfigOpTime(),
-                                          repl::ReadConcernLevel::kMajorityReadConcern);
-
-        auto result = grid.shardRegistry()->exhaustiveFindOnConfigNode(
-            readHost.getValue(), nss, query, sort, limit, readConcern);
+        auto result = grid.shardRegistry()->exhaustiveFindOnConfig(
+            kConfigReadSelector, nss, query, sort, limit, readConcern);
 
         if (ErrorCodes::isNetworkError(result.getStatus().code())) {
             lastStatus = result.getStatus();
-            configShard->getTargeter()->markHostUnreachable(readHost.getValue());
             continue;
         }
 
@@ -1168,18 +1161,10 @@ bool CatalogManagerReplicaSet::_runReadCommand(OperationContext* txn,
                                                BSONObjBuilder* result) {
     Status lastStatus = Status::OK();
     for (int retry = 0; retry < kMaxReadRetry; retry++) {
-        auto targeter = grid.shardRegistry()->getShard(txn, "config")->getTargeter();
-        auto target = targeter->findHost(settings);
-        if (!target.isOK()) {
-            return Command::appendCommandStatus(*result, target.getStatus());
-        }
-
-        auto resultStatus =
-            grid.shardRegistry()->runCommandOnConfig(target.getValue(), dbname, cmdObj);
+        auto resultStatus = grid.shardRegistry()->runCommandOnConfig(settings, dbname, cmdObj);
 
         if (ErrorCodes::isNetworkError(resultStatus.getStatus().code())) {
             lastStatus = resultStatus.getStatus();
-            targeter->markHostUnreachable(target.getValue());
             continue;
         }
 

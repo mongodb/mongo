@@ -97,22 +97,14 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
         return {ErrorCodes::BadValue, "shard name cannot be empty"};
     }
 
-    auto shardConn = shardRegistry->createConnection(connectionString);
+    const std::shared_ptr<Shard> shardConn{shardRegistry->createConnection(connectionString)};
     invariant(shardConn);
 
-    auto shardHostStatus =
-        shardConn->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
-    if (!shardHostStatus.isOK()) {
-        return shardHostStatus.getStatus();
-    }
-
-    const HostAndPort& shardHost = shardHostStatus.getValue();
-
-    StatusWith<BSONObj> cmdStatus{ErrorCodes::InternalError, "uninitialized value"};
+    const ReadPreferenceSetting readPref{ReadPreference::PrimaryOnly};
 
     // Is it mongos?
-    cmdStatus =
-        shardRegistry->runCommandForAddShard(txn, shardHost, "admin", BSON("isdbgrid" << 1));
+    auto cmdStatus = shardRegistry->runCommandForAddShard(
+        txn, shardConn, readPref, "admin", BSON("isdbgrid" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -123,8 +115,8 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
     }
 
     // Is it a replica set?
-    cmdStatus =
-        shardRegistry->runCommandForAddShard(txn, shardHost, "admin", BSON("isMaster" << 1));
+    cmdStatus = shardRegistry->runCommandForAddShard(
+        txn, shardConn, readPref, "admin", BSON("isMaster" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -158,7 +150,7 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
 
     // Is it a mongos config server?
     cmdStatus = shardRegistry->runCommandForAddShard(
-        txn, shardHost, "admin", BSON("replSetGetStatus" << 1));
+        txn, shardConn, readPref, "admin", BSON("replSetGetStatus" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }
@@ -219,8 +211,8 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
             if (hostSet.find(host) == hostSet.end()) {
                 return {ErrorCodes::OperationFailed,
                         str::stream() << "in seed list " << connectionString.toString() << ", host "
-                                      << host << " does not belong to replica set "
-                                      << foundSetName};
+                                      << host << " does not belong to replica set " << foundSetName
+                                      << "; found " << resIsMaster.toString()};
             }
         }
     }
@@ -256,19 +248,16 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
  */
 StatusWith<std::vector<std::string>> getDBNamesListFromShard(
     OperationContext* txn, ShardRegistry* shardRegistry, const ConnectionString& connectionString) {
-    auto shardConn = shardRegistry->createConnection(connectionString);
+    const std::shared_ptr<Shard> shardConn{
+        shardRegistry->createConnection(connectionString).release()};
     invariant(shardConn);
 
-    auto shardHostStatus =
-        shardConn->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()});
-    if (!shardHostStatus.isOK()) {
-        return shardHostStatus.getStatus();
-    }
-
-    const HostAndPort& shardHost = shardHostStatus.getValue();
-
     auto cmdStatus =
-        shardRegistry->runCommandForAddShard(txn, shardHost, "admin", BSON("listDatabases" << 1));
+        shardRegistry->runCommandForAddShard(txn,
+                                             shardConn,
+                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                             "admin",
+                                             BSON("listDatabases" << 1));
     if (!cmdStatus.isOK()) {
         return cmdStatus.getStatus();
     }

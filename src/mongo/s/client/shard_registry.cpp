@@ -44,6 +44,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
@@ -71,6 +72,20 @@ const Seconds kConfigCommandTimeout{30};
 const int kNotMasterNumRetries = 3;
 const Milliseconds kNotMasterRetryInterval{500};
 const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
+const BSONObj kReplSecondaryOkMetadata{
+    BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1)};
+const BSONObj kSecondaryOkMetadata{BSON(rpc::kSecondaryOkFieldName << 1)};
+
+void updateReplSetMonitor(const std::shared_ptr<RemoteCommandTargeter>& targeter,
+                          const HostAndPort& remoteHost,
+                          const Status& remoteCommandStatus) {
+    if (ErrorCodes::NotMaster == remoteCommandStatus) {
+        targeter->markHostNotMaster(remoteHost);
+    } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
+        targeter->markHostUnreachable(remoteHost);
+    }
+}
+
 }  // unnamed namespace
 
 ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
@@ -329,13 +344,19 @@ OpTime ShardRegistry::getConfigOpTime() {
     return _configOpTime;
 }
 
-StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfigNode(
-    const HostAndPort& host,
+StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
+    const ReadPreferenceSetting& readPref,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit,
     boost::optional<repl::ReadConcernArgs> readConcern) {
+    const auto targeter = getConfigShard()->getTargeter();
+    const auto host = targeter->findHost(readPref);
+    if (!host.isOK()) {
+        return host.getStatus();
+    }
+
     // If for some reason the callback never gets invoked, we will return this status
     Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
     QueryResponse response;
@@ -391,8 +412,13 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfigNo
     BSONObjBuilder findCmdBuilder;
     lpq->asFindCommand(&findCmdBuilder);
 
-    QueryFetcher fetcher(
-        _executor.get(), host, nss, findCmdBuilder.done(), fetcherCallback, kReplMetadata);
+    QueryFetcher fetcher(_executor.get(),
+                         host.getValue(),
+                         nss,
+                         findCmdBuilder.done(),
+                         fetcherCallback,
+                         readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata
+                                                                      : kReplSecondaryOkMetadata);
 
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
@@ -400,6 +426,8 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfigNo
     }
 
     fetcher.wait();
+
+    updateReplSetMonitor(targeter, host.getValue(), status);
 
     if (!status.isOK()) {
         return status;
@@ -410,12 +438,19 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfigNo
     return response;
 }
 
-StatusWith<BSONObj> ShardRegistry::runCommand(OperationContext* txn,
-                                              const HostAndPort& host,
-                                              const std::string& dbName,
-                                              const BSONObj& cmdObj) {
-    auto response =
-        _runCommandWithMetadata(_executor.get(), host, dbName, cmdObj, rpc::makeEmptyMetadata());
+StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,
+                                                     const std::shared_ptr<Shard>& shard,
+                                                     const ReadPreferenceSetting& readPref,
+                                                     const std::string& dbName,
+                                                     const BSONObj& cmdObj) {
+    auto response = _runCommandWithMetadata(_executor.get(),
+                                            shard,
+                                            readPref,
+                                            dbName,
+                                            cmdObj,
+                                            readPref.pref == ReadPreference::PrimaryOnly
+                                                ? rpc::makeEmptyMetadata()
+                                                : kSecondaryOkMetadata);
     if (!response.isOK()) {
         return response.getStatus();
     }
@@ -423,12 +458,32 @@ StatusWith<BSONObj> ShardRegistry::runCommand(OperationContext* txn,
     return response.getValue().response;
 }
 
+StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,
+                                                     ShardId shardId,
+                                                     const ReadPreferenceSetting& readPref,
+                                                     const std::string& dbName,
+                                                     const BSONObj& cmdObj) {
+    auto shard = getShard(txn, shardId);
+    if (!shard) {
+        return {ErrorCodes::ShardNotFound, str::stream() << "shard " << shardId << " not found"};
+    }
+    return runCommandOnShard(txn, shard, readPref, dbName, cmdObj);
+}
+
+
 StatusWith<BSONObj> ShardRegistry::runCommandForAddShard(OperationContext* txn,
-                                                         const HostAndPort& host,
+                                                         const std::shared_ptr<Shard>& shard,
+                                                         const ReadPreferenceSetting& readPref,
                                                          const std::string& dbName,
                                                          const BSONObj& cmdObj) {
-    auto status = _runCommandWithMetadata(
-        _executorForAddShard.get(), host, dbName, cmdObj, rpc::makeEmptyMetadata());
+    auto status = _runCommandWithMetadata(_executorForAddShard.get(),
+                                          shard,
+                                          readPref,
+                                          dbName,
+                                          cmdObj,
+                                          readPref.pref == ReadPreference::PrimaryOnly
+                                              ? rpc::makeEmptyMetadata()
+                                              : kSecondaryOkMetadata);
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -436,10 +491,16 @@ StatusWith<BSONObj> ShardRegistry::runCommandForAddShard(OperationContext* txn,
     return status.getValue().response;
 }
 
-StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(const HostAndPort& host,
+StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(const ReadPreferenceSetting& readPref,
                                                       const std::string& dbName,
                                                       const BSONObj& cmdObj) {
-    auto response = _runCommandWithMetadata(_executor.get(), host, dbName, cmdObj, kReplMetadata);
+    auto response = _runCommandWithMetadata(
+        _executor.get(),
+        getConfigShard(),
+        readPref,
+        dbName,
+        cmdObj,
+        readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata : kReplSecondaryOkMetadata);
 
     if (!response.isOK()) {
         return response.getStatus();
@@ -451,9 +512,8 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(const HostAndPort& host,
 
 StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
                                                                           const BSONObj& cmdObj) {
-    auto configShard = getConfigShard();
     auto response = _runCommandWithNotMasterRetries(
-        _executor.get(), configShard->getTargeter(), dbname, cmdObj, kReplMetadata);
+        _executor.get(), getConfigShard(), dbname, cmdObj, kReplMetadata);
 
     if (!response.isOK()) {
         return response.getStatus();
@@ -471,7 +531,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationConte
     invariant(!shard->isConfig());
 
     auto response = _runCommandWithNotMasterRetries(
-        _executor.get(), shard->getTargeter(), dbname, cmdObj, rpc::makeEmptyMetadata());
+        _executor.get(), shard, dbname, cmdObj, rpc::makeEmptyMetadata());
     if (!response.isOK()) {
         return response.getStatus();
     }
@@ -481,28 +541,15 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationConte
 
 StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMasterRetries(
     TaskExecutor* executor,
-    const std::shared_ptr<RemoteCommandTargeter>& targeter,
+    const std::shared_ptr<Shard>& shard,
     const std::string& dbname,
     const BSONObj& cmdObj,
     const BSONObj& metadata) {
-    const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet{});
+    const ReadPreferenceSetting readPref{ReadPreference::PrimaryOnly};
 
     for (int i = 0; i < kNotMasterNumRetries; ++i) {
-        auto target = targeter->findHost(readPref);
-        if (!target.isOK()) {
-            if (ErrorCodes::NotMaster == target.getStatus()) {
-                if (i == kNotMasterNumRetries - 1) {
-                    // If we're out of retries don't bother sleeping, just return.
-                    return target.getStatus();
-                }
-                sleepmillis(durationCount<Milliseconds>(kNotMasterRetryInterval));
-                continue;
-            }
-            return target.getStatus();
-        }
-
         auto response =
-            _runCommandWithMetadata(executor, target.getValue(), dbname, cmdObj, metadata);
+            _runCommandWithMetadata(executor, shard, readPref, dbname, cmdObj, metadata);
         if (!response.isOK()) {
             return response.getStatus();
         }
@@ -510,7 +557,6 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMast
         Status commandStatus = getStatusFromCommandResult(response.getValue().response);
         if (ErrorCodes::NotMaster == commandStatus ||
             ErrorCodes::NotMasterNoSlaveOkCode == commandStatus) {
-            targeter->markHostNotMaster(target.getValue());
             if (i == kNotMasterNumRetries - 1) {
                 // If we're out of retries don't bother sleeping, just return.
                 return commandStatus;
@@ -527,14 +573,22 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMast
 
 StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadata(
     TaskExecutor* executor,
-    const HostAndPort& host,
+    const std::shared_ptr<Shard>& shard,
+    const ReadPreferenceSetting& readPref,
     const std::string& dbName,
     const BSONObj& cmdObj,
     const BSONObj& metadata) {
+    auto targeter = shard->getTargeter();
+    auto host = targeter->findHost(readPref);
+    if (!host.isOK()) {
+        return host.getStatus();
+    }
+
+    executor::RemoteCommandRequest request(
+        host.getValue(), dbName, cmdObj, metadata, kConfigCommandTimeout);
     StatusWith<executor::RemoteCommandResponse> responseStatus =
         Status(ErrorCodes::InternalError, "Internal error running command");
 
-    executor::RemoteCommandRequest request(host, dbName, cmdObj, metadata, kConfigCommandTimeout);
     auto callStatus =
         executor->scheduleRemoteCommand(request,
                                         [&responseStatus](const RemoteCommandCallbackArgs& args) {
@@ -547,11 +601,13 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
     // Block until the command is carried out
     executor->wait(callStatus.getValue());
 
+    updateReplSetMonitor(targeter, host.getValue(), responseStatus.getStatus());
     if (!responseStatus.isOK()) {
         return responseStatus.getStatus();
     }
 
     auto response = responseStatus.getValue();
+    updateReplSetMonitor(targeter, host.getValue(), getStatusFromCommandResult(response.data));
 
     CommandResponse cmdResponse;
     cmdResponse.response = response.data;

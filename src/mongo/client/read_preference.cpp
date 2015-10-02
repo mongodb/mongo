@@ -114,6 +114,9 @@ TagSet TagSet::primaryOnly() {
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref, TagSet tags)
     : pref(std::move(pref)), tags(std::move(tags)) {}
 
+ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref)
+    : ReadPreferenceSetting(pref, defaultTagSetForMode(pref)) {}
+
 StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromBSON(const BSONObj& readPrefObj) {
     std::string modeStr;
     auto modeExtractStatus = bsonExtractStringField(readPrefObj, kModeFieldName, &modeStr);

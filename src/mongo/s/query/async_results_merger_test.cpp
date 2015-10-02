@@ -37,6 +37,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -1037,7 +1038,7 @@ TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
     ASSERT_FALSE(arm->ready());
 
     BSONObj cmdRequestMetadata = getFirstPendingRequest().metadata;
-    ASSERT_EQ(cmdRequestMetadata, BSON("$secondaryOk" << 1));
+    ASSERT_EQ(cmdRequestMetadata, BSON(rpc::kSecondaryOkFieldName << 1));
 
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}")};

@@ -309,11 +309,12 @@ void Chunk::pickSplitVector(OperationContext* txn,
     BSONObj cmdObj = cmd.obj();
 
     const auto primaryShard = grid.shardRegistry()->getShard(txn, getShardId());
-    auto targetStatus =
-        primaryShard->getTargeter()->findHost({ReadPreference::PrimaryPreferred, TagSet{}});
-    uassertStatusOK(targetStatus);
-
-    auto result = grid.shardRegistry()->runCommand(txn, targetStatus.getValue(), "admin", cmdObj);
+    auto result = grid.shardRegistry()->runCommandOnShard(
+        txn,
+        primaryShard,
+        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+        "admin",
+        cmdObj);
 
     uassertStatusOK(result.getStatus());
     uassertStatusOK(Command::getStatusFromCommandResult(result.getValue()));

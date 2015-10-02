@@ -226,11 +226,12 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
             continue;
         }
 
-        const auto shardHost = uassertStatusOK(
-            s->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
-
-        BSONObj f = uassertStatusOK(
-            grid.shardRegistry()->runCommand(txn, shardHost, "admin", BSON("features" << 1)));
+        BSONObj f = uassertStatusOK(grid.shardRegistry()->runCommandOnShard(
+            txn,
+            s,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            BSON("features" << 1)));
         if (f["oidMachine"].isNumber()) {
             int x = f["oidMachine"].numberInt();
             if (oids.count(x) == 0) {
@@ -239,16 +240,21 @@ bool Balancer::_checkOIDs(OperationContext* txn) {
                 log() << "error: 2 machines have " << x << " as oid machine piece: " << shardId
                       << " and " << oids[x];
 
-                uassertStatusOK(grid.shardRegistry()->runCommand(
-                    txn, shardHost, "admin", BSON("features" << 1 << "oidReset" << 1)));
+                uassertStatusOK(grid.shardRegistry()->runCommandOnShard(
+                    txn,
+                    s,
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                    "admin",
+                    BSON("features" << 1 << "oidReset" << 1)));
 
                 const auto otherShard = grid.shardRegistry()->getShard(txn, oids[x]);
                 if (otherShard) {
-                    const auto otherShardHost = uassertStatusOK(otherShard->getTargeter()->findHost(
-                        {ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
-
-                    uassertStatusOK(grid.shardRegistry()->runCommand(
-                        txn, otherShardHost, "admin", BSON("features" << 1 << "oidReset" << 1)));
+                    uassertStatusOK(grid.shardRegistry()->runCommandOnShard(
+                        txn,
+                        otherShard,
+                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                        "admin",
+                        BSON("features" << 1 << "oidReset" << 1)));
                 }
 
                 return false;

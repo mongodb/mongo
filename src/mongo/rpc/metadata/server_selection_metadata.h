@@ -44,6 +44,18 @@ class StatusWith;
 namespace rpc {
 
 /**
+ * Symbolic constant for the "$secondaryOk" metadata field. This field should be of boolean or
+ * numeric type, and is treated as a boolean.
+ */
+extern const char kSecondaryOkFieldName[];
+
+/**
+ * Symbolic constant for the "$readPreference" metadata field. The field should be of Object type
+ * when present.
+ */
+extern const char kReadPreferenceFieldName[];
+
+/**
  * This class comprises the request metadata fields that concern server selection, that is,
  * the conditions on which servers can execute this operation.
  */

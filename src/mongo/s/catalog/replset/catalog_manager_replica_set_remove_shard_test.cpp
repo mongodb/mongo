@@ -38,6 +38,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -172,7 +173,8 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     // Respond to request to reload information about existing shards
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
+                      request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
@@ -348,7 +350,8 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     // Respond to request to reload information about existing shards
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
+                      request.metadata);
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));

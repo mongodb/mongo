@@ -43,10 +43,10 @@
 namespace mongo {
 namespace rpc {
 
-namespace {
-
 const char kSecondaryOkFieldName[] = "$secondaryOk";
 const char kReadPreferenceFieldName[] = "$readPreference";
+
+namespace {
 
 const char kQueryOptionsFieldName[] = "$queryOptions";
 

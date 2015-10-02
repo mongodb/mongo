@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
@@ -104,8 +105,6 @@ public:
             ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
             ASSERT_EQ(_configHost, request.target);
             ASSERT_EQ("config", request.dbname);
-
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
             BSONObj expectedCmd(fromjson(R"({
                 delete: "chunks",

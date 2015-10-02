@@ -40,10 +40,10 @@
 
 namespace mongo {
 
-struct HostAndPort;
 class NamespaceString;
-class RemoteCommandTargeter;
 class ShardRegistry;
+struct HostAndPort;
+struct ReadPreferenceSetting;
 
 class DistLockCatalogImpl final : public DistLockCatalog {
 public:
@@ -81,7 +81,7 @@ public:
     virtual Status stopPing(StringData processId) override;
 
 private:
-    StatusWith<std::vector<BSONObj>> _findOnConfig(const HostAndPort& host,
+    StatusWith<std::vector<BSONObj>> _findOnConfig(const ReadPreferenceSetting& readPref,
                                                    const NamespaceString& nss,
                                                    const BSONObj& query,
                                                    const BSONObj& sort,

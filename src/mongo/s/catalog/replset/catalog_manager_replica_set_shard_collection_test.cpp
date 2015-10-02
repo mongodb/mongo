@@ -40,6 +40,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set.h"
 #include "mongo/s/catalog/replset/catalog_manager_replica_set_test_fixture.h"
@@ -82,7 +83,9 @@ public:
     void expectGetDatabase(const DatabaseType& expectedDb) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(
+                BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
+                request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
@@ -152,7 +155,9 @@ public:
     void expectReloadChunks(const std::string& ns, const vector<ChunkType>& chunks) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(
+                BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
+                request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
@@ -212,7 +217,9 @@ public:
     void expectReloadCollection(const CollectionType& collection) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(
+                BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
+                request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), CollectionType::ConfigNS);
@@ -238,7 +245,9 @@ public:
     void expectLoadNewestChunk(const string& ns, const ChunkType& chunk) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_EQUALS(
+                BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
+                request.metadata);
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
@@ -760,7 +769,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
         ASSERT_EQUALS(0, request.cmdObj["maxSplitPoints"].numberLong());
         ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());
 
-        ASSERT_EQUALS(rpc::makeEmptyMetadata(), request.metadata);
+        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1), request.metadata);
 
         return BSON("ok" << 1 << "splitKeys"
                          << BSON_ARRAY(splitPoint0 << splitPoint1 << splitPoint2 << splitPoint3));

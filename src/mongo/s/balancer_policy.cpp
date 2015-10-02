@@ -69,16 +69,12 @@ namespace {
 std::string retrieveShardMongoDVersion(OperationContext* txn,
                                        ShardId shardId,
                                        ShardRegistry* shardRegistry) {
-    auto shard = shardRegistry->getShard(txn, shardId);
-    if (!shard) {
-        uassertStatusOK({ErrorCodes::ShardNotFound, "Shard not found"});
-    }
-
-    auto shardHost = uassertStatusOK(
-        shard->getTargeter()->findHost({ReadPreference::PrimaryOnly, TagSet::primaryOnly()}));
-
     BSONObj serverStatus = uassertStatusOK(
-        shardRegistry->runCommand(txn, shardHost, "admin", BSON("serverStatus" << 1)));
+        shardRegistry->runCommandOnShard(txn,
+                                         shardId,
+                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                         "admin",
+                                         BSON("serverStatus" << 1)));
     BSONElement versionElement = serverStatus["version"];
     if (versionElement.type() != String) {
         uassertStatusOK({ErrorCodes::NoSuchKey, "version field not found in serverStatus"});
