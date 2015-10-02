@@ -83,10 +83,6 @@ public:
     }
 
     bool slaveOk() const override {
-        return false;
-    }
-
-    bool slaveOverrideOk() const override {
         return true;
     }
 

@@ -55,10 +55,6 @@ public:
     }
 
     bool slaveOk() const final {
-        return false;
-    }
-
-    bool slaveOverrideOk() const final {
         return true;
     }
 
