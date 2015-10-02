@@ -532,7 +532,7 @@ __wt_debug_page(
 	WT_DBG *ds, _ds;
 	WT_DECL_RET;
 
-        WT_ASSERT(session, S2BT_SAFE(session) != NULL);
+	WT_ASSERT(session, S2BT_SAFE(session) != NULL);
 
 	ds = &_ds;
 	WT_RET(__debug_config(session, ds, ofile));
@@ -547,7 +547,7 @@ __wt_debug_page(
 /*
  * __debug_tree --
  *	Dump the in-memory information for a tree. Takes an explicit btree
- *	as one may not be set on the session here. We mark the session to 
+ *	as one may not be set on the session here. We mark the session to
  *	the btree here
  */
 static int
