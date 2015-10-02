@@ -243,6 +243,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	WT_CACHE_POOL *cp;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	uint32_t session_flags;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -252,8 +253,9 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	 * Create a session that can be used by the cache pool thread, do
 	 * it in the main thread to avoid shutdown races
 	 */
+	session_flags = WT_SESSION_NO_DATA_HANDLES;
 	if ((ret = __wt_open_internal_session(
-		conn, "cache-pool", false, false, &cache->cp_session)) != 0)
+	    conn, "cache-pool", false, session_flags, &cache->cp_session)) != 0)
 		WT_RET_MSG(NULL, ret,
 		    "Failed to create session for cache pool");
 

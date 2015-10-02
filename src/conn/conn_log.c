@@ -821,6 +821,7 @@ int
 __wt_logmgr_open(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	uint32_t session_flags;
 
 	conn = S2C(session);
 
@@ -832,8 +833,9 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 	 * Start the log close thread.  It is not configurable.
 	 * If logging is enabled, this thread runs.
 	 */
-	WT_RET(__wt_open_internal_session(
-	    conn, "log-close-server", false, false, &conn->log_file_session));
+	session_flags = WT_SESSION_NO_DATA_HANDLES;
+	WT_RET(__wt_open_internal_session(conn,
+	    "log-close-server", false, session_flags, &conn->log_file_session));
 	WT_RET(__wt_cond_alloc(conn->log_file_session,
 	    "log close server", false, &conn->log_file_cond));
 
@@ -848,8 +850,8 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 	 * Start the log write LSN thread.  It is not configurable.
 	 * If logging is enabled, this thread runs.
 	 */
-	WT_RET(__wt_open_internal_session(
-	    conn, "log-wrlsn-server", false, false, &conn->log_wrlsn_session));
+	WT_RET(__wt_open_internal_session(conn, "log-wrlsn-server",
+	    false, session_flags, &conn->log_wrlsn_session));
 	WT_RET(__wt_cond_alloc(conn->log_wrlsn_session,
 	    "log write lsn server", false, &conn->log_wrlsn_cond));
 	WT_RET(__wt_thread_create(conn->log_wrlsn_session,
@@ -868,8 +870,8 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
 		WT_RET(__wt_cond_signal(session, conn->log_cond));
 	} else {
 		/* The log server gets its own session. */
-		WT_RET(__wt_open_internal_session(
-		    conn, "log-server", false, false, &conn->log_session));
+		WT_RET(__wt_open_internal_session(conn,
+		    "log-server", false, session_flags, &conn->log_session));
 		WT_RET(__wt_cond_alloc(conn->log_session,
 		    "log server", false, &conn->log_cond));
 

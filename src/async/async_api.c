@@ -53,7 +53,7 @@ __async_get_format(WT_CONNECTION_IMPL *conn, const char *uri,
 	 * for the cursor.
 	 */
 	WT_RET(__wt_open_internal_session(
-	    conn, "async-cursor", true, true, &session));
+	    conn, "async-cursor", true, 0, &session));
 	__wt_spin_lock(session, &async->ops_lock);
 	WT_ERR(__wt_calloc_one(session, &af));
 	WT_ERR(__wt_strdup(session, uri, &af->uri));
@@ -229,7 +229,7 @@ __async_start(WT_SESSION_IMPL *session)
 {
 	WT_ASYNC *async;
 	WT_CONNECTION_IMPL *conn;
-	uint32_t i;
+	uint32_t i, session_flags;
 
 	conn = S2C(session);
 	conn->async_cfg = 1;
@@ -256,9 +256,9 @@ __async_start(WT_SESSION_IMPL *session)
 		 * workers and we may want to selectively stop some workers
 		 * while leaving the rest running.
 		 */
-		WT_RET(__wt_open_internal_session(conn,
-		    "async-worker", true, true, &async->worker_sessions[i]));
-		F_SET(async->worker_sessions[i], WT_SESSION_SERVER_ASYNC);
+		session_flags = WT_SESSION_SERVER_ASYNC;
+		WT_RET(__wt_open_internal_session(conn, "async-worker",
+		    true, session_flags, &async->worker_sessions[i]));
 	}
 	for (i = 0; i < conn->async_workers; i++) {
 		/*
@@ -305,7 +305,7 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 	bool run;
-	uint32_t i;
+	uint32_t i, session_flags;
 
 	conn = S2C(session);
 	async = conn->async;
@@ -371,10 +371,9 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 			/*
 			 * Each worker has its own session.
 			 */
+			session_flags = WT_SESSION_SERVER_ASYNC;
 			WT_RET(__wt_open_internal_session(conn, "async-worker",
-			    true, true, &async->worker_sessions[i]));
-			F_SET(async->worker_sessions[i],
-			    WT_SESSION_SERVER_ASYNC);
+			    true, session_flags, &async->worker_sessions[i]));
 		}
 		for (i = conn->async_workers; i < tmp_conn.async_workers; i++) {
 			/*

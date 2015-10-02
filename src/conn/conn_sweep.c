@@ -353,15 +353,12 @@ int
 __wt_sweep_create(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	uint32_t session_flags;
 
 	conn = S2C(session);
 
 	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_SERVER_SWEEP);
-
-	WT_RET(__wt_open_internal_session(
-	    conn, "sweep-server", true, true, &conn->sweep_session));
-	session = conn->sweep_session;
 
 	/*
 	 * Handle sweep does enough I/O it may be called upon to perform slow
@@ -372,8 +369,11 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 	 *
 	 * Don't tap the sweep thread for eviction.
 	 */
-	F_SET(session, WT_SESSION_CAN_WAIT |
-	    WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION);
+	session_flags = WT_SESSION_CAN_WAIT |
+	    WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION;
+	WT_RET(__wt_open_internal_session(
+	    conn, "sweep-server", true, session_flags, &conn->sweep_session));
+	session = conn->sweep_session;
 
 	WT_RET(__wt_cond_alloc(
 	    session, "handle sweep server", false, &conn->sweep_cond));

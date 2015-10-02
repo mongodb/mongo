@@ -236,27 +236,30 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_EVICT_WORKER *workers;
 	size_t alloc;
-	uint32_t i;
+	uint32_t i, session_flags;
 
 	conn = S2C(session);
 
-	alloc = conn->evict_workers_alloc * sizeof(*workers);
-	WT_RET(__wt_realloc(session, &alloc,
-	    conn->evict_workers_max * sizeof(*workers), &conn->evict_workctx));
-	workers = conn->evict_workctx;
+	if (conn->evict_workers_alloc < conn->evict_workers_max) {
+		alloc = conn->evict_workers_alloc * sizeof(*workers);
+		WT_RET(__wt_realloc(session, &alloc,
+		    conn->evict_workers_max * sizeof(*workers),
+		    &conn->evict_workctx));
+		workers = conn->evict_workctx;
+	}
 
 	for (i = conn->evict_workers_alloc; i < conn->evict_workers_max; i++) {
-		WT_ERR(__wt_open_internal_session(conn,
-		    "eviction-worker", true, false, &workers[i].session));
-		workers[i].id = i;
-
 		/*
+		 * Eviction worker threads get their own session.
 		 * Eviction worker threads get their own lookaside table cursor.
 		 * Eviction worker threads may be called upon to perform slow
 		 * operations for the block manager.
 		 */
-		F_SET(workers[i].session,
-		    WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_CAN_WAIT);
+		session_flags =
+		    WT_SESSION_CAN_WAIT | WT_SESSION_LOOKASIDE_CURSOR;
+		WT_ERR(__wt_open_internal_session(conn, "eviction-worker",
+		    false, session_flags, &workers[i].session));
+		workers[i].id = i;
 
 		if (i < conn->evict_workers_min) {
 			++conn->evict_workers;
@@ -275,36 +278,39 @@ err:	conn->evict_workers_alloc = conn->evict_workers_max;
  *	Start the eviction server thread.
  */
 int
-__wt_evict_create(WT_SESSION_IMPL *session)
+__wt_evict_create(WT_SESSION_IMPL *session, bool with_las)
 {
 	WT_CONNECTION_IMPL *conn;
+	uint32_t session_flags;
 
 	conn = S2C(session);
 
 	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_EVICTION_RUN);
 
-	/* We need a session handle because we're reading/writing pages. */
-	WT_RET(__wt_open_internal_session(
-	    conn, "eviction-server", true, false, &conn->evict_session));
+	/*
+	 * We need a session handle because we're reading/writing pages.
+	 *
+	 * The eviction server gets its own lookaside table cursor.
+	 *
+	 * If there's only a single eviction thread, it may be called upon to
+	 * perform slow operations for the block manager.  (The flag is not
+	 * reset if reconfigured later, but I doubt that's a problem.)
+	 */
+	session_flags = with_las ? WT_SESSION_LOOKASIDE_CURSOR : 0;
+	if (conn->evict_workers_max == 0)
+		FLD_SET(session_flags, WT_SESSION_CAN_WAIT);
+	WT_RET(__wt_open_internal_session(conn,
+	    "eviction-server", false, session_flags, &conn->evict_session));
 	session = conn->evict_session;
 
 	/*
 	 * If eviction workers were configured, allocate sessions for them now.
 	 * This is done to reduce the chance that we will open new eviction
 	 * sessions after WT_CONNECTION::close is called.
-	 *
-	 * If there's only a single eviction thread, it may be called upon to
-	 * perform slow operations for the block manager.  (The flag is not
-	 * reset if reconfigured later, but I doubt that's a problem.)
 	 */
 	if (conn->evict_workers_max > 0)
 		WT_RET(__evict_workers_resize(session));
-	else
-		F_SET(session, WT_SESSION_CAN_WAIT);
-
-	/* The eviction server gets its own lookaside table cursor. */
-	F_SET(session, WT_SESSION_LOOKASIDE_CURSOR);
 
 	/*
 	 * Start the primary eviction server thread after the worker threads
