@@ -199,10 +199,10 @@ public:
               &localMaxSamplesPerArchiveMetricChunk) {}
 
     virtual Status validate(const std::int32_t& potentialNewValue) {
-        if (potentialNewValue < 1) {
+        if (potentialNewValue < 2) {
             return Status(
                 ErrorCodes::BadValue,
-                "diagnosticDataCollectionSamplesPerChunk must be greater than or equal to 1");
+                "diagnosticDataCollectionSamplesPerChunk must be greater than or equal to 2");
         }
 
         auto controller = getGlobalFTDCController();
@@ -228,10 +228,10 @@ public:
               &localMaxSamplesPerInterimMetricChunk) {}
 
     virtual Status validate(const std::int32_t& potentialNewValue) {
-        if (potentialNewValue < 1) {
+        if (potentialNewValue < 2) {
             return Status(ErrorCodes::BadValue,
                           "diagnosticDataCollectionSamplesPerInterimUpdate must be greater than or "
-                          "equal to 1");
+                          "equal to 2");
         }
 
         auto controller = getGlobalFTDCController();

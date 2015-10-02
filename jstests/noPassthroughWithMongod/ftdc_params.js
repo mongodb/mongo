@@ -31,12 +31,14 @@
     assert.commandWorked(setparam({"diagnosticDataCollectionPeriodMillis": 100}));
     assert.commandWorked(setparam({"diagnosticDataCollectionDirectorySizeMb": 10}));
     assert.commandWorked(setparam({"diagnosticDataCollectionFileSizeMb": 1}));
-    assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerChunk": 1}));
-    assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerInterimUpdate": 1}));
+    assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerChunk": 2}));
+    assert.commandWorked(setparam({"diagnosticDataCollectionSamplesPerInterimUpdate": 2}));
 
     // Negative tests - set values below minimums
     assert.commandFailed(setparam({"diagnosticDataCollectionPeriodMillis": 1}));
     assert.commandFailed(setparam({"diagnosticDataCollectionDirectorySizeMb": 1}));
+    assert.commandFailed(setparam({"diagnosticDataCollectionSamplesPerChunk": 1}));
+    assert.commandFailed(setparam({"diagnosticDataCollectionSamplesPerInterimUpdate": 1}));
 
     // Negative test - set file size bigger then directory size
     assert.commandWorked(setparam({"diagnosticDataCollectionDirectorySizeMb": 10}));
