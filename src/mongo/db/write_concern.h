@@ -100,6 +100,7 @@ struct WriteConcernResult {
  */
 Status waitForWriteConcern(OperationContext* txn,
                            const repl::OpTime& replOpTime,
+                           const WriteConcernOptions& writeConcern,
                            WriteConcernResult* result);
 
 

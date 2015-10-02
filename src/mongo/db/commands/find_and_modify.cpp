@@ -491,8 +491,11 @@ public:
         }
 
         WriteConcernResult res;
-        auto waitForWCStatus = waitForWriteConcern(
-            txn, repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(), &res);
+        auto waitForWCStatus =
+            waitForWriteConcern(txn,
+                                repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
+                                txn->getWriteConcern(),
+                                &res);
         appendCommandWCStatus(result, waitForWCStatus);
 
         return true;

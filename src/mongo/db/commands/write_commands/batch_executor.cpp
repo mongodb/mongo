@@ -332,8 +332,11 @@ void WriteBatchExecutor::executeBatch(const BatchedCommandRequest& request,
     }
 
     WriteConcernResult res;
-    Status status = waitForWriteConcern(
-        _txn, repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp(), &res);
+    Status status =
+        waitForWriteConcern(_txn,
+                            repl::ReplClientInfo::forClient(_txn->getClient()).getLastOp(),
+                            _txn->getWriteConcern(),
+                            &res);
 
     if (!status.isOK()) {
         wcError.reset(toWriteConcernError(status, res));

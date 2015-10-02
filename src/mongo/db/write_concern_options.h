@@ -57,6 +57,8 @@ public:
 
     WriteConcernOptions(const std::string& mode, SyncMode sync, int timeout);
 
+    WriteConcernOptions(const std::string& mode, SyncMode sync, Milliseconds timeout);
+
     Status parse(const BSONObj& obj);
 
     /**

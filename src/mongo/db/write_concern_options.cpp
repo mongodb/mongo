@@ -25,6 +25,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/write_concern_options.h"
 
 #include "mongo/base/status.h"
@@ -63,6 +65,11 @@ WriteConcernOptions::WriteConcernOptions(int numNodes, SyncMode sync, int timeou
 
 WriteConcernOptions::WriteConcernOptions(const std::string& mode, SyncMode sync, int timeout)
     : syncMode(sync), wNumNodes(0), wMode(mode), wTimeout(timeout) {}
+
+WriteConcernOptions::WriteConcernOptions(const std::string& mode,
+                                         SyncMode sync,
+                                         Milliseconds timeout)
+    : syncMode(sync), wNumNodes(0), wMode(mode), wTimeout(durationCount<Milliseconds>(timeout)) {}
 
 Status WriteConcernOptions::parse(const BSONObj& obj) {
     if (obj.isEmpty()) {
@@ -179,4 +186,5 @@ BSONObj WriteConcernOptions::toBSON() const {
 bool WriteConcernOptions::shouldWaitForOtherNodes() const {
     return !wMode.empty() || wNumNodes > 1;
 }
-}
+
+}  // namespace mongo

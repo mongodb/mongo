@@ -203,9 +203,8 @@ void WriteConcernResult::appendTo(const WriteConcernOptions& writeConcern,
 
 Status waitForWriteConcern(OperationContext* txn,
                            const OpTime& replOpTime,
+                           const WriteConcernOptions& writeConcern,
                            WriteConcernResult* result) {
-    const WriteConcernOptions& writeConcern = txn->getWriteConcern();
-
     // We assume all options have been validated earlier, if not, programming error
     dassert(validateWriteConcern(writeConcern).isOK());
 
