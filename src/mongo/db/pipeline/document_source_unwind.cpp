@@ -116,11 +116,12 @@ boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
         invariant(_index == 0 || _index < length);
 
         if (length == 0) {
-            // Preserve an empty array if asked to, otherwise skip it.
+            // Preserve documents with empty arrays if asked to, otherwise skip them.
             _haveNext = false;
             if (!_preserveNullAndEmptyArrays) {
                 return boost::none;
             }
+            _output.removeNestedField(_unwindPathFieldIndexes);
         } else {
             // Set field to be the next element in the array. If needed, this will automatically
             // clone all the documents along the field path so that the end values are not shared

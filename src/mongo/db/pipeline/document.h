@@ -414,6 +414,9 @@ public:
     void remove(StringData key) {
         getField(key) = Value();
     }
+    void removeNestedField(const std::vector<Position>& positions) {
+        getNestedField(positions) = Value();
+    }
 
     /** Gets/Sets a nested field given a path.
      *

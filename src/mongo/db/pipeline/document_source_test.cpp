@@ -1957,10 +1957,10 @@ class EmptyArray : public CheckResultsBase {
         return {DOC("_id" << 0 << "a" << BSONArray())};
     }
     string expectedPreservedResultSetString() const override {
-        return "[{_id: 0, a: []}]";
+        return "[{_id: 0}]";
     }
     string expectedPreservedIndexedResultSetString() const override {
-        return "[{_id: 0, a: [], index: null}]";
+        return "[{_id: 0, index: null}]";
     }
 };
 
@@ -2188,7 +2188,7 @@ class SeveralMoreDocuments : public CheckResultsBase {
                " {_id: 4, a: 1}, {_id: 4, a: 2}, {_id: 4, a: 3},"
                " {_id: 5, a: 4}, {_id: 5, a: 5}, {_id: 5, a: 6},"
                " {_id: 6, a: 7}, {_id: 6, a: 8}, {_id: 6, a: 9},"
-               " {_id: 7, a: []}]";
+               " {_id: 7}]";
     }
     string expectedIndexedResultSetString() const override {
         return "[{_id: 2, a: 'a', index: 0},"
@@ -2218,7 +2218,7 @@ class SeveralMoreDocuments : public CheckResultsBase {
                " {_id: 6, a: 7, index: 0},"
                " {_id: 6, a: 8, index: 1},"
                " {_id: 6, a: 9, index: 2},"
-               " {_id: 7, a: [], index: null}]";
+               " {_id: 7, index: null}]";
     }
 };
 

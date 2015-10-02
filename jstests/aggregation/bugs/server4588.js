@@ -41,7 +41,7 @@
     expectedResults = [
         {_id: 0, index: null},
         {_id: 1, x: null, index: null},
-        {_id: 2, x: [], index: null},
+        {_id: 2, index: null},
         {_id: 3, x: 1, index: NumberLong(0)},
         {_id: 3, x: 2, index: NumberLong(1)},
         {_id: 3, x: 3, index: NumberLong(2)},

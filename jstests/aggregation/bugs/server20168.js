@@ -37,5 +37,5 @@
 
     testPreserveNullAndEmptyArraysParam({_id: 0}, "$x", {_id: 0});
     testPreserveNullAndEmptyArraysParam({_id: 0, x: null}, "$x", {_id: 0, x: null});
-    testPreserveNullAndEmptyArraysParam({_id: 0, x: []}, "$x", {_id: 0, x: []});
+    testPreserveNullAndEmptyArraysParam({_id: 0, x: []}, "$x", {_id: 0});
 }());
