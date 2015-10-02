@@ -492,6 +492,7 @@ tasks:
 
 ## jstestfuzz ##
 - name: jstestfuzz
+  exec_timeout_secs: 7200 # Time out the task if it runs for more than 2 hours.
   depends_on:
   - name: compile
   commands:
@@ -555,6 +556,11 @@ tasks:
         content_type: ${content_type|application/x-gzip}
         display_name: Generated Tests - Execution ${execution}
     - func: "run tests"
+      # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
+      # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
+      # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
+      # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
+      timeout_secs: 1800
       vars:
         resmoke_args: --suites=jstestfuzz
 
