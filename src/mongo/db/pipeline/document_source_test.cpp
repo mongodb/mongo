@@ -1777,11 +1777,11 @@ public:
     virtual ~CheckResultsBase() {}
 
     void run() {
-        // Once with the legacy syntax.
-        createLegacyUnwind();
+        // Once with the simple syntax.
+        createSimpleUnwind();
         assertResultsMatch(expectedResultSet(false, false));
 
-        // Once with the normal syntax.
+        // Once with the full syntax.
         createUnwind(false, false);
         assertResultsMatch(expectedResultSet(false, false));
 
@@ -1801,6 +1801,10 @@ public:
 protected:
     virtual string unwindFieldPath() const {
         return "$a";
+    }
+
+    virtual string indexPath() const {
+        return "index";
     }
 
     virtual std::deque<Document> inputData() {
@@ -1841,9 +1845,9 @@ protected:
 
 private:
     /**
-     * Initializes '_unwind' using the legacy '{$unwind: '$path'}' syntax.
+     * Initializes '_unwind' using the simple '{$unwind: '$path'}' syntax.
      */
-    void createLegacyUnwind() {
+    void createSimpleUnwind() {
         auto specObj = BSON("$unwind" << unwindFieldPath());
         _unwind = static_cast<DocumentSourceUnwind*>(
             DocumentSourceUnwind::createFromBson(specObj.firstElement(), ctx()).get());
@@ -1851,15 +1855,15 @@ private:
     }
 
     /**
-     * Initializes '_unwind' using the current '{$unwind: {path: '$path'}}' syntax.
+     * Initializes '_unwind' using the full '{$unwind: {path: '$path'}}' syntax.
      */
     void createUnwind(bool preserveNullAndEmptyArrays, bool includeArrayIndex) {
         auto specObj =
-            BSON("$unwind" << BSON("path" << unwindFieldPath() << "preserveNullAndEmptyArrays"
-                                          << preserveNullAndEmptyArrays << "includeArrayIndex"
-                                          << includeArrayIndex));
+            DOC("$unwind" << DOC("path" << unwindFieldPath() << "preserveNullAndEmptyArrays"
+                                        << preserveNullAndEmptyArrays << "includeArrayIndex"
+                                        << (includeArrayIndex ? Value(indexPath()) : Value())));
         _unwind = static_cast<DocumentSourceUnwind*>(
-            DocumentSourceUnwind::createFromBson(specObj.firstElement(), ctx()).get());
+            DocumentSourceUnwind::createFromBson(specObj.toBson().firstElement(), ctx()).get());
         checkBsonRepresentation(preserveNullAndEmptyArrays, includeArrayIndex);
     }
 
@@ -1904,11 +1908,11 @@ private:
     }
 
     BSONObj expectedSerialization(bool preserveNullAndEmptyArrays, bool includeArrayIndex) const {
-        return DOC("$unwind" << DOC("path"
-                                    << Value(unwindFieldPath()) << "preserveNullAndEmptyArrays"
-                                    << (preserveNullAndEmptyArrays ? Value(true) : Value())
-                                    << "includeArrayIndex"
-                                    << (includeArrayIndex ? Value(true) : Value()))).toBson();
+        return DOC("$unwind" << DOC(
+                       "path" << Value(unwindFieldPath()) << "preserveNullAndEmptyArrays"
+                              << (preserveNullAndEmptyArrays ? Value(true) : Value())
+                              << "includeArrayIndex"
+                              << (includeArrayIndex ? Value(indexPath()) : Value()))).toBson();
     }
 
     /** Assert that iterator state accessors consistently report the source is exhausted. */
@@ -1956,7 +1960,7 @@ class EmptyArray : public CheckResultsBase {
         return "[{_id: 0, a: []}]";
     }
     string expectedPreservedIndexedResultSetString() const override {
-        return expectedPreservedResultSetString();
+        return "[{_id: 0, a: [], index: null}]";
     }
 };
 
@@ -1972,7 +1976,7 @@ class MissingValue : public CheckResultsBase {
         return "[{_id: 0}]";
     }
     string expectedPreservedIndexedResultSetString() const override {
-        return expectedPreservedResultSetString();
+        return "[{_id: 0, index: null}]";
     }
 };
 
@@ -1988,7 +1992,7 @@ class Null : public CheckResultsBase {
         return "[{_id: 0, a: null}]";
     }
     string expectedPreservedIndexedResultSetString() const override {
-        return expectedPreservedResultSetString();
+        return "[{_id: 0, a: null, index: null}]";
     }
 };
 
@@ -2004,7 +2008,7 @@ class Undefined : public CheckResultsBase {
         return "[{_id: 0, a: undefined}]";
     }
     string expectedPreservedIndexedResultSetString() const override {
-        return expectedPreservedResultSetString();
+        return "[{_id: 0, a: undefined, index: null}]";
     }
 };
 
@@ -2017,7 +2021,7 @@ class OneValue : public CheckResultsBase {
         return "[{_id: 0, a: 1}]";
     }
     string expectedIndexedResultSetString() const override {
-        return "[{_id: 0, a: {index: 0, value: 1}}]";
+        return "[{_id: 0, a: 1, index: 0}]";
     }
 };
 
@@ -2030,7 +2034,7 @@ class TwoValues : public CheckResultsBase {
         return "[{_id: 0, a: 1}, {_id: 0, a: 2}]";
     }
     string expectedIndexedResultSetString() const override {
-        return "[{_id: 0, a: {index: 0, value: 1}}, {_id: 0, a: {index: 1, value: 2}}]";
+        return "[{_id: 0, a: 1, index: 0}, {_id: 0, a: 2, index: 1}]";
     }
 };
 
@@ -2043,7 +2047,7 @@ class ArrayWithNull : public CheckResultsBase {
         return "[{_id: 0, a: 1}, {_id: 0, a: null}]";
     }
     string expectedIndexedResultSetString() const override {
-        return "[{_id: 0, a: {index: 0, value: 1}}, {_id: 0, a: {index: 1, value: null}}]";
+        return "[{_id: 0, a: 1, index: 0}, {_id: 0, a: null, index: 1}]";
     }
 };
 
@@ -2057,8 +2061,8 @@ class TwoDocuments : public CheckResultsBase {
         return "[{_id: 0, a: 1}, {_id: 0, a: 2}, {_id: 1, a: 3}, {_id: 1, a: 4}]";
     }
     string expectedIndexedResultSetString() const override {
-        return "[{_id: 0, a: {index: 0, value: 1}}, {_id: 0, a: {index: 1, value: 2}},"
-               " {_id: 1, a: {index: 0, value: 3}}, {_id: 1, a: {index: 1, value: 4}}]";
+        return "[{_id: 0, a: 1, index: 0}, {_id: 0, a: 2, index: 1},"
+               " {_id: 1, a: 3, index: 0}, {_id: 1, a: 4, index: 1}]";
     }
 };
 
@@ -2074,8 +2078,8 @@ class NestedArray : public CheckResultsBase {
         return "[{_id: 0, a: {b: 1, c: 3}}, {_id: 0, a: {b: 2, c: 3}}]";
     }
     string expectedIndexedResultSetString() const override {
-        return "[{_id: 0, a: {b: {index: 0, value: 1}, c: 3}},"
-               " {_id: 0, a: {b: {index: 1, value: 2}, c: 3}}]";
+        return "[{_id: 0, a: {b: 1, c: 3}, index: 0},"
+               " {_id: 0, a: {b: 2, c: 3}, index: 1}]";
     }
 };
 
@@ -2094,7 +2098,7 @@ class NonObjectParent : public CheckResultsBase {
         return "[{_id: 0, a: 4}]";
     }
     string expectedPreservedIndexedResultSetString() const override {
-        return expectedPreservedResultSetString();
+        return "[{_id: 0, a: 4, index: null}]";
     }
 };
 
@@ -2111,8 +2115,8 @@ class DoubleNestedArray : public CheckResultsBase {
         return "[{_id: 0, a: {b: {d: 1, e: 4}, c: 3}}, {_id: 0, a: {b: {d: 2, e: 4}, c: 3}}]";
     }
     string expectedIndexedResultSetString() const override {
-        return "[{_id: 0, a: {b: {d: {index: 0, value: 1}, e: 4}, c: 3}}, "
-               " {_id: 0, a: {b: {d: {index: 1, value: 2}, e: 4}, c: 3}}]";
+        return "[{_id: 0, a: {b: {d: 1, e: 4}, c: 3}, index: 0}, "
+               " {_id: 0, a: {b: {d: 2, e: 4}, c: 3}, index: 1}]";
     }
 };
 
@@ -2138,22 +2142,22 @@ class SeveralDocuments : public CheckResultsBase {
                " {_id: 4, a: 30}]";
     }
     string expectedIndexedResultSetString() const override {
-        return "[{_id: 0, a: {index: 0, value: 1}},"
-               " {_id: 0, a: {index: 1, value: 2}},"
-               " {_id: 0, a: {index: 2, value: 3}},"
-               " {_id: 3, a: {index: 0, value: 10}},"
-               " {_id: 3, a: {index: 1, value: 20}},"
-               " {_id: 4, a: {index: 0, value: 30}}]";
+        return "[{_id: 0, a: 1, index: 0},"
+               " {_id: 0, a: 2, index: 1},"
+               " {_id: 0, a: 3, index: 2},"
+               " {_id: 3, a: 10, index: 0},"
+               " {_id: 3, a: 20, index: 1},"
+               " {_id: 4, a: 30, index: 0}]";
     }
     string expectedPreservedIndexedResultSetString() const override {
-        return "[{_id: 0, a: {index: 0, value: 1}},"
-               " {_id: 0, a: {index: 1, value: 2}},"
-               " {_id: 0, a: {index: 2, value: 3}},"
-               " {_id: 1},"
-               " {_id: 2},"
-               " {_id: 3, a: {index: 0, value: 10}},"
-               " {_id: 3, a: {index: 1, value: 20}},"
-               " {_id: 4, a: {index: 0, value: 30}}]";
+        return "[{_id: 0, a: 1, index: 0},"
+               " {_id: 0, a: 2, index: 1},"
+               " {_id: 0, a: 3, index: 2},"
+               " {_id: 1, index: null},"
+               " {_id: 2, index: null},"
+               " {_id: 3, a: 10, index: 0},"
+               " {_id: 3, a: 20, index: 1},"
+               " {_id: 4, a: 30, index: 0}]";
     }
 };
 
@@ -2187,34 +2191,164 @@ class SeveralMoreDocuments : public CheckResultsBase {
                " {_id: 7, a: []}]";
     }
     string expectedIndexedResultSetString() const override {
-        return "[{_id: 2, a: {index: 0, value: 'a'}},"
-               " {_id: 2, a: {index: 1, value: 'b'}},"
-               " {_id: 4, a: {index: 0, value: 1}},"
-               " {_id: 4, a: {index: 1, value: 2}},"
-               " {_id: 4, a: {index: 2, value: 3}},"
-               " {_id: 5, a: {index: 0, value: 4}},"
-               " {_id: 5, a: {index: 1, value: 5}},"
-               " {_id: 5, a: {index: 2, value: 6}},"
-               " {_id: 6, a: {index: 0, value: 7}},"
-               " {_id: 6, a: {index: 1, value: 8}},"
-               " {_id: 6, a: {index: 2, value: 9}}]";
+        return "[{_id: 2, a: 'a', index: 0},"
+               " {_id: 2, a: 'b', index: 1},"
+               " {_id: 4, a: 1, index: 0},"
+               " {_id: 4, a: 2, index: 1},"
+               " {_id: 4, a: 3, index: 2},"
+               " {_id: 5, a: 4, index: 0},"
+               " {_id: 5, a: 5, index: 1},"
+               " {_id: 5, a: 6, index: 2},"
+               " {_id: 6, a: 7, index: 0},"
+               " {_id: 6, a: 8, index: 1},"
+               " {_id: 6, a: 9, index: 2}]";
     }
     string expectedPreservedIndexedResultSetString() const override {
-        return "[{_id: 0, a: null},"
-               " {_id: 1},"
-               " {_id: 2, a: {index: 0, value: 'a'}},"
-               " {_id: 2, a: {index: 1, value: 'b'}},"
-               " {_id: 3},"
-               " {_id: 4, a: {index: 0, value: 1}},"
-               " {_id: 4, a: {index: 1, value: 2}},"
-               " {_id: 4, a: {index: 2, value: 3}},"
-               " {_id: 5, a: {index: 0, value: 4}},"
-               " {_id: 5, a: {index: 1, value: 5}},"
-               " {_id: 5, a: {index: 2, value: 6}},"
-               " {_id: 6, a: {index: 0, value: 7}},"
-               " {_id: 6, a: {index: 1, value: 8}},"
-               " {_id: 6, a: {index: 2, value: 9}},"
-               " {_id: 7, a: []}]";
+        return "[{_id: 0, a: null, index: null},"
+               " {_id: 1, index: null},"
+               " {_id: 2, a: 'a', index: 0},"
+               " {_id: 2, a: 'b', index: 1},"
+               " {_id: 3, index: null},"
+               " {_id: 4, a: 1, index: 0},"
+               " {_id: 4, a: 2, index: 1},"
+               " {_id: 4, a: 3, index: 2},"
+               " {_id: 5, a: 4, index: 0},"
+               " {_id: 5, a: 5, index: 1},"
+               " {_id: 5, a: 6, index: 2},"
+               " {_id: 6, a: 7, index: 0},"
+               " {_id: 6, a: 8, index: 1},"
+               " {_id: 6, a: 9, index: 2},"
+               " {_id: 7, a: [], index: null}]";
+    }
+};
+
+/**
+ * Test the 'includeArrayIndex' option, where the specified path is part of a sub-object.
+ */
+class IncludeArrayIndexSubObject : public CheckResultsBase {
+    string indexPath() const override {
+        return "b.index";
+    }
+    std::deque<Document> inputData() override {
+        return {DOC("_id" << 0 << "a" << DOC_ARRAY(0) << "b" << DOC("x" << 100)),
+                DOC("_id" << 1 << "a" << 1 << "b" << DOC("x" << 100)),
+                DOC("_id" << 2 << "b" << DOC("x" << 100))};
+    }
+    string expectedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: {x: 100}}, {_id: 1, a: 1, b: {x: 100}}]";
+    }
+    string expectedPreservedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: {x: 100}}, {_id: 1, a: 1, b: {x: 100}}, {_id: 2, b: {x: 100}}]";
+    }
+    string expectedIndexedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: {x: 100, index: 0}}, {_id: 1, a: 1, b: {x: 100, index: null}}]";
+    }
+    string expectedPreservedIndexedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: {x: 100, index: 0}},"
+               " {_id: 1, a: 1, b: {x: 100, index: null}},"
+               " {_id: 2, b: {x: 100, index: null}}]";
+    }
+};
+
+/**
+ * Test the 'includeArrayIndex' option, where the specified path overrides an existing field.
+ */
+class IncludeArrayIndexOverrideExisting : public CheckResultsBase {
+    string indexPath() const override {
+        return "b";
+    }
+    std::deque<Document> inputData() override {
+        return {DOC("_id" << 0 << "a" << DOC_ARRAY(0) << "b" << 100),
+                DOC("_id" << 1 << "a" << 1 << "b" << 100),
+                DOC("_id" << 2 << "b" << 100)};
+    }
+    string expectedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: 100}, {_id: 1, a: 1, b: 100}]";
+    }
+    string expectedPreservedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: 100}, {_id: 1, a: 1, b: 100}, {_id: 2, b: 100}]";
+    }
+    string expectedIndexedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: 0}, {_id: 1, a: 1, b: null}]";
+    }
+    string expectedPreservedIndexedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: 0}, {_id: 1, a: 1, b: null}, {_id: 2, b: null}]";
+    }
+};
+
+/**
+ * Test the 'includeArrayIndex' option, where the specified path overrides an existing nested field.
+ */
+class IncludeArrayIndexOverrideExistingNested : public CheckResultsBase {
+    string indexPath() const override {
+        return "b.index";
+    }
+    std::deque<Document> inputData() override {
+        return {DOC("_id" << 0 << "a" << DOC_ARRAY(0) << "b" << 100),
+                DOC("_id" << 1 << "a" << 1 << "b" << 100),
+                DOC("_id" << 2 << "b" << 100)};
+    }
+    string expectedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: 100}, {_id: 1, a: 1, b: 100}]";
+    }
+    string expectedPreservedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: 100}, {_id: 1, a: 1, b: 100}, {_id: 2, b: 100}]";
+    }
+    string expectedIndexedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: {index: 0}}, {_id: 1, a: 1, b: {index: null}}]";
+    }
+    string expectedPreservedIndexedResultSetString() const override {
+        return "[{_id: 0, a: 0, b: {index: 0}},"
+               " {_id: 1, a: 1, b: {index: null}},"
+               " {_id: 2, b: {index: null}}]";
+    }
+};
+
+/**
+ * Test the 'includeArrayIndex' option, where the specified path overrides the field that was being
+ * unwound.
+ */
+class IncludeArrayIndexOverrideUnwindPath : public CheckResultsBase {
+    string indexPath() const override {
+        return "a";
+    }
+    std::deque<Document> inputData() override {
+        return {
+            DOC("_id" << 0 << "a" << DOC_ARRAY(5)), DOC("_id" << 1 << "a" << 1), DOC("_id" << 2)};
+    }
+    string expectedResultSetString() const override {
+        return "[{_id: 0, a: 5}, {_id: 1, a: 1}]";
+    }
+    string expectedPreservedResultSetString() const override {
+        return "[{_id: 0, a: 5}, {_id: 1, a: 1}, {_id: 2}]";
+    }
+    string expectedIndexedResultSetString() const override {
+        return "[{_id: 0, a: 0}, {_id: 1, a: null}]";
+    }
+    string expectedPreservedIndexedResultSetString() const override {
+        return "[{_id: 0, a: 0}, {_id: 1, a: null}, {_id: 2, a: null}]";
+    }
+};
+
+/**
+ * Test the 'includeArrayIndex' option, where the specified path is a subfield of the field that was
+ * being unwound.
+ */
+class IncludeArrayIndexWithinUnwindPath : public CheckResultsBase {
+    string indexPath() const override {
+        return "a.index";
+    }
+    std::deque<Document> inputData() override {
+        return {DOC("_id" << 0 << "a"
+                          << DOC_ARRAY(100 << DOC("b" << 1) << DOC("b" << 1 << "index" << -1)))};
+    }
+    string expectedResultSetString() const override {
+        return "[{_id: 0, a: 100}, {_id: 0, a: {b: 1}}, {_id: 0, a: {b: 1, index: -1}}]";
+    }
+    string expectedIndexedResultSetString() const override {
+        return "[{_id: 0, a: {index: 0}},"
+               " {_id: 0, a: {b: 1, index: 1}},"
+               " {_id: 0, a: {b: 1, index: 2}}]";
     }
 };
 
@@ -2222,7 +2356,8 @@ class SeveralMoreDocuments : public CheckResultsBase {
 class Dependencies : public Mock::Base {
 public:
     void run() {
-        auto unwind = DocumentSourceUnwind::create(ctx(), "x.y.z", false, false);
+        auto unwind =
+            DocumentSourceUnwind::create(ctx(), "x.y.z", false, boost::optional<string>("index"));
         DepsTracker dependencies;
         ASSERT_EQUALS(DocumentSource::SEE_NEXT, unwind->getDependencies(&dependencies));
         ASSERT_EQUALS(1U, dependencies.fields.size());
@@ -2259,6 +2394,17 @@ TEST_F(InvalidUnwindSpec, NonStringPath) {
     ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path" << 2))), UserException, 28808);
 }
 
+TEST_F(InvalidUnwindSpec, NonDollarPrefixedPath) {
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind"
+                                         << "somePath")),
+                       UserException,
+                       28818);
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
+                                                           << "somePath"))),
+                       UserException,
+                       28818);
+}
+
 TEST_F(InvalidUnwindSpec, NonBoolPreserveNullAndEmptyArrays) {
     ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
                                                            << "$x"
@@ -2267,12 +2413,36 @@ TEST_F(InvalidUnwindSpec, NonBoolPreserveNullAndEmptyArrays) {
                        28809);
 }
 
-TEST_F(InvalidUnwindSpec, NonBoolIncludeArrayIndex) {
+TEST_F(InvalidUnwindSpec, NonStringIncludeArrayIndex) {
     ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
                                                            << "$x"
                                                            << "includeArrayIndex" << 2))),
                        UserException,
                        28810);
+}
+
+TEST_F(InvalidUnwindSpec, EmptyStringIncludeArrayIndex) {
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
+                                                           << "$x"
+                                                           << "includeArrayIndex"
+                                                           << ""))),
+                       UserException,
+                       28810);
+}
+
+TEST_F(InvalidUnwindSpec, DollarPrefixedIncludeArrayIndex) {
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
+                                                           << "$x"
+                                                           << "includeArrayIndex"
+                                                           << "$"))),
+                       UserException,
+                       28822);
+    ASSERT_THROWS_CODE(createUnwind(BSON("$unwind" << BSON("path"
+                                                           << "$x"
+                                                           << "includeArrayIndex"
+                                                           << "$path"))),
+                       UserException,
+                       28822);
 }
 
 TEST_F(InvalidUnwindSpec, UnrecognizedOption) {
@@ -2575,6 +2745,11 @@ public:
         add<DocumentSourceUnwind::SeveralDocuments>();
         add<DocumentSourceUnwind::SeveralMoreDocuments>();
         add<DocumentSourceUnwind::Dependencies>();
+        add<DocumentSourceUnwind::IncludeArrayIndexSubObject>();
+        add<DocumentSourceUnwind::IncludeArrayIndexOverrideExisting>();
+        add<DocumentSourceUnwind::IncludeArrayIndexOverrideExistingNested>();
+        add<DocumentSourceUnwind::IncludeArrayIndexOverrideUnwindPath>();
+        add<DocumentSourceUnwind::IncludeArrayIndexWithinUnwindPath>();
 
         add<DocumentSourceGeoNear::LimitCoalesce>();
 
