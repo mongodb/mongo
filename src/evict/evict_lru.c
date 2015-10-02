@@ -364,6 +364,8 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 		WT_TRET(__wt_cond_signal(session, cache->evict_waiter_cond));
 		WT_TRET(__wt_thread_join(session, workers[i].tid));
 	}
+	conn->evict_workers = 0;
+
 	/* Handle shutdown when cleaning up after a failed open. */
 	if (conn->evict_workctx != NULL) {
 		for (i = 0; i < conn->evict_workers_alloc; i++) {
@@ -373,6 +375,7 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 		}
 		__wt_free(session, conn->evict_workctx);
 	}
+	conn->evict_workers_alloc = 0;
 
 	if (conn->evict_session != NULL) {
 		wt_session = &conn->evict_session->iface;
