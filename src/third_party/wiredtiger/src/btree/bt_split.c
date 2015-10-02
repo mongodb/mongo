@@ -825,6 +825,12 @@ __split_parent_lock(
 			F_CLR_ATOMIC(parent, WT_PAGE_SPLIT_LOCKED);
 			continue;
 		}
+		/*
+		 * If a checkpoint is running and we fail to lock the parent
+		 * page, give up immmediately to avoid deadlock.
+		 */
+		if (S2BT(session)->checkpointing)
+			return (EBUSY);
 		__wt_yield();
 	}
 
