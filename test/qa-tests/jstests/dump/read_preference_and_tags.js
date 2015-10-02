@@ -38,14 +38,14 @@
 
     rs.reconfig(conf);
 
-    runMongoProgram('mongodump', '--host', "replset/"+primary.host, '--readPreference=nearest', '--tags={use:"secondary1"}');
+    runMongoProgram('mongodump', '--host', "replset/"+primary.host, '--readPreference={mode:"nearest", tags:{use:"secondary1"}}');
     jsTest.log("rawMongoProgramOutput "+ rawMongoProgramOutput());
 
     replset1.nodes.forEach(function(node){
         var count = node.getDB('foo').system.profile.find().count();
         jsTest.log(node.host+" "+count);
         if (node.host == hostByTag["secondary1"]) {
-            assert.ne(count,0,node.host);
+            assert.neq(count,0,node.host);
         } else {
             assert.eq(count,0,node.host);
         }

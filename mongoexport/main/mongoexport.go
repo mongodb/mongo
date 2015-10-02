@@ -62,7 +62,7 @@ func main() {
 			log.Logf(log.Always, "--slaveOk can't be specified when --readPreference is specified")
 			os.Exit(util.ExitBadOptions)
 		}
-		log.Logf(log.Always, "--slaveOk is depriciated and being internally rewritten as --readPreference=nearest")
+		log.Logf(log.Always, "--slaveOk is deprecated and being internally rewritten as --readPreference=nearest")
 		inputOpts.ReadPreference = "nearest"
 	}
 
