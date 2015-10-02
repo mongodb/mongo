@@ -50,7 +50,6 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/master_slave.h"
-#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/snapshot_thread.h"
@@ -284,19 +283,6 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
 
 void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(const Timestamp& newTime) {
     setNewTimestamp(newTime);
-}
-
-StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastBatchOpTime(
-    OperationContext* txn) {
-    auto mv = getMinValid(txn);
-
-    // If we are in the middle of a batch, and recovering then we need to return the start.
-    if (!mv.start.isNull()) {
-        return mv.start;
-    } else {
-        // Batch is either not started or legacy apply so get the last optime from the oplog.
-        return loadLastOpTime(txn);
-    }
 }
 
 StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(OperationContext* txn) {

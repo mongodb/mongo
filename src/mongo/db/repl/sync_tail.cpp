@@ -46,7 +46,6 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/global_timestamp.h"
@@ -128,25 +127,6 @@ bool isCrudOpType(const char* field) {
             return field[1] == 0;
     }
     return false;
-}
-
-void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
-    const NamespaceString oplogNss(rsOplogName);
-    ScopedTransaction transaction(txn, MODE_IX);
-    Lock::DBLock oplogDbLock(txn->lockState(), oplogNss.db(), MODE_IX);
-    Lock::CollectionLock oplogCollectionLoc(txn->lockState(), oplogNss.ns(), MODE_X);
-    OldClientContext ctx(txn, rsOplogName);
-    Collection* oplogCollection = ctx.db()->getCollection(rsOplogName);
-    if (!oplogCollection) {
-        fassertFailedWithStatusNoTrace(
-            28820,
-            Status(ErrorCodes::NamespaceNotFound, str::stream() << "Can't find " << rsOplogName));
-    }
-
-    RecordId loc = Helpers::findOne(txn, oplogCollection, BSON("ts" << truncateTimestamp), false);
-    if (!loc.isNull()) {
-        oplogCollection->temp_cappedTruncateAfter(txn, loc, false);
-    }
 }
 }
 
@@ -454,14 +434,7 @@ void SyncTail::oplogApplication() {
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
     OperationContextImpl txn;
-    auto mv = getMinValid(&txn);
-    OpTime originalEndOpTime(mv.end);
-
-    if (!mv.start.isNull()) {
-        // We are recovering from a failed batch apply, so truncate the oplog back to 'start'.
-        truncateOplogTo(&txn, mv.start.getTimestamp());
-    }
-
+    OpTime originalEndOpTime(getMinValid(&txn).end);
     while (!inShutdown()) {
         OpQueue ops;
 

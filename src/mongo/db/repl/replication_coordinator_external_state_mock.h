@@ -67,7 +67,6 @@ public:
     virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
     virtual void setGlobalTimestamp(const Timestamp& newTime);
     virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
-    virtual StatusWith<OpTime> loadLastBatchOpTime(OperationContext* txn);
     virtual void closeConnections();
     virtual void killAllUserOperations(OperationContext* txn);
     virtual void clearShardingState();
