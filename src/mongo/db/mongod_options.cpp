@@ -1211,7 +1211,9 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         if (!params.count("storage.dbPath")) {
             storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
         }
-        replSettings.master = true;
+        if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::SCCC) {
+            replSettings.master = true;  // To force SCCC config servers to have an oplog for backup
+        }
         if (!params.count("replication.oplogSizeMB"))
             replSettings.oplogSize = 5 * 1024 * 1024;
     }
