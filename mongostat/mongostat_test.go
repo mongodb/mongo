@@ -60,14 +60,12 @@ func TestStatLine(t *testing.T) {
 		},
 		Locks: map[string]LockStats{
 			".": {
-				ReadWriteLockTimes{Read: 2850999, Write: 1807873}, // locked
-				ReadWriteLockTimes{Read: 1393322, Write: 246102},  // acquiring
-				nil,
+				TimeLockedMicros:    ReadWriteLockTimes{Read: 2850999, Write: 1807873},
+				TimeAcquiringMicros: ReadWriteLockTimes{Read: 1393322, Write: 246102},
 			},
 			"test": {
-				ReadWriteLockTimes{Read: 663190, Write: 379}, // locked
-				ReadWriteLockTimes{Read: 200443, Write: 6},   // acquiring
-				nil,
+				TimeLockedMicros:    ReadWriteLockTimes{Read: 663190, Write: 379},
+				TimeAcquiringMicros: ReadWriteLockTimes{Read: 200443, Write: 6},
 			},
 		},
 		Network: &NetworkStats{
@@ -149,14 +147,12 @@ func TestStatLine(t *testing.T) {
 		},
 		Locks: map[string]LockStats{
 			".": {
-				ReadWriteLockTimes{Read: 2850999, Write: 1807873}, // locked
-				ReadWriteLockTimes{Read: 1393322, Write: 246102},  // acquiring
-				nil,
+				TimeLockedMicros:    ReadWriteLockTimes{Read: 2850999, Write: 1807873},
+				TimeAcquiringMicros: ReadWriteLockTimes{Read: 1393322, Write: 246102},
 			},
 			"test": {
-				ReadWriteLockTimes{Read: 663190, Write: 500397}, // locked
-				ReadWriteLockTimes{Read: 200443, Write: 6},      // acquiring
-				nil,
+				TimeLockedMicros:    ReadWriteLockTimes{Read: 663190, Write: 500397},
+				TimeAcquiringMicros: ReadWriteLockTimes{Read: 200443, Write: 6},
 			},
 		},
 		Network: &NetworkStats{
