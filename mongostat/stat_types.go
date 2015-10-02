@@ -223,10 +223,11 @@ type LockStats struct {
 	TimeLockedMicros    ReadWriteLockTimes `bson:"timeLockedMicros"`
 	TimeAcquiringMicros ReadWriteLockTimes `bson:"timeAcquiringMicros"`
 
-	// AcquireCount is a new field of the lock stats only populated on 3.0 or newer.
+	// AcquireCount and AcquireWaitCount are new fields of the lock stats only populated on 3.0 or newer.
 	// Typed as a pointer so that if it is nil, mongostat can assume the field is not populated
 	// with real namespace data.
-	AcquireCount *ReadWriteLockTimes `bson:"acquireCount,omitempty"`
+	AcquireCount     *ReadWriteLockTimes `bson:"acquireCount,omitempty"`
+	AcquireWaitCount *ReadWriteLockTimes `bson:"acquireWaitCount,omitempty"`
 }
 
 // ExtraInfo stores additional platform specific information.
@@ -261,6 +262,8 @@ var StatHeaders = []StatHeader{
 	{"res", Always},
 	{"non-mapped", MMAPOnly | AllOnly},
 	{"faults", MMAPOnly},
+	{"lr|lw %", MMAPOnly | AllOnly},
+	{"lrt|lwt", MMAPOnly | AllOnly},
 	{"    locked db", Locks},
 	{"qr|qw", Always},
 	{"ar|aw", Always},
@@ -291,6 +294,13 @@ func percentageInt64(value, outOf int64) float64 {
 	return 100 * (float64(value) / float64(outOf))
 }
 
+func averageInt64(value, outOf int64) int64 {
+	if value == 0 || outOf == 0 {
+		return 0
+	}
+	return value / outOf
+}
+
 func (slice lockUsages) Len() int {
 	return len(slice)
 }
@@ -301,6 +311,14 @@ func (slice lockUsages) Less(i, j int) bool {
 
 func (slice lockUsages) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
+}
+
+// CollectionLockStatus stores a collection's lock statistics.
+type CollectionLockStatus struct {
+	ReadAcquireWaitsPercentage  float64
+	WriteAcquireWaitsPercentage float64
+	ReadAcquireTimeMicros       int64
+	WriteAcquireTimeMicros      int64
 }
 
 // LockStatus stores a database's lock statistics.
@@ -328,6 +346,9 @@ type StatLine struct {
 
 	// Opcounter fields
 	Insert, Query, Update, Delete, GetMore, Command int64
+
+	// Collection locks (3.0 mmap only)
+	CollectionLocks *CollectionLockStatus
 
 	// Cache utilization (wiredtiger only)
 	CacheDirtyPercent float64
@@ -462,6 +483,18 @@ func (jlf *JSONLineFormatter) FormatLines(lines []StatLine, index int, discover 
 			lineJson["non-mapped"] = nonMappedVal
 
 			lineJson["faults"] = fmt.Sprintf("%v", line.Faults)
+
+			if lineFlags&AllOnly > 0 {
+				// check if we have any locks
+				if lineFlags&Locks <= 0 {
+					if line.CollectionLocks != nil && !line.IsMongos {
+						lineJson["lr|lw %"] = fmt.Sprintf("%.1f%%|%.1f%%", line.CollectionLocks.ReadAcquireWaitsPercentage,
+							line.CollectionLocks.WriteAcquireWaitsPercentage)
+						lineJson["lrt|lwt"] = fmt.Sprintf("%v|%v", line.CollectionLocks.ReadAcquireTimeMicros,
+							line.CollectionLocks.WriteAcquireTimeMicros)
+					}
+				}
+			}
 
 			highestLockedVal := "" // empty for mongos
 			if line.HighestLocked != nil && !line.IsMongos {
@@ -630,6 +663,28 @@ func (glf *GridLineFormatter) FormatLines(lines []StatLine, index int, discover 
 			}
 		}
 
+		if lineFlags&MMAPOnly > 0 && lineFlags&AllOnly > 0 {
+			// check if we have any locks
+			if lineFlags&Locks <= 0 {
+				if line.CollectionLocks != nil && !line.IsMongos {
+					percentCell := fmt.Sprintf("%.1f%%|%.1f%%", line.CollectionLocks.ReadAcquireWaitsPercentage,
+						line.CollectionLocks.WriteAcquireWaitsPercentage)
+					glf.Writer.WriteCell(percentCell)
+					timeCell := fmt.Sprintf("%v|%v", line.CollectionLocks.ReadAcquireTimeMicros,
+						line.CollectionLocks.WriteAcquireTimeMicros)
+					glf.Writer.WriteCell(timeCell)
+				} else {
+					//don't write any lock status for mongos nodes
+					glf.Writer.WriteCell("")
+					glf.Writer.WriteCell("")
+				}
+			} else {
+				// no locks
+				glf.Writer.WriteCell("n/a")
+				glf.Writer.WriteCell("n/a")
+			}
+		}
+
 		// Write columns related to lock % if activated
 		if lineFlags&Locks > 0 {
 			if line.HighestLocked != nil && !line.IsMongos {
@@ -781,6 +836,23 @@ func NewStatLine(oldStat, newStat ServerStatus, key string, all bool, sampleSecs
 			// This appears to be a 3.0+ server so the data in these fields do *not* refer to
 			// actual namespaces and thus we can't compute lock %.
 			returnVal.HighestLocked = nil
+
+			// Check if it's a 3.0+ MMAP server so we can still compute collection locks
+			collectionCheck, hasCollection := oldStat.Locks["Collection"]
+			if hasCollection && collectionCheck.AcquireWaitCount != nil {
+				readWaitCountDiff := newStat.Locks["Collection"].AcquireWaitCount.Read - oldStat.Locks["Collection"].AcquireWaitCount.Read
+				readTotalCountDiff := newStat.Locks["Collection"].AcquireCount.Read - oldStat.Locks["Collection"].AcquireCount.Read
+				writeWaitCountDiff := newStat.Locks["Collection"].AcquireWaitCount.Write - oldStat.Locks["Collection"].AcquireWaitCount.Write
+				writeTotalCountDiff := newStat.Locks["Collection"].AcquireCount.Write - oldStat.Locks["Collection"].AcquireCount.Write
+				readAcquireTimeDiff := newStat.Locks["Collection"].TimeAcquiringMicros.Read - oldStat.Locks["Collection"].TimeAcquiringMicros.Read
+				writeAcquireTimeDiff := newStat.Locks["Collection"].TimeAcquiringMicros.Write - oldStat.Locks["Collection"].TimeAcquiringMicros.Write
+				returnVal.CollectionLocks = &CollectionLockStatus{
+					ReadAcquireWaitsPercentage:  percentageInt64(readWaitCountDiff, readTotalCountDiff),
+					WriteAcquireWaitsPercentage: percentageInt64(writeWaitCountDiff, writeTotalCountDiff),
+					ReadAcquireTimeMicros:       averageInt64(readAcquireTimeDiff, readWaitCountDiff),
+					WriteAcquireTimeMicros:      averageInt64(writeAcquireTimeDiff, writeWaitCountDiff),
+				}
+			}
 		} else {
 			prevLocks := parseLocks(oldStat)
 			curLocks := parseLocks(newStat)
