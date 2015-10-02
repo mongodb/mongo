@@ -154,6 +154,7 @@ Date_t NetworkInterfaceASIO::now() {
 void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                         const RemoteCommandRequest& request,
                                         const RemoteCommandCompletionFn& onFinish) {
+    invariant(onFinish);
     {
         stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
         const auto insertResult = _inGetConnection.emplace(cbHandle);

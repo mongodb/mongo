@@ -242,5 +242,9 @@ void NetworkInterfaceASIO::AsyncOp::reset() {
     // _inSetup should always be false at this point.
 }
 
+void NetworkInterfaceASIO::AsyncOp::setOnFinish(RemoteCommandCompletionFn&& onFinish) {
+    _onFinish = std::move(onFinish);
+}
+
 }  // namespace executor
 }  // namespace mongo

@@ -275,6 +275,8 @@ private:
 
         void reset();
 
+        void setOnFinish(RemoteCommandCompletionFn&& onFinish);
+
     private:
         NetworkInterfaceASIO* const _owner;
         // Information describing a task enqueued on the NetworkInterface

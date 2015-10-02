@@ -185,6 +185,14 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
         return;
     }
 
+    // If we fail during refresh, the _onFinish function of the AsyncOp will get called. As such we
+    // need to intercept those calls so we can capture them. This will get cleared out when we fill
+    // in the real onFinish in startCommand.
+    op->setOnFinish([this, cb](StatusWith<RemoteCommandResponse> failedResponse) {
+        invariant(!failedResponse.isOK());
+        cb(this, failedResponse.getStatus());
+    });
+
     _global->_impl->_asyncRunCommand(
         op,
         [this, op](std::error_code ec, size_t bytes) {
