@@ -788,6 +788,9 @@ err:	/* Free any resources that may have been cached in the cursor. */
 
 	__wt_scr_free(session, &key);
 
+	if (ret == 0)
+		return (0);
+
 	/*
 	 * A note on error handling: if handling a page with unresolved changes,
 	 * we create new in-memory pages that include those unresolved changes.
