@@ -699,12 +699,9 @@ __split_multi_inmem(
 	uint64_t recno;
 	uint32_t i, slot;
 
-	__wt_btcur_init(session, &cbt);
-	__wt_btcur_open(&cbt);
-
 	/*
 	 * We can find unresolved updates when attempting to evict a page, which
-	 * can't be written. This code re-creates the in-memory page and applies
+	 * can't be written. This code re-creates the in-memory page and moves
 	 * the unresolved updates to that page.
 	 *
 	 * Clear the disk image and link the page into the passed-in WT_REF to
@@ -720,12 +717,20 @@ __split_multi_inmem(
 	if (orig->type == WT_PAGE_ROW_LEAF)
 		WT_RET(__wt_scr_alloc(session, 0, &key));
 
+	__wt_btcur_init(session, &cbt);
+	__wt_btcur_open(&cbt);
+
 	/* Re-create each modification we couldn't write. */
 	for (i = 0, supd = multi->supd; i < multi->supd_entries; ++i, ++supd)
 		switch (orig->type) {
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			/* Build a key. */
+			/*
+			 * Build a key.
+			 * !!!
+			 * Terminate the original page's update list, corrupting
+			 * that page.
+			 */
 			upd = supd->ins->upd;
 			supd->ins->upd = NULL;
 			recno = WT_INSERT_RECNO(supd->ins);
@@ -747,6 +752,11 @@ __split_multi_inmem(
 				WT_ERR(__wt_row_leaf_key(
 				    session, orig, supd->rip, key, false));
 			} else {
+				/*
+				 * !!!
+				 * Terminate the original page's update list,
+				 * corrupting that page.
+				 */
 				upd = supd->ins->upd;
 				supd->ins->upd = NULL;
 
@@ -777,7 +787,18 @@ err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt, true));
 
 	__wt_scr_free(session, &key);
-	return (ret);
+
+	/*
+	 * A note on error handling: if handling a page with unresolved changes,
+	 * we create new in-memory pages that include those unresolved changes.
+	 * The problem is the new pages use the original page's update lists,
+	 * that is, the code in this function moves the update lists to the new
+	 * pages, truncating the original page's update lists, and the original
+	 * page has been corrupted. We could do the move in multiple passes, but
+	 * unwinding the changes is error-prone and difficult to test. For now,
+	 * fail hard.
+	 */
+	WT_PANIC_RET(session, ret, "multi-page split failed");
 }
 
 /*
@@ -1573,19 +1594,7 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 
 	return (0);
 
-err:	/*
-	 * A note on error handling: in the case of evicting a page that has
-	 * unresolved changes, we just instantiated some in-memory pages that
-	 * reflect those unresolved changes.  The problem is those pages
-	 * reference the same WT_UPDATE chains as the page we're splitting,
-	 * that is, we simply copied references into the new pages.  If the
-	 * split fails, the original page is fine, but discarding the created
-	 * page would free those update chains, and that's wrong.  There isn't
-	 * an easy solution, there's a lot of small memory allocations in some
-	 * common code paths, and unwinding those changes will be difficult.
-	 * For now, leak the memory by not discarding the instantiated pages.
-	 */
-	for (i = 0; i < new_entries; ++i)
+err:	for (i = 0; i < new_entries; ++i)
 		__wt_free_ref(session, page, ref_new[i], false);
 	__wt_free(session, ref_new);
 	return (ret);
