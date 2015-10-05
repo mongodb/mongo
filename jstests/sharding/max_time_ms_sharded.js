@@ -84,25 +84,15 @@ assert.doesNotThrow(function() { cursor.next() },
 // Test that mongos correctly times out max time sharded getmore operations.  Uses
 // maxTimeNeverTimeOut to ensure mongod doesn't enforce a time limit.
 //
+// TODO: This is unimplemented.  A test for this functionality should be written as
+// part of the work for SERVER-19410.
+//
 
 configureMaxTimeNeverTimeOut("alwaysOn");
 
-// Positive test.  ~10s operation, 5s limit.  The operation takes ~10s because each shard processes
-// 25 batches of ~200ms each, and mongos never runs getmore in parallel on shards.
-// TODO: Re-enable once SERVER-19410 is implemented.
-/*
-cursor = coll.find({$where: function() { sleep(100); return true; }});
-cursor.batchSize(2);
-cursor.maxTimeMS(5*1000);
-assert.doesNotThrow(function() { cursor.next(); },
-                    [],
-                    "did not expect mongos to time out first batch of query");
-assert.throws(function() { cursor.itcount(); },
-              [],
-              "expected mongos to abort getmore due to time limit");
-*/
+// Positive test.  TODO: see above.
 
-// Negative test.  Same as above (~10s operation), with a high (1-day) limit.
+// Negative test.  ~10s operation, with a high (1-day) limit.
 cursor = coll.find({$where: function() { sleep(100); return true; }});
 cursor.batchSize(2);
 cursor.maxTimeMS(1000*60*60*24);
