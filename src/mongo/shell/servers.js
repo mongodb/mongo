@@ -793,9 +793,6 @@ function appendSetParameterArgs(argArray) {
                     });
                 }
             }
-            if (argArray.indexOf('--configsvr') > 0 && argArray.indexOf('--replSet') > 0) {
-                argArray.push.apply(argArray, ['--setParameter', "enableReplSnapshotThread=1"]);
-            }
         }
     }
     return argArray;

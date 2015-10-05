@@ -49,7 +49,7 @@ class ReplicationCoordinatorExternalStateImpl : public ReplicationCoordinatorExt
 public:
     ReplicationCoordinatorExternalStateImpl();
     virtual ~ReplicationCoordinatorExternalStateImpl();
-    virtual void startThreads() override;
+    virtual void startThreads(const ReplSettings& settings) override;
     virtual void startMasterSlave(OperationContext* txn);
     virtual void shutdown();
     virtual void initiateOplog(OperationContext* txn, bool updateReplOpTime);

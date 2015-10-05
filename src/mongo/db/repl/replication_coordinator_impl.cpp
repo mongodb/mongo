@@ -398,7 +398,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     }
     _performPostMemberStateUpdateAction(action);
     if (!isArbiter) {
-        _externalState->startThreads();
+        _externalState->startThreads(_settings);
     }
 }
 
@@ -831,6 +831,17 @@ OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
 
 ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext* txn,
                                                                 const ReadConcernArgs& settings) {
+    const bool isMajorityReadConcern =
+        settings.getLevel() == ReadConcernLevel::kMajorityReadConcern;
+
+    if (isMajorityReadConcern && !getSettings().majorityReadConcernEnabled) {
+        // This is an opt-in feature. Fail if the user didn't opt-in.
+        return ReadConcernResponse(
+            Status(ErrorCodes::ReadConcernMajorityNotEnabled,
+                   "Majority read concern requested, but server was not started with "
+                   "--enableMajorityReadConcern."));
+    }
+
     const auto ts = settings.getOpTime();
     // Note that if 'settings' has no explicit after-optime, 'ts' will be the earliest
     // possible optime, which means the comparisons with 'ts' below are always false.  This is
@@ -852,7 +863,6 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
 
     Timer timer;
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    bool isMajorityReadConcern = settings.getLevel() == ReadConcernLevel::kMajorityReadConcern;
     if (isMajorityReadConcern && !_externalState->snapshotsEnabled()) {
         return ReadConcernResponse(
             Status(ErrorCodes::CommandNotSupported,
@@ -2121,7 +2131,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         // A configuration passed to replSetInitiate() with the current node as an arbiter
         // will fail validation with a "replSet initiate got ... while validating" reason.
         invariant(!newConfig.getMemberAt(myIndex.getValue()).isArbiter());
-        _externalState->startThreads();
+        _externalState->startThreads(_settings);
     }
 
     return Status::OK();

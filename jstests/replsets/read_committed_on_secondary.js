@@ -6,9 +6,21 @@
 var name = "read_committed_on_secondary";
 var replTest = new ReplSetTest({name: name,
                                 nodes: 3,
-                                nodeOptions: {setParameter: "enableReplSnapshotThread=true"}});
+                                nodeOptions: {enableMajorityReadConcern: ''}});
 var nodes = replTest.nodeList();
-var conns = replTest.startSet();
+
+try {
+    replTest.startSet();
+} catch (e) {
+    var conn = MongoRunner.runMongod();
+    if (!conn.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
+        jsTest.log("skipping test since storage engine doesn't support committed reads");
+        MongoRunner.stopMongod(conn);
+        return;
+    }
+    throw e;
+}
+
 replTest.initiate({"_id": name,
                    "members": [
                        { "_id": 0, "host": nodes[0] },
@@ -26,12 +38,6 @@ var collPrimary = dbPrimary[name];
 
 var dbSecondary = secondary.getDB(name);
 var collSecondary = dbSecondary[name];
-
-if (!dbSecondary.serverStatus().storageEngine.supportsCommittedReads) {
-    assert.neq(dbSecondary.serverStatus().storageEngine.name, "wiredTiger");
-    jsTest.log("skipping test since storage engine doesn't support committed reads");
-    return;
-}
 
 function saveDoc(state) {
     var res = dbPrimary.runCommandWithMetadata(

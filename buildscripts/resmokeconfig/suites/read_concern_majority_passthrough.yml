@@ -48,6 +48,7 @@ executor:
       mongod_options:
         set_parameters:
           enableTestCommands: 1
+        enableMajorityReadConcern: ''
       # Running with one node until SERVER-20260 in place. Allows us to use a much smaller sleep.
       # Bring up to two or three once fixed.
       num_nodes: 1

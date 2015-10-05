@@ -427,7 +427,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         bool isArbiter = myIndex.isOK() && myIndex.getValue() != -1 &&
             newConfig.getMemberAt(myIndex.getValue()).isArbiter();
         if (!isArbiter) {
-            _externalState->startThreads();
+            _externalState->startThreads(_settings);
         }
     }
 

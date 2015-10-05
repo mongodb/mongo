@@ -147,6 +147,7 @@ error_code("IncompatibleCatalogManager", 144)
 error_code("PooledConnectionsDropped", 145)
 error_code("ExceededMemoryLimit", 146)
 error_code("ZLibError", 147)
+error_code("ReadConcernMajorityNotEnabled", 148)
 
 # Non-sequential error codes (for compatibility only)
 error_code("RecvStaleConfig", 9996)

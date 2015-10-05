@@ -2357,13 +2357,26 @@ TEST_F(ReplCoordTest, ReadAfterEqualOpTime) {
 }
 
 TEST_F(ReplCoordTest, CantUseReadAfterCommittedIfNotReplSet) {
-    init(ReplSettings());
+    auto settings = ReplSettings();
+    settings.majorityReadConcernEnabled = true;
+    init(settings);
+
     OperationContextNoop txn;
     auto result = getReplCoord()->waitUntilOpTime(
         &txn, ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernLevel::kMajorityReadConcern));
 
     ASSERT_FALSE(result.didWait());
     ASSERT_EQUALS(ErrorCodes::NotAReplicaSet, result.getStatus());
+}
+
+TEST_F(ReplCoordTest, CantUseReadAfterCommittedIfNotEnabled) {
+    init(ReplSettings());
+    OperationContextNoop txn;
+    auto result = getReplCoord()->waitUntilOpTime(
+        &txn, ReadConcernArgs(OpTime(Timestamp(50, 0), 0), ReadConcernLevel::kMajorityReadConcern));
+
+    ASSERT_FALSE(result.didWait());
+    ASSERT_EQUALS(ErrorCodes::ReadConcernMajorityNotEnabled, result.getStatus());
 }
 
 TEST_F(ReplCoordTest, ReadAfterCommittedWhileShutdown) {

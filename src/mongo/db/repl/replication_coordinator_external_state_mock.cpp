@@ -58,7 +58,7 @@ ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock
 
 ReplicationCoordinatorExternalStateMock::~ReplicationCoordinatorExternalStateMock() {}
 
-void ReplicationCoordinatorExternalStateMock::startThreads() {
+void ReplicationCoordinatorExternalStateMock::startThreads(const ReplSettings& settings) {
     _threadsStarted = true;
 }
 

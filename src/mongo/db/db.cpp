@@ -464,6 +464,20 @@ static void _initAndListen(int listenPort) {
 
     const repl::ReplSettings& replSettings = repl::getGlobalReplicationCoordinator()->getSettings();
 
+    if (!getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager()) {
+        if (moe::startupOptionsParsed.count("replication.enableMajorityReadConcern")) {
+            // Note: we are intentionally only erroring if the user explicitly requested that we
+            // enable majority read concern. We do not error if the they are implicitly enabled for
+            // CSRS because a required step in the upgrade procedure can involve an mmapv1 node in
+            // the CSRS in the REMOVED state. This is handled by the TopologyCoordinator.
+            invariant(replSettings.majorityReadConcernEnabled);
+            severe() << "Majority read concern requires a storage engine that supports"
+                     << "snapshots, such as wiredTiger. " << storageGlobalParams.engine
+                     << " does not support snapshots.";
+            exitCleanly(EXIT_BADOPTIONS);
+        }
+    }
+
     {
         ProcessId pid = ProcessId::getCurrent();
         LogstreamBuilder l = log(LogComponent::kControl);

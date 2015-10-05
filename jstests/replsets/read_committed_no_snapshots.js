@@ -9,9 +9,21 @@ load("jstests/replsets/rslib.js");
 var name = "read_committed_no_snapshots";
 var replTest = new ReplSetTest({name: name,
                                 nodes: 3,
-                                nodeOptions: {setParameter: "enableReplSnapshotThread=true"}});
+                                nodeOptions: {enableMajorityReadConcern: ''}});
 var nodes = replTest.nodeList();
-replTest.startSet();
+
+try {
+    replTest.startSet();
+} catch (e) {
+    var conn = MongoRunner.runMongod();
+    if (!conn.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
+        jsTest.log("skipping test since storage engine doesn't support committed reads");
+        MongoRunner.stopMongod(conn);
+        return;
+    }
+    throw e;
+}
+
 replTest.initiate({"_id": name,
                    "members": [
                        { "_id": 0, "host": nodes[0] },
@@ -25,12 +37,6 @@ var primary = replTest.getPrimary();
 var secondary = replTest.liveNodes.slaves[0];
 var secondaryId = replTest.getNodeId(secondary);
 var db = primary.getDB(name);
-
-if (!db.serverStatus().storageEngine.supportsCommittedReads) {
-    assert.neq(db.serverStatus().storageEngine.name, "wiredTiger");
-    jsTest.log("skipping test since storage engine doesn't support committed reads");
-    return;
-}
 
 // Do a write, wait for it to replicate, and ensure it is visible.
 var res = db.runCommandWithMetadata(

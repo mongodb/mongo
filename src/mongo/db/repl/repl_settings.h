@@ -49,28 +49,6 @@ typedef enum { NotSlave = 0, SimpleSlave } SlaveTypes;
 
 class ReplSettings {
 public:
-    SlaveTypes slave;
-
-    /**
-     * true means we are master and doing replication.  if we are not writing to oplog, this won't
-     * be true.
-     */
-    bool master;
-
-    bool fastsync;
-
-    bool autoresync;
-
-    int slavedelay;
-
-    long long oplogSize;  // --oplogSize
-
-    // for master/slave replication
-    std::string source;  // --source
-    std::string only;    // --only
-    int pretouch;        // --pretouch for replication application (experimental)
-
-    std::string replSet;  // --replSet[/<seedlist>]
     std::string ourSetName() const {
         std::string setname;
         size_t sl = replSet.find('/');
@@ -82,49 +60,37 @@ public:
         return !replSet.empty();
     }
 
+    SlaveTypes slave = NotSlave;
+
+    /**
+     * true means we are master and doing replication.  if we are not writing to oplog, this won't
+     * be true.
+     */
+    bool master = false;
+
+    bool fastsync = false;
+
+    bool autoresync = false;
+
+    int slavedelay = 0;
+
+    long long oplogSize = 0;  // --oplogSize
+
+    /**
+     * True means that the majorityReadConcern feature is enabled, either explicitly by the user or
+     * implicitly by a requiring feature such as CSRS. It does not mean that the storage engine
+     * supports snapshots or that the snapshot thread is running. Those are tracked separately.
+     */
+    bool majorityReadConcernEnabled = false;
+
+    // for master/slave replication
+    std::string source;  // --source
+    std::string only;    // --only
+    int pretouch = 0;    // --pretouch for replication application (experimental)
+
+    std::string replSet;  // --replSet[/<seedlist>]
+
     std::string rsIndexPrefetch;  // --indexPrefetch
-
-    ReplSettings()
-        : slave(NotSlave),
-          master(false),
-          fastsync(),
-          autoresync(false),
-          slavedelay(),
-          oplogSize(0),
-          pretouch(0) {}
-
-    // TODO(spencer): Remove explicit copy constructor after we no longer have mutable state
-    // in ReplSettings.
-    ReplSettings(const ReplSettings& other)
-        : slave(other.slave),
-          master(other.master),
-          fastsync(other.fastsync),
-          autoresync(other.autoresync),
-          slavedelay(other.slavedelay),
-          oplogSize(other.oplogSize),
-          source(other.source),
-          only(other.only),
-          pretouch(other.pretouch),
-          replSet(other.replSet),
-          rsIndexPrefetch(other.rsIndexPrefetch) {}
-
-    ReplSettings& operator=(const ReplSettings& other) {
-        if (this == &other)
-            return *this;
-
-        slave = other.slave;
-        master = other.master;
-        fastsync = other.fastsync;
-        autoresync = other.autoresync;
-        slavedelay = other.slavedelay;
-        oplogSize = other.oplogSize;
-        source = other.source;
-        only = other.only;
-        pretouch = other.pretouch;
-        replSet = other.replSet;
-        rsIndexPrefetch = other.rsIndexPrefetch;
-        return *this;
-    }
 };
 
 }  // namespace repl

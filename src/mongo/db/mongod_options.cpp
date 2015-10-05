@@ -418,6 +418,11 @@ Status addMongodOptions(moe::OptionSection* options) {
                    "specify index prefetching behavior (if secondary) [none|_id_only|all]")
         .format("(:?none)|(:?_id_only)|(:?all)", "(none/_id_only/all)");
 
+    rs_options.addOptionChaining("replication.enableMajorityReadConcern",
+                                 "enableMajorityReadConcern",
+                                 moe::Switch,
+                                 "enables majority readConcern");
+
     // Sharding Options
 
     sharding_options.addOptionChaining(
@@ -1137,6 +1142,10 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
             params["replication.secondaryIndexPrefetch"].as<std::string>();
     }
 
+    if (params.count("replication.enableMajorityReadConcern")) {
+        replSettings.majorityReadConcernEnabled = true;
+    }
+
     if (params.count("storage.indexBuildRetry")) {
         serverGlobalParams.indexBuildRetry = params["storage.indexBuildRetry"].as<bool>();
     }
@@ -1231,6 +1240,10 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
                           " Only supported value is \"sccc\"");
         }
         serverGlobalParams.configsvrMode = CatalogManager::ConfigServerMode::SCCC;
+    }
+
+    if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::CSRS) {
+        replSettings.majorityReadConcernEnabled = true;
     }
 
     if (params.count("sharding.archiveMovedChunks")) {

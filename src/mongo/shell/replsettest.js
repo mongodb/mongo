@@ -767,7 +767,7 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ) {
     
     var rval = this.nodes[n] = MongoRunner.runMongod( options )
 
-    if(!rval) return rval;
+    if(!rval) throw Error("Failed to start node " + n);
     
     // Add replica set specific attributes
     this.nodes[n].nodeId = n
