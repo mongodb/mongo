@@ -745,11 +745,16 @@ __wt_config_gets_def(WT_SESSION_IMPL *session,
 
 	*value = false_value;
 	value->val = def;
+
 	if (cfg == NULL || cfg[0] == NULL || cfg[1] == NULL)
 		return (0);
-	else if (cfg[2] == NULL)
+
+	if (cfg[2] == NULL) {
 		WT_RET_NOTFOUND_OK(
 		    __wt_config_getones(session, cfg[1], key, value));
+		return (0);
+	}
+
 	return (__wt_config_gets(session, cfg, key, value));
 }
 
