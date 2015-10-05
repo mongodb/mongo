@@ -106,7 +106,7 @@ env.Library(
     ],
     LIBDEPS_TAGS=[
         # Circular with libmongoscore.  TODO: This tag should be removed as part of the work for
-        # SERVER-20194.
+        # SERVER-20758.
         'incomplete',
     ],
 )
