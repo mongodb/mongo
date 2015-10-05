@@ -388,5 +388,10 @@ void ReplicationCoordinatorExternalStateImpl::forceSnapshotCreation() {
 bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {
     return _snapshotThread != nullptr;
 }
+
+void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters() {
+    signalOplogWaiters();
+}
+
 }  // namespace repl
 }  // namespace mongo

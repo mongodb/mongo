@@ -75,6 +75,7 @@ public:
     void updateCommittedSnapshot(SnapshotName newCommitPoint) final;
     void forceSnapshotCreation() final;
     virtual bool snapshotsEnabled() const;
+    virtual void notifyOplogMetadataWaiters();
 
     std::string getNextOpContextThreadName();
 

@@ -576,7 +576,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
         if (ntoreturn) {
             batchSize = ntoreturn;
         }
-        GetMoreRequest getMoreRequest(NamespaceString(ns), id, batchSize, boost::none);
+        GetMoreRequest getMoreRequest(NamespaceString(ns), id, batchSize, boost::none, boost::none);
 
         auto cursorResponse = ClusterFind::runGetMore(txn, getMoreRequest);
         if (cursorResponse == ErrorCodes::CursorNotFound) {

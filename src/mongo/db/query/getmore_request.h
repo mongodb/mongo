@@ -52,7 +52,8 @@ struct GetMoreRequest {
     GetMoreRequest(NamespaceString namespaceString,
                    CursorId id,
                    boost::optional<long long> sizeOfBatch,
-                   boost::optional<long long> term);
+                   boost::optional<long long> term,
+                   boost::optional<repl::OpTime> lastKnownCommittedOpTime);
 
     /**
      * Construct a GetMoreRequest from the command specification and db name.
@@ -77,6 +78,9 @@ struct GetMoreRequest {
 
     // Only internal queries from replication will typically have a term.
     const boost::optional<long long> term;
+
+    // Only internal queries from replication will have a last known committed optime.
+    const boost::optional<repl::OpTime> lastKnownCommittedOpTime;
 
 private:
     /**

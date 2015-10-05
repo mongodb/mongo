@@ -214,6 +214,8 @@ bool ReplicationCoordinatorExternalStateMock::snapshotsEnabled() const {
     return true;
 }
 
+void ReplicationCoordinatorExternalStateMock::notifyOplogMetadataWaiters() {}
+
 void ReplicationCoordinatorExternalStateMock::logTransitionToPrimaryToOplog(OperationContext* txn) {
     _lastOpTime = OpTime(Timestamp(1, 0), 1);
 }

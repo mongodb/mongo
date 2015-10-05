@@ -407,6 +407,11 @@ public:
         _minVisibleSnapshot = name;
     }
 
+    /**
+     * Notify (capped collection) waiters of data changes, like an insert.
+     */
+    void notifyCappedWaitersIfNeeded();
+
 private:
     /**
      * Returns a non-ok Status if document does not pass this collection's validator.
@@ -426,11 +431,6 @@ private:
     Status recordStoreGoingToUpdateInPlace(OperationContext* txn, const RecordId& loc);
 
     Status aboutToDeleteCapped(OperationContext* txn, const RecordId& loc, RecordData data);
-
-    /**
-     * Notify (capped collection) waiters of data changes, like an insert.
-     */
-    void notifyCappedWaitersIfNeeded();
 
     /**
      * same semantics as insertDocument, but doesn't do:

@@ -230,7 +230,8 @@ Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
     }
 
     BSONObj cmdObj = remote.cursorId
-        ? GetMoreRequest(_params.nsString, *remote.cursorId, adjustedBatchSize, boost::none)
+        ? GetMoreRequest(
+              _params.nsString, *remote.cursorId, adjustedBatchSize, boost::none, boost::none)
               .toBSON()
         : *remote.cmdObj;
 

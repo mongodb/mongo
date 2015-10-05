@@ -2727,6 +2727,8 @@ void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& co
 
     _lastCommittedOpTime = committedOpTime;
 
+    _externalState->notifyOplogMetadataWaiters();
+
     auto maxSnapshotForOpTime = SnapshotInfo{committedOpTime, SnapshotName::max()};
     if (!_uncommittedSnapshots.empty() && _uncommittedSnapshots.front() <= maxSnapshotForOpTime) {
         // At least one uncommitted snapshot is ready to be blessed as committed.

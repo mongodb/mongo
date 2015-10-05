@@ -557,6 +557,7 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     bob->append("maxTimeMS", durationCount<Milliseconds>(fetcherMaxTimeMS));
     if (receivedMetadata) {
         bob->append("term", _replCoord->getTerm());
+        _replCoord->getLastCommittedOpTime().append(bob, "lastKnownCommittedOpTime");
     }
 }
 

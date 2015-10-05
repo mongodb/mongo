@@ -920,6 +920,11 @@ void oplogCheckCloseDatabase(OperationContext* txn, Database* db) {
     _localOplogCollection = nullptr;
 }
 
+void signalOplogWaiters() {
+    if (_localOplogCollection) {
+        _localOplogCollection->notifyCappedWaitersIfNeeded();
+    }
+}
 
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(replSnapshotThreadThrottleMicros, int, 1000);
 

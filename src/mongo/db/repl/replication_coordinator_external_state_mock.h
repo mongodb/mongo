@@ -78,6 +78,7 @@ public:
     virtual void updateCommittedSnapshot(SnapshotName newCommitPoint);
     virtual void forceSnapshotCreation();
     virtual bool snapshotsEnabled() const;
+    virtual void notifyOplogMetadataWaiters();
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"

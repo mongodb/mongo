@@ -186,7 +186,7 @@ TEST(GetMoreRequestTest, parseFromBSONIgnoreMaxTimeMS) {
 }
 
 TEST(GetMoreRequestTest, toBSONHasBatchSize) {
-    GetMoreRequest request(NamespaceString("testdb.testcoll"), 123, 99, boost::none);
+    GetMoreRequest request(NamespaceString("testdb.testcoll"), 123, 99, boost::none, boost::none);
     BSONObj requestObj = request.toBSON();
     BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection"
                                              << "testcoll"
@@ -195,7 +195,8 @@ TEST(GetMoreRequestTest, toBSONHasBatchSize) {
 }
 
 TEST(GetMoreRequestTest, toBSONMissingMatchSize) {
-    GetMoreRequest request(NamespaceString("testdb.testcoll"), 123, boost::none, boost::none);
+    GetMoreRequest request(
+        NamespaceString("testdb.testcoll"), 123, boost::none, boost::none, boost::none);
     BSONObj requestObj = request.toBSON();
     BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection"
                                              << "testcoll");
@@ -203,7 +204,7 @@ TEST(GetMoreRequestTest, toBSONMissingMatchSize) {
 }
 
 TEST(GetMoreRequestTest, toBSONHasTerm) {
-    GetMoreRequest request(NamespaceString("testdb.testcoll"), 123, 99, 1);
+    GetMoreRequest request(NamespaceString("testdb.testcoll"), 123, 99, 1, boost::none);
     BSONObj requestObj = request.toBSON();
     BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection"
                                              << "testcoll"

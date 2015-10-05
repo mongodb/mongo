@@ -145,5 +145,11 @@ void setNewTimestamp(const Timestamp& newTime);
  * Detects the current replication mode and sets the "_oplogCollectionName" accordingly.
  */
 void setOplogCollectionName();
+
+/**
+ * Signal any waiting AwaitData queries on the oplog that there is new data or metadata available.
+ */
+void signalOplogWaiters();
+
 }  // namespace repl
 }  // namespace mongo

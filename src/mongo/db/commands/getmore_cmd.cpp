@@ -300,27 +300,38 @@ public:
         // If this is an await data cursor, and we hit EOF without generating any results, then
         // we block waiting for new data to arrive.
         if (isCursorAwaitData(cursor) && state == PlanExecutor::IS_EOF && numResults == 0) {
-            // Save the PlanExecutor and drop our locks.
-            exec->saveState();
-            ctx.reset();
+            auto replCoord = repl::ReplicationCoordinator::get(txn);
+            // Return immediately if we need to update the commit time.
+            if (request.lastKnownCommittedOpTime == replCoord->getLastCommittedOpTime()) {
+                // Retrieve the notifier which we will wait on until new data arrives. We make sure
+                // to do this in the lock because once we drop the lock it is possible for the
+                // collection to become invalid. The notifier itself will outlive the collection if
+                // the collection is dropped, as we keep a shared_ptr to it.
+                auto notifier = ctx->getCollection()->getCappedInsertNotifier();
 
-            // Block waiting for data.
-            Microseconds timeout(CurOp::get(txn)->getRemainingMaxTimeMicros());
-            notifier->wait(notifierVersion, timeout);
-            notifier.reset();
+                // Save the PlanExecutor and drop our locks.
+                exec->saveState();
+                ctx.reset();
 
-            // Set expected latency to match wait time. This makes sure the logs aren't spammed
-            // by awaitData queries that exceed slowms due to blocking on the CappedInsertNotifier.
-            CurOp::get(txn)->setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
+                // Block waiting for data.
+                Microseconds timeout(CurOp::get(txn)->getRemainingMaxTimeMicros());
+                notifier->wait(notifierVersion, timeout);
+                notifier.reset();
 
-            ctx.reset(new AutoGetCollectionForRead(txn, request.nss));
-            exec->restoreState();
+                // Set expected latency to match wait time. This makes sure the logs aren't spammed
+                // by awaitData queries that exceed slowms due to blocking on the
+                // CappedInsertNotifier.
+                CurOp::get(txn)->setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
 
-            // We woke up because either the timed_wait expired, or there was more data. Either
-            // way, attempt to generate another batch of results.
-            batchStatus = generateBatch(cursor, request, &nextBatch, &state, &numResults);
-            if (!batchStatus.isOK()) {
-                return appendCommandStatus(result, batchStatus);
+                ctx.reset(new AutoGetCollectionForRead(txn, request.nss));
+                exec->restoreState();
+
+                // We woke up because either the timed_wait expired, or there was more data. Either
+                // way, attempt to generate another batch of results.
+                batchStatus = generateBatch(cursor, request, &nextBatch, &state, &numResults);
+                if (!batchStatus.isOK()) {
+                    return appendCommandStatus(result, batchStatus);
+                }
             }
         }
 

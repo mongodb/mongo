@@ -217,6 +217,8 @@ public:
      * Returns whether or not the SnapshotThread is active.
      */
     virtual bool snapshotsEnabled() const = 0;
+
+    virtual void notifyOplogMetadataWaiters() = 0;
 };
 
 }  // namespace repl
