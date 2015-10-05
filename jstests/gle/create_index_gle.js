@@ -1,14 +1,22 @@
 load('jstests/replsets/rslib.js');
-var st = new ShardingTest({ shards: { rs0: { nodes: 2, oplogSize: 10, verbose: 1 }}});
+(function () {
+"use strict";
+
+var st = new ShardingTest({
+    shards: {
+        rs0: {
+            nodes: { n0: {}, n1: { rsConfig: { priority: 0 } } },
+            oplogSize: 10,
+            verbose: 1,
+        }
+    },
+});
 var replTest = st.rs0;
 
 var config = replTest.getReplSetConfig();
-config.members[1].priority = 0;
 // Add a delay long enough so getLastError would actually 'wait' for write concern.
 config.members[1].slaveDelay = 3;
 config.version = 2;
-
-var priConn = replTest.getPrimary();
 
 reconfig(replTest, config, true);
 
@@ -38,3 +46,4 @@ assert.eq(priIdx.length, secIdx.length, 'pri: ' + tojson(priIdx) + ', sec: ' + t
 
 st.stop();
 
+}());
