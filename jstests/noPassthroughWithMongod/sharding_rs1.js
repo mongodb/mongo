@@ -17,12 +17,15 @@ while ( bigString.length < 10000 )
 
 inserted = 0;
 num = 0;
-var bulk = db.foo.initializeUnorderedBulkOp();
+
 while ( inserted < ( 20 * 1024 * 1024 ) ){
-    bulk.insert({ _id: num++, s: bigString, x: Math.random() });
-    inserted += bigString.length;
+    var bulk = db.foo.initializeUnorderedBulkOp();
+    for (var i = 0; i < 100; i ++) {
+        bulk.insert({ _id: num++, s: bigString, x: Math.random() });
+        inserted += bigString.length;
+    }
+    assert.writeOK(bulk.execute({w: 3}));
 }
-assert.writeOK(bulk.execute());
 
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 assert.lt( 20 , s.config.chunks.count()  , "setup2" );
