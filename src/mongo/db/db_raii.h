@@ -177,13 +177,6 @@ public:
      */
     OldClientContext(OperationContext* txn, const std::string& ns, Database* db, bool justCreated);
 
-    /**
-     * note: this does not call _finishInit -- i.e., does not call
-     * ensureShardVersionOKOrThrow for example.
-     * see also: reset().
-     */
-    OldClientContext(OperationContext* txn, const std::string& ns, Database* db);
-
     ~OldClientContext();
 
     Database* db() const {

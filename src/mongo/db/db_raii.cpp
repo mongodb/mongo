@@ -142,9 +142,6 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const Nam
     }
 }
 
-OldClientContext::OldClientContext(OperationContext* txn, const std::string& ns, Database* db)
-    : _justCreated(false), _doVersion(true), _ns(ns), _db(db), _txn(txn) {}
-
 OldClientContext::OldClientContext(OperationContext* txn,
                                    const std::string& ns,
                                    Database* db,
