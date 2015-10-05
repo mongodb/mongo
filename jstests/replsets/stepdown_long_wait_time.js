@@ -32,9 +32,14 @@
     jsTestLog("do a write then ask the PRIMARY to stepdown");
     var options = {writeConcern: {w: 1, wtimeout: 60000}};
     assert.writeOK(primary.getDB(name).foo.insert({x: 1}, options));
-    var cmd = "db.getSiblingDB('admin').runCommand({replSetStepDown: 60, " +
-                                                   "secondaryCatchUpPeriodSecs: 60});";
-    var stepDowner = startParallelShell(cmd, primary.port);
+    var stepDownSecs = 60;
+    var secondaryCatchUpPeriodSecs = 60;
+    var stepDownCmd = "db.getSiblingDB('admin').runCommand({" +
+        "replSetStepDown: " + stepDownSecs + ", " +
+        "secondaryCatchUpPeriodSecs: " + secondaryCatchUpPeriodSecs +
+    "});";
+    var stepDowner = startParallelShell(stepDownCmd, primary.port);
+
     assert.soon(function() {
         var res = primary.getDB('admin').currentOp(true);
         for (var entry in res.inprog) {
@@ -44,7 +49,7 @@
         }
         printjson(res);
         return false;
-    }, "global shared lock not acquired");
+    }, "global shared lock not acquired", 30000, 1000);
 
     jsTestLog("do a write and wait for it to be waiting for a lock");
     var updateCmd = function() {
@@ -55,6 +60,7 @@
                 // main thread signaled update thread to exit by deleting the doc it's updating
                 quit(0);
             }
+            sleep(1000);
         }
     };
     var writer = startParallelShell(updateCmd, primary.port);
@@ -67,16 +73,22 @@
         }
         printjson(res);
         return false;
-    }, "write failed to block on global lock");
+    }, "write failed to block on global lock", 30000, 1000);
 
-    jsTestLog("bring back the SECONDARY and wait for it become PRIMARY");
+    jsTestLog("Bring back the SECONDARY " + secondary.host + " and wait for PRIMARY " +
+              primary.host + " to completely step down.");
     replSet.unPartition(1,0);
     replSet.unPartition(1,2);
 
-    replSet.waitForState(secondary, replSet.PRIMARY, 30000);
+    replSet.waitForState(primary, replSet.SECONDARY, stepDownSecs * 1000);
+
+    jsTestLog("Wait for SECONDARY " + secondary.host + " to become PRIMARY");
+    var newPrimary = replSet.getPrimary();
+    var config = assert.commandWorked(newPrimary.adminCommand({replSetGetConfig: 1})).config;
+    var electionTimeoutMillis = config.settings.electionTimeoutMillis;
+    replSet.waitForState(secondary, replSet.PRIMARY, electionTimeoutMillis * 2);
 
     jsTestLog("signal update thread to exit");
-    var newPrimary = replSet.getPrimary();
     assert.writeOK(newPrimary.getDB(name).foo.remove({}));
 
     var exitCode = stepDowner({checkExitSuccess: false});
