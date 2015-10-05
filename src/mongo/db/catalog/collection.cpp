@@ -125,7 +125,7 @@ void CappedInsertNotifier::notifyAll() {
     _notifier.notify_all();
 }
 
-void CappedInsertNotifier::_wait(stdx::unique_lock<std::mutex>& lk,
+void CappedInsertNotifier::_wait(stdx::unique_lock<stdx::mutex>& lk,
                                  uint64_t prevVersion,
                                  Microseconds timeout) const {
     while (!_dead && prevVersion == _version) {
