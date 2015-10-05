@@ -367,16 +367,22 @@ DBQuery.prototype.countReturn = function(){
 */
 DBQuery.prototype.itcount = function(){
     var num = 0;
+
+    // Track how many bytes we've used this cursor to iterate iterated.  This function can be called
+    // with some very large cursors.  SpiderMonkey appears happy to allow these objects to
+    // accumulate, so regular gc() avoids an overly large memory footprint.
+    //
+    // TODO: migrate this function into c++
+    var bytesSinceGC = 0;
+
     while ( this.hasNext() ){
         num++;
-        this.next();
+        var nextDoc = this.next();
+        bytesSinceGC += Object.bsonsize(nextDoc);
 
-        // This function can be called with some very large cursors.
-        // SpiderMonkey appears happy to allow these objects to accumulate, so
-        // regular gc() avoids an overly large memory footprint.
-        //
-        // TODO: migrate this function into c++
-        if (num % 10000 == 0) {
+        // Garbage collect every 10 MB.
+        if (bytesSinceGC > (10 * 1024 * 1024)) {
+            bytesSinceGC = 0;
             gc();
         }
     }
