@@ -339,11 +339,17 @@ LIRGeneratorShared::useStorableAtStart(MDefinition* mir)
 #endif
 
 LAllocation
+LIRGeneratorShared::useKeepalive(MDefinition* mir)
+{
+    return use(mir, LUse(LUse::KEEPALIVE));
+}
+
+LAllocation
 LIRGeneratorShared::useKeepaliveOrConstant(MDefinition* mir)
 {
     if (mir->isConstant())
         return LAllocation(mir->toConstant()->vp());
-    return use(mir, LUse(LUse::KEEPALIVE));
+    return useKeepalive(mir);
 }
 
 LUse

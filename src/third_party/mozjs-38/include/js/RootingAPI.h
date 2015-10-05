@@ -1153,7 +1153,18 @@ class PersistentRooted : public js::PersistentRootedBase<T>,
     DECLARE_POINTER_CONSTREF_OPS(T);
     DECLARE_POINTER_ASSIGN_OPS(PersistentRooted, T);
     DECLARE_NONPOINTER_ACCESSOR_METHODS(ptr);
-    DECLARE_NONPOINTER_MUTABLE_ACCESSOR_METHODS(ptr);
+
+    // These are the same as DECLARE_NONPOINTER_MUTABLE_ACCESSOR_METHODS, except
+    // they check that |this| is initialized in case the caller later stores
+    // something in |ptr|.
+    T* address() {
+        MOZ_ASSERT(initialized());
+        return &ptr;
+    }
+    T& get() {
+        MOZ_ASSERT(initialized());
+        return ptr;
+    }
 
   private:
     void set(T value) {

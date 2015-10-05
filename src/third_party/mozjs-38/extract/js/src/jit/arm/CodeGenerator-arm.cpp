@@ -590,11 +590,11 @@ CodeGeneratorARM::visitDivI(LDivI* ins)
     if (mir->canTruncateRemainder()) {
         masm.ma_sdiv(lhs, rhs, output);
     } else {
-        masm.ma_sdiv(lhs, rhs, ScratchRegister);
-        masm.ma_mul(ScratchRegister, rhs, temp);
-        masm.ma_cmp(lhs, temp);
+        masm.ma_sdiv(lhs, rhs, temp);
+        masm.ma_mul(temp, rhs, ScratchRegister);
+        masm.ma_cmp(lhs, ScratchRegister);
         bailoutIf(Assembler::NotEqual, ins->snapshot());
-        masm.ma_mov(ScratchRegister, output);
+        masm.ma_mov(temp, output);
     }
 
     masm.bind(&done);

@@ -190,6 +190,7 @@
     _(Lambda)                       \
     _(LambdaArrow)                  \
     _(LambdaForSingleton)           \
+    _(KeepAliveObject)              \
     _(Slots)                        \
     _(Elements)                     \
     _(ConvertElementsToDoubles)     \

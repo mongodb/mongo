@@ -2174,6 +2174,15 @@ LIRGenerator::visitLambdaArrow(MLambdaArrow* ins)
 }
 
 void
+LIRGenerator::visitKeepAliveObject(MKeepAliveObject* ins)
+{
+    MDefinition* obj = ins->object();
+    MOZ_ASSERT(obj->type() == MIRType_Object);
+
+    add(new(alloc()) LKeepAliveObject(useKeepalive(obj)), ins);
+}
+
+void
 LIRGenerator::visitSlots(MSlots* ins)
 {
     define(new(alloc()) LSlots(useRegisterAtStart(ins->object())), ins);

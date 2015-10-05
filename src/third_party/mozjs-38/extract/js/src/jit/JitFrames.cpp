@@ -361,14 +361,20 @@ JitFrameIterator::machineState() const
     return machine;
 }
 
+static uint32_t
+NumArgAndLocalSlots(const InlineFrameIterator& frame)
+{
+    JSScript* script = frame.script();
+    return CountArgSlots(script, frame.maybeCalleeTemplate()) + script->nfixed();
+}
+
 static void
-CloseLiveIterator(JSContext* cx, const InlineFrameIterator& frame, uint32_t localSlot)
+CloseLiveIterator(JSContext* cx, const InlineFrameIterator& frame, uint32_t stackSlot)
 {
     SnapshotIterator si = frame.snapshotIterator();
 
     // Skip stack slots until we reach the iterator object.
-    uint32_t base = CountArgSlots(frame.script(), frame.maybeCalleeTemplate()) + frame.script()->nfixed();
-    uint32_t skipSlots = base + localSlot - 1;
+    uint32_t skipSlots = NumArgAndLocalSlots(frame) + stackSlot - 1;
 
     for (unsigned i = 0; i < skipSlots; i++)
         si.skip();
@@ -437,6 +443,11 @@ HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame, ResumeFromEx
     if (!script->hasTrynotes())
         return;
 
+    uint32_t base = NumArgAndLocalSlots(frame);
+    SnapshotIterator si = frame.snapshotIterator();
+    MOZ_ASSERT(si.numAllocations() >= base);
+    const uint32_t stackDepth = si.numAllocations() - base;
+
     JSTryNote* tn = script->trynotes()->vector;
     JSTryNote* tnEnd = tn + script->trynotes()->length;
 
@@ -445,6 +456,9 @@ HandleExceptionIon(JSContext* cx, const InlineFrameIterator& frame, ResumeFromEx
         if (pcOffset < tn->start)
             continue;
         if (pcOffset >= tn->start + tn->length)
+            continue;
+
+        if (tn->stackDepth > stackDepth)
             continue;
 
         switch (tn->kind) {
@@ -2101,6 +2115,8 @@ SnapshotIterator::initInstructionResults(MaybeReadFallback& fallback)
     JitFrameLayout* fp = fallback.frame->jsFrame();
     RInstructionResults* results = fallback.activation->maybeIonFrameRecovery(fp);
     if (!results) {
+        AutoCompartment ac(cx, fallback.frame->script()->compartment());
+
         // We do not have the result yet, which means that an observable stack
         // slot is requested.  As we do not want to bailout every time for the
         // same reason, we need to recompile without optimizing away the

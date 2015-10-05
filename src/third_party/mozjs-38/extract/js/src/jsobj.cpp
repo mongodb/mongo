@@ -2707,8 +2707,8 @@ js::GetBuiltinPrototype(ExclusiveContext* cx, JSProtoKey key, MutableHandleObjec
     return true;
 }
 
-static bool
-IsStandardPrototype(JSObject* obj, JSProtoKey key)
+bool
+js::IsStandardPrototype(JSObject* obj, JSProtoKey key)
 {
     GlobalObject& global = obj->global();
     Value v = global.getPrototype(key);

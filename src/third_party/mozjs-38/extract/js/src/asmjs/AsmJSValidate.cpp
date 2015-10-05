@@ -9292,6 +9292,11 @@ CheckModule(ExclusiveContext* cx, AsmJSParser& parser, ParseNode* stmtList,
 
     m.startFunctionBodies();
 
+#if !defined(ENABLE_SHARED_ARRAY_BUFFER)
+    if (m.module().hasArrayView() && m.module().isSharedView())
+        return m.fail(nullptr, "shared views not supported by this build");
+#endif
+
     if (!CheckFunctions(m))
         return false;
 

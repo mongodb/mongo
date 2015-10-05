@@ -493,6 +493,9 @@ class CompileInfo
         if (slot == thisSlot())
             return true;
 
+        if (funMaybeLazy()->isHeavyweight() && slot == scopeChainSlot())
+            return true;
+
         // If the function may need an arguments object, then make sure to
         // preserve the scope chain, because it may be needed to construct the
         // arguments object during bailout. If we've already created an

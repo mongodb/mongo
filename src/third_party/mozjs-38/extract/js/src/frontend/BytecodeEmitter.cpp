@@ -448,7 +448,10 @@ static inline bool
 UpdateLineNumberNotes(ExclusiveContext* cx, BytecodeEmitter* bce, uint32_t offset)
 {
     TokenStream* ts = &bce->parser->tokenStream;
-    if (!ts->srcCoords.isOnThisLine(offset, bce->currentLine())) {
+    bool onThisLine;
+    if (!ts->srcCoords.isOnThisLine(offset, bce->currentLine(), &onThisLine))
+        return ts->reportError(JSMSG_OUT_OF_MEMORY);
+    if (!onThisLine) {
         unsigned line = ts->srcCoords.lineNum(offset);
         unsigned delta = line - bce->currentLine();
 

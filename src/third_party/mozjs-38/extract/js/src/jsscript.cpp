@@ -3851,7 +3851,7 @@ LazyScript::hasUncompiledEnclosingScript() const
         return false;
 
     JSFunction& fun = enclosingScope()->as<JSFunction>();
-    return fun.isInterpreted() && (!fun.mutableScript() || !fun.nonLazyScript()->code());
+    return !fun.hasScript() || fun.hasUncompiledScript() || !fun.nonLazyScript()->code();
 }
 
 uint32_t

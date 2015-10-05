@@ -769,7 +769,9 @@ Parser<FullParseHandler>::cloneLeftHandSide(ParseNode* opn)
             ParseNode* pn2;
             if (opn->isKind(PNK_OBJECT)) {
                 if (opn2->isKind(PNK_MUTATEPROTO)) {
-                    ParseNode* target = cloneLeftHandSide(opn2->pn_kid);
+                    ParseNode* target = opn2->pn_kid->isKind(PNK_ASSIGN)
+                                        ? cloneDestructuringDefault(opn2->pn_kid)
+                                        : cloneLeftHandSide(opn2->pn_kid);
                     if (!target)
                         return nullptr;
                     pn2 = handler.new_<UnaryNode>(PNK_MUTATEPROTO, JSOP_NOP, opn2->pn_pos, target);
@@ -780,12 +782,9 @@ Parser<FullParseHandler>::cloneLeftHandSide(ParseNode* opn)
                     ParseNode* tag = cloneParseTree(opn2->pn_left);
                     if (!tag)
                         return nullptr;
-                    ParseNode* target;
-                    if (opn2->pn_right->isKind(PNK_ASSIGN)) {
-                        target = cloneDestructuringDefault(opn2->pn_right);
-                    } else {
-                        target = cloneLeftHandSide(opn2->pn_right);
-                    }
+                    ParseNode* target = opn2->pn_right->isKind(PNK_ASSIGN)
+                                        ? cloneDestructuringDefault(opn2->pn_right)
+                                        : cloneLeftHandSide(opn2->pn_right);
                     if (!target)
                         return nullptr;
 

@@ -890,46 +890,15 @@ GlobalHelperThreadState::finishParseTask(JSContext* maybecx, JSRuntime* rt, void
         !EnsureConstructor(cx, global, JSProto_Array) ||
         !EnsureConstructor(cx, global, JSProto_Function) ||
         !EnsureConstructor(cx, global, JSProto_RegExp) ||
-        !EnsureConstructor(cx, global, JSProto_Iterator))
+        !EnsureConstructor(cx, global, JSProto_Iterator) ||
+        !EnsureConstructor(cx, global, JSProto_GeneratorFunction))
     {
         LeaveParseTaskZone(rt, parseTask);
         return nullptr;
     }
 
-    LeaveParseTaskZone(rt, parseTask);
+    mergeParseTaskCompartment(rt, parseTask, global, cx->compartment());
 
-    // Point the prototypes of any objects in the script's compartment to refer
-    // to the corresponding prototype in the new compartment. This will briefly
-    // create cross compartment pointers, which will be fixed by the
-    // MergeCompartments call below.  It's not safe for a GC to observe this
-    // state, so finish any ongoing GC first and assert that we can't trigger
-    // another one.
-    gc::AutoFinishGC finishGC(rt);
-    for (gc::ZoneCellIter iter(parseTask->cx->zone(), gc::FINALIZE_OBJECT_GROUP);
-         !iter.done();
-         iter.next())
-    {
-        JS::AutoAssertNoAlloc noAlloc(rt);
-        ObjectGroup* group = iter.get<ObjectGroup>();
-        TaggedProto proto(group->proto());
-        if (!proto.isObject())
-            continue;
-
-        JSProtoKey key = JS::IdentifyStandardPrototype(proto.toObject());
-        if (key == JSProto_Null)
-            continue;
-        MOZ_ASSERT(key == JSProto_Object || key == JSProto_Array ||
-                   key == JSProto_Function || key == JSProto_RegExp ||
-                   key == JSProto_Iterator);
-
-        JSObject* newProto = GetBuiltinPrototypePure(global, key);
-        MOZ_ASSERT(newProto);
-
-        group->setProtoUnchecked(TaggedProto(newProto));
-    }
-
-    // Move the parsed script and all its contents into the desired compartment.
-    gc::MergeCompartments(parseTask->cx->compartment(), cx->compartment());
     if (!parseTask->finish(cx))
         return nullptr;
 
@@ -956,6 +925,57 @@ GlobalHelperThreadState::finishParseTask(JSContext* maybecx, JSRuntime* rt, void
     }
 
     return script;
+}
+
+void
+GlobalHelperThreadState::mergeParseTaskCompartment(JSRuntime* rt, ParseTask* parseTask,
+                                                   Handle<GlobalObject*> global,
+                                                   JSCompartment* dest)
+{
+    // After we call LeaveParseTaskZone() it's not safe to GC until we have
+    // finished merging the contents of the parse task's compartment into the
+    // destination compartment.  Finish any ongoing incremental GC first and
+    // assert that no allocation can occur.
+    gc::AutoFinishGC finishGC(rt);
+    JS::AutoAssertNoAlloc noAlloc(rt);
+
+    LeaveParseTaskZone(rt, parseTask);
+
+    // Point the prototypes of any objects in the script's compartment to refer
+    // to the corresponding prototype in the new compartment. This will briefly
+    // create cross compartment pointers, which will be fixed by the
+    // MergeCompartments call below.
+    for (gc::ZoneCellIter iter(parseTask->cx->zone(), gc::FINALIZE_OBJECT_GROUP);
+         !iter.done();
+         iter.next())
+    {
+        ObjectGroup* group = iter.get<ObjectGroup>();
+        TaggedProto proto(group->proto());
+        if (!proto.isObject())
+            continue;
+
+        JSProtoKey key = JS::IdentifyStandardPrototype(proto.toObject());
+        if (key == JSProto_Null) {
+            // Generator functions don't have Function.prototype as prototype
+            // but a different function object, so IdentifyStandardPrototype
+            // doesn't work. Just special-case it here.
+            if (IsStandardPrototype(proto.toObject(), JSProto_GeneratorFunction))
+                key = JSProto_GeneratorFunction;
+            else
+                continue;
+        }
+        MOZ_ASSERT(key == JSProto_Object || key == JSProto_Array ||
+                   key == JSProto_Function || key == JSProto_RegExp ||
+                   key == JSProto_Iterator || key == JSProto_GeneratorFunction);
+
+        JSObject* newProto = GetBuiltinPrototypePure(global, key);
+        MOZ_ASSERT(newProto);
+
+        group->setProtoUnchecked(TaggedProto(newProto));
+    }
+
+    // Move the parsed script and all its contents into the desired compartment.
+    gc::MergeCompartments(parseTask->cx->compartment(), dest);
 }
 
 void

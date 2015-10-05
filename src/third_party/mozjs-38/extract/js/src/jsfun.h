@@ -318,9 +318,16 @@ class JSFunction : public js::NativeObject
         return nonLazyScript();
     }
 
-    JSScript* nonLazyScript() const {
+    // The state of a JSFunction whose script errored out during bytecode
+    // compilation. Such JSFunctions are only reachable via GC iteration and
+    // not from script.
+    bool hasUncompiledScript() const {
         MOZ_ASSERT(hasScript());
-        MOZ_ASSERT(u.i.s.script_);
+        return !u.i.s.script_;
+    }
+
+    JSScript* nonLazyScript() const {
+        MOZ_ASSERT(!hasUncompiledScript());
         return u.i.s.script_;
     }
 

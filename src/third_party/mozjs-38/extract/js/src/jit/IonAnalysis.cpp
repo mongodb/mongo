@@ -2708,6 +2708,117 @@ jit::EliminateRedundantChecks(MIRGraph& graph)
     return true;
 }
 
+static bool
+NeedsKeepAlive(MInstruction* slotsOrElements, MInstruction* use)
+{
+    MOZ_ASSERT(slotsOrElements->type() == MIRType_Elements ||
+               slotsOrElements->type() == MIRType_Slots);
+
+    if (slotsOrElements->block() != use->block())
+        return true;
+
+    MBasicBlock* block = use->block();
+    MInstructionIterator iter(block->begin(slotsOrElements));
+    MOZ_ASSERT(*iter == slotsOrElements);
+    ++iter;
+
+    while (true) {
+        if (*iter == use)
+            return false;
+
+        switch (iter->op()) {
+          case MDefinition::Op_Nop:
+          case MDefinition::Op_Constant:
+          case MDefinition::Op_KeepAliveObject:
+          case MDefinition::Op_Unbox:
+          case MDefinition::Op_LoadSlot:
+          case MDefinition::Op_StoreSlot:
+          case MDefinition::Op_LoadFixedSlot:
+          case MDefinition::Op_StoreFixedSlot:
+          case MDefinition::Op_LoadElement:
+          case MDefinition::Op_StoreElement:
+          case MDefinition::Op_InitializedLength:
+          case MDefinition::Op_ArrayLength:
+          case MDefinition::Op_BoundsCheck:
+            iter++;
+            break;
+          default:
+            return true;
+        }
+    }
+
+    MOZ_CRASH("Unreachable");
+}
+
+void
+jit::AddKeepAliveInstructions(MIRGraph& graph)
+{
+    for (MBasicBlockIterator i(graph.begin()); i != graph.end(); i++) {
+        MBasicBlock* block = *i;
+
+        for (MInstructionIterator insIter(block->begin()); insIter != block->end(); insIter++) {
+            MInstruction* ins = *insIter;
+            if (ins->type() != MIRType_Elements && ins->type() != MIRType_Slots)
+                continue;
+
+            MDefinition* ownerObject;
+            switch (ins->op()) {
+              case MDefinition::Op_ConstantElements:
+                continue;
+              case MDefinition::Op_ConvertElementsToDoubles:
+                // EliminateRedundantChecks should have replaced all uses.
+                MOZ_ASSERT(!ins->hasUses());
+                continue;
+              case MDefinition::Op_Elements:
+              case MDefinition::Op_TypedArrayElements:
+              case MDefinition::Op_TypedObjectElements:
+                MOZ_ASSERT(ins->numOperands() == 1);
+                ownerObject = ins->getOperand(0);
+                break;
+              case MDefinition::Op_Slots:
+                ownerObject = ins->toSlots()->object();
+                break;
+              default:
+                MOZ_CRASH("Unexpected op");
+            }
+
+            MOZ_ASSERT(ownerObject->type() == MIRType_Object);
+
+            if (ownerObject->isConstant()) {
+                // Constants are kept alive by other pointers, for instance
+                // ImmGCPtr in JIT code.
+                continue;
+            }
+
+            for (MUseDefIterator uses(ins); uses; uses++) {
+                MInstruction* use = uses.def()->toInstruction();
+
+                if (use->isStoreElementHole()) {
+                    // StoreElementHole has an explicit object operand. If GVN
+                    // is disabled, we can get different unbox instructions with
+                    // the same object as input, so we check for that case.
+                    MOZ_ASSERT_IF(!use->toStoreElementHole()->object()->isUnbox() && !ownerObject->isUnbox(),
+                                  use->toStoreElementHole()->object() == ownerObject);
+                    continue;
+                }
+
+                if (use->isInArray()) {
+                    // See StoreElementHole case above.
+                    MOZ_ASSERT_IF(!use->toInArray()->object()->isUnbox() && !ownerObject->isUnbox(),
+                                  use->toInArray()->object() == ownerObject);
+                    continue;
+                }
+
+                if (!NeedsKeepAlive(ins, use))
+                    continue;
+
+                MKeepAliveObject* keepAlive = MKeepAliveObject::New(graph.alloc(), ownerObject);
+                use->block()->insertAfter(use, keepAlive);
+            }
+        }
+    }
+}
+
 bool
 LinearSum::multiply(int32_t scale)
 {

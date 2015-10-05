@@ -4017,6 +4017,20 @@ class LLambdaArrow : public LInstructionHelper<1, 1 + BOX_PIECES, 1>
     }
 };
 
+class LKeepAliveObject : public LInstructionHelper<0, 1, 0>
+{
+  public:
+    LIR_HEADER(KeepAliveObject)
+
+    explicit LKeepAliveObject(const LAllocation& object) {
+        setOperand(0, object);
+    }
+
+    const LAllocation* object() {
+        return getOperand(0);
+    }
+};
+
 // Load the "slots" member out of a JSObject.
 //   Input: JSObject pointer
 //   Output: slots pointer

@@ -7744,6 +7744,29 @@ class MSetTypedObjectOffset
     }
 };
 
+class MKeepAliveObject
+  : public MUnaryInstruction,
+    public SingleObjectPolicy::Data
+{
+    explicit MKeepAliveObject(MDefinition* object)
+      : MUnaryInstruction(object)
+    {
+        setResultType(MIRType_None);
+        setGuard();
+    }
+
+  public:
+    INSTRUCTION_HEADER(KeepAliveObject)
+
+    static MKeepAliveObject* New(TempAllocator& alloc, MDefinition* object) {
+        return new(alloc) MKeepAliveObject(object);
+    }
+
+    MDefinition* object() const {
+        return getOperand(0);
+    }
+};
+
 // Perform !-operation
 class MNot
   : public MUnaryInstruction,

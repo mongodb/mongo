@@ -227,6 +227,9 @@ class GlobalHelperThreadState
     }
 
     JSScript* finishParseTask(JSContext* maybecx, JSRuntime* rt, void* token);
+    void mergeParseTaskCompartment(JSRuntime* rt, ParseTask* parseTask,
+                                   Handle<GlobalObject*> global,
+                                   JSCompartment* dest);
     bool compressionInProgress(SourceCompressionTask* task);
     SourceCompressionTask* compressionTaskForSource(ScriptSource* ss);
 
