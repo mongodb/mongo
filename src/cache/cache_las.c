@@ -24,10 +24,12 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	/*
 	 * Lookaside table statistics are copied from the underlying lookaside
 	 * table data-source statistics. If there's no lookaside table, values
-	 * remain 0. In the current system, there's always a lookaside table,
-	 * but there's no reason not to be cautious.
+	 * remain 0.
+	 *
+	 * The statistics log is started before we create the lookaside table,
+	 * check the session and the cursor for validity.
 	 */
-	if (conn->las_session->las_cursor == NULL)
+	if (conn->las_session == NULL || conn->las_session->las_cursor == NULL)
 		return;
 
 	/*
