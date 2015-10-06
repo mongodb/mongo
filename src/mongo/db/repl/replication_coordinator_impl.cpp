@@ -2659,7 +2659,8 @@ void ReplicationCoordinatorImpl::_shouldChangeSyncSource(
         return;
     }
 
-    *shouldChange = _topCoord->shouldChangeSyncSource(currentSource, _replExecutor.now());
+    *shouldChange =
+        _topCoord->shouldChangeSyncSource(currentSource, getMyLastOptime(), _replExecutor.now());
 }
 
 bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource) {

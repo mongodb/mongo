@@ -2299,30 +2299,41 @@ long long TopologyCoordinatorImpl::getTerm() {
 }
 
 bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
+                                                     const OpTime& myLastOpTime,
                                                      Date_t now) const {
     // Methodology:
     // If there exists a viable sync source member other than currentSource, whose oplog has
     // reached an optime greater than _options.maxSyncSourceLagSecs later than currentSource's,
     // return true.
+    // If the currentSource has the same replication progress as we do and has no source for further
+    // progress, return true.
 
     // If the user requested a sync source change, return true.
     if (_forceSyncSourceIndex != -1) {
         return true;
     }
 
-    const int currentMemberIndex = _rsConfig.findMemberIndexByHostAndPort(currentSource);
-    if (currentMemberIndex == -1) {
+    const int currentSourceIndex = _rsConfig.findMemberIndexByHostAndPort(currentSource);
+    if (currentSourceIndex == -1) {
         return true;
     }
-    invariant(currentMemberIndex != _selfIndex);
+    invariant(currentSourceIndex != _selfIndex);
 
-    OpTime currentOpTime = _hbdata[currentMemberIndex].getOpTime();
-    if (currentOpTime.isNull()) {
+    const auto& currentSourceHBData = _hbdata[currentSourceIndex];
+    OpTime currentSourceOpTime = currentSourceHBData.getOpTime();
+
+    if (currentSourceOpTime.isNull()) {
         // Haven't received a heartbeat from the sync source yet, so can't tell if we should
         // change.
         return false;
     }
-    unsigned int currentSecs = currentOpTime.getSecs();
+
+    if (currentSourceHBData.getSyncSource().empty() && currentSourceOpTime <= myLastOpTime &&
+        currentSourceHBData.getState() != MemberState::RS_PRIMARY) {
+        return true;
+    }
+
+    unsigned int currentSecs = currentSourceOpTime.getSecs();
     unsigned int goalSecs = currentSecs + durationCount<Seconds>(_options.maxSyncSourceLagSecs);
 
     for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); it != _hbdata.end();
@@ -2334,7 +2345,7 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
             it->getState().readable() && !_memberIsBlacklisted(candidateConfig, now) &&
             goalSecs < it->getOpTime().getSecs()) {
             log() << "changing sync target because current sync target's most recent OpTime is "
-                  << currentOpTime.toString() << " which is more than "
+                  << currentSourceOpTime.toString() << " which is more than "
                   << _options.maxSyncSourceLagSecs << " behind member "
                   << candidateConfig.getHostAndPort().toString() << " whose most recent OpTime is "
                   << it->getOpTime().toString();

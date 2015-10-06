@@ -154,11 +154,14 @@ public:
     /**
      * Determines if a new sync source should be chosen, if a better candidate sync source is
      * available.  If the current sync source's last optime is more than _maxSyncSourceLagSecs
-     * behind any syncable source, this function returns true.
+     * behind any syncable source, this function returns true. If our current sync source is not
+     * primary, has no sync source, and only has data up to "myLastOpTime", returns true.
      *
      * "now" is used to skip over currently blacklisted sync sources.
      */
-    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource, Date_t now) const = 0;
+    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
+                                        const OpTime& myLastOpTime,
+                                        Date_t now) const = 0;
 
     /**
      * Checks whether we are a single node set and we are not in a stepdown period.  If so,

@@ -158,7 +158,9 @@ public:
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
     virtual void unblacklistSyncSource(const HostAndPort& host, Date_t now);
     virtual void clearSyncSourceBlacklist();
-    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource, Date_t now) const;
+    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
+                                        const OpTime& myLastOpTime,
+                                        Date_t now) const;
     virtual bool becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now);
     virtual void setElectionSleepUntil(Date_t newTime);
     virtual void setFollowerMode(MemberState::MS newMode);
