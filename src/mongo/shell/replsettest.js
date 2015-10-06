@@ -454,27 +454,13 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     var cmd     = {};
     var cmdKey  = initCmd || 'replSetInitiate';
     var timeout = timeout || 60000;
-    var ex;
     if (jsTestOptions().useLegacyReplicationProtocol && !config.hasOwnProperty("protocolVersion")) {
         config.protocolVersion = 0;
     }
     cmd[cmdKey] = config;
     printjson(cmd);
 
-    // TODO(schwerin): After removing the legacy implementation of replica sets, there should be no
-    // reason to try these commands more than once, so we should be able to get rid of assert.soon()
-    // here.
-    assert.soon(function () {
-        try {
-            assert.commandWorked(master.runCommand(cmd), tojson(cmd));
-            return true;
-        }
-        catch (ex) {
-            print("ReplSetTest caught exception " + tojson(ex) + " while running " + tojson(cmd) +
-                  " in assert.soon");
-            return false;
-        }
-    }, "Failed all attempts to run "  + tojson(cmd), timeout);
+    assert.commandWorked(master.runCommand(cmd), tojson(cmd));
     this.awaitSecondaryNodes(timeout);
 
     // Setup authentication if running test with authentication
