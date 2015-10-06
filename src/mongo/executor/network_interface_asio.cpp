@@ -43,6 +43,7 @@
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -95,6 +96,7 @@ std::string NetworkInterfaceASIO::getHostName() {
 
 void NetworkInterfaceASIO::startup() {
     _serviceRunner = stdx::thread([this]() {
+        setThreadName("NetworkInterfaceASIO");
         try {
             asio::io_service::work work(_io_service);
             _io_service.run();
