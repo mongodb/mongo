@@ -2,9 +2,7 @@
 // Tests cleanup of orphaned data via the orphaned data cleanup command
 //
 
-var options = { shardOptions : { verbose : 2 } };
-
-var st = new ShardingTest({ shards : 2, mongos : 2, other : options });
+var st = new ShardingTest({ shards: 2 });
 st.stopBalancer();
 
 var mongos = st.s0;

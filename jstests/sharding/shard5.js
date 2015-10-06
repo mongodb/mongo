@@ -10,6 +10,10 @@ s2 = s._mongos[1];
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
+if (s.configRS) {
+    // Ensure that the second mongos will see the movePrimary
+    s.configRS.awaitLastOpCommitted();
+}
 
 s.getDB( "test" ).foo.save( { num : 1 } );
 s.getDB( "test" ).foo.save( { num : 2 } );

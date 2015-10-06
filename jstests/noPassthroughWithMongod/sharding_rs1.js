@@ -1,6 +1,6 @@
 // tests sharding with replica sets
 
-var s = new ShardingTest({ shards: 3, verbose: 1, mongos: 2,
+var s = new ShardingTest({ shards: 3,
                            other: { rs: true , chunksize: 1, enableBalancer: true }});
 
 s.adminCommand( { enablesharding : "test" } );
