@@ -90,15 +90,15 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     if( isObject( testName ) ) {
         var params = Object.merge( testName, {} )
-        
+
         testName = params.name || "test"
         otherParams = Object.merge(otherParams, params);
         otherParams = Object.merge(params.other || {}, otherParams);
 
-        numShards = otherParams.shards || 2
-        verboseLevel = otherParams.verbose || 0
-        numMongos = otherParams.mongos || 1
-        numConfigs = otherParams.config || numConfigs;
+        numShards = otherParams.hasOwnProperty('shards') ? otherParams.shards : 2;
+        verboseLevel = otherParams.hasOwnProperty('verbose') ? otherParams.verbose : 0;
+        numMongos = otherParams.hasOwnProperty('mongos') ? otherParams.mongos : 1;
+        numConfigs = otherParams.hasOwnProperty('config') ? otherParams.config : numConfigs;
 
         var tempCount = 0;
         
