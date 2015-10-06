@@ -30,6 +30,7 @@
 
 #include <string>
 
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/jsobj.h"
 
@@ -209,6 +210,18 @@ TEST(GetMoreRequestTest, toBSONHasTerm) {
     BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection"
                                              << "testcoll"
                                              << "batchSize" << 99 << "term" << 1);
+    ASSERT_EQ(requestObj, expectedRequest);
+}
+
+TEST(GetMoreRequestTest, toBSONHasCommitLevel) {
+    GetMoreRequest request(
+        NamespaceString("testdb.testcoll"), 123, 99, 1, repl::OpTime(Timestamp(0, 10), 2));
+    BSONObj requestObj = request.toBSON();
+    BSONObj expectedRequest =
+        BSON("getMore" << CursorId(123) << "collection"
+                       << "testcoll"
+                       << "batchSize" << 99 << "term" << 1 << "lastKnownCommittedOpTime"
+                       << BSON("ts" << Timestamp(0, 10) << "t" << 2LL));
     ASSERT_EQ(requestObj, expectedRequest);
 }
 

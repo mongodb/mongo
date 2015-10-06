@@ -189,6 +189,10 @@ BSONObj GetMoreRequest::toBSON() const {
         builder.append(kTermField, *term);
     }
 
+    if (lastKnownCommittedOpTime) {
+        lastKnownCommittedOpTime->append(&builder, kLastKnownCommittedOpTimeField);
+    }
+
     return builder.obj();
 }
 
