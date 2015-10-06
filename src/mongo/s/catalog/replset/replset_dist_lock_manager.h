@@ -61,18 +61,19 @@ public:
     virtual ~ReplSetDistLockManager();
 
     virtual void startUp() override;
-    virtual void shutDown(bool allowNetworking) override;
+    virtual void shutDown(OperationContext* txn, bool allowNetworking) override;
 
     virtual StatusWith<DistLockManager::ScopedDistLock> lock(
+        OperationContext* txn,
         StringData name,
         StringData whyMessage,
         stdx::chrono::milliseconds waitFor,
         stdx::chrono::milliseconds lockTryInterval) override;
 
 protected:
-    virtual void unlock(const DistLockHandle& lockSessionID) override;
+    virtual void unlock(OperationContext* txn, const DistLockHandle& lockSessionID) override;
 
-    virtual Status checkStatus(const DistLockHandle& lockSessionID) override;
+    virtual Status checkStatus(OperationContext* txn, const DistLockHandle& lockSessionID) override;
 
 private:
     /**
@@ -94,7 +95,8 @@ private:
      * Returns true if the current process that owns the lock has no fresh pings since
      * the lock expiration threshold.
      */
-    StatusWith<bool> canOvertakeLock(const LocksType lockDoc,
+    StatusWith<bool> canOvertakeLock(OperationContext* txn,
+                                     const LocksType lockDoc,
                                      const stdx::chrono::milliseconds& lockExpiration);
 
     //

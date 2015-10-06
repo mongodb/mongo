@@ -297,7 +297,7 @@ Status checkAndInitConfigVersion(OperationContext* txn,
     string whyMessage(stream() << "initializing config database to new format v"
                                << CURRENT_CONFIG_VERSION);
     auto lockTimeout = stdx::chrono::minutes(20);
-    auto scopedDistLock = distLockManager->lock("configUpgrade", whyMessage, lockTimeout);
+    auto scopedDistLock = distLockManager->lock(txn, "configUpgrade", whyMessage, lockTimeout);
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
