@@ -305,7 +305,9 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
         fassertFailedNoTrace(28545);
     }
 
-    StatusWith<OpTime> lastOpTimeStatus = _externalState->loadLastOpTime(txn);
+    // Returns the last optime from the oplog, possibly truncating first if we need to recover.
+    _externalState->cleanUpLastApplyBatch(txn);
+    auto lastOpTimeStatus = _externalState->loadLastOpTime(txn);
 
     // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
     // that the server's networking layer be up and running and accepting connections, which
@@ -365,7 +367,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     OpTime lastOpTime;
     if (!isArbiter) {
         if (!lastOpTimeStatus.isOK()) {
-            warning() << "Failed to load timestamp of most recently applied operation; "
+            warning() << "Failed to load timestamp of most recently applied operation: "
                       << lastOpTimeStatus.getStatus();
         } else {
             lastOpTime = lastOpTimeStatus.getValue();

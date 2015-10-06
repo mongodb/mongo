@@ -52,6 +52,10 @@ class RecordId;
 namespace repl {
 class ReplSettings;
 
+/**
+ * Truncates the oplog after, and including, the "truncateTimestamp" entry.
+ */
+void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp);
 
 /**
  * Create a new capped collection for the oplog if it doesn't yet exist.

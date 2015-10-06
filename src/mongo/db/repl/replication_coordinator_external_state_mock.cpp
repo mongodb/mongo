@@ -142,6 +142,8 @@ void ReplicationCoordinatorExternalStateMock::setLocalLastVoteDocument(
 
 void ReplicationCoordinatorExternalStateMock::setGlobalTimestamp(const Timestamp& newTime) {}
 
+void ReplicationCoordinatorExternalStateMock::cleanUpLastApplyBatch(OperationContext* txn) {}
+
 StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::loadLastOpTime(OperationContext* txn) {
     return _lastOpTime;
 }

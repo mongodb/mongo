@@ -46,6 +46,7 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/global_timestamp.h"
@@ -435,6 +436,7 @@ void SyncTail::oplogApplication() {
 
     OperationContextImpl txn;
     OpTime originalEndOpTime(getMinValid(&txn).end);
+
     while (!inShutdown()) {
         OpQueue ops;
 

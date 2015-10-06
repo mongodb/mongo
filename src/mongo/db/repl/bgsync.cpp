@@ -106,7 +106,8 @@ Status checkRemoteOplogStart(stdx::function<StatusWith<BSONObj>()> getNextOperat
     if (opTime != lastOpTimeFetched || hash != lastHashFetched) {
         return Status(ErrorCodes::OplogStartMissing,
                       str::stream() << "our last op time fetched: " << lastOpTimeFetched.toString()
-                                    << ". source's GTE: " << opTime.toString());
+                                    << ". source's GTE: " << opTime.toString() << " hashes: ("
+                                    << lastHashFetched << "/" << hash << ")");
     }
     return Status::OK();
 }

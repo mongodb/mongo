@@ -294,6 +294,51 @@ OplogDocWriter _logOpWriter(OperationContext* txn,
 }
 }  // end anon namespace
 
+// Truncates the oplog to and including the "truncateTimestamp" entry.
+void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
+    const NamespaceString oplogNss(rsOplogName);
+    ScopedTransaction transaction(txn, MODE_IX);
+    AutoGetDb autoDb(txn, oplogNss.db(), MODE_IX);
+    Lock::CollectionLock oplogCollectionLoc(txn->lockState(), oplogNss.ns(), MODE_X);
+    Collection* oplogCollection = autoDb.getDb()->getCollection(oplogNss);
+    if (!oplogCollection) {
+        fassertFailedWithStatusNoTrace(
+            28820,
+            Status(ErrorCodes::NamespaceNotFound, str::stream() << "Can't find " << rsOplogName));
+    }
+
+    // Scan through oplog in reverse, from latest entry to first, to find the truncateTimestamp.
+    bool foundSomethingToTruncate = false;
+    RecordId lastRecordId;
+    BSONObj lastOplogEntry;
+    auto oplogRs = oplogCollection->getRecordStore();
+    auto oplogReverseCursor = oplogRs->getCursor(txn, false);
+    bool first = true;
+    while (auto next = oplogReverseCursor->next()) {
+        lastOplogEntry = next->data.releaseToBson();
+        lastRecordId = next->id;
+
+        const auto tsElem = lastOplogEntry["ts"];
+
+        if (first) {
+            if (tsElem.eoo())
+                LOG(2) << "Oplog tail entry: " << lastOplogEntry;
+            else
+                LOG(2) << "Oplog tail entry ts field: " << tsElem;
+            first = false;
+        }
+
+        if (tsElem.timestamp() < truncateTimestamp) {
+            break;
+        }
+
+        foundSomethingToTruncate = true;
+    }
+
+    if (foundSomethingToTruncate) {
+        oplogCollection->temp_cappedTruncateAfter(txn, lastRecordId, false);
+    }
+}
 /* we write to local.oplog.rs:
      { ts : ..., h: ..., v: ..., op: ..., etc }
    ts: an OpTime timestamp

@@ -145,6 +145,13 @@ public:
     virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn) = 0;
 
     /**
+     * Cleaning up the oplog, by potentially truncating:
+     * If we are recovering from a failed batch then minvalid.start though minvalid.end need
+     * to be removed from the oplog before we can start applying operations.
+     */
+    virtual void cleanUpLastApplyBatch(OperationContext* txn) = 0;
+
+    /**
      * Returns the HostAndPort of the remote client connected to us that initiated the operation
      * represented by "txn".
      */

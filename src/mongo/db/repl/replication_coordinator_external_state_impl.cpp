@@ -50,6 +50,7 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/master_slave.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/rs_sync.h"
@@ -84,6 +85,7 @@ const char tsFieldName[] = "ts";
 // Set this to false to disable the background creation of snapshots. This can be used for A-B
 // benchmarking to find how much overhead repl::SnapshotThread introduces.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableReplSnapshotThread, bool, true);
+
 }  // namespace
 
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl()
@@ -285,6 +287,16 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
 
 void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(const Timestamp& newTime) {
     setNewTimestamp(newTime);
+}
+
+void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationContext* txn) {
+    auto mv = getMinValid(txn);
+
+    if (!mv.start.isNull()) {
+        // If we are in the middle of a batch, and recoveringm then we need to truncate the oplog.
+        LOG(2) << "Recovering from a failed apply batch, start:" << mv.start.toBSON();
+        truncateOplogTo(txn, mv.start.getTimestamp());
+    }
 }
 
 StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(OperationContext* txn) {
