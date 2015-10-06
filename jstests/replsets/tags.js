@@ -1,187 +1,244 @@
-function myprint( x ) {
-    print( "tags output: " + x );
-}
+(function() {
+    'use strict';
 
-var num = 5;
-var host = getHostName();
-var name = "tags";
+    var num = 5;
+    var host = getHostName();
+    var name = 'tags';
 
-var replTest = new ReplSetTest( {name: name, nodes: num} );
-var nodes = replTest.startSet();
-var port = replTest.ports;
-replTest.initiate({_id : name, members :
-        [
-            {_id:0, host : host+":"+port[0], tags : {"server" : "0", "dc" : "ny", "ny" : "1", "rack" : "ny.rk1"}},
-            {_id:1, host : host+":"+port[1], tags : {"server" : "1", "dc" : "ny", "ny" : "2", "rack" : "ny.rk1"}},
-            {_id:2, host : host+":"+port[2], tags : {"server" : "2", "dc" : "ny", "ny" : "3", "rack" : "ny.rk2", "2" : "this"}},
-            {_id:3, host : host+":"+port[3], tags : {"server" : "3", "dc" : "sf", "sf" : "1", "rack" : "sf.rk1"}},
-            {_id:4, host : host+":"+port[4], tags : {"server" : "4", "dc" : "sf", "sf" : "2", "rack" : "sf.rk2"}},
+    var replTest = new ReplSetTest({name: name, nodes: num});
+    var nodes = replTest.nodeList();
+    replTest.startSet();
+    var port = replTest.ports;
+    replTest.initiate({
+        _id: name,
+        members : [
+            {
+                _id: 0,
+                host: nodes[0],
+                tags: {
+                    server: '0',
+                    dc: 'ny',
+                    ny: '1',
+                    rack: 'ny.rk1',
+                },
+            },
+            {
+                _id: 1,
+                host: nodes[1],
+                priority: 2,
+                tags: {
+                    server: '1',
+                    dc: 'ny',
+                    ny: '2',
+                    rack: 'ny.rk1',
+                },
+            },
+            {
+                _id: 2,
+                host: nodes[2],
+                priority: 3,
+                tags: {
+                    server: '2',
+                    dc: 'ny',
+                    ny: '3',
+                    rack: 'ny.rk2',
+                    2: 'this',
+                },
+            },
+            {
+                _id: 3,
+                host: nodes[3],
+                tags: {
+                    server: '3',
+                    dc: 'sf',
+                    sf: '1',
+                    rack: 'sf.rk1',
+                },
+            },
+            {
+                _id: 4,
+                host: nodes[4],
+                tags: {
+                    server: '4',
+                    dc: 'sf',
+                    sf: '2',
+                    rack: 'sf.rk2',
+                },
+            },
         ],
         settings : {
             getLastErrorModes : {
-                "2 dc and 3 server" : {"dc" : 2, "server" : 3},
-                "1 and 2" : {"server" : 1}
-            }
-        }});
+                '2 dc and 3 server': {
+                    dc: 2,
+                    server: 3,
+                },
+                '1 and 2': {
+                    2: 1,
+                    server: 1,
+                },
+                '2': {
+                    2: 1,
+                },
+                '3 and 4': {
+                    sf: 2,
+                },
+                '3 or 4': {
+                    sf: 1,
+                },
+            },
+        },
+    });
 
-var master = replTest.getMaster();
-// make everyone catch up before reconfig
-replTest.awaitReplication();
+    replTest.awaitReplication();
 
-var config = master.getDB("local").system.replset.findOne();
+    // Create collection to guard against timeouts due to file allocation.
+    assert.commandWorked(replTest.getPrimary().getDB('foo').createCollection('bar'));
+    replTest.awaitReplication();
 
-printjson(config);
-var modes = config.settings.getLastErrorModes;
-assert.eq(typeof modes, "object");
-assert.eq(modes["2 dc and 3 server"].dc, 2);
-assert.eq(modes["2 dc and 3 server"].server, 3);
-assert.eq(modes["1 and 2"]["server"], 1);
+    var ensurePrimary = function(nodeId, expectedWritableNodes) {
+        jsTestLog('Node ' + nodeId + ' (' + replTest.nodes[nodeId].host + ') should be primary.');
+        replTest.waitForState(replTest.nodes[nodeId], replTest.PRIMARY, 60 * 1000);
+        primary = replTest.getPrimary();
+        var writeConcern = {writeConcern: {w: expectedWritableNodes, wtimeout: 30 * 1000}};
+        assert.writeOK(primary.getDB('foo').bar.insert({x: 100}, writeConcern));
+        return primary;
+    };
 
-config.version++;
-config.members[1].priority = 1.5;
-config.members[2].priority = 2;
-modes["3 or 4"] = {"sf" : 1};
-modes["3 and 4"] = {"sf" : 2};
-modes["1 and 2"]["2"] = 1;
-modes["2"] = {"2" : 1}
+    // 2 should eventually stage a priority takeover from the primary.
+    var primary = ensurePrimary(2, 3);
 
-try {
-    master.getDB("admin").runCommand({replSetReconfig : config});
-}
-catch(e) {
-    myprint(e);
-}
+    jsTestLog('primary is now 2');
+    var config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
+    jsTestLog('test configuration = ' + tojson(config));
 
-assert.soon(function() {
-    try {
-        return nodes[2].getDB("admin").isMaster().ismaster;
-    } catch (x) {
-        return false;
-    }
-}, 'wait for 2 to be primary', 60000);
+    jsTestLog('bridging started');
+    replTest.bridge();
+    jsTestLog('bridge 1 of 7');
+    replTest.partition(0, 3);
+    jsTestLog('bridge 2 of 7');
+    replTest.partition(0, 4);
+    jsTestLog('bridge 3 of 7');
+    replTest.partition(1, 3);
+    jsTestLog('bridge 4 of 7');
+    replTest.partition(1, 4);
+    jsTestLog('bridge 5 of 7');
+    replTest.partition(2, 3);
+    jsTestLog('bridge 6 of 7');
+    replTest.partition(2, 4);
+    jsTestLog('bridge 7 of 7');
+    replTest.partition(3, 4);
+    jsTestLog('bridging finished');
 
-myprint("primary is now 2");
-master = replTest.getMaster();
-config = master.getDB("local").system.replset.findOne();
-printjson(config);
+    jsTestLog('partitions: nodes with each set of brackets [N1, N2, N3] form a complete network.');
+    jsTestLog('partitions: [0-1-2] [3] [4] (only nodes 0 and 1 can replicate from primary node 2');
 
-modes = config.settings.getLastErrorModes;
-assert.eq(typeof modes, "object");
-assert.eq(modes["2 dc and 3 server"].dc, 2);
-assert.eq(modes["2 dc and 3 server"].server, 3);
-assert.eq(modes["1 and 2"]["server"], 1);
-assert.eq(modes["3 or 4"]["sf"], 1);
-assert.eq(modes["3 and 4"]["sf"], 2);
+    var doc = {x: 1};
 
-// create collection to guard against timeouts due to file allocation
-assert.commandWorked(master.getDB("foo").createCollection("bar"));
-replTest.awaitReplication();
+    // This timeout should be shorter in duration than the server parameter maxSyncSourceLagSecs.
+    // Some writes are expected to block for this 'timeout' duration before failing.
+    // Depending on the order of heartbeats (containing last committed op time) received
+    // by a node, it might hang up on its sync source. This may cause some of the write concern
+    // tests to fail.
+    var timeout = 20 * 1000;
 
-myprint("bridging");
-replTest.bridge();
-myprint("bridge 1");
-replTest.partition(0, 3);
-myprint("bridge 2");
-replTest.partition(0, 4);
-myprint("bridge 3");
-replTest.partition(1, 3);
-myprint("bridge 4");
-replTest.partition(1, 4);
-myprint("bridge 5");
-replTest.partition(2, 3);
-myprint("bridge 6");
-replTest.partition(2, 4);
-myprint("bridge 7");
-replTest.partition(3, 4);
-myprint("done bridging");
+    jsTestLog('test1');
+    primary = ensurePrimary(2, 3);
 
-myprint("paritions: [0-1-2-0] [3] [4]")
-myprint("test1");
-myprint("2 should be primary");
-master = replTest.getMaster();
+    jsTestLog('Non-existent write concern should be rejected.');
+    options = {writeConcern: {w: 'blahblah', wtimeout: timeout}};
+    assert.writeOK(primary.getDB('foo').bar.insert(doc));
+    var result = assert.writeError(primary.getDB('foo').bar.insert(doc, options));
+    assert.neq(null, result.getWriteConcernError());
+    assert.eq(ErrorCodes.UnknownReplWriteConcern, result.getWriteConcernError().code,
+              tojson(result.getWriteConcernError()));
 
-printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
+    jsTestLog('Write concern "3 or 4" should fail - 3 and 4 are not connected to the primary.');
+    var options = {writeConcern: {w: '3 or 4', wtimeout: timeout}};
+    assert.writeOK(primary.getDB('foo').bar.insert(doc));
+    result = primary.getDB('foo').bar.insert(doc, options);
+    assert.neq(null, result.getWriteConcernError());
+    assert(result.getWriteConcernError().errInfo.wtimeout);
 
-var timeout = 30 * 1000;
+    replTest.unPartition(1,4);
+    jsTestLog('partitions: [0-1-2] [1-4] [3] ' +
+              '(all nodes besides node 3 can replicate from primary node 2)');
+    primary = ensurePrimary(2, 4);
 
-var options = { writeConcern: { w: "3 or 4", wtimeout: timeout }};
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-var result = master.getDB("foo").bar.insert({ x: 1 }, options);
-assert.neq(null, result.getWriteConcernError());
-assert(result.getWriteConcernError().errInfo.wtimeout);
+    jsTestLog('Write concern "3 or 4" should work - 4 is now connected to the primary ' +
+              primary.host + ' via node 1 ' + replTest.nodes[1].host);
+    options = {writeConcern: {w: '3 or 4', wtimeout: timeout}};
+    assert.writeOK(primary.getDB('foo').bar.insert(doc));
+    assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
-replTest.unPartition(1,4);
+    jsTestLog('Write concern "3 and 4" should fail - 3 is not connected to the primary.');
+    options = {writeConcern: {w: '3 and 4', wtimeout: timeout}};
+    assert.writeOK(primary.getDB('foo').bar.insert(doc));
+    result = assert.writeError(primary.getDB('foo').bar.insert(doc, options));
+    assert.neq(null, result.getWriteConcernError());
+    assert(result.getWriteConcernError().errInfo.wtimeout, tojson(result.getWriteConcernError()));
 
-myprint("partitions: [1-4] [0-1-2-0] [3]");
-myprint("test2");
-options = { writeConcern: { w: "3 or 4", wtimeout: timeout }};
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
+    replTest.unPartition(3,4);
+    jsTestLog('partitions: [0-1-2] [1-4] [3-4] ' +
+              '(all secondaries can replicate from primary node 2)');
+    primary = ensurePrimary(2, 5);
 
-myprint("partitions: [1-4] [0-1-2-0] [3]");
-myprint("test3");
-options = { writeConcern: { w: "3 and 4", wtimeout: timeout }};
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-result = assert.writeError(master.getDB("foo").bar.insert({ x: 1 }, options));
-assert.neq(null, result.getWriteConcernError());
-assert(result.getWriteConcernError().errInfo.wtimeout, tojson(result.getWriteConcernError()));
+    jsTestLog('31004 should sync from 31001 (31026)');
+    jsTestLog('31003 should sync from 31004 (31024)');
+    jsTestLog('Write concern "3 and 4" should work - ' +
+              'nodes 3 and 4 are connected to primary via node 1.');
+    options = {writeConcern: {w: '3 and 4', wtimeout: timeout}};
+    assert.writeOK(primary.getDB('foo').bar.insert(doc));
+    assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
-replTest.unPartition(3,4);
+    jsTestLog('Write concern "2" - writes to primary only.');
+    options = {writeConcern: {w: '2', wtimeout: 0}};
+    assert.writeOK(primary.getDB('foo').bar.insert(doc));
+    assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
-myprint("partitions: [0-4-3] [0-1-2-0]");
-myprint("31004 should sync from 31001 (31026)");
-myprint("31003 should sync from 31004 (31024)");
-myprint("test4");
-options = { writeConcern: { w: "3 and 4", wtimeout: timeout }};
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
+    jsTestLog('Write concern "1 and 2"');
+    options = {writeConcern: {w: '1 and 2', wtimeout: 0}};
+    assert.writeOK(primary.getDB('foo').bar.insert(doc));
+    assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
-myprint("non-existent w");
-options = { writeConcern: { w: "blahblah", wtimeout: timeout }};
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-result = assert.writeError(master.getDB("foo").bar.insert({ x: 1 }, options));
-assert.neq(null, result.getWriteConcernError());
-assert.eq(79, result.getWriteConcernError().code, tojson(result.getWriteConcernError()));
+    jsTestLog('Write concern "2 dc and 3 server"');
+    primary = ensurePrimary(2, 5);
+    options = {writeConcern: {w: '2 dc and 3 server', wtimeout: timeout}};
+    assert.writeOK(primary.getDB('foo').bar.insert(doc));
+    assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
-myprint("test mode 2");
-options = { writeConcern: { w: "2", wtimeout: 0 }};
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
+    jsTestLog('Bringing down current primary node 2 ' + primary.host +
+              ' to allow next higher priority node 1 ' + replTest.nodes[1].host +
+              ' to become primary.');
 
-myprint("test two on the primary");
-options = { writeConcern: { w: "1 and 2", wtimeout: 0 }};
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
+    // Is this necessary since 3 will be connected to the new primary via node 4?
+    replTest.unPartition(1,3);
 
-myprint("test5");
-options = { writeConcern: { w: "2 dc and 3 server", wtimeout: timeout }};
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
+    replTest.partition(2, 0);
+    replTest.partition(2, 1);
 
-replTest.unPartition(1,3);
+    // Is this necessary when we partition node 2 off from the rest of the nodes?
+    replTest.stop(2);
+    jsTestLog('partitions: [0-1] [2] [1-3-4] ' +
+    '(all secondaries except down node 2 can replicate from new primary node 1)');
 
-replTest.partition(2, 0);
-replTest.partition(2, 1);
-replTest.stop(2);
+    // Node 1 with slightly higher priority will take over.
+    jsTestLog('1 must become primary here because otherwise the other members will take too ' +
+              'long timing out their old sync threads');
+    primary = ensurePrimary(1, 4);
 
-// Node 1 with slightly higher priority will take over.
-replTest.waitForState(nodes[1], replTest.PRIMARY, 60 * 1000);
+    jsTestLog('Write concern "3 and 4" should still work with new primary node 1 ' + primary.host);
+    options = {writeConcern: {w: '3 and 4', wtimeout: timeout}};
+    assert.writeOK(primary.getDB('foo').bar.insert(doc));
+    assert.writeOK(primary.getDB('foo').bar.insert(doc, options));
 
-myprint("1 must become primary here because otherwise the other members will take too long " +
-        "timing out their old sync threads");
-master = replTest.getMaster();
+    jsTestLog('Write concern "2" should fail because node 2 ' + replTest.nodes[2].host +
+              ' is down.');
+    options = {writeConcern: {w: '2', wtimeout: timeout}};
+    assert.writeOK(primary.getDB('foo').bar.insert(doc));
+    result = assert.writeError(primary.getDB('foo').bar.insert(doc, options));
+    assert.neq(null, result.getWriteConcernError());
+    assert(result.getWriteConcernError().errInfo.wtimeout);
 
-myprint("test6");
-options = { writeConcern: { w: "3 and 4", wtimeout: timeout }};
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, options));
-
-myprint("test mode 2");
-options = { writeConcern: { w: "2", wtimeout: timeout }};
-assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-result = assert.writeError(master.getDB("foo").bar.insert({ x: 1 }, options));
-assert.neq(null, result.getWriteConcernError());
-assert(result.getWriteConcernError().errInfo.wtimeout);
-
-replTest.stopSet();
-myprint("\n\ntags.js SUCCESS\n\n");
+    replTest.stopSet();
+    jsTestLog('tags.js SUCCESS');
+}());
