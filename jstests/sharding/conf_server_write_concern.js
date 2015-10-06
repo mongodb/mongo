@@ -1,6 +1,5 @@
 /**
- * Test write concern with w parameter when writing directly to the config servers will
- * not cause an error.
+ * Test write concern with w parameter when writing directly to the config servers works as expected
  */
 function writeToConfigTest(){
     jsTestLog("Testing data writes to config server with write concern");

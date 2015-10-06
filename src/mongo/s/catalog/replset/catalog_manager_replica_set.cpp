@@ -869,7 +869,7 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* t
                                                              BSONObjBuilder* result) {
     BSONObj cmdToRun = cmdObj;
     {
-        // Make sure that the if the command has a write concern that it is w:1 or w:majority, and
+        // Make sure that if the command has a write concern that it is w:1 or w:majority, and
         // convert w:1 or no write concern to w:majority before sending.
         WriteConcernOptions writeConcern;
         const char* writeConcernFieldName = "writeConcern";
