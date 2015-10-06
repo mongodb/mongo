@@ -43,6 +43,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logger/ramlog.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/fail_point_service.h"
@@ -326,7 +327,9 @@ public:
             BSONObj res;
 
             try {
-                ScopedDbConnection connTo(chunkMoveState.getToShardCS());
+                // Use ShardConnection even though this operation isn't versioned to ensure that
+                // the ConfigServerMetadata gets sent along with the command.
+                ShardConnection connTo(chunkMoveState.getToShardCS(), "");
                 connTo->runCommand("admin", recvChunkStartBuilder.done(), res);
                 connTo.done();
             } catch (const DBException& e) {
