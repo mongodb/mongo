@@ -3,6 +3,7 @@
  * not cause an error.
  */
 function writeToConfigTest(){
+    jsTestLog("Testing data writes to config server with write concern");
     var st = new ShardingTest({ shards: 2 });
     var confDB = st.s.getDB( 'config' );
 
@@ -23,6 +24,7 @@ function writeToConfigTest(){
  * would trigger writes to config servers (in this test, split chunks is used).
  */
 function configTest(){
+    jsTestLog("Testing metadata writes to config server with write concern");
     var st = new ShardingTest({ shards: 1, rs: { oplogSize: 10 }, other: { chunkSize: 1 }});
      
     var mongos = st.s;
@@ -40,11 +42,17 @@ function configTest(){
     var currChunks = initChunks;
     var gleObj = null;
     var x = 0;
-     
-    while( currChunks <= initChunks ){
-        assert.writeOK(coll.insert({ x: x++ }, { writeConcern: { w: 'majority' }}));
+    var largeStr = new Array(1024*128).toString();
+
+    assert.soon(function() {
+        var bulk = coll.initializeUnorderedBulkOp();
+        for (var i = 0; i < 100; i++) {
+            bulk.insert({x: x++, largeStr: largeStr});
+        }
+        assert.writeOK(bulk.execute({w: 'majority'}));
         currChunks = chunkCount();
-    }
+        return currChunks > initChunks;
+    }, function() { return "currChunks: " + currChunks + ", initChunks: " + initChunks; });
 
     st.stop();
 }
