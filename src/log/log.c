@@ -368,8 +368,7 @@ __log_zero(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(zerobuf);
 	WT_DECL_RET;
 	WT_LOG *log;
-	wt_off_t off, partial;
-	uint32_t allocsize, bufsz, wrlen;
+	uint32_t allocsize, bufsz, off, partial, wrlen;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -383,7 +382,7 @@ __log_zero(WT_SESSION_IMPL *session,
 	 * If they're using smaller log files, cap it at the file size.
 	 */
 	if (conn->log_file_max < bufsz)
-		bufsz = conn->log_file_max;
+		bufsz = (uint32_t)conn->log_file_max;
 	WT_RET(__wt_scr_alloc(session, bufsz, &zerobuf));
 	memset(zerobuf->mem, 0, zerobuf->memsize);
 	WT_STAT_FAST_CONN_INCR(session, log_zero_fills);
@@ -393,14 +392,14 @@ __log_zero(WT_SESSION_IMPL *session,
 	 * we reach the beginning or we find a chunk that contains any non-zero
 	 * bytes.  Compare against a known zero byte chunk.
 	 */
-	off = start_off;
-	while (off < len) {
+	off = (uint32_t)start_off;
+	while (off < (uint32_t)len) {
 		/*
 		 * Typically we start to zero the file after the log header
 		 * and the bufsz is a sector-aligned size.  So we want to
 		 * align our writes when we can.
 		 */
-		partial = off % (wt_off_t)bufsz;
+		partial = off % bufsz;
 		if (partial != 0)
 			wrlen = bufsz - partial;
 		else
@@ -408,9 +407,10 @@ __log_zero(WT_SESSION_IMPL *session,
 		/*
 		 * Check if we're writing a partial amount at the end too.
 		 */
-		if (len - off < bufsz)
-			wrlen = len - off;
-		WT_ERR(__wt_write(session, fh, off, wrlen, zerobuf->mem));
+		if ((uint32_t)len - off < bufsz)
+			wrlen = (uint32_t)len - off;
+		WT_ERR(__wt_write(session,
+		    fh, (wt_off_t)off, wrlen, zerobuf->mem));
 		off += wrlen;
 	}
 err:	__wt_scr_free(session, &zerobuf);
