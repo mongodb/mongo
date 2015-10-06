@@ -548,10 +548,10 @@ __wt_debug_page(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile)
 /*
  * __debug_tree --
  *	Dump the in-memory information for a tree. Takes an explicit btree
- *	as one may not be set on the session here. This function will be called
- *	by API functions invoked from a debugger, as marking a btree to a
- *	session is complex, we take one as an argument. We mark the session
- *	to the btree in this function for use in the callers below.
+ *	as one may not be set on the session. This is often the case as this
+ *	function will be called from within a debugger, which makes setting a
+ *	btree complicated. We mark the session to the btree in this function
+ *	for use in the callers below.
  */
 static int
 __debug_tree(
