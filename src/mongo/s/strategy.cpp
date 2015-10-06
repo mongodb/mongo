@@ -574,7 +574,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
     if (useClusterClientCursor) {
         boost::optional<long long> batchSize;
         if (ntoreturn) {
-            batchSize = ntoreturn;
+            batchSize = abs(ntoreturn);
         }
         GetMoreRequest getMoreRequest(NamespaceString(ns), id, batchSize, boost::none, boost::none);
 

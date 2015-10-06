@@ -1081,6 +1081,16 @@ tasks:
       resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: sharding_jscore_passthrough_wire_ops_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility
+
+- <<: *task_template
   name: parallel
   commands:
   - func: "do setup"
@@ -1950,6 +1960,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -2067,6 +2078,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -2175,6 +2187,7 @@ buildvariants:
   - name: slow2_WT
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool_WT
   - name: unittests
 
@@ -2434,6 +2447,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -2532,6 +2546,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -2686,6 +2701,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -2777,6 +2793,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -2971,6 +2988,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -3094,6 +3112,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: tool_WT
   - name: unittests
@@ -4007,6 +4026,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: sharding_WT
   - name: slow1
   - name: slow1_WT
@@ -4160,6 +4180,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -4320,6 +4341,7 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: slow1
   - name: slow1_WT
   - name: slow2
@@ -4438,6 +4460,7 @@ buildvariants:
   - name: sharded_collections_jscore_passthrough_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
   - name: ssl
   - name: sslSpecial
   - name: tool

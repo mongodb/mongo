@@ -15,4 +15,4 @@ executor:
           TestData:
             useLegacyConfigServers: true
         nodb: ''
-        readMode: legacy
+        readMode: commands
