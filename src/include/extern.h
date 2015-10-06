@@ -337,7 +337,7 @@ extern int __wt_log_get_all_files(WT_SESSION_IMPL *session, char ***filesp, u_in
 extern void __wt_log_files_free(WT_SESSION_IMPL *session, char **files, u_int count);
 extern int __wt_log_extract_lognum( WT_SESSION_IMPL *session, const char *name, uint32_t *id);
 extern int __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot);
-extern int __wt_log_allocfile( WT_SESSION_IMPL *session, uint32_t lognum, const char *dest, bool prealloc);
+extern int __wt_log_allocfile( WT_SESSION_IMPL *session, uint32_t lognum, const char *dest);
 extern int __wt_log_remove(WT_SESSION_IMPL *session, const char *file_prefix, uint32_t lognum);
 extern int __wt_log_open(WT_SESSION_IMPL *session);
 extern int __wt_log_close(WT_SESSION_IMPL *session);

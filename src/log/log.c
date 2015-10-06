@@ -822,7 +822,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	if (create_log) {
 		log->prep_missed++;
 		WT_RET(__wt_log_allocfile(
-		    session, log->fileid, WT_LOG_FILENAME, true));
+		    session, log->fileid, WT_LOG_FILENAME));
 	}
 	WT_RET(__log_openfile(session,
 	    false, &log->log_fh, WT_LOG_FILENAME, log->fileid));
@@ -973,7 +973,7 @@ err:	WT_TRET(__wt_close(session, &log_fh));
  */
 int
 __wt_log_allocfile(
-    WT_SESSION_IMPL *session, uint32_t lognum, const char *dest, bool prealloc)
+    WT_SESSION_IMPL *session, uint32_t lognum, const char *dest)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(from_path);
@@ -1005,8 +1005,7 @@ __wt_log_allocfile(
 	WT_ERR(__log_openfile(session, true, &log_fh, WT_LOG_TMPNAME, tmp_id));
 	WT_ERR(__log_file_header(session, log_fh, NULL, true));
 	WT_ERR(__wt_ftruncate(session, log_fh, WT_LOG_FIRST_RECORD));
-	if (prealloc)
-		WT_ERR(__log_prealloc(session, log_fh));
+	WT_ERR(__log_prealloc(session, log_fh));
 	WT_ERR(__wt_fsync(session, log_fh));
 	WT_ERR(__wt_close(session, &log_fh));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
