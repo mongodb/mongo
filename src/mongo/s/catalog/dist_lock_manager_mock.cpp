@@ -59,16 +59,12 @@ DistLockManagerMock::DistLockManagerMock()
 
 void DistLockManagerMock::startUp() {}
 
-void DistLockManagerMock::shutDown(OperationContext* txn, bool allowNetworking) {
+void DistLockManagerMock::shutDown(bool allowNetworking) {
     uassert(28659, "DistLockManagerMock shut down with outstanding locks present", _locks.empty());
 }
 
 StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lock(
-    OperationContext* txn,
-    StringData name,
-    StringData whyMessage,
-    milliseconds waitFor,
-    milliseconds lockTryInterval) {
+    StringData name, StringData whyMessage, milliseconds waitFor, milliseconds lockTryInterval) {
     _lockChecker(name, whyMessage, waitFor, lockTryInterval);
     _lockChecker = NoLockFuncSet;
 
@@ -88,10 +84,10 @@ StatusWith<DistLockManager::ScopedDistLock> DistLockManagerMock::lock(
     info.lockID = DistLockHandle::gen();
     _locks.push_back(info);
 
-    return DistLockManager::ScopedDistLock(nullptr, info.lockID, this);
+    return DistLockManager::ScopedDistLock(info.lockID, this);
 }
 
-void DistLockManagerMock::unlock(OperationContext* txn, const DistLockHandle& lockHandle) {
+void DistLockManagerMock::unlock(const DistLockHandle& lockHandle) {
     std::vector<LockInfo>::iterator it =
         std::find_if(_locks.begin(),
                      _locks.end(),
@@ -102,7 +98,7 @@ void DistLockManagerMock::unlock(OperationContext* txn, const DistLockHandle& lo
     _locks.erase(it);
 }
 
-Status DistLockManagerMock::checkStatus(OperationContext* txn, const DistLockHandle& lockHandle) {
+Status DistLockManagerMock::checkStatus(const DistLockHandle& lockHandle) {
     return Status::OK();
 }
 

@@ -345,7 +345,6 @@ OpTime ShardRegistry::getConfigOpTime() {
 }
 
 StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
-    OperationContext* txn,
     const ReadPreferenceSetting& readPref,
     const NamespaceString& nss,
     const BSONObj& query,
@@ -492,8 +491,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandForAddShard(OperationContext* txn,
     return status.getValue().response;
 }
 
-StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(OperationContext* txn,
-                                                      const ReadPreferenceSetting& readPref,
+StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(const ReadPreferenceSetting& readPref,
                                                       const std::string& dbName,
                                                       const BSONObj& cmdObj) {
     auto response = _runCommandWithMetadata(
@@ -512,8 +510,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(OperationContext* txn,
     return response.getValue().response;
 }
 
-StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(OperationContext* txn,
-                                                                          const std::string& dbname,
+StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
                                                                           const BSONObj& cmdObj) {
     auto response = _runCommandWithNotMasterRetries(
         _executor.get(), getConfigShard(), dbname, cmdObj, kReplMetadata);

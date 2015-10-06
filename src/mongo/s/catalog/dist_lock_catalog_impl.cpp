@@ -153,10 +153,9 @@ DistLockCatalogImpl::DistLockCatalogImpl(ShardRegistry* shardRegistry,
 
 DistLockCatalogImpl::~DistLockCatalogImpl() = default;
 
-StatusWith<LockpingsType> DistLockCatalogImpl::getPing(OperationContext* txn,
-                                                       StringData processID) {
+StatusWith<LockpingsType> DistLockCatalogImpl::getPing(StringData processID) {
     auto findResult = _findOnConfig(
-        txn, kReadPref, _lockPingNS, BSON(LockpingsType::process() << processID), BSONObj(), 1);
+        kReadPref, _lockPingNS, BSON(LockpingsType::process() << processID), BSONObj(), 1);
 
     if (!findResult.isOK()) {
         return findResult.getStatus();
@@ -180,7 +179,7 @@ StatusWith<LockpingsType> DistLockCatalogImpl::getPing(OperationContext* txn,
     return pingDocResult.getValue();
 }
 
-Status DistLockCatalogImpl::ping(OperationContext* txn, StringData processID, Date_t ping) {
+Status DistLockCatalogImpl::ping(StringData processID, Date_t ping) {
     auto request =
         FindAndModifyRequest::makeUpdate(_lockPingNS,
                                          BSON(LockpingsType::process() << processID),
@@ -188,8 +187,8 @@ Status DistLockCatalogImpl::ping(OperationContext* txn, StringData processID, Da
     request.setUpsert(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandOnConfigWithNotMasterRetries(
-        txn, _locksNS.db().toString(), request.toBSON());
+    auto resultStatus =
+        _client->runCommandOnConfigWithNotMasterRetries(_locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -200,8 +199,7 @@ Status DistLockCatalogImpl::ping(OperationContext* txn, StringData processID, Da
     return findAndModifyStatus.getStatus();
 }
 
-StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* txn,
-                                                    StringData lockID,
+StatusWith<LocksType> DistLockCatalogImpl::grabLock(StringData lockID,
                                                     const OID& lockSessionID,
                                                     StringData who,
                                                     StringData processId,
@@ -220,8 +218,8 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* txn,
     request.setShouldReturnNew(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandOnConfigWithNotMasterRetries(
-        txn, _locksNS.db().toString(), request.toBSON());
+    auto resultStatus =
+        _client->runCommandOnConfigWithNotMasterRetries(_locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -251,8 +249,7 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* txn,
     return locksTypeResult.getValue();
 }
 
-StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* txn,
-                                                        StringData lockID,
+StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(StringData lockID,
                                                         const OID& lockSessionID,
                                                         const OID& currentHolderTS,
                                                         StringData who,
@@ -274,8 +271,8 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* txn,
     request.setShouldReturnNew(true);
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandOnConfigWithNotMasterRetries(
-        txn, _locksNS.db().toString(), request.toBSON());
+    auto resultStatus =
+        _client->runCommandOnConfigWithNotMasterRetries(_locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -299,15 +296,15 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* txn,
     return locksTypeResult.getValue();
 }
 
-Status DistLockCatalogImpl::unlock(OperationContext* txn, const OID& lockSessionID) {
+Status DistLockCatalogImpl::unlock(const OID& lockSessionID) {
     auto request = FindAndModifyRequest::makeUpdate(
         _locksNS,
         BSON(LocksType::lockID(lockSessionID)),
         BSON("$set" << BSON(LocksType::state(LocksType::UNLOCKED))));
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandOnConfigWithNotMasterRetries(
-        txn, _locksNS.db().toString(), request.toBSON());
+    auto resultStatus =
+        _client->runCommandOnConfigWithNotMasterRetries(_locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -327,9 +324,8 @@ Status DistLockCatalogImpl::unlock(OperationContext* txn, const OID& lockSession
     return findAndModifyStatus;
 }
 
-StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(OperationContext* txn) {
-    auto resultStatus =
-        _client->runCommandOnConfig(txn, kReadPref, "admin", BSON("serverStatus" << 1));
+StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo() {
+    auto resultStatus = _client->runCommandOnConfig(kReadPref, "admin", BSON("serverStatus" << 1));
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -360,10 +356,9 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(Opera
     return DistLockCatalog::ServerInfo(localTimeElem.date(), electionIdStatus.getValue());
 }
 
-StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(OperationContext* txn,
-                                                       const OID& lockSessionID) {
-    auto findResult = _findOnConfig(
-        txn, kReadPref, _locksNS, BSON(LocksType::lockID(lockSessionID)), BSONObj(), 1);
+StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(const OID& lockSessionID) {
+    auto findResult =
+        _findOnConfig(kReadPref, _locksNS, BSON(LocksType::lockID(lockSessionID)), BSONObj(), 1);
 
     if (!findResult.isOK()) {
         return findResult.getStatus();
@@ -387,9 +382,9 @@ StatusWith<LocksType> DistLockCatalogImpl::getLockByTS(OperationContext* txn,
     return locksTypeResult.getValue();
 }
 
-StatusWith<LocksType> DistLockCatalogImpl::getLockByName(OperationContext* txn, StringData name) {
+StatusWith<LocksType> DistLockCatalogImpl::getLockByName(StringData name) {
     auto findResult =
-        _findOnConfig(txn, kReadPref, _locksNS, BSON(LocksType::name() << name), BSONObj(), 1);
+        _findOnConfig(kReadPref, _locksNS, BSON(LocksType::name() << name), BSONObj(), 1);
 
     if (!findResult.isOK()) {
         return findResult.getStatus();
@@ -413,13 +408,13 @@ StatusWith<LocksType> DistLockCatalogImpl::getLockByName(OperationContext* txn, 
     return locksTypeResult.getValue();
 }
 
-Status DistLockCatalogImpl::stopPing(OperationContext* txn, StringData processId) {
+Status DistLockCatalogImpl::stopPing(StringData processId) {
     auto request =
         FindAndModifyRequest::makeRemove(_lockPingNS, BSON(LockpingsType::process() << processId));
     request.setWriteConcern(_writeConcern);
 
-    auto resultStatus = _client->runCommandOnConfigWithNotMasterRetries(
-        txn, _locksNS.db().toString(), request.toBSON());
+    auto resultStatus =
+        _client->runCommandOnConfigWithNotMasterRetries(_locksNS.db().toString(), request.toBSON());
 
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -432,15 +427,13 @@ Status DistLockCatalogImpl::stopPing(OperationContext* txn, StringData processId
 }
 
 StatusWith<vector<BSONObj>> DistLockCatalogImpl::_findOnConfig(
-    OperationContext* txn,
     const ReadPreferenceSetting& readPref,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
     repl::ReadConcernArgs readConcern(boost::none, repl::ReadConcernLevel::kMajorityReadConcern);
-    auto result =
-        _client->exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit, readConcern);
+    auto result = _client->exhaustiveFindOnConfig(readPref, nss, query, sort, limit, readConcern);
 
     if (!result.isOK()) {
         return result.getStatus();

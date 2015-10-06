@@ -50,10 +50,9 @@ public:
     virtual ~LegacyDistLockManager() = default;
 
     virtual void startUp() override;
-    virtual void shutDown(OperationContext* txn, bool allowNetworking) override;
+    virtual void shutDown(bool allowNetworking) override;
 
     virtual StatusWith<DistLockManager::ScopedDistLock> lock(
-        OperationContext* txn,
         StringData name,
         StringData whyMessage,
         stdx::chrono::milliseconds waitFor,
@@ -63,10 +62,9 @@ public:
     void enablePinger(bool enable);
 
 protected:
-    virtual void unlock(OperationContext* txn,
-                        const DistLockHandle& lockHandle) BOOST_NOEXCEPT override;
+    virtual void unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT override;
 
-    virtual Status checkStatus(OperationContext* txn, const DistLockHandle& lockHandle) override;
+    virtual Status checkStatus(const DistLockHandle& lockHandle) override;
 
 private:
     const ConnectionString _configServer;

@@ -201,7 +201,6 @@ public:
      * Note: should never be used outside of CatalogManagerReplicaSet or DistLockCatalogImpl.
      */
     StatusWith<QueryResponse> exhaustiveFindOnConfig(
-        OperationContext* txn,
         const ReadPreferenceSetting& readPref,
         const NamespaceString& nss,
         const BSONObj& query,
@@ -241,8 +240,7 @@ public:
      * the result.  It is the responsibility of the caller to check the returned BSON for
      * command-specific failures.
      */
-    StatusWith<BSONObj> runCommandOnConfig(OperationContext* txn,
-                                           const ReadPreferenceSetting& readPref,
+    StatusWith<BSONObj> runCommandOnConfig(const ReadPreferenceSetting& readPref,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj);
 
@@ -262,8 +260,7 @@ public:
                                                        const std::string& dbname,
                                                        const BSONObj& cmdObj);
 
-    StatusWith<BSONObj> runCommandOnConfigWithNotMasterRetries(OperationContext* txn,
-                                                               const std::string& dbname,
+    StatusWith<BSONObj> runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
                                                                const BSONObj& cmdObj);
 
 private:

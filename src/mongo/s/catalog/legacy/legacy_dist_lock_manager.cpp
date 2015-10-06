@@ -58,7 +58,7 @@ void LegacyDistLockManager::startUp() {
     _pinger = stdx::make_unique<LegacyDistLockPinger>();
 }
 
-void LegacyDistLockManager::shutDown(OperationContext* txn, bool allowNetworking) {
+void LegacyDistLockManager::shutDown(bool allowNetworking) {
     stdx::unique_lock<stdx::mutex> sl(_mutex);
     _isStopped = true;
 
@@ -72,11 +72,7 @@ void LegacyDistLockManager::shutDown(OperationContext* txn, bool allowNetworking
 }
 
 StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
-    OperationContext* txn,
-    StringData name,
-    StringData whyMessage,
-    milliseconds waitFor,
-    milliseconds lockTryInterval) {
+    StringData name, StringData whyMessage, milliseconds waitFor, milliseconds lockTryInterval) {
     auto distLock = stdx::make_unique<DistributedLock>(_configServer, name.toString());
 
     {
@@ -139,7 +135,7 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
                 _lockMap.insert(std::make_pair(lock.getLockID(), std::move(distLock)));
             }
 
-            return ScopedDistLock(txn, lock.getLockID(), this);
+            return ScopedDistLock(lock.getLockID(), this);
         }
 
         if (waitFor == milliseconds::zero())
@@ -165,8 +161,7 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
     return lastStatus;
 }
 
-void LegacyDistLockManager::unlock(OperationContext* txn,
-                                   const DistLockHandle& lockHandle) BOOST_NOEXCEPT {
+void LegacyDistLockManager::unlock(const DistLockHandle& lockHandle) BOOST_NOEXCEPT {
     unique_ptr<DistributedLock> distLock;
 
     {
@@ -190,7 +185,7 @@ void LegacyDistLockManager::unlock(OperationContext* txn,
     }
 }
 
-Status LegacyDistLockManager::checkStatus(OperationContext* txn, const DistLockHandle& lockHandle) {
+Status LegacyDistLockManager::checkStatus(const DistLockHandle& lockHandle) {
     // Note: this should not happen when locks are managed through ScopedDistLock.
     if (_pinger->willUnlockOID(lockHandle)) {
         return Status(ErrorCodes::LockFailed,

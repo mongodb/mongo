@@ -37,7 +37,6 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -104,10 +103,6 @@ public:
         }
     }
 
-    OperationContext* txn() {
-        return &_txn;
-    }
-
 private:
     void setUp() override {
         auto networkUniquePtr = stdx::make_unique<executor::NetworkInterfaceMock>();
@@ -144,7 +139,6 @@ private:
 
     std::unique_ptr<ShardRegistry> _shardRegistry;
     std::unique_ptr<DistLockCatalogImpl> _distLockCatalog;
-    OperationContextNoop _txn;
 };
 
 void checkReadConcern(const BSONObj& findCmd) {
@@ -156,7 +150,7 @@ void checkReadConcern(const BSONObj& findCmd) {
 TEST_F(DistLockCatalogFixture, BasicPing) {
     auto future = launchAsync([this] {
         Date_t ping(dateFromISOString("2014-03-11T09:17:18.098Z").getValue());
-        auto status = catalog()->ping(txn(), "abcd", ping);
+        auto status = catalog()->ping("abcd", ping);
         ASSERT_OK(status);
     });
 
@@ -192,21 +186,21 @@ TEST_F(DistLockCatalogFixture, BasicPing) {
 
 TEST_F(DistLockCatalogFixture, PingTargetError) {
     targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status = catalog()->ping(txn(), "abcd", Date_t::now());
+    auto status = catalog()->ping("abcd", Date_t::now());
     ASSERT_NOT_OK(status);
 }
 
 TEST_F(DistLockCatalogFixture, PingRunCmdError) {
     shutdownShardRegistry();
 
-    auto status = catalog()->ping(txn(), "abcd", Date_t::now());
+    auto status = catalog()->ping("abcd", Date_t::now());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
 TEST_F(DistLockCatalogFixture, PingCommandError) {
     auto future = launchAsync([this] {
-        auto status = catalog()->ping(txn(), "abcd", Date_t::now());
+        auto status = catalog()->ping("abcd", Date_t::now());
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -224,7 +218,7 @@ TEST_F(DistLockCatalogFixture, PingCommandError) {
 
 TEST_F(DistLockCatalogFixture, PingWriteError) {
     auto future = launchAsync([this] {
-        auto status = catalog()->ping(txn(), "abcd", Date_t::now());
+        auto status = catalog()->ping("abcd", Date_t::now());
         ASSERT_EQUALS(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -242,7 +236,7 @@ TEST_F(DistLockCatalogFixture, PingWriteError) {
 
 TEST_F(DistLockCatalogFixture, PingWriteConcernError) {
     auto future = launchAsync([this] {
-        auto status = catalog()->ping(txn(), "abcd", Date_t::now());
+        auto status = catalog()->ping("abcd", Date_t::now());
         ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -263,7 +257,7 @@ TEST_F(DistLockCatalogFixture, PingWriteConcernError) {
 
 TEST_F(DistLockCatalogFixture, PingUnsupportedWriteConcernResponse) {
     auto future = launchAsync([this] {
-        auto status = catalog()->ping(txn(), "abcd", Date_t::now());
+        auto status = catalog()->ping("abcd", Date_t::now());
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -285,7 +279,7 @@ TEST_F(DistLockCatalogFixture, PingUnsupportedWriteConcernResponse) {
 
 TEST_F(DistLockCatalogFixture, PingUnsupportedResponseFormat) {
     auto future = launchAsync([this] {
-        auto status = catalog()->ping(txn(), "abcd", Date_t::now());
+        auto status = catalog()->ping("abcd", Date_t::now());
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
     });
 
@@ -302,7 +296,7 @@ TEST_F(DistLockCatalogFixture, GrabLockNoOp) {
         OID myID("555f80be366c194b13fb0372");
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
         auto resultStatus =
-            catalog()->grabLock(txn(), "test", myID, "me", "mongos", now, "because").getStatus();
+            catalog()->grabLock("test", myID, "me", "mongos", now, "because").getStatus();
 
         ASSERT_EQUALS(ErrorCodes::LockStateChangeFailed, resultStatus.code());
     });
@@ -341,8 +335,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWithNewDoc) {
     auto future = launchAsync([this] {
         OID myID("555f80be366c194b13fb0372");
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
-        auto resultStatus =
-            catalog()->grabLock(txn(), "test", myID, "me", "mongos", now, "because");
+        auto resultStatus = catalog()->grabLock("test", myID, "me", "mongos", now, "because");
         ASSERT_OK(resultStatus.getStatus());
 
         const auto& lockDoc = resultStatus.getValue();
@@ -403,7 +396,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWithNewDoc) {
 TEST_F(DistLockCatalogFixture, GrabLockWithBadLockDoc) {
     auto future = launchAsync([this] {
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
-        auto resultStatus = catalog()->grabLock(txn(), "test", OID(), "", "", now, "").getStatus();
+        auto resultStatus = catalog()->grabLock("test", OID(), "", "", now, "").getStatus();
         ASSERT_EQUALS(ErrorCodes::FailedToParse, resultStatus.code());
     });
 
@@ -434,22 +427,21 @@ TEST_F(DistLockCatalogFixture, GrabLockWithBadLockDoc) {
 
 TEST_F(DistLockCatalogFixture, GrabLockTargetError) {
     targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status = catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
+    auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
     ASSERT_NOT_OK(status);
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockRunCmdError) {
     shutdownShardRegistry();
 
-    auto status = catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
+    auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
 TEST_F(DistLockCatalogFixture, GrabLockCommandError) {
     auto future = launchAsync([this] {
-        auto status =
-            catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
+        auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -467,8 +459,7 @@ TEST_F(DistLockCatalogFixture, GrabLockCommandError) {
 
 TEST_F(DistLockCatalogFixture, GrabLockDupKeyError) {
     auto future = launchAsync([this] {
-        auto status =
-            catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
+        auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::LockStateChangeFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -486,8 +477,7 @@ TEST_F(DistLockCatalogFixture, GrabLockDupKeyError) {
 
 TEST_F(DistLockCatalogFixture, GrabLockWriteError) {
     auto future = launchAsync([this] {
-        auto status =
-            catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
+        auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -505,8 +495,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWriteError) {
 
 TEST_F(DistLockCatalogFixture, GrabLockWriteConcernError) {
     auto future = launchAsync([this] {
-        auto status =
-            catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
+        auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -527,8 +516,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWriteConcernError) {
 
 TEST_F(DistLockCatalogFixture, GrabLockWriteConcernErrorBadType) {
     auto future = launchAsync([this] {
-        auto status =
-            catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
+        auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::TypeMismatch, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -547,8 +535,7 @@ TEST_F(DistLockCatalogFixture, GrabLockWriteConcernErrorBadType) {
 
 TEST_F(DistLockCatalogFixture, GrabLockResponseMissingValueField) {
     auto future = launchAsync([this] {
-        auto status =
-            catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
+        auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -564,8 +551,7 @@ TEST_F(DistLockCatalogFixture, GrabLockResponseMissingValueField) {
 
 TEST_F(DistLockCatalogFixture, GrabLockUnsupportedWriteConcernResponse) {
     auto future = launchAsync([this] {
-        auto status =
-            catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
+        auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -587,8 +573,7 @@ TEST_F(DistLockCatalogFixture, GrabLockUnsupportedWriteConcernResponse) {
 
 TEST_F(DistLockCatalogFixture, GrabLockUnsupportedResponseFormat) {
     auto future = launchAsync([this] {
-        auto status =
-            catalog()->grabLock(txn(), "", OID::gen(), "", "", Date_t::now(), "").getStatus();
+        auto status = catalog()->grabLock("", OID::gen(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
     });
 
@@ -607,7 +592,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockNoOp) {
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
         auto resultStatus =
             catalog()
-                ->overtakeLock(txn(), "test", myID, currentOwner, "me", "mongos", now, "because")
+                ->overtakeLock("test", myID, currentOwner, "me", "mongos", now, "because")
                 .getStatus();
 
         ASSERT_EQUALS(ErrorCodes::LockStateChangeFailed, resultStatus.code());
@@ -652,8 +637,8 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWithNewDoc) {
         OID myID("555f80be366c194b13fb0372");
         OID currentOwner("555f99712c99a78c5b083358");
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
-        auto resultStatus = catalog()->overtakeLock(
-            txn(), "test", myID, currentOwner, "me", "mongos", now, "because");
+        auto resultStatus =
+            catalog()->overtakeLock("test", myID, currentOwner, "me", "mongos", now, "because");
         ASSERT_OK(resultStatus.getStatus());
 
         const auto& lockDoc = resultStatus.getValue();
@@ -719,7 +704,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWithBadLockDoc) {
     auto future = launchAsync([this] {
         Date_t now(dateFromISOString("2015-05-22T19:17:18.098Z").getValue());
         auto resultStatus =
-            catalog()->overtakeLock(txn(), "test", OID(), OID(), "", "", now, "").getStatus();
+            catalog()->overtakeLock("test", OID(), OID(), "", "", now, "").getStatus();
         ASSERT_EQUALS(ErrorCodes::FailedToParse, resultStatus.code());
     });
 
@@ -750,16 +735,14 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWithBadLockDoc) {
 
 TEST_F(DistLockCatalogFixture, OvertakeLockTargetError) {
     targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status =
-        catalog()->overtakeLock(txn(), "", OID(), OID(), "", "", Date_t::now(), "").getStatus();
+    auto status = catalog()->overtakeLock("", OID(), OID(), "", "", Date_t::now(), "").getStatus();
     ASSERT_NOT_OK(status);
 }
 
 TEST_F(DistLockCatalogFixture, OvertakeLockRunCmdError) {
     shutdownShardRegistry();
 
-    auto status =
-        catalog()->overtakeLock(txn(), "", OID(), OID(), "", "", Date_t::now(), "").getStatus();
+    auto status = catalog()->overtakeLock("", OID(), OID(), "", "", Date_t::now(), "").getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
@@ -767,7 +750,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockRunCmdError) {
 TEST_F(DistLockCatalogFixture, OvertakeLockCommandError) {
     auto future = launchAsync([this] {
         auto status =
-            catalog()->overtakeLock(txn(), "", OID(), OID(), "", "", Date_t::now(), "").getStatus();
+            catalog()->overtakeLock("", OID(), OID(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -786,7 +769,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockCommandError) {
 TEST_F(DistLockCatalogFixture, OvertakeLockWriteError) {
     auto future = launchAsync([this] {
         auto status =
-            catalog()->overtakeLock(txn(), "", OID(), OID(), "", "", Date_t::now(), "").getStatus();
+            catalog()->overtakeLock("", OID(), OID(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -805,7 +788,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWriteError) {
 TEST_F(DistLockCatalogFixture, OvertakeLockWriteConcernError) {
     auto future = launchAsync([this] {
         auto status =
-            catalog()->overtakeLock(txn(), "", OID(), OID(), "", "", Date_t::now(), "").getStatus();
+            catalog()->overtakeLock("", OID(), OID(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -827,7 +810,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockWriteConcernError) {
 TEST_F(DistLockCatalogFixture, OvertakeLockUnsupportedWriteConcernResponse) {
     auto future = launchAsync([this] {
         auto status =
-            catalog()->overtakeLock(txn(), "", OID(), OID(), "", "", Date_t::now(), "").getStatus();
+            catalog()->overtakeLock("", OID(), OID(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -850,7 +833,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockUnsupportedWriteConcernResponse) {
 TEST_F(DistLockCatalogFixture, OvertakeLockUnsupportedResponseFormat) {
     auto future = launchAsync([this] {
         auto status =
-            catalog()->overtakeLock(txn(), "", OID(), OID(), "", "", Date_t::now(), "").getStatus();
+            catalog()->overtakeLock("", OID(), OID(), "", "", Date_t::now(), "").getStatus();
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
     });
 
@@ -864,7 +847,7 @@ TEST_F(DistLockCatalogFixture, OvertakeLockUnsupportedResponseFormat) {
 
 TEST_F(DistLockCatalogFixture, BasicUnlock) {
     auto future = launchAsync([this] {
-        auto status = catalog()->unlock(txn(), OID("555f99712c99a78c5b083358"));
+        auto status = catalog()->unlock(OID("555f99712c99a78c5b083358"));
         ASSERT_OK(status);
     });
 
@@ -896,7 +879,7 @@ TEST_F(DistLockCatalogFixture, BasicUnlock) {
 
 TEST_F(DistLockCatalogFixture, UnlockWithNoNewDoc) {
     auto future = launchAsync([this] {
-        auto status = catalog()->unlock(txn(), OID("555f99712c99a78c5b083358"));
+        auto status = catalog()->unlock(OID("555f99712c99a78c5b083358"));
         ASSERT_OK(status);
     });
 
@@ -924,21 +907,21 @@ TEST_F(DistLockCatalogFixture, UnlockWithNoNewDoc) {
 
 TEST_F(DistLockCatalogFixture, UnlockTargetError) {
     targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status = catalog()->unlock(txn(), OID());
+    auto status = catalog()->unlock(OID());
     ASSERT_NOT_OK(status);
 }
 
 TEST_F(DistLockCatalogFixture, UnlockRunCmdError) {
     shutdownShardRegistry();
 
-    auto status = catalog()->unlock(txn(), OID());
+    auto status = catalog()->unlock(OID());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
 TEST_F(DistLockCatalogFixture, UnlockCommandError) {
     auto future = launchAsync([this] {
-        auto status = catalog()->unlock(txn(), OID());
+        auto status = catalog()->unlock(OID());
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -956,7 +939,7 @@ TEST_F(DistLockCatalogFixture, UnlockCommandError) {
 
 TEST_F(DistLockCatalogFixture, UnlockWriteError) {
     auto future = launchAsync([this] {
-        auto status = catalog()->unlock(txn(), OID());
+        auto status = catalog()->unlock(OID());
         ASSERT_EQUALS(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -974,7 +957,7 @@ TEST_F(DistLockCatalogFixture, UnlockWriteError) {
 
 TEST_F(DistLockCatalogFixture, UnlockWriteConcernError) {
     auto future = launchAsync([this] {
-        auto status = catalog()->unlock(txn(), OID());
+        auto status = catalog()->unlock(OID());
         ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -995,7 +978,7 @@ TEST_F(DistLockCatalogFixture, UnlockWriteConcernError) {
 
 TEST_F(DistLockCatalogFixture, UnlockUnsupportedWriteConcernResponse) {
     auto future = launchAsync([this] {
-        auto status = catalog()->unlock(txn(), OID());
+        auto status = catalog()->unlock(OID());
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1017,7 +1000,7 @@ TEST_F(DistLockCatalogFixture, UnlockUnsupportedWriteConcernResponse) {
 
 TEST_F(DistLockCatalogFixture, UnlockUnsupportedResponseFormat) {
     auto future = launchAsync([this] {
-        auto status = catalog()->unlock(txn(), OID());
+        auto status = catalog()->unlock(OID());
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
     });
 
@@ -1033,7 +1016,7 @@ TEST_F(DistLockCatalogFixture, BasicGetServerInfo) {
     auto future = launchAsync([this] {
         Date_t localTime(dateFromISOString("2015-05-26T13:06:27.293Z").getValue());
         OID electionID("555fa85d4d8640862a0fc79b");
-        auto resultStatus = catalog()->getServerInfo(txn());
+        auto resultStatus = catalog()->getServerInfo();
         ASSERT_OK(resultStatus.getStatus());
 
         const auto& serverInfo = resultStatus.getValue();
@@ -1060,21 +1043,21 @@ TEST_F(DistLockCatalogFixture, BasicGetServerInfo) {
 
 TEST_F(DistLockCatalogFixture, GetServerTargetError) {
     targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status = catalog()->getServerInfo(txn()).getStatus();
+    auto status = catalog()->getServerInfo().getStatus();
     ASSERT_NOT_OK(status);
 }
 
 TEST_F(DistLockCatalogFixture, GetServerRunCmdError) {
     shutdownShardRegistry();
 
-    auto status = catalog()->getServerInfo(txn()).getStatus();
+    auto status = catalog()->getServerInfo().getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
 TEST_F(DistLockCatalogFixture, GetServerCommandError) {
     auto future = launchAsync([this] {
-        auto status = catalog()->getServerInfo(txn()).getStatus();
+        auto status = catalog()->getServerInfo().getStatus();
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1092,7 +1075,7 @@ TEST_F(DistLockCatalogFixture, GetServerCommandError) {
 
 TEST_F(DistLockCatalogFixture, GetServerBadElectionId) {
     auto future = launchAsync([this] {
-        auto status = catalog()->getServerInfo(txn()).getStatus();
+        auto status = catalog()->getServerInfo().getStatus();
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1114,7 +1097,7 @@ TEST_F(DistLockCatalogFixture, GetServerBadElectionId) {
 
 TEST_F(DistLockCatalogFixture, GetServerBadLocalTime) {
     auto future = launchAsync([this] {
-        auto status = catalog()->getServerInfo(txn()).getStatus();
+        auto status = catalog()->getServerInfo().getStatus();
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1136,7 +1119,7 @@ TEST_F(DistLockCatalogFixture, GetServerBadLocalTime) {
 
 TEST_F(DistLockCatalogFixture, GetServerNoGLEStats) {
     auto future = launchAsync([this] {
-        auto status = catalog()->getServerInfo(txn()).getStatus();
+        auto status = catalog()->getServerInfo().getStatus();
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1153,7 +1136,7 @@ TEST_F(DistLockCatalogFixture, GetServerNoGLEStats) {
 
 TEST_F(DistLockCatalogFixture, GetServerNoElectionId) {
     auto future = launchAsync([this] {
-        auto status = catalog()->getServerInfo(txn()).getStatus();
+        auto status = catalog()->getServerInfo().getStatus();
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1174,7 +1157,7 @@ TEST_F(DistLockCatalogFixture, GetServerNoElectionId) {
 
 TEST_F(DistLockCatalogFixture, BasicStopPing) {
     auto future = launchAsync([this] {
-        auto status = catalog()->stopPing(txn(), "test");
+        auto status = catalog()->stopPing("test");
         ASSERT_OK(status);
     });
 
@@ -1205,21 +1188,21 @@ TEST_F(DistLockCatalogFixture, BasicStopPing) {
 
 TEST_F(DistLockCatalogFixture, StopPingTargetError) {
     targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status = catalog()->stopPing(txn(), "");
+    auto status = catalog()->stopPing("");
     ASSERT_NOT_OK(status);
 }
 
 TEST_F(DistLockCatalogFixture, StopPingRunCmdError) {
     shutdownShardRegistry();
 
-    auto status = catalog()->stopPing(txn(), "");
+    auto status = catalog()->stopPing("");
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
 TEST_F(DistLockCatalogFixture, StopPingCommandError) {
     auto future = launchAsync([this] {
-        auto status = catalog()->stopPing(txn(), "");
+        auto status = catalog()->stopPing("");
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1237,7 +1220,7 @@ TEST_F(DistLockCatalogFixture, StopPingCommandError) {
 
 TEST_F(DistLockCatalogFixture, StopPingWriteError) {
     auto future = launchAsync([this] {
-        auto status = catalog()->stopPing(txn(), "");
+        auto status = catalog()->stopPing("");
         ASSERT_EQUALS(ErrorCodes::Unauthorized, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1255,7 +1238,7 @@ TEST_F(DistLockCatalogFixture, StopPingWriteError) {
 
 TEST_F(DistLockCatalogFixture, StopPingWriteConcernError) {
     auto future = launchAsync([this] {
-        auto status = catalog()->stopPing(txn(), "");
+        auto status = catalog()->stopPing("");
         ASSERT_EQUALS(ErrorCodes::WriteConcernFailed, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1276,7 +1259,7 @@ TEST_F(DistLockCatalogFixture, StopPingWriteConcernError) {
 
 TEST_F(DistLockCatalogFixture, StopPingUnsupportedWriteConcernResponse) {
     auto future = launchAsync([this] {
-        auto status = catalog()->stopPing(txn(), "");
+        auto status = catalog()->stopPing("");
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1298,7 +1281,7 @@ TEST_F(DistLockCatalogFixture, StopPingUnsupportedWriteConcernResponse) {
 
 TEST_F(DistLockCatalogFixture, StopPingUnsupportedResponseFormat) {
     auto future = launchAsync([this] {
-        auto status = catalog()->stopPing(txn(), "");
+        auto status = catalog()->stopPing("");
         ASSERT_EQUALS(ErrorCodes::UnsupportedFormat, status.code());
     });
 
@@ -1313,7 +1296,7 @@ TEST_F(DistLockCatalogFixture, StopPingUnsupportedResponseFormat) {
 TEST_F(DistLockCatalogFixture, BasicGetPing) {
     auto future = launchAsync([this] {
         Date_t ping(dateFromISOString("2015-05-26T13:06:27.293Z").getValue());
-        auto resultStatus = catalog()->getPing(txn(), "test");
+        auto resultStatus = catalog()->getPing("test");
         ASSERT_OK(resultStatus.getStatus());
 
         const auto& pingDoc = resultStatus.getValue();
@@ -1350,21 +1333,21 @@ TEST_F(DistLockCatalogFixture, BasicGetPing) {
 
 TEST_F(DistLockCatalogFixture, GetPingTargetError) {
     targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status = catalog()->getPing(txn(), "").getStatus();
+    auto status = catalog()->getPing("").getStatus();
     ASSERT_EQUALS(ErrorCodes::InternalError, status.code());
 }
 
 TEST_F(DistLockCatalogFixture, GetPingRunCmdError) {
     shutdownShardRegistry();
 
-    auto status = catalog()->getPing(txn(), "").getStatus();
+    auto status = catalog()->getPing("").getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
 TEST_F(DistLockCatalogFixture, GetPingNotFound) {
     auto future = launchAsync([this] {
-        auto status = catalog()->getPing(txn(), "").getStatus();
+        auto status = catalog()->getPing("").getStatus();
         ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1377,7 +1360,7 @@ TEST_F(DistLockCatalogFixture, GetPingNotFound) {
 
 TEST_F(DistLockCatalogFixture, GetPingUnsupportedFormat) {
     auto future = launchAsync([this] {
-        auto status = catalog()->getPing(txn(), "test").getStatus();
+        auto status = catalog()->getPing("test").getStatus();
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1401,7 +1384,7 @@ TEST_F(DistLockCatalogFixture, GetPingUnsupportedFormat) {
 TEST_F(DistLockCatalogFixture, BasicGetLockByTS) {
     auto future = launchAsync([this] {
         OID ts("555f99712c99a78c5b083358");
-        auto resultStatus = catalog()->getLockByTS(txn(), ts);
+        auto resultStatus = catalog()->getLockByTS(ts);
         ASSERT_OK(resultStatus.getStatus());
 
         const auto& lockDoc = resultStatus.getValue();
@@ -1435,20 +1418,20 @@ TEST_F(DistLockCatalogFixture, BasicGetLockByTS) {
 
 TEST_F(DistLockCatalogFixture, GetLockByTSTargetError) {
     targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status = catalog()->getLockByTS(txn(), OID()).getStatus();
+    auto status = catalog()->getLockByTS(OID()).getStatus();
     ASSERT_EQUALS(ErrorCodes::InternalError, status.code());
 }
 
 TEST_F(DistLockCatalogFixture, GetLockByTSRunCmdError) {
     shutdownShardRegistry();
-    auto status = catalog()->getLockByTS(txn(), OID()).getStatus();
+    auto status = catalog()->getLockByTS(OID()).getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
 TEST_F(DistLockCatalogFixture, GetLockByTSNotFound) {
     auto future = launchAsync([this] {
-        auto status = catalog()->getLockByTS(txn(), OID()).getStatus();
+        auto status = catalog()->getLockByTS(OID()).getStatus();
         ASSERT_EQUALS(ErrorCodes::LockNotFound, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1461,7 +1444,7 @@ TEST_F(DistLockCatalogFixture, GetLockByTSNotFound) {
 
 TEST_F(DistLockCatalogFixture, GetLockByTSUnsupportedFormat) {
     auto future = launchAsync([this] {
-        auto status = catalog()->getLockByTS(txn(), OID()).getStatus();
+        auto status = catalog()->getLockByTS(OID()).getStatus();
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1485,7 +1468,7 @@ TEST_F(DistLockCatalogFixture, GetLockByTSUnsupportedFormat) {
 TEST_F(DistLockCatalogFixture, BasicGetLockByName) {
     auto future = launchAsync([this] {
         OID ts("555f99712c99a78c5b083358");
-        auto resultStatus = catalog()->getLockByName(txn(), "abc");
+        auto resultStatus = catalog()->getLockByName("abc");
         ASSERT_OK(resultStatus.getStatus());
 
         const auto& lockDoc = resultStatus.getValue();
@@ -1522,21 +1505,21 @@ TEST_F(DistLockCatalogFixture, BasicGetLockByName) {
 
 TEST_F(DistLockCatalogFixture, GetLockByNameTargetError) {
     targeter()->setFindHostReturnValue({ErrorCodes::InternalError, "can't target"});
-    auto status = catalog()->getLockByName(txn(), "x").getStatus();
+    auto status = catalog()->getLockByName("x").getStatus();
     ASSERT_EQUALS(ErrorCodes::InternalError, status.code());
 }
 
 TEST_F(DistLockCatalogFixture, GetLockByNameRunCmdError) {
     shutdownShardRegistry();
 
-    auto status = catalog()->getLockByName(txn(), "x").getStatus();
+    auto status = catalog()->getLockByName("x").getStatus();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
 TEST_F(DistLockCatalogFixture, GetLockByNameNotFound) {
     auto future = launchAsync([this] {
-        auto status = catalog()->getLockByName(txn(), "x").getStatus();
+        auto status = catalog()->getLockByName("x").getStatus();
         ASSERT_EQUALS(ErrorCodes::LockNotFound, status.code());
         ASSERT_FALSE(status.reason().empty());
     });
@@ -1549,7 +1532,7 @@ TEST_F(DistLockCatalogFixture, GetLockByNameNotFound) {
 
 TEST_F(DistLockCatalogFixture, GetLockByNameUnsupportedFormat) {
     auto future = launchAsync([this] {
-        auto status = catalog()->getLockByName(txn(), "x").getStatus();
+        auto status = catalog()->getLockByName("x").getStatus();
         ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
         ASSERT_FALSE(status.reason().empty());
     });

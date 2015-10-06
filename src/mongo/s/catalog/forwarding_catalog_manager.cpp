@@ -132,8 +132,8 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock> ForwardingCatalogManager::d
         try {
             _operationLock.lock_shared();
             auto guard = MakeGuard([this] { _operationLock.unlock_shared(); });
-            auto dlmLock = _actual->getDistLockManager()->lock(
-                txn, name, whyMessage, waitFor, lockTryInterval);
+            auto dlmLock =
+                _actual->getDistLockManager()->lock(name, whyMessage, waitFor, lockTryInterval);
             if (dlmLock.isOK()) {
                 guard.Dismiss();  // Don't unlock _operationLock; hold it until the returned
                                   // ScopedDistLock goes out of scope!
