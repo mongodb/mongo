@@ -43,6 +43,8 @@ public:
 
     void kill() final;
 
+    bool remotesExhausted() final;
+
 private:
     long long _limit;
 

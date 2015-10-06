@@ -190,6 +190,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFind) {
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
 
     // First shard responds.
     std::vector<CursorResponse> responses;
@@ -200,6 +201,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFind) {
 
     // Can't return any results until we have a response from all three shards.
     ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
 
     // Second two shards respond.
     responses.clear();
@@ -211,6 +213,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFind) {
 
     executor->waitForEvent(readyEvent);
 
+    ASSERT_TRUE(arm->remotesExhausted());
     ASSERT_TRUE(arm->ready());
     ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
@@ -245,6 +248,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
     scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
+    ASSERT_FALSE(arm->remotesExhausted());
     ASSERT_TRUE(arm->ready());
     ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
@@ -261,6 +265,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
 
     responses.clear();
     std::vector<BSONObj> batch4 = {fromjson("{_id: 7}"), fromjson("{_id: 8}")};
@@ -272,6 +277,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
     scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
+    ASSERT_FALSE(arm->remotesExhausted());
     ASSERT_TRUE(arm->ready());
     ASSERT_EQ(fromjson("{_id: 10}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
@@ -284,6 +290,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
 
     responses.clear();
     std::vector<BSONObj> batch7 = {fromjson("{_id: 11}")};
@@ -291,6 +298,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
     scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
+    ASSERT_TRUE(arm->remotesExhausted());
     ASSERT_TRUE(arm->ready());
     ASSERT_EQ(fromjson("{_id: 11}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
@@ -944,6 +952,7 @@ TEST_F(AsyncResultsMergerTest, TailableBasic) {
     // In the tailable case, we expect boost::none after every batch.
     ASSERT_TRUE(arm->ready());
     ASSERT(!unittest::assertGet(arm->nextReady()));
+    ASSERT_FALSE(arm->remotesExhausted());
 
     ASSERT_FALSE(arm->ready());
     readyEvent = unittest::assertGet(arm->nextEvent());
@@ -956,9 +965,11 @@ TEST_F(AsyncResultsMergerTest, TailableBasic) {
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
     ASSERT_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()));
     ASSERT_TRUE(arm->ready());
     ASSERT(!unittest::assertGet(arm->nextReady()));
+    ASSERT_FALSE(arm->remotesExhausted());
 
     auto killedEvent = arm->kill();
     executor->waitForEvent(killedEvent);
@@ -979,12 +990,36 @@ TEST_F(AsyncResultsMergerTest, TailableEmptyBatch) {
     scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
-    // After receiving an empty batch, the ARM should return boost::none.
+    // After receiving an empty batch, the ARM should return boost::none, but remotes should not be
+    // marked as exhausted.
     ASSERT_TRUE(arm->ready());
     ASSERT(!unittest::assertGet(arm->nextReady()));
+    ASSERT_FALSE(arm->remotesExhausted());
 
     auto killedEvent = arm->kill();
     executor->waitForEvent(killedEvent);
+}
+
+TEST_F(AsyncResultsMergerTest, TailableExhaustedCursor) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
+    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Remote responds with an empty batch and a zero cursor id.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch;
+    responses.emplace_back(_nss, CursorId(0), batch);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    executor->waitForEvent(readyEvent);
+
+    // Afterwards, the ARM should return boost::none and remote cursors should be marked as
+    // exhausted.
+    ASSERT_TRUE(arm->ready());
+    ASSERT(!unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->remotesExhausted());
 }
 
 TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {

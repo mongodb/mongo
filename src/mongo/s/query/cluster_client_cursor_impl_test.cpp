@@ -100,6 +100,35 @@ TEST(ClusterClientCursorImpl, QueueResult) {
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 4LL);
 }
 
+TEST(ClusterClientCursorImpl, RemotesExhausted) {
+    auto mockStage = stdx::make_unique<RouterStageMock>();
+    mockStage->queueResult(BSON("a" << 1));
+    mockStage->queueResult(BSON("a" << 2));
+    mockStage->markRemotesExhausted();
+
+    ClusterClientCursorImpl cursor(std::move(mockStage));
+    ASSERT_TRUE(cursor.remotesExhausted());
+
+    auto firstResult = cursor.next();
+    ASSERT_OK(firstResult.getStatus());
+    ASSERT(firstResult.getValue());
+    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 1));
+    ASSERT_TRUE(cursor.remotesExhausted());
+
+    auto secondResult = cursor.next();
+    ASSERT_OK(secondResult.getStatus());
+    ASSERT(secondResult.getValue());
+    ASSERT_EQ(*secondResult.getValue(), BSON("a" << 2));
+    ASSERT_TRUE(cursor.remotesExhausted());
+
+    auto thirdResult = cursor.next();
+    ASSERT_OK(thirdResult.getStatus());
+    ASSERT(!thirdResult.getValue());
+    ASSERT_TRUE(cursor.remotesExhausted());
+
+    ASSERT_EQ(cursor.getNumReturnedSoFar(), 2LL);
+}
+
 }  // namespace
 
 }  // namespace mongo

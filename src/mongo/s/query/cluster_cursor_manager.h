@@ -183,6 +183,12 @@ public:
          */
         void queueResult(const BSONObj& obj);
 
+        /**
+         * Returns whether or not all the remote cursors underlying this cursor have been
+         * exhausted. Cannot be called after returnCursor() is called. A cursor must be owned.
+         */
+        bool remotesExhausted();
+
     private:
         // ClusterCursorManager is a friend so that its methods can call the PinnedCursor
         // constructor declared below, which is private to prevent clients from calling it directly.

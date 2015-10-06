@@ -143,6 +143,11 @@ void ClusterCursorManager::PinnedCursor::queueResult(const BSONObj& obj) {
     _cursor->queueResult(obj);
 }
 
+bool ClusterCursorManager::PinnedCursor::remotesExhausted() {
+    invariant(_cursor);
+    return _cursor->remotesExhausted();
+}
+
 void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
     invariant(_cursor);
 

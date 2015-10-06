@@ -65,6 +65,8 @@ public:
 
     void queueResult(const BSONObj& obj) final;
 
+    bool remotesExhausted() final;
+
 private:
     /**
      * Constructs the pipeline of MergerPlanStages which will be used to answer the query.

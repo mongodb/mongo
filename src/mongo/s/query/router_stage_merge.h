@@ -49,6 +49,8 @@ public:
 
     void kill() final;
 
+    bool remotesExhausted() final;
+
 private:
     // Not owned here.
     executor::TaskExecutor* _executor;

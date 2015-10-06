@@ -172,6 +172,34 @@ TEST(RouterStageSkipTest, SkipStageToleratesMidStreamEOF) {
     ASSERT(!thirdResult.getValue());
 }
 
+TEST(RouterStageSkipTest, SkipStageRemotesExhausted) {
+    auto mockStage = stdx::make_unique<RouterStageMock>();
+    mockStage->queueResult(BSON("a" << 1));
+    mockStage->queueResult(BSON("a" << 2));
+    mockStage->queueResult(BSON("a" << 3));
+    mockStage->markRemotesExhausted();
+
+    auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 1);
+    ASSERT_TRUE(skipStage->remotesExhausted());
+
+    auto firstResult = skipStage->next();
+    ASSERT_OK(firstResult.getStatus());
+    ASSERT(firstResult.getValue());
+    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 2));
+    ASSERT_TRUE(skipStage->remotesExhausted());
+
+    auto secondResult = skipStage->next();
+    ASSERT_OK(secondResult.getStatus());
+    ASSERT(secondResult.getValue());
+    ASSERT_EQ(*secondResult.getValue(), BSON("a" << 3));
+    ASSERT_TRUE(skipStage->remotesExhausted());
+
+    auto thirdResult = skipStage->next();
+    ASSERT_OK(thirdResult.getStatus());
+    ASSERT(!thirdResult.getValue());
+    ASSERT_TRUE(skipStage->remotesExhausted());
+}
+
 }  // namespace
 
 }  // namespace mongo

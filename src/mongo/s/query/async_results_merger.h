@@ -86,6 +86,11 @@ public:
     virtual ~AsyncResultsMerger();
 
     /**
+     * Returns true if all of the remote cursors are exhausted.
+     */
+    bool remotesExhausted();
+
+    /**
      * Returns true if there is no need to schedule remote work in order to take the next action.
      * This means that either
      *   --there is a buffered result which we can return,
@@ -229,6 +234,11 @@ private:
      * Returns success if the command to retrieve the next batch was scheduled successfully.
      */
     Status askForNextBatch_inlock(size_t remoteIndex);
+
+    /**
+     * Checks whether or not the remote cursors are all exhausted.
+     */
+    bool remotesExhausted_inlock();
 
     //
     // Helpers for ready().

@@ -61,4 +61,8 @@ void RouterStageRemoveSortKey::kill() {
     getChildStage()->kill();
 }
 
+bool RouterStageRemoveSortKey::remotesExhausted() {
+    return getChildStage()->remotesExhausted();
+}
+
 }  // namespace mongo

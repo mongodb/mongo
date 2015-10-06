@@ -62,15 +62,22 @@ AsyncResultsMerger::AsyncResultsMerger(executor::TaskExecutor* executor,
 
 AsyncResultsMerger::~AsyncResultsMerger() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    invariant(remotesExhausted_inlock() || _lifecycleState == kKillComplete);
+}
 
-    bool allExhausted = true;
+bool AsyncResultsMerger::remotesExhausted() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return remotesExhausted_inlock();
+}
+
+bool AsyncResultsMerger::remotesExhausted_inlock() {
     for (const auto& remote : _remotes) {
         if (!remote.exhausted()) {
-            allExhausted = false;
+            return false;
         }
     }
 
-    invariant(allExhausted || _lifecycleState == kKillComplete);
+    return true;
 }
 
 bool AsyncResultsMerger::ready() {

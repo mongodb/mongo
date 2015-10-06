@@ -79,6 +79,10 @@ void ClusterClientCursorMock::queueResult(const BSONObj& obj) {
     _resultsQueue.push({obj});
 }
 
+bool ClusterClientCursorMock::remotesExhausted() {
+    MONGO_UNREACHABLE;
+}
+
 void ClusterClientCursorMock::queueError(Status status) {
     _resultsQueue.push({status});
 }

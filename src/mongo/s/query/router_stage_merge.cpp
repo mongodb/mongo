@@ -60,4 +60,8 @@ void RouterStageMerge::kill() {
     _executor->waitForEvent(killEvent);
 }
 
+bool RouterStageMerge::remotesExhausted() {
+    return _arm.remotesExhausted();
+}
+
 }  // namespace mongo

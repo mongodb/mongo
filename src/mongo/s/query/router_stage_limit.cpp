@@ -59,4 +59,8 @@ void RouterStageLimit::kill() {
     getChildStage()->kill();
 }
 
+bool RouterStageLimit::remotesExhausted() {
+    return getChildStage()->remotesExhausted();
+}
+
 }  // namespace mongo

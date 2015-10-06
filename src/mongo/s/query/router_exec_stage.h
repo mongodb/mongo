@@ -66,6 +66,11 @@ public:
      */
     virtual void kill() = 0;
 
+    /**
+     * Returns whether or not all the remote cursors are exhausted.
+     */
+    virtual bool remotesExhausted() = 0;
+
 protected:
     /**
      * Returns an unowned pointer to the child stage, or nullptr if there is no child.

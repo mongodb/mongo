@@ -60,4 +60,8 @@ void RouterStageSkip::kill() {
     getChildStage()->kill();
 }
 
+bool RouterStageSkip::remotesExhausted() {
+    return getChildStage()->remotesExhausted();
+}
+
 }  // namespace mongo

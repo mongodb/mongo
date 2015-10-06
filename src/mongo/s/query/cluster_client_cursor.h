@@ -90,6 +90,11 @@ public:
      * 'obj' must be owned BSON.
      */
     virtual void queueResult(const BSONObj& obj) = 0;
+
+    /**
+     * Returns whether or not all the remote cursors underlying this cursor have been exhausted.
+     */
+    virtual bool remotesExhausted() = 0;
 };
 
 }  // namespace mongo

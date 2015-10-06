@@ -137,6 +137,33 @@ TEST(RouterStageLimitTest, LimitStageToleratesMidStreamEOF) {
     ASSERT(!fourthResult.getValue());
 }
 
+TEST(RouterStageLimitTest, LimitStageRemotesExhausted) {
+    auto mockStage = stdx::make_unique<RouterStageMock>();
+    mockStage->queueResult(BSON("a" << 1));
+    mockStage->queueResult(BSON("a" << 2));
+    mockStage->markRemotesExhausted();
+
+    auto limitStage = stdx::make_unique<RouterStageLimit>(std::move(mockStage), 100);
+    ASSERT_TRUE(limitStage->remotesExhausted());
+
+    auto firstResult = limitStage->next();
+    ASSERT_OK(firstResult.getStatus());
+    ASSERT(firstResult.getValue());
+    ASSERT_EQ(*firstResult.getValue(), BSON("a" << 1));
+    ASSERT_TRUE(limitStage->remotesExhausted());
+
+    auto secondResult = limitStage->next();
+    ASSERT_OK(secondResult.getStatus());
+    ASSERT(secondResult.getValue());
+    ASSERT_EQ(*secondResult.getValue(), BSON("a" << 2));
+    ASSERT_TRUE(limitStage->remotesExhausted());
+
+    auto thirdResult = limitStage->next();
+    ASSERT_OK(thirdResult.getStatus());
+    ASSERT(!thirdResult.getValue());
+    ASSERT_TRUE(limitStage->remotesExhausted());
+}
+
 }  // namespace
 
 }  // namespace mongo

@@ -81,6 +81,10 @@ void ClusterClientCursorImpl::queueResult(const BSONObj& obj) {
     _stash.push(obj);
 }
 
+bool ClusterClientCursorImpl::remotesExhausted() {
+    return _root->remotesExhausted();
+}
+
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     executor::TaskExecutor* executor, ClusterClientCursorParams params) {
     // The first stage is always the one which merges from the remotes.

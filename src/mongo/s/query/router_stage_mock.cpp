@@ -46,6 +46,10 @@ void RouterStageMock::queueEOF() {
     _resultsQueue.push({boost::none});
 }
 
+void RouterStageMock::markRemotesExhausted() {
+    _remotesExhausted = true;
+}
+
 StatusWith<boost::optional<BSONObj>> RouterStageMock::next() {
     if (_resultsQueue.empty()) {
         return {boost::none};
@@ -58,6 +62,10 @@ StatusWith<boost::optional<BSONObj>> RouterStageMock::next() {
 
 void RouterStageMock::kill() {
     // No child to kill.
+}
+
+bool RouterStageMock::remotesExhausted() {
+    return _remotesExhausted;
 }
 
 }  // namespace mongo

@@ -54,6 +54,11 @@ public:
     void queueResult(const BSONObj& obj) final;
 
     /**
+     * Not used.
+     */
+    bool remotesExhausted() final;
+
+    /**
      * Queues an error response.
      */
     void queueError(Status status);

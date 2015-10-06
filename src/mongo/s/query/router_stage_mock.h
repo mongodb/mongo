@@ -36,7 +36,8 @@
 namespace mongo {
 
 /**
- * Passes through the first n results and then returns boost::none.
+ * Initialized by adding results to its results queue, it then passes through the results in its
+ * queue until the queue is empty.
  */
 class RouterStageMock final : public RouterExecStage {
 public:
@@ -45,6 +46,8 @@ public:
     StatusWith<boost::optional<BSONObj>> next() final;
 
     void kill() final;
+
+    bool remotesExhausted() final;
 
     /**
      * Queues a BSONObj to be returned.
@@ -62,8 +65,14 @@ public:
      */
     void queueEOF();
 
+    /**
+     * Explicitly marks the remote cursors as all exhausted.
+     */
+    void markRemotesExhausted();
+
 private:
     std::queue<StatusWith<boost::optional<BSONObj>>> _resultsQueue;
+    bool _remotesExhausted = false;
 };
 
 }  // namespace mongo
