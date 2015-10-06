@@ -45,6 +45,84 @@ namespace mongo {
 
 using std::string;
 
+namespace {
+
+// Lists the $-prefixed query options that can be passed alongside a wrapped query predicate for
+// OP_QUERY find. The $orderby field is omitted because "orderby" (no dollar sign) is also allowed,
+// and this requires special handling.
+const std::vector<const char*> kDollarQueryModifiers = {
+    "$hint",
+    "$comment",
+    "$maxScan",
+    "$max",
+    "$min",
+    "$returnKey",
+    "$showDiskLoc",
+    "$snapshot",
+    "$maxTimeMS",
+};
+
+/**
+ * For a find using the OP_QUERY protocol (as opposed to the commands protocol), upconverts the
+ * "query" field so that the profiling entry matches that of the find command.
+ */
+BSONObj upconvertQueryEntry(const BSONObj& query,
+                            const NamespaceString& nss,
+                            int ntoreturn,
+                            int ntoskip) {
+    BSONObjBuilder bob;
+
+    bob.append("find", nss.coll());
+
+    // Whether or not the query predicate is wrapped inside a "query" or "$query" field so that
+    // other options can be passed alongside the predicate.
+    bool predicateIsWrapped = false;
+
+    // Extract the query predicate.
+    BSONObj filter;
+    if (auto elem = query["query"]) {
+        predicateIsWrapped = true;
+        bob.appendAs(elem, "filter");
+    } else if (auto elem = query["$query"]) {
+        predicateIsWrapped = true;
+        bob.appendAs(elem, "filter");
+    } else if (!query.isEmpty()) {
+        bob.append("filter", query);
+    }
+
+    if (ntoskip) {
+        bob.append("skip", ntoskip);
+    }
+    if (ntoreturn) {
+        bob.append("ntoreturn", ntoreturn);
+    }
+
+    // The remainder of the query options are only available if the predicate is passed in wrapped
+    // form. If the predicate is not wrapped, we're done.
+    if (!predicateIsWrapped) {
+        return bob.obj();
+    }
+
+    // Extract the sort.
+    if (auto elem = query["orderby"]) {
+        bob.appendAs(elem, "sort");
+    } else if (auto elem = query["$orderby"]) {
+        bob.appendAs(elem, "sort");
+    }
+
+    // Add $-prefixed OP_QUERY modifiers, like $hint.
+    for (auto modifier : kDollarQueryModifiers) {
+        if (auto elem = query[modifier]) {
+            // Use "+ 1" to omit the leading dollar sign.
+            bob.appendAs(elem, modifier + 1);
+        }
+    }
+
+    return bob.obj();
+}
+
+}  // namespace
+
 /**
  * This type decorates a Client object with a stack of active CurOp objects.
  *
@@ -249,6 +327,17 @@ void CurOp::reportState(BSONObjBuilder* builder) {
 
     if (_op == dbInsert) {
         _query.append(*builder, "insert");
+    } else if (!_command && _op == dbQuery) {
+        // This is a legacy OP_QUERY. We upconvert the "query" field of the currentOp output to look
+        // similar to a find command.
+        //
+        // CurOp doesn't have access to the ntoreturn or ntoskip values. By setting them to zero, we
+        // will omit mention of them in the currentOp output.
+        const int ntoreturn = 0;
+        const int ntoskip = 0;
+
+        builder->append(
+            "query", upconvertQueryEntry(_query.get(), NamespaceString(_ns), ntoreturn, ntoskip));
     } else {
         _query.append(*builder, "query");
     }
@@ -552,18 +641,6 @@ void appendAsObjOrString(StringData name,
 }
 }  // namespace
 
-const std::vector<const char*> OpDebug::kDollarQueryModifiers = {
-    "$hint",
-    "$comment",
-    "$maxScan",
-    "$max",
-    "$min",
-    "$returnKey",
-    "$showDiskLoc",
-    "$snapshot",
-    "$maxTimeMS",
-};
-
 bool OpDebug::isFindCommand() const {
     return iscommand && str::equals(query.firstElement().fieldName(), "find");
 }
@@ -582,58 +659,6 @@ int OpDebug::getLogicalOpType() const {
     } else {
         return op;
     }
-}
-
-BSONObj OpDebug::upconvertQueryEntry(const NamespaceString& nss) const {
-    BSONObjBuilder bob;
-
-    bob.append("find", nss.coll());
-
-    // Whether or not the query predicate is wrapped inside a "query" or "$query" field so that
-    // other options can be passed alongside the predicate.
-    bool predicateIsWrapped = false;
-
-    // Extract the query predicate.
-    BSONObj filter;
-    if (auto elem = query["query"]) {
-        predicateIsWrapped = true;
-        bob.appendAs(elem, "filter");
-    } else if (auto elem = query["$query"]) {
-        predicateIsWrapped = true;
-        bob.appendAs(elem, "filter");
-    } else if (!query.isEmpty()) {
-        bob.append("filter", query);
-    }
-
-    if (ntoskip) {
-        bob.append("skip", ntoskip);
-    }
-    if (ntoreturn) {
-        bob.append("ntoreturn", ntoreturn);
-    }
-
-    // The remainder of the query options are only available if the predicate is passed in wrapped
-    // form. If the predicate is not wrapped, we're done.
-    if (!predicateIsWrapped) {
-        return bob.obj();
-    }
-
-    // Extract the sort.
-    if (auto elem = query["orderby"]) {
-        bob.appendAs(elem, "sort");
-    } else if (auto elem = query["$orderby"]) {
-        bob.appendAs(elem, "sort");
-    }
-
-    // Add $-prefixed OP_QUERY modifiers, like $hint.
-    for (auto modifier : kDollarQueryModifiers) {
-        if (auto elem = query[modifier]) {
-            // Use "+ 1" to omit the leading dollar sign.
-            bob.appendAs(elem, modifier + 1);
-        }
-    }
-
-    return bob.obj();
 }
 
 #define OPDEBUG_APPEND_NUMBER(x) \
@@ -655,7 +680,8 @@ void OpDebug::append(const CurOp& curop,
     b.append("ns", nss.ns());
 
     if (!iscommand && op == dbQuery) {
-        appendAsObjOrString("query", upconvertQueryEntry(nss), maxElementSize, &b);
+        appendAsObjOrString(
+            "query", upconvertQueryEntry(query, nss, ntoreturn, ntoskip), maxElementSize, &b);
     } else if (!query.isEmpty()) {
         const char* fieldName = (logicalOpType == dbCommand) ? "command" : "query";
         appendAsObjOrString(fieldName, query, maxElementSize, &b);
