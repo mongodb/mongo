@@ -358,8 +358,31 @@ public:
      */
     static void appendCommandWCStatus(BSONObjBuilder& result, const Status& status);
 
-    // Set by command line.  Controls whether or not testing-only commands should be available.
-    static int testCommandsEnabled;
+    /**
+     * If true, then testing commands are available. Defaults to false.
+     *
+     * Testing commands should conditionally register themselves by consulting this flag:
+     *
+     *     MONGO_INITIALIZER(RegisterMyTestCommand)(InitializerContext* context) {
+     *         if (Command::testCommandsEnabled) {
+     *             // Leaked intentionally: a Command registers itself when constructed.
+     *             new MyTestCommand();
+     *         }
+     *         return Status::OK();
+     *     }
+     *
+     * To make testing commands available by default, change the value to true before running any
+     * mongo initializers:
+     *
+     *     int myMain(int argc, char** argv, char** envp) {
+     *         static StaticObserver StaticObserver;
+     *         Command::testCommandsEnabled = true;
+     *         ...
+     *         runGlobalInitializersOrDie(argc, argv, envp);
+     *         ...
+     *     }
+     */
+    static bool testCommandsEnabled;
 
     /**
      * Returns true if this a request for the 'help' information associated with the command.

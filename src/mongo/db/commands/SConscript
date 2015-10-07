@@ -3,6 +3,13 @@
 Import("env")
 
 env.Library(
+    target="test_commands_enabled",
+    source=[
+        "test_commands_enabled.cpp",
+    ]
+)
+
+env.Library(
     target='server_status_core',
     source=[
         'server_status_internal.cpp',

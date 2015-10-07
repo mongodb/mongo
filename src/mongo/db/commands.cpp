@@ -72,14 +72,12 @@ Command::CommandMap* Command::_commandsByBestName;
 Command::CommandMap* Command::_webCommands;
 Command::CommandMap* Command::_commands;
 
-int Command::testCommandsEnabled = 0;
-
 Counter64 Command::unknownCommands;
 static ServerStatusMetricField<Counter64> displayUnknownCommands("commands.<UNKNOWN>",
                                                                  &Command::unknownCommands);
 
 namespace {
-ExportedServerParameter<int, ServerParameterType::kStartupOnly> testCommandsParameter(
+ExportedServerParameter<bool, ServerParameterType::kStartupOnly> testCommandsParameter(
     ServerParameterSet::getGlobal(), "enableTestCommands", &Command::testCommandsEnabled);
 }
 

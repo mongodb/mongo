@@ -98,7 +98,7 @@ Status createIndexFromSpec(OperationContext* txn, StringData ns, const BSONObj& 
 
 int dbtestsMain(int argc, char** argv, char** envp) {
     static StaticObserver StaticObserver;
-    Command::testCommandsEnabled = 1;
+    Command::testCommandsEnabled = true;
     ::mongo::setupSynchronousSignalHandlers();
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     repl::ReplSettings replSettings;
