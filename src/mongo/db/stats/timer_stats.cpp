@@ -1,5 +1,3 @@
-// timer_stats.cpp
-
 /*    Copyright 2012 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -31,42 +29,49 @@
 
 namespace mongo {
 
-TimerHolder::TimerHolder(TimerStats* stats) : _stats(stats), _recorded(false) {}
+TimerHolder::TimerHolder(TimerStats* stats) : _stats(stats), _recorded(false) {
+}
 
 TimerHolder::~TimerHolder() {
     if (!_recorded) {
-        recordMillis();
+        recordTimerStats();
     }
 }
 
-int TimerHolder::recordMillis() {
+long long TimerHolder::recordTimerStats() {
     _recorded = true;
     if (_stats) {
         return _stats->record(_t);
     }
-    return _t.millis();
+    return _t.micros();
 }
 
 void TimerStats::recordMillis(int millis) {
-    _num.fetchAndAdd(1);
-    _totalMillis.fetchAndAdd(millis);
+    recordMicros(static_cast<long long>(millis) * 1000);
 }
 
-int TimerStats::record(const Timer& timer) {
-    int millis = timer.millis();
-    recordMillis(millis);
-    return millis;
+void TimerStats::recordMicros(long long micros) {
+    _num.fetchAndAdd(1);
+    _totalMicros.fetchAndAdd(micros);
+}
+
+long long TimerStats::record(const Timer& timer) {
+    long long micros = timer.micros();
+    recordMicros(micros);
+    return micros;
 }
 
 BSONObj TimerStats::getReport() const {
     long long n, t;
     {
         n = _num.loadRelaxed();
-        t = _totalMillis.loadRelaxed();
+        t = _totalMicros.loadRelaxed();
     }
     BSONObjBuilder b(64);
     b.appendNumber("num", n);
-    b.appendNumber("totalMillis", t);
+    b.appendNumber("totalMillis", static_cast<int>(t / 1000));
+    b.appendNumber("totalMicros", t);
     return b.obj();
 }
-}
+
+} // namespace mongo

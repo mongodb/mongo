@@ -1,5 +1,3 @@
-// timer_stats.h
-
 /*    Copyright 2012 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -34,58 +32,111 @@
 
 namespace mongo {
 
-
 /**
- * Holds timing information in milliseconds
- * keeps track of number of times and total milliseconds
- * so a diff can be computed
+ * \brief Holds timing information in microseconds
+ *
+ * It keeps track of number of times it has been updated and the accumulated
+ * microseconds so a diff can be computed.
  */
 class TimerStats {
 public:
+    /**
+     * \brief Increments the timing information
+     *
+     * \param millis The number of milliseconds to increment the timing stats
+     */
     void recordMillis(int millis);
 
     /**
-     * @return number of millis
+     * \brief Increments the timing information
+     *
+     * \param micros The number of microseconds to increment the timing stats
      */
-    int record(const Timer& timer);
+    void recordMicros(long long micros);
 
+    /**
+     * \brief Increment the timing information using a Timer
+     *
+     * \param timer The timer to use to increment the timing stats
+     * \return The number of microseconds that the timing stats was incremented
+     */
+    long long record(const Timer& timer);
+
+    /**
+     * \brief Generate the BSONObj containing the timing stats information
+     *
+     * The object returned has 3 fields:
+     *   - 'n': contains the number of times the stats were incremented.
+     *   - 'totalMillis': the timing information in milliseconds.
+     *   - 'totalMicros': the timing information in microseconds.
+     *
+     * \return The BSONObj with the timing stats
+     */
     BSONObj getReport() const;
+
     operator BSONObj() const {
         return getReport();
     }
 
 private:
     AtomicInt64 _num;
-    AtomicInt64 _totalMillis;
+    AtomicInt64 _totalMicros;
 };
 
 /**
- * Holds an instance of a Timer such that we the time is recorded
- * when the TimerHolder goes out of scope
+ * \brief Scope based timing class
+ *
+ * This class is used to update a TimerStat object based on the time this
+ * class is alive.
+ * When constructed this class initializes a timer and when the instance is
+ * destructed, the TimerStat object associated with it is updated with the
+ * number of microseconds the timer has counted.
  */
 class TimerHolder {
 public:
-    /** Destructor will record to TimerStats */
+    /**
+     * \brief Constructs a TimerHolder with the TimerStats it needs to update
+     *
+     * \param stats Pointer to the TimerStats object to update
+     */
     TimerHolder(TimerStats* stats);
-    /** Will record stats if recordMillis hasn't (based on _recorded)  */
+
+    /**
+     * \brief Destroys the instance and updates the TimerStats object if
+     * necessary
+     */
     ~TimerHolder();
 
     /**
-     * returns elapsed millis from internal timer
+     * \brief Gets the number of milliseconds from the internal timer
+     *
+     * \return The number of milliseconds from the internal timer
      */
     int millis() const {
         return _t.millis();
     }
 
     /**
-     * records the time in the TimerStats and marks that we've
-     * already recorded so the destructor doesn't
+     * \brief Gets the number of microseconds from the internal timer
+     *
+     * \return The number of microseconds from the internal timer
      */
-    int recordMillis();
+    long long micros() const {
+        return _t.micros();
+    }
+
+    /**
+     * \brief Updates the TimerStats object using the internal timer
+     *
+     * \return The number of microseconds that have been added to the
+     *  TimerStats object
+     */
+    long long recordTimerStats();
 
 private:
     TimerStats* _stats;
     bool _recorded;
     Timer _t;
 };
-}
+
+} // namespace mongo
