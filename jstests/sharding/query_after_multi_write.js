@@ -18,27 +18,37 @@ var runTest = function(writeFunc) {
     assert.commandWorked(testDB.adminCommand({ split: 'test.user', middle: { x: 0 }}));
     assert.commandWorked(testDB.adminCommand({ moveChunk: 'test.user',
                                                find: { x: 0 },
-                                               to: 'shard0001' }));
+                                               to: 'shard0001',
+                                               _waitForDelete: true }));
 
     var testDB2 = st.s1.getDB('test');
     testDB2.user.insert({ x: 123456 });
 
     // Move chunk to bump version on a different mongos.
-    testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0000' });
+    assert.commandWorked(testDB.adminCommand({ moveChunk: 'test.user',
+                                               find: { x: 0 },
+                                               to: 'shard0000',
+                                               _waitForDelete: true }));
 
     // Issue a query and make sure it gets routed to the right shard.
     assert.neq(null, testDB2.user.findOne({ x: 123456 }));
 
     // At this point, s1 thinks the version of 'test.user' is 2, bounce it again so it gets
     // incremented to 3
-    testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0001' });
+    assert.commandWorked(testDB.adminCommand({ moveChunk: 'test.user',
+                                               find: { x: 0 },
+                                               to: 'shard0001',
+                                               _waitForDelete: true }));
 
     // Issue a query and make sure it gets routed to the right shard again.
     assert.neq(null, testDB2.user.findOne({ x: 123456 }));
 
     // At this point, s0 thinks the version of 'test.user' is 3, bounce it again so it gets
     // incremented to 4
-    testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0000' });
+    assert.commandWorked(testDB.adminCommand({ moveChunk: 'test.user',
+                                               find: { x: 0 },
+                                               to: 'shard0000',
+                                               _waitForDelete: true }));
 
     // Ensure that write commands with multi version do not reset the connection shard version to
     // ignored.
