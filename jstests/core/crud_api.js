@@ -730,10 +730,6 @@
         var result = coll.aggregate([{$match: {}}], {batchSize:2}).toArray();
         assert.eq(2, result.length);
 
-        // Set the maxTimeMS and allowDiskUse on aggregation query
-        var result = coll.aggregate([{$match: {}}], {batchSize:2, maxTimeMS:100, allowDiskUse:true}).toArray();
-        assert.eq(2, result.length);
-
         // Drop collection
         coll.drop();
         coll.ensureIndex({a:1}, {unique:true})
