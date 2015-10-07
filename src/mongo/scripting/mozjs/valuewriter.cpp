@@ -244,103 +244,112 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
         JS::RootedObject obj(_context, _value.toObjectOrNull());
         ObjectWrapper o(_context, obj);
 
-        if (JS_ObjectIsFunction(_context, _value.toObjectOrNull())) {
-            uassert(16716,
-                    "cannot convert native function to BSON",
-                    !scope->getProto<NativeFunctionInfo>().instanceOf(obj));
-            b->appendCode(sd, ValueWriter(_context, _value).toString());
-            return;
+        auto jsclass = JS_GetClass(obj);
+
+        if (jsclass) {
+            if (scope->getProto<OIDInfo>().getJSClass() == jsclass) {
+                b->append(sd, OIDInfo::getOID(_context, obj));
+
+                return;
+            }
+
+            if (scope->getProto<NumberLongInfo>().getJSClass() == jsclass) {
+                long long out = NumberLongInfo::ToNumberLong(_context, obj);
+                b->append(sd, out);
+
+                return;
+            }
+
+            if (scope->getProto<NumberIntInfo>().getJSClass() == jsclass) {
+                b->append(sd, NumberIntInfo::ToNumberInt(_context, obj));
+
+                return;
+            }
+
+            if (scope->getProto<NumberDecimalInfo>().getJSClass() == jsclass) {
+                b->append(sd, NumberDecimalInfo::ToNumberDecimal(_context, obj));
+
+                return;
+            }
+
+            if (scope->getProto<DBPointerInfo>().getJSClass() == jsclass) {
+                JS::RootedValue id(_context);
+                o.getValue("id", &id);
+
+                b->appendDBRef(sd, o.getString("ns"), OIDInfo::getOID(_context, id));
+
+                return;
+            }
+
+            if (scope->getProto<BinDataInfo>().getJSClass() == jsclass) {
+                auto str = static_cast<std::string*>(JS_GetPrivate(obj));
+
+                auto binData = base64::decode(*str);
+
+                b->appendBinData(sd,
+                                 binData.size(),
+                                 static_cast<mongo::BinDataType>(
+                                     static_cast<int>(o.getNumber(InternedString::type))),
+                                 binData.c_str());
+
+                return;
+            }
+
+            if (scope->getProto<TimestampInfo>().getJSClass() == jsclass) {
+                Timestamp ot(o.getNumber("t"), o.getNumber("i"));
+                b->append(sd, ot);
+
+                return;
+            }
+
+            if (scope->getProto<MinKeyInfo>().getJSClass() == jsclass) {
+                b->appendMinKey(sd);
+
+                return;
+            }
+
+            if (scope->getProto<MaxKeyInfo>().getJSClass() == jsclass) {
+                b->appendMaxKey(sd);
+
+                return;
+            }
         }
 
-        if (JS_ObjectIsRegExp(_context, obj)) {
-            JS::RootedValue v(_context);
-            v.setObjectOrNull(obj);
+        auto protoKey = JS::IdentifyStandardInstance(obj);
 
-            std::string regex = ValueWriter(_context, v).toString();
-            regex = regex.substr(1);
-            std::string r = regex.substr(0, regex.rfind('/'));
-            std::string o = regex.substr(regex.rfind('/') + 1);
+        switch (protoKey) {
+            case JSProto_Function: {
+                uassert(16716,
+                        "cannot convert native function to BSON",
+                        !scope->getProto<NativeFunctionInfo>().instanceOf(obj));
+                JSStringWrapper jsstr;
+                b->appendCode(sd, ValueWriter(_context, _value).toStringData(&jsstr));
+                return;
+            }
+            case JSProto_RegExp: {
+                JS::RootedValue v(_context);
+                v.setObjectOrNull(obj);
 
-            b->appendRegex(sd, r, o);
+                std::string regex = ValueWriter(_context, v).toString();
+                regex = regex.substr(1);
+                std::string r = regex.substr(0, regex.rfind('/'));
+                std::string o = regex.substr(regex.rfind('/') + 1);
 
-            return;
-        }
+                b->appendRegex(sd, r, o);
 
-        if (JS_ObjectIsDate(_context, obj)) {
-            JS::RootedValue dateval(_context);
-            o.callMethod("getTime", &dateval);
+                return;
+            }
+            case JSProto_Date: {
+                JS::RootedValue dateval(_context);
+                o.callMethod("getTime", &dateval);
 
-            auto d = Date_t::fromMillisSinceEpoch(ValueWriter(_context, dateval).toNumber());
-            b->appendDate(sd, d);
+                auto d = Date_t::fromMillisSinceEpoch(ValueWriter(_context, dateval).toNumber());
+                b->appendDate(sd, d);
 
-            return;
-        }
-
-        if (scope->getProto<OIDInfo>().instanceOf(obj)) {
-            b->append(sd, OID(o.getString("str")));
-
-            return;
-        }
-
-        if (scope->getProto<NumberLongInfo>().instanceOf(obj)) {
-            long long out = NumberLongInfo::ToNumberLong(_context, obj);
-            b->append(sd, out);
-
-            return;
-        }
-
-        if (scope->getProto<NumberIntInfo>().instanceOf(obj)) {
-            b->append(sd, NumberIntInfo::ToNumberInt(_context, obj));
-
-            return;
-        }
-
-        if (scope->getProto<NumberDecimalInfo>().instanceOf(obj)) {
-            b->append(sd, NumberDecimalInfo::ToNumberDecimal(_context, obj));
-
-            return;
-        }
-
-        if (scope->getProto<DBPointerInfo>().instanceOf(obj)) {
-            JS::RootedValue id(_context);
-            o.getValue("id", &id);
-
-            b->appendDBRef(
-                sd, o.getString("ns"), OID(ObjectWrapper(_context, id).getString("str")));
-
-            return;
-        }
-
-        if (scope->getProto<BinDataInfo>().instanceOf(obj)) {
-            auto str = static_cast<std::string*>(JS_GetPrivate(obj));
-
-            auto binData = base64::decode(*str);
-
-            b->appendBinData(sd,
-                             binData.size(),
-                             static_cast<mongo::BinDataType>(static_cast<int>(o.getNumber("type"))),
-                             binData.c_str());
-
-            return;
-        }
-
-        if (scope->getProto<TimestampInfo>().instanceOf(obj)) {
-            Timestamp ot(o.getNumber("t"), o.getNumber("i"));
-            b->append(sd, ot);
-
-            return;
-        }
-
-        if (scope->getProto<MinKeyInfo>().instanceOf(obj)) {
-            b->appendMinKey(sd);
-
-            return;
-        }
-
-        if (scope->getProto<MaxKeyInfo>().instanceOf(obj)) {
-            b->appendMaxKey(sd);
-
-            return;
+                return;
+            }
+            default:
+                break;
         }
     }
 
