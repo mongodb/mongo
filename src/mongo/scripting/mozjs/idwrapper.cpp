@@ -65,8 +65,47 @@ uint32_t IdWrapper::toInt32() const {
     return JSID_TO_INT(_value);
 }
 
+void IdWrapper::toValue(JS::MutableHandleValue value) const {
+    if (isInt()) {
+        value.setInt32(toInt32());
+        return;
+    }
+
+    if (isString()) {
+        auto str = JSID_TO_STRING(_value);
+        value.setString(str);
+        return;
+    }
+
+    uasserted(ErrorCodes::BadValue, "Failed to toValue() non-string and non-integer jsid");
+}
+
 bool IdWrapper::equals(StringData sd) const {
     return sd.compare(toString()) == 0;
+}
+
+bool IdWrapper::equalsAscii(StringData sd) const {
+    if (isString()) {
+        auto str = JSID_TO_STRING(_value);
+
+        if (!str) {
+            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JSID_TO_STRING");
+        }
+
+        bool matched;
+        if (!JS_StringEqualsAscii(_context, str, sd.rawData(), &matched)) {
+            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_StringEqualsAscii");
+        }
+
+        return matched;
+    }
+
+    if (isInt()) {
+        JSStringWrapper jsstr(toInt32());
+        return jsstr.toStringData().compare(sd) == 0;
+    }
+
+    uasserted(ErrorCodes::BadValue, "Cannot equalsAscii non-string non-integer jsid");
 }
 
 bool IdWrapper::isInt() const {

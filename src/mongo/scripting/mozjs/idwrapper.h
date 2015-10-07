@@ -59,10 +59,13 @@ public:
      */
     uint32_t toInt32() const;
 
+    void toValue(JS::MutableHandleValue value) const;
+
     bool isString() const;
     bool isInt() const;
 
     bool equals(StringData sd) const;
+    bool equalsAscii(StringData sd) const;
 
 private:
     JSContext* _context;
