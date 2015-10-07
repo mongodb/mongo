@@ -357,6 +357,67 @@ __wt_log_extract_lognum(
 }
 
 /*
+ * __log_zero --
+ *	Zero a log file.
+ */
+static int
+__log_zero(WT_SESSION_IMPL *session,
+    WT_FH *fh, wt_off_t start_off, wt_off_t len)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(zerobuf);
+	WT_DECL_RET;
+	WT_LOG *log;
+	uint32_t allocsize, bufsz, off, partial, wrlen;
+
+	conn = S2C(session);
+	log = conn->log;
+	allocsize = log->allocsize;
+	zerobuf = NULL;
+	if (allocsize < WT_MEGABYTE)
+		bufsz = WT_MEGABYTE;
+	else
+		bufsz = allocsize;
+	/*
+	 * If they're using smaller log files, cap it at the file size.
+	 */
+	if (conn->log_file_max < bufsz)
+		bufsz = (uint32_t)conn->log_file_max;
+	WT_RET(__wt_scr_alloc(session, bufsz, &zerobuf));
+	memset(zerobuf->mem, 0, zerobuf->memsize);
+	WT_STAT_FAST_CONN_INCR(session, log_zero_fills);
+
+	/*
+	 * Read in a chunk starting at the end of the file.  Keep going until
+	 * we reach the beginning or we find a chunk that contains any non-zero
+	 * bytes.  Compare against a known zero byte chunk.
+	 */
+	off = (uint32_t)start_off;
+	while (off < (uint32_t)len) {
+		/*
+		 * Typically we start to zero the file after the log header
+		 * and the bufsz is a sector-aligned size.  So we want to
+		 * align our writes when we can.
+		 */
+		partial = off % bufsz;
+		if (partial != 0)
+			wrlen = bufsz - partial;
+		else
+			wrlen = bufsz;
+		/*
+		 * Check if we're writing a partial amount at the end too.
+		 */
+		if ((uint32_t)len - off < bufsz)
+			wrlen = (uint32_t)len - off;
+		WT_ERR(__wt_write(session,
+		    fh, (wt_off_t)off, wrlen, zerobuf->mem));
+		off += wrlen;
+	}
+err:	__wt_scr_free(session, &zerobuf);
+	return (ret);
+}
+
+/*
  * __log_prealloc --
  *	Pre-allocate a log file.
  */
@@ -370,7 +431,15 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 	conn = S2C(session);
 	log = conn->log;
 	ret = 0;
-	if (fh->fallocate_available == WT_FALLOCATE_NOT_AVAILABLE ||
+	/*
+	 * If the user configured zero filling, pre-allocate the log file
+	 * manually.  Otherwise use either fallocate or ftruncate to create
+	 * and zero the log file based on what is available.
+	 */
+	if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ZERO_FILL))
+		ret = __log_zero(session, fh,
+		    WT_LOG_FIRST_RECORD, conn->log_file_max);
+	else if (fh->fallocate_available == WT_FALLOCATE_NOT_AVAILABLE ||
 	    (ret = __wt_fallocate(session, fh,
 	    WT_LOG_FIRST_RECORD, conn->log_file_max)) == ENOTSUP)
 		ret = __wt_ftruncate(session, fh,
@@ -738,9 +807,8 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 		/*
 		 * If we get any error other than WT_NOTFOUND, return it.
 		 */
-		if (ret != 0 && ret != WT_NOTFOUND)
-			return (ret);
-		ret = 0;
+		WT_RET_NOTFOUND_OK(ret);
+
 		if (create_log) {
 			WT_STAT_FAST_CONN_INCR(session, log_prealloc_missed);
 			if (conn->log_cond != NULL)
@@ -754,7 +822,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	if (create_log) {
 		log->prep_missed++;
 		WT_RET(__wt_log_allocfile(
-		    session, log->fileid, WT_LOG_FILENAME, true));
+		    session, log->fileid, WT_LOG_FILENAME));
 	}
 	WT_RET(__log_openfile(session,
 	    false, &log->log_fh, WT_LOG_FILENAME, log->fileid));
@@ -905,7 +973,7 @@ err:	WT_TRET(__wt_close(session, &log_fh));
  */
 int
 __wt_log_allocfile(
-    WT_SESSION_IMPL *session, uint32_t lognum, const char *dest, bool prealloc)
+    WT_SESSION_IMPL *session, uint32_t lognum, const char *dest)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(from_path);
@@ -937,8 +1005,7 @@ __wt_log_allocfile(
 	WT_ERR(__log_openfile(session, true, &log_fh, WT_LOG_TMPNAME, tmp_id));
 	WT_ERR(__log_file_header(session, log_fh, NULL, true));
 	WT_ERR(__wt_ftruncate(session, log_fh, WT_LOG_FIRST_RECORD));
-	if (prealloc)
-		WT_ERR(__log_prealloc(session, log_fh));
+	WT_ERR(__log_prealloc(session, log_fh));
 	WT_ERR(__wt_fsync(session, log_fh));
 	WT_ERR(__wt_close(session, &log_fh));
 	WT_ERR(__wt_verbose(session, WT_VERB_LOG,
@@ -1206,11 +1273,11 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 	WT_LSN sync_lsn;
 	int64_t release_buffered, release_bytes;
 	int yield_count;
-	bool locked, need_relock;
+	bool locked;
 
 	conn = S2C(session);
 	log = conn->log;
-	locked = need_relock = false;
+	locked = false;
 	yield_count = 0;
 	if (freep != NULL)
 		*freep = 1;
@@ -1257,7 +1324,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 		 * and more walking of the slot pool for a very small number
 		 * of slots to process.  Don't signal here.
 		 */
-		goto done;
+		return (0);
 	}
 
 	/*
@@ -1271,19 +1338,15 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 		 * unlock in case an earlier thread is trying to switch its
 		 * slot and complete its operation.
 		 */
-		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT)) {
+		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT))
 			__wt_spin_unlock(session, &log->log_slot_lock);
-			need_relock = true;
-		}
 		if (++yield_count < 1000)
 			__wt_yield();
 		else
-			WT_ERR(__wt_cond_wait(
-			    session, log->log_write_cond, 200));
-		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT)) {
+			ret = __wt_cond_wait(session, log->log_write_cond, 200);
+		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT))
 			__wt_spin_lock(session, &log->log_slot_lock);
-			need_relock = false;
-		}
+		WT_ERR(ret);
 	}
 
 	log->write_start_lsn = slot->slot_start_lsn;
@@ -1363,11 +1426,8 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 	}
 err:	if (locked)
 		__wt_spin_unlock(session, &log->log_sync_lock);
-	if (need_relock)
-		__wt_spin_lock(session, &log->log_slot_lock);
 	if (ret != 0 && slot->slot_error == 0)
 		slot->slot_error = ret;
-done:
 	return (ret);
 }
 

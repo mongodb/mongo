@@ -130,7 +130,6 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	int tret;
 
 	switch (trk->op) {
 	case WT_ST_EMPTY:	/* Unused slot */
@@ -139,19 +138,16 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		btree = trk->dhandle->handle;
 		bm = btree->bm;
 		WT_WITH_DHANDLE(session, trk->dhandle,
-		    WT_TRET(bm->checkpoint_resolve(bm, session)));
+		    ret = bm->checkpoint_resolve(bm, session));
 		break;
 	case WT_ST_DROP_COMMIT:
-		if ((tret = __wt_remove_if_exists(session, trk->a)) != 0) {
-			__wt_err(session, tret,
-			    "metadata remove dropped file %s",
-			    trk->a);
-			WT_TRET(tret);
-		}
+		if ((ret = __wt_remove_if_exists(session, trk->a)) != 0)
+			__wt_err(session, ret,
+			    "metadata remove dropped file %s", trk->a);
 		break;
 	case WT_ST_LOCK:
 		WT_WITH_DHANDLE(session, trk->dhandle,
-		    WT_TRET(__wt_session_release_btree(session)));
+		    ret = __wt_session_release_btree(session));
 		break;
 	case WT_ST_FILEOP:
 	case WT_ST_REMOVE:
@@ -172,7 +168,6 @@ static int
 __meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 {
 	WT_DECL_RET;
-	int tret;
 
 	switch (trk->op) {
 	case WT_ST_EMPTY:	/* Unused slot */
@@ -185,7 +180,7 @@ __meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		if (trk->created)
 			F_SET(trk->dhandle, WT_DHANDLE_DISCARD);
 		WT_WITH_DHANDLE(session, trk->dhandle,
-		    WT_TRET(__wt_session_release_btree(session)));
+		    ret = __wt_session_release_btree(session));
 		break;
 	case WT_ST_FILEOP:	/* File operation */
 		/*
@@ -194,22 +189,16 @@ __meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		 * For removes, b is NULL.
 		 */
 		if (trk->a != NULL && trk->b != NULL &&
-		    (tret = __wt_rename(session,
-		    trk->b + strlen("file:"),
-		    trk->a + strlen("file:"))) != 0) {
-			__wt_err(session, tret,
-			    "metadata unroll rename %s to %s",
-			    trk->b, trk->a);
-			WT_TRET(tret);
-		} else if (trk->a == NULL) {
-			if ((tret = __wt_remove(session,
-			    trk->b + strlen("file:"))) != 0) {
-				__wt_err(session, tret,
-				    "metadata unroll create %s",
-				    trk->b);
-				WT_TRET(tret);
-			}
-		}
+		    (ret = __wt_rename(session,
+		    trk->b + strlen("file:"), trk->a + strlen("file:"))) != 0)
+			__wt_err(session, ret,
+			    "metadata unroll rename %s to %s", trk->b, trk->a);
+
+		if (trk->a == NULL &&
+		    (ret = __wt_remove(session, trk->b + strlen("file:"))) != 0)
+			__wt_err(session, ret,
+			    "metadata unroll create %s", trk->b);
+
 		/*
 		 * We can't undo removes yet: that would imply
 		 * some kind of temporary rename and remove in
@@ -217,21 +206,14 @@ __meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 		 */
 		break;
 	case WT_ST_REMOVE:	/* Remove trk.a */
-		if ((tret = __wt_metadata_remove(session, trk->a)) != 0) {
-			__wt_err(session, tret,
-			    "metadata unroll remove: %s",
-			    trk->a);
-			WT_TRET(tret);
-		}
+		if ((ret = __wt_metadata_remove(session, trk->a)) != 0)
+			__wt_err(session, ret,
+			    "metadata unroll remove: %s", trk->a);
 		break;
 	case WT_ST_SET:		/* Set trk.a to trk.b */
-		if ((tret = __wt_metadata_update(
-		    session, trk->a, trk->b)) != 0) {
-			__wt_err(session, tret,
-			    "metadata unroll update %s to %s",
-			    trk->a, trk->b);
-			WT_TRET(tret);
-		}
+		if ((ret = __wt_metadata_update(session, trk->a, trk->b)) != 0)
+			__wt_err(session, ret,
+			    "metadata unroll update %s to %s", trk->a, trk->b);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

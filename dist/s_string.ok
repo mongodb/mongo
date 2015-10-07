@@ -646,6 +646,7 @@ intrin
 inuse
 io
 ip
+islocked
 ispo
 iteratively
 jnr
@@ -842,6 +843,7 @@ rectype
 recurse
 refp
 reinitialization
+relocked
 resize
 resizing
 ret

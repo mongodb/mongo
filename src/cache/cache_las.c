@@ -24,10 +24,9 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	/*
 	 * Lookaside table statistics are copied from the underlying lookaside
 	 * table data-source statistics. If there's no lookaside table, values
-	 * remain 0. In the current system, there's always a lookaside table,
-	 * but there's no reason not to be cautious.
+	 * remain 0.
 	 */
-	if (conn->las_cursor == NULL)
+	if (!F_ISSET(conn, WT_CONN_LAS_OPEN))
 		return;
 
 	/*
@@ -35,46 +34,13 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	 * to it by way of the underlying btree handle, but it's a little ugly.
 	 */
 	cstats = conn->stats;
-	dstats = ((WT_CURSOR_BTREE *)conn->las_cursor)->btree->dhandle->stats;
+	dstats = ((WT_CURSOR_BTREE *)
+	    conn->las_session->las_cursor)->btree->dhandle->stats;
 
 	WT_STAT_SET(session, cstats,
 	    cache_lookaside_insert, WT_STAT_READ(dstats, cursor_insert));
 	WT_STAT_SET(session, cstats,
 	    cache_lookaside_remove, WT_STAT_READ(dstats, cursor_remove));
-}
-
-/*
- * __las_cursor_create --
- *	Open a new lookaside table cursor.
- */
-static int
-__las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
-{
-	WT_BTREE *btree;
-	const char *open_cursor_cfg[] = {
-	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
-
-	WT_RET(__wt_open_cursor(
-	    session, WT_LAS_URI, NULL, open_cursor_cfg, cursorp));
-
-	/*
-	 * Set special flags for the lookaside table: the lookaside flag (used,
-	 * for example, to avoid writing records during reconciliation), also
-	 * turn off checkpoints and logging.
-	 *
-	 * Test flags before setting them so updates can't race in subsequent
-	 * opens (the first update is safe because it's single-threaded from
-	 * wiredtiger_open).
-	 */
-	btree = S2BT(session);
-	if (!F_ISSET(btree, WT_BTREE_LOOKASIDE))
-		F_SET(btree, WT_BTREE_LOOKASIDE);
-	if (!F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
-		F_SET(btree, WT_BTREE_NO_CHECKPOINT);
-	if (!F_ISSET(btree, WT_BTREE_NO_LOGGING))
-		F_SET(btree, WT_BTREE_NO_LOGGING);
-
-	return (0);
 }
 
 /*
@@ -85,7 +51,7 @@ int
 __wt_las_create(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
+	uint32_t session_flags;
 	const char *drop_cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_drop), "force=true", NULL };
 
@@ -93,30 +59,28 @@ __wt_las_create(WT_SESSION_IMPL *session)
 
 	/*
 	 * Done at startup: we cannot do it on demand because we require the
-	 * schema lock to create and drop the file, and it may not always be
+	 * schema lock to create and drop the table, and it may not always be
 	 * available.
 	 *
-	 * Open an internal session, used for the shared lookaside cursor.
-	 *
-	 * Sessions associated with a lookaside cursor should never be tapped
-	 * for eviction.
+	 * Discard any previous incarnation of the table.
 	 */
-	WT_RET(__wt_open_internal_session(
-	    conn, "lookaside table", true, true, &conn->las_session));
-	session = conn->las_session;
-	F_SET(session, WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION);
-
-	/* Discard any previous incarnation of the file. */
 	WT_RET(__wt_session_drop(session, WT_LAS_URI, drop_cfg));
 
-	/* Re-create the file. */
+	/* Re-create the table. */
 	WT_RET(__wt_session_create(session, WT_LAS_URI, WT_LAS_FORMAT));
 
-	/* Open the shared cursor. */
-	WT_WITHOUT_DHANDLE(session,
-	    ret = __las_cursor_create(session, &conn->las_cursor));
+	/*
+	 * Open a shared internal session used to access the lookaside table.
+	 * This session should never be tapped for eviction.
+	 */
+	session_flags = WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION;
+	WT_RET(__wt_open_internal_session(
+	    conn, "lookaside table", true, session_flags, &conn->las_session));
 
-	return (ret);
+	/* Flag that the lookaside table has been created. */
+	F_SET(conn, WT_CONN_LAS_OPEN);
+
+	return (0);
 }
 
 /*
@@ -138,7 +102,6 @@ __wt_las_destroy(WT_SESSION_IMPL *session)
 	wt_session = &conn->las_session->iface;
 	ret = wt_session->close(wt_session, NULL);
 
-	conn->las_cursor = NULL;
 	conn->las_session = NULL;
 
 	return (ret);
@@ -176,6 +139,40 @@ __wt_las_is_written(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_las_cursor_create --
+ *	Open a new lookaside table cursor.
+ */
+int
+__wt_las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
+{
+	WT_BTREE *btree;
+	const char *open_cursor_cfg[] = {
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), NULL };
+
+	WT_RET(__wt_open_cursor(
+	    session, WT_LAS_URI, NULL, open_cursor_cfg, cursorp));
+
+	/*
+	 * Set special flags for the lookaside table: the lookaside flag (used,
+	 * for example, to avoid writing records during reconciliation), also
+	 * turn off checkpoints and logging.
+	 *
+	 * Test flags before setting them so updates can't race in subsequent
+	 * opens (the first update is safe because it's single-threaded from
+	 * wiredtiger_open).
+	 */
+	btree = S2BT(session);
+	if (!F_ISSET(btree, WT_BTREE_LOOKASIDE))
+		F_SET(btree, WT_BTREE_LOOKASIDE);
+	if (!F_ISSET(btree, WT_BTREE_NO_CHECKPOINT))
+		F_SET(btree, WT_BTREE_NO_CHECKPOINT);
+	if (!F_ISSET(btree, WT_BTREE_NO_LOGGING))
+		F_SET(btree, WT_BTREE_NO_LOGGING);
+
+	return (0);
+}
+
+/*
  * __wt_las_cursor --
  *	Return a lookaside cursor.
  */
@@ -184,7 +181,6 @@ __wt_las_cursor(
     WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t *session_flags)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 
 	*cursorp = NULL;
 
@@ -202,20 +198,15 @@ __wt_las_cursor(
 
 	conn = S2C(session);
 
-	/* Eviction and sweep threads have their own lookaside table cursors. */
-	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR)) {
-		if (session->las_cursor == NULL) {
-			WT_WITHOUT_DHANDLE(session, ret =
-			    __las_cursor_create(session, &session->las_cursor));
-			WT_RET(ret);
-		}
-
+	/*
+	 * Some threads have their own lookaside table cursors, else lock the
+	 * shared lookaside cursor.
+	 */
+	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR))
 		*cursorp = session->las_cursor;
-	} else {
-		/* Lock the shared lookaside cursor. */
+	else {
 		__wt_spin_lock(session, &conn->las_lock);
-
-		*cursorp = conn->las_cursor;
+		*cursorp = conn->las_session->las_cursor;
 	}
 
 	/* Turn caching and eviction off. */
@@ -253,8 +244,8 @@ __wt_las_cursor_close(
 	F_SET(session, session_flags);
 
 	/*
-	 * Eviction and sweep threads have their own lookaside table cursors;
-	 * else, unlock the shared lookaside cursor.
+	 * Some threads have their own lookaside table cursors, else unlock the
+	 * shared lookaside cursor.
 	 */
 	if (!F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR))
 		__wt_spin_unlock(session, &conn->las_lock);

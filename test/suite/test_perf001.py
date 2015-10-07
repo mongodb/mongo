@@ -72,4 +72,3 @@ class test_perf001(wttest.WiredTigerTestCase):
 
 if __name__ == '__main__':
     wttest.run()
-

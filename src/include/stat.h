@@ -338,6 +338,7 @@ struct __wt_connection_stats {
 	int64_t log_sync_dir;
 	int64_t log_write_lsn;
 	int64_t log_writes;
+	int64_t log_zero_fills;
 	int64_t lsm_checkpoint_throttle;
 	int64_t lsm_merge_throttle;
 	int64_t lsm_rows_merged;

@@ -4,15 +4,18 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-# Clear lines that only contain whitespace.
+# Clear lines that only contain whitespace, discard trailing empty lines.
 whitespace()
 {
-	sed -e 's/[	 ][	 ]*$//' < $1 > $t
+	sed -e 's/[	 ][	 ]*$//' \
+	    -e '${' \
+	    -e '/^$/d' \
+	    -e '}' < $1 > $t
 	cmp $t $1 > /dev/null 2>&1 || (echo "$1" && cp $t $1)
 }
 
 # Clear lines that only contain whitespace, compress multiple empty lines
-# into a single line, discarding trailing empty lines.
+# into a single line, discard trailing empty lines.
 whitespace_and_empty_line()
 {
 	sed -e 's/[	 ][	 ]*$//' \

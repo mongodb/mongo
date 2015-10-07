@@ -37,29 +37,6 @@
 	    &(p)->flags_atomic, __orig, __orig | (uint8_t)(mask)));	\
 } while (0)
 
-#define	F_CAS_ATOMIC(p, mask, ret) do {					\
-	uint8_t __orig;							\
-	ret = 0;							\
-	do {								\
-		__orig = (p)->flags_atomic;				\
-		if ((__orig & (uint8_t)(mask)) != 0) {			\
-			ret = EBUSY;					\
-			break;						\
-		}							\
-	} while (!__wt_atomic_cas8(					\
-	    &(p)->flags_atomic, __orig, __orig | (uint8_t)(mask)));	\
-} while (0)
-
-#define	F_CAS_ATOMIC_WAIT(p, mask) do {					\
-	int __ret;							\
-	for (;;) {							\
-		F_CAS_ATOMIC(p, mask, __ret);				\
-		if (__ret == 0)						\
-			break;						\
-		__wt_yield();						\
-	}								\
-} while (0)
-
 #define	F_CLR_ATOMIC(p, mask)	do {					\
 	uint8_t __orig;							\
 	do {								\

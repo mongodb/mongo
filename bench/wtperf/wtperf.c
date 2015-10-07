@@ -600,7 +600,34 @@ worker(void *arg)
 			if (ret == WT_NOTFOUND)
 				break;
 
-op_err:			lprintf(cfg, ret, 0,
+op_err:			if (ret == WT_ROLLBACK && ops_per_txn != 0) {
+				/*
+				 * If we are running with explicit transactions
+				 * configured and we hit a WT_ROLLBACK, then we
+				 * should rollback the current transaction and
+				 * attempt to continue.
+				 * This does break the guarantee of insertion
+				 * order in cases of ordered inserts, as we
+				 * aren't retrying here.
+				 */
+				lprintf(cfg, ret, 1,
+				    "%s for: %s, range: %"PRIu64, op_name(op),
+				    key_buf, wtperf_value_range(cfg));
+				if ((ret = session->rollback_transaction(
+				    session, NULL)) != 0) {
+					lprintf(cfg, ret, 0,
+					     "Failed rollback_transaction");
+					goto err;
+				}
+				if ((ret = session->begin_transaction(
+				    session, NULL)) != 0) {
+					lprintf(cfg, ret, 0,
+					    "Worker begin transaction failed");
+					goto err;
+				}
+				break;
+			}
+			lprintf(cfg, ret, 0,
 			    "%s failed for: %s, range: %"PRIu64,
 			    op_name(op), key_buf, wtperf_value_range(cfg));
 			goto err;
@@ -644,7 +671,7 @@ op_err:			lprintf(cfg, ret, 0,
 			if ((ret = session->begin_transaction(
 			    session, NULL)) != 0) {
 				lprintf(cfg, ret, 0,
-				    "Worker transaction commit failed");
+				    "Worker begin transaction failed");
 				goto err;
 			}
 		}
@@ -1171,8 +1198,12 @@ monitor(void *arg)
 		if (latency_max != 0 &&
 		    (read_max > latency_max || insert_max > latency_max ||
 		     update_max > latency_max))
+			/*
+			 * Make this a non-fatal error and print WARNING in
+			 * the output so Jenkins can flag it as unstable.
+			 */
 			lprintf(cfg, 0, 0,
-			    "max latency exceeded: threshold %" PRIu32
+			    "WARNING: max latency exceeded: threshold %" PRIu32
 			    " read max %" PRIu32 " insert max %" PRIu32
 			    " update max %" PRIu32, latency_max,
 			    read_max, insert_max, update_max);

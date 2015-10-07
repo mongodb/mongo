@@ -67,4 +67,3 @@ class test_txn12(wttest.WiredTigerTestCase, suite_subprocess):
 
 if __name__ == '__main__':
     wttest.run()
-
