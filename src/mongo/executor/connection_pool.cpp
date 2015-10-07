@@ -144,10 +144,8 @@ private:
     State _state;
 };
 
-// TODO: revisit these durations when we come up with a more pervasive solution
-// for NetworkInterfaceASIO's timers
-Milliseconds const ConnectionPool::kDefaultRefreshTimeout = Minutes(5);
-Milliseconds const ConnectionPool::kDefaultRefreshRequirement = Minutes(5);
+Milliseconds const ConnectionPool::kDefaultRefreshTimeout = Seconds(20);
+Milliseconds const ConnectionPool::kDefaultRefreshRequirement = Seconds(60);
 Milliseconds const ConnectionPool::kDefaultHostTimeout = Minutes(5);
 
 ConnectionPool::ConnectionPool(std::unique_ptr<DependentTypeFactoryInterface> impl, Options options)
