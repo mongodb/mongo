@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <jsapi.h>
 #include <memory>
 #include <string>
