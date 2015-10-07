@@ -9,7 +9,7 @@ var $config = (function() {
 
     var states = {
         init: function init(db, collName) {
-            this.uniqueDBName = 'drop_database' + this.tid;
+            this.uniqueDBName = db.getName() + 'drop_database' + this.tid;
         },
 
         createAndDrop: function createAndDrop(db, collName) {

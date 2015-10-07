@@ -7,12 +7,13 @@
 
 if (typeof uniqueDBName === 'undefined') {
     // Returns a unique database name:
-    //   db0, db1, ...
-    var uniqueDBName = (function() {
+    //   <dbNamePrefix>db0, <dbNamePrefix>db1, ...
+    var uniqueDBName = (function(dbNamePrefix) {
         var i = 0;
 
-        return function() {
-            return 'db' + i++;
+        return function(dbNamePrefix) {
+            var prefix = dbNamePrefix || '';
+            return prefix + 'db' + i++;
         };
     })();
 }

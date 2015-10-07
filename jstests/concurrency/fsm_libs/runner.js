@@ -33,7 +33,7 @@ var runner = (function() {
     }
 
     function validateExecutionOptions(mode, options) {
-        var allowedKeys = [];
+        var allowedKeys = ['dbNamePrefix'];
         if (mode.parallel || mode.composed) {
             allowedKeys.push('numSubsets');
             allowedKeys.push('subsetSize');
@@ -76,12 +76,18 @@ var runner = (function() {
             assert.lte(options.composeProb, 1);
         }
 
+        if (typeof options.dbNamePrefix !== 'undefined') {
+            assert.eq('string', typeof options.dbNamePrefix,
+                      'expected dbNamePrefix to be a string');
+        }
+
         return options;
     }
 
     function validateCleanupOptions(options) {
         var allowedKeys = [
-            'dropDatabaseBlacklist'
+            'dropDatabaseBlacklist',
+            'keepExistingDatabases'
         ];
 
         Object.keys(options).forEach(function(option) {
@@ -93,6 +99,11 @@ var runner = (function() {
         if (typeof options.dropDatabaseBlacklist !== 'undefined') {
             assert(Array.isArray(options.dropDatabaseBlacklist),
                    'expected dropDatabaseBlacklist to be an array');
+        }
+
+        if (typeof options.keepExistingDatabases !== 'undefined') {
+            assert.eq('boolean', typeof options.keepExistingDatabases,
+                      'expected keepExistingDatabases to be a boolean');
         }
 
         return options;
@@ -158,7 +169,7 @@ var runner = (function() {
         return schedule;
     }
 
-    function prepareCollections(workloads, context, cluster, clusterOptions) {
+    function prepareCollections(workloads, context, cluster, clusterOptions, executionOptions) {
         var dbName, collName, myDB;
         var firstWorkload = true;
 
@@ -171,7 +182,7 @@ var runner = (function() {
             }
             if (firstWorkload || !clusterOptions.sameCollection) {
                 if (firstWorkload || !clusterOptions.sameDB) {
-                    dbName = uniqueDBName();
+                    dbName = uniqueDBName(executionOptions.dbNamePrefix);
                 }
                 collName = uniqueCollName();
 
@@ -375,7 +386,9 @@ var runner = (function() {
         if (cleanupOptions.dropDatabaseBlacklist) {
             dbBlacklist = dbBlacklist.concat(cleanupOptions.dropDatabaseBlacklist);
         }
-        dropAllDatabases(cluster.getDB('test'), dbBlacklist);
+        if (!cleanupOptions.keepExistingDatabases) {
+            dropAllDatabases(cluster.getDB('test'), dbBlacklist);
+        }
 
         var maxAllowedConnections = 100;
         Random.setRandomSeed(clusterOptions.seed);
@@ -402,7 +415,7 @@ var runner = (function() {
 
                 jsTest.log(workloads.join('\n'));
 
-                prepareCollections(workloads, context, cluster, clusterOptions);
+                prepareCollections(workloads, context, cluster, clusterOptions, executionOptions);
 
                 try {
                     workloads.forEach(function(workload) {

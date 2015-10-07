@@ -25,7 +25,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
-        this.outDBName = uniqueDBName;
+        this.outDBName = db.getName() + uniqueDBName;
     };
 
     $config.states.mapReduce = function mapReduce(db, collName) {
@@ -50,15 +50,15 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
-        var outDB = db.getSiblingDB(uniqueDBName);
+        var outDB = db.getSiblingDB(db.getName() + uniqueDBName);
         assertAlways.commandWorked(outDB.createCollection(collName));
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        var outDB = db.getSiblingDB(uniqueDBName);
+        var outDB = db.getSiblingDB(db.getName() + uniqueDBName);
         var res = outDB.dropDatabase();
         assertAlways.commandWorked(res);
-        assertAlways.eq(uniqueDBName, res.dropped);
+        assertAlways.eq(db.getName() + uniqueDBName, res.dropped);
     };
 
     return $config;

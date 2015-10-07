@@ -31,7 +31,7 @@ var $config = (function() {
 
         saveDocId: function saveDocId(db, collName, id) {
             // Use a separate database to avoid conflicts with other FSM workloads.
-            var ownedDB = db.getSiblingDB(this.uniqueDBName);
+            var ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
 
             var updateDoc = { $push: {} };
             updateDoc.$push[this.opName] = id;
@@ -100,7 +100,7 @@ var $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
-        var ownedDB = db.getSiblingDB(this.uniqueDBName);
+        var ownedDB = db.getSiblingDB(db.getName() + this.uniqueDBName);
 
         assertWhenOwnColl(function() {
             var docs = ownedDB[collName].find().toArray();
@@ -115,7 +115,7 @@ var $config = (function() {
 
         var res = ownedDB.dropDatabase();
         assertAlways.commandWorked(res);
-        assertAlways.eq(this.uniqueDBName, res.dropped);
+        assertAlways.eq(db.getName() + this.uniqueDBName, res.dropped);
 
         function checkForDuplicateIds(ids, opName) {
             var indices = new Array(ids.length);

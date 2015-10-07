@@ -24,7 +24,7 @@ var $config = (function() {
         }
 
         function init(db, collName) {
-            this.fromDBName = uniqueDBName(this.prefix, this.tid, 0);
+            this.fromDBName = db.getName() + uniqueDBName(this.prefix, this.tid, 0);
             this.num = 1;
             var fromDB = db.getSiblingDB(this.fromDBName);
 
@@ -38,7 +38,7 @@ var $config = (function() {
         }
 
         function rename(db, collName) {
-            var toDBName = uniqueDBName(this.prefix, this.tid, this.num++);
+            var toDBName = db.getName() + uniqueDBName(this.prefix, this.tid, this.num++);
             var renameCommand = {
                 renameCollection: this.fromDBName + '.' + collName,
                 to: toDBName + '.' + collName,
@@ -70,7 +70,7 @@ var $config = (function() {
     };
 
     function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');
+        var pattern = new RegExp('^' + db.getName() + this.prefix + '\\d+_\\d+$');
         dropDatabases(db, pattern);
     }
 
