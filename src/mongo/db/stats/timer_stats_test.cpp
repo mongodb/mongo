@@ -63,4 +63,4 @@ TEST(TimerStatsTest, GetReportOneRecording) {
     );
 }
 
-}  // namespace mongo
+}  // namespace
