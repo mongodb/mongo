@@ -302,8 +302,7 @@ private:
                                    const string& configdb,
                                    bool authoritative,
                                    string& errmsg,
-                                   BSONObjBuilder& result,
-                                   bool locked = false) {
+                                   BSONObjBuilder& result) {
         if (configdb.size() == 0) {
             errmsg = "no configdb";
             return false;
@@ -353,15 +352,8 @@ private:
             return false;
         }
 
-        if (locked) {
-            ShardingState::get(txn)->initialize(txn, configdb);
-            return true;
-        }
-
-        ScopedTransaction transaction(txn, MODE_X);
-        Lock::GlobalWrite lk(txn->lockState());
-
-        return _checkConfigOrInit(txn, configdb, authoritative, errmsg, result, true);
+        ShardingState::get(txn)->initialize(txn, configdb);
+        return true;
     }
 
 } setShardVersionCmd;
