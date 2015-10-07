@@ -1,17 +1,16 @@
+(function() {
+"use strict";
 var otherOptions = { rs: true , numReplicas: 2 , chunksize: 1 , nopreallocj: true };
 var s = new ShardingTest({ shards: 2, verbose: 1, other: otherOptions });
 assert.writeOK(s.config.settings.update({ _id: "balancer" },
                          { $set: { stopped: true }}, true ));
 
-db = s.getDB( "test" );
+var db = s.getDB( "test" );
 var bulk = db.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < 2100; i++) {
     bulk.insert({ _id: i, x: i });
 }
 assert.writeOK(bulk.execute());
-
-serverName = s.getServerName( "test" ) 
-other = s.config.shards.findOne( { _id : { $ne : serverName } } );
 
 s.adminCommand( { enablesharding : "test" } )
 s.ensurePrimaryShard('test', 'test-rs0');
@@ -21,10 +20,11 @@ for ( i=0; i<20; i++ )
     s.adminCommand( { split : "test.foo" , middle : { _id : i * 100 } } );
 
 assert.eq( 2100, db.foo.find().itcount() );
-coll = db.foo;
+var coll = db.foo;
 coll.setSlaveOk();
 
-
+var serverName = s.getServerName( "test" );
+var other = s.config.shards.findOne( { _id : { $ne : serverName } } );
 
 for ( i=0; i<20; i++ ) {
     // Needs to waitForDelete because we'll be performing a slaveOk query,
@@ -41,5 +41,5 @@ for ( i=0; i<20; i++ ) {
 
 s.stop();
 
-
+}());
 
