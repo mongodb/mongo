@@ -101,6 +101,10 @@ public:
         help << "query for documents";
     }
 
+    OperationType getLogicalOp() const override {
+        return dbQuery;
+    }
+
     /**
      * A find command does not increment the command counter, but rather increments the
      * query counter.

@@ -246,12 +246,9 @@ CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
     _progressMeter.finished();
     _numYields = 0;
     _expectedLatencyMs = 0;
-    _op = 0;
+    _networkOp = opInvalid;
+    _logicalOp = opInvalid;
     _command = NULL;
-}
-
-void CurOp::setOp_inlock(int op) {
-    _op = op;
 }
 
 ProgressMeter& CurOp::setMessage_inlock(const char* msg,
@@ -309,25 +306,12 @@ void CurOp::reportState(BSONObjBuilder* builder) {
         builder->append("microsecs_running", static_cast<long long int>(elapsedMicros()));
     }
 
-    const char* opName;
-    if (_command && _command->name == "find") {
-        // If the operation is a find command, we report "op" as "query", for consistency with
-        // OP_QUERY legacy find operations.
-        opName = opToString(dbQuery);
-    } else if (_command && _command->name == "getMore") {
-        // If the operation is a getMore command, we report "op" as "getmore", for consistency
-        // with OP_GET_MORE legacy find operations.
-        opName = opToString(dbGetMore);
-    } else {
-        opName = opToString(_op);
-    }
-    builder->append("op", opName);
-
+    builder->append("op", opToString(_logicalOp));
     builder->append("ns", _ns);
 
-    if (_op == dbInsert) {
+    if (_networkOp == dbInsert) {
         _query.append(*builder, "insert");
-    } else if (!_command && _op == dbQuery) {
+    } else if (!_command && _networkOp == dbQuery) {
         // This is a legacy OP_QUERY. We upconvert the "query" field of the currentOp output to look
         // similar to a find command.
         //
@@ -470,7 +454,8 @@ uint64_t CurOp::MaxTimeTracker::getRemainingMicros() const {
 }
 
 void OpDebug::reset() {
-    op = 0;
+    networkOp = opInvalid;
+    logicalOp = opInvalid;
     iscommand = false;
     query = BSONObj();
     updateobj = BSONObj();
@@ -527,7 +512,7 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     if (iscommand)
         s << "command ";
     else
-        s << opToString(op) << ' ';
+        s << opToString(networkOp) << ' ';
 
     s << curop.getNS();
 
@@ -600,7 +585,7 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     }
 
     if (iscommand) {
-        s << " protocol:" << getProtoString(op);
+        s << " protocol:" << getProtoString(networkOp);
     }
 
     s << " " << executionTime << "ms";
@@ -641,26 +626,6 @@ void appendAsObjOrString(StringData name,
 }
 }  // namespace
 
-bool OpDebug::isFindCommand() const {
-    return iscommand && str::equals(query.firstElement().fieldName(), "find");
-}
-
-bool OpDebug::isGetMoreCommand() const {
-    return iscommand && str::equals(query.firstElement().fieldName(), "getMore");
-}
-
-int OpDebug::getLogicalOpType() const {
-    if (isFindCommand()) {
-        return dbQuery;
-    } else if (isGetMoreCommand()) {
-        return dbGetMore;
-    } else if (iscommand) {
-        return dbCommand;
-    } else {
-        return op;
-    }
-}
-
 #define OPDEBUG_APPEND_NUMBER(x) \
     if (x != -1)                 \
     b.appendNumber(#x, (x))
@@ -673,17 +638,16 @@ void OpDebug::append(const CurOp& curop,
                      BSONObjBuilder& b) const {
     const size_t maxElementSize = 50 * 1024;
 
-    int logicalOpType = getLogicalOpType();
-    b.append("op", opToString(logicalOpType));
+    b.append("op", opToString(logicalOp));
 
     NamespaceString nss = NamespaceString(curop.getNS());
     b.append("ns", nss.ns());
 
-    if (!iscommand && op == dbQuery) {
+    if (!iscommand && networkOp == dbQuery) {
         appendAsObjOrString(
             "query", upconvertQueryEntry(query, nss, ntoreturn, ntoskip), maxElementSize, &b);
     } else if (!query.isEmpty()) {
-        const char* fieldName = (logicalOpType == dbCommand) ? "command" : "query";
+        const char* fieldName = (logicalOp == dbCommand) ? "command" : "query";
         appendAsObjOrString(fieldName, query, maxElementSize, &b);
     } else if (!iscommand && curop.haveQuery()) {
         appendAsObjOrString("query", curop.query(), maxElementSize, &b);
@@ -728,7 +692,7 @@ void OpDebug::append(const CurOp& curop,
     OPDEBUG_APPEND_NUMBER(nreturned);
     OPDEBUG_APPEND_NUMBER(responseLength);
     if (iscommand) {
-        b.append("protocol", getProtoString(op));
+        b.append("protocol", getProtoString(networkOp));
     }
     b.append("millis", executionTime);
 
