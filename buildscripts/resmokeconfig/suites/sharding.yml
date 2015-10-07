@@ -6,7 +6,6 @@ selector:
     exclude_files:
     - jstests/sharding/csrs_upgrade.js                    # SERVER-20694
     - jstests/sharding/csrs_upgrade_during_migrate.js     # flaky - SERVER-20580
-    - jstests/sharding/multi_mongos2.js                   # SERVER-20676
 
 executor:
   js_test:
