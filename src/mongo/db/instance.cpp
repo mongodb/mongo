@@ -419,7 +419,7 @@ void assembleResponse(OperationContext* txn,
                       DbResponse& dbresponse,
                       const HostAndPort& remote) {
     // before we lock...
-    OperationType op = m.operation();
+    int op = m.operation();
     bool isCommand = false;
 
     DbMessage dbmsg(m);
@@ -492,20 +492,16 @@ void assembleResponse(OperationContext* txn,
         case dbDelete:
             globalOpCounters.gotDelete();
             break;
-        default:
-            break;
     }
 
     CurOp& currentOp = *CurOp::get(txn);
     {
         stdx::lock_guard<Client> lk(*txn->getClient());
-        // Commands handling code will reset this if the operation is a command
-        // which is logically a basic CRUD operation like query, insert, etc.
-        currentOp.setNetworkOp_inlock(op);
-        currentOp.setLogicalOp_inlock(op);
+        currentOp.setOp_inlock(op);
     }
 
     OpDebug& debug = currentOp.debug();
+    debug.op = op;
 
     long long logThreshold = serverGlobalParams.slowMS;
     LogComponent responseComponent(LogComponent::kQuery);
@@ -556,8 +552,7 @@ void assembleResponse(OperationContext* txn,
                 logThreshold = 10;
                 receivedKillCursors(txn, m);
             } else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
-                log(LogComponent::kQuery)
-                    << "    operation isn't supported: " << static_cast<int>(op) << endl;
+                log(LogComponent::kQuery) << "    operation isn't supported: " << op << endl;
                 currentOp.done();
                 shouldLog = true;
             } else {

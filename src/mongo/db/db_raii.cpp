@@ -103,7 +103,7 @@ AutoGetCollectionForRead::~AutoGetCollectionForRead() {
     auto currentOp = CurOp::get(_txn);
     Top::get(_txn->getClient()->getServiceContext())
         .record(currentOp->getNS(),
-                currentOp->getNetworkOp(),
+                currentOp->getOp(),
                 -1,  // "read locked"
                 _timer.micros(),
                 currentOp->isCommand());
@@ -183,7 +183,7 @@ void OldClientContext::_finishInit() {
 }
 
 void OldClientContext::_checkNotStale() const {
-    switch (CurOp::get(_txn)->getNetworkOp()) {
+    switch (CurOp::get(_txn)->getOp()) {
         case dbGetMore:  // getMore is special and should be handled elsewhere.
         case dbUpdate:   // update & delete check shard version in instance.cpp, so don't check
         case dbDelete:   // here as well.
@@ -200,7 +200,7 @@ OldClientContext::~OldClientContext() {
     auto currentOp = CurOp::get(_txn);
     Top::get(_txn->getClient()->getServiceContext())
         .record(currentOp->getNS(),
-                currentOp->getNetworkOp(),
+                currentOp->getOp(),
                 _txn->lockState()->isWriteLocked() ? 1 : -1,
                 _timer.micros(),
                 currentOp->isCommand());

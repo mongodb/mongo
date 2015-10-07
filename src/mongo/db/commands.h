@@ -241,10 +241,6 @@ public:
         return false;
     }
 
-    virtual OperationType getLogicalOp() const {
-        return dbCommand;
-    }
-
     /** @param webUI expose the command in the web ui as localhost:28017/<name>
         @param oldName an optional old, deprecated name for the command
     */

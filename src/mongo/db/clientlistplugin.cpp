@@ -114,7 +114,7 @@ private:
 
             tablecell(ss, curOp->elapsedSeconds());
 
-            tablecell(ss, curOp->getNetworkOp());
+            tablecell(ss, curOp->getOp());
             tablecell(ss, html::escape(curOp->getNS()));
 
             if (curOp->haveQuery()) {

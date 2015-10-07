@@ -89,7 +89,7 @@ void IndexBuilder::run() {
 
     {
         stdx::lock_guard<Client> lk(*txn.getClient());
-        CurOp::get(txn)->setNetworkOp_inlock(dbInsert);
+        CurOp::get(txn)->setOp_inlock(dbInsert);
     }
     NamespaceString ns(_index["ns"].String());
 
