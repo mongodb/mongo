@@ -891,9 +891,6 @@ PlanStage::StageState UpdateStage::work(WorkingSetID* out) {
                 member->transitionToOwnedObj();
             }
         } catch (const WriteConflictException& wce) {
-            // Ensure that the BSONObj underlying the WorkingSetMember is owned because it may be
-            // freed when we yield.
-            member->makeObjOwnedIfNeeded();
             _idRetrying = id;
             memberFreer.Dismiss();  // Keep this member around so we can retry updating it.
             *out = WorkingSet::INVALID_ID;
