@@ -197,14 +197,12 @@ void MongoBase::Functions::find::call(JSContext* cx, JS::CallArgs args) {
     bool haveFields = false;
 
     if (args.get(2).isObject()) {
-        size_t i = 0;
-
         JS::RootedObject obj(cx, args.get(2).toObjectOrNull());
 
-        ObjectWrapper(cx, obj).enumerate([&i](jsid) { ++i; });
-
-        if (i > 0)
+        ObjectWrapper(cx, obj).enumerate([&](jsid) {
             haveFields = true;
+            return false;
+        });
     }
 
     if (haveFields)
@@ -281,6 +279,8 @@ void MongoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
             array.getValue(id, &value);
 
             bos.push_back(addId(value));
+
+            return true;
         });
 
         if (!foundElement)
@@ -303,7 +303,7 @@ void MongoBase::Functions::remove::call(JSContext* cx, JS::CallArgs args) {
 
     ObjectWrapper o(cx, args.thisv());
 
-    if (o.hasField("readOnly") && o.getBoolean("readOnly"))
+    if (o.hasOwnField(InternedString::readOnly) && o.getBoolean(InternedString::readOnly))
         uasserted(ErrorCodes::BadValue, "js db in read only mode");
 
     auto conn = getConnection(args);
@@ -332,7 +332,7 @@ void MongoBase::Functions::update::call(JSContext* cx, JS::CallArgs args) {
 
     ObjectWrapper o(cx, args.thisv());
 
-    if (o.hasField("readOnly") && o.getBoolean("readOnly"))
+    if (o.hasOwnField(InternedString::readOnly) && o.getBoolean(InternedString::readOnly))
         uasserted(ErrorCodes::BadValue, "js db in read only mode");
 
     auto conn = getConnection(args);

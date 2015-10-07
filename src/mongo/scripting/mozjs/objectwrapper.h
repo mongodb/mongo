@@ -83,6 +83,7 @@ public:
         void get(JSContext* cx, JS::HandleObject o, JS::MutableHandleValue value);
         void set(JSContext* cx, JS::HandleObject o, JS::HandleValue value);
         bool has(JSContext* cx, JS::HandleObject o);
+        bool hasOwn(JSContext* cx, JS::HandleObject o);
         void define(JSContext* cx, JS::HandleObject o, JS::HandleValue value, unsigned attrs);
         void del(JSContext* cx, JS::HandleObject o);
         std::string toString(JSContext* cx);
@@ -132,6 +133,7 @@ public:
     void rename(Key key, const char* to);
 
     bool hasField(Key key);
+    bool hasOwnField(Key key);
 
     void callMethod(const char* name, const JS::HandleValueArray& args, JS::MutableHandleValue out);
     void callMethod(const char* name, JS::MutableHandleValue out);
@@ -154,7 +156,8 @@ public:
         JS::RootedId rid(_context);
         for (size_t i = 0; i < ids.length(); ++i) {
             rid.set(ids[i]);
-            callback(rid);
+            if (!callback(rid))
+                break;
         }
     }
 

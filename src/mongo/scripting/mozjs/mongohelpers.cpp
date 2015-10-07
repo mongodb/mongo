@@ -87,6 +87,7 @@ void MongoHelpersInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::H
     exportsWrapper.enumerate([&](JS::HandleId _id) {
         exportsWrapper.getValue(_id, &copyExport);
         protoWrapper.setValue(_id, copyExport);
+        return true;
     });
 }
 

@@ -61,14 +61,14 @@ long long NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleValue thisv) {
 long long NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleObject thisv) {
     ObjectWrapper o(cx, thisv);
 
-    if (!o.hasField(InternedString::top)) {
-        if (!o.hasField(InternedString::floatApprox))
+    if (!o.hasOwnField(InternedString::top)) {
+        if (!o.hasOwnField(InternedString::floatApprox))
             uasserted(ErrorCodes::InternalError, "No top and no floatApprox fields");
 
         return o.getNumberLongLong(InternedString::floatApprox);
     }
 
-    if (!o.hasField(InternedString::bottom))
+    if (!o.hasOwnField(InternedString::bottom))
         uasserted(ErrorCodes::InternalError, "top but no bottom field");
 
     return ((unsigned long long)((long long)o.getNumberLongLong(InternedString::top) << 32) +

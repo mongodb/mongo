@@ -168,6 +168,37 @@ bool ObjectWrapper::Key::has(JSContext* cx, JS::HandleObject o) {
     throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to has value on a JSObject");
 }
 
+bool ObjectWrapper::Key::hasOwn(JSContext* cx, JS::HandleObject o) {
+    bool has;
+
+    switch (_type) {
+        case Type::Field:
+            if (JS_AlreadyHasOwnProperty(cx, o, _field, &has))
+                return has;
+            break;
+        case Type::Index:
+            if (JS_AlreadyHasOwnElement(cx, o, _idx, &has))
+                return has;
+            break;
+        case Type::Id: {
+            JS::RootedId id(cx, _id);
+
+            if (JS_AlreadyHasOwnPropertyById(cx, o, id, &has))
+                return has;
+            break;
+        }
+        case Type::InternedString: {
+            InternedStringId id(cx, _internedString);
+
+            if (JS_AlreadyHasOwnPropertyById(cx, o, id, &has))
+                return has;
+            break;
+        }
+    }
+
+    throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to hasOwn value on a JSObject");
+}
+
 void ObjectWrapper::Key::del(JSContext* cx, JS::HandleObject o) {
     switch (_type) {
         case Type::Field:
@@ -373,6 +404,10 @@ bool ObjectWrapper::hasField(Key key) {
     return key.has(_context, _object);
 }
 
+bool ObjectWrapper::hasOwnField(Key key) {
+    return key.hasOwn(_context, _object);
+}
+
 void ObjectWrapper::callMethod(const char* field,
                                const JS::HandleValueArray& args,
                                JS::MutableHandleValue out) {
@@ -439,8 +474,8 @@ BSONObj ObjectWrapper::toBSON() {
 
     // We special case the _id field in top-level objects and move it to the front.
     // This matches other drivers behavior and makes finding the _id field quicker in BSON.
-    if (hasField("_id")) {
-        _writeField(&b, "_id", &frames, frames.top().originalBSON);
+    if (hasOwnField(InternedString::_id)) {
+        _writeField(&b, InternedString::_id, &frames, frames.top().originalBSON);
     }
 
     while (frames.size()) {
@@ -467,7 +502,9 @@ BSONObj ObjectWrapper::toBSON() {
         if (frames.size() == 1) {
             IdWrapper idw(_context, id);
 
-            if (idw.isString() && idw.equals("_id")) {
+            // TODO: check if it's cheaper to just compare with an interned
+            // string of "_id" rather than with ascii
+            if (idw.isString() && idw.equalsAscii("_id")) {
                 continue;
             }
         }
