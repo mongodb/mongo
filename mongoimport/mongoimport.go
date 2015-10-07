@@ -329,7 +329,7 @@ func (imp *MongoImport) importDocuments(inputReader InputReader) (numImported ui
 		collection := session.DB(imp.ToolOptions.DB).
 			C(imp.ToolOptions.Collection)
 		if err := collection.DropCollection(); err != nil {
-			if err.Error() != db.ErrNsNotFound.Error() {
+			if err.Error() != db.ErrNsNotFound {
 				return 0, err
 			}
 		}

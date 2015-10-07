@@ -197,16 +197,13 @@ func filterIngestError(stopOnError bool, err error) error {
 	if err == nil {
 		return nil
 	}
-	if err.Error() == db.ErrNoReachableServers.Error() {
-		return err
-	}
 	if err.Error() == io.EOF.Error() {
-		err = db.ErrLostConnection
+		return fmt.Errorf(db.ErrLostConnection)
+	}
+	if stopOnError || db.IsConnectionError(err) {
+		return err
 	}
 	log.Logf(log.Always, "error inserting documents: %v", err)
-	if stopOnError || err == db.ErrLostConnection {
-		return err
-	}
 	return nil
 }
 

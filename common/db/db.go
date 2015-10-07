@@ -3,13 +3,13 @@
 package db
 
 import (
-	"errors"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/password"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
+	"strings"
 	"sync"
 	"time"
 )
@@ -38,12 +38,18 @@ const (
 	DefaultTestPort = "33333"
 )
 
+const (
+	ErrLostConnection     = "lost connection to server"
+	ErrNoReachableServers = "no reachable servers"
+	ErrNsNotFound         = "ns not found"
+	// replication errors list the replset name if we are talking to a mongos,
+	// so we can only check for this universal prefix
+	ErrReplTimeoutPrefix = "waiting for replication timed out"
+)
+
 var (
-	ErrLostConnection     = errors.New("lost connection to server")
-	ErrNoReachableServers = errors.New("no reachable servers")
-	ErrNsNotFound         = errors.New("ns not found")
-	DefaultDialTimeout    = time.Second * 3
-	GetConnectorFuncs     = []GetConnectorFunc{}
+	DefaultDialTimeout = time.Second * 3
+	GetConnectorFuncs  = []GetConnectorFunc{}
 )
 
 // Used to manage database sessions
@@ -191,10 +197,8 @@ func IsConnectionError(err error) bool {
 	if err == nil {
 		return false
 	}
-	if err.Error() == ErrNoReachableServers.Error() {
-		return true
-	}
-	if err.Error() == io.EOF.Error() {
+	if err.Error() == ErrNoReachableServers || err.Error() == io.EOF.Error() ||
+		strings.HasPrefix(err.Error(), ErrReplTimeoutPrefix) {
 		return true
 	}
 	return false
