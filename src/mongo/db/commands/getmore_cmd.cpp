@@ -298,7 +298,8 @@ public:
         if (isCursorAwaitData(cursor) && state == PlanExecutor::IS_EOF && numResults == 0) {
             auto replCoord = repl::ReplicationCoordinator::get(txn);
             // Return immediately if we need to update the commit time.
-            if (request.lastKnownCommittedOpTime == replCoord->getLastCommittedOpTime()) {
+            if (!request.lastKnownCommittedOpTime ||
+                (request.lastKnownCommittedOpTime == replCoord->getLastCommittedOpTime())) {
                 // Retrieve the notifier which we will wait on until new data arrives. We make sure
                 // to do this in the lock because once we drop the lock it is possible for the
                 // collection to become invalid. The notifier itself will outlive the collection if
