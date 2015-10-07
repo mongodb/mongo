@@ -48,6 +48,16 @@ public:
     JSStringWrapper(JSContext* cx, JSString* str);
     JSStringWrapper(std::int32_t val);
 
+#if defined(_MSC_VER) && _MSC_VER < 1900
+    JSStringWrapper(JSStringWrapper&&);
+
+    JSStringWrapper& operator=(JSStringWrapper&&);
+#else
+    JSStringWrapper(JSStringWrapper&&) = default;
+
+    JSStringWrapper& operator=(JSStringWrapper&&) = default;
+#endif
+
     StringData toStringData() const;
     std::string toString() const;
 
