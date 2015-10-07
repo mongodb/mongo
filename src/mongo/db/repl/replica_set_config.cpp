@@ -52,7 +52,6 @@ const std::string ReplicaSetConfig::kMajorityWriteConcernModeName = "$majority";
 const Milliseconds ReplicaSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
 const Milliseconds ReplicaSetConfig::kDefaultElectionTimeoutPeriod(10000);
-const int ReplicaSetConfig::kDefaultElectionTimeoutOffsetLimit(2000);
 const bool ReplicaSetConfig::kDefaultChainingAllowed(true);
 
 namespace {
@@ -71,7 +70,6 @@ const std::string kLegalConfigTopFieldNames[] = {kIdFieldName,
                                                  ReplicaSetConfig::kConfigServerFieldName};
 
 const std::string kElectionTimeoutFieldName = "electionTimeoutMillis";
-const std::string kElectionTimeoutOffsetLimitFieldName = "electionTimeoutOffsetLimitMillis";
 const std::string kHeartbeatIntervalFieldName = "heartbeatIntervalMillis";
 const std::string kHeartbeatTimeoutFieldName = "heartbeatTimeoutSecs";
 const std::string kChainingAllowedFieldName = "chainingAllowed";
@@ -188,51 +186,35 @@ Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
     //
     // Parse electionTimeoutMillis
     //
-    BSONElement electionTimeoutMillisElement = settings[kElectionTimeoutFieldName];
-    if (electionTimeoutMillisElement.eoo()) {
-        _electionTimeoutPeriod = Milliseconds(kDefaultElectionTimeoutPeriod);
-    } else if (electionTimeoutMillisElement.isNumber()) {
-        _electionTimeoutPeriod = Milliseconds(electionTimeoutMillisElement.numberInt());
-    } else {
-        return Status(ErrorCodes::TypeMismatch,
-                      str::stream() << "Expected type of " << kSettingsFieldName << "."
-                                    << kElectionTimeoutFieldName
-                                    << " to be a number, but found a value of type "
-                                    << typeName(electionTimeoutMillisElement.type()));
-    }
-
-    //
-    // Parse electionTimeoutOffsetLimit
-    //
     auto greaterThanZero = stdx::bind(std::greater<long long>(), stdx::placeholders::_1, 0);
-    long long electionTimeoutOffsetLimitMillis;
-    auto electionTimeoutOffsetLimitStatus =
-        bsonExtractIntegerFieldWithDefaultIf(settings,
-                                             kElectionTimeoutOffsetLimitFieldName,
-                                             kDefaultElectionTimeoutOffsetLimit,
-                                             greaterThanZero,
-                                             "election timeout offset limit must be greater than 0",
-                                             &electionTimeoutOffsetLimitMillis);
-    if (!electionTimeoutOffsetLimitStatus.isOK()) {
-        return electionTimeoutOffsetLimitStatus;
+    long long electionTimeoutMillis;
+    auto electionTimeoutStatus = bsonExtractIntegerFieldWithDefaultIf(
+        settings,
+        kElectionTimeoutFieldName,
+        durationCount<Milliseconds>(kDefaultElectionTimeoutPeriod),
+        greaterThanZero,
+        "election timeout must be greater than 0",
+        &electionTimeoutMillis);
+    if (!electionTimeoutStatus.isOK()) {
+        return electionTimeoutStatus;
     }
-    _electionTimeoutOffsetLimit = electionTimeoutOffsetLimitMillis;
+    _electionTimeoutPeriod = Milliseconds(electionTimeoutMillis);
 
     //
     // Parse heartbeatTimeoutSecs
     //
-    BSONElement hbTimeoutSecsElement = settings[kHeartbeatTimeoutFieldName];
-    if (hbTimeoutSecsElement.eoo()) {
-        _heartbeatTimeoutPeriod = Seconds(kDefaultHeartbeatTimeoutPeriod);
-    } else if (hbTimeoutSecsElement.isNumber()) {
-        _heartbeatTimeoutPeriod = Seconds(hbTimeoutSecsElement.numberInt());
-    } else {
-        return Status(ErrorCodes::TypeMismatch,
-                      str::stream() << "Expected type of " << kSettingsFieldName << "."
-                                    << kHeartbeatTimeoutFieldName
-                                    << " to be a number, but found a value of type "
-                                    << typeName(hbTimeoutSecsElement.type()));
+    long long heartbeatTimeoutSecs;
+    Status heartbeatTimeoutStatus =
+        bsonExtractIntegerFieldWithDefaultIf(settings,
+                                             kHeartbeatTimeoutFieldName,
+                                             durationCount<Seconds>(kDefaultHeartbeatTimeoutPeriod),
+                                             greaterThanZero,
+                                             "heartbeat timeout must be greater than 0",
+                                             &heartbeatTimeoutSecs);
+    if (!heartbeatTimeoutStatus.isOK()) {
+        return heartbeatTimeoutStatus;
     }
+    _heartbeatTimeoutPeriod = Seconds(heartbeatTimeoutSecs);
 
     //
     // Parse chainingAllowed
@@ -337,20 +319,6 @@ Status ReplicaSetConfig::validate() const {
                                     << " field value must be non-negative, "
                                        "but found "
                                     << durationCount<Milliseconds>(_heartbeatInterval));
-    }
-    if (_heartbeatTimeoutPeriod < Seconds(0)) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << kSettingsFieldName << '.' << kHeartbeatTimeoutFieldName
-                                    << " field value must be non-negative, "
-                                       "but found "
-                                    << durationCount<Seconds>(_heartbeatTimeoutPeriod));
-    }
-    if (_electionTimeoutPeriod < Milliseconds(0)) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << kSettingsFieldName << '.' << kElectionTimeoutFieldName
-                                    << " field value must be non-negative, "
-                                       "but found "
-                                    << durationCount<Milliseconds>(_electionTimeoutPeriod));
     }
     if (_members.size() > kMaxMembers || _members.empty()) {
         return Status(ErrorCodes::BadValue,
@@ -656,8 +624,6 @@ BSONObj ReplicaSetConfig::toBSON() const {
                                   durationCount<Seconds>(_heartbeatTimeoutPeriod));
     settingsBuilder.appendIntOrLL(kElectionTimeoutFieldName,
                                   durationCount<Milliseconds>(_electionTimeoutPeriod));
-    settingsBuilder.appendIntOrLL(kElectionTimeoutOffsetLimitFieldName,
-                                  _electionTimeoutOffsetLimit);
 
 
     BSONObjBuilder gleModes(settingsBuilder.subobjStart(kGetLastErrorModesFieldName));

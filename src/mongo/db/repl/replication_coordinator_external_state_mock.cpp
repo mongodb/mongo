@@ -218,6 +218,10 @@ bool ReplicationCoordinatorExternalStateMock::snapshotsEnabled() const {
 
 void ReplicationCoordinatorExternalStateMock::notifyOplogMetadataWaiters() {}
 
+double ReplicationCoordinatorExternalStateMock::getElectionTimeoutOffsetLimitFraction() const {
+    return 0.15;
+}
+
 void ReplicationCoordinatorExternalStateMock::logTransitionToPrimaryToOplog(OperationContext* txn) {
     _lastOpTime = OpTime(Timestamp(1, 0), 1);
 }

@@ -39,6 +39,7 @@ namespace mongo {
 namespace repl {
 
 extern int maxSyncSourceLagSecs;
+extern double replElectionTimeoutOffsetLimitFraction;
 
 bool anyReplEnabled();
 

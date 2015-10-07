@@ -228,6 +228,12 @@ public:
     virtual bool snapshotsEnabled() const = 0;
 
     virtual void notifyOplogMetadataWaiters() = 0;
+
+    /**
+     * Returns multiplier to apply to election timeout to obtain upper bound
+     * on randomized offset.
+     */
+    virtual double getElectionTimeoutOffsetLimitFraction() const = 0;
 };
 
 }  // namespace repl

@@ -77,6 +77,7 @@ public:
     void forceSnapshotCreation() final;
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters();
+    virtual double getElectionTimeoutOffsetLimitFraction() const;
 
     std::string getNextOpContextThreadName();
 

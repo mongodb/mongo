@@ -62,7 +62,6 @@ public:
     static const Milliseconds kDefaultElectionTimeoutPeriod;
     static const Milliseconds kDefaultHeartbeatInterval;
     static const Seconds kDefaultHeartbeatTimeoutPeriod;
-    static const int kDefaultElectionTimeoutOffsetLimit;
     static const bool kDefaultChainingAllowed;
 
     /**
@@ -286,13 +285,6 @@ public:
      */
     Milliseconds getPriorityTakeoverDelay(int memberIdx) const;
 
-    /**
-     * Returns the upper bound (in Milliseconds) of the election timeout's random offset.
-     */
-    int getElectionTimeoutOffsetLimit() const {
-        return _electionTimeoutOffsetLimit;
-    }
-
 private:
     /**
      * Parses the "settings" subdocument of a replica set configuration.
@@ -321,9 +313,8 @@ private:
     WriteConcernOptions _defaultWriteConcern;
     Milliseconds _electionTimeoutPeriod = kDefaultElectionTimeoutPeriod;
     Milliseconds _heartbeatInterval = kDefaultHeartbeatInterval;
-    Seconds _heartbeatTimeoutPeriod = Seconds(0);
+    Seconds _heartbeatTimeoutPeriod = kDefaultHeartbeatTimeoutPeriod;
     bool _chainingAllowed = kDefaultChainingAllowed;
-    int _electionTimeoutOffsetLimit = kDefaultElectionTimeoutOffsetLimit;
     int _majorityVoteCount = 0;
     int _writeMajority = 0;
     int _totalVotingMembers = 0;

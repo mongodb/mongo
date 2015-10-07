@@ -684,8 +684,9 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
         return;
     }
 
-    Milliseconds randomOffset =
-        Milliseconds(_replExecutor.nextRandomInt64(_rsConfig.getElectionTimeoutOffsetLimit()));
+    Milliseconds randomOffset = Milliseconds(_replExecutor.nextRandomInt64(
+        durationCount<Milliseconds>(_rsConfig.getElectionTimeoutPeriod()) *
+        _externalState->getElectionTimeoutOffsetLimitFraction()));
     auto now = _replExecutor.now();
     auto when = now + _rsConfig.getElectionTimeoutPeriod() + randomOffset;
     invariant(when > now);

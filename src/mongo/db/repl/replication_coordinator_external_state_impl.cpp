@@ -403,5 +403,9 @@ void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters() {
     signalOplogWaiters();
 }
 
+double ReplicationCoordinatorExternalStateImpl::getElectionTimeoutOffsetLimitFraction() const {
+    return replElectionTimeoutOffsetLimitFraction;
+}
+
 }  // namespace repl
 }  // namespace mongo

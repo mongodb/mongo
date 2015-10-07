@@ -72,7 +72,6 @@ TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS(ReplicaSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
     ASSERT_EQUALS(Seconds(10), config.getHeartbeatTimeoutPeriod());
     ASSERT_EQUALS(Seconds(10), config.getElectionTimeoutPeriod());
-    ASSERT_EQUALS(2000, config.getElectionTimeoutOffsetLimit());
     ASSERT_TRUE(config.isChainingAllowed());
     ASSERT_FALSE(config.isConfigServer());
     ASSERT_EQUALS(0, config.getProtocolVersion());
@@ -93,7 +92,7 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
                                        << BSON("eastCoast" << BSON("NYC" << 1)) << "chainingAllowed"
                                        << false << "heartbeatIntervalMillis" << 5000
                                        << "heartbeatTimeoutSecs" << 120 << "electionTimeoutMillis"
-                                       << 10 << "electionTimeoutOffsetLimitMillis" << 2))));
+                                       << 10))));
     ASSERT_OK(config.validate());
     ASSERT_EQUALS("rs0", config.getReplSetName());
     ASSERT_EQUALS(1234, config.getConfigVersion());
@@ -106,7 +105,6 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_EQUALS(Seconds(5), config.getHeartbeatInterval());
     ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
     ASSERT_EQUALS(Milliseconds(10), config.getElectionTimeoutPeriod());
-    ASSERT_EQUALS(2, config.getElectionTimeoutOffsetLimit());
     ASSERT_EQUALS(2, config.getProtocolVersion());
 }
 
@@ -486,42 +484,6 @@ TEST(ReplicaSetConfig, ParseFailsWithNonNumericElectionTimeoutMillisField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonNumericElectionTimeoutOffsetLimitMillisField) {
-    ReplicaSetConfig config;
-    Status status = config.initialize(BSON("_id"
-                                           << "rs0"
-                                           << "version" << 1 << "members"
-                                           << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                    << "localhost:12345"))
-                                           << "settings" << BSON("electionTimeoutOffsetLimitMillis"
-                                                                 << "no")));
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
-}
-
-TEST(ReplicaSetConfig, ParseFailsWithZeroElectionTimeoutOffsetLimitMillisField) {
-    ReplicaSetConfig config;
-    Status status =
-        config.initialize(BSON("_id"
-                               << "rs0"
-                               << "version" << 1 << "members"
-                               << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                        << "localhost:12345")) << "settings"
-                               << BSON("electionTimeoutOffsetLimitMillis" << 0)));
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
-}
-
-TEST(ReplicaSetConfig, ParseFailsWithNegativeElectionTimeoutOffsetLimitMillisField) {
-    ReplicaSetConfig config;
-    Status status =
-        config.initialize(BSON("_id"
-                               << "rs0"
-                               << "version" << 1 << "members"
-                               << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                        << "localhost:12345")) << "settings"
-                               << BSON("electionTimeoutOffsetLimitMillis" << -1000)));
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
-}
-
 TEST(ReplicaSetConfig, ParseFailsWithNonNumericHeartbeatTimeoutSecsField) {
     ReplicaSetConfig config;
     Status status = config.initialize(BSON("_id"
@@ -789,13 +751,14 @@ TEST(ReplicaSetConfig, ElectionTimeoutField) {
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(Milliseconds(20), config.getElectionTimeoutPeriod());
 
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 1 << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")) << "settings"
-                                     << BSON("electionTimeoutMillis" << -20))));
-    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+    auto status = config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345"))
+                                         << "settings" << BSON("electionTimeoutMillis" << -20)));
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "election timeout must be greater than 0");
 }
 
 TEST(ReplicaSetConfig, HeartbeatTimeoutField) {
@@ -809,13 +772,14 @@ TEST(ReplicaSetConfig, HeartbeatTimeoutField) {
     ASSERT_OK(config.validate());
     ASSERT_EQUALS(Seconds(20), config.getHeartbeatTimeoutPeriod());
 
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 1 << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")) << "settings"
-                                     << BSON("heartbeatTimeoutSecs" << -20))));
-    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
+    auto status = config.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version" << 1 << "members"
+                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                  << "localhost:12345"))
+                                         << "settings" << BSON("heartbeatTimeoutSecs" << -20)));
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "heartbeat timeout must be greater than 0");
 }
 
 TEST(ReplicaSetConfig, GleDefaultField) {
@@ -923,7 +887,6 @@ bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
         a.getHeartbeatInterval() == b.getHeartbeatInterval() &&
         a.getHeartbeatTimeoutPeriod() == b.getHeartbeatTimeoutPeriod() &&
         a.getElectionTimeoutPeriod() == b.getElectionTimeoutPeriod() &&
-        a.getElectionTimeoutOffsetLimit() == b.getElectionTimeoutOffsetLimit() &&
         a.isChainingAllowed() == b.isChainingAllowed() &&
         a.isConfigServer() == b.isConfigServer() &&
         a.getDefaultWriteConcern().wNumNodes == b.getDefaultWriteConcern().wNumNodes &&
@@ -969,14 +932,14 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
                                     << BSON("coast"
                                             << "west"
                                             << "hdd"
-                                            << "true"))) << "protocolVersion" << 0 << "settings"
-        << BSON("heartbeatIntervalMillis"
-                << 5000 << "heartbeatTimeoutSecs" << 20
-                << "electionTimeoutOffsetLimitMillis" << 2 << "electionTimeoutMillis" << 4
-                << "chainingAllowd" << true << "getLastErrorDefaults" << BSON("w"
-                                                                              << "majority")
-                << "getLastErrorModes" << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1) << "coasts"
-                                                       << BSON("coast" << 2))))));
+                                            << "true"))) << "protocolVersion" << 0
+        << "settings" << BSON("heartbeatIntervalMillis"
+                              << 5000 << "heartbeatTimeoutSecs" << 20 << "electionTimeoutMillis"
+                              << 4 << "chainingAllowd" << true << "getLastErrorDefaults"
+                              << BSON("w"
+                                      << "majority") << "getLastErrorModes"
+                              << BSON("disks" << BSON("ssd" << 1 << "hdd" << 1) << "coasts"
+                                              << BSON("coast" << 2))))));
     BSONObj configObjA = configA.toBSON();
     // Ensure a protocolVersion does not show up if it is 0 to maintain cross version compatibility.
     ASSERT_FALSE(configObjA.hasField("protocolVersion"));
@@ -1001,9 +964,8 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityInvalid) {
                            << BSON("_id" << 2 << "host"
                                          << "localhost:3828"
                                          << "votes" << 0 << "priority" << 0)) << "settings"
-             << BSON("heartbeatIntervalMillis" << -5000 << "heartbeatTimeoutSecs" << -20
-                                               << "electionTimeoutMillis" << -2
-                                               << "electionTimeoutOffsetLimitMillis" << 2))));
+             << BSON("heartbeatIntervalMillis" << -5000 << "heartbeatTimeoutSecs" << 20
+                                               << "electionTimeoutMillis" << 2))));
     ASSERT_OK(configB.initialize(configA.toBSON()));
     ASSERT_NOT_OK(configA.validate());
     ASSERT_NOT_OK(configB.validate());

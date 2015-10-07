@@ -80,6 +80,7 @@ public:
     virtual void forceSnapshotCreation();
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters();
+    virtual double getElectionTimeoutOffsetLimitFraction() const;
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"
