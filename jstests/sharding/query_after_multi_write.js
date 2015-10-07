@@ -11,11 +11,14 @@ var runTest = function(writeFunc) {
     var testDB = st.s.getDB('test');
     testDB.dropDatabase();
 
-    testDB.adminCommand({ enableSharding: 'test' });
+    assert.commandWorked(testDB.adminCommand({ enableSharding: 'test' }));
     st.ensurePrimaryShard('test', 'shard0000');
-    testDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
-    testDB.adminCommand({ split: 'test.user', middle: { x: 0 }});
-    testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0001' });
+
+    assert.commandWorked(testDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }}));
+    assert.commandWorked(testDB.adminCommand({ split: 'test.user', middle: { x: 0 }}));
+    assert.commandWorked(testDB.adminCommand({ moveChunk: 'test.user',
+                                               find: { x: 0 },
+                                               to: 'shard0001' }));
 
     var testDB2 = st.s1.getDB('test');
     testDB2.user.insert({ x: 123456 });
