@@ -66,11 +66,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             fromStringData(elem.valueStringData());
             return;
         case mongo::jstOID: {
-            JS::AutoValueArray<1> args(_context);
-
-            ValueReader(_context, args[0]).fromStringData(elem.OID().toString());
-
-            scope->getProto<OIDInfo>().newInstance(args, _value);
+            OIDInfo::make(_context, elem.OID(), _value);
             return;
         }
         case mongo::NumberDouble:

@@ -40,14 +40,24 @@ namespace mozjs {
  */
 struct OIDInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
+    static void finalize(JSFreeOp* fop, JSObject* obj);
 
     struct Functions {
+        MONGO_DECLARE_JS_FUNCTION(getter);
         MONGO_DECLARE_JS_FUNCTION(toString);
     };
 
     static const JSFunctionSpec methods[2];
 
+    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+
     static const char* const className;
+
+    static void postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto);
+
+    static void make(JSContext* cx, const OID& oid, JS::MutableHandleValue out);
+    static OID getOID(JSContext* cx, JS::HandleValue value);
+    static OID getOID(JSContext* cx, JS::HandleObject object);
 };
 
 }  // namespace mozjs

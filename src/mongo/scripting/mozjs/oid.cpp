@@ -42,46 +42,86 @@ namespace mongo {
 namespace mozjs {
 
 const JSFunctionSpec OIDInfo::methods[2] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, OIDInfo), JS_FS_END,
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(toString, OIDInfo), JS_FS_END,
 };
 
 const char* const OIDInfo::className = "ObjectId";
 
+void OIDInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    auto oid = static_cast<OID*>(JS_GetPrivate(obj));
+
+    if (oid) {
+        delete oid;
+    }
+}
+
 void OIDInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
-    ObjectWrapper o(cx, args.thisv());
+    auto oid = static_cast<OID*>(JS_GetPrivate(args.thisv().toObjectOrNull()));
 
-    if (!o.hasField("str"))
-        uasserted(ErrorCodes::BadValue, "Must have \"str\" field");
-
-    JS::RootedValue value(cx);
-    o.getValue("str", &value);
-
-    std::string str = str::stream() << "ObjectId(\"" << ValueWriter(cx, value).toString() << "\")";
+    std::string str = str::stream() << "ObjectId(\"" << oid->toString() << "\")";
 
     ValueReader(cx, args.rval()).fromStringData(str);
 }
 
+void OIDInfo::Functions::getter::call(JSContext* cx, JS::CallArgs args) {
+    auto oid = static_cast<OID*>(JS_GetPrivate(args.thisv().toObjectOrNull()));
+
+    ValueReader(cx, args.rval()).fromStringData(oid->toString());
+}
+
 void OIDInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
-
-    auto oid = stdx::make_unique<OID>();
-
+    OID oid;
     if (args.length() == 0) {
-        oid->init();
+        oid.init();
     } else {
         auto str = ValueWriter(cx, args.get(0)).toString();
 
         Scope::validateObjectIdString(str);
-        oid->init(str);
+        oid.init(str);
     }
 
+    make(cx, oid, args.rval());
+}
+
+void OIDInfo::make(JSContext* cx, const OID& oid, JS::MutableHandleValue out) {
+    auto scope = getScope(cx);
+
+    auto oidHolder = stdx::make_unique<OID>(oid);
     JS::RootedObject thisv(cx);
     scope->getProto<OIDInfo>().newObject(&thisv);
-    ObjectWrapper o(cx, thisv);
+    JS_SetPrivate(thisv, oidHolder.release());
 
-    o.setString("str", oid->toString());
+    out.setObjectOrNull(thisv);
+}
 
-    args.rval().setObjectOrNull(thisv);
+OID OIDInfo::getOID(JSContext* cx, JS::HandleValue value) {
+    JS::RootedObject obj(cx, value.toObjectOrNull());
+    return getOID(cx, obj);
+}
+
+OID OIDInfo::getOID(JSContext* cx, JS::HandleObject object) {
+    auto oid = static_cast<OID*>(JS_GetPrivate(object));
+
+    if (oid) {
+        return *oid;
+    }
+
+    uasserted(ErrorCodes::BadValue, "Can't call getOID on OID prototype");
+}
+
+void OIDInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {
+    JS::RootedValue undef(cx);
+    undef.setUndefined();
+
+    if (!JS_DefinePropertyById(cx,
+                               proto,
+                               getScope(cx)->getInternedStringId(InternedString::str),
+                               undef,
+                               JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_SHARED,
+                               smUtils::wrapConstrainedMethod<Functions::getter, true, OIDInfo>,
+                               nullptr)) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_DefinePropertyById");
+    }
 }
 
 }  // namespace mozjs
