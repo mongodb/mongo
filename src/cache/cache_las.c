@@ -25,11 +25,8 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	 * Lookaside table statistics are copied from the underlying lookaside
 	 * table data-source statistics. If there's no lookaside table, values
 	 * remain 0.
-	 *
-	 * The statistics log is started before we create the lookaside table,
-	 * check the session and the cursor for validity.
 	 */
-	if (conn->las_session == NULL || conn->las_session->las_cursor == NULL)
+	if (!F_ISSET(conn, WT_CONN_LAS_OPEN))
 		return;
 
 	/*
@@ -62,25 +59,28 @@ __wt_las_create(WT_SESSION_IMPL *session)
 
 	/*
 	 * Done at startup: we cannot do it on demand because we require the
-	 * schema lock to create and drop the file, and it may not always be
+	 * schema lock to create and drop the table, and it may not always be
 	 * available.
 	 *
-	 * Discard any previous incarnation of the file.
+	 * Discard any previous incarnation of the table.
 	 */
 	WT_RET(__wt_session_drop(session, WT_LAS_URI, drop_cfg));
 
-	/* Re-create the file. */
+	/* Re-create the table. */
 	WT_RET(__wt_session_create(session, WT_LAS_URI, WT_LAS_FORMAT));
 
 	/*
-	 * Open an internal session, used for the shared lookaside cursor.
-	 *
-	 * Sessions associated with a lookaside cursor should never be tapped
-	 * for eviction.
+	 * Open a shared internal session used to access the lookaside table.
+	 * This session should never be tapped for eviction.
 	 */
 	session_flags = WT_SESSION_LOOKASIDE_CURSOR | WT_SESSION_NO_EVICTION;
-	return (__wt_open_internal_session(
+	WT_RET(__wt_open_internal_session(
 	    conn, "lookaside table", true, session_flags, &conn->las_session));
+
+	/* Flag that the lookaside table has been created. */
+	F_SET(conn, WT_CONN_LAS_OPEN);
+
+	return (0);
 }
 
 /*

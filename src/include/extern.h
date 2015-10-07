@@ -319,7 +319,7 @@ extern int __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, const c
 extern int __wt_evict_file(WT_SESSION_IMPL *session, int syncop);
 extern void __wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
-extern int __wt_evict_create(WT_SESSION_IMPL *session, bool with_las);
+extern int __wt_evict_create(WT_SESSION_IMPL *session);
 extern int __wt_evict_destroy(WT_SESSION_IMPL *session);
 extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, bool *evict_resetp);
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
