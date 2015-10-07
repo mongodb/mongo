@@ -218,9 +218,9 @@ MozJSImplScope::MozRuntime::MozRuntime() {
 
         _runtime = JS_NewRuntime(kMaxBytesBeforeGC);
 
-        static_assert(kMaxStackBytes > (16 * 1024), "kMaxStackBytes must be larger than 16k");
+        static_assert(kMaxStackBytes > (32 * 1024), "kMaxStackBytes must be larger than 32k");
 
-        JS_SetNativeStackQuota(_runtime, kMaxStackBytes - (16 * 1024));
+        JS_SetNativeStackQuota(_runtime, kMaxStackBytes - (32 * 1024));
     }
 
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSRuntime", _runtime);

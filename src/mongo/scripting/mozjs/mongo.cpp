@@ -174,7 +174,7 @@ void MongoBase::Functions::runCommandWithMetadata::call(JSContext* cx, JS::CallA
     mergedResultBob.append("commandReply", res->getCommandReply());
     mergedResultBob.append("metadata", res->getMetadata());
 
-    auto mergedResult = mergedResultBob.done();
+    auto mergedResult = mergedResultBob.obj();
     ValueReader(cx, args.rval()).fromBSON(mergedResult, nullptr, false);
 }
 
