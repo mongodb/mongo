@@ -29,6 +29,7 @@
 #pragma once
 
 #include <jsapi.h>
+#include <vm/PosixNSPR.h>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/mozjs/bindata.h"
@@ -317,8 +318,9 @@ private:
         MozRuntime();
         ~MozRuntime();
 
-        JSRuntime* _runtime;
-        JSContext* _context;
+        PRThread* _thread = nullptr;
+        JSRuntime* _runtime = nullptr;
+        JSContext* _context = nullptr;
     };
 
     /**

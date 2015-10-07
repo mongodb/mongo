@@ -237,6 +237,10 @@ public:
         return createScope();
     }
 
+    virtual Scope* newScopeForCurrentThread() {
+        return createScopeForCurrentThread();
+    }
+
     virtual void runTest() = 0;
 
     virtual bool utf8Ok() const = 0;
@@ -274,6 +278,7 @@ public:
 
 protected:
     virtual Scope* createScope() = 0;
+    virtual Scope* createScopeForCurrentThread() = 0;
     void (*_scopeInitCallback)(Scope&);
 
 private:

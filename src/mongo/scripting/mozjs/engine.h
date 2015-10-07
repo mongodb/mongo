@@ -51,6 +51,7 @@ public:
     ~MozJSScriptEngine() override;
 
     mongo::Scope* createScope() override;
+    mongo::Scope* createScopeForCurrentThread() override;
 
     void runTest() override {}
 

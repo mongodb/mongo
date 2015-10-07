@@ -67,6 +67,10 @@ mongo::Scope* MozJSScriptEngine::createScope() {
     return new MozJSProxyScope(this);
 }
 
+mongo::Scope* MozJSScriptEngine::createScopeForCurrentThread() {
+    return new MozJSImplScope(this);
+}
+
 void MozJSScriptEngine::interrupt(unsigned opId) {
     stdx::lock_guard<stdx::mutex> intLock(_globalInterruptLock);
     OpIdToScopeMap::iterator iScope = _opToScopeMap.find(opId);

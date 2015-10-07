@@ -176,7 +176,11 @@ public:
     void kill();
 
 private:
-    void runOnImplThread(std::function<void()> f);
+    template <typename Closure>
+    void run(Closure&& closure);
+
+    void runOnImplThread(stdx::function<void()> f);
+
     void shutdownThread();
     static void implThread(void* proxy);
 

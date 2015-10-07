@@ -50,6 +50,9 @@ class nspr::Thread {
 public:
     Thread(void (*start)(void* arg), void* arg, uint32_t stackSize, bool joinable)
         : start(start), arg(arg), joinable(joinable) {
+        if (!start)
+            return;
+
         thread_ = CreateThread(nullptr, stackSize, ThreadRoutine, this, 0, nullptr);
 
         if (thread_ == nullptr) {
@@ -89,6 +92,8 @@ class nspr::Thread {
 public:
     Thread(void (*start)(void* arg), void* arg, uint32_t stackSize, bool joinable)
         : start(start), arg(arg), joinable(joinable) {
+        if (!start)
+            return;
         pthread_attr_t attrs;
 
         if (pthread_attr_init(&attrs) != 0) {
@@ -130,6 +135,24 @@ private:
     }
 };
 #endif
+
+namespace mongo {
+namespace mozjs {
+
+void PR_BindThread(PRThread* thread) {
+    kCurrentThread = thread;
+}
+
+PRThread* PR_CreateFakeThread() {
+    return new PRThread(nullptr, nullptr, 0, true);
+}
+
+void PR_DestroyFakeThread(PRThread* thread) {
+    delete thread;
+}
+}  // namespace mozjs
+}  // namespace mongo
+
 
 PRThread* PR_CreateThread(PRThreadType type,
                           void (*start)(void* arg),

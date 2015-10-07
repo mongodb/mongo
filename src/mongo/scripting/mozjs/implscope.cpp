@@ -204,6 +204,15 @@ void MozJSImplScope::_gcCallback(JSRuntime* rt, JSGCStatus status, void* data) {
 MozJSImplScope::MozRuntime::MozRuntime() {
     mongo::sm::reset(kMallocMemoryLimit);
 
+    // If this runtime isn't running on an NSPR thread, then it is
+    // running on a mongo thread. In that case, we need to insert a
+    // fake NSPR thread so that the SM runtime can call PR functions
+    // without falling over.
+    auto thread = PR_GetCurrentThread();
+    if (!thread) {
+        PR_BindThread(_thread = PR_CreateFakeThread());
+    }
+
     {
         stdx::unique_lock<stdx::mutex> lk(gRuntimeCreationMutex);
 
@@ -232,6 +241,12 @@ MozJSImplScope::MozRuntime::MozRuntime() {
 MozJSImplScope::MozRuntime::~MozRuntime() {
     JS_DestroyContext(_context);
     JS_DestroyRuntime(_runtime);
+
+    if (_thread) {
+        invariant(PR_GetCurrentThread() == _thread);
+        PR_DestroyFakeThread(_thread);
+        PR_BindThread(nullptr);
+    }
 }
 
 MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
