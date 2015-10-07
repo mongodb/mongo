@@ -50,7 +50,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -59,7 +58,6 @@
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -667,21 +665,10 @@ public:
             return false;
         }
 
-        ChunkVersion cmdVersion;
-        {
-            // Mongos >= v3.2 sends the full version, v3.0 only sends the epoch.
-            // TODO(SERVER-20742): Stop parsing epoch separately after 3.2.
-            OID cmdEpoch;
-            auto& operationVersion = OperationShardVersion::get(txn);
-            if (operationVersion.hasShardVersion()) {
-                cmdVersion = operationVersion.getShardVersion(nss);
-                cmdEpoch = cmdVersion.epoch();
-            } else {
-                BSONElement epochElem(cmdObj["epoch"]);
-                if (epochElem.type() == jstOID) {
-                    OID cmdEpoch = epochElem.OID();
-                }
-            }
+        // From mongos >= v3.0.
+        BSONElement epochElem(cmdObj["epoch"]);
+        if (epochElem.type() == jstOID) {
+            OID cmdEpoch = epochElem.OID();
 
             if (cmdEpoch != shardVersion.epoch()) {
                 std::string msg = str::stream() << "splitChunk cannot split chunk "
@@ -690,7 +677,7 @@ public:
                                                 << "current epoch: " << shardVersion.epoch()
                                                 << ", cmd epoch: " << cmdEpoch;
                 warning() << msg;
-                throw SendStaleConfigException(nss.toString(), msg, cmdVersion, shardVersion);
+                return appendCommandStatus(result, Status(ErrorCodes::SendStaleConfig, msg));
             }
         }
 
@@ -712,7 +699,7 @@ public:
                                             << "[" << min << "," << max << ")"
                                             << " to split, the chunk boundaries may be stale";
             warning() << msg;
-            throw SendStaleConfigException(nss.toString(), msg, cmdVersion, shardVersion);
+            return appendCommandStatus(result, Status(ErrorCodes::SendStaleConfig, msg));
         }
 
         log() << "splitChunk accepted at version " << shardVersion;

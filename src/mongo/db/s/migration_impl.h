@@ -175,12 +175,8 @@ private:
     ConnectionString _fromShardCS;
     ConnectionString _toShardCS;
 
-    // Epoch for the collection sent along with the command
-    // TODO(SERVER-20742): remove this after 3.2, now that we're sending version it is redundant
+    // Expected epoch for the collection, whose chunks are being moved
     OID _collectionEpoch;
-
-    // ChunkVersion for the collection sent along with the command
-    ChunkVersion _collectionVersion;
 
     // Min and max key of the chunk being moved
     BSONObj _minKey;

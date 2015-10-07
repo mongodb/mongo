@@ -12,17 +12,13 @@ var testDB = st.s.getDB('test');
 testDB.adminCommand({ enableSharding: 'test' });
 
 var callSplit = function(db, minKey, maxKey, splitPoints) {
-    var res = st.s.adminCommand({getShardVersion: "test.user"});
-    assert.commandWorked(res);
-    var shardVersion = [res.version, res.versionEpoch];
     return db.runCommand({
         splitChunk: 'test.user',
         from: 'shard0000',
         min: minKey,
         max: maxKey,
         keyPattern: { x: 1 },
-        splitKeys: splitPoints,
-        shardVersion: shardVersion,
+        splitKeys: splitPoints
     });
 };
 
