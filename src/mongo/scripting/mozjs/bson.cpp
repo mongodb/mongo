@@ -39,6 +39,7 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace mozjs {
@@ -87,7 +88,7 @@ struct BSONHolder {
     bool _resolved;
     bool _readOnly;
     bool _altered;
-    std::set<std::string> _removed;
+    StringMap<bool> _removed;
 };
 
 BSONHolder* getValidHolder(JSContext* cx, JSObject* obj) {
@@ -135,7 +136,7 @@ void BSONInfo::enumerate(JSContext* cx, JS::HandleObject obj, JS::AutoIdVector& 
 
         // TODO: when we get heterogenous set lookup, switch to StringData
         // rather than involving the temporary string
-        if (holder->_removed.count(e.fieldName()))
+        if (holder->_removed.find(e.fieldName()) != holder->_removed.end())
             continue;
 
         ValueReader(cx, &val).fromStringData(e.fieldNameStringData());
@@ -178,7 +179,8 @@ void BSONInfo::delProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
 
         holder->_altered = true;
 
-        holder->_removed.insert(IdWrapper(cx, id).toString());
+        JSStringWrapper jsstr;
+        holder->_removed[IdWrapper(cx, id).toStringData(&jsstr)] = true;
     }
 
     *succeeded = true;
