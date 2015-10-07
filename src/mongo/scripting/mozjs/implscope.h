@@ -44,6 +44,7 @@
 #include "mongo/scripting/mozjs/engine.h"
 #include "mongo/scripting/mozjs/error.h"
 #include "mongo/scripting/mozjs/global.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/jsthread.h"
 #include "mongo/scripting/mozjs/maxkey.h"
 #include "mongo/scripting/mozjs/minkey.h"
@@ -296,6 +297,10 @@ public:
 
     void advanceGeneration() override;
 
+    JS::HandleId getInternedStringId(InternedString name) {
+        return _internedStrings.getInternedString(name);
+    }
+
 private:
     void _MozJSCreateFunction(const char* raw,
                               ScriptingFunction functionNumber,
@@ -348,6 +353,7 @@ private:
     WrapType<GlobalInfo> _globalProto;
     JS::HandleObject _global;
     std::vector<JS::PersistentRootedValue> _funcs;
+    InternedStringTable _internedStrings;
     std::atomic<bool> _pendingKill;
     std::string _error;
     unsigned int _opId;        // op id for this scope

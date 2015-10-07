@@ -26,42 +26,62 @@
  * then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/scripting/mozjs/dbpointer.h"
-
-#include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/internedstring.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/util/mongoutils/str.h"
+#include <array>
+#include <jsapi.h>
 
 namespace mongo {
 namespace mozjs {
 
-const char* const DBPointerInfo::className = "DBPointer";
+/**
+ * An enum that includes members for each interned string we own. These values
+ * can be used with InteredStringId to get a handle to an id that matches that
+ * identifier, or directly in ObjectWrapper.
+ */
+enum class InternedString {
+#define MONGO_MOZJS_INTERNED_STRING(name, str) name,
+#include "mongo/scripting/mozjs/internedstring.defs"
+#undef MONGO_MOZJS_INTERNED_STRING
+    NUM_IDS,
+};
 
-void DBPointerInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
+/**
+ * Provides a handle to an interned string id.
+ */
+class InternedStringId {
+public:
+    InternedStringId(JSContext* cx, InternedString id);
 
-    if (args.length() != 2)
-        uasserted(ErrorCodes::BadValue, "DBPointer needs 2 arguments");
+    operator JS::HandleId() {
+        return _id;
+    }
 
-    if (!args.get(0).isString())
-        uasserted(ErrorCodes::BadValue, "DBPointer 1st parameter must be a string");
+    operator jsid() {
+        return _id;
+    }
 
-    if (!scope->getProto<OIDInfo>().instanceOf(args.get(1)))
-        uasserted(ErrorCodes::BadValue, "DBPointer 2nd parameter must be an ObjectId");
+private:
+    JS::RootedId _id;
+};
 
-    JS::RootedObject thisv(cx);
-    scope->getProto<DBPointerInfo>().newObject(&thisv);
-    ObjectWrapper o(cx, thisv);
+/**
+ * The scope global interned string table. This owns persistent roots to each
+ * id and can lookup ids by enum identifier
+ */
+class InternedStringTable {
+public:
+    explicit InternedStringTable(JSContext* cx);
+    ~InternedStringTable();
 
-    o.setValue(InternedString::ns, args.get(0));
-    o.setValue(InternedString::id, args.get(1));
+    JS::HandleId getInternedString(InternedString id) {
+        return _internedStrings[static_cast<std::size_t>(id)];
+    }
 
-    args.rval().setObjectOrNull(thisv);
-}
+private:
+    std::array<JS::PersistentRootedId, static_cast<std::size_t>(InternedString::NUM_IDS)>
+        _internedStrings;
+};
 
 }  // namespace mozjs
 }  // namespace mongo

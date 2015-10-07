@@ -34,6 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
@@ -85,7 +86,7 @@ void DBInfo::getProperty(JSContext* cx,
 
     // no hit, create new collection
     JS::RootedValue getCollection(cx);
-    parentWrapper.getValue("getCollection", &getCollection);
+    parentWrapper.getValue(InternedString::getCollection, &getCollection);
 
     if (!(getCollection.isObject() && JS_ObjectIsFunction(cx, getCollection.toObjectOrNull()))) {
         uasserted(ErrorCodes::BadValue, "getCollection is not a function");
@@ -124,8 +125,8 @@ void DBInfo::construct(JSContext* cx, JS::CallArgs args) {
     scope->getProto<DBInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
-    o.setValue("_mongo", args.get(0));
-    o.setValue("_name", args.get(1));
+    o.setValue(InternedString::_mongo, args.get(0));
+    o.setValue(InternedString::_name, args.get(1));
 
     std::string dbName = ValueWriter(cx, args.get(1)).toString();
 

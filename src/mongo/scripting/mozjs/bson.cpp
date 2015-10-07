@@ -35,6 +35,7 @@
 
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
@@ -251,7 +252,7 @@ void BSONInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObj
     JS::RootedValue value(cx);
     value.setBoolean(true);
 
-    ObjectWrapper(cx, proto).defineProperty("_bson", value, 0);
+    ObjectWrapper(cx, proto).defineProperty(InternedString::_bson, value, 0);
 }
 
 }  // namespace mozjs

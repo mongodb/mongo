@@ -32,6 +32,7 @@
 
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 
 namespace mongo {
@@ -49,10 +50,10 @@ void DBQueryInfo::construct(JSContext* cx, JS::CallArgs args) {
     scope->getProto<DBQueryInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
-    o.setValue("_mongo", args.get(0));
-    o.setValue("_db", args.get(1));
-    o.setValue("_collection", args.get(2));
-    o.setValue("_ns", args.get(3));
+    o.setValue(InternedString::_mongo, args.get(0));
+    o.setValue(InternedString::_db, args.get(1));
+    o.setValue(InternedString::_collection, args.get(2));
+    o.setValue(InternedString::_ns, args.get(3));
 
     JS::RootedObject emptyObj(cx);
     JS::RootedValue emptyObjVal(cx);
@@ -62,44 +63,44 @@ void DBQueryInfo::construct(JSContext* cx, JS::CallArgs args) {
     nullVal.setNull();
 
     if (args.length() > 4 && args.get(4).isObject()) {
-        o.setValue("_query", args.get(4));
+        o.setValue(InternedString::_query, args.get(4));
     } else {
-        o.setValue("_query", emptyObjVal);
+        o.setValue(InternedString::_query, emptyObjVal);
     }
 
     if (args.length() > 5 && args.get(5).isObject()) {
-        o.setValue("_fields", args.get(5));
+        o.setValue(InternedString::_fields, args.get(5));
     } else {
-        o.setValue("_fields", nullVal);
+        o.setValue(InternedString::_fields, nullVal);
     }
 
     if (args.length() > 6 && args.get(6).isNumber()) {
-        o.setValue("_limit", args.get(6));
+        o.setValue(InternedString::_limit, args.get(6));
     } else {
-        o.setNumber("_limit", 0);
+        o.setNumber(InternedString::_limit, 0);
     }
 
     if (args.length() > 7 && args.get(7).isNumber()) {
-        o.setValue("_skip", args.get(7));
+        o.setValue(InternedString::_skip, args.get(7));
     } else {
-        o.setNumber("_skip", 0);
+        o.setNumber(InternedString::_skip, 0);
     }
 
     if (args.length() > 8 && args.get(8).isNumber()) {
-        o.setValue("_batchSize", args.get(8));
+        o.setValue(InternedString::_batchSize, args.get(8));
     } else {
-        o.setNumber("_batchSize", 0);
+        o.setNumber(InternedString::_batchSize, 0);
     }
 
     if (args.length() > 9 && args.get(9).isNumber()) {
-        o.setValue("_options", args.get(9));
+        o.setValue(InternedString::_options, args.get(9));
     } else {
-        o.setNumber("_options", 0);
+        o.setNumber(InternedString::_options, 0);
     }
 
-    o.setValue("_cursor", nullVal);
-    o.setNumber("_numReturned", 0);
-    o.setBoolean("_special", false);
+    o.setValue(InternedString::_cursor, nullVal);
+    o.setNumber(InternedString::_numReturned, 0);
+    o.setBoolean(InternedString::_special, false);
 
     args.rval().setObjectOrNull(thisv);
 }
@@ -126,7 +127,7 @@ void DBQueryInfo::getProperty(JSContext* cx,
     ObjectWrapper parentWrapper(cx, parent);
 
     JS::RootedValue arrayAccess(cx);
-    parentWrapper.getValue("arrayAccess", &arrayAccess);
+    parentWrapper.getValue(InternedString::arrayAccess, &arrayAccess);
 
     if (arrayAccess.isObject() && JS_ObjectIsFunction(cx, arrayAccess.toObjectOrNull())) {
         JS::AutoValueArray<1> args(cx);

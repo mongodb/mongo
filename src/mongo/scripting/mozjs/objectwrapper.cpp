@@ -30,6 +30,8 @@
 
 #include "mongo/scripting/mozjs/objectwrapper.h"
 
+#include <js/Conversions.h>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/decimal128.h"
@@ -62,6 +64,13 @@ void ObjectWrapper::Key::get(JSContext* cx, JS::HandleObject o, JS::MutableHandl
                 return;
             break;
         }
+        case Type::InternedString: {
+            InternedStringId id(cx, _internedString);
+
+            if (JS_GetPropertyById(cx, o, id, value))
+                return;
+            break;
+        }
     }
 
     throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to get value on a JSObject");
@@ -79,6 +88,13 @@ void ObjectWrapper::Key::set(JSContext* cx, JS::HandleObject o, JS::HandleValue 
             break;
         case Type::Id: {
             JS::RootedId id(cx, _id);
+
+            if (JS_SetPropertyById(cx, o, id, value))
+                return;
+            break;
+        }
+        case Type::InternedString: {
+            InternedStringId id(cx, _internedString);
 
             if (JS_SetPropertyById(cx, o, id, value))
                 return;
@@ -109,6 +125,13 @@ void ObjectWrapper::Key::define(JSContext* cx,
                 return;
             break;
         }
+        case Type::InternedString: {
+            InternedStringId id(cx, _internedString);
+
+            if (JS_DefinePropertyById(cx, o, id, value, attrs))
+                return;
+            break;
+        }
     }
 
     throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to define value on a JSObject");
@@ -128,6 +151,13 @@ bool ObjectWrapper::Key::has(JSContext* cx, JS::HandleObject o) {
             break;
         case Type::Id: {
             JS::RootedId id(cx, _id);
+
+            if (JS_HasPropertyById(cx, o, id, &has))
+                return has;
+            break;
+        }
+        case Type::InternedString: {
+            InternedStringId id(cx, _internedString);
 
             if (JS_HasPropertyById(cx, o, id, &has))
                 return has;
@@ -156,6 +186,12 @@ void ObjectWrapper::Key::del(JSContext* cx, JS::HandleObject o) {
                 return;
             break;
         }
+        case Type::InternedString: {
+            InternedStringId id(cx, _internedString);
+
+            if (JS_DeleteProperty(cx, o, IdWrapper(cx, id).toString().c_str()))
+                break;
+        }
     }
 
     throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to delete value on a JSObject");
@@ -169,6 +205,10 @@ std::string ObjectWrapper::Key::toString(JSContext* cx) {
             return std::to_string(_idx);
         case Type::Id: {
             JS::RootedId id(cx, _id);
+            return IdWrapper(cx, id).toString();
+        }
+        case Type::InternedString: {
+            InternedStringId id(cx, _internedString);
             return IdWrapper(cx, id).toString();
         }
     }
@@ -470,9 +510,9 @@ std::string ObjectWrapper::getClassName() {
         return jsclass->name;
 
     JS::RootedValue ctor(_context);
-    getValue("constructor", &ctor);
+    getValue(InternedString::constructor, &ctor);
 
-    return ObjectWrapper(_context, ctor).getString("name");
+    return ObjectWrapper(_context, ctor).getString(InternedString::name);
 }
 
 }  // namespace mozjs

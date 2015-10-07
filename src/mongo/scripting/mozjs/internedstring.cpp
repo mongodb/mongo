@@ -28,51 +28,38 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/scripting/mozjs/timestamp.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 
 #include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/internedstring.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace mozjs {
 
-const char* const TimestampInfo::className = "Timestamp";
+InternedStringTable::InternedStringTable(JSContext* cx) {
+    JSAutoRequest ar(cx);
 
-void TimestampInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
+    int i = 0;
 
-    JS::RootedObject thisv(cx);
-    scope->getProto<TimestampInfo>().newObject(&thisv);
-    ObjectWrapper o(cx, thisv);
-
-    if (args.length() == 0) {
-        o.setNumber(InternedString::t, 0);
-        o.setNumber(InternedString::i, 0);
-    } else if (args.length() == 2) {
-        if (!args.get(0).isNumber())
-            uasserted(ErrorCodes::BadValue, "Timestamp time must be a number");
-        if (!args.get(1).isNumber())
-            uasserted(ErrorCodes::BadValue, "Timestamp increment must be a number");
-
-        int64_t t = ValueWriter(cx, args.get(0)).toInt64();
-        int64_t largestVal = int64_t(Timestamp::max().getSecs());
-        if (t > largestVal)
-            uasserted(ErrorCodes::BadValue,
-                      str::stream() << "The first argument must be in seconds; " << t
-                                    << " is too large (max " << largestVal << ")");
-
-        o.setValue(InternedString::t, args.get(0));
-        o.setValue(InternedString::i, args.get(1));
-    } else {
-        uasserted(ErrorCodes::BadValue, "Timestamp needs 0 or 2 arguments");
-    }
-
-    args.rval().setObjectOrNull(thisv);
+#define MONGO_MOZJS_INTERNED_STRING(name, str)                                        \
+    do {                                                                              \
+        auto s = JS_InternString(cx, str);                                            \
+        if (!s) {                                                                     \
+            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_InternString"); \
+        }                                                                             \
+        _internedStrings[i++].init(cx, INTERNED_STRING_TO_JSID(cx, s));               \
+    } while (0);
+#include "mongo/scripting/mozjs/internedstring.defs"
+#undef MONGO_MOZJS_INTERNED_STRING
 }
+
+InternedStringTable::~InternedStringTable() {
+    for (auto&& x : _internedStrings) {
+        x.reset();
+    }
+}
+
+InternedStringId::InternedStringId(JSContext* cx, InternedString id)
+    : _id(cx, getScope(cx)->getInternedStringId(id)) {}
 
 }  // namespace mozjs
 }  // namespace mongo

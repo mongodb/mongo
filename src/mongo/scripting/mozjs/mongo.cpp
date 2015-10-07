@@ -240,7 +240,7 @@ void MongoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
 
     ObjectWrapper o(cx, args.thisv());
 
-    if (o.hasField("readOnly") && o.getBoolean("readOnly"))
+    if (o.hasField(InternedString::readOnly) && o.getBoolean(InternedString::readOnly))
         uasserted(ErrorCodes::BadValue, "js db in read only mode");
 
     auto conn = getConnection(args);
@@ -257,10 +257,10 @@ void MongoBase::Functions::insert::call(JSContext* cx, JS::CallArgs args) {
 
         ObjectWrapper ele(cx, elementObj);
 
-        if (!ele.hasField("_id")) {
+        if (!ele.hasField(InternedString::_id)) {
             JS::RootedValue value(cx);
             scope->getProto<OIDInfo>().newInstance(&value);
-            ele.setValue("_id", value);
+            ele.setValue(InternedString::_id, value);
         }
 
         return ValueWriter(cx, value).toBSON();
@@ -589,8 +589,8 @@ void MongoLocalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     JS_SetPrivate(thisv, new std::shared_ptr<DBClientBase>(conn.release()));
 
-    o.setBoolean("slaveOk", false);
-    o.setString("host", "EMBEDDED");
+    o.setBoolean(InternedString::slaveOk, false);
+    o.setString(InternedString::host, "EMBEDDED");
 
     args.rval().setObjectOrNull(thisv);
 }
@@ -622,8 +622,8 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     JS_SetPrivate(thisv, new std::shared_ptr<DBClientBase>(conn.release()));
 
-    o.setBoolean("slaveOk", false);
-    o.setString("host", host);
+    o.setBoolean(InternedString::slaveOk, false);
+    o.setString(InternedString::host, host);
 
     args.rval().setObjectOrNull(thisv);
 }

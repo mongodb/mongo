@@ -225,7 +225,7 @@ namespace {
 
 JSThreadConfig* getConfig(JSContext* cx, JS::CallArgs args) {
     JS::RootedValue value(cx);
-    ObjectWrapper(cx, args.thisv()).getValue("_JSThreadConfig", &value);
+    ObjectWrapper(cx, args.thisv()).getValue(InternedString::_JSThreadConfig, &value);
 
     if (!value.isObject())
         uasserted(ErrorCodes::BadValue, "_JSThreadConfig not an object");
@@ -255,7 +255,7 @@ void JSThreadInfo::Functions::init::call(JSContext* cx, JS::CallArgs args) {
     JSThreadConfig* config = new JSThreadConfig(cx, args);
     JS_SetPrivate(obj, config);
 
-    ObjectWrapper(cx, args.thisv()).setObject("_JSThreadConfig", obj);
+    ObjectWrapper(cx, args.thisv()).setObject(InternedString::_JSThreadConfig, obj);
 
     args.rval().setUndefined();
 }

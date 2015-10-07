@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/exception.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/lifetimestack.h"
 
 namespace mongo {
@@ -68,12 +69,14 @@ public:
             Field,
             Index,
             Id,
+            InternedString,
         };
 
     public:
         Key(const char* field) : _field(field), _type(Type::Field) {}
         Key(uint32_t idx) : _idx(idx), _type(Type::Index) {}
         Key(JS::HandleId id) : _id(id), _type(Type::Id) {}
+        Key(InternedString id) : _internedString(id), _type(Type::InternedString) {}
 
     private:
         void get(JSContext* cx, JS::HandleObject o, JS::MutableHandleValue value);
@@ -87,6 +90,7 @@ public:
             const char* _field;
             uint32_t _idx;
             jsid _id;
+            InternedString _internedString;
         };
         Type _type;
     };

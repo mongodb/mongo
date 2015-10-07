@@ -242,6 +242,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _globalProto(_context),
       _global(_globalProto.getProto()),
       _funcs(),
+      _internedStrings(_context),
       _pendingKill(false),
       _opId(0),
       _opCtx(nullptr),

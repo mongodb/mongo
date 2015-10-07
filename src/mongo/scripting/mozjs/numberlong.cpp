@@ -53,12 +53,6 @@ const JSFunctionSpec NumberLongInfo::methods[5] = {
 
 const char* const NumberLongInfo::className = "NumberLong";
 
-namespace {
-const char* const kTop = "top";
-const char* const kBottom = "bottom";
-const char* const kFloatApprox = "floatApprox";
-}  // namespace
-
 long long NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleValue thisv) {
     JS::RootedObject obj(cx, thisv.toObjectOrNull());
     return ToNumberLong(cx, obj);
@@ -67,18 +61,18 @@ long long NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleValue thisv) {
 long long NumberLongInfo::ToNumberLong(JSContext* cx, JS::HandleObject thisv) {
     ObjectWrapper o(cx, thisv);
 
-    if (!o.hasField(kTop)) {
-        if (!o.hasField(kFloatApprox))
+    if (!o.hasField(InternedString::top)) {
+        if (!o.hasField(InternedString::floatApprox))
             uasserted(ErrorCodes::InternalError, "No top and no floatApprox fields");
 
-        return o.getNumberLongLong(kFloatApprox);
+        return o.getNumberLongLong(InternedString::floatApprox);
     }
 
-    if (!o.hasField(kBottom))
+    if (!o.hasField(InternedString::bottom))
         uasserted(ErrorCodes::InternalError, "top but no bottom field");
 
-    return ((unsigned long long)((long long)o.getNumberLongLong(kTop) << 32) +
-            (unsigned)(o.getNumberLongLong(kBottom)));
+    return ((unsigned long long)((long long)o.getNumberLongLong(InternedString::top) << 32) +
+            (unsigned)(o.getNumberLongLong(InternedString::bottom)));
 }
 
 void NumberLongInfo::Functions::valueOf::call(JSContext* cx, JS::CallArgs args) {
@@ -142,11 +136,11 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
     JS::RootedValue bottom(cx);
 
     if (args.length() == 0) {
-        o.setNumber(kFloatApprox, 0);
+        o.setNumber(InternedString::floatApprox, 0);
     } else if (args.length() == 1) {
         auto arg = args.get(0);
         if (arg.isNumber()) {
-            o.setValue(kFloatApprox, arg);
+            o.setValue(InternedString::floatApprox, arg);
         } else {
             std::string str = ValueWriter(cx, arg).toString();
             long long val;
@@ -161,11 +155,11 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
             // values above 2^53 are not accurately represented in JS
             if (val == INT64_MIN || std::abs(val) >= 9007199254740992LL) {
                 auto val64 = static_cast<unsigned long long>(val);
-                o.setNumber(kFloatApprox, val);
-                o.setNumber(kTop, val64 >> 32);
-                o.setNumber(kBottom, val64 & 0x00000000ffffffff);
+                o.setNumber(InternedString::floatApprox, val);
+                o.setNumber(InternedString::top, val64 >> 32);
+                o.setNumber(InternedString::bottom, val64 & 0x00000000ffffffff);
             } else {
-                o.setNumber(kFloatApprox, val);
+                o.setNumber(InternedString::floatApprox, val);
             }
         }
     } else {
@@ -182,9 +176,9 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
                 static_cast<double>(static_cast<uint32_t>(args.get(2).toNumber())))
             uasserted(ErrorCodes::BadValue, "bottom must be a 32 bit unsigned number");
 
-        o.setValue(kFloatApprox, args.get(0));
-        o.setValue(kTop, args.get(1));
-        o.setValue(kBottom, args.get(2));
+        o.setValue(InternedString::floatApprox, args.get(0));
+        o.setValue(InternedString::top, args.get(1));
+        o.setValue(InternedString::bottom, args.get(2));
     }
 
     args.rval().setObjectOrNull(thisv);

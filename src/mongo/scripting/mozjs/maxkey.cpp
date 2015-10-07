@@ -30,6 +30,7 @@
 
 #include "mongo/scripting/mozjs/maxkey.h"
 
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
@@ -43,10 +44,6 @@ const JSFunctionSpec MaxKeyInfo::methods[2] = {
 };
 
 const char* const MaxKeyInfo::className = "MaxKey";
-
-namespace {
-const char* const kSingleton = "singleton";
-}  // namespace
 
 void MaxKeyInfo::construct(JSContext* cx, JS::CallArgs args) {
     call(cx, args);
@@ -64,14 +61,14 @@ void MaxKeyInfo::call(JSContext* cx, JS::CallArgs args) {
 
     JS::RootedValue val(cx);
 
-    if (!o.hasField(kSingleton)) {
+    if (!o.hasField(InternedString::singleton)) {
         JS::RootedObject thisv(cx);
         scope->getProto<MaxKeyInfo>().newObject(&thisv);
 
         val.setObjectOrNull(thisv);
-        o.setValue(kSingleton, val);
+        o.setValue(InternedString::singleton, val);
     } else {
-        o.getValue(kSingleton, &val);
+        o.getValue(InternedString::singleton, &val);
 
         if (!getScope(cx)->getProto<MaxKeyInfo>().instanceOf(val))
             uasserted(ErrorCodes::BadValue, "MaxKey singleton not of type MaxKey");
@@ -90,8 +87,8 @@ void MaxKeyInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleO
     JS::RootedValue value(cx);
     getScope(cx)->getProto<MaxKeyInfo>().newObject(&value);
 
-    ObjectWrapper(cx, global).setValue("MaxKey", value);
-    protoWrapper.setValue(kSingleton, value);
+    ObjectWrapper(cx, global).setValue(InternedString::MaxKey, value);
+    protoWrapper.setValue(InternedString::singleton, value);
 }
 
 }  // namespace mozjs

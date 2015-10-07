@@ -34,6 +34,7 @@
 #include <cctype>
 
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
@@ -157,7 +158,7 @@ void BinDataInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) {
 
     str::stream ss;
 
-    ss << "BinData(" << o.getNumber("type") << ",\"" << *str << "\")";
+    ss << "BinData(" << o.getNumber(InternedString::type) << ",\"" << *str << "\")";
 
     ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
 }
@@ -215,8 +216,8 @@ void BinDataInfo::construct(JSContext* cx, JS::CallArgs args) {
     JS::RootedValue len(cx);
     len.setInt32(tmpBase64.length());
 
-    o.defineProperty("len", len, JSPROP_READONLY);
-    o.defineProperty("type", type, JSPROP_READONLY);
+    o.defineProperty(InternedString::len, len, JSPROP_READONLY);
+    o.defineProperty(InternedString::type, type, JSPROP_READONLY);
 
     JS_SetPrivate(thisv, new std::string(std::move(str)));
 

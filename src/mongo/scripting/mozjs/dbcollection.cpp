@@ -67,10 +67,10 @@ void DBCollectionInfo::construct(JSContext* cx, JS::CallArgs args) {
     scope->getProto<DBCollectionInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
-    o.setValue("_mongo", args.get(0));
-    o.setValue("_db", args.get(1));
-    o.setValue("_shortName", args.get(2));
-    o.setValue("_fullName", args.get(3));
+    o.setValue(InternedString::_mongo, args.get(0));
+    o.setValue(InternedString::_db, args.get(1));
+    o.setValue(InternedString::_shortName, args.get(2));
+    o.setValue(InternedString::_fullName, args.get(3));
 
     std::string fullName = ValueWriter(cx, args.get(3)).toString();
 

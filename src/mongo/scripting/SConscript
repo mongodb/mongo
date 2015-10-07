@@ -121,6 +121,7 @@ if usemozjs:
             'mozjs/global.cpp',
             'mozjs/idwrapper.cpp',
             'mozjs/implscope.cpp',
+            'mozjs/internedstring.cpp',
             'mozjs/jscustomallocator.cpp',
             'mozjs/jsstringwrapper.cpp',
             'mozjs/jsthread.cpp',
