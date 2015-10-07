@@ -121,7 +121,13 @@ BSONObj ValueWriter::toBSON() {
 }
 
 std::string ValueWriter::toString() {
-    return JSStringWrapper(_context, JS::ToString(_context, _value)).toString();
+    JSStringWrapper jsstr;
+    return toStringData(&jsstr).toString();
+}
+
+StringData ValueWriter::toStringData(JSStringWrapper* jsstr) {
+    *jsstr = JSStringWrapper(_context, JS::ToString(_context, _value));
+    return jsstr->toStringData();
 }
 
 double ValueWriter::toNumber() {
@@ -192,7 +198,8 @@ void ValueWriter::writeThis(BSONObjBuilder* b,
             (std::string::npos == sd.find('\0')));
 
     if (_value.isString()) {
-        b->append(sd, toString());
+        JSStringWrapper jsstr;
+        b->append(sd, toStringData(&jsstr));
     } else if (_value.isNumber()) {
         double val = toNumber();
 

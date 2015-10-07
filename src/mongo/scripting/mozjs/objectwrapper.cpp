@@ -198,23 +198,40 @@ void ObjectWrapper::Key::del(JSContext* cx, JS::HandleObject o) {
 }
 
 std::string ObjectWrapper::Key::toString(JSContext* cx) {
-    switch (_type) {
-        case Type::Field:
-            return _field;
-        case Type::Index:
-            return std::to_string(_idx);
-        case Type::Id: {
-            JS::RootedId id(cx, _id);
-            return IdWrapper(cx, id).toString();
-        }
-        case Type::InternedString: {
-            InternedStringId id(cx, _internedString);
-            return IdWrapper(cx, id).toString();
-        }
+    JSStringWrapper jsstr;
+    return toStringData(cx, &jsstr).toString();
+}
+
+StringData ObjectWrapper::Key::toStringData(JSContext* cx, JSStringWrapper* jsstr) {
+    if (_type == Type::Field) {
+        return _field;
     }
 
-    throwCurrentJSException(
-        cx, ErrorCodes::InternalError, "Failed to toString a ObjectWrapper::Key");
+    if (_type == Type::Index) {
+        *jsstr = JSStringWrapper(_idx);
+        return jsstr->toStringData();
+    }
+
+    JS::RootedId rid(cx);
+
+    if (_type == Type::Id) {
+        rid.set(_id);
+    } else {
+        InternedStringId id(cx, _internedString);
+        rid.set(id);
+    }
+
+    if (JSID_IS_INT(rid)) {
+        *jsstr = JSStringWrapper(JSID_TO_INT(rid));
+        return jsstr->toStringData();
+    }
+
+    if (JSID_IS_STRING(rid)) {
+        *jsstr = JSStringWrapper(cx, JSID_TO_STRING(rid));
+        return jsstr->toStringData();
+    }
+
+    uasserted(ErrorCodes::BadValue, "Couldn't convert key to String");
 }
 
 ObjectWrapper::ObjectWrapper(JSContext* cx, JS::HandleObject obj)
@@ -500,7 +517,9 @@ void ObjectWrapper::_writeField(BSONObjBuilder* b,
     ValueWriter x(_context, value);
     x.setOriginalBSON(originalParent);
 
-    x.writeThis(b, key.toString(_context), frames);
+    JSStringWrapper jsstr;
+
+    x.writeThis(b, key.toStringData(_context, &jsstr), frames);
 }
 
 std::string ObjectWrapper::getClassName() {

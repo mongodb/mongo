@@ -45,6 +45,7 @@ class JSStringWrapper {
 public:
     JSStringWrapper() = default;
     JSStringWrapper(JSContext* cx, JSString* str);
+    JSStringWrapper(std::int32_t val);
 
     StringData toStringData() const;
     std::string toString() const;
@@ -52,9 +53,10 @@ public:
     explicit operator bool() const;
 
 private:
-    JSContext* _context = nullptr;
     std::unique_ptr<char[]> _str;
     size_t _length = 0;
+    char _buf[64];
+    bool _isSet = false;
 };
 
 }  // namespace mozjs

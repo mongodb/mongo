@@ -54,6 +54,7 @@ public:
      * toNumber()
      */
     std::string toString();
+    StringData toStringData(JSStringWrapper* jsstr);
     int type();
     double toNumber();
     int32_t toInt32();

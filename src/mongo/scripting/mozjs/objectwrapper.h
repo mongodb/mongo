@@ -35,6 +35,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/exception.h"
 #include "mongo/scripting/mozjs/internedstring.h"
+#include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/lifetimestack.h"
 
 namespace mongo {
@@ -85,6 +86,7 @@ public:
         void define(JSContext* cx, JS::HandleObject o, JS::HandleValue value, unsigned attrs);
         void del(JSContext* cx, JS::HandleObject o);
         std::string toString(JSContext* cx);
+        StringData toStringData(JSContext* cx, JSStringWrapper* jsstr);
 
         union {
             const char* _field;

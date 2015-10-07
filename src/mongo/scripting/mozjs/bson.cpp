@@ -194,14 +194,15 @@ void BSONInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, boo
     }
 
     IdWrapper idw(cx, id);
+    JSStringWrapper jsstr;
 
-    if (!holder->_readOnly && holder->_removed.count(idw.toString())) {
+    auto sname = idw.toStringData(&jsstr);
+
+    if (!holder->_readOnly && holder->_removed.find(sname.toString()) != holder->_removed.end()) {
         return;
     }
 
     ObjectWrapper o(cx, obj);
-
-    std::string sname = IdWrapper(cx, id).toString();
 
     if (holder->_obj.hasField(sname)) {
         auto elem = holder->_obj[sname];

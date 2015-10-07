@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/scripting/mozjs/jsstringwrapper.h"
 
 namespace mongo {
 namespace mozjs {
@@ -51,6 +52,7 @@ public:
      * Converts to a string.  This coerces for integers
      */
     std::string toString() const;
+    StringData toStringData(JSStringWrapper* jsstr) const;
 
     /**
      * Converts to an int.  This throws if the id is not an integer

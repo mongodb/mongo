@@ -41,7 +41,11 @@
 namespace mongo {
 namespace mozjs {
 
-JSStringWrapper::JSStringWrapper(JSContext* cx, JSString* str) : _context(cx) {
+JSStringWrapper::JSStringWrapper(std::int32_t value) : _isSet(true) {
+    _length = sprintf(_buf, "%d", value);
+}
+
+JSStringWrapper::JSStringWrapper(JSContext* cx, JSString* str) : _isSet(true) {
     if (!str)
         throwCurrentJSException(cx, ErrorCodes::InternalError, "Cannot encode null JSString");
 
@@ -56,20 +60,21 @@ JSStringWrapper::JSStringWrapper(JSContext* cx, JSString* str) : _context(cx) {
 
     _length = JS::GetDeflatedUTF8StringLength(flat);
 
-    JS::RootedString rstr(cx, str);
+    char* out;
+    if (_length < sizeof(_buf)) {
+        out = _buf;
+    } else {
+        _str.reset(new char[_length + 1]);
+        out = _str.get();
+    }
 
-    JSAutoByteString abs;
-    abs.encodeUtf8(cx, rstr);
-
-    if (!abs)
-        throwCurrentJSException(cx, ErrorCodes::InternalError, "Failed to encode JSString");
-
-    _str.reset(new char[_length]);
-    std::memcpy(_str.get(), abs.ptr(), _length);
+    JS::DeflateStringToUTF8Buffer(flat, mozilla::RangedPtr<char>(out, _length));
+    out[_length] = '\0';
 }
 
 StringData JSStringWrapper::toStringData() const {
-    return StringData(_str.get(), _length);
+    invariant(_isSet);
+    return StringData(_str ? _str.get() : _buf, _length);
 }
 
 std::string JSStringWrapper::toString() const {
@@ -77,7 +82,7 @@ std::string JSStringWrapper::toString() const {
 }
 
 JSStringWrapper::operator bool() const {
-    return _str.get();
+    return _isSet;
 }
 
 }  // namespace mozjs
