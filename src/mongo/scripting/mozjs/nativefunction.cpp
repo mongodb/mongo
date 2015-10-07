@@ -77,20 +77,12 @@ void NativeFunctionInfo::call(JSContext* cx, JS::CallArgs args) {
         return;
     }
 
-    BSONObjBuilder bob;
-    JS::RootedObject robj(cx, JS_NewPlainObject(cx));
-    ObjectWrapper wobj(cx, robj);
-
-    for (unsigned i = 0; i < args.length(); i++) {
-        // 11 is enough here.  unsigned's are only 32 bits, and 1 << 32 is only
-        // 10 decimal digits.  +1 for the null and we're only at 11.
-        char buf[11];
-        std::sprintf(buf, "%i", i);
-
-        wobj.setValue(buf, args.get(i));
+    JS::RootedObject robj(cx, JS_NewArrayObject(cx, args));
+    if (!robj) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_NewArrayObject");
     }
 
-    BSONObj out = holder->_func(wobj.toBSON(), holder->_ctx);
+    BSONObj out = holder->_func(ObjectWrapper(cx, robj).toBSON(), holder->_ctx);
 
     ValueReader(cx, args.rval()).fromBSONElement(out.firstElement(), out, false);
 }

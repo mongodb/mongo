@@ -76,20 +76,19 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             _value.setInt32(elem.Int());
             return;
         case mongo::Array: {
-            auto arrayPtr = JS_NewArrayObject(_context, 0);
-            uassert(ErrorCodes::JSInterpreterFailure, "Failed to JS_NewArrayObject", arrayPtr);
-            JS::RootedObject array(_context, arrayPtr);
+            JS::AutoValueVector avv(_context);
 
-            unsigned i = 0;
             BSONForEach(subElem, elem.embeddedObject()) {
-                // We use an unsigned 32 bit integer, so 10 base 10 digits and
-                // 1 null byte
-                char str[11];
-                sprintf(str, "%i", i++);
                 JS::RootedValue member(_context);
 
                 ValueReader(_context, &member).fromBSONElement(subElem, parent, readOnly);
-                ObjectWrapper(_context, array).setValue(str, member);
+                if (!avv.append(member)) {
+                    uasserted(ErrorCodes::JSInterpreterFailure, "Failed to append to JS array");
+                }
+            }
+            JS::RootedObject array(_context, JS_NewArrayObject(_context, avv));
+            if (!array) {
+                uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_NewArrayObject");
             }
             _value.setObjectOrNull(array);
             return;
