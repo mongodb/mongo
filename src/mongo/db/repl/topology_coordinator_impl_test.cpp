@@ -4958,7 +4958,8 @@ TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommitted) {
 
     updateConfig(BSON("_id"
                       << "rs0"
-                      << "version" << 1 << "configsvr" << true << "members"
+                      << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true
+                      << "members"
                       << BSON_ARRAY(BSON("_id" << 10 << "host"
                                                << "hself")
                                     << BSON("_id" << 20 << "host"
@@ -4978,7 +4979,8 @@ TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommittedButInSCCCMode) {
 
     updateConfig(BSON("_id"
                       << "rs0"
-                      << "version" << 1 << "configsvr" << true << "members"
+                      << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true
+                      << "members"
                       << BSON_ARRAY(BSON("_id" << 10 << "host"
                                                << "hself")
                                     << BSON("_id" << 20 << "host"
@@ -5001,7 +5003,8 @@ TEST_F(TopoCoordTest, GetMemberStateValidConfigSvr) {
 
     updateConfig(BSON("_id"
                       << "rs0"
-                      << "version" << 1 << "configsvr" << true << "members"
+                      << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true
+                      << "members"
                       << BSON_ARRAY(BSON("_id" << 10 << "host"
                                                << "hself")
                                     << BSON("_id" << 20 << "host"

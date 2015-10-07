@@ -732,11 +732,12 @@ TEST(ReplicaSetConfig, ChainingAllowedField) {
 
 TEST(ReplicaSetConfig, ConfigServerField) {
     ReplicaSetConfig config;
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version" << 1 << "configsvr" << true << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")))));
+    ASSERT_OK(
+        config.initialize(BSON("_id"
+                               << "rs0"
+                               << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true
+                               << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                     << "localhost:12345")))));
     ASSERT_TRUE(config.isConfigServer());
 
     ReplicaSetConfig config2;
@@ -1107,11 +1108,28 @@ TEST(ReplicaSetConfig, CheckBeyondMaximumNodesFailsValidate) {
     ASSERT_TRUE(configA == configB);
 }
 
+TEST(ReplicaSetConfig, CheckConfigServerCantBeProtocolVersion0) {
+    ReplicaSetConfig configA;
+    ASSERT_OK(configA.initialize(BSON("_id"
+                                      << "rs0"
+                                      << "protocolVersion" << 0 << "version" << 1 << "configsvr"
+                                      << true << "members"
+                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                               << "localhost:12345")
+                                                    << BSON("_id" << 1 << "host"
+                                                                  << "localhost:54321"
+                                                                  << "arbiterOnly" << true)))));
+    Status status = configA.validate();
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "cannot run in protocolVersion 0");
+}
+
 TEST(ReplicaSetConfig, CheckConfigServerCantHaveArbiters) {
     ReplicaSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
-                                      << "version" << 1 << "configsvr" << true << "members"
+                                      << "protocolVersion" << 1 << "version" << 1 << "configsvr"
+                                      << true << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")
                                                     << BSON("_id" << 1 << "host"
@@ -1126,7 +1144,8 @@ TEST(ReplicaSetConfig, CheckConfigServerMustBuildIndexes) {
     ReplicaSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
-                                      << "version" << 1 << "configsvr" << true << "members"
+                                      << "protocolVersion" << 1 << "version" << 1 << "configsvr"
+                                      << true << "members"
                                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                << "localhost:12345")
                                                     << BSON("_id" << 1 << "host"
@@ -1140,15 +1159,16 @@ TEST(ReplicaSetConfig, CheckConfigServerMustBuildIndexes) {
 
 TEST(ReplicaSetConfig, CheckConfigServerCantHaveSlaveDelay) {
     ReplicaSetConfig configA;
-    ASSERT_OK(configA.initialize(BSON("_id"
-                                      << "rs0"
-                                      << "version" << 1 << "configsvr" << true << "members"
-                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                               << "localhost:12345")
-                                                    << BSON("_id" << 1 << "host"
-                                                                  << "localhost:54321"
-                                                                  << "priority" << 0 << "slaveDelay"
-                                                                  << 3)))));
+    ASSERT_OK(
+        configA.initialize(BSON("_id"
+                                << "rs0"
+                                << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true
+                                << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                      << "localhost:12345")
+                                                           << BSON("_id" << 1 << "host"
+                                                                         << "localhost:54321"
+                                                                         << "priority" << 0
+                                                                         << "slaveDelay" << 3)))));
     Status status = configA.validate();
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "cannot have a non-zero slaveDelay");

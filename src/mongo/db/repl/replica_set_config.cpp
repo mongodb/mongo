@@ -451,6 +451,9 @@ Status ReplicaSetConfig::validate() const {
     }
 
     if (_configServer) {
+        if (_protocolVersion == 0) {
+            return Status(ErrorCodes::BadValue, "Config servers cannot run in protocolVersion 0");
+        }
         if (arbiterCount > 0) {
             return Status(ErrorCodes::BadValue,
                           "Arbiters are not allowed in replica set configurations being used for "

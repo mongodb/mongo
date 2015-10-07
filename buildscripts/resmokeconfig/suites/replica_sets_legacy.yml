@@ -2,6 +2,8 @@ selector:
   js_test:
     roots:
     - jstests/replsets/*.js
+    exclude_files:
+    - jstests/replsets/config_server_checks.js
 
 executor:
   js_test:
