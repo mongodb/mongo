@@ -5,6 +5,9 @@ pre:
     - command: shell.track
 
 post:
+    - command: attach.results
+      params:
+        file_location: src/report.json
     - command: shell.cleanup
     - command: shell.exec
       # destroy the cluster
@@ -19,6 +22,7 @@ post:
           echo "Cluster DESTROYED."
           echo "Test Results: "
           egrep "name|ops_per_sec" ../perf.json
+
 
 functions:
   "prepare environment":
@@ -172,6 +176,29 @@ functions:
             content_type: ${content_type|application/x-gzip}
             display_name: ${test}-test-log
 
+  "analyze":
+    - command: json.get_history
+      params:
+        task: ${task_name}
+        file: "src/history.json"
+        name: "perf"
+    - command: json.get_history
+      params:
+        tags: true
+        task: ${task_name}
+        file: "src/tags.json"
+        name: "perf"
+    - command: shell.exec
+      # post_run_check.py and override.json for DSI tests is part of dsi repo in dsi/bin
+      type : test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          python ../dsi/bin/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.0.6-BASELINE --overrideFile ../dsi/bin/override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
+
+
 tasks:
 - name: compile
   commands:
@@ -256,6 +283,7 @@ tasks:
       vars:
         test: "benchRun-mmap"
 
+    - func: "analyze"
     - func: "destroy cluster"
 
 - name: shard_cluster_test
@@ -310,6 +338,7 @@ tasks:
       vars:
         test: "benchRun-mmap"
 
+    - func: "analyze"
     - func: "destroy cluster"
 
 - name: replica_cluster_test
@@ -341,29 +370,30 @@ tasks:
       vars:
         test: "benchRun-wiredTiger"
 
-    - func: "configure mongodb cluster"
-      vars:
-        test: "ycsb-mmap"
-        storageEngine: "mmapv1"
+ #   - func: "configure mongodb cluster"
+ #     vars:
+ #       test: "ycsb-mmap"
+ #       storageEngine: "mmapv1"
 
-    - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "ycsb-mmap"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb-mmap"
+ #   - func: "run test"
+ #     vars:
+ #       storageEngine: "mmapv1"
+ #       test: "ycsb-mmap"
+ #   - func: "make test log artifact"
+ #   - func: "upload log file"
+ #     vars:
+ #       test: "ycsb-mmap"
 
-    - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "benchRun-mmap"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "benchRun-mmap"
+ #   - func: "run test"
+ #     vars:
+ #       storageEngine: "mmapv1"
+ #       test: "benchRun-mmap"
+ #   - func: "make test log artifact"
+ #   - func: "upload log file"
+ #     vars:
+ #       test: "benchRun-mmap"
 
+    - func: "analyze"
     - func: "destroy cluster"
 
 
