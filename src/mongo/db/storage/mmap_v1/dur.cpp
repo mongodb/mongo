@@ -90,7 +90,7 @@
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"

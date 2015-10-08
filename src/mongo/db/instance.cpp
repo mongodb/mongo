@@ -84,7 +84,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/rpc/command_reply_builder.h"

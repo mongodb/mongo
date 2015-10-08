@@ -43,7 +43,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 

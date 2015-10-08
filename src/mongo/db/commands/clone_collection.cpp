@@ -52,7 +52,7 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

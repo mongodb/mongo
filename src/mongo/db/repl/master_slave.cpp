@@ -67,7 +67,7 @@
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"

@@ -41,7 +41,7 @@
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/timer.h"
 

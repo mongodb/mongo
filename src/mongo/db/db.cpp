@@ -93,7 +93,7 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/ttl.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/platform/process_id.h"

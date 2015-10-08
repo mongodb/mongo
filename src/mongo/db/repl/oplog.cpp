@@ -80,7 +80,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/d_state.h"

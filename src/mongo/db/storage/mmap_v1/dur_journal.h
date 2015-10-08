@@ -83,7 +83,5 @@ void WRITETOJOURNAL(const JSectHeader& h, const AlignedBuilder& uncompressed);
 
 // in case disk controller buffers writes
 const long long ExtraKeepTimeMs = 10000;
-
-const unsigned JournalCommitIntervalDefault = 100;
-}
-}
+}  // namespace dur
+}  // namespace mongo

@@ -50,7 +50,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {

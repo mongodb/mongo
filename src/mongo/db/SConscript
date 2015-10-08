@@ -651,7 +651,6 @@ serverOnlyFiles = [
     "stats/range_deleter_server_status.cpp",
     "stats/snapshots.cpp",
     "storage/storage_init.cpp",
-    "storage_options.cpp",
     "ttl.cpp",
     "write_concern.cpp",
 ]
@@ -723,6 +722,7 @@ serveronlyLibdeps = [
     "storage/mmap_v1/storage_mmapv1",
     "storage/storage_engine_lock_file",
     "storage/storage_engine_metadata",
+    "storage/storage_options",
     "update_index_data",
 ]
 

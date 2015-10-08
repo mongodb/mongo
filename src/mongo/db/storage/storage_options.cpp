@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 
 #include "mongo/db/server_parameters.h"
 

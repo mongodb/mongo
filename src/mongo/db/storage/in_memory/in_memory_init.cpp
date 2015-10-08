@@ -33,7 +33,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/in_memory/in_memory_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
 

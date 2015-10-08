@@ -53,7 +53,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"

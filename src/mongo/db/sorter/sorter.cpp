@@ -53,7 +53,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/util/assert_util.h"

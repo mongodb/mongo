@@ -34,7 +34,7 @@
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 

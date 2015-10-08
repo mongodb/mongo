@@ -59,7 +59,7 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"

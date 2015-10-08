@@ -48,6 +48,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"

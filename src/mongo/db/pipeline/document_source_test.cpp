@@ -34,7 +34,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/temp_dir.h"
 

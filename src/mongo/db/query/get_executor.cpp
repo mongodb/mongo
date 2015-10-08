@@ -73,7 +73,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"

@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/string_map.h"
 

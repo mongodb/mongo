@@ -44,7 +44,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/mmap_v1/aligned_builder.h"
 #include "mongo/db/storage/mmap_v1/logfile.h"
 #include "mongo/db/storage/paths.h"

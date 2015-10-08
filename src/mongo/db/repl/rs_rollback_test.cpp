@@ -50,7 +50,7 @@
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/unittest/temp_dir.h"
 
