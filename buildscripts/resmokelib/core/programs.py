@@ -50,6 +50,11 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     if shortcut_opts["nojournal"] and "journal" in kwargs:
         del kwargs["journal"]
 
+    # Ensure that config servers run with journaling enabled.
+    if "configsvr" in kwargs:
+        shortcut_opts["nojournal"] = False
+        kwargs["journal"] = ""
+
     # Command line options override the YAML configuration.
     for opt_name in shortcut_opts:
         opt_value = shortcut_opts[opt_name]

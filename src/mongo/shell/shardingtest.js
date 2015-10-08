@@ -294,6 +294,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                             pathOpts : Object.merge( pathOpts, { config : i } ),
                             dbpath : "$testName-config$config",
                             keyFile : keyFile,
+                            // Ensure that journaling is always enabled for config servers.
+                            journal : "",
                             configsvr : "" };
 
             options = Object.merge( options, ShardingTest.configOptions || {} )
@@ -329,6 +331,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
         // when using CSRS, always use wiredTiger as the storage engine
         var startOptions = { pathOpts: pathOpts,
+                             // Ensure that journaling is always enabled for config servers.
+                             journal : "",
                              configsvr : "",
                              noJournalPrealloc : otherParams.nopreallocj,
                              storageEngine : "wiredTiger",
