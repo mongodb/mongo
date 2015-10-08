@@ -562,7 +562,7 @@ void MMAPV1DatabaseCatalogEntry::_init(OperationContext* txn) {
     RecordStoreV1Base* rs = _getNamespaceRecordStore();
     invariant(rs);
 
-    auto iterator = rs->getIterator(txn);
+    scoped_ptr<RecordIterator> iterator(rs->getIterator(txn));
 
     while (!iterator->isEOF()) {
         auto rid = iterator->getNext();
