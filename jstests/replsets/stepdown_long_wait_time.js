@@ -1,10 +1,10 @@
 // Ensure writes do not prevent a node from Stepping down
 // 1. Start up a 3 node set (1 arbiter).
-// 2. Isolate the SECONDARY.
+// 2. Stop replication on the SECONDARY using a fail point.
 // 3. Do one write and then spin up a second shell which asks the PRIMARY to StepDown.
 // 4. Once StepDown has begun, spin up a third shell which will attempt to do writes, which should
 //    block waiting for StepDown to release its lock.
-// 5. Once a write is blocked, de-isolate the SECONDARY.
+// 5. Once a write is blocked, restart replication on the SECONDARY.
 // 6. Wait for PRIMARY to StepDown.
 
 (function () {
@@ -19,15 +19,17 @@
                           {"_id" : 1, "host" : nodes[1]},
                           {"_id" : 2, "host" : nodes[2], "arbiterOnly" : true}]});
 
-    jsTestLog("isolate one node");
-    replSet.bridge();
-    replSet.partition(1,0);
-    replSet.partition(1,2);
-
     replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
     var primary = replSet.getPrimary();
+
     var secondary = replSet.getSecondary();
-    assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
+    jsTestLog('Disable replication on the SECONDARY ' + secondary.host);
+    assert.commandWorked(
+        secondary.getDB('admin').runCommand(
+            {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}
+        ),
+        'Failed to configure rsSyncApplyStop failpoint.'
+    );
 
     jsTestLog("do a write then ask the PRIMARY to stepdown");
     var options = {writeConcern: {w: 1, wtimeout: 60000}};
@@ -53,14 +55,16 @@
 
     jsTestLog("do a write and wait for it to be waiting for a lock");
     var updateCmd = function() {
-        while (true) {
+        jsTestLog('Updating document on the primary. Blocks until the primary has stepped down.')
+        try {
             var res = db.getSiblingDB("stepDownWithLongWait").foo.update({}, {$inc: {x: 1}});
-            assert.writeOK(res);
-            if (res.nModified === 0) {
-                // main thread signaled update thread to exit by deleting the doc it's updating
-                quit(0);
-            }
-            sleep(1000);
+            jsTestLog('Unexpected successful update operation on the primary during step down: ' +
+                      tojson(res));
+        }
+        catch (e) {
+            // Not important what error we get back. The client will probably be disconnected by
+            // the primary with a "error doing query: failed" message.
+            jsTestLog('Update operation returned with result: ' + tojson(e));
         }
     };
     var writer = startParallelShell(updateCmd, primary.port);
@@ -75,26 +79,23 @@
         return false;
     }, "write failed to block on global lock", 30000, 1000);
 
-    jsTestLog("Bring back the SECONDARY " + secondary.host + " and wait for PRIMARY " +
-              primary.host + " to completely step down.");
-    replSet.unPartition(1,0);
-    replSet.unPartition(1,2);
+    jsTestLog('Enable replication on the SECONDARY ' + secondary.host);
+    assert.commandWorked(
+        secondary.getDB('admin').runCommand(
+            {configureFailPoint: 'rsSyncApplyStop', mode: 'off'}
+        ),
+        'Failed to disable rsSyncApplyStop failpoint.'
+    );
 
-    replSet.waitForState(primary, replSet.SECONDARY, stepDownSecs * 1000);
-
-    jsTestLog("Wait for SECONDARY " + secondary.host + " to become PRIMARY");
-    var newPrimary = replSet.getPrimary();
-    var config = assert.commandWorked(newPrimary.adminCommand({replSetGetConfig: 1})).config;
-    var electionTimeoutMillis = config.settings.electionTimeoutMillis;
-    replSet.waitForState(secondary, replSet.PRIMARY, electionTimeoutMillis * 2);
-
-    jsTestLog("signal update thread to exit");
-    assert.writeOK(newPrimary.getDB(name).foo.remove({}));
-
+    jsTestLog("Wait for PRIMARY " + primary.host + " to completely step down.");
+    replSet.waitForState(primary, replSet.SECONDARY, secondaryCatchUpPeriodSecs * 1000);
     var exitCode = stepDowner({checkExitSuccess: false});
     assert.neq(0, exitCode, "expected replSetStepDown to close the shell's connection");
 
     // The connection for the 'writer' may be closed due to the primary stepping down, or signaled
     // by the main thread to quit.
     writer({checkExitSuccess: false});
+
+    jsTestLog("Wait for SECONDARY " + secondary.host + " to become PRIMARY");
+    replSet.waitForState(secondary, replSet.PRIMARY, stepDownSecs * 1000);
 })();
