@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <atomic>
 #include <string>
 
 /*
@@ -43,7 +42,6 @@ struct MMAPV1Options {
         : lenForNewNsFiles(16 * 1024 * 1024),
           preallocj(true),
           prealloc(false),
-          journalCommitInterval(0),  // 0 means use default
           quota(false),
           quotaFiles(8) {}
 
@@ -55,13 +53,6 @@ struct MMAPV1Options {
     bool preallocj;   // --nopreallocj no preallocation of journal files
     bool prealloc;    // --noprealloc no preallocation of data files
     bool smallfiles;  // --smallfiles allocate smaller data files
-
-    // --journalCommitInterval
-    // The maximum amount of time the mongod process allows between journal operations.
-    // Values can range from 2 to 300 milliseconds. Lower values increase the durability
-    // of the journal, at the expense of disk performance.
-
-    std::atomic<unsigned> journalCommitInterval;  // group/batch commit interval ms
 
     // --journalOptions 7            dump journal and terminate without doing anything further
     // --journalOptions 4            recover and terminate without listening

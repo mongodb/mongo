@@ -92,6 +92,10 @@ struct StorageGlobalParams {
 
     bool dur;  // --dur durability (now --journal)
 
+    // --journalCommitInterval
+    static const int kMaxJournalCommitIntervalMs;
+    std::atomic<int> journalCommitIntervalMs;
+
     // --notablescan
     // no table scans allowed
     std::atomic<bool> noTableScan;

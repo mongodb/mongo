@@ -136,6 +136,8 @@ public:
     static bool initRsOplogBackgroundThread(StringData ns);
 
 private:
+    class WiredTigerJournalFlusher;
+
     Status _salvageIfNeeded(const char* uri);
     void _checkIdentPath(StringData ident);
 
@@ -148,7 +150,9 @@ private:
     WT_EVENT_HANDLER _eventHandler;
     std::unique_ptr<WiredTigerSessionCache> _sessionCache;
     std::string _path;
+
     bool _durable;
+    std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;
 
     std::string _rsOptions;
     std::string _indexOptions;

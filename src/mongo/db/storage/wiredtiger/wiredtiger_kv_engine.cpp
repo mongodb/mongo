@@ -37,6 +37,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/service_context.h"
@@ -50,6 +51,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
+#include "mongo/util/background.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
@@ -63,6 +66,44 @@ namespace mongo {
 using std::set;
 using std::string;
 
+class WiredTigerKVEngine::WiredTigerJournalFlusher : public BackgroundJob {
+public:
+    explicit WiredTigerJournalFlusher(WiredTigerSessionCache* sessionCache)
+        : BackgroundJob(false /* deleteSelf */), _sessionCache(sessionCache) {}
+
+    virtual string name() const {
+        return "WTJournalFlusher";
+    }
+
+    virtual void run() {
+        Client::initThread(name().c_str());
+
+        LOG(1) << "starting " << name() << " thread";
+
+        auto session = _sessionCache->getSession();
+
+        while (!_shuttingDown.load()) {
+            _sessionCache->waitUntilDurable(session);
+
+            int ms = storageGlobalParams.journalCommitIntervalMs;
+            if (!ms) {
+                ms = 100;
+            }
+
+            sleepmillis(ms);
+        }
+        LOG(1) << "stopping " << name() << " thread";
+    }
+
+    void shutdown() {
+        _shuttingDown.store(true);
+        wait();
+    }
+
+private:
+    WiredTigerSessionCache* _sessionCache;
+    std::atomic<bool> _shuttingDown{false};
+};
 
 WiredTigerKVEngine::WiredTigerKVEngine(const std::string& path,
                                        const std::string& extraOpenOptions,
@@ -154,6 +195,11 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& path,
 
     _sessionCache.reset(new WiredTigerSessionCache(this));
 
+    if (_durable) {
+        _journalFlusher = stdx::make_unique<WiredTigerJournalFlusher>(_sessionCache.get());
+        _journalFlusher->go();
+    }
+
     _sizeStorerUri = "table:sizeStorer";
     {
         WiredTigerSession session(_conn);
@@ -181,6 +227,8 @@ void WiredTigerKVEngine::cleanShutdown() {
     if (_conn) {
         // these must be the last things we do before _conn->close();
         _sizeStorer.reset(NULL);
+        if (_journalFlusher)
+            _journalFlusher->shutdown();
         _sessionCache->shuttingDown();
 
 #if !__has_feature(address_sanitizer)

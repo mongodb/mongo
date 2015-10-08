@@ -31,6 +31,7 @@
 #include "mongo/db/storage/storage_options.h"
 
 #include "mongo/db/server_parameters.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -46,6 +47,8 @@ const char* StorageGlobalParams::kDefaultConfigDbPath = "\\data\\configdb\\";
 const char* StorageGlobalParams::kDefaultDbPath = "/data/db";
 const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
 #endif
+
+const int StorageGlobalParams::kMaxJournalCommitIntervalMs = 500;
 
 /**
  * Specify whether all queries must use indexes.
@@ -63,4 +66,29 @@ ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> NoTableSc
 ExportedServerParameter<double, ServerParameterType::kStartupAndRuntime> SyncdelaySetting(
     ServerParameterSet::getGlobal(), "syncdelay", &storageGlobalParams.syncdelay);
 
+/**
+ * Specify an integer between 1 and kMaxJournalCommitInterval signifying the number of milliseconds
+ * (ms) between journal commits.
+ */
+class JournalCommitIntervalSetting
+    : public ExportedServerParameter<int, ServerParameterType::kRuntimeOnly> {
+public:
+    JournalCommitIntervalSetting()
+        : ExportedServerParameter<int, ServerParameterType::kRuntimeOnly>(
+              ServerParameterSet::getGlobal(),
+              "journalCommitInterval",
+              &storageGlobalParams.journalCommitIntervalMs) {}
+
+    virtual Status validate(const int& potentialNewValue) {
+        if (potentialNewValue < 1 ||
+            potentialNewValue > StorageGlobalParams::kMaxJournalCommitIntervalMs) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "journalCommitInterval must be between 1 and "
+                                        << StorageGlobalParams::kMaxJournalCommitIntervalMs
+                                        << ", but attempted to set to: " << potentialNewValue);
+        }
+
+        return Status::OK();
+    }
+} journalCommitIntervalSetting;
 }  // namespace mongo

@@ -59,6 +59,8 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
+MMAPV1Options mmapv1GlobalOptions;
+
 namespace {
 
 #if !defined(__sun)

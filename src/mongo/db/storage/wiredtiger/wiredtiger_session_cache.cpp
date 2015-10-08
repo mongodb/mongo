@@ -169,8 +169,10 @@ void WiredTigerSessionCache::waitUntilDurable(WiredTigerSession* session) {
     // Use the journal when available, or a checkpoint otherwise.
     if (_engine->isDurable()) {
         invariantWTOK(s->log_flush(s, "sync=on"));
+        LOG(4) << "flushed journal";
     } else {
         invariantWTOK(s->checkpoint(s, NULL));
+        LOG(4) << "created checkpoint";
     }
 }
 

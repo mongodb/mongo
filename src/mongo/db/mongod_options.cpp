@@ -329,11 +329,11 @@ Status addMongodOptions(moe::OptionSection* options) {
         .setSources(moe::SourceAllLegacy)
         .incompatibleWith("storage.mmapv1.journal.debugFlags");
 
-    storage_options.addOptionChaining("storage.mmapv1.journal.commitIntervalMs",
+    storage_options.addOptionChaining("storage.journal.commitIntervalMs",
                                       "journalCommitInterval",
                                       moe::Unsigned,
                                       "how often to group/batch commit (ms)",
-                                      "storage.journal.commitIntervalMs");
+                                      "storage.mmapv1.journal.commitIntervalMs");
 
     // Deprecated option that we don't want people to use for performance reasons
     storage_options.addOptionChaining("nopreallocj",
@@ -1039,16 +1039,19 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         storageGlobalParams.dur = params["storage.journal.enabled"].as<bool>();
     }
 
-    if (params.count("storage.mmapv1.journal.commitIntervalMs")) {
+    if (params.count("storage.journal.commitIntervalMs")) {
         // don't check if dur is false here as many will just use the default, and will default
         // to off on win32.  ie no point making life a little more complex by giving an error on
         // a dev environment.
-        mmapv1GlobalOptions.journalCommitInterval =
-            params["storage.mmapv1.journal.commitIntervalMs"].as<unsigned>();
-        if (mmapv1GlobalOptions.journalCommitInterval <= 1 ||
-            mmapv1GlobalOptions.journalCommitInterval > 300) {
+        storageGlobalParams.journalCommitIntervalMs =
+            params["storage.journal.commitIntervalMs"].as<int>();
+        if (storageGlobalParams.journalCommitIntervalMs < 1 ||
+            storageGlobalParams.journalCommitIntervalMs >
+                StorageGlobalParams::kMaxJournalCommitIntervalMs) {
             return Status(ErrorCodes::BadValue,
-                          "--journalCommitInterval out of allowed range (0-300ms)");
+                          str::stream() << "--journalCommitInterval out of allowed range (1-"
+                                        << StorageGlobalParams::kMaxJournalCommitIntervalMs
+                                        << "ms)");
         }
     }
     if (params.count("storage.mmapv1.journal.debugFlags")) {
