@@ -196,6 +196,7 @@ jsTestOptions = function(){
                                     TestData.useLegacyReplicationProtocol || false,
                               enableEncryption: TestData.enableEncryption,
                               encryptionKeyFile: TestData.encryptionKeyFile,
+                              auditDestination: TestData.auditDestination,
                               minPort: TestData.minPort,
                               maxPort: TestData.maxPort,
                             }
