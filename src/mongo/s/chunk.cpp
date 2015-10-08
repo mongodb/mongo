@@ -443,6 +443,8 @@ Status Chunk::multiSplit(OperationContext* txn, const vector<BSONObj>& m, BSONOb
     cmd.append("from", getShardId());
     cmd.append("splitKeys", m);
     cmd.append("configdb", grid.shardRegistry()->getConfigServerConnectionString().toString());
+    _manager->getVersion().appendForCommands(&cmd);
+    // TODO(SERVER-20742): Remove this after 3.2, now that we're sending version it is redundant
     cmd.append("epoch", _manager->getVersion().epoch());
     BSONObj cmdObj = cmd.obj();
 
@@ -510,6 +512,8 @@ bool Chunk::moveAndCommit(OperationContext* txn,
 
     builder.append("waitForDelete", waitForDelete);
     builder.append(LiteParsedQuery::cmdOptionMaxTimeMS, maxTimeMS);
+    _manager->getVersion().appendForCommands(&builder);
+    // TODO(SERVER-20742): Remove this after 3.2, now that we're sending version it is redundant
     builder.append("epoch", _manager->getVersion().epoch());
 
     ShardConnection fromconn(_getShardConnectionString(txn), "");

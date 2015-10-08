@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/operation_shard_version.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/logger/ramlog.h"
@@ -46,6 +47,7 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -221,14 +223,24 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock*> ChunkMoveOperationState::a
         return Status(ErrorCodes::IncompatibleShardingMetadata, msg);
     }
 
-    if (_collectionEpoch != _shardVersion.epoch()) {
-        const string msg = stream() << "moveChunk cannot move chunk "
-                                    << "[" << _minKey << "," << _maxKey << "), "
-                                    << "collection may have been dropped. "
-                                    << "current epoch: " << _shardVersion.epoch()
-                                    << ", cmd epoch: " << _collectionEpoch;
-        warning() << msg;
-        return Status(ErrorCodes::IncompatibleShardingMetadata, msg);
+    {
+        // Mongos >= v3.2 sends the full version, v3.0 only sends the epoch.
+        // TODO(SERVER-20742): Stop parsing epoch separately after 3.2.
+        auto& operationVersion = OperationShardVersion::get(txn);
+        if (operationVersion.hasShardVersion()) {
+            _collectionVersion = operationVersion.getShardVersion(_nss);
+            _collectionEpoch = _collectionVersion.epoch();
+        }  // else the epoch will already be set from the parsing of the ChunkMoveOperationState
+
+        if (_collectionEpoch != _shardVersion.epoch()) {
+            const string msg = stream() << "moveChunk cannot move chunk "
+                                        << "[" << _minKey << "," << _maxKey << "), "
+                                        << "collection may have been dropped. "
+                                        << "current epoch: " << _shardVersion.epoch()
+                                        << ", cmd epoch: " << _collectionEpoch;
+            warning() << msg;
+            throw SendStaleConfigException(_nss.toString(), msg, _collectionVersion, _shardVersion);
+        }
     }
 
     _collMetadata = shardingState->getCollectionMetadata(_nss.ns());
@@ -247,7 +259,7 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock*> ChunkMoveOperationState::a
                                     << "[" << _minKey << "," << _maxKey << ")"
                                     << " to migrate, the chunk boundaries may be stale";
         warning() << msg;
-        return Status(ErrorCodes::IncompatibleShardingMetadata, msg);
+        throw SendStaleConfigException(_nss.toString(), msg, _collectionVersion, _shardVersion);
     }
 
     return &_distLockStatus->getValue();
