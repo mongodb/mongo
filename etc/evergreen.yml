@@ -4291,7 +4291,7 @@ buildvariants:
 ###########################################
 
 - name: ubuntu1410-debug-asan
-  display_name: ~ ASAN SSL Ubuntu 14.10 DEBUG
+  display_name: ~ ASAN Enterprise SSL Ubuntu 14.10 DEBUG
   modules:
   - enterprise
   run_on:
@@ -4408,6 +4408,7 @@ buildvariants:
   tasks:
   - name: compile
   - name: jstestfuzz
+  - name: unittests
 
 - name: ubuntu1410-fast-clang
   display_name: ~ Clang/libc++ SSL Ubuntu 14.10
