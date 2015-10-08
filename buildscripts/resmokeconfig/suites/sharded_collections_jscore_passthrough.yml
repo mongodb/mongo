@@ -7,6 +7,7 @@ selector:
     # mongos. This command or functionality is placed in a comment next to the failing test.
     - jstests/core/apitest_db.js  # profiling.
     - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
+    - jstests/core/bypass_doc_validation.js  # copyDatabase
     - jstests/core/capped*.js  # capped collections.
     - jstests/core/check_shard_index.js  # checkShardingIndex.
     - jstests/core/collection_truncate.js  # emptycapped.
