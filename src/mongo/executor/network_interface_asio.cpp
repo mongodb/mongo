@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
 
 #include "mongo/platform/basic.h"
 
@@ -98,6 +98,7 @@ void NetworkInterfaceASIO::startup() {
     _serviceRunner = stdx::thread([this]() {
         setThreadName("NetworkInterfaceASIO");
         try {
+            LOG(2) << "The NetworkInterfaceASIO worker thread is spinning up";
             asio::io_service::work work(_io_service);
             _io_service.run();
         } catch (...) {
@@ -113,6 +114,7 @@ void NetworkInterfaceASIO::shutdown() {
     _state.store(State::kShutdown);
     _io_service.stop();
     _serviceRunner.join();
+    LOG(2) << "NetworkInterfaceASIO shutdown successfully";
 }
 
 void NetworkInterfaceASIO::waitForWork() {
@@ -164,12 +166,16 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
         invariant(insertResult.second);
     }
 
+    LOG(2) << "startCommand: " << request.toString();
+
     auto startTime = now();
 
     auto nextStep = [this, startTime, cbHandle, request, onFinish](
         StatusWith<ConnectionPool::ConnectionHandle> swConn) {
 
         if (!swConn.isOK()) {
+            LOG(2) << "Failed to get connection from pool: " << swConn.getStatus();
+
             bool wasPreviouslyCanceled = false;
             {
                 stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
@@ -238,6 +244,8 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
                         // The operation has been cleaned up, do not access.
                         return;
                     }
+
+                    LOG(2) << "Operation timed out: " << op->request().toString();
 
                     // An operation may be in mid-flight when it times out, so we
                     // cancel any in-progress async calls but do not complete the operation now.
