@@ -72,6 +72,7 @@ var Cluster = function(options) {
         mongod: []
     };
     var nextConn = 0;
+    var primaries = [];
 
     // TODO: Define size of replica set from options
     var replSetNodes = 3;
@@ -135,6 +136,7 @@ var Cluster = function(options) {
                 i = 0;
                 while (rsTest) {
                     this._addReplicaSetConns(rsTest);
+                    primaries.push(rsTest.getPrimary());
                     ++i;
                     rsTest = st['rs' + i];
                 }
@@ -163,6 +165,7 @@ var Cluster = function(options) {
             rst.awaitSecondaryNodes();
 
             conn = rst.getPrimary();
+            primaries = [conn];
 
             this.teardown = function() {
                 rst.stopSet();
@@ -276,15 +279,18 @@ var Cluster = function(options) {
                     wtimeout: 300000 // wait up to 5 minutes
                 }
             };
-            this.executeOnMongodNodes(function (db) {
-                // Execute on all primary nodes
-                if (db.isMaster().ismaster) {
-                    // Insert a document with a writeConcern for all nodes in the replica set to
-                    // ensure that all previous workload operations have completed on secondaries
-                    var result = db.getSiblingDB('test').fsm_teardown.insert({ a: 1 }, wc);
-                    assert.writeOK(result, 'teardown insert failed: ' + tojson(result));
-                    assert(db.getSiblingDB('test').fsm_teardown.drop(), 'teardown drop failed');
-                }
+            primaries.forEach(function(primary) {
+                var startTime = Date.now();
+                jsTest.log(primary.host + ': awaitReplication started');
+
+                // Insert a document with a writeConcern for all nodes in the replica set to
+                // ensure that all previous workload operations have completed on secondaries
+                var result = primary.getDB('test').fsm_teardown.insert({ a: 1 }, wc);
+                assert.writeOK(result, 'teardown insert failed: ' + tojson(result));
+                assert(primary.getDB('test').fsm_teardown.drop(), 'teardown drop failed');
+
+                var totalTime = Date.now() - startTime;
+                jsTest.log(primary.host + ': awaitReplication completed in ' + totalTime + ' ms');
             });
         }
     };
