@@ -68,43 +68,54 @@ OpTime ReadConcernArgs::getOpTime() const {
 }
 
 Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
+    invariant(!_opTime && !_level);  // only legal to call on uninitialized object.
+
     if (readConcernElem.eoo()) {
         return Status::OK();
     }
 
     dassert(readConcernElem.fieldNameStringData() == kReadConcernFieldName);
 
-    if (!readConcernElem.isABSONObj()) {
+    if (readConcernElem.type() != Object) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << kReadConcernFieldName << " field should be an object");
     }
 
     BSONObj readConcernObj = readConcernElem.Obj();
+    for (auto&& field : readConcernObj) {
+        auto fieldName = field.fieldNameStringData();
+        if (fieldName == kAfterOpTimeFieldName) {
+            OpTime opTime;
+            // TODO pass field in rather than scanning again.
+            auto opTimeStatus =
+                bsonExtractOpTimeField(readConcernObj, kAfterOpTimeFieldName, &opTime);
+            if (!opTimeStatus.isOK()) {
+                return opTimeStatus;
+            }
+            _opTime = opTime;
+        } else if (fieldName == kLevelFieldName) {
+            std::string levelString;
+            // TODO pass field in rather than scanning again.
+            auto readCommittedStatus =
+                bsonExtractStringField(readConcernObj, kLevelFieldName, &levelString);
+            if (!readCommittedStatus.isOK()) {
+                return readCommittedStatus;
+            }
 
-    if (readConcernObj.hasField(kAfterOpTimeFieldName)) {
-        OpTime opTime;
-        auto opTimeStatus = bsonExtractOpTimeField(readConcernObj, kAfterOpTimeFieldName, &opTime);
-        if (!opTimeStatus.isOK()) {
-            return opTimeStatus;
-        }
-        _opTime = opTime;
-    }
-
-    std::string levelString;
-    auto readCommittedStatus =
-        bsonExtractStringField(readConcernObj, kLevelFieldName, &levelString);
-    if (readCommittedStatus.isOK()) {
-        if (levelString == kLocalReadConcernStr) {
-            _level = ReadConcernLevel::kLocalReadConcern;
-        } else if (levelString == kMajorityReadConcernStr) {
-            _level = ReadConcernLevel::kMajorityReadConcern;
+            if (levelString == kLocalReadConcernStr) {
+                _level = ReadConcernLevel::kLocalReadConcern;
+            } else if (levelString == kMajorityReadConcernStr) {
+                _level = ReadConcernLevel::kMajorityReadConcern;
+            } else {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << kReadConcernFieldName << '.' << kLevelFieldName
+                                            << " must be either 'local' or 'majority'");
+            }
         } else {
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << kReadConcernFieldName << '.' << kLevelFieldName
-                                        << " must be either \"local\" or \"majority\"");
+            return Status(ErrorCodes::InvalidOptions,
+                          str::stream() << "Unrecognized option in " << kReadConcernFieldName
+                                        << ": " << fieldName);
         }
-    } else if (readCommittedStatus != ErrorCodes::NoSuchKey) {
-        return readCommittedStatus;
     }
 
     return Status::OK();

@@ -47,8 +47,8 @@ var runTest = function(testDB, primaryConn) {
         filter: { x: 1 },
         readConcern: {
             afterOpTime: { ts: twoSecTS, t: term },
-            maxTimeMS: 10 * 1000
-        }
+        },
+        maxTimeMS: 10 * 1000,
     }));
 
     assert.eq(null, res.code);

@@ -163,6 +163,14 @@ TEST(ReadAfterParse, BadLevelValue) {
                                                       << "seven is not a real level"))));
 }
 
+TEST(ReadAfterParse, BadOption) {
+    ReadConcernArgs readAfterOpTime;
+    ASSERT_EQ(ErrorCodes::InvalidOptions,
+              readAfterOpTime.initialize(BSON("find"
+                                              << "test" << ReadConcernArgs::kReadConcernFieldName
+                                              << BSON("asdf" << 1))));
+}
+
 TEST(ReadAfterSerialize, Empty) {
     BSONObjBuilder builder;
     ReadConcernArgs readAfterOpTime;
