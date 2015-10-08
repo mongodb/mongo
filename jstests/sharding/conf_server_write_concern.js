@@ -25,7 +25,7 @@ function writeToConfigTest(){
  */
 function configTest(){
     jsTestLog("Testing metadata writes to config server with write concern");
-    var st = new ShardingTest({ shards: 1, rs: { oplogSize: 10 }, other: { chunkSize: 1 }});
+    var st = new ShardingTest({ shards: 1, rs: true, other: { chunkSize: 1 }});
      
     var mongos = st.s;
     var testDB = mongos.getDB( 'test' );
@@ -49,7 +49,7 @@ function configTest(){
         for (var i = 0; i < 100; i++) {
             bulk.insert({x: x++, largeStr: largeStr});
         }
-        assert.writeOK(bulk.execute({w: 'majority'}));
+        assert.writeOK(bulk.execute({w: 'majority', wtimeout: 60 * 1000}));
         currChunks = chunkCount();
         return currChunks > initChunks;
     }, function() { return "currChunks: " + currChunks + ", initChunks: " + initChunks; });

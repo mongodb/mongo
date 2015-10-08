@@ -4,7 +4,6 @@ selector:
     - jstests/sharding/*.js
     - jstests/sharding/sync_cluster_config/*.js
     exclude_files:
-    - jstests/sharding/conf_server_write_concern.js  # SERVER-20817
     - jstests/sharding/csrs_upgrade.js  # SERVER-20694
     - jstests/sharding/csrs_upgrade_during_migrate.js  # SERVER-20580
 
