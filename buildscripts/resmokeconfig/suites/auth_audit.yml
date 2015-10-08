@@ -1,0 +1,15 @@
+selector:
+  js_test:
+    roots:
+    - jstests/auth/*.js
+
+# Auth tests start their own mongod's.
+executor:
+  js_test:
+    config:
+      shell_options:
+        nodb: ''
+        readMode: commands
+        global_vars:
+          TestData:
+            auditDestination: 'console'

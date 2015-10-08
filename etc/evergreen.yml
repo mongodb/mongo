@@ -628,6 +628,22 @@ tasks:
       resmoke_args: --suites=auth --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: auth_audit
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=auth_audit --storageEngine=mmapv1
+
+- <<: *task_template
+  name: auth_audit_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=auth_audit --storageEngine=wiredTiger
+
+- <<: *task_template
   name: dbtest
   commands:
   - func: "do setup"
@@ -1331,6 +1347,16 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth
+
+- <<: *task_template
+  name: sharding_auth_audit_WT
+  depends_on:
+  - name: sharding_auth
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_auth_audit --storageEngine=wiredTiger
 
 - <<: *task_template
   name: sharding_legacy
@@ -2451,6 +2477,8 @@ buildvariants:
   - name: audit_WT
   - name: auth
   - name: auth_WT
+  - name: auth_audit
+  - name: auth_audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
@@ -2472,6 +2500,7 @@ buildvariants:
   - name: replication_auth
   - name: sasl
   - name: sharding_auth
+  - name: sharding_auth_audit_WT
   - name: sharding_WT_ese
   - name: slow1
   - name: slow1_WT
@@ -2929,6 +2958,8 @@ buildvariants:
     - windows-64-vs2013-compile
   - name: audit
   - name: audit_WT
+  - name: auth_audit
+  - name: auth_audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
@@ -2942,6 +2973,7 @@ buildvariants:
   - name: replicasets_WT_ese
   - name: sasl
   - name: sharding_auth
+  - name: sharding_auth_audit_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -3302,6 +3334,8 @@ buildvariants:
   - name: compile
   - name: audit
   - name: audit_WT
+  - name: auth_audit
+  - name: auth_audit_WT
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
@@ -3311,6 +3345,7 @@ buildvariants:
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
+  - name: sharding_auth_audit_WT
   - name: snmp
   - name: snmp_WT
   - name: ssl
@@ -4321,6 +4356,8 @@ buildvariants:
   - name: aggregation_auth
   - name: audit
   - name: audit_WT
+  - name: auth_audit
+  - name: auth_audit_WT
   - name: auth
   - name: auth_WT
   - name: bulk_gle_passthrough
@@ -4379,6 +4416,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
+  - name: sharding_auth_audit_WT
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
