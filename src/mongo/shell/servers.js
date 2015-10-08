@@ -494,18 +494,6 @@ MongoRunner.mongodOptions = function( opts ){
         opts.encryptionKeyFile = jsTestOptions().encryptionKeyFile;
     }
 
-    if (opts.hasOwnProperty("auditDestination")) {
-        // opts.auditDestination, if set, must be a string
-        if (typeof opts.auditDestination !== "string") {
-            throw new Error("The auditDestination option must be a string if it is specified");
-        }
-    } else if (jsTestOptions().auditDestination !== undefined) {
-        if (typeof(jsTestOptions().auditDestination) !== "string") {
-            throw new Error("The auditDestination option must be a string if it is specified");
-        }
-        opts.auditDestination = jsTestOptions().auditDestination;
-    }
-
     if( opts.noReplSet ) opts.replSet = null
     if( opts.arbiter ) opts.oplogSize = 1
             
@@ -539,18 +527,6 @@ MongoRunner.mongosOptions = function( opts ) {
         opts.keyFile = jsTestOptions().keyFile
     }
     
-    if (opts.hasOwnProperty("auditDestination")) {
-        // opts.auditDestination, if set, must be a string
-        if (typeof opts.auditDestination !== "string") {
-            throw new Error("The auditDestination option must be a string if it is specified");
-        }
-    } else if (jsTestOptions().auditDestination !== undefined) {
-        if (typeof(jsTestOptions().auditDestination) !== "string") {
-            throw new Error("The auditDestination option must be a string if it is specified");
-        }
-        opts.auditDestination = jsTestOptions().auditDestination;
-    }
-
     return opts
 }
 
