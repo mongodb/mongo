@@ -160,7 +160,7 @@ void noteInCriticalSection(WriteErrorDetail* staleError) {
  * Translates write item type to wire protocol op code. Helper for
  * WriteBatchExecutor::applyWriteItem().
  */
-int getOpCode(const BatchItemRef& currWrite) {
+Operation getOpCode(const BatchItemRef& currWrite) {
     switch (currWrite.getRequest()->getBatchType()) {
         case BatchedCommandRequest::BatchType_Insert:
             return dbInsert;
@@ -485,11 +485,10 @@ static bool checkIndexConstraints(OperationContext* txn,
 static void beginCurrentOp(OperationContext* txn, const BatchItemRef& currWrite) {
     stdx::lock_guard<Client> lk(*txn->getClient());
     CurOp* const currentOp = CurOp::get(txn);
-    currentOp->setOp_inlock(getOpCode(currWrite));
+    currentOp->setNetworkOp_inlock(getOpCode(currWrite));
+    currentOp->setLogicalOp_inlock(getOpCode(currWrite));
     currentOp->ensureStarted();
     currentOp->setNS_inlock(currWrite.getRequest()->getNS().ns());
-
-    currentOp->debug().op = currentOp->getOp();
 
     if (currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert) {
         currentOp->setQuery_inlock(currWrite.getDocument());
@@ -561,7 +560,7 @@ static void finishCurrentOp(OperationContext* txn, WriteErrorDetail* opError) {
     recordCurOpMetrics(txn);
     Top::get(txn->getClient()->getServiceContext())
         .record(currentOp->getNS(),
-                currentOp->getOp(),
+                currentOp->getNetworkOp(),
                 1,  // "write locked"
                 currentOp->totalTimeMicros(),
                 currentOp->isCommand());
@@ -570,8 +569,8 @@ static void finishCurrentOp(OperationContext* txn, WriteErrorDetail* opError) {
         currentOp->debug().exceptionInfo =
             ExceptionInfo(opError->getErrMessage(), opError->getErrCode());
 
-        LOG(3) << " Caught Assertion in " << opToString(currentOp->getOp()) << ", continuing "
-               << causedBy(opError->getErrMessage());
+        LOG(3) << " Caught Assertion in " << opToString(currentOp->getNetworkOp())
+               << ", continuing " << causedBy(opError->getErrMessage());
     }
 
     bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kWrite,
@@ -586,7 +585,7 @@ static void finishCurrentOp(OperationContext* txn, WriteErrorDetail* opError) {
     }
 
     if (currentOp->shouldDBProfile(executionTime)) {
-        profile(txn, CurOp::get(txn)->getOp());
+        profile(txn, CurOp::get(txn)->getNetworkOp());
     }
 }
 

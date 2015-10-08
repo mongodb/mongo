@@ -39,6 +39,7 @@
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/thread_safe_string.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 
@@ -149,7 +150,12 @@ public:
     // -------------------
 
     // basic options
-    int op;
+    // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_COMMAND, etc.
+    Operation networkOp;  // only set this through setNetworkOp_inlock() to keep synced
+    // _logicalOp is the logical operation type, ie 'dbQuery' regardless of whether this is an
+    // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_COMMAND.
+    // Similarly, the return value will be dbGetMore for both OP_GET_MORE and getMore command.
+    Operation logicalOp;  // only set this through setNetworkOp_inlock() to keep synced
     bool iscommand;
     BSONObj query;
     BSONObj updateobj;
@@ -202,17 +208,6 @@ private:
      * OP_GET_MORE and all other operations.
      */
     bool isGetMoreCommand() const;
-
-    /**
-     * Get the op code for the logical type of this  operation.
-     *
-     * The "op" field represents the network-level op code, e.g. whether the network message was an
-     * OP_QUERY, OP_GET_MORE, OP_COMMAND, etc. In contrast, the return value of this function will
-     * be 'dbQuery' regardless of whether this is an OP_QUERY find, a find command using OP_QUERY,
-     * or a find command using OP_COMMAND. Similarly, the return value will be dbGetMore for both
-     * OP_GET_MORE and getMore command (using either of the command protocols).
-     */
-    int getLogicalOpType() const;
 };
 
 /**
@@ -262,9 +257,20 @@ public:
     void enter_inlock(const char* ns, int dbProfileLevel);
 
     /**
-     * Sets the type of the current operation to "op".
+     * Sets the type of the current network operation.
      */
-    void setOp_inlock(int op);
+    void setNetworkOp_inlock(Operation op) {
+        _networkOp = op;
+        _debug.networkOp = op;
+    }
+
+    /**
+     * Sets the type of the current logical operation.
+     */
+    void setLogicalOp_inlock(Operation op) {
+        _logicalOp = op;
+        _debug.logicalOp = op;
+    }
 
     /**
      * Marks the current operation as being a command.
@@ -304,10 +310,19 @@ public:
     void raiseDbProfileLevel(int dbProfileLevel);
 
     /**
-     * Gets the type of the current operation.
+     * Gets the network operation type. No lock is required if called by the thread executing
+     * the operation, but the lock must be held if called from another thread.
      */
-    int getOp() const {
-        return _op;
+    Operation getNetworkOp() const {
+        return _networkOp;
+    }
+
+    /**
+     * Gets the logical operation type. No lock is required if called by the thread executing
+     * the operation, but the lock must be held if called from another thread.
+     */
+    Operation getLogicalOp() const {
+        return _logicalOp;
     }
 
     /**
@@ -466,7 +481,14 @@ private:
     Command* _command;
     long long _start;
     long long _end;
-    int _op;
+
+    // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_COMMAND, etc.
+    Operation _networkOp;  // only set this through setNetworkOp_inlock() to keep synced
+    // _logicalOp is the logical operation type, ie 'dbQuery' regardless of whether this is an
+    // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_COMMAND.
+    // Similarly, the return value will be dbGetMore for both OP_GET_MORE and getMore command.
+    Operation _logicalOp;  // only set this through setNetworkOp_inlock() to keep synced
+
     bool _isCommand;
     int _dbprofile;  // 0=off, 1=slow, 2=all
     std::string _ns;

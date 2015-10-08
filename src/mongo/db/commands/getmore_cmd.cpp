@@ -103,6 +103,10 @@ public:
         help << "retrieve more results from an existing cursor";
     }
 
+    Operation getLogicalOp() const override {
+        return dbGetMore;
+    }
+
     /**
      * A getMore command increments the getMore counter, not the command counter.
      */

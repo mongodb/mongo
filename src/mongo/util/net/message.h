@@ -55,7 +55,8 @@ class MessagingPort;
 
 typedef uint32_t MSGID;
 
-enum Operations {
+enum Operation {
+    opInvalid = 0,
     opReply = 1,     /* reply. responseTo is set. */
     dbMsg = 1000,    /* generic msg command followed by a std::string */
     dbUpdate = 2001, /* update object */
@@ -243,8 +244,8 @@ public:
         return header().getResponseTo();
     }
 
-    int32_t getOperation() const {
-        return header().getOpCode();
+    Operation getOperation() const {
+        return Operation(header().getOpCode());
     }
 
     const char* data() const {
@@ -359,7 +360,7 @@ public:
         return _buf ? _buf : _data[0].first;
     }
 
-    int operation() const {
+    Operation operation() const {
         return header().getOperation();
     }
 

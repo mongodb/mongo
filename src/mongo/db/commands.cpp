@@ -488,6 +488,12 @@ void runCommands(OperationContext* txn,
         LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
                << c->getRedactedCopyForLogging(request.getCommandArgs());
 
+        {
+            // Try to set this as early as possible, as soon as we have figured out the command.
+            stdx::lock_guard<Client> lk(*txn->getClient());
+            CurOp::get(txn)->setLogicalOp_inlock(c->getLogicalOp());
+        }
+
         Command::execCommand(txn, c, request, replyBuilder);
     }
 

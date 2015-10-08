@@ -237,7 +237,7 @@ bool MessagingPort::recv(const Message& toSend, Message& response) {
                 << "  toSend op: " << (unsigned)toSend.operation() << '\n'
                 << "  response msgid:" << (unsigned)response.header().getId() << '\n'
                 << "  response len:  " << (unsigned)response.header().getLen() << '\n'
-                << "  response op:  " << response.operation() << '\n'
+                << "  response op:  " << static_cast<int>(response.operation()) << '\n'
                 << "  remote: " << psock->remoteString();
         verify(false);
         response.reset();

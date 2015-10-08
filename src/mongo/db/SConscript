@@ -506,6 +506,7 @@ env.Library(
         'auth/serverauth',
         'commands/server_status_core',
         'common',
+        'curop',
         'exec/working_set',
         'index/key_generator',
         'index_names',
