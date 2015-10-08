@@ -661,6 +661,8 @@ tasks:
 
 - <<: *task_template
   name: dur_jscore_passthrough
+  depends_on:
+  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -839,6 +841,8 @@ tasks:
 
 - <<: *task_template
   name: jsCore_WT_ese
+  depends_on:
+  - name: jsCore_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -847,6 +851,8 @@ tasks:
 
 - <<: *task_template
   name: jsCore_compatibility
+  depends_on:
+  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -856,6 +862,8 @@ tasks:
 
 - <<: *task_template
   name: jsCore_compatibility_WT
+  depends_on:
+  - name: jsCore_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -865,6 +873,8 @@ tasks:
 
 - <<: *task_template
   name: jsCore_auth
+  depends_on:
+  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -874,6 +884,8 @@ tasks:
 
 - <<: *task_template
   name: jsCore_op_query
+  depends_on:
+  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -883,6 +895,8 @@ tasks:
 
 - <<: *task_template
   name: jsCore_op_query_WT
+  depends_on:
+  - name: jsCore_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -901,6 +915,8 @@ tasks:
 
 - <<: *task_template
   name: jsCore_small_oplog
+  depends_on:
+  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -909,6 +925,8 @@ tasks:
 
 - <<: *task_template
   name: jsCore_small_oplog_WT
+  depends_on:
+  - name: jsCore_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -917,6 +935,8 @@ tasks:
 
 - <<: *task_template
   name: jsCore_small_oplog_rs
+  depends_on:
+  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -925,6 +945,8 @@ tasks:
 
 - <<: *task_template
   name: jsCore_small_oplog_rs_WT
+  depends_on:
+  - name: jsCore_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1066,6 +1088,8 @@ tasks:
 
 - <<: *task_template
   name: sharding_jscore_passthrough
+  depends_on:
+  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1074,6 +1098,8 @@ tasks:
 
 - <<: *task_template
   name: sharding_jscore_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1092,6 +1118,8 @@ tasks:
 
 - <<: *task_template
   name: parallel
+  depends_on:
+  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1100,6 +1128,8 @@ tasks:
 
 - <<: *task_template
   name: parallel_WT
+  depends_on:
+  - name: jsCore_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1108,6 +1138,8 @@ tasks:
 
 - <<: *task_template
   name: parallel_compatibility
+  depends_on:
+  - name: jsCore
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1116,6 +1148,8 @@ tasks:
 
 - <<: *task_template
   name: parallel_compatibility_WT
+  depends_on:
+  - name: jsCore_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -2898,6 +2932,8 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
+  - name: jsCore
+  - name: jsCore_WT
   - name: jsCore_WT_ese
   - name: sharding_WT_ese
   - name: jsCore_auth
@@ -3269,6 +3305,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
+  - name: jsCore
   - name: jsCore_auth
   - name: mmap
   - name: replicasets_auth
@@ -3317,6 +3354,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
+  - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
   - name: mmap
@@ -3364,6 +3402,7 @@ buildvariants:
   - name: ese_WT
   - name: jstestfuzz
   - name: mmap
+  - name: jsCore
   - name: jsCore_auth
   - name: replicasets_auth
   - name: rlp # RLP only runs on this variant
@@ -3406,6 +3445,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
+  - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
   - name: mmap
@@ -3756,6 +3796,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
+  - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
   - name: mmap
@@ -3800,6 +3841,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
+  - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
   - name: mmap
@@ -3848,6 +3890,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
+  - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
   - name: replicasets_auth
@@ -4072,6 +4115,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: ese_WT
+  - name: jsCore
   - name: jsCore_auth
   - name: jstestfuzz
   - name: mmap
