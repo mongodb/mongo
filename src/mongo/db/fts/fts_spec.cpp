@@ -358,6 +358,8 @@ BSONObj FTSSpec::fixSpec(const BSONObj& spec) {
         uasserted(17284, "text index option 'weights' must be an object");
     }
 
+    uassert(28823, "text index option 'weights' must specify fields or the wildcard", !m.empty());
+
     BSONObj weights;
     {
         BSONObjBuilder b;

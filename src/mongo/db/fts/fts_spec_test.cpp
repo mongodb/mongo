@@ -156,6 +156,9 @@ TEST(FTSSpec, FixWeights1) {
     assertFixFailure("{key: {a: 'text'}, weights: {$a: 1}}");
     assertFixFailure("{key: {a: 'text'}, weights: {'a.$a': 1}}");
     assertFixFailure("{key: {a: 'text'}, weights: {'a.$**': 1}}");
+
+    assertFixFailure("{key: {_fts: 'text', _ftsx: 1}, weights: {}}");
+    assertFixFailure("{key: {_fts: 'text', _ftsx: 1}}");
 }
 
 TEST(FTSSpec, FixLanguageOverride1) {

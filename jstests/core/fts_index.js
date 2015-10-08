@@ -3,6 +3,7 @@
 // 2. Text indexes properly enforce a schema on the language_override field.
 // 3. Collections may have at most one text index.
 // 4. Text indexes properly handle large documents.
+// 5. Bad weights test cases.
 
 var coll = db.fts_index;
 var indexName = "textIndex";
@@ -140,5 +141,13 @@ for(var i = 0; i < 1024 * 1024; ++i) {
 coll.insert({a: longstring});
 coll.insert({a: longstring2});
 assert.eq(1, coll.find({$text: {$search: longstring}}).itcount(), "long string not found in index");
+coll.dropIndexes();
+
+//
+// 5. Bad weights test cases.
+//
+assert.commandFailed(coll.ensureIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}, {weights: {}}));
+assert.commandFailed(coll.ensureIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}));
+
 
 coll.drop();
