@@ -66,8 +66,8 @@ TEST(FTDCFileTest, TestFileBasicMetadata) {
 
     ASSERT_OK(writer.open(p));
 
-    ASSERT_OK(writer.writeMetadata(doc1));
-    ASSERT_OK(writer.writeMetadata(doc2));
+    ASSERT_OK(writer.writeMetadata(doc1, Date_t()));
+    ASSERT_OK(writer.writeMetadata(doc2, Date_t()));
 
     writer.close();
 
@@ -111,8 +111,8 @@ TEST(FTDCFileTest, TestFileBasicCompress) {
 
     ASSERT_OK(writer.open(p));
 
-    ASSERT_OK(writer.writeSample(doc1));
-    ASSERT_OK(writer.writeSample(doc2));
+    ASSERT_OK(writer.writeSample(doc1, Date_t()));
+    ASSERT_OK(writer.writeSample(doc2, Date_t()));
 
     writer.close();
 
@@ -155,7 +155,7 @@ public:
     }
 
     void addSample(const BSONObj& sample) {
-        ASSERT_OK(_writer.writeSample(sample));
+        ASSERT_OK(_writer.writeSample(sample, Date_t()));
         _docs.emplace_back(sample);
     }
 

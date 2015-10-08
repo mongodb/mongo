@@ -67,19 +67,21 @@ TEST(FTDCCompressor, TestBasic) {
 
     auto st = c.addSample(BSON("name"
                                << "joe"
-                               << "key1" << 33 << "key2" << 42));
+                               << "key1" << 33 << "key2" << 42),
+                          Date_t());
     ASSERT_HAS_SPACE(st);
     st = c.addSample(BSON("name"
                           << "joe"
-                          << "key1" << 34 << "key2" << 45));
+                          << "key1" << 34 << "key2" << 45),
+                     Date_t());
     ASSERT_HAS_SPACE(st);
 
 
-    StatusWith<ConstDataRange> swBuf = c.getCompressedSamples();
+    StatusWith<std::tuple<ConstDataRange, Date_t>> swBuf = c.getCompressedSamples();
 
     ASSERT_TRUE(swBuf.isOK());
-    ASSERT_TRUE(swBuf.getValue().length() > 0);
-    ASSERT_TRUE(swBuf.getValue().data() != nullptr);
+    ASSERT_TRUE(std::get<0>(swBuf.getValue()).length() > 0);
+    ASSERT_TRUE(std::get<0>(swBuf.getValue()).data() != nullptr);
 }
 
 // Test strings only
@@ -92,21 +94,23 @@ TEST(FTDCCompressor, TestStrings) {
                                << "key1"
                                << "value1"
                                << "key2"
-                               << "value2"));
+                               << "value2"),
+                          Date_t());
     ASSERT_HAS_SPACE(st);
     st = c.addSample(BSON("name"
                           << "joe"
                           << "key1"
                           << "value3"
                           << "key2"
-                          << "value6"));
+                          << "value6"),
+                     Date_t());
     ASSERT_HAS_SPACE(st);
 
-    StatusWith<ConstDataRange> swBuf = c.getCompressedSamples();
+    StatusWith<std::tuple<ConstDataRange, Date_t>> swBuf = c.getCompressedSamples();
 
     ASSERT_TRUE(swBuf.isOK());
-    ASSERT_TRUE(swBuf.getValue().length() > 0);
-    ASSERT_TRUE(swBuf.getValue().data() != nullptr);
+    ASSERT_TRUE(std::get<0>(swBuf.getValue()).length() > 0);
+    ASSERT_TRUE(std::get<0>(swBuf.getValue()).data() != nullptr);
 }
 
 /**
@@ -121,9 +125,9 @@ public:
         validate(boost::none_t());
     }
 
-    StatusWith<boost::optional<std::tuple<ConstDataRange, FTDCCompressor::CompressorState>>>
+    StatusWith<boost::optional<std::tuple<ConstDataRange, FTDCCompressor::CompressorState, Date_t>>>
     addSample(const BSONObj& sample) {
-        auto st = _compressor.addSample(sample);
+        auto st = _compressor.addSample(sample, Date_t());
 
         if (!st.getValue().is_initialized()) {
             _docs.emplace_back(sample);
@@ -153,7 +157,7 @@ public:
         } else {
             auto swBuf = _compressor.getCompressedSamples();
             ASSERT_TRUE(swBuf.isOK());
-            auto sw = _decompressor.uncompress(swBuf.getValue());
+            auto sw = _decompressor.uncompress(std::get<0>(swBuf.getValue()));
             ASSERT_TRUE(sw.isOK());
 
             list = sw.getValue();

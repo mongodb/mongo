@@ -72,12 +72,12 @@ public:
     /**
      * Write a BSON document as a metadata type to the archive log.
      */
-    Status writeMetadata(const BSONObj& metadata);
+    Status writeMetadata(const BSONObj& metadata, Date_t date);
 
     /**
      * Write a sample to interim and/or archive log as needed.
      */
-    Status writeSample(const BSONObj& sample);
+    Status writeSample(const BSONObj& sample, Date_t date);
 
     /**
      * Close all the files and shutdown cleanly by zeroing the beginning of the interim file.
@@ -103,7 +103,7 @@ private:
     /**
      * Flush all changes to disk.
      */
-    Status flush(const boost::optional<ConstDataRange>&);
+    Status flush(const boost::optional<ConstDataRange>&, Date_t date);
 
     /**
      * Write a buffer to the beginning of the interim file.

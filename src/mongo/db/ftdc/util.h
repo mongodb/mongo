@@ -123,7 +123,7 @@ StatusWith<BSONObj> constructDocumentFromMetrics(const BSONObj& ref,
 
 /**
  * Create BSON metadata document for storage. The passed in document is embedded as the doc
- * field in the example above.
+ * field in the example above. For the _id field, the specified date is used.
  *
  * Example:
  * {
@@ -132,11 +132,12 @@ StatusWith<BSONObj> constructDocumentFromMetrics(const BSONObj& ref,
  *  "doc" : { ... }
  * }
  */
-BSONObj createBSONMetadataDocument(const BSONObj& metadata);
+BSONObj createBSONMetadataDocument(const BSONObj& metadata, Date_t date);
 
 /**
  * Create a BSON metric chunk document for storage. The passed in document is embedded as the
- * data field in the example above.
+ * data field in the example above. For the _id field, the date is specified by the caller
+ * since the metric chunk usually composed of multiple samples gathered over a period of time.
  *
  * Example:
  * {
@@ -145,7 +146,12 @@ BSONObj createBSONMetadataDocument(const BSONObj& metadata);
  *  "data" : BinData(...)
  * }
  */
-BSONObj createBSONMetricChunkDocument(ConstDataRange buf);
+BSONObj createBSONMetricChunkDocument(ConstDataRange buf, Date_t now);
+
+/**
+ * Get the _id field of a BSON document
+ */
+StatusWith<Date_t> getBSONDocumentId(const BSONObj& obj);
 
 /**
  * Get the type of a BSON document

@@ -194,9 +194,10 @@ void FTDCController::doLoop() {
             // TODO: consider only running this thread if we are enabled
             // for now, we just keep an idle thread as it is simplier
             if (_config.enabled) {
-                BSONObj obj = _periodicCollectors.collect(client);
+                auto collectSample = _periodicCollectors.collect(client);
 
-                Status s = _mgr->writeSampleAndRotateIfNeeded(client, obj);
+                Status s = _mgr->writeSampleAndRotateIfNeeded(
+                    client, std::get<0>(collectSample), std::get<1>(collectSample));
 
                 uassertStatusOK(s);
             }

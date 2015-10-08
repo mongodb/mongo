@@ -46,16 +46,26 @@ void FTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collec
     _collectors.emplace_back(std::move(collector));
 }
 
-BSONObj FTDCCollectorCollection::collect(Client* client) {
+std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     BSONObjBuilder builder;
+
+    Date_t start = client->getServiceContext()->getClockSource()->now();
+    bool firstLoop = true;
 
     for (auto& collector : _collectors) {
         BSONObjBuilder subObjBuilder(builder.subobjStart(collector->name()));
 
         // Add a Date_t before and after each BSON is collected so that we can track timing of the
         // collector.
-        subObjBuilder.appendDate(kFTDCCollectStartField,
-                                 client->getServiceContext()->getClockSource()->now());
+        Date_t now = start;
+
+        if (!firstLoop) {
+            now = client->getServiceContext()->getClockSource()->now();
+        }
+
+        firstLoop = false;
+
+        subObjBuilder.appendDate(kFTDCCollectStartField, now);
 
         {
             // Create a operation context per command so that we do not share operation contexts
@@ -69,7 +79,7 @@ BSONObj FTDCCollectorCollection::collect(Client* client) {
                                  client->getServiceContext()->getClockSource()->now());
     }
 
-    return builder.obj();
+    return std::tuple<BSONObj, Date_t>(builder.obj(), start);
 }
 
 }  // namespace mongo

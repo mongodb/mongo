@@ -72,7 +72,7 @@ public:
      * Metadata documents are unowned.
      * Metric documents are owned.
      */
-    std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&> next();
+    std::tuple<FTDCBSONUtil::FTDCType, const BSONObj&, Date_t> next();
 
 private:
     /**
@@ -121,6 +121,9 @@ private:
 
     // Current set of metrics documents
     std::vector<BSONObj> _docs;
+
+    // _id of current metadata or metric chunk
+    Date_t _dateId;
 
     // Current metadata document - unowned
     BSONObj _metadata;

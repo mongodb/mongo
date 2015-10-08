@@ -88,9 +88,12 @@ public:
      *  1. kCompressorFull if the compressor is considered full.
      *  2. kSchemaChanged if there was a schema change, and buffer should be flushed.
      *  3. kHasSpace if it has room for more metrics in the current buffer.
+     *
+     * date is the date at which the sample as started to be captured. It will be saved in the
+     * compressor if this sample is used as the reference document.N
      */
-    StatusWith<boost::optional<std::tuple<ConstDataRange, CompressorState>>> addSample(
-        const BSONObj& sample);
+    StatusWith<boost::optional<std::tuple<ConstDataRange, CompressorState, Date_t>>> addSample(
+        const BSONObj& sample, Date_t date);
 
     /**
      * Returns the number of enqueued samples.
@@ -122,7 +125,7 @@ public:
      * The returned buffer is valid until next call to addSample() or getCompressedSamples() with
      * CompressBuffer::kGenerateNewCompressedBuffer.
      */
-    StatusWith<ConstDataRange> getCompressedSamples();
+    StatusWith<std::tuple<ConstDataRange, Date_t>> getCompressedSamples();
 
     /**
      * Reset the state of the compressor.
@@ -144,7 +147,7 @@ private:
     /**
      * Reset the state
      */
-    void _reset(const BSONObj& referenceDoc);
+    void _reset(const BSONObj& referenceDoc, Date_t date);
 
 private:
     // Block Compressor
@@ -155,6 +158,10 @@ private:
 
     // Reference schema document
     BSONObj _referenceDoc;
+
+    // Time at which reference schema document was collected.
+    // Passed in via addSample and returned with each chunk.
+    Date_t _referenceDocDate;
 
     // Number of Metrics for the reference document
     std::uint32_t _metricsCount{0};

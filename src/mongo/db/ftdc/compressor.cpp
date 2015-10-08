@@ -35,17 +35,18 @@
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/ftdc/varint.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 using std::swap;
 
-StatusWith<boost::optional<std::tuple<ConstDataRange, FTDCCompressor::CompressorState>>>
-FTDCCompressor::addSample(const BSONObj& sample) {
+StatusWith<boost::optional<std::tuple<ConstDataRange, FTDCCompressor::CompressorState, Date_t>>>
+FTDCCompressor::addSample(const BSONObj& sample, Date_t date) {
     if (_referenceDoc.isEmpty()) {
         FTDCBSONUtil::extractMetricsFromDocument(sample, sample, &_metrics);
-        _reset(sample);
+        _reset(sample, date);
         return {boost::none_t()};
     }
 
@@ -69,10 +70,11 @@ FTDCCompressor::addSample(const BSONObj& sample) {
         }
 
         // Set the new sample as the current reference document as we have to start all over
-        _reset(sample);
-        return {boost::optional<std::tuple<ConstDataRange, FTDCCompressor::CompressorState>>(
-            std::tuple<ConstDataRange, FTDCCompressor::CompressorState>(
-                swCompressedSamples.getValue(), CompressorState::kSchemaChanged))};
+        _reset(sample, date);
+        return {std::tuple<ConstDataRange, FTDCCompressor::CompressorState, Date_t>(
+            std::get<0>(swCompressedSamples.getValue()),
+            CompressorState::kSchemaChanged,
+            std::get<1>(swCompressedSamples.getValue()))};
     }
 
 
@@ -98,16 +100,17 @@ FTDCCompressor::addSample(const BSONObj& sample) {
         // Setup so that we treat the next sample as the reference sample
         _referenceDoc = BSONObj();
 
-        return {boost::optional<std::tuple<ConstDataRange, FTDCCompressor::CompressorState>>(
-            std::tuple<ConstDataRange, FTDCCompressor::CompressorState>(
-                swCompressedSamples.getValue(), CompressorState::kCompressorFull))};
+        return {std::tuple<ConstDataRange, FTDCCompressor::CompressorState, Date_t>(
+            std::get<0>(swCompressedSamples.getValue()),
+            CompressorState::kCompressorFull,
+            std::get<1>(swCompressedSamples.getValue()))};
     }
 
     // The buffer is not full, inform the caller
     return {boost::none_t()};
 }
 
-StatusWith<ConstDataRange> FTDCCompressor::getCompressedSamples() {
+StatusWith<std::tuple<ConstDataRange, Date_t>> FTDCCompressor::getCompressedSamples() {
     _uncompressedChunkBuffer.setlen(0);
 
     // Append reference document - BSON Object
@@ -203,17 +206,20 @@ StatusWith<ConstDataRange> FTDCCompressor::getCompressedSamples() {
 
     _compressedChunkBuffer.appendBuf(swDest.getValue().data(), swDest.getValue().length());
 
-    return ConstDataRange(_compressedChunkBuffer.buf(),
-                          static_cast<size_t>(_compressedChunkBuffer.len()));
+    return std::tuple<ConstDataRange, Date_t>(
+        ConstDataRange(_compressedChunkBuffer.buf(),
+                       static_cast<size_t>(_compressedChunkBuffer.len())),
+        _referenceDocDate);
 }
 
 void FTDCCompressor::reset() {
     _metrics.clear();
-    _reset(BSONObj());
+    _reset(BSONObj(), Date_t());
 }
 
-void FTDCCompressor::_reset(const BSONObj& referenceDoc) {
+void FTDCCompressor::_reset(const BSONObj& referenceDoc, Date_t date) {
     _referenceDoc = referenceDoc;
+    _referenceDocDate = date;
 
     _metricsCount = _metrics.size();
     _deltaCount = 0;

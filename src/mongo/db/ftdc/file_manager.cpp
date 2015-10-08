@@ -164,22 +164,22 @@ StatusWith<boost::filesystem::path> FTDCFileManager::generateArchiveFileName(
 Status FTDCFileManager::openArchiveFile(
     Client* client,
     const boost::filesystem::path& path,
-    const std::vector<std::tuple<FTDCBSONUtil::FTDCType, BSONObj>>& docs) {
+    const std::vector<std::tuple<FTDCBSONUtil::FTDCType, BSONObj, Date_t>>& docs) {
     auto sOpen = _writer.open(path);
     if (!sOpen.isOK()) {
         return sOpen;
     }
 
     // Append any old interim records
-    for (auto& pair : docs) {
-        if (std::get<0>(pair) == FTDCBSONUtil::FTDCType::kMetadata) {
-            Status s = _writer.writeMetadata(std::get<1>(pair));
+    for (auto& triplet : docs) {
+        if (std::get<0>(triplet) == FTDCBSONUtil::FTDCType::kMetadata) {
+            Status s = _writer.writeMetadata(std::get<1>(triplet), std::get<2>(triplet));
 
             if (!s.isOK()) {
                 return s;
             }
         } else {
-            Status s = _writer.writeSample(std::get<1>(pair));
+            Status s = _writer.writeSample(std::get<1>(triplet), std::get<2>(triplet));
 
             if (!s.isOK()) {
                 return s;
@@ -191,9 +191,9 @@ Status FTDCFileManager::openArchiveFile(
     // collect one-time information
     // This is appened after the file is opened to ensure a user can determine which bson objects
     // where collected from which server instance.
-    BSONObj o = _rotateCollectors->collect(client);
-    if (!o.isEmpty()) {
-        Status s = _writer.writeMetadata(o);
+    auto sample = _rotateCollectors->collect(client);
+    if (!std::get<0>(sample).isEmpty()) {
+        Status s = _writer.writeMetadata(std::get<0>(sample), std::get<1>(sample));
 
         if (!s.isOK()) {
             return s;
@@ -221,7 +221,8 @@ void FTDCFileManager::trimDirectory(std::vector<boost::filesystem::path>& files)
     }
 }
 
-std::vector<std::tuple<FTDCBSONUtil::FTDCType, BSONObj>> FTDCFileManager::recoverInterimFile() {
+std::vector<std::tuple<FTDCBSONUtil::FTDCType, BSONObj, Date_t>>
+FTDCFileManager::recoverInterimFile() {
     decltype(recoverInterimFile()) docs;
 
     auto interimFile = FTDCUtil::getInterimFile(_path);
@@ -250,9 +251,9 @@ std::vector<std::tuple<FTDCBSONUtil::FTDCType, BSONObj>> FTDCFileManager::recove
 
     StatusWith<bool> m = read.hasNext();
     for (; m.isOK() && m.getValue(); m = read.hasNext()) {
-        auto pair = read.next();
-        docs.emplace_back(std::tuple<FTDCBSONUtil::FTDCType, BSONObj>(
-            std::get<0>(pair), std::get<1>(pair).getOwned()));
+        auto triplet = read.next();
+        docs.emplace_back(std::tuple<FTDCBSONUtil::FTDCType, BSONObj, Date_t>(
+            std::get<0>(triplet), std::get<1>(triplet).getOwned(), std::get<2>(triplet)));
     }
 
     // Warn if the interim file was corrupt or we had an unclean shutdown
@@ -285,8 +286,10 @@ Status FTDCFileManager::rotate(Client* client) {
     return openArchiveFile(client, swFile.getValue(), {});
 }
 
-Status FTDCFileManager::writeSampleAndRotateIfNeeded(Client* client, const BSONObj& sample) {
-    Status s = _writer.writeSample(sample);
+Status FTDCFileManager::writeSampleAndRotateIfNeeded(Client* client,
+                                                     const BSONObj& sample,
+                                                     Date_t date) {
+    Status s = _writer.writeSample(sample, date);
 
     if (!s.isOK()) {
         return s;

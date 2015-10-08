@@ -82,7 +82,7 @@ public:
      *
      * Rotates files as needed.
      */
-    Status writeSampleAndRotateIfNeeded(Client* client, const BSONObj& sample);
+    Status writeSampleAndRotateIfNeeded(Client* client, const BSONObj& sample, Date_t date);
 
     /**
      * Closes the current file manager down.
@@ -110,9 +110,10 @@ private:
     /**
      * Recover the interim file.
      *
-     * Checks if the file is non-empty, and if so appends it the archive file.
+     * Checks if the file is non-empty, and if gets a list of documents with the original times they
+     * were written disk based on the _id fields.
      */
-    std::vector<std::tuple<FTDCBSONUtil::FTDCType, BSONObj>> recoverInterimFile();
+    std::vector<std::tuple<FTDCBSONUtil::FTDCType, BSONObj, Date_t>> recoverInterimFile();
 
     /**
      * Removes the oldest files if the directory is over quota
@@ -123,12 +124,15 @@ private:
      * Open a new file for writing.
      *
      * Steps:
-     * 1. Writes any recovered interim file samples into the file.
+     * 1. Writes any recovered interim file samples into the file. These entries are written to the
+     *    archive file with the time they were written to the interim file instead of the time this
+     *    recovery is written.
      * 2. Appends file rotation collectors upon opening the file.
      */
-    Status openArchiveFile(Client* client,
-                           const boost::filesystem::path& path,
-                           const std::vector<std::tuple<FTDCBSONUtil::FTDCType, BSONObj>>& docs);
+    Status openArchiveFile(
+        Client* client,
+        const boost::filesystem::path& path,
+        const std::vector<std::tuple<FTDCBSONUtil::FTDCType, BSONObj, Date_t>>& docs);
 
 private:
     // config to use

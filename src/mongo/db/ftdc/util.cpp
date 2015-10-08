@@ -329,23 +329,34 @@ StatusWith<BSONObj> constructDocumentFromMetrics(const BSONObj& ref,
     return b.obj();
 }
 
-BSONObj createBSONMetadataDocument(const BSONObj& metadata) {
+BSONObj createBSONMetadataDocument(const BSONObj& metadata, Date_t date) {
     BSONObjBuilder builder;
-    builder.appendDate(kFTDCIdField, getGlobalServiceContext()->getClockSource()->now());
+    builder.appendDate(kFTDCIdField, date);
     builder.appendNumber(kFTDCTypeField, static_cast<int>(FTDCType::kMetadata));
     builder.appendObject(kFTDCDocField, metadata.objdata(), metadata.objsize());
 
     return builder.obj();
 }
 
-BSONObj createBSONMetricChunkDocument(ConstDataRange buf) {
+BSONObj createBSONMetricChunkDocument(ConstDataRange buf, Date_t date) {
     BSONObjBuilder builder;
 
-    builder.appendDate(kFTDCIdField, getGlobalServiceContext()->getClockSource()->now());
+    builder.appendDate(kFTDCIdField, date);
     builder.appendNumber(kFTDCTypeField, static_cast<int>(FTDCType::kMetricChunk));
     builder.appendBinData(kFTDCDataField, buf.length(), BinDataType::BinDataGeneral, buf.data());
 
     return builder.obj();
+}
+
+StatusWith<Date_t> getBSONDocumentId(const BSONObj& obj) {
+    BSONElement element;
+
+    Status status = bsonExtractTypedField(obj, kFTDCIdField, BSONType::Date, &element);
+    if (!status.isOK()) {
+        return {status};
+    }
+
+    return {element.Date()};
 }
 
 StatusWith<FTDCType> getBSONDocumentType(const BSONObj& obj) {
