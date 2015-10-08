@@ -319,7 +319,7 @@ std::unique_ptr<PlanStageStats> CachedPlanStage::getStats() {
     std::unique_ptr<PlanStageStats> ret =
         stdx::make_unique<PlanStageStats>(_commonStats, STAGE_CACHED_PLAN);
     ret->specific = stdx::make_unique<CachedPlanStats>(_specificStats);
-    ret->children.push_back(child()->getStats().release());
+    ret->children.emplace_back(child()->getStats());
 
     return ret;
 }

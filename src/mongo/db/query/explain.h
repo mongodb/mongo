@@ -164,10 +164,11 @@ private:
      * @param winnerStats -- the stats tree for the winning plan.
      * @param rejectedStats -- an array of stats trees, one per rejected plan
      */
-    static void generatePlannerInfo(PlanExecutor* exec,
-                                    PlanStageStats* winnerStats,
-                                    const std::vector<PlanStageStats*>& rejectedStats,
-                                    BSONObjBuilder* out);
+    static void generatePlannerInfo(
+        PlanExecutor* exec,
+        PlanStageStats* winnerStats,
+        const std::vector<std::unique_ptr<PlanStageStats>>& rejectedStats,
+        BSONObjBuilder* out);
 
     /**
      * Generates the execution stats section for the stats tree 'stats',

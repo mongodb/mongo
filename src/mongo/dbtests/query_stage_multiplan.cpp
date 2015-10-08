@@ -35,6 +35,7 @@
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
@@ -287,6 +288,121 @@ public:
     }
 };
 
+// Test the structure and values of the explain output.
+class MPSExplainAllPlans : public QueryStageMultiPlanBase {
+public:
+    void run() {
+        // Insert a document to create the collection.
+        insert(BSON("x" << 1));
+
+        const int nDocs = 500;
+
+        auto ws = stdx::make_unique<WorkingSet>();
+        auto firstPlan = stdx::make_unique<QueuedDataStage>(&_txn, ws.get());
+        auto secondPlan = stdx::make_unique<QueuedDataStage>(&_txn, ws.get());
+
+        for (int i = 0; i < nDocs; ++i) {
+            addMember(firstPlan.get(), ws.get(), BSON("x" << 1));
+
+            // Make the second plan slower by inserting a NEED_TIME between every result.
+            addMember(secondPlan.get(), ws.get(), BSON("x" << 1));
+            secondPlan->pushBack(PlanStage::NEED_TIME);
+        }
+
+        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+
+        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(nss, BSON("x" << 1)));
+        unique_ptr<MultiPlanStage> mps =
+            make_unique<MultiPlanStage>(&_txn, ctx.getCollection(), cq.get());
+
+        // Put each plan into the MultiPlanStage. Takes ownership of 'firstPlan' and 'secondPlan'.
+        auto firstSoln = stdx::make_unique<QuerySolution>();
+        auto secondSoln = stdx::make_unique<QuerySolution>();
+        mps->addPlan(firstSoln.release(), firstPlan.release(), ws.get());
+        mps->addPlan(secondSoln.release(), secondPlan.release(), ws.get());
+
+        // Making a PlanExecutor chooses the best plan.
+        auto exec = uassertStatusOK(PlanExecutor::make(
+            &_txn, std::move(ws), std::move(mps), ctx.getCollection(), PlanExecutor::YIELD_MANUAL));
+
+        auto root = static_cast<MultiPlanStage*>(exec->getRootStage());
+        ASSERT_TRUE(root->bestPlanChosen());
+        // The first QueuedDataStage should have won.
+        ASSERT_EQ(root->bestPlanIdx(), 0);
+
+        BSONObjBuilder bob;
+        Explain::explainStages(exec.get(), ExplainCommon::EXEC_ALL_PLANS, &bob);
+        BSONObj explained = bob.done();
+
+        ASSERT_EQ(explained["executionStats"]["nReturned"].Int(), nDocs);
+        ASSERT_EQ(explained["executionStats"]["executionStages"]["needTime"].Int(), 0);
+        auto allPlansStats = explained["executionStats"]["allPlansExecution"].Array();
+        ASSERT_EQ(allPlansStats.size(), 2UL);
+        for (auto&& planStats : allPlansStats) {
+            int maxEvaluationResults = internalQueryPlanEvaluationMaxResults;
+            ASSERT_EQ(planStats["executionStages"]["stage"].String(), "QUEUED_DATA");
+            if (planStats["executionStages"]["needTime"].Int() > 0) {
+                // This is the losing plan. Should only have advanced about half the time.
+                ASSERT_LT(planStats["nReturned"].Int(), maxEvaluationResults);
+            } else {
+                // This is the winning plan. Stats here should be from the trial period.
+                ASSERT_EQ(planStats["nReturned"].Int(), maxEvaluationResults);
+            }
+        }
+    }
+
+private:
+    /**
+     * Allocates a new WorkingSetMember with data 'dataObj' in 'ws', and adds the WorkingSetMember
+     * to 'qds'.
+     */
+    void addMember(QueuedDataStage* qds, WorkingSet* ws, BSONObj dataObj) {
+        WorkingSetID id = ws->allocate();
+        WorkingSetMember* wsm = ws->get(id);
+        wsm->obj = Snapshotted<BSONObj>(SnapshotId(), BSON("x" << 1));
+        wsm->transitionToOwnedObj();
+        qds->pushBack(id);
+    }
+};
+
+// Test that the plan summary only includes stats from the winning plan.
+//
+// This is a regression test for SERVER-20111.
+class MPSSummaryStats : public QueryStageMultiPlanBase {
+public:
+    void run() {
+        const int N = 5000;
+        for (int i = 0; i < N; ++i) {
+            insert(BSON("foo" << (i % 10)));
+        }
+
+        // Add two indices to give more plans.
+        addIndex(BSON("foo" << 1));
+        addIndex(BSON("foo" << -1 << "bar" << 1));
+
+        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        Collection* coll = ctx.getCollection();
+
+        // Create the executor (Matching all documents).
+        auto queryObj = BSON("foo" << BSON("$gte" << 0));
+        auto cq = uassertStatusOK(CanonicalQuery::canonicalize(nss, queryObj));
+        auto exec =
+            uassertStatusOK(getExecutor(&_txn, coll, std::move(cq), PlanExecutor::YIELD_MANUAL));
+
+        ASSERT_EQ(exec->getRootStage()->stageType(), STAGE_MULTI_PLAN);
+
+        exec->executePlan();
+
+        PlanSummaryStats stats;
+        Explain::getSummaryStats(*exec, &stats);
+
+        // If only the winning plan's stats are recorded, we should not have examined more than the
+        // total number of documents/index keys.
+        ASSERT_LTE(stats.totalDocsExamined, static_cast<size_t>(N));
+        ASSERT_LTE(stats.totalKeysExamined, static_cast<size_t>(N));
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("query_stage_multiplan") {}
@@ -294,6 +410,8 @@ public:
     void setupTests() {
         add<MPSCollectionScanVsHighlySelectiveIXScan>();
         add<MPSBackupPlan>();
+        add<MPSExplainAllPlans>();
+        add<MPSSummaryStats>();
     }
 };
 

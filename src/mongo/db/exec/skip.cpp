@@ -102,7 +102,7 @@ unique_ptr<PlanStageStats> SkipStage::getStats() {
     _specificStats.skip = _toSkip;
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_SKIP);
     ret->specific = make_unique<SkipStats>(_specificStats);
-    ret->children.push_back(child()->getStats().release());
+    ret->children.emplace_back(child()->getStats());
     return ret;
 }
 

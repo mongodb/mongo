@@ -73,7 +73,7 @@ const UpdateStats* getUpdateStats(const PlanStageStats* stats) {
     // The stats may refer to an update stage, or a projection stage wrapping an update stage.
     if (StageType::STAGE_PROJECTION == stats->stageType) {
         invariant(stats->children.size() == 1);
-        stats = stats->children[0];
+        stats = stats->children[0].get();
     }
 
     invariant(StageType::STAGE_UPDATE == stats->stageType);
@@ -84,7 +84,7 @@ const DeleteStats* getDeleteStats(const PlanStageStats* stats) {
     // The stats may refer to a delete stage, or a projection stage wrapping a delete stage.
     if (StageType::STAGE_PROJECTION == stats->stageType) {
         invariant(stats->children.size() == 1);
-        stats = stats->children[0];
+        stats = stats->children[0].get();
     }
 
     invariant(StageType::STAGE_DELETE == stats->stageType);

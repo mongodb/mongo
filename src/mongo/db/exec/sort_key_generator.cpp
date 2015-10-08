@@ -315,7 +315,7 @@ PlanStage::StageState SortKeyGeneratorStage::work(WorkingSetID* out) {
 
 std::unique_ptr<PlanStageStats> SortKeyGeneratorStage::getStats() {
     auto ret = stdx::make_unique<PlanStageStats>(_commonStats, STAGE_SORT_KEY_GENERATOR);
-    ret->children.push_back(child()->getStats().release());
+    ret->children.emplace_back(child()->getStats());
     return ret;
 }
 

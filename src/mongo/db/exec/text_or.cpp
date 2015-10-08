@@ -122,8 +122,8 @@ std::unique_ptr<PlanStageStats> TextOrStage::getStats() {
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_TEXT_OR);
     ret->specific = make_unique<TextOrStats>(_specificStats);
 
-    for (auto& child : _children) {
-        ret->children.push_back(child->getStats().release());
+    for (auto&& child : _children) {
+        ret->children.emplace_back(child->getStats());
     }
 
     return ret;

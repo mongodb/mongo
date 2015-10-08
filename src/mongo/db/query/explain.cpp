@@ -60,16 +60,25 @@ using std::vector;
  * Traverse the tree rooted at 'root', and add all tree nodes into the list 'flattened'.
  */
 void flattenStatsTree(const PlanStageStats* root, vector<const PlanStageStats*>* flattened) {
+    invariant(root->stageType != STAGE_MULTI_PLAN);
     flattened->push_back(root);
-    for (size_t i = 0; i < root->children.size(); ++i) {
-        flattenStatsTree(root->children[i], flattened);
+    for (auto&& child : root->children) {
+        flattenStatsTree(child.get(), flattened);
     }
 }
 
 /**
- * Traverse the tree rooted at 'root', and add all nodes into the list 'flattened'.
+ * Traverse the tree rooted at 'root', and add all nodes into the list 'flattened'. If a
+ * MultiPlanStage is encountered, only add the best plan and its children to 'flattened'.
  */
 void flattenExecTree(const PlanStage* root, vector<const PlanStage*>* flattened) {
+    if (root->stageType() == STAGE_MULTI_PLAN) {
+        // Only add the winning stage from a MultiPlanStage.
+        auto mps = static_cast<const MultiPlanStage*>(root);
+        const PlanStage* winningStage = mps->getChildren()[mps->bestPlanIdx()].get();
+        return flattenExecTree(winningStage, flattened);
+    }
+
     flattened->push_back(root);
     const auto& children = root->getChildren();
     for (size_t i = 0; i < children.size(); ++i) {
@@ -483,7 +492,7 @@ void Explain::statsToBSON(const PlanStageStats& stats,
 // static
 void Explain::generatePlannerInfo(PlanExecutor* exec,
                                   PlanStageStats* winnerStats,
-                                  const vector<PlanStageStats*>& rejectedStats,
+                                  const vector<unique_ptr<PlanStageStats>>& rejectedStats,
                                   BSONObjBuilder* out) {
     CanonicalQuery* query = exec->getCanonicalQuery();
 
@@ -596,8 +605,8 @@ void Explain::explainStages(PlanExecutor* exec,
     // Get stats of the winning plan from the trial period, if the verbosity level
     // is high enough and there was a runoff between multiple plans.
     unique_ptr<PlanStageStats> winningStatsTrial;
-    if (verbosity >= ExplainCommon::EXEC_ALL_PLANS && NULL != mps) {
-        winningStatsTrial = exec->getStats();
+    if (verbosity >= ExplainCommon::EXEC_ALL_PLANS && mps) {
+        winningStatsTrial = std::move(exec->getStats()->children[mps->bestPlanIdx()]);
         invariant(winningStatsTrial.get());
     }
 
@@ -611,13 +620,21 @@ void Explain::explainStages(PlanExecutor* exec,
     // Step 2: collect plan stats (which also give the structure of the plan tree).
     //
 
-    // Get stats for the winning plan.
-    unique_ptr<PlanStageStats> winningStats(exec->getStats());
+    // Get stats for the winning plan. If there is only a single candidate plan, it is considered
+    // the winner.
+    unique_ptr<PlanStageStats> winningStats(
+        mps ? std::move(mps->getStats()->children[mps->bestPlanIdx()])
+            : std::move(exec->getStats()));
 
     // Get stats for the rejected plans, if more than one plan was considered.
-    OwnedPointerVector<PlanStageStats> allPlansStats;
-    if (NULL != mps) {
-        allPlansStats = mps->generateCandidateStats();
+    vector<unique_ptr<PlanStageStats>> allPlansStats;
+    if (mps && verbosity >= ExplainCommon::EXEC_ALL_PLANS) {
+        auto mpsStats = mps->getStats();
+        for (size_t i = 0; i < mpsStats->children.size(); ++i) {
+            if (i != static_cast<size_t>(mps->bestPlanIdx())) {
+                allPlansStats.emplace_back(std::move(mpsStats->children[i]));
+            }
+        }
     }
 
     //
@@ -625,7 +642,7 @@ void Explain::explainStages(PlanExecutor* exec,
     //
 
     if (verbosity >= ExplainCommon::QUERY_PLANNER) {
-        generatePlannerInfo(exec, winningStats.get(), allPlansStats.vector(), out);
+        generatePlannerInfo(exec, winningStats.get(), allPlansStats, out);
     }
 
     if (verbosity >= ExplainCommon::EXEC_STATS) {
@@ -651,15 +668,15 @@ void Explain::explainStages(PlanExecutor* exec,
             // from the trial period of the winning plan. The "allPlansExecution" section
             // will contain an apples-to-apples comparison of the winning plan's stats against
             // all rejected plans' stats collected during the trial period.
-            if (NULL != mps) {
+            if (mps) {
                 invariant(winningStatsTrial.get());
-                allPlansStats.push_back(winningStatsTrial.release());
+                allPlansStats.emplace_back(std::move(winningStatsTrial));
             }
 
             BSONArrayBuilder allPlansBob(execBob.subarrayStart("allPlansExecution"));
             for (size_t i = 0; i < allPlansStats.size(); ++i) {
                 BSONObjBuilder planBob(allPlansBob.subobjStart());
-                generateExecStats(allPlansStats[i], verbosity, &planBob, boost::none);
+                generateExecStats(allPlansStats[i].get(), verbosity, &planBob, boost::none);
                 planBob.doneFast();
             }
             allPlansBob.doneFast();

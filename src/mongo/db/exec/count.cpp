@@ -167,7 +167,7 @@ unique_ptr<PlanStageStats> CountStage::getStats() {
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_COUNT);
     ret->specific = make_unique<CountStats>(_specificStats);
     if (!_children.empty()) {
-        ret->children.push_back(child()->getStats().release());
+        ret->children.emplace_back(child()->getStats());
     }
     return ret;
 }

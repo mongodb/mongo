@@ -169,7 +169,7 @@ double computeSelectivity(const PlanStageStats* stats) {
     } else {
         double sum = 0;
         for (size_t i = 0; i < stats->children.size(); ++i) {
-            sum += computeSelectivity(stats->children[i]);
+            sum += computeSelectivity(stats->children[i].get());
         }
         return sum;
     }
@@ -180,7 +180,7 @@ bool hasStage(const StageType type, const PlanStageStats* stats) {
         return true;
     }
     for (size_t i = 0; i < stats->children.size(); ++i) {
-        if (hasStage(type, stats->children[i])) {
+        if (hasStage(type, stats->children[i].get())) {
             return true;
         }
     }

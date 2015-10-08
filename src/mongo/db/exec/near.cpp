@@ -313,7 +313,7 @@ unique_ptr<PlanStageStats> NearStage::getStats() {
     unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, _stageType);
     ret->specific.reset(_specificStats.clone());
     for (size_t i = 0; i < _childrenIntervals.size(); ++i) {
-        ret->children.push_back(_childrenIntervals[i]->covering->getStats().release());
+        ret->children.emplace_back(_childrenIntervals[i]->covering->getStats());
     }
     return ret;
 }

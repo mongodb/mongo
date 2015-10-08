@@ -106,12 +106,6 @@ private:
 struct PlanStageStats {
     PlanStageStats(const CommonStats& c, StageType t) : stageType(t), common(c) {}
 
-    ~PlanStageStats() {
-        for (size_t i = 0; i < children.size(); ++i) {
-            delete children[i];
-        }
-    }
-
     /**
      * Make a deep copy.
      */
@@ -122,7 +116,7 @@ struct PlanStageStats {
         }
         for (size_t i = 0; i < children.size(); ++i) {
             invariant(children[i]);
-            stats->children.push_back(children[i]->clone());
+            stats->children.emplace_back(children[i]->clone());
         }
         return stats;
     }
@@ -137,7 +131,7 @@ struct PlanStageStats {
     std::unique_ptr<SpecificStats> specific;
 
     // The stats of the node's children.
-    std::vector<PlanStageStats*> children;
+    std::vector<std::unique_ptr<PlanStageStats>> children;
 
 private:
     MONGO_DISALLOW_COPYING(PlanStageStats);

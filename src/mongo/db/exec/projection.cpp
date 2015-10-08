@@ -244,7 +244,7 @@ unique_ptr<PlanStageStats> ProjectionStage::getStats() {
     projStats->projObj = _projObj;
     ret->specific = std::move(projStats);
 
-    ret->children.push_back(child()->getStats().release());
+    ret->children.emplace_back(child()->getStats());
     return ret;
 }
 

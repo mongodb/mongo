@@ -342,24 +342,6 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     return Status::OK();
 }
 
-vector<PlanStageStats*> MultiPlanStage::generateCandidateStats() {
-    OwnedPointerVector<PlanStageStats> candidateStats;
-
-    for (size_t ix = 0; ix < _candidates.size(); ix++) {
-        if (ix == (size_t)_bestPlanIdx) {
-            continue;
-        }
-        if (ix == (size_t)_backupPlanIdx) {
-            continue;
-        }
-
-        unique_ptr<PlanStageStats> stats = _candidates[ix].root->getStats();
-        candidateStats.push_back(stats.release());
-    }
-
-    return candidateStats.release();
-}
-
 bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolicy) {
     bool doneWorking = false;
 
@@ -498,15 +480,13 @@ QuerySolution* MultiPlanStage::bestSolution() {
 }
 
 unique_ptr<PlanStageStats> MultiPlanStage::getStats() {
-    if (bestPlanChosen()) {
-        return _candidates[_bestPlanIdx].root->getStats();
-    }
-    if (hasBackupPlan()) {
-        return _candidates[_backupPlanIdx].root->getStats();
-    }
     _commonStats.isEOF = isEOF();
-
-    return make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_PLAN);
+    unique_ptr<PlanStageStats> ret = make_unique<PlanStageStats>(_commonStats, STAGE_MULTI_PLAN);
+    ret->specific = make_unique<MultiPlanStats>(_specificStats);
+    for (auto&& child : _children) {
+        ret->children.emplace_back(child->getStats());
+    }
+    return ret;
 }
 
 const SpecificStats* MultiPlanStage::getSpecificStats() const {
