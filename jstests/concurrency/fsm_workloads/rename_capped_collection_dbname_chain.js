@@ -76,7 +76,12 @@ var $config = (function() {
 
     return {
         threadCount: 10,
-        iterations: 20,
+        // We only run a few iterations to reduce the amount of data cumulatively
+        // written to disk by mmapv1. For example, setting 10 threads and 5
+        // iterations causes this workload to write at least 32MB (.ns and .0 files)
+        // * 10 threads * 5 iterations worth of data to disk, which can be slow on
+        // test hosts.
+        iterations: 5,
         data: data,
         states: states,
         transitions: transitions,
