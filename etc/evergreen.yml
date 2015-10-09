@@ -36,6 +36,7 @@ variables:
     vars:
       resmoke_args: --help
       run_multiple_jobs: false
+      max_jobs: 0  # If set in combination with run_multiple_jobs, will cap the number of jobs used.
 
 - &debug_symbol_variants
   - enterprise-linux-64-amazon-ami
@@ -239,7 +240,11 @@ functions:
 
         cp mongodb*/bin/* .
         if [ ${run_multiple_jobs|false} = true ]; then
-          ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${num_cores|1} ${test_flags} --log=buildlogger --reportFile=report.json
+          if [ ${max_jobs|0} -gt 0 ] && [ ${max_jobs|0} -lt ${num_jobs_available|1} ]; then
+              ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${max_jobs} ${test_flags} --log=buildlogger --reportFile=report.json
+          else
+              ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${num_jobs_available|1} ${test_flags} --log=buildlogger --reportFile=report.json
+          fi
         else
           ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=1 ${test_flags} --log=buildlogger --reportFile=report.json
         fi
@@ -568,6 +573,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=unittests
+      run_multiple_jobs: true
 
 ## integration test suites ##
 
@@ -578,6 +584,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: aggregation_WT
@@ -586,6 +593,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: aggregation_auth
@@ -594,6 +602,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=aggregation_auth
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: audit
@@ -602,6 +611,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=audit --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: audit_WT
@@ -610,6 +620,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=audit --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: auth
@@ -618,6 +629,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=auth --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: auth_WT
@@ -626,6 +638,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=auth --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: auth_audit
@@ -634,6 +647,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=auth_audit --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: auth_audit_WT
@@ -642,6 +656,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=auth_audit --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: dbtest
@@ -650,6 +665,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=dbtest --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: dbtest_WT
@@ -658,6 +674,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=dbtest --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: disk
@@ -666,6 +683,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=disk
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: durability
@@ -674,6 +692,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=durability
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: dur_jscore_passthrough
@@ -684,6 +703,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=dur_jscore_passthrough
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: ese_WT
@@ -708,6 +728,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=ese --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: failpoints
@@ -716,6 +737,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=failpoints
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: failpoints_auth
@@ -724,6 +746,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=failpoints_auth
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth
@@ -732,6 +755,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth_WT
@@ -740,6 +764,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth_write_cmd
@@ -748,6 +773,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args:  --suites=gle_auth --shellWriteMode=commands --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth_write_cmd_WT
@@ -756,6 +782,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth --shellWriteMode=commands --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth_basics_passthrough
@@ -764,6 +791,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth_basics_passthrough_WT
@@ -772,6 +800,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth_basics_passthrough_write_cmd
@@ -780,6 +809,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=commands --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: gle_auth_basics_passthrough_write_cmd_WT
@@ -788,6 +818,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=commands --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: integration_tests_standalone
@@ -796,6 +827,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_standalone
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: integration_tests_replset
@@ -804,6 +836,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_replset
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough
@@ -812,6 +845,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_WT
@@ -820,6 +854,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -828,6 +863,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=commands --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_write_cmd_WT
@@ -836,6 +872,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=commands --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore
@@ -864,6 +901,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_ese --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_compatibility
@@ -938,6 +976,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_small_oplog --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_small_oplog_WT
@@ -948,6 +987,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_small_oplog --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_small_oplog_rs
@@ -958,6 +998,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_small_oplog_rs --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsCore_small_oplog_rs_WT
@@ -968,6 +1009,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core_small_oplog_rs --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: mongosTest
@@ -976,6 +1018,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=mongos_test
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: mmap
@@ -984,6 +1027,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=mmap
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: multiversion
@@ -1000,7 +1044,7 @@ tasks:
         cp mongodb*/bin/* .
         rm -rf /data/install /data/multiversion
         ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "1.8" "2.0" "2.2" "2.4" "2.6" "3.0"
-        PATH=$PATH:/data/multiversion ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=multiversion ${test_flags} --log=buildlogger --reportFile=report.json
+        PATH=$PATH:/data/multiversion ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=multiversion --jobs ${num_jobs_available|1} ${test_flags} --log=buildlogger --reportFile=report.json
 
 - <<: *task_template
   name: noPassthrough
@@ -1009,6 +1053,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=no_passthrough --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: noPassthrough_WT
@@ -1017,6 +1062,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=no_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: noPassthroughWithMongod
@@ -1025,6 +1071,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=no_passthrough_with_mongod --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: noPassthroughWithMongod_WT
@@ -1033,6 +1080,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=no_passthrough_with_mongod --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: bulk_gle_passthrough
@@ -1041,6 +1089,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=bulk_gle_passthrough --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: bulk_gle_passthrough_WT
@@ -1049,6 +1098,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=bulk_gle_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: slow1
@@ -1057,6 +1107,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=slow1 --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: slow1_WT
@@ -1065,6 +1116,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=slow1 --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: slow2
@@ -1073,6 +1125,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=slow2 --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: slow2_WT
@@ -1081,6 +1134,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=slow2 --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharded_collections_jscore_passthrough
@@ -1091,6 +1145,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_collections_jscore_passthrough --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharded_collections_jscore_passthrough_WT
@@ -1101,6 +1156,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharded_collections_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_jscore_passthrough
@@ -1111,6 +1167,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_jscore_passthrough_WT
@@ -1121,6 +1178,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding_jscore_passthrough_wire_ops_WT
@@ -1131,6 +1189,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: parallel
@@ -1227,6 +1286,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=rlp --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: rlp_WT
@@ -1235,6 +1295,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=rlp --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: read_concern_majority_passthrough_WT
@@ -1243,6 +1304,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=read_concern_majority_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: replicasets
@@ -1251,6 +1313,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets --storageEngine=mmapv1
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: replicasets_WT
@@ -1259,6 +1323,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets --storageEngine=wiredTiger
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: replicasets_WT_ese
@@ -1267,6 +1333,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_ese --storageEngine=wiredTiger
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: replicasets_auth
@@ -1275,6 +1343,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_auth
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: replicasets_legacy
@@ -1283,6 +1353,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_legacy
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: replication
@@ -1291,6 +1362,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replication --storageEngine=mmapv1
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: replication_WT
@@ -1299,6 +1372,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replication --storageEngine=wiredTiger
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: replication_auth
@@ -1307,6 +1382,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replication_auth
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: sasl
@@ -1315,6 +1392,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sasl
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: sharding
@@ -1323,6 +1401,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding --storageEngine=mmapv1
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: sharding_WT
@@ -1331,6 +1411,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding --storageEngine=wiredTiger
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: sharding_WT_ese
@@ -1339,6 +1421,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_ese --storageEngine=wiredTiger
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: sharding_auth
@@ -1347,6 +1431,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: sharding_auth_audit_WT
@@ -1357,6 +1443,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_auth_audit --storageEngine=wiredTiger
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: sharding_legacy
@@ -1365,6 +1453,8 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=sharding_legacy
+      run_multiple_jobs: true
+      max_jobs: 2
 
 - <<: *task_template
   name: snmp
@@ -1381,7 +1471,7 @@ tasks:
         cp mongodb*/bin/* .
         mkdir -p snmpconf
         cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
-        SNMPCONFPATH=snmpconf ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=snmp --storageEngine=mmapv1 ${test_flags} --log=buildlogger --reportFile=report.json
+        SNMPCONFPATH=snmpconf ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=snmp --jobs ${num_jobs_available|1} --storageEngine=mmapv1 ${test_flags} --log=buildlogger --reportFile=report.json
 
 - <<: *task_template
   name: snmp_WT
@@ -1398,7 +1488,7 @@ tasks:
         cp mongodb*/bin/* .
         mkdir -p snmpconf
         cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
-        SNMPCONFPATH=snmpconf ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=snmp --storageEngine=wiredTiger ${test_flags} --log=buildlogger --reportFile=report.json
+        SNMPCONFPATH=snmpconf ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=snmp --jobs ${num_jobs_available|1} --storageEngine=wiredTiger ${test_flags} --log=buildlogger --reportFile=report.json
 
 - <<: *task_template
   name: ssl
@@ -1407,6 +1497,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=ssl
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: sslSpecial
@@ -1415,6 +1506,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=ssl_special
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: tool
@@ -1423,6 +1515,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=tool --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: tool_WT
@@ -1431,6 +1524,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=tool --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsDecimalCore
@@ -1439,6 +1533,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=decimal
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: jsDecimalCore_WT
@@ -1447,6 +1542,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=decimal --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - name: push
   depends_on:
@@ -1935,7 +2031,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -2039,7 +2135,7 @@ buildvariants:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --repeat=10 --shuffle
   tasks:
   - name: compile
@@ -2072,7 +2168,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux-debug
     push_arch: x86_64
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
   tasks:
@@ -2157,7 +2253,7 @@ buildvariants:
     push_name: linux-duroff
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --nojournal
   tasks:
   - name: compile
@@ -2211,7 +2307,7 @@ buildvariants:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm
   tasks:
   - name: compile
@@ -2263,7 +2359,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1204
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1204 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -2362,7 +2458,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1404
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -2461,7 +2557,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
     compile_flags: --ssl MONGO_DISTMOD=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -2532,7 +2628,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-amazon
     compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -2632,7 +2728,7 @@ buildvariants:
     push_name: linux
     push_arch: i686
     compile_flags: --release MONGO_DISTARCH=i686 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --wiredtiger=off CCFLAGS="-m32" LINKFLAGS="-m32"
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
   tasks:
   - name: compile
@@ -2662,7 +2758,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-decimal
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release --experimental-decimal-support=on
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -2695,7 +2791,7 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) VARIANT_DIR=win32
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: 1
     test_flags: --continueOnFailure
     ext: zip
   tasks:
@@ -2786,7 +2882,7 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) MONGO_DISTMOD=2008plus VARIANT_DIR=win32
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: 1
     test_flags: --continueOnFailure
     ext: zip
   tasks:
@@ -2875,7 +2971,7 @@ buildvariants:
     push_name: win32-debug
     push_arch: x86_64-2008plus
     content_type: application/zip
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: 1
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(grep -c ^processor /proc/cpuinfo) MONGO_DISTMOD=2008plus
     ext: zip
@@ -2948,7 +3044,7 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: 1
     test_flags: --continueOnFailure
     ext: zip
   tasks:
@@ -2999,7 +3095,7 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(grep -c ^processor /proc/cpuinfo) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: 1
     test_flags: --continueOnFailure
     ext: zip
   tasks:
@@ -3081,7 +3177,7 @@ buildvariants:
     msi_target: msi
     content_type: application/zip
     compile_flags: --release -j$(grep -c ^processor /proc/cpuinfo) --wiredtiger=off TARGET_ARCH=i386 VARIANT_DIR=win32
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: 1
     test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
     ext: zip
   tasks:
@@ -3114,7 +3210,7 @@ buildvariants:
     push_name: osx
     push_arch: x86_64
     compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
-    num_cores: $(sysctl -n hw.logicalcpu)
+    num_jobs_available: 1
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -3200,7 +3296,7 @@ buildvariants:
     push_arch: x86_64
     tooltags: "-tags ssl"
     compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
-    num_cores: $(sysctl -n hw.logicalcpu)
+    num_jobs_available: 1
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -3283,7 +3379,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: osx-debug
     push_arch: x86_64
-    num_cores: $(sysctl -n hw.logicalcpu)
+    num_jobs_available: 1
     test_flags: --continueOnFailure
     compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --osx-version-min=10.7 --libc++
   tasks:
@@ -3327,7 +3423,7 @@ buildvariants:
     push_arch: x86_64-enterprise
     tooltags: "-tags 'ssl sasl'"
     compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
-    num_cores: $(sysctl -n hw.logicalcpu)
+    num_jobs_available: 1
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -3374,7 +3470,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel57
     compile_flags: --ssl MONGO_DISTMOD=rhel57 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3420,7 +3516,7 @@ buildvariants:
     push_arch: x86_64-enterprise-rhel62
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3467,7 +3563,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3511,7 +3607,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel55
     compile_flags: --ssl MONGO_DISTMOD=rhel55 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -3611,7 +3707,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel62
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -3711,7 +3807,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel70
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -3816,7 +3912,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1204
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1204 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3861,7 +3957,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1404
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3910,7 +4006,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-suse11
     compile_flags: --ssl MONGO_DISTMOD=suse11 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -3954,7 +4050,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-suse11
     compile_flags: --ssl MONGO_DISTMOD=suse11 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -4055,7 +4151,7 @@ buildvariants:
     push_name: sunos5
     push_arch: x86_64
     compile_flags: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ -j$(kstat cpu | sort -u | grep -c "^module") --release CCFLAGS="-m64" LINKFLAGS="-m64 -static-libstdc++ -static-libgcc" OBJCOPY=/opt/mongodbtoolchain/bin/objcopy
-    num_cores: $(kstat cpu | sort -u | grep -c "^module")
+    num_jobs_available: $(kstat cpu | sort -u | grep -c "^module")
     test_flags: --continueOnFailure
   tasks:
   - name: compile
@@ -4135,7 +4231,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-debian71
     compile_flags: --ssl MONGO_DISTMOD=debian71 --release -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager-enterprise.py
@@ -4179,7 +4275,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian71
     compile_flags: --ssl MONGO_DISTMOD=debian71 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     has_packages: true
     packager_script: packager.py
@@ -4282,7 +4378,7 @@ buildvariants:
   expansions:
     build_rocksdb: true
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ VARIANT_DIR=release
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure --storageEngine=rocksdb
   tasks:
   - name: compile
@@ -4346,7 +4442,7 @@ buildvariants:
     asan_symbolizer: ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-3.5
     enable_lsan: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
     compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: -j1 --continueOnFailure  # Avoid starting too many mongod's under ASAN build.
   tasks:
   - name: compile
@@ -4445,7 +4541,7 @@ buildvariants:
     asan_symbolizer: ASAN_SYMBOLIZER_PATH=/usr/bin/llvm-symbolizer-3.5
     enable_lsan: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
     compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: -j1 --continueOnFailure  # Avoid starting too many mongod's under ASAN build.
   tasks:
   - name: compile
@@ -4461,7 +4557,7 @@ buildvariants:
   expansions:
     tooltags: "-tags 'ssl'"
     compile_flags: CC=/usr/bin/clang CXX=/usr/bin/clang++ --libc++ --ssl -j$(grep -c ^processor /proc/cpuinfo) VARIANT_DIR=build MONGO_DISTMOD=ubuntu1410-clang
-    num_cores: $(grep -c ^processor /proc/cpuinfo)
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --continueOnFailure
     push_path: linux
     push_bucket: downloads.mongodb.org
