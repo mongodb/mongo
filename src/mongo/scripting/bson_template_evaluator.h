@@ -28,8 +28,8 @@
 
 /*
  * This library supports a templating language that helps in generating BSON documents from a
- * template. The language supports the following template:
- * #RAND_INT, #SEQ_INT, #RAND_STRING, #CONCAT, and #OID.
+ * template. The language supports the following templates:
+ * #RAND_INT, #SEQ_INT, #RAND_STRING, #CONCAT, #CUR_DATE, $VARIABLE and #OID.
  *
  * The language will help in quickly expressing richer documents  for use in benchRun.
  * Ex. : { key : { #RAND_INT: [10, 20] } } or  { key : { #CONCAT: ["hello", " ", "world"] } }
@@ -251,6 +251,16 @@ private:
                                const char* fieldName,
                                const BSONObj& in,
                                BSONObjBuilder& out);
+
+    /*
+     * Operator method to support #CUR_DATE : { date: { #CUR_DATE: 100 }
+     * The argument to CUR_DATE is the offset in milliseconds which will be added to the current
+     * date.  Pass an offset of 0 to get the current date.
+     */
+    static Status evalCurrentDate(BsonTemplateEvaluator* btl,
+                                  const char* fieldName,
+                                  const BSONObj& in,
+                                  BSONObjBuilder& out);
 
     // Per object pseudo random number generator
     PseudoRandom rng;

@@ -1,8 +1,12 @@
 function benchrun_sub_insert(use_write_command) {
     t = db.benchrun_sub;
     t.drop();
+    var offset = 10000;
     ops = [{op: "insert", ns: "test.benchrun_sub",
-            doc: {x: { "#RAND_INT" : [ 0, 100 ] }},
+            doc: {x: { "#RAND_INT" : [ 0, 100 ] },
+                  curDate: { "#CUR_DATE" : 0 } ,
+                  futureDate: { "#CUR_DATE" : offset} ,
+                  pastDate: { "#CUR_DATE" : (0 - offset) } },
             writeCmd: use_write_command,
             }];
 
@@ -13,10 +17,18 @@ function benchrun_sub_insert(use_write_command) {
 
     assert.gt(res.insert, 0);
 
+    var now = new Date();
     t.find().forEach(function(doc) {
             var field = doc.x;
             assert.gte(field, 0);
             assert.lt(field, 100);
+            var curDate = doc.curDate;
+            assert.lte(curDate, now);
+            var futureDate = doc.futureDate;
+            assert.gt(futureDate, curDate);
+            assert.gte(new Date(now.getTime() + offset), futureDate);
+            var pastDate = doc.pastDate;
+            assert.lte(pastDate, new Date(now.getTime() - offset));
         }
     );
 }
