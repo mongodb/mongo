@@ -74,9 +74,7 @@ function traceMissingDoc( coll, doc, mongos ) {
     }
     
     var compareOps = function( opA, opB ) {
-        if ( opA.ts < opB.ts ) return -1;
-        if ( opB.ts < opA.ts ) return 1;
-        else return 0;
+        return bsonWoCompare( opA.ts, opB.ts );
     }
     
     allOps.sort( compareOps );
