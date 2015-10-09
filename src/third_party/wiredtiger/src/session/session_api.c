@@ -1144,47 +1144,12 @@ __session_strerror(WT_SESSION *wt_session, int error)
 }
 
 /*
- * __wt_open_internal_session --
- *	Allocate a session for WiredTiger's use.
+ * __open_session --
+ *	Allocate a session handle.
  */
-int
-__wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
-    bool uses_dhandles, bool open_metadata, WT_SESSION_IMPL **sessionp)
-{
-	WT_SESSION_IMPL *session;
-
-	*sessionp = NULL;
-
-	WT_RET(__wt_open_session(conn, NULL, NULL, open_metadata, &session));
-	session->name = name;
-
-	/*
-	 * Public sessions are automatically closed during WT_CONNECTION->close.
-	 * If the session handles for internal threads were to go on the public
-	 * list, there would be complex ordering issues during close.  Set a
-	 * flag to avoid this: internal sessions are not closed automatically.
-	 */
-	F_SET(session, WT_SESSION_INTERNAL);
-
-	/*
-	 * Some internal threads must keep running after we close all data
-	 * handles.  Make sure these threads don't open their own handles.
-	 */
-	if (!uses_dhandles)
-		F_SET(session, WT_SESSION_NO_DATA_HANDLES);
-
-	*sessionp = session;
-	return (0);
-}
-
-/*
- * __wt_open_session --
- *	Allocate a session handle.  The internal parameter is used for sessions
- *	opened by WiredTiger for its own use.
- */
-int
-__wt_open_session(WT_CONNECTION_IMPL *conn,
-    WT_EVENT_HANDLER *event_handler, const char *config, bool open_metadata,
+static int
+__open_session(WT_CONNECTION_IMPL *conn,
+    WT_EVENT_HANDLER *event_handler, const char *config,
     WT_SESSION_IMPL **sessionp)
 {
 	static const WT_SESSION stds = {
@@ -1324,7 +1289,26 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	WT_STAT_FAST_CONN_INCR(session, session_open);
 
 err:	__wt_spin_unlock(session, &conn->api_lock);
-	WT_RET(ret);
+	return (ret);
+}
+
+/*
+ * __wt_open_session --
+ *	Allocate a session handle.
+ */
+int
+__wt_open_session(WT_CONNECTION_IMPL *conn,
+    WT_EVENT_HANDLER *event_handler, const char *config,
+    bool open_metadata, WT_SESSION_IMPL **sessionp)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	WT_SESSION *wt_session;
+
+	*sessionp = NULL;
+
+	/* Acquire a session. */
+	WT_RET(__open_session(conn, event_handler, config, &session));
 
 	/*
 	 * Acquiring the metadata handle requires the schema lock; we've seen
@@ -1336,8 +1320,59 @@ err:	__wt_spin_unlock(session, &conn->api_lock);
 	 */
 	if (open_metadata) {
 		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
-		WT_RET(__wt_metadata_open(session_ret));
+		if ((ret = __wt_metadata_open(session)) != 0) {
+			wt_session = &session->iface;
+			WT_TRET(wt_session->close(wt_session, NULL));
+			return (ret);
+		}
 	}
 
+	*sessionp = session;
+	return (0);
+}
+
+/*
+ * __wt_open_internal_session --
+ *	Allocate a session for WiredTiger's use.
+ */
+int
+__wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
+    bool open_metadata, uint32_t session_flags, WT_SESSION_IMPL **sessionp)
+{
+	WT_DECL_RET;
+	WT_SESSION *wt_session;
+	WT_SESSION_IMPL *session;
+
+	*sessionp = NULL;
+
+	/* Acquire a session. */
+	WT_RET(__wt_open_session(conn, NULL, NULL, open_metadata, &session));
+	session->name = name;
+
+	/*
+	 * Public sessions are automatically closed during WT_CONNECTION->close.
+	 * If the session handles for internal threads were to go on the public
+	 * list, there would be complex ordering issues during close.  Set a
+	 * flag to avoid this: internal sessions are not closed automatically.
+	 */
+	F_SET(session, session_flags | WT_SESSION_INTERNAL);
+
+	/*
+	 * Acquiring the lookaside table cursor requires various locks; we've
+	 * seen problems in the past where deadlocks happened because sessions
+	 * deadlocked getting the cursor late in the process.  Be defensive,
+	 * get it now.
+	 */
+	if (F_ISSET(session, WT_SESSION_LOOKASIDE_CURSOR)) {
+		WT_WITHOUT_DHANDLE(session, ret =
+		    __wt_las_cursor_create(session, &session->las_cursor));
+		if (ret != 0) {
+			wt_session = &session->iface;
+			WT_TRET(wt_session->close(wt_session, NULL));
+			return (ret);
+		}
+	}
+
+	*sessionp = session;
 	return (0);
 }

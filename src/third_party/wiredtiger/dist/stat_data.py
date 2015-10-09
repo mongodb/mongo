@@ -272,6 +272,7 @@ connection_stats = [
     LogStat('log_sync_dir', 'log sync_dir operations'),
     LogStat('log_write_lsn', 'log server thread advances write LSN'),
     LogStat('log_writes', 'log write operations'),
+    LogStat('log_zero_fills', 'log files manually zero-filled'),
 
     ##########################################
     # Reconciliation statistics

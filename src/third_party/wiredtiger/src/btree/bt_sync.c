@@ -140,8 +140,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			 */
 			if (!WT_PAGE_IS_INTERNAL(page) &&
 			    F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) &&
-			    WT_TXNID_LT(txn->snap_max, mod->first_dirty_txn) &&
-			    mod->rec_result != WT_PM_REC_REWRITE) {
+			    WT_TXNID_LT(txn->snap_max, mod->first_dirty_txn)) {
 				__wt_page_modify_set(session, page);
 				continue;
 			}
