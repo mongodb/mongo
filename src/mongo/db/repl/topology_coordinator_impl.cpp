@@ -2344,8 +2344,8 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
             (candidateConfig.shouldBuildIndexes() || !_selfConfig().shouldBuildIndexes()) &&
             it->getState().readable() && !_memberIsBlacklisted(candidateConfig, now) &&
             goalSecs < it->getOpTime().getSecs()) {
-            log() << "changing sync target because current sync target's most recent OpTime is "
-                  << currentSourceOpTime.toString() << " which is more than "
+            log() << "re-evaluating sync source because our current sync source's most recent "
+                  << "OpTime is " << currentSourceOpTime.toString() << " which is more than "
                   << _options.maxSyncSourceLagSecs << " behind member "
                   << candidateConfig.getHostAndPort().toString() << " whose most recent OpTime is "
                   << it->getOpTime().toString();

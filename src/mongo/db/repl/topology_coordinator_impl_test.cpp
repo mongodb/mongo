@@ -4227,7 +4227,7 @@ TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherHappierMemberExists) 
     startCapturingLogMessages();
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), OpTime(), now()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("changing sync target"));
+    ASSERT_EQUALS(1, countLogLinesContaining("re-evaluating sync source"));
 }
 
 TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberIsBlackListed) {
@@ -4269,7 +4269,7 @@ TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberIsBlackListed) 
     startCapturingLogMessages();
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), OpTime(), now()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("changing sync target"));
+    ASSERT_EQUALS(1, countLogLinesContaining("re-evaluating sync source"));
 }
 
 TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceCurrentTargetNoLongerPrimary) {
@@ -4473,7 +4473,7 @@ TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberDoesNotBuildInd
     startCapturingLogMessages();
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), OpTime(), now()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("changing sync target"));
+    ASSERT_EQUALS(1, countLogLinesContaining("re-evaluating sync source"));
 }
 
 TEST_F(TopoCoordTest, CheckShouldStandForElectionWithPrimary) {
