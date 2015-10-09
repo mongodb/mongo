@@ -148,6 +148,7 @@ function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
         // Start mongod with no options
         var baseMongod = MongoRunner.runMongod({
             configsvr: "",
+            journal: "",
             replSet: "csrs",
             storageEngine: "wiredTiger"
         });

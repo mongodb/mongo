@@ -28,7 +28,9 @@ rs4.initiate();
 // replica set with configsvr: true should *not* be allowed to be added as a shard
 var rs5 = new ReplSetTest({name: 'csrs',
                            nodes: 3,
-                           nodeOptions: {configsvr: "", storageEngine: "wiredTiger"}});
+                           nodeOptions: {configsvr: "",
+                                         journal: "",
+                                         storageEngine: "wiredTiger"}});
 rs5.startSet();
 var conf = rs5.getReplSetConfig();
 conf.configsvr = true;

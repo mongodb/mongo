@@ -45,10 +45,15 @@ var expectedResult = {
     "parsed" : {
         "sharding" : {
             "clusterRole" : "configsvr"
+        },
+        "storage" : {
+            "journal" : {
+                "enabled" : true
+            }
         }
     }
 };
-testGetCmdLineOptsMongod({ configsvr : "" }, expectedResult);
+testGetCmdLineOptsMongod({ configsvr : "", journal: "" }, expectedResult);
 
 jsTest.log("Testing \"shardsvr\" command line option");
 expectedResult = {

@@ -22,6 +22,7 @@ function expectState(rst, state) {
 // into REMOVED state if storage engine is not WiredTiger
 jsTestLog("configsvr in rs config and --configsvr cmd line, but mmapv1");
 var rst = new ReplSetTest({name: "configrs3", nodes: 1, nodeOptions: {configsvr: "",
+                                                                      journal: "",
                                                                       storageEngine: "mmapv1"}});
 
 rst.startSet();
@@ -41,6 +42,7 @@ rst.stopSet();
 // into REMOVED state if storage engine is not WiredTiger but we're running in SCCC mode
 jsTestLog("configsvr in rs config and --configsvr cmd line, but mmapv1 with configSvrMode=sccc");
 var rst = new ReplSetTest({name: "configrs4", nodes: 1, nodeOptions: {configsvr: "",
+                                                                      journal: "",
                                                                       storageEngine: "mmapv1",
                                                                       configsvrMode: "sccc"}});
 
@@ -60,7 +62,9 @@ rst.stopSet();
 jsTestLog("configsvr in rs config and --configsvr cmd line, normal case");
 var rst = new ReplSetTest({name: "configrs5",
                            nodes: 1,
-                           nodeOptions: {configsvr: "", storageEngine: "wiredTiger"}});
+                           nodeOptions: {configsvr: "",
+                                         journal: "",
+                                         storageEngine: "wiredTiger"}});
 
 rst.startSet();
 var conf = rst.getReplSetConfig();
