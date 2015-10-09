@@ -220,8 +220,8 @@ private:
         bool ok = conn->runCommand(conf->name(), cmdObj, res);
         conn.done();
 
-        // RecvStaleConfigCode is the code for RecvStaleConfigException.
-        if (!ok && res.getIntField("code") == RecvStaleConfigCode) {
+        // ErrorCodes::RecvStaleConfig is the code for RecvStaleConfigException.
+        if (!ok && res.getIntField("code") == ErrorCodes::RecvStaleConfig) {
             // Command code traps this exception and re-runs
             throw RecvStaleConfigException("FindAndModify", res);
         }

@@ -130,7 +130,7 @@ void Command::execCommandClientBasic(OperationContext* txn,
         const int code = e.getCode();
 
         // Codes for StaleConfigException
-        if (code == RecvStaleConfigCode || code == SendStaleConfigCode) {
+        if (code == ErrorCodes::RecvStaleConfig || code == ErrorCodes::SendStaleConfig) {
             throw;
         }
 

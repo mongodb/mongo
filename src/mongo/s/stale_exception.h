@@ -47,11 +47,11 @@ public:
                          int code,
                          ChunkVersion received,
                          ChunkVersion wanted)
-        : AssertionException(stream() << raw << " ( ns : " << ns
-                                      << ", received : " << received.toString()
-                                      << ", wanted : " << wanted.toString() << ", "
-                                      << (code == SendStaleConfigCode ? "send" : "recv") << " )",
-                             code),
+        : AssertionException(
+              stream() << raw << " ( ns : " << ns << ", received : " << received.toString()
+                       << ", wanted : " << wanted.toString() << ", "
+                       << (code == ErrorCodes::SendStaleConfig ? "send" : "recv") << " )",
+              code),
           _ns(ns),
           _received(received),
           _wanted(wanted) {}
@@ -64,7 +64,7 @@ public:
                                                                       : std::string("<unknown>"))
                        << ", received : " << ChunkVersion::fromBSON(error, "vReceived").toString()
                        << ", wanted : " << ChunkVersion::fromBSON(error, "vWanted").toString()
-                       << ", " << (code == SendStaleConfigCode ? "send" : "recv") << " )",
+                       << ", " << (code == ErrorCodes::SendStaleConfig ? "send" : "recv") << " )",
               code),
           // For legacy reasons, we may not always get a namespace here
           _ns(error["ns"].type() == String ? error["ns"].String() : ""),
@@ -138,10 +138,10 @@ public:
                              const std::string& raw,
                              ChunkVersion received,
                              ChunkVersion wanted)
-        : StaleConfigException(ns, raw, SendStaleConfigCode, received, wanted) {}
+        : StaleConfigException(ns, raw, ErrorCodes::SendStaleConfig, received, wanted) {}
 
     SendStaleConfigException(const std::string& raw, const BSONObj& error)
-        : StaleConfigException(raw, SendStaleConfigCode, error) {}
+        : StaleConfigException(raw, ErrorCodes::SendStaleConfig, error) {}
 };
 
 class RecvStaleConfigException : public StaleConfigException {
@@ -150,10 +150,10 @@ public:
                              const std::string& raw,
                              ChunkVersion received,
                              ChunkVersion wanted)
-        : StaleConfigException(ns, raw, RecvStaleConfigCode, received, wanted) {}
+        : StaleConfigException(ns, raw, ErrorCodes::RecvStaleConfig, received, wanted) {}
 
     RecvStaleConfigException(const std::string& raw, const BSONObj& error)
-        : StaleConfigException(raw, RecvStaleConfigCode, error) {}
+        : StaleConfigException(raw, ErrorCodes::RecvStaleConfig, error) {}
 };
 
 }  // namespace mongo

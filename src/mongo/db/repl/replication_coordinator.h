@@ -542,7 +542,7 @@ public:
      * Returns Status::OK() if all updates are processed correctly, NodeNotFound
      * if any updating node cannot be found in the config, InvalidReplicaSetConfig if the
      * "configVersion" sent in any of the updates doesn't match our config version, or
-     * NotMasterOrSecondaryCode if we are in state REMOVED or otherwise don't have a valid
+     * NotMasterOrSecondary if we are in state REMOVED or otherwise don't have a valid
      * replica set config.
      * If a non-OK status is returned, it is unspecified whether none or some of the updates
      * were applied.

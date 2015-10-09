@@ -441,7 +441,7 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
         // For testing migration failures
         if (MONGO_FAIL_POINT(failMigrationConfigWritePrepare)) {
             throw DBException("mock migration failure before config write",
-                              PrepareConfigsFailedCode);
+                              ErrorCodes::PrepareConfigsFailed);
         }
 
         applyOpsStatus =
@@ -456,7 +456,7 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
         applyOpsStatus = ex.toStatus();
     }
 
-    if (applyOpsStatus == ErrorCodes::PrepareConfigsFailedCode) {
+    if (applyOpsStatus == ErrorCodes::PrepareConfigsFailed) {
         // In the process of issuing the migrate commit, the SyncClusterConnection checks that
         // the config servers are reachable. If they are not, we are sure that the applyOps
         // command was not sent to any of the configs, so we can safely back out of the

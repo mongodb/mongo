@@ -1,6 +1,4 @@
-// assert_util.h
-
-/*    Copyright 2009 10gen Inc.
+/**   Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -45,16 +43,6 @@
 #undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 
 namespace mongo {
-
-enum CommonErrorCodes {
-    OkCode = 0,
-    SendStaleConfigCode = 13388,       // uassert( 13388 )
-    RecvStaleConfigCode = 9996,        // uassert( 9996 )
-    PrepareConfigsFailedCode = 13104,  // uassert( 13104 )
-    NotMasterOrSecondaryCode = 13436,  // uassert( 13436 )
-    NotMasterNoSlaveOkCode = 13435,    // uassert( 13435 )
-    NotMaster = 10107,                 // uassert( 10107 )
-};
 
 class AssertionCount {
 public:

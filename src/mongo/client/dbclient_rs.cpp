@@ -629,7 +629,7 @@ unique_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult(
 
     // If the error code here ever changes, we need to change this code also
     BSONElement code = error["code"];
-    if (code.isNumber() && code.Int() == NotMasterOrSecondaryCode /* not master or secondary */) {
+    if (code.isNumber() && code.Int() == ErrorCodes::NotMasterOrSecondary) {
         isntSecondary();
         throw DBException(str::stream() << "slave " << _lastSlaveOkHost.toString()
                                         << " is no longer secondary",
@@ -847,7 +847,7 @@ void DBClientReplicaSet::checkResponse(const char* data,
 
         if (nReturned == -1 /* no result, maybe network problem */ ||
             (hasErrField(dataObj) && !dataObj["code"].eoo() &&
-             dataObj["code"].Int() == NotMasterOrSecondaryCode)) {
+             dataObj["code"].Int() == ErrorCodes::NotMasterOrSecondary)) {
             if (_lazyState._lastClient == _lastSlaveOkConn.get()) {
                 isntSecondary();
             } else if (_lazyState._lastClient == _master.get()) {
@@ -871,7 +871,7 @@ void DBClientReplicaSet::checkResponse(const char* data,
 
         if (nReturned == -1 /* no result, maybe network problem */ ||
             (hasErrField(dataObj) && !dataObj["code"].eoo() &&
-             dataObj["code"].Int() == NotMasterNoSlaveOkCode)) {
+             dataObj["code"].Int() == ErrorCodes::NotMasterNoSlaveOk)) {
             if (_lazyState._lastClient == _master.get()) {
                 isntMaster();
             }

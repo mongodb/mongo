@@ -1219,7 +1219,7 @@ void Command::execCommand(OperationContext* txn,
 
             // This logic is clearer if we don't have to invert it.
             if (!canRunHere && command->slaveOverrideOk()) {
-                uasserted(ErrorCodes::NotMasterNoSlaveOkCode, "not master and slaveOk=false");
+                uasserted(ErrorCodes::NotMasterNoSlaveOk, "not master and slaveOk=false");
             }
 
             uassert(ErrorCodes::NotMaster, "not master", canRunHere);
@@ -1228,7 +1228,7 @@ void Command::execCommand(OperationContext* txn,
                 replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
                 !replCoord->canAcceptWritesForDatabase(dbname) &&
                 !replCoord->getMemberState().secondary()) {
-                uasserted(ErrorCodes::NotMasterOrSecondaryCode, "node is recovering");
+                uasserted(ErrorCodes::NotMasterOrSecondary, "node is recovering");
             }
         }
 

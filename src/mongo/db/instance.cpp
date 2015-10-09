@@ -179,7 +179,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                   << " ntoreturn:" << queryMessage.ntoreturn;
     }
 
-    const SendStaleConfigException* scex = (exception->getCode() == SendStaleConfigCode)
+    const SendStaleConfigException* scex = (exception->getCode() == ErrorCodes::SendStaleConfig)
         ? static_cast<const SendStaleConfigException*>(exception)
         : NULL;
 

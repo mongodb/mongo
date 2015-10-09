@@ -41,8 +41,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 
-// error codes 8000-8009
-
 namespace mongo {
 
 using std::unique_ptr;
@@ -285,7 +283,7 @@ BSONObj SyncClusterConnection::findOne(const string& ns,
         if (lockType > 0) {  // write $cmd
             string errmsg;
             if (!prepare(errmsg))
-                throw UserException(PrepareConfigsFailedCode,
+                throw UserException(ErrorCodes::PrepareConfigsFailed,
                                     (string) "SyncClusterConnection::findOne prepare failed: " +
                                         errmsg);
 

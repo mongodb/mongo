@@ -931,7 +931,7 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
                                                          long long* configVersion) {
     if (_selfIndex == -1) {
         // Ignore updates when we're in state REMOVED
-        return Status(ErrorCodes::NotMasterOrSecondaryCode,
+        return Status(ErrorCodes::NotMasterOrSecondary,
                       "Received replSetUpdatePosition command but we are in state REMOVED");
     }
     invariant(getReplicationMode() == modeReplSet);
@@ -1479,7 +1479,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
                                                          const NamespaceString& ns,
                                                          bool slaveOk) {
     if (_memberState.rollback() && ns.isOplog()) {
-        return Status(ErrorCodes::NotMasterOrSecondaryCode,
+        return Status(ErrorCodes::NotMasterOrSecondary,
                       "cannot read from oplog collection while in rollback");
     }
     if (txn->getClient()->isInDirectClient()) {
@@ -1495,10 +1495,10 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
         if (_canServeNonLocalReads.loadRelaxed()) {
             return Status::OK();
         }
-        return Status(ErrorCodes::NotMasterOrSecondaryCode,
+        return Status(ErrorCodes::NotMasterOrSecondary,
                       "not master or secondary; cannot currently read from this replSet member");
     }
-    return Status(ErrorCodes::NotMasterNoSlaveOkCode, "not master and slaveOk=false");
+    return Status(ErrorCodes::NotMasterNoSlaveOk, "not master and slaveOk=false");
 }
 
 bool ReplicationCoordinatorImpl::isInPrimaryOrSecondaryState() const {

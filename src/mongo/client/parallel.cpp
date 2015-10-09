@@ -82,7 +82,7 @@ string ParallelSortClusteredCursor::getNS() {
 
 /**
  * Throws a RecvStaleConfigException wrapping the stale error document in this cursor when the
- * ShardConfigStale flag is set or a command returns a SendStaleConfigCode error code.
+ * ShardConfigStale flag is set or a command returns a ErrorCodes::SendStaleConfig error code.
  */
 void throwCursorStale(DBClientCursor* cursor) {
     verify(cursor);
@@ -99,7 +99,7 @@ void throwCursorStale(DBClientCursor* cursor) {
         // flag on the cursor.
         // TODO: Standardize stale config reporting.
         BSONObj res = cursor->peekFirst();
-        if (res.hasField("code") && res["code"].Number() == SendStaleConfigCode) {
+        if (res.hasField("code") && res["code"].Number() == ErrorCodes::SendStaleConfig) {
             throw RecvStaleConfigException("command returned a stale config error", res);
         }
     }
