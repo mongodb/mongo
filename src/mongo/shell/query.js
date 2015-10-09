@@ -654,7 +654,10 @@ DBQuery.Option = {
 };
 
 function DBCommandCursor(mongo, cmdResult, batchSize) {
-    assert.commandWorked(cmdResult)
+    if (cmdResult.ok != 1) {
+        throw _getErrorWithCode(cmdResult, "error: " + tojson(cmdResult));
+    }
+
     this._batch = cmdResult.cursor.firstBatch.reverse(); // modifies input to allow popping
 
     if (mongo.useReadCommands()) {
@@ -687,7 +690,9 @@ DBCommandCursor.prototype.close = function() {
             cursors: [ this._cursorid ],
         };
         var cmdRes = this._db.runCommand(killCursorCmd);
-        assert.commandWorked(cmdRes);
+        if (cmdRes.ok != 1) {
+            throw _getErrorWithCode(cmdRes, "killCursors command failed: " + tojson(cmdRes));
+        }
 
         this._cursorHandle.zeroCursorId();
         this._cursorid = NumberLong(0);
@@ -713,7 +718,9 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
 
     // Deliver the getMore command, and check for errors in the response.
     var cmdRes = this._db.runCommand(getMoreCmd);
-    assert.commandWorked(cmdRes);
+    if (cmdRes.ok != 1) {
+        throw _getErrorWithCode(cmdRes, "getMore command failed: " + tojson(cmdRes));
+    }
 
     if (this._ns !== cmdRes.cursor.ns) {
         throw Error("unexpected collection in getMore response: " +
