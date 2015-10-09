@@ -229,9 +229,6 @@ void ShardRegistry::getAllShardIds(vector<ShardId>* all) const {
                 continue;
             }
 
-            if (seen.count(s->getId())) {
-                continue;
-            }
             seen.insert(s->getId());
         }
     }
@@ -288,6 +285,8 @@ void ShardRegistry::_addShard_inlock(const ShardType& shardType) {
 
 void ShardRegistry::updateLookupMapsForShard(shared_ptr<Shard> shard,
                                              const ConnectionString& newConnString) {
+    log() << "Updating ShardRegistry connection string for shard " << shard->getId()
+          << " to: " << newConnString.toString();
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _updateLookupMapsForShard_inlock(std::move(shard), newConnString);
 }

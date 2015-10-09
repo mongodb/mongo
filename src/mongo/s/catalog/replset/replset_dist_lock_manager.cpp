@@ -272,7 +272,8 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
         if (status.isOK()) {
             // Lock is acquired since findAndModify was able to successfully modify
             // the lock document.
-            LOG(0) << "distributed lock '" << name << "' acquired, ts : " << lockSessionID;
+            LOG(0) << "distributed lock '" << name << "' acquired for '" << whyMessage
+                   << "', ts : " << lockSessionID;
             return ScopedDistLock(lockSessionID, this);
         }
 

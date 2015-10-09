@@ -329,13 +329,6 @@ private:
     // Last known highest opTime from the config server that should be used when doing reads.
     repl::OpTime _configOpTime;
 
-    // Last known highest opTime from the config server that can contain uncommitted data.
-    // Safe to use only with majority read concern.
-    // This is a temporary workaround for SERVER-20487 and is only used for cases when a
-    // write conflict occurred (for example duplicate key error), and we want to make sure that
-    // the next read will be able to see that write.
-    repl::OpTime _configVisibleOpTime;
-
     // Map of both shardName -> Shard and hostName -> Shard
     ShardMap _lookup;
 

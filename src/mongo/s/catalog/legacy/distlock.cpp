@@ -757,10 +757,10 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
 
     // Log our lock results
     if (gotLock)
-        LOG(logLvl - 1) << "distributed lock '" << lockName
-                        << "' acquired, ts : " << currLock[LocksType::lockID()].OID() << endl;
+        LOG(logLvl - 1) << "distributed lock '" << lockName << "' acquired for '" << why
+                        << "', ts : " << currLock[LocksType::lockID()].OID();
     else
-        LOG(logLvl - 1) << "distributed lock '" << lockName << "' was not acquired." << endl;
+        LOG(logLvl - 1) << "distributed lock '" << lockName << "' was not acquired.";
 
     conn.done();
 
