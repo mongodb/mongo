@@ -273,11 +273,11 @@ void DistributionStatus::dump() const {
 
 Status DistributionStatus::populateShardInfoMap(OperationContext* txn, ShardInfoMap* shardInfo) {
     try {
-        vector<ShardType> shards;
-        Status status = grid.catalogManager(txn)->getAllShards(txn, &shards);
-        if (!status.isOK()) {
-            return status;
+        auto shardsStatus = grid.catalogManager(txn)->getAllShards(txn);
+        if (!shardsStatus.isOK()) {
+            return shardsStatus.getStatus();
         }
+        vector<ShardType> shards = std::move(shardsStatus.getValue().value);
 
         for (const ShardType& shardData : shards) {
             std::set<std::string> dummy;

@@ -549,11 +549,11 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
     logChange(
         txn, txn->getClient()->clientAddress(true), "dropCollection.start", ns.ns(), BSONObj());
 
-    vector<ShardType> allShards;
-    Status status = getAllShards(txn, &allShards);
-    if (!status.isOK()) {
-        return status;
+    auto shardsStatus = getAllShards(txn);
+    if (!shardsStatus.isOK()) {
+        return shardsStatus.getStatus();
     }
+    vector<ShardType> allShards = std::move(shardsStatus.getValue().value);
 
     LOG(1) << "dropCollection " << ns << " started";
 
@@ -936,7 +936,9 @@ StatusWith<string> CatalogManagerLegacy::getTagForChunk(OperationContext* txn,
     return status.getStatus();
 }
 
-Status CatalogManagerLegacy::getAllShards(OperationContext* txn, vector<ShardType>* shards) {
+StatusWith<OpTimePair<std::vector<ShardType>>> CatalogManagerLegacy::getAllShards(
+    OperationContext* txn) {
+    std::vector<ShardType> shards;
     ScopedDbConnection conn(_configServerConnectionString, 30.0);
     std::unique_ptr<DBClientCursor> cursor(
         _safeCursor(conn->query(ShardType::ConfigNS, BSONObj())));
@@ -945,7 +947,7 @@ Status CatalogManagerLegacy::getAllShards(OperationContext* txn, vector<ShardTyp
 
         StatusWith<ShardType> shardRes = ShardType::fromBSON(shardObj);
         if (!shardRes.isOK()) {
-            shards->clear();
+            shards.clear();
             conn.done();
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse shard with id ("
@@ -953,11 +955,11 @@ Status CatalogManagerLegacy::getAllShards(OperationContext* txn, vector<ShardTyp
                                         << "): " << shardRes.getStatus().toString());
         }
 
-        shards->push_back(shardRes.getValue());
+        shards.push_back(shardRes.getValue());
     }
     conn.done();
 
-    return Status::OK();
+    return OpTimePair<std::vector<ShardType>>{std::move(shards)};
 }
 
 bool CatalogManagerLegacy::runUserManagementWriteCommand(OperationContext* txn,

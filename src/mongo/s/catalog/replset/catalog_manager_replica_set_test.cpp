@@ -327,9 +327,8 @@ TEST_F(CatalogManagerReplSetTest, GetAllShardsValid) {
     const vector<ShardType> expectedShardsList = {s1, s2, s3};
 
     auto future = launchAsync([this] {
-        vector<ShardType> shards;
-        ASSERT_OK(catalogManager()->getAllShards(operationContext(), &shards));
-        return shards;
+        auto shards = assertGet(catalogManager()->getAllShards(operationContext()));
+        return shards.value;
     });
 
     onFindCommand([this, &s1, &s2, &s3](const RemoteCommandRequest& request) {
@@ -363,11 +362,9 @@ TEST_F(CatalogManagerReplSetTest, GetAllShardsWithInvalidShard) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        vector<ShardType> shards;
-        Status status = catalogManager()->getAllShards(operationContext(), &shards);
+        auto status = catalogManager()->getAllShards(operationContext());
 
-        ASSERT_EQ(ErrorCodes::FailedToParse, status);
-        ASSERT_EQ(0U, shards.size());
+        ASSERT_EQ(ErrorCodes::FailedToParse, status.getStatus());
     });
 
     onFindCommand([](const RemoteCommandRequest& request) {

@@ -123,12 +123,12 @@ void ShardRegistry::shutdown() {
 }
 
 void ShardRegistry::reload(OperationContext* txn) {
-    vector<ShardType> shards;
-    Status status = grid.catalogManager(txn)->getAllShards(txn, &shards);
+    auto shardsStatus = grid.catalogManager(txn)->getAllShards(txn);
     uassert(13632,
             str::stream() << "could not get updated shard list from config server due to "
-                          << status.toString(),
-            status.isOK());
+                          << shardsStatus.getStatus().toString(),
+            shardsStatus.isOK());
+    vector<ShardType> shards = std::move(shardsStatus.getValue().value);
 
     int numShards = shards.size();
 

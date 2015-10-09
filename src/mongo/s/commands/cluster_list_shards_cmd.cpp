@@ -73,11 +73,12 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        std::vector<ShardType> shards;
-        Status status = grid.catalogManager(txn)->getAllShards(txn, &shards);
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+        auto shardsStatus = grid.catalogManager(txn)->getAllShards(txn);
+        if (!shardsStatus.isOK()) {
+            return appendCommandStatus(result, shardsStatus.getStatus());
         }
+        std::vector<ShardType> shards = std::move(shardsStatus.getValue().value);
+
         std::vector<BSONObj> shardsObj;
         for (std::vector<ShardType>::const_iterator it = shards.begin(); it != shards.end(); it++) {
             shardsObj.push_back(it->toBSON());

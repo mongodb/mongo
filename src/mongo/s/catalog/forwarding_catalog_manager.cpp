@@ -473,14 +473,9 @@ StatusWith<std::string> ForwardingCatalogManager::getTagForChunk(OperationContex
     return retry(txn, [&] { return _actual->getTagForChunk(txn, collectionNs, chunk); });
 }
 
-Status ForwardingCatalogManager::getAllShards(OperationContext* txn,
-                                              std::vector<ShardType>* shards) {
-    invariant(shards->empty());
-    return retry(txn,
-                 [&] {
-                     shards->clear();
-                     return _actual->getAllShards(txn, shards);
-                 });
+StatusWith<OpTimePair<std::vector<ShardType>>> ForwardingCatalogManager::getAllShards(
+    OperationContext* txn) {
+    return retry(txn, [&] { return _actual->getAllShards(txn); });
 }
 
 bool ForwardingCatalogManager::runUserManagementWriteCommand(OperationContext* txn,

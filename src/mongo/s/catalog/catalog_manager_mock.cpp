@@ -35,6 +35,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_settings.h"
+#include "mongo/s/catalog/type_shard.h"
 
 namespace mongo {
 
@@ -133,8 +134,9 @@ StatusWith<string> CatalogManagerMock::getTagForChunk(OperationContext* txn,
     return string();
 }
 
-Status CatalogManagerMock::getAllShards(OperationContext* txn, vector<ShardType>* shards) {
-    return Status::OK();
+StatusWith<OpTimePair<std::vector<ShardType>>> CatalogManagerMock::getAllShards(
+    OperationContext* txn) {
+    return {OpTimePair<std::vector<ShardType>>{{}}};
 }
 
 bool CatalogManagerMock::runUserManagementWriteCommand(OperationContext* txn,

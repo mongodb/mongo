@@ -823,20 +823,19 @@ Status runUpgradeOnAllShards(OperationContext* txn, int maxSteps, const BSONObj&
     const BSONObj cmdObj = cmdObjBuilder.done();
 
     // Upgrade each shard in turn, stopping on first failure.
-    vector<ShardType> allShards;
-    Status status = grid.catalogManager(txn)->getAllShards(txn, &allShards);
-    if (!status.isOK()) {
-        return status;
-    }
     auto shardRegistry = grid.shardRegistry();
-    for (const auto& shardEntry : allShards) {
-        auto cmdResult = shardRegistry->runCommandWithNotMasterRetries(
-            txn, shardEntry.getName(), "admin", cmdObj);
+    shardRegistry->reload(txn);
+    vector<string> shardIds;
+    shardRegistry->getAllShardIds(&shardIds);
+
+    for (const auto& shardId : shardIds) {
+        auto cmdResult =
+            shardRegistry->runCommandWithNotMasterRetries(txn, shardId, "admin", cmdObj);
 
         if (!cmdResult.isOK()) {
-            return Status(status.code(),
-                          str::stream() << "Failed to run authSchemaUpgrade on shard "
-                                        << shardEntry.getName() << causedBy(status));
+            return Status(cmdResult.getStatus().code(),
+                          str::stream() << "Failed to run authSchemaUpgrade on shard " << shardId
+                                        << causedBy(cmdResult.getStatus()));
         }
     }
 

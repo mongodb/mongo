@@ -443,11 +443,11 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
     logChange(
         txn, txn->getClient()->clientAddress(true), "dropCollection.start", ns.ns(), BSONObj());
 
-    vector<ShardType> allShards;
-    Status status = getAllShards(txn, &allShards);
-    if (!status.isOK()) {
-        return status;
+    auto shardsStatus = getAllShards(txn);
+    if (!shardsStatus.isOK()) {
+        return shardsStatus.getStatus();
     }
+    vector<ShardType> allShards = std::move(shardsStatus.getValue().value);
 
     LOG(1) << "dropCollection " << ns << " started";
 
@@ -793,7 +793,9 @@ StatusWith<string> CatalogManagerReplicaSet::getTagForChunk(OperationContext* tx
     return tagsResult.getValue().getTag();
 }
 
-Status CatalogManagerReplicaSet::getAllShards(OperationContext* txn, vector<ShardType>* shards) {
+StatusWith<OpTimePair<std::vector<ShardType>>> CatalogManagerReplicaSet::getAllShards(
+    OperationContext* txn) {
+    std::vector<ShardType> shards;
     auto findStatus = _exhaustiveFindOnConfig(txn,
                                               NamespaceString(ShardType::ConfigNS),
                                               BSONObj(),     // no query filter
@@ -806,17 +808,17 @@ Status CatalogManagerReplicaSet::getAllShards(OperationContext* txn, vector<Shar
     for (const BSONObj& doc : findStatus.getValue().value) {
         auto shardRes = ShardType::fromBSON(doc);
         if (!shardRes.isOK()) {
-            shards->clear();
+            shards.clear();
             return {ErrorCodes::FailedToParse,
                     stream() << "Failed to parse shard with id ("
                              << doc[ShardType::name()].toString()
                              << "): " << shardRes.getStatus().toString()};
         }
 
-        shards->push_back(shardRes.getValue());
+        shards.push_back(shardRes.getValue());
     }
 
-    return Status::OK();
+    return OpTimePair<std::vector<ShardType>>{std::move(shards), findStatus.getValue().opTime};
 }
 
 bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* txn,
