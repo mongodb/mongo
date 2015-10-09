@@ -636,7 +636,10 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 
 	__dmsg(ds, ": %s\n", __wt_page_type_string(page->type));
 	__dmsg(ds, "\t" "disk %p, entries %" PRIu32, page->dsk, entries);
-	__dmsg(ds, "%s", __wt_page_is_modified(page) ? ", dirty" : ", clean");
+	__dmsg(ds, ", %s", __wt_page_is_modified(page) ? "dirty" : "clean");
+	__dmsg(ds, ", %s", __wt_fair_islocked(
+	    session, &page->page_lock) ? "locked" : "unlocked");
+
 	if (F_ISSET_ATOMIC(page, WT_PAGE_BUILD_KEYS))
 		__dmsg(ds, ", keys-built");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_ALLOC))
@@ -647,8 +650,6 @@ __debug_page_metadata(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, ", evict-lru");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_KEYS))
 		__dmsg(ds, ", overflow-keys");
-	if (F_ISSET_ATOMIC(page, WT_PAGE_RECONCILIATION))
-		__dmsg(ds, ", reconciliation");
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
 		__dmsg(ds, ", split-insert");
 

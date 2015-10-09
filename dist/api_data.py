@@ -411,6 +411,41 @@ connection_runtime_config = [
             interval in seconds at which to check for files that are
             inactive and close them''', min=1, max=100000),
         ]),
+    Config('log', '', r'''
+        enable logging. Enabling logging uses three sessions from the
+        configured session_max''',
+        type='category', subconfig=[
+        Config('archive', 'true', r'''
+            automatically archive unneeded log files''',
+            type='boolean'),
+        Config('compressor', 'none', r'''
+            configure a compressor for log records.  Permitted values are
+            \c "none" or custom compression engine name created with
+            WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
+            for \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression,
+            these names are also available. See @ref compression for more
+            information'''),
+        Config('enabled', 'false', r'''
+            enable logging subsystem''',
+            type='boolean'),
+        Config('file_max', '100MB', r'''
+            the maximum size of log files''',
+            min='100KB', max='2GB'),
+        Config('path', '', r'''
+            the path to a directory into which the log files are written.
+            If the value is not an absolute path name, the files are created
+            relative to the database home'''),
+        Config('prealloc', 'true', r'''
+            pre-allocate log files.''',
+            type='boolean'),
+        Config('recover', 'on', r'''
+            run recovery or error if recovery needs to run after an
+            unclean shutdown.''',
+            choices=['error','on']),
+        Config('zero_fill', 'false', r'''
+            manually write zeroes into log files''',
+            type='boolean'),
+        ]),
     Config('lsm_manager', '', r'''
         configure database wide options for LSM tree management. The LSM
         manager is started automatically the first time an LSM tree is opened.
@@ -611,38 +646,6 @@ common_wiredtiger_open = [
         maximum number of simultaneous hazard pointers per session
         handle''',
         min='15'),
-    Config('log', '', r'''
-        enable logging. Enabling logging uses three sessions from the
-        configured session_max''',
-        type='category', subconfig=[
-        Config('archive', 'true', r'''
-            automatically archive unneeded log files''',
-            type='boolean'),
-        Config('compressor', 'none', r'''
-            configure a compressor for log records.  Permitted values are
-            \c "none" or custom compression engine name created with
-            WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
-            for \c "bzip2", \c "snappy", \c "lz4" or \c "zlib" compression,
-            these names are also available. See @ref compression for more
-            information'''),
-        Config('enabled', 'false', r'''
-            enable logging subsystem''',
-            type='boolean'),
-        Config('file_max', '100MB', r'''
-            the maximum size of log files''',
-            min='100KB', max='2GB'),
-        Config('path', '', r'''
-            the path to a directory into which the log files are written.
-            If the value is not an absolute path name, the files are created
-            relative to the database home'''),
-        Config('prealloc', 'true', r'''
-            pre-allocate log files.''',
-            type='boolean'),
-        Config('recover', 'on', r'''
-            run recovery or error if recovery needs to run after an
-            unclean shutdown.''',
-            choices=['error','on']),
-        ]),
     Config('mmap', 'true', r'''
         Use memory mapping to access files when possible''',
         type='boolean'),

@@ -44,7 +44,6 @@ typedef struct {
 	 * Track maximum transaction ID seen and first unwritten transaction ID.
 	 */
 	uint64_t max_txn;
-	uint64_t first_dirty_txn;
 
 	/*
 	 * When we can't mark the page clean (for example, checkpoint found some
@@ -292,7 +291,7 @@ typedef struct {
 } WT_RECONCILE;
 
 static void __rec_bnd_cleanup(WT_SESSION_IMPL *, WT_RECONCILE *, bool);
-static void __rec_cell_build_addr(
+static void __rec_cell_build_addr(WT_SESSION_IMPL *,
 		WT_RECONCILE *, const void *, size_t, u_int, uint64_t);
 static int  __rec_cell_build_int_key(WT_SESSION_IMPL *,
 		WT_RECONCILE *, const void *, size_t, bool *);
@@ -394,7 +393,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	 *    In-memory splits: reconciliation of an internal page cannot handle
 	 * a child page splitting during the reconciliation.
 	 */
-	F_CAS_ATOMIC_WAIT(page, WT_PAGE_RECONCILIATION);
+	WT_RET(__wt_fair_lock(session, &page->page_lock));
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -432,7 +431,7 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 		WT_TRET(__rec_write_wrapup_err(session, r, page));
 
 	/* Release the reconciliation lock. */
-	F_CLR_ATOMIC(page, WT_PAGE_RECONCILIATION);
+	WT_TRET(__wt_fair_unlock(session, &page->page_lock));
 
 	/* Update statistics. */
 	WT_STAT_FAST_CONN_INCR(session, rec_pages);
@@ -537,11 +536,6 @@ __rec_write_status(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * Set the page's status based on whether or not we cleaned the page.
 	 */
 	if (r->leave_dirty) {
-		/*
-		 * Update the page's first unwritten transaction ID.
-		 */
-		mod->first_dirty_txn = r->first_dirty_txn;
-
 		/*
 		 * The page remains dirty.
 		 *
@@ -880,12 +874,6 @@ __rec_write_init(WT_SESSION_IMPL *session,
 
 	r->cache_write_lookaside = r->cache_write_restore = false;
 
-	/*
-	 * Running transactions may update the page after we write it, so
-	 * this is the highest ID we can be confident we will see.
-	 */
-	r->first_dirty_txn = conn->txn_global.last_running;
-
 	return (0);
 }
 
@@ -1083,17 +1071,11 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
 
-		/*
-		 * Track the largest/smallest transaction IDs on the list and
-		 * the smallest not-globally-visible transaction on the page.
-		 */
+		/* Track the largest/smallest transaction IDs on the list. */
 		if (WT_TXNID_LT(max_txn, txnid))
 			max_txn = txnid;
 		if (WT_TXNID_LT(txnid, min_txn))
 			min_txn = txnid;
-		if (WT_TXNID_LT(txnid, r->first_dirty_txn) &&
-		    !__wt_txn_visible_all(session, txnid))
-			r->first_dirty_txn = txnid;
 
 		/*
 		 * Find the first update we can use.
@@ -3837,7 +3819,8 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			val->cell_len = 0;
 			val->len = val->buf.size;
 		} else
-			__rec_cell_build_addr(r, addr->addr, addr->size,
+			__rec_cell_build_addr(session, r,
+			    addr->addr, addr->size,
 			    __rec_vtype(addr), ref->key.recno);
 		WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
@@ -3883,7 +3866,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/* Build the value cell. */
 		addr = &multi->addr;
-		__rec_cell_build_addr(r,
+		__rec_cell_build_addr(session, r,
 		    addr->addr, addr->size, __rec_vtype(addr), r->recno);
 
 		/* Boundary: split or write the page. */
@@ -4708,7 +4691,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			vtype = state == WT_CHILD_PROXY ?
 			    WT_CELL_ADDR_DEL : (u_int)vpack->raw;
 		}
-		__rec_cell_build_addr(r, p, size, vtype, WT_RECNO_OOB);
+		__rec_cell_build_addr(session, r, p, size, vtype, WT_RECNO_OOB);
 		WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/*
@@ -4794,8 +4777,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		r->cell_zero = false;
 
 		addr = &multi->addr;
-		__rec_cell_build_addr(
-		    r, addr->addr, addr->size, __rec_vtype(addr), WT_RECNO_OOB);
+		__rec_cell_build_addr(session, r,
+		    addr->addr, addr->size, __rec_vtype(addr), WT_RECNO_OOB);
 
 		/* Boundary: split or write the page. */
 		if (key->len + val->len > r->space_avail)
@@ -5863,12 +5846,14 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
  * on the page.
  */
 static void
-__rec_cell_build_addr(WT_RECONCILE *r,
+__rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     const void *addr, size_t size, u_int cell_type, uint64_t recno)
 {
 	WT_KV *val;
 
 	val = &r->v;
+
+	WT_ASSERT(session, size != 0 || cell_type == WT_CELL_ADDR_DEL);
 
 	/*
 	 * We don't check the address size because we can't store an address on

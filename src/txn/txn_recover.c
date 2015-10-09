@@ -412,11 +412,12 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	WT_RECOVERY r;
 	struct WT_RECOVERY_FILE *metafile;
 	char *config;
-	bool needs_rec, was_backup;
+	bool eviction_started, needs_rec, was_backup;
 
 	conn = S2C(session);
 	WT_CLEAR(r);
 	WT_INIT_LSN(&r.ckpt_lsn);
+	eviction_started = false;
 	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP);
 
 	/* We need a real session for recovery. */
@@ -494,6 +495,15 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 */
 	if (needs_rec && FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_ERR))
 		WT_ERR(WT_RUN_RECOVERY);
+
+	/*
+	 * Recovery can touch more data than fits in cache, so it relies on
+	 * regular eviction to manage paging.  Start eviction threads for
+	 * recovery without LAS cursors.
+	 */
+	WT_ERR(__wt_evict_create(session));
+	eviction_started = true;
+
 	/*
 	 * Always run recovery even if it was a clean shutdown.
 	 * We can consider skipping it in the future.
@@ -522,6 +532,18 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 done:	FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE);
 err:	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
+
+	if (ret != 0)
+		__wt_err(session, ret, "Recovery failed");
+
+	/*
+	 * Destroy the eviction threads that were started in support of
+	 * recovery.  They will be restarted once the lookaside table is
+	 * created.
+	 */
+	if (eviction_started)
+		WT_TRET(__wt_evict_destroy(session));
+
 	WT_TRET(session->iface.close(&session->iface, NULL));
 
 	return (ret);
