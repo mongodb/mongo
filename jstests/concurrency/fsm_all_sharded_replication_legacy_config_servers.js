@@ -10,9 +10,6 @@ var blacklist = [
     'distinct_noindex.js', // SERVER-13116 distinct isn't sharding aware
     'distinct_projection.js', // SERVER-13116 distinct isn't sharding aware
     'drop_database.js', // SERVER-17397 Drops of sharded namespaces may not fully succeed
-    'yield_sort.js', // SERVER-17011 Cursor can return objects out of order if updated during query
-    'yield_sort_merge.js', // SERVER-17011 also applies, since this query uses SORT stage,
-                           // not SORT_MERGE stage in sharded environment
 
     // Disabled due to SERVER-3645, '.count() can be wrong on sharded collections'.
     // This bug is problematic for these workloads because they assert on count() values:
