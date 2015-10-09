@@ -241,12 +241,12 @@ functions:
         cp mongodb*/bin/* .
         if [ ${run_multiple_jobs|false} = true ]; then
           if [ ${max_jobs|0} -gt 0 ] && [ ${max_jobs|0} -lt ${num_jobs_available|1} ]; then
-              ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${max_jobs} ${test_flags} --log=buildlogger --reportFile=report.json
+              ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${max_jobs} --shuffle ${test_flags} --log=buildlogger --reportFile=report.json
           else
-              ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${num_jobs_available|1} ${test_flags} --log=buildlogger --reportFile=report.json
+              ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${num_jobs_available|1} --shuffle ${test_flags} --log=buildlogger --reportFile=report.json
           fi
         else
-          ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=1 ${test_flags} --log=buildlogger --reportFile=report.json
+          ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=1 --shuffle ${test_flags} --log=buildlogger --reportFile=report.json
         fi
 
   "setup release credentials":
@@ -1044,7 +1044,7 @@ tasks:
         cp mongodb*/bin/* .
         rm -rf /data/install /data/multiversion
         ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "Linux/x86_64" "1.8" "2.0" "2.2" "2.4" "2.6" "3.0"
-        PATH=$PATH:/data/multiversion ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=multiversion --jobs ${num_jobs_available|1} ${test_flags} --log=buildlogger --reportFile=report.json
+        PATH=$PATH:/data/multiversion ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=multiversion --jobs ${num_jobs_available|1} --shuffle ${test_flags} --log=buildlogger --reportFile=report.json
 
 - <<: *task_template
   name: noPassthrough
@@ -1471,7 +1471,7 @@ tasks:
         cp mongodb*/bin/* .
         mkdir -p snmpconf
         cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
-        SNMPCONFPATH=snmpconf ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=snmp --jobs ${num_jobs_available|1} --storageEngine=mmapv1 ${test_flags} --log=buildlogger --reportFile=report.json
+        SNMPCONFPATH=snmpconf ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=snmp --jobs ${num_jobs_available|1} --shuffle --storageEngine=mmapv1 ${test_flags} --log=buildlogger --reportFile=report.json
 
 - <<: *task_template
   name: snmp_WT
@@ -1488,7 +1488,7 @@ tasks:
         cp mongodb*/bin/* .
         mkdir -p snmpconf
         cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
-        SNMPCONFPATH=snmpconf ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=snmp --jobs ${num_jobs_available|1} --storageEngine=wiredTiger ${test_flags} --log=buildlogger --reportFile=report.json
+        SNMPCONFPATH=snmpconf ${asan_symbolizer} ${enable_lsan} ${python|python} buildscripts/resmoke.py --suites=snmp --jobs ${num_jobs_available|1} --shuffle --storageEngine=wiredTiger ${test_flags} --log=buildlogger --reportFile=report.json
 
 - <<: *task_template
   name: ssl
