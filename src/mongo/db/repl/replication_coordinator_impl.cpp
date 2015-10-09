@@ -1269,6 +1269,7 @@ ReplicationCoordinatorImpl::stepDown_nonBlocking(OperationContext* txn,
                                               waitUntil,
                                               stepDownUntil,
                                               force,
+                                              true,  // restartHeartbeats
                                               result));
     if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
         *result = cbh.getStatus();
@@ -1309,6 +1310,7 @@ void ReplicationCoordinatorImpl::_stepDownContinue(
     const Date_t waitUntil,
     const Date_t stepDownUntil,
     bool force,
+    bool restartHeartbeats,
     Status* result) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         // Cancelation only occurs on shutdown, which will also handle signaling the event.
@@ -1385,6 +1387,7 @@ void ReplicationCoordinatorImpl::_stepDownContinue(
                                                      waitUntil,
                                                      stepDownUntil,
                                                      force,
+                                                     false,  // restartHeartbeats
                                                      result));
     if (!cbh.isOK()) {
         *result = cbh.getStatus();
@@ -1394,6 +1397,11 @@ void ReplicationCoordinatorImpl::_stepDownContinue(
 
     // We send out a fresh round of heartbeats because stepping down successfully without
     // {force: true} is dependent on timely heartbeat data.
+    // This callback is invoked every time a heartbeat response is processed so restart heartbeats
+    // only once.
+    if (!restartHeartbeats) {
+        return;
+    }
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _cancelHeartbeats();
     _startHeartbeats_inlock(cbData);

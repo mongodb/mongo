@@ -670,6 +670,7 @@ private:
                            Date_t waitUntil,
                            Date_t stepdownUntil,
                            bool force,
+                           bool restartHeartbeats,
                            Status* result);
 
     OID _getMyRID_inlock() const;

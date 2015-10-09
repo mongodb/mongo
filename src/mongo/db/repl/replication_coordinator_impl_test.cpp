@@ -1465,6 +1465,89 @@ TEST_F(StepDownTest, StepDownCatchUp) {
         getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
     }
     while (getNet()->hasReadyRequests()) {
+        auto noi = getNet()->getNextReadyRequest();
+        log() << "Blackholing network request " << noi->getRequest().cmdObj;
+        getNet()->blackHole(noi);
+    }
+    getNet()->runReadyNetworkOperations();
+    exitNetwork();
+
+    getReplExec()->waitForEvent(eventHandle);
+    ASSERT_OK(result);
+    ASSERT_TRUE(repl->getMemberState().secondary());
+}
+
+TEST_F(StepDownTest, StepDownCatchUpOnSecondHeartbeat) {
+    OperationContextReplMock txn;
+    OpTimeWithTermZero optime1(100, 1);
+    OpTimeWithTermZero optime2(100, 2);
+    // No secondary is caught up
+    auto repl = getReplCoord();
+    repl->setMyLastOptime(optime2);
+    ASSERT_OK(repl->setLastOptime_forTest(1, 1, optime1));
+    ASSERT_OK(repl->setLastOptime_forTest(1, 2, optime1));
+
+    simulateSuccessfulV1Election();
+
+    // Step down where the secondary actually has to catch up before the stepDown can succeed.
+    // On entering the network, _stepDownContinue should cancel the heartbeats scheduled for
+    // T + 2 seconds and send out a new round of heartbeats immediately.
+    // This makes it unnecessary to advance the clock after entering the network to process
+    // the heartbeat requests.
+    Status result(ErrorCodes::InternalError, "not mutated");
+    auto globalReadLockAndEventHandle =
+        repl->stepDown_nonBlocking(&txn, false, Milliseconds(10000), Milliseconds(60000), &result);
+    const auto& eventHandle = globalReadLockAndEventHandle.second;
+    ASSERT_TRUE(eventHandle);
+    ASSERT_TRUE(txn.lockState()->isReadLocked());
+
+    // Secondary has not caught up on first round of heartbeats.
+    enterNetwork();
+    ASSERT(getNet()->hasReadyRequests());
+    NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
+    RemoteCommandRequest request = noi->getRequest();
+    log() << "HB1: " << request.target.toString() << " processing " << request.cmdObj;
+    ReplSetHeartbeatArgsV1 hbArgs;
+    if (hbArgs.initialize(request.cmdObj).isOK()) {
+        ReplSetHeartbeatResponse hbResp;
+        hbResp.setSetName(hbArgs.getSetName());
+        hbResp.setState(MemberState::RS_SECONDARY);
+        hbResp.setConfigVersion(hbArgs.getConfigVersion());
+        BSONObjBuilder respObj;
+        respObj << "ok" << 1;
+        hbResp.addToBSON(&respObj, false);
+        getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
+    }
+    while (getNet()->hasReadyRequests()) {
+        getNet()->blackHole(getNet()->getNextReadyRequest());
+    }
+    getNet()->runReadyNetworkOperations();
+    exitNetwork();
+
+    auto config = getReplCoord()->getConfig();
+    auto heartbeatInterval = config.getHeartbeatInterval();
+
+    // Make a secondary actually catch up
+    enterNetwork();
+    auto until = getNet()->now() + heartbeatInterval;
+    getNet()->runUntil(until);
+    ASSERT_EQUALS(until, getNet()->now());
+    ASSERT(getNet()->hasReadyRequests());
+    noi = getNet()->getNextReadyRequest();
+    request = noi->getRequest();
+    log() << "HB2: " << request.target.toString() << " processing " << request.cmdObj;
+    if (hbArgs.initialize(request.cmdObj).isOK()) {
+        ReplSetHeartbeatResponse hbResp;
+        hbResp.setSetName(hbArgs.getSetName());
+        hbResp.setState(MemberState::RS_SECONDARY);
+        hbResp.setConfigVersion(hbArgs.getConfigVersion());
+        hbResp.setOpTime(optime2);
+        BSONObjBuilder respObj;
+        respObj << "ok" << 1;
+        hbResp.addToBSON(&respObj, false);
+        getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
+    }
+    while (getNet()->hasReadyRequests()) {
         getNet()->blackHole(getNet()->getNextReadyRequest());
     }
     getNet()->runReadyNetworkOperations();
