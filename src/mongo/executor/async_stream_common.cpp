@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
 
 #include "mongo/platform/basic.h"
 
@@ -37,9 +37,9 @@
 namespace mongo {
 namespace executor {
 
-void logCloseFailed(std::error_code ec) {
+void warnCloseFailed(std::error_code ec) {
     invariant(ec);
-    LOG(1) << "failed to close stream: " << ec.message();
+    warning() << "failed to close stream:" << ec.message();
 }
 
 }  // namespace executor

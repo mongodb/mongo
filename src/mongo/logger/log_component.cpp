@@ -81,7 +81,6 @@ LogComponent LogComponent::parent() const {
         case kDefault:
             return kNumLogComponents;
             DECLARE_LOG_COMPONENT_PARENT(kJournal, kStorage);
-            DECLARE_LOG_COMPONENT_PARENT(kASIO, kNetwork);
         case kNumLogComponents:
             return kNumLogComponents;
         default:
@@ -122,8 +121,6 @@ StringData LogComponent::toStringData() const {
             return createStringData("write");
         case kFTDC:
             return createStringData("ftdc");
-        case kASIO:
-            return createStringData("asio");
         case kNumLogComponents:
             return createStringData("total");
             // No default. Compiler should complain if there's a log component that's not handled.
@@ -190,8 +187,6 @@ StringData LogComponent::getNameForLog() const {
             return createStringData("WRITE   ");
         case kFTDC:
             return createStringData("FTDC    ");
-        case kASIO:
-            return createStringData("ASIO    ");
         case kNumLogComponents:
             return createStringData("TOTAL   ");
             // No default. Compiler should complain if there's a log component that's not handled.

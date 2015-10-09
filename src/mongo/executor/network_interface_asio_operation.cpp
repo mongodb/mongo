@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
 
 #include "mongo/platform/basic.h"
 
@@ -105,7 +105,6 @@ NetworkInterfaceASIO::AsyncOp::AsyncOp(NetworkInterfaceASIO* const owner,
       _inSetup(true) {}
 
 void NetworkInterfaceASIO::AsyncOp::cancel() {
-    LOG(2) << "Canceling operation; original request was: " << request().toString();
     std::shared_ptr<AsyncOp::AccessControl> access;
     std::size_t generation;
     {

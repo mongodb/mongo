@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor
 
 #include "mongo/platform/basic.h"
 
@@ -237,13 +237,10 @@ void NetworkInterfaceASIO::_beginCommunication(AsyncOp* op) {
     // codepath.
 
     if (op->_inSetup) {
-        log() << "Successfully connected to " << op->request().target.toString();
         op->_inSetup = false;
         op->finish(RemoteCommandResponse());
         return;
     }
-
-    LOG(3) << "Initiating asynchronous command: " << op->request().toString();
 
     auto beginStatus = op->beginCommand(op->request(), _metadataHook.get());
     if (!beginStatus.isOK()) {
@@ -262,6 +259,7 @@ void NetworkInterfaceASIO::_completedOpCallback(AsyncOp* op) {
 }
 
 void NetworkInterfaceASIO::_networkErrorCallback(AsyncOp* op, const std::error_code& ec) {
+    LOG(3) << "networking error occurred";
     if (ec.category() == mongoErrorCategory()) {
         // If we get a Mongo error code, we can preserve it.
         _completeOperation(op, Status(ErrorCodes::fromInt(ec.value()), ec.message()));
@@ -290,18 +288,11 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
         auto iter = _inProgress.find(op);
 
         // This can happen if we fail during setup.
-        if (iter == _inProgress.end()) {
-            log() << "Failed to connect to " << op->request().target << " - " << resp.getStatus();
+        if (iter == _inProgress.end())
             return;
-        }
 
         ownedOp = std::move(iter->second);
         _inProgress.erase(iter);
-    }
-
-    if (!resp.isOK()) {
-        LOG(2) << "Failed to execute command: " << op->request().toString()
-               << " reason: " << resp.getStatus();
     }
 
     invariant(ownedOp);
@@ -333,7 +324,6 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, const ResponseStatus&
 }
 
 void NetworkInterfaceASIO::_asyncRunCommand(AsyncOp* op, NetworkOpHandler handler) {
-    LOG(2) << "Starting asynchronous command on host " << op->request().target.toString();
     // We invert the following steps below to run a command:
     // 1 - send the given command
     // 2 - receive a header for the response

@@ -35,7 +35,7 @@
 namespace mongo {
 namespace executor {
 
-void logCloseFailed(std::error_code ec);
+void warnCloseFailed(std::error_code ec);
 
 template <typename ASIOStream>
 void destroyStream(ASIOStream* stream, bool connected) {
@@ -46,7 +46,7 @@ void destroyStream(ASIOStream* stream, bool connected) {
     stream->shutdown(asio::ip::tcp::socket::shutdown_both, ec);
     stream->close();
     if (ec) {
-        logCloseFailed(ec);
+        warnCloseFailed(ec);
     }
 }
 
