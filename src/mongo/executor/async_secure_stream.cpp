@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
 
 #include "mongo/platform/basic.h"
 
@@ -88,7 +88,8 @@ void AsyncSecureStream::_handleHandshake(std::error_code ec, const std::string& 
     auto certStatus =
         getSSLManager()->parseAndValidatePeerCertificate(_stream.native_handle(), hostName);
     if (!certStatus.isOK()) {
-        warning() << certStatus.getStatus();
+        warning() << "Failed to validate peer certificate during SSL handshake: "
+                  << certStatus.getStatus();
     }
     _userHandler(make_error_code(certStatus.getStatus().code()));
 }
