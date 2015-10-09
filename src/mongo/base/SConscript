@@ -52,3 +52,28 @@ env.CppUnitTest(
         'system_error',
     ],
 )
+
+env.Library(
+    target=[
+        'secure_allocator'
+    ],
+    source=[
+        'secure_allocator.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/secure_zero_memory',
+    ],
+)
+
+env.CppUnitTest(
+    target=[
+        'secure_allocator_test',
+    ],
+    source=[
+        'secure_allocator_test.cpp',
+    ],
+    LIBDEPS=[
+        'secure_allocator',
+    ],
+)

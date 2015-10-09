@@ -257,11 +257,12 @@ std::string causedBy(const Status& e) {
     return causedBy(e.reason());
 }
 
-string errnoWithPrefix(const char* prefix) {
+string errnoWithPrefix(StringData prefix) {
+    const auto suffix = errnoWithDescription();
     stringstream ss;
-    if (prefix)
+    if (!prefix.empty())
         ss << prefix << ": ";
-    ss << errnoWithDescription();
+    ss << suffix;
     return ss.str();
 }
 
