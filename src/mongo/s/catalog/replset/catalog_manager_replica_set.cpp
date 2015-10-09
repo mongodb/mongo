@@ -343,7 +343,28 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
         return OpTimePair<DatabaseType>(dbt);
     }
 
+    auto result = _fetchDatabaseMetadata(txn, dbName, kConfigReadSelector);
+    if (result == ErrorCodes::NamespaceNotFound) {
+        // If we failed to find the database metadata on the 'nearest' config server, try again
+        // against the primary, in case the database was recently created.
+        result =
+            _fetchDatabaseMetadata(txn, dbName, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+        if (ErrorCodes::isNotMasterError(result.getStatus().code())) {
+            return Status(ErrorCodes::NoConfigMaster,
+                          str::stream() << "Could not confirm non-existence of database \""
+                                        << dbName
+                                        << "\" because there is no config server primary");
+        }
+    }
+    return result;
+}
+
+StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::_fetchDatabaseMetadata(
+    OperationContext* txn, const std::string& dbName, const ReadPreferenceSetting& readPref) {
+    dassert(dbName != "admin" && dbName != "config");
+
     auto findStatus = _exhaustiveFindOnConfig(txn,
+                                              readPref,
                                               NamespaceString(DatabaseType::ConfigNS),
                                               BSON(DatabaseType::name(dbName)),
                                               BSONObj(),
@@ -372,6 +393,7 @@ StatusWith<OpTimePair<CollectionType>> CatalogManagerReplicaSet::getCollection(
     auto configShard = grid.shardRegistry()->getShard(txn, "config");
 
     auto statusFind = _exhaustiveFindOnConfig(txn,
+                                              kConfigReadSelector,
                                               NamespaceString(CollectionType::ConfigNS),
                                               BSON(CollectionType::fullNs(collNs)),
                                               BSONObj(),
@@ -409,6 +431,7 @@ Status CatalogManagerReplicaSet::getCollections(OperationContext* txn,
     }
 
     auto findStatus = _exhaustiveFindOnConfig(txn,
+                                              kConfigReadSelector,
                                               NamespaceString(CollectionType::ConfigNS),
                                               b.obj(),
                                               BSONObj(),
@@ -643,8 +666,12 @@ Status CatalogManagerReplicaSet::logChange(OperationContext* txn,
 
 StatusWith<SettingsType> CatalogManagerReplicaSet::getGlobalSettings(OperationContext* txn,
                                                                      const string& key) {
-    auto findStatus = _exhaustiveFindOnConfig(
-        txn, NamespaceString(SettingsType::ConfigNS), BSON(SettingsType::key(key)), BSONObj(), 1);
+    auto findStatus = _exhaustiveFindOnConfig(txn,
+                                              kConfigReadSelector,
+                                              NamespaceString(SettingsType::ConfigNS),
+                                              BSON(SettingsType::key(key)),
+                                              BSONObj(),
+                                              1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -677,6 +704,7 @@ Status CatalogManagerReplicaSet::getDatabasesForShard(OperationContext* txn,
                                                       const string& shardName,
                                                       vector<string>* dbs) {
     auto findStatus = _exhaustiveFindOnConfig(txn,
+                                              kConfigReadSelector,
                                               NamespaceString(DatabaseType::ConfigNS),
                                               BSON(DatabaseType::primary(shardName)),
                                               BSONObj(),
@@ -709,8 +737,8 @@ Status CatalogManagerReplicaSet::getChunks(OperationContext* txn,
 
     // Convert boost::optional<int> to boost::optional<long long>.
     auto longLimit = limit ? boost::optional<long long>(*limit) : boost::none;
-    auto findStatus =
-        _exhaustiveFindOnConfig(txn, NamespaceString(ChunkType::ConfigNS), query, sort, longLimit);
+    auto findStatus = _exhaustiveFindOnConfig(
+        txn, kConfigReadSelector, NamespaceString(ChunkType::ConfigNS), query, sort, longLimit);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -742,6 +770,7 @@ Status CatalogManagerReplicaSet::getTagsForCollection(OperationContext* txn,
     tags->clear();
 
     auto findStatus = _exhaustiveFindOnConfig(txn,
+                                              kConfigReadSelector,
                                               NamespaceString(TagsType::ConfigNS),
                                               BSON(TagsType::ns(collectionNs)),
                                               BSON(TagsType::min() << 1),
@@ -770,8 +799,8 @@ StatusWith<string> CatalogManagerReplicaSet::getTagForChunk(OperationContext* tx
     BSONObj query =
         BSON(TagsType::ns(collectionNs) << TagsType::min() << BSON("$lte" << chunk.getMin())
                                         << TagsType::max() << BSON("$gte" << chunk.getMax()));
-    auto findStatus =
-        _exhaustiveFindOnConfig(txn, NamespaceString(TagsType::ConfigNS), query, BSONObj(), 1);
+    auto findStatus = _exhaustiveFindOnConfig(
+        txn, kConfigReadSelector, NamespaceString(TagsType::ConfigNS), query, BSONObj(), 1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -797,6 +826,7 @@ StatusWith<OpTimePair<std::vector<ShardType>>> CatalogManagerReplicaSet::getAllS
     OperationContext* txn) {
     std::vector<ShardType> shards;
     auto findStatus = _exhaustiveFindOnConfig(txn,
+                                              kConfigReadSelector,
                                               NamespaceString(ShardType::ConfigNS),
                                               BSONObj(),     // no query filter
                                               BSONObj(),     // no sort
@@ -918,8 +948,12 @@ Status CatalogManagerReplicaSet::_checkDbDoesNotExist(OperationContext* txn,
     queryBuilder.appendRegex(
         DatabaseType::name(), (string) "^" + pcrecpp::RE::QuoteMeta(dbName) + "$", "i");
 
-    auto findStatus = _exhaustiveFindOnConfig(
-        txn, NamespaceString(DatabaseType::ConfigNS), queryBuilder.obj(), BSONObj(), 1);
+    auto findStatus = _exhaustiveFindOnConfig(txn,
+                                              kConfigReadSelector,
+                                              NamespaceString(DatabaseType::ConfigNS),
+                                              queryBuilder.obj(),
+                                              BSONObj(),
+                                              1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -955,6 +989,7 @@ StatusWith<std::string> CatalogManagerReplicaSet::_generateNewShardName(Operatio
     shardNameRegex.appendRegex(ShardType::name(), "^shard");
 
     auto findStatus = _exhaustiveFindOnConfig(txn,
+                                              kConfigReadSelector,
                                               NamespaceString(ShardType::ConfigNS),
                                               shardNameRegex.obj(),
                                               BSON(ShardType::name() << -1),
@@ -1079,6 +1114,7 @@ Status CatalogManagerReplicaSet::initConfigVersion(OperationContext* txn) {
 
 StatusWith<VersionType> CatalogManagerReplicaSet::_getConfigVersion(OperationContext* txn) {
     auto findStatus = _exhaustiveFindOnConfig(txn,
+                                              kConfigReadSelector,
                                               NamespaceString(VersionType::ConfigNS),
                                               BSONObj(),
                                               BSONObj(),
@@ -1131,6 +1167,7 @@ StatusWith<VersionType> CatalogManagerReplicaSet::_getConfigVersion(OperationCon
 
 StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFindOnConfig(
     OperationContext* txn,
+    const ReadPreferenceSetting& readPref,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
@@ -1142,7 +1179,7 @@ StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFin
                                           repl::ReadConcernLevel::kMajorityReadConcern};
 
         auto result = grid.shardRegistry()->exhaustiveFindOnConfig(
-            kConfigReadSelector, nss, query, sort, limit, readConcern);
+            readPref, nss, query, sort, limit, readConcern);
 
         if (ErrorCodes::isNetworkError(result.getStatus().code())) {
             lastStatus = result.getStatus();

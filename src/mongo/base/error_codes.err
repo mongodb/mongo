@@ -148,6 +148,7 @@ error_code("PooledConnectionsDropped", 145)
 error_code("ExceededMemoryLimit", 146)
 error_code("ZLibError", 147)
 error_code("ReadConcernMajorityNotEnabled", 148)
+error_code("NoConfigMaster", 149)
 
 # Non-sequential error codes (for compatibility only)
 error_code("RecvStaleConfig", 9996)
@@ -169,5 +170,4 @@ error_code("PrepareConfigsFailedCode", 13104);
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound", "NetworkTimeout"])
 error_class("Interruption", ["Interrupted", "InterruptedAtShutdown", "ExceededTimeLimit"])
-error_class("IndexCreationError", ["CannotCreateIndex", "IndexOptionsConflict",
-                                   "IndexKeySpecsConflict", "IndexAlreadyExists"])
+error_class("NotMasterError", ["NotMaster", "NotMasterNoSlaveOkCode"])

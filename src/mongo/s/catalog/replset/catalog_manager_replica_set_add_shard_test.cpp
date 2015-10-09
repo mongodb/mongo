@@ -214,39 +214,58 @@ TEST_F(AddShardTest, AddShardStandalone) {
 
     // Make sure the shard add code checks for the presence of each of the two databases we returned
     // in the previous call, in the config server metadata
-    onFindCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, configHost);
-        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                      request.metadata);
+    for (int i = 0; i < 2; i++) {
+        // Do it twice because getDatabase retries if it can't find a database
+        onFindCommand([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, configHost);
+            if (i == 0) {
+                ASSERT_EQUALS(
+                    BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
+                    request.metadata);
+            } else if (i == 1) {
+                // The retry runs with PrimaryOnly read preference
+                ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            }
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+            auto query =
+                assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
-        ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB1")));
+            ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB1")));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        return vector<BSONObj>{};
-    });
+            return vector<BSONObj>{};
+        });
+    }
 
-    onFindCommand([this](const RemoteCommandRequest& request) {
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
-        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                      request.metadata);
+    for (int i = 0; i < 2; i++) {
+        onFindCommand([this, i](const RemoteCommandRequest& request) {
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
+            if (i == 0) {
+                ASSERT_EQUALS(
+                    BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
+                    request.metadata);
+            } else if (i == 1) {
+                // The retry runs with PrimaryOnly read preference
+                ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            }
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+            auto query =
+                assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
-        ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB2")));
+            ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB2")));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        return vector<BSONObj>{};
-    });
+            return vector<BSONObj>{};
+        });
+    }
 
     // The new shard is being inserted
     ShardType expectedShard;
@@ -330,39 +349,58 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
 
     // Make sure the shard add code checks for the presence of each of the two databases we returned
     // in the previous call, in the config server metadata
-    onFindCommand([&](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, configHost);
-        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                      request.metadata);
+    for (int i = 0; i < 2; i++) {
+        // Do it twice because getDatabase retries if it can't find a database
+        onFindCommand([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, configHost);
+            if (i == 0) {
+                ASSERT_EQUALS(
+                    BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
+                    request.metadata);
+            } else if (i == 1) {
+                // The retry runs with PrimaryOnly read preference
+                ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            }
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
 
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+            auto query =
+                assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
-        ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB1")));
+            ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB1")));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        return vector<BSONObj>{};
-    });
+            return vector<BSONObj>{};
+        });
+    }
 
-    onFindCommand([this](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                      request.metadata);
+    for (int i = 0; i < 2; i++) {
+        onFindCommand([this, i](const RemoteCommandRequest& request) {
+            if (i == 0) {
+                ASSERT_EQUALS(
+                    BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
+                    request.metadata);
+            } else if (i == 1) {
+                // The retry runs with PrimaryOnly read preference
+                ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            }
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
-        auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
+            auto query =
+                assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));
 
-        ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
-        ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB2")));
+            ASSERT_EQ(query->ns(), DatabaseType::ConfigNS);
+            ASSERT_EQ(query->getFilter(), BSON(DatabaseType::name("TestDB2")));
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        return vector<BSONObj>{};
-    });
+            return vector<BSONObj>{};
+        });
+    }
 
     ShardType existingShard;
     existingShard.setName("shard0005");

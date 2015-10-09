@@ -168,6 +168,7 @@ private:
 
     StatusWith<OpTimePair<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* txn,
+        const ReadPreferenceSetting& readPref,
         const NamespaceString& nss,
         const BSONObj& query,
         const BSONObj& sort,
@@ -182,6 +183,13 @@ private:
      * Returns the current cluster schema/protocol version.
      */
     StatusWith<VersionType> _getConfigVersion(OperationContext* txn);
+
+    /**
+     * Queries the config servers for the database metadata for the given database, using the
+     * given read preference.  Returns NamespaceNotFound if no database metadata is found.
+     */
+    StatusWith<OpTimePair<DatabaseType>> _fetchDatabaseMetadata(
+        OperationContext* txn, const std::string& dbName, const ReadPreferenceSetting& readPref);
 
     //
     // All member variables are labeled with one of the following codes indicating the

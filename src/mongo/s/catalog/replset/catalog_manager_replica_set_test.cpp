@@ -181,6 +181,62 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseExisting) {
     ASSERT_EQ(expectedDb.toBSON(), dbOpTimePair.value.toBSON());
 }
 
+TEST_F(CatalogManagerReplSetTest, GetDatabaseStaleSecondaryRetrySuccess) {
+    HostAndPort firstHost{"TestHost1"};
+    HostAndPort secondHost{"TestHost2"};
+    configTargeter()->setFindHostReturnValue(firstHost);
+
+    DatabaseType expectedDb;
+    expectedDb.setName("bigdata");
+    expectedDb.setPrimary("shard0000");
+    expectedDb.setSharded(true);
+
+    auto future = launchAsync([this, &expectedDb] {
+        return assertGet(catalogManager()->getDatabase(operationContext(), expectedDb.getName()));
+    });
+
+    // Return empty result set as if the database wasn't found
+    onFindCommand([this, &firstHost, &secondHost](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(firstHost, request.target);
+        configTargeter()->setFindHostReturnValue(secondHost);
+        return vector<BSONObj>{};
+    });
+
+    // Make sure we retarget and retry.
+    onFindCommand([this, &expectedDb, &secondHost](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(secondHost, request.target);
+        return vector<BSONObj>{expectedDb.toBSON()};
+    });
+
+    const auto dbOpTimePair = future.timed_get(kFutureTimeout);
+    ASSERT_EQ(expectedDb.toBSON(), dbOpTimePair.value.toBSON());
+}
+
+TEST_F(CatalogManagerReplSetTest, GetDatabaseStaleSecondaryRetryNoPrimary) {
+    HostAndPort testHost{"TestHost1"};
+    configTargeter()->setFindHostReturnValue(testHost);
+
+    DatabaseType expectedDb;
+    expectedDb.setName("bigdata");
+    expectedDb.setPrimary("shard0000");
+    expectedDb.setSharded(true);
+
+    auto future = launchAsync([this, &expectedDb] {
+        auto dbResult = catalogManager()->getDatabase(operationContext(), "NonExistent");
+        ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NoConfigMaster);
+    });
+
+    // Return empty result set as if the database wasn't found
+    onFindCommand([this, &testHost](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS(testHost, request.target);
+        // Make it so when it attempts to retarget and retry it will get a NotMaster error.
+        configTargeter()->setFindHostReturnValue(Status(ErrorCodes::NotMaster, "no config master"));
+        return vector<BSONObj>{};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
 TEST_F(CatalogManagerReplSetTest, GetDatabaseNotExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
@@ -189,6 +245,7 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseNotExisting) {
         ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NamespaceNotFound);
     });
 
+    onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
     onFindCommand([](const RemoteCommandRequest& request) { return vector<BSONObj>{}; });
 
     future.timed_get(kFutureTimeout);
