@@ -466,13 +466,10 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	 * further forward, so that once a read-uncommitted cursor is
 	 * positioned on a value, it can't be freed.
 	 */
-	if (txn->isolation == WT_ISO_READ_UNCOMMITTED &&
-	    !F_ISSET(txn, WT_TXN_HAS_ID) &&
-	    WT_TXNID_LT(txn_state->snap_min, txn_global->last_running))
-		txn_state->snap_min = txn_global->last_running;
-
-	if (txn->isolation != WT_ISO_READ_UNCOMMITTED &&
-	    !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
+	if (txn->isolation == WT_ISO_READ_UNCOMMITTED) {
+		if (txn_state->snap_min == WT_TXN_NONE)
+			txn_state->snap_min = txn_global->last_running;
+	} else if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
 		__wt_txn_get_snapshot(session);
 }
 
