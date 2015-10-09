@@ -167,7 +167,7 @@ public:
         {
             WriteUnitOfWork wunit(&_txn);
             rs->deleteRecord(&_txn, id1);
-                wunit.commit();
+            wunit.commit();
         }
 
         ASSERT_FALSE(checkValid());
