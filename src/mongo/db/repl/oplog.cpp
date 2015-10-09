@@ -179,8 +179,6 @@ class OplogDocWriter : public DocWriter {
 public:
     OplogDocWriter(const BSONObj& frame, const BSONObj& oField) : _frame(frame), _oField(oField) {}
 
-    ~OplogDocWriter() {}
-
     void writeDocument(char* start) const {
         char* buf = start;
 
@@ -269,6 +267,31 @@ bool oplogDisabled(OperationContext* txn,
 
     return false;
 }
+
+OplogDocWriter _logOpWriter(OperationContext* txn,
+                            const char* opstr,
+                            NamespaceString& nss,
+                            const BSONObj& obj,
+                            BSONObj* o2,
+                            bool fromMigrate,
+                            OpTime optime,
+                            long long hashNew) {
+    BSONObjBuilder b(256);
+
+    b.append("ts", optime.getTimestamp());
+    if (optime.getTerm() != -1)
+        b.append("t", optime.getTerm());
+    b.append("h", hashNew);
+    b.append("v", OPLOG_VERSION);
+    b.append("op", opstr);
+    b.append("ns", nss.ns());
+    if (fromMigrate)
+        b.appendBool("fromMigrate", true);
+    if (o2)
+        b.append("o2", *o2);
+
+    return OplogDocWriter(b.obj(), obj);
+}
 }  // end anon namespace
 
 /* we write to local.oplog.rs:
@@ -316,32 +339,9 @@ void _logOp(OperationContext* txn,
     Lock::CollectionLock lk2(txn->lockState(), oplogCollectionName, MODE_IX);
 
     auto slot = getNextOpTime(txn, _localOplogCollection, replCoord, opstr, replicationMode);
-    OpTime optime = slot.first;
-    long long hashNew = slot.second;
-
     // we jump through a bunch of hoops here to avoid copying the obj buffer twice --
     // instead we do a single copy to the destination in the record store.
-    BSONObjBuilder b(256);
-
-    b.append("ts", optime.getTimestamp());
-    if (optime.getTerm() != -1) {
-        b.append("t", optime.getTerm());
-    }
-    b.append("h", hashNew);
-    b.append("v", OPLOG_VERSION);
-    b.append("op", opstr);
-    b.append("ns", ns);
-    if (fromMigrate) {
-        b.appendBool("fromMigrate", true);
-    }
-
-    if (o2) {
-        b.append("o2", *o2);
-    }
-    BSONObj partial = b.done();
-
-    OplogDocWriter writer(partial, obj);
-    // This transaction might roll back.
+    auto writer = _logOpWriter(txn, opstr, nss, obj, o2, fromMigrate, slot.first, slot.second);
     checkOplogInsert(_localOplogCollection->insertDocument(txn, &writer, false));
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
