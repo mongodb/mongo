@@ -329,6 +329,9 @@ private:
     // Last known highest opTime from the config server that should be used when doing reads.
     repl::OpTime _configOpTime;
 
+    // Config server OpTime of the query run during the last successful ShardRegistry::reload() call
+    repl::OpTime _lastReloadOpTime;
+
     // Map of both shardName -> Shard and hostName -> Shard
     ShardMap _lookup;
 

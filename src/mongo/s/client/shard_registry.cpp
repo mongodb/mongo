@@ -129,12 +129,22 @@ void ShardRegistry::reload(OperationContext* txn) {
                           << shardsStatus.getStatus().toString(),
             shardsStatus.isOK());
     vector<ShardType> shards = std::move(shardsStatus.getValue().value);
+    OpTime reloadOpTime = std::move(shardsStatus.getValue().opTime);
 
     int numShards = shards.size();
 
     LOG(1) << "found " << numShards << " shards listed on config server(s)";
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    // Only actually update the registry if the config.shards query came back at an OpTime newer
+    // than _lastReloadOpTime.
+    if (reloadOpTime < _lastReloadOpTime) {
+        LOG(1) << "Not updating ShardRegistry from the results of query at config server OpTime "
+               << reloadOpTime
+               << ", which is older than the OpTime of the last reload: " << _lastReloadOpTime;
+        return;
+    }
+    _lastReloadOpTime = reloadOpTime;
 
     _lookup.clear();
     _rsLookup.clear();
@@ -142,8 +152,6 @@ void ShardRegistry::reload(OperationContext* txn) {
     _addConfigShard_inlock();
 
     for (const ShardType& shardType : shards) {
-        uassertStatusOK(shardType.validate());
-
         // Skip the config host even if there is one left over from legacy installations. The
         // config host is installed manually from the catalog manager data.
         if (shardType.getName() == "config") {

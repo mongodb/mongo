@@ -811,8 +811,16 @@ StatusWith<OpTimePair<std::vector<ShardType>>> CatalogManagerReplicaSet::getAllS
             shards.clear();
             return {ErrorCodes::FailedToParse,
                     stream() << "Failed to parse shard with id ("
-                             << doc[ShardType::name()].toString()
-                             << "): " << shardRes.getStatus().toString()};
+                             << doc[ShardType::name()].toString() << ")"
+                             << causedBy(shardRes.getStatus())};
+        }
+
+        Status validateStatus = shardRes.getValue().validate();
+        if (!validateStatus.isOK()) {
+            return {validateStatus.code(),
+                    stream() << "Failed to validate shard with id ("
+                             << doc[ShardType::name()].toString() << ")"
+                             << causedBy(validateStatus)};
         }
 
         shards.push_back(shardRes.getValue());
