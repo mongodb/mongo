@@ -784,12 +784,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     repl::TopologyCoordinatorImpl::Options topoCoordOptions;
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
     topoCoordOptions.configServerMode = serverGlobalParams.configsvrMode;
-    // TODO(SERVER-19739):  Rather than checking if the storage engine name is "wiredTiger"
-    // we should be asking the global storage engine whether it supports readCommitted,
-    // however at this point in mongod startup the storage engine has not yet been
-    // initialized.
-    topoCoordOptions.storageEngineSupportsReadCommitted =
-        storageGlobalParams.engine == "wiredTiger";
 
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         getGlobalReplSettings(),

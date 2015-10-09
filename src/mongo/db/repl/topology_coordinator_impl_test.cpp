@@ -4969,8 +4969,8 @@ TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommitted) {
     serverGlobalParams.configsvr = true;
     TopologyCoordinatorImpl::Options options;
     options.configServerMode = CatalogManager::ConfigServerMode::CSRS;
-    options.storageEngineSupportsReadCommitted = false;
     setOptions(options);
+    getTopoCoord().setStorageEngineSupportsReadCommitted(false);
 
     updateConfig(BSON("_id"
                       << "rs0"
@@ -4990,8 +4990,8 @@ TEST_F(TopoCoordTest, GetMemberStateConfigSvrNoReadCommittedButInSCCCMode) {
     serverGlobalParams.configsvr = true;
     TopologyCoordinatorImpl::Options options;
     options.configServerMode = CatalogManager::ConfigServerMode::SCCC;
-    options.storageEngineSupportsReadCommitted = false;
     setOptions(options);
+    getTopoCoord().setStorageEngineSupportsReadCommitted(false);
 
     updateConfig(BSON("_id"
                       << "rs0"
@@ -5014,8 +5014,8 @@ TEST_F(TopoCoordTest, GetMemberStateValidConfigSvr) {
     serverGlobalParams.configsvr = true;
     TopologyCoordinatorImpl::Options options;
     options.configServerMode = CatalogManager::ConfigServerMode::CSRS;
-    options.storageEngineSupportsReadCommitted = true;
     setOptions(options);
+    getTopoCoord().setStorageEngineSupportsReadCommitted(true);
 
     updateConfig(BSON("_id"
                       << "rs0"

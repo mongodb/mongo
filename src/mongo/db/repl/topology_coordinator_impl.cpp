@@ -2139,9 +2139,11 @@ MemberState TopologyCoordinatorImpl::getMemberState() const {
         if (_options.configServerMode == CatalogManager::ConfigServerMode::NONE) {
             return MemberState::RS_REMOVED;
         }
-        if (_options.configServerMode == CatalogManager::ConfigServerMode::CSRS &&
-            !_options.storageEngineSupportsReadCommitted) {
-            return MemberState::RS_REMOVED;
+        if (_options.configServerMode == CatalogManager::ConfigServerMode::CSRS) {
+            invariant(_storageEngineSupportsReadCommitted != ReadCommittedSupport::kUnknown);
+            if (_storageEngineSupportsReadCommitted == ReadCommittedSupport::kNo) {
+                return MemberState::RS_REMOVED;
+            }
         }
     } else {
         if (_options.configServerMode != CatalogManager::ConfigServerMode::NONE) {
@@ -2461,6 +2463,11 @@ bool TopologyCoordinatorImpl::becomeCandidateIfElectable(const Date_t now,
     _role = Role::candidate;
 
     return true;
+}
+
+void TopologyCoordinatorImpl::setStorageEngineSupportsReadCommitted(bool supported) {
+    _storageEngineSupportsReadCommitted =
+        supported ? ReadCommittedSupport::kYes : ReadCommittedSupport::kNo;
 }
 
 }  // namespace repl

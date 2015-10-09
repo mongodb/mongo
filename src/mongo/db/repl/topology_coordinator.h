@@ -449,6 +449,12 @@ public:
      */
     virtual bool becomeCandidateIfElectable(const Date_t now, const OpTime& lastOpApplied) = 0;
 
+    /**
+     * Updates the storage engine read committed support in the TopologyCoordinator options after
+     * creation.
+     */
+    virtual void setStorageEngineSupportsReadCommitted(bool supported) = 0;
+
 protected:
     TopologyCoordinator() {}
 };

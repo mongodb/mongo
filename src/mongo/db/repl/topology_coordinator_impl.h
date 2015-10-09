@@ -130,9 +130,6 @@ public:
         // Whether or not this node is running as a config server, and if so whether it was started
         // with --configsvrMode=SCCC.
         CatalogManager::ConfigServerMode configServerMode{CatalogManager::ConfigServerMode::NONE};
-
-        // Whether or not the storage engine supports read committed.
-        bool storageEngineSupportsReadCommitted{true};
     };
 
     /**
@@ -239,6 +236,7 @@ public:
                                                     const int memberIndex,
                                                     const OpTime& myLastOpApplied);
     virtual bool becomeCandidateIfElectable(const Date_t now, const OpTime& lastOpApplied);
+    virtual void setStorageEngineSupportsReadCommitted(bool supported);
 
     ////////////////////////////////////////////////////////////
     //
@@ -453,6 +451,15 @@ private:
 
     // V1 last vote info for elections
     LastVote _lastVote;
+
+    enum class ReadCommittedSupport {
+        kUnknown,
+        kNo,
+        kYes,
+    };
+
+    // Whether or not the storage engine supports read committed.
+    ReadCommittedSupport _storageEngineSupportsReadCommitted{ReadCommittedSupport::kUnknown};
 };
 
 }  // namespace repl

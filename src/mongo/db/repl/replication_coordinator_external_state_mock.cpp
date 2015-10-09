@@ -224,6 +224,11 @@ double ReplicationCoordinatorExternalStateMock::getElectionTimeoutOffsetLimitFra
     return 0.15;
 }
 
+bool ReplicationCoordinatorExternalStateMock::isReadCommittedSupportedByStorageEngine(
+    OperationContext* txn) const {
+    return true;
+}
+
 void ReplicationCoordinatorExternalStateMock::logTransitionToPrimaryToOplog(OperationContext* txn) {
     _lastOpTime = OpTime(Timestamp(1, 0), 1);
 }

@@ -82,6 +82,7 @@ public:
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters();
     virtual double getElectionTimeoutOffsetLimitFraction() const;
+    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* txn) const;
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"

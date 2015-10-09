@@ -79,6 +79,7 @@ public:
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters();
     virtual double getElectionTimeoutOffsetLimitFraction() const;
+    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* txn) const;
 
     std::string getNextOpContextThreadName();
 

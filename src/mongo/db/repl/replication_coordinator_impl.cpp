@@ -434,6 +434,9 @@ void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
 
     _replExecutor.startup();
 
+    _topCoord->setStorageEngineSupportsReadCommitted(
+        _externalState->isReadCommittedSupportedByStorageEngine(txn));
+
     bool doneLoadingConfig = _startLoadLocalConfig(txn);
     if (doneLoadingConfig) {
         // If we're not done loading the config, then the config state will be set by

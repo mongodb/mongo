@@ -241,6 +241,11 @@ public:
      * on randomized offset.
      */
     virtual double getElectionTimeoutOffsetLimitFraction() const = 0;
+
+    /**
+     * Returns true if the current storage engine supports read committed.
+     */
+    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* txn) const = 0;
 };
 
 }  // namespace repl

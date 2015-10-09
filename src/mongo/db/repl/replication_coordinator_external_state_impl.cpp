@@ -421,5 +421,13 @@ double ReplicationCoordinatorExternalStateImpl::getElectionTimeoutOffsetLimitFra
     return replElectionTimeoutOffsetLimitFraction;
 }
 
+bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageEngine(
+    OperationContext* txn) const {
+    auto storageEngine = txn->getServiceContext()->getGlobalStorageEngine();
+    // This should never be called if the storage engine has not been initialized.
+    invariant(storageEngine);
+    return storageEngine->getSnapshotManager();
+}
+
 }  // namespace repl
 }  // namespace mongo
