@@ -29,7 +29,7 @@
 
 namespace mongo {
 
-TimerHolder::TimerHolder(TimerStats* stats) : _stats(stats), _recorded(false) {
+TimerHolder::TimerHolder(TimerStats& stats) : _stats(stats), _recorded(false) {
 }
 
 TimerHolder::~TimerHolder() {
@@ -40,10 +40,7 @@ TimerHolder::~TimerHolder() {
 
 Microseconds TimerHolder::recordTimerStats() {
     _recorded = true;
-    if (_stats) {
-        return _stats->record(_t);
-    }
-    return Microseconds(_t.micros());
+    return _stats.record(_t);
 }
 
 Microseconds TimerStats::record(const Timer& timer) {

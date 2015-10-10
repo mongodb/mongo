@@ -40,7 +40,6 @@ namespace mongo {
  */
 class TimerStats {
 public:
-
     /**
      * \brief Increments the timing information
      *
@@ -95,9 +94,9 @@ public:
     /**
      * \brief Constructs a TimerHolder with the TimerStats it needs to update
      *
-     * \param stats Pointer to the TimerStats object to update
+     * \param stats Reference to the TimerStats object to update
      */
-    TimerHolder(TimerStats* stats);
+    TimerHolder(TimerStats& stats);
 
     /**
      * \brief Destroys the instance and updates the TimerStats object if
@@ -123,7 +122,7 @@ public:
     Microseconds recordTimerStats();
 
 private:
-    TimerStats* _stats;
+    TimerStats& _stats;
     bool _recorded;
     Timer _t;
 };

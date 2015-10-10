@@ -76,7 +76,7 @@ void prefetchIndexPages(OperationContext* txn,
         case BackgroundSync::PREFETCH_NONE:
             return;
         case BackgroundSync::PREFETCH_ID_ONLY: {
-            TimerHolder timer(&prefetchIndexStats);
+            TimerHolder timer(prefetchIndexStats);
             // on the update op case, the call to prefetchRecordPages will touch the _id index.
             // thus perhaps this option isn't very useful?
             try {
@@ -97,7 +97,7 @@ void prefetchIndexPages(OperationContext* txn,
             IndexCatalog::IndexIterator ii =
                 collection->getIndexCatalog()->getIndexIterator(txn, true);
             while (ii.more()) {
-                TimerHolder timer(&prefetchIndexStats);
+                TimerHolder timer(prefetchIndexStats);
                 // This will page in all index pages for the given object.
                 try {
                     IndexDescriptor* desc = ii.next();
@@ -119,7 +119,7 @@ void prefetchIndexPages(OperationContext* txn,
 void prefetchRecordPages(OperationContext* txn, Database* db, const char* ns, const BSONObj& obj) {
     BSONElement _id;
     if (obj.getObjectID(_id)) {
-        TimerHolder timer(&prefetchDocStats);
+        TimerHolder timer(prefetchDocStats);
         BSONObjBuilder builder;
         builder.append(_id);
         BSONObj result;

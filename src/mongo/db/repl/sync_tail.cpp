@@ -306,7 +306,7 @@ void applyOps(const std::vector<std::vector<BSONObj>>& writerVectors,
               OldThreadPool* writerPool,
               SyncTail::MultiSyncApplyFunc func,
               SyncTail* sync) {
-    TimerHolder timer(&applyBatchStats);
+    TimerHolder timer(applyBatchStats);
     for (std::vector<std::vector<BSONObj>>::const_iterator it = writerVectors.begin();
          it != writerVectors.end();
          ++it) {
