@@ -38,26 +38,17 @@ TimerHolder::~TimerHolder() {
     }
 }
 
-long long TimerHolder::recordTimerStats() {
+Microseconds TimerHolder::recordTimerStats() {
     _recorded = true;
     if (_stats) {
         return _stats->record(_t);
     }
-    return _t.micros();
+    return Microseconds(_t.micros());
 }
 
-void TimerStats::recordMillis(int millis) {
-    recordMicros(static_cast<long long>(millis) * 1000);
-}
-
-void TimerStats::recordMicros(long long micros) {
-    _num.fetchAndAdd(1);
-    _totalMicros.fetchAndAdd(micros);
-}
-
-long long TimerStats::record(const Timer& timer) {
-    long long micros = timer.micros();
-    recordMicros(micros);
+Microseconds TimerStats::record(const Timer& timer) {
+    auto micros = Microseconds(timer.micros());
+    recordDuration(micros);
     return micros;
 }
 

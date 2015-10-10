@@ -520,7 +520,7 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     }
 
     // record time for each batch
-    getmoreReplStats.recordMillis(durationCount<Milliseconds>(queryResponse.elapsedMillis));
+    getmoreReplStats.recordDuration(queryResponse.elapsedMillis);
 
     networkByteStats.increment(currentBatchMessageSize);
 

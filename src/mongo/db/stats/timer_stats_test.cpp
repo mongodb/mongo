@@ -51,13 +51,16 @@ TEST(TimerStatsTest, GetReportNoRecording) {
 TEST(TimerStatsTest, GetReportOneRecording) {
     TimerStats timerStats;
     Timer timer;
-    long long micros = timerStats.record(timer);
-    int millis = static_cast<int>(micros / 1000);
+    auto micros = timerStats.record(timer);
+    auto microsAsLongLong = static_cast<long long>(micros.count());
+    auto millisAsInt = static_cast<int>(
+        duration_cast<Milliseconds>(micros).count()
+    );
     ASSERT_EQUALS(
         BSON(
             "num" << 1 <<
-            "totalMillis" << millis <<
-            "totalMicros" << micros
+            "totalMillis" << millisAsInt <<
+            "totalMicros" << microsAsLongLong
         ),
         timerStats.getReport()
     );

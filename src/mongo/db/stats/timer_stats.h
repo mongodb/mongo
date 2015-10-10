@@ -33,26 +33,24 @@
 namespace mongo {
 
 /**
- * \brief Holds timing information in microseconds
+ * \brief Holds timing information
  *
  * It keeps track of number of times it has been updated and the accumulated
- * microseconds so a diff can be computed.
+ * time so a diff can be computed.
  */
 class TimerStats {
 public:
-    /**
-     * \brief Increments the timing information
-     *
-     * \param millis The number of milliseconds to increment the timing stats
-     */
-    void recordMillis(int millis);
 
     /**
      * \brief Increments the timing information
      *
      * \param micros The number of microseconds to increment the timing stats
      */
-    void recordMicros(long long micros);
+    template <typename DType>
+    void recordDuration(DType duration) {
+        _num.fetchAndAdd(1);
+        _totalMicros.fetchAndAdd(duration_cast<Microseconds>(duration).count());
+    }
 
     /**
      * \brief Increment the timing information using a Timer
@@ -60,7 +58,7 @@ public:
      * \param timer The timer to use to increment the timing stats
      * \return The number of microseconds that the timing stats was incremented
      */
-    long long record(const Timer& timer);
+    Microseconds record(const Timer& timer);
 
     /**
      * \brief Generate the BSONObj containing the timing stats information
@@ -108,21 +106,12 @@ public:
     ~TimerHolder();
 
     /**
-     * \brief Gets the number of milliseconds from the internal timer
-     *
-     * \return The number of milliseconds from the internal timer
-     */
-    int millis() const {
-        return _t.millis();
-    }
-
-    /**
      * \brief Gets the number of microseconds from the internal timer
      *
      * \return The number of microseconds from the internal timer
      */
-    long long micros() const {
-        return _t.micros();
+    Microseconds micros() const {
+        return Microseconds(_t.micros());
     }
 
     /**
@@ -131,7 +120,7 @@ public:
      * \return The number of microseconds that have been added to the
      *  TimerStats object
      */
-    long long recordTimerStats();
+    Microseconds recordTimerStats();
 
 private:
     TimerStats* _stats;
