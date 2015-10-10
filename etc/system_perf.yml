@@ -370,28 +370,28 @@ tasks:
       vars:
         test: "benchRun-wiredTiger"
 
- #   - func: "configure mongodb cluster"
- #     vars:
- #       test: "ycsb-mmap"
- #       storageEngine: "mmapv1"
+    - func: "configure mongodb cluster"
+      vars:
+        test: "ycsb-mmap"
+        storageEngine: "mmapv1"
 
- #   - func: "run test"
- #     vars:
- #       storageEngine: "mmapv1"
- #       test: "ycsb-mmap"
- #   - func: "make test log artifact"
- #   - func: "upload log file"
- #     vars:
- #       test: "ycsb-mmap"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "ycsb-mmap"
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "ycsb-mmap"
 
- #   - func: "run test"
- #     vars:
- #       storageEngine: "mmapv1"
- #       test: "benchRun-mmap"
- #   - func: "make test log artifact"
- #   - func: "upload log file"
- #     vars:
- #       test: "benchRun-mmap"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "benchRun-mmap"
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "benchRun-mmap"
 
     - func: "analyze"
     - func: "destroy cluster"
