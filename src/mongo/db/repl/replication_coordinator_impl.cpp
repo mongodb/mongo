@@ -1257,9 +1257,6 @@ ReplicationCoordinatorImpl::stepDown_nonBlocking(OperationContext* txn,
         return StepDownNonBlockingResult();
     }
 
-    // This is done by GlobalRead after acquiring the lock successfully.
-    txn->lockState()->lockMMAPV1Flush();
-
     StatusWith<ReplicationExecutor::EventHandle> finishedEvent = _replExecutor.makeEvent();
     if (finishedEvent.getStatus() == ErrorCodes::ShutdownInProgress) {
         *result = finishedEvent.getStatus();
