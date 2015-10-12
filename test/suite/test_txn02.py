@@ -104,9 +104,18 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         # deterministic manner.
         self.txn_sync = self.sync_list[
             self.scenario_number % len(self.sync_list)]
+        #
+        # We don't want to run zero fill with only the same settings, such
+        # as archive or sync, which are an even number of options.
+        #
+        freq = 3
+        zerofill = 'false'
+        if self.scenario_number % freq == 0:
+            zerofill = 'true'
         self.backup_dir = os.path.join(self.home, "WT_BACKUP")
         conn_params = \
                 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+                'log=(zero_fill=%s),' % zerofill + \
                 'create,error_prefix="%s: ",' % self.shortid() + \
                 'transaction_sync="%s",' % self.txn_sync
         # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)

@@ -678,11 +678,15 @@ __wt_conn_dhandle_discard(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	/*
-	 * Close open data handles: first, everything but the metadata file
-	 * (as closing a normal file may open and write the metadata file),
-	 * then the metadata file.  This function isn't called often, and I
-	 * don't want to "know" anything about the metadata file's position on
-	 * the list, so we do it the hard way.
+	 * Empty the session cache: any data handles created in a connection
+	 * method may be cached here, and we're about to close them.
+	 */
+	__wt_session_close_cache(session);
+
+	/*
+	 * Close open data handles: first, everything but the metadata file (as
+	 * closing a normal file may open and write the metadata file), then
+	 * the metadata file.
 	 */
 restart:
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {

@@ -81,4 +81,3 @@ class test_bug013(wttest.WiredTigerTestCase):
 
 if __name__ == '__main__':
     wttest.run()
-

@@ -571,7 +571,7 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 	/* Try to find the index in the table. */
 	for (i = 0; i < table->nindices; i++) {
 		idx = table->indices[i];
-		if (strcmp(idx->name, uri) == 0) {
+		if (idx != NULL && strcmp(idx->name, uri) == 0) {
 			if (tablep != NULL)
 				*tablep = table;
 			else

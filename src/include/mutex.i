@@ -251,3 +251,91 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 #error Unknown spinlock type
 
 #endif
+
+/*
+ * __wt_fair_trylock --
+ *	Try to get a lock - give up if it is not immediately available.
+ */
+static inline int
+__wt_fair_trylock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
+{
+	WT_FAIR_LOCK new, old;
+
+	WT_UNUSED(session);
+
+	old = new = *lock;
+
+	/* Exit early if there is no chance we can get the lock. */
+	if (old.fair_lock_waiter != old.fair_lock_owner)
+		return (EBUSY);
+
+	/* The replacement lock value is a result of allocating a new ticket. */
+	++new.fair_lock_waiter;
+	return (__wt_atomic_cas32(
+	    &lock->u.lock, old.u.lock, new.u.lock) ? 0 : EBUSY);
+}
+
+/*
+ * __wt_fair_lock --
+ *	Get a lock.
+ */
+static inline int
+__wt_fair_lock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
+{
+	uint16_t ticket;
+	int pause_cnt;
+
+	WT_UNUSED(session);
+
+	/*
+	 * Possibly wrap: if we have more than 64K lockers waiting, the ticket
+	 * value will wrap and two lockers will simultaneously be granted the
+	 * lock.
+	 */
+	ticket = __wt_atomic_fetch_add16(&lock->fair_lock_waiter, 1);
+	for (pause_cnt = 0; ticket != lock->fair_lock_owner;) {
+		/*
+		 * We failed to get the lock; pause before retrying and if we've
+		 * paused enough, sleep so we don't burn CPU to no purpose. This
+		 * situation happens if there are more threads than cores in the
+		 * system and we're thrashing on shared resources.
+		 */
+		if (++pause_cnt < 1000)
+			WT_PAUSE();
+		else
+			__wt_sleep(0, 10);
+	}
+
+	return (0);
+}
+
+/*
+ * __wt_fair_unlock --
+ *	Release a shared lock.
+ */
+static inline int
+__wt_fair_unlock(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
+{
+	WT_UNUSED(session);
+
+	/*
+	 * We have exclusive access - the update does not need to be atomic.
+	 */
+	++lock->fair_lock_owner;
+
+	return (0);
+}
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __wt_fair_islocked --
+ *	Test whether the lock is currently held
+ */
+static inline bool
+__wt_fair_islocked(WT_SESSION_IMPL *session, WT_FAIR_LOCK *lock)
+{
+	WT_UNUSED(session);
+
+	return (lock->fair_lock_waiter != lock->fair_lock_owner);
+}
+#endif

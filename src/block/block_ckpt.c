@@ -657,7 +657,7 @@ live_update:
 	}
 #endif
 
-	block->ckpt_inprogress = 1;
+	block->ckpt_inprogress = true;
 
 err:	if (locked)
 		__wt_spin_unlock(session, &block->live_lock);
@@ -775,7 +775,7 @@ __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		WT_RET_MSG(session, WT_ERROR,
 		    "%s: checkpoint resolved, but no checkpoint in progress",
 		    block->name);
-	block->ckpt_inprogress = 0;
+	block->ckpt_inprogress = false;
 
 	__wt_spin_lock(session, &block->live_lock);
 	ret = __wt_block_extlist_merge(

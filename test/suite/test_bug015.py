@@ -25,48 +25,24 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_sweep02.py
-# Test configuring and reconfiguring sweep options.
-#
 
 import wiredtiger, wttest
-from wiredtiger import wiredtiger_open
-from wttest import unittest
+from helper import copy_wiredtiger_home, key_populate, simple_populate
 
-class test_sweep02(wttest.WiredTigerTestCase):
-    base_config = 'create,'
-    dir = 'WT_TEST'
-    tablebase = 'test_sweep02'
-    uri = 'table:' + tablebase
-
-    # Disable default setup/shutdown steps - connections are managed manually.
-    def setUpSessionOpen(self, conn):
-        return None
-
-    def setUpConnectionOpen(self, dir):
-        self.dir = dir
-        return None
-
-    def test_config01(self):
-        self.conn = wiredtiger_open(self.dir,
-            self.base_config + "file_manager=()")
-
-    def test_config02(self):
-        self.conn = wiredtiger_open(self.dir,
-            self.base_config + "file_manager=(close_scan_interval=1)")
-
-    def test_config03(self):
-        self.conn = wiredtiger_open(self.dir,
-            self.base_config + "file_manager=(close_idle_time=1)")
-
-    def test_config04(self):
-        self.conn = wiredtiger_open(self.dir,
-            self.base_config + "file_manager=(close_handle_minimum=500)")
-
-    def test_config05(self):
-        self.conn = wiredtiger_open(self.dir, self.base_config + \
-            "file_manager=(close_scan_interval=1,close_idle_time=1)")
+# test_bug015.py
+#    JIRA WT-2162: index drop in a certain order triggers NULL pointer deref
+class test_bug015(wttest.WiredTigerTestCase):
+    def test_bug015(self):
+        table = 'table:test_bug015'
+        idx1 = 'index:test_bug015:aab'
+        idx2 = 'index:test_bug015:aaa'
+        self.session.create(table, "columns=(k,v)")
+        self.session.create(idx1, "columns=(v)")
+        self.session.create(idx2, "columns=(v)")
+        self.session.drop(idx1, "force=true")
+        self.session.create(idx1, "columns=(v)")
+        self.session.drop(idx2, "force=true")
+        self.session.create(idx2, "columns=(v)")
 
 if __name__ == '__main__':
     wttest.run()

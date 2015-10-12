@@ -141,37 +141,37 @@ struct __wt_table {
  *	Drop the handle, table and/or schema locks, perform an operation,
  *	re-acquire the lock(s).
  */
-#define	WT_WITHOUT_LOCKS(session, op) do {			\
-	WT_CONNECTION_IMPL *__conn = S2C(session);		\
-	int __handle_locked =					\
-		F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST);\
-	int __table_locked =					\
-		F_ISSET(session, WT_SESSION_LOCKED_TABLE);	\
-	int __schema_locked =					\
-		F_ISSET(session, WT_SESSION_LOCKED_SCHEMA);	\
-	if (__handle_locked) {					\
-		F_CLR(session, WT_SESSION_LOCKED_HANDLE_LIST);	\
-		__wt_spin_unlock(session, &__conn->dhandle_lock);\
-	}							\
-	if (__table_locked) {					\
-		F_CLR(session, WT_SESSION_LOCKED_TABLE);	\
-		__wt_spin_unlock(session, &__conn->table_lock);\
-	}							\
-	if (__schema_locked) {					\
-		F_CLR(session, WT_SESSION_LOCKED_SCHEMA);	\
-		__wt_spin_unlock(session, &__conn->schema_lock);\
-	}							\
-	op;							\
-	if (__schema_locked) {					\
-		__wt_spin_lock(session, &__conn->schema_lock);	\
-		F_SET(session, WT_SESSION_LOCKED_SCHEMA);	\
-	}							\
-	if (__table_locked) {					\
-		__wt_spin_lock(session, &__conn->table_lock);	\
-		F_SET(session, WT_SESSION_LOCKED_TABLE);	\
-	}							\
-	if (__handle_locked) {					\
-		__wt_spin_lock(session, &__conn->dhandle_lock);	\
-		F_SET(session, WT_SESSION_LOCKED_HANDLE_LIST);	\
-	}							\
+#define	WT_WITHOUT_LOCKS(session, op) do {				\
+	WT_CONNECTION_IMPL *__conn = S2C(session);			\
+	bool __handle_locked =						\
+	    F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST);		\
+	bool __table_locked =						\
+	    F_ISSET(session, WT_SESSION_LOCKED_TABLE);			\
+	bool __schema_locked =						\
+	    F_ISSET(session, WT_SESSION_LOCKED_SCHEMA);			\
+	if (__handle_locked) {						\
+		F_CLR(session, WT_SESSION_LOCKED_HANDLE_LIST);		\
+		__wt_spin_unlock(session, &__conn->dhandle_lock);	\
+	}								\
+	if (__table_locked) {						\
+		F_CLR(session, WT_SESSION_LOCKED_TABLE);		\
+		__wt_spin_unlock(session, &__conn->table_lock);		\
+	}								\
+	if (__schema_locked) {						\
+		F_CLR(session, WT_SESSION_LOCKED_SCHEMA);		\
+		__wt_spin_unlock(session, &__conn->schema_lock);	\
+	}								\
+	op;								\
+	if (__schema_locked) {						\
+		__wt_spin_lock(session, &__conn->schema_lock);		\
+		F_SET(session, WT_SESSION_LOCKED_SCHEMA);		\
+	}								\
+	if (__table_locked) {						\
+		__wt_spin_lock(session, &__conn->table_lock);		\
+		F_SET(session, WT_SESSION_LOCKED_TABLE);		\
+	}								\
+	if (__handle_locked) {						\
+		__wt_spin_lock(session, &__conn->dhandle_lock);		\
+		F_SET(session, WT_SESSION_LOCKED_HANDLE_LIST);		\
+	}								\
 } while (0)

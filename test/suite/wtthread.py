@@ -171,4 +171,3 @@ class op_thread(threading.Thread):
             for next_cursor in cursors:
                 next_cursor.close()
         sess.close()
-
