@@ -532,14 +532,15 @@ Status removePrivilegeDocuments(OperationContext* txn,
  */
 Status writeAuthSchemaVersionIfNeeded(OperationContext* txn,
                                       AuthorizationManager* authzManager,
-                                      int foundSchemaVersion) {
+                                      int foundSchemaVersion,
+                                      const BSONObj& writeConcern) {
     Status status = updateOneAuthzDocument(
         txn,
         AuthorizationManager::versionCollectionNamespace,
         AuthorizationManager::versionDocumentQuery,
         BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName << foundSchemaVersion)),
-        true,                                        // upsert
-        BSONObj());                                  // write concern
+        true,  // upsert
+        writeConcern);
     if (status == ErrorCodes::NoMatchingDocument) {  // SERVER-11492
         status = Status::OK();
     }
@@ -552,7 +553,9 @@ Status writeAuthSchemaVersionIfNeeded(OperationContext* txn,
  * for the MongoDB 2.6 and 3.0 MongoDB-CR/SCRAM mixed auth mode.
  * Returns an error otherwise.
  */
-Status requireAuthSchemaVersion26Final(OperationContext* txn, AuthorizationManager* authzManager) {
+Status requireAuthSchemaVersion26Final(OperationContext* txn,
+                                       AuthorizationManager* authzManager,
+                                       const BSONObj& writeConcern) {
     int foundSchemaVersion;
     Status status = authzManager->getAuthorizationVersion(txn, &foundSchemaVersion);
     if (!status.isOK()) {
@@ -567,7 +570,7 @@ Status requireAuthSchemaVersion26Final(OperationContext* txn, AuthorizationManag
                           << AuthorizationManager::schemaVersion26Final << " but found "
                           << foundSchemaVersion);
     }
-    return writeAuthSchemaVersionIfNeeded(txn, authzManager, foundSchemaVersion);
+    return writeAuthSchemaVersionIfNeeded(txn, authzManager, foundSchemaVersion, writeConcern);
 }
 
 /**
@@ -712,7 +715,7 @@ public:
 
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, args.writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -822,7 +825,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, args.writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -886,26 +889,25 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
+        UserName userName;
+        BSONObj writeConcern;
+        Status status =
+            auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName, &writeConcern);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
+        }
+
         ServiceContext* serviceContext = txn->getClient()->getServiceContext();
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
-
-
-        UserName userName;
-        BSONObj writeConcern;
-        status = auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName, &writeConcern);
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status);
-        }
-
-        int nMatched;
 
         audit::logDropUser(ClientBasic::getCurrent(), userName);
 
+        int nMatched;
         status = removePrivilegeDocuments(txn,
                                           BSON(AuthorizationManager::USER_NAME_FIELD_NAME
                                                << userName.getUser()
@@ -959,26 +961,24 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status);
-        }
-
         BSONObj writeConcern;
-        status =
+        Status status =
             auth::parseAndValidateDropAllUsersFromDatabaseCommand(cmdObj, dbname, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
-        int numRemoved;
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
+        }
 
         audit::logDropAllUsersFromDatabase(ClientBasic::getCurrent(), dbname);
 
+        int numRemoved;
         status = removePrivilegeDocuments(txn,
                                           BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname),
                                           writeConcern,
@@ -1023,20 +1023,20 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        std::string userNameString;
+        std::vector<RoleName> roles;
+        BSONObj writeConcern;
+        Status status = auth::parseRolePossessionManipulationCommands(
+            cmdObj, "grantRolesToUser", dbname, &userNameString, &roles, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        std::string userNameString;
-        std::vector<RoleName> roles;
-        BSONObj writeConcern;
-        status = auth::parseRolePossessionManipulationCommands(
-            cmdObj, "grantRolesToUser", dbname, &userNameString, &roles, &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1098,20 +1098,20 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        std::string userNameString;
+        std::vector<RoleName> roles;
+        BSONObj writeConcern;
+        Status status = auth::parseRolePossessionManipulationCommands(
+            cmdObj, "revokeRolesFromUser", dbname, &userNameString, &roles, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        std::string userNameString;
-        std::vector<RoleName> roles;
-        BSONObj writeConcern;
-        status = auth::parseRolePossessionManipulationCommands(
-            cmdObj, "revokeRolesFromUser", dbname, &userNameString, &roles, &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1346,7 +1346,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, args.writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1430,7 +1430,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, args.writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1497,20 +1497,20 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        RoleName roleName;
+        PrivilegeVector privilegesToAdd;
+        BSONObj writeConcern;
+        Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
+            cmdObj, "grantPrivilegesToRole", dbname, &roleName, &privilegesToAdd, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        RoleName roleName;
-        PrivilegeVector privilegesToAdd;
-        BSONObj writeConcern;
-        status = auth::parseAndValidateRolePrivilegeManipulationCommands(
-            cmdObj, "grantPrivilegesToRole", dbname, &roleName, &privilegesToAdd, &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1605,24 +1605,25 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        RoleName roleName;
+        PrivilegeVector privilegesToRemove;
+        BSONObj writeConcern;
+        Status status =
+            auth::parseAndValidateRolePrivilegeManipulationCommands(cmdObj,
+                                                                    "revokePrivilegesFromRole",
+                                                                    dbname,
+                                                                    &roleName,
+                                                                    &privilegesToRemove,
+                                                                    &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        RoleName roleName;
-        PrivilegeVector privilegesToRemove;
-        BSONObj writeConcern;
-        status = auth::parseAndValidateRolePrivilegeManipulationCommands(cmdObj,
-                                                                         "revokePrivilegesFromRole",
-                                                                         dbname,
-                                                                         &roleName,
-                                                                         &privilegesToRemove,
-                                                                         &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1742,7 +1743,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1815,20 +1816,20 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        std::string roleNameString;
+        std::vector<RoleName> rolesToRemove;
+        BSONObj writeConcern;
+        Status status = auth::parseRolePossessionManipulationCommands(
+            cmdObj, "revokeRolesFromRole", dbname, &roleNameString, &rolesToRemove, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        std::string roleNameString;
-        std::vector<RoleName> rolesToRemove;
-        BSONObj writeConcern;
-        status = auth::parseRolePossessionManipulationCommands(
-            cmdObj, "revokeRolesFromRole", dbname, &roleNameString, &rolesToRemove, &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1907,18 +1908,18 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        Status status = requireAuthSchemaVersion26Final(txn, authzManager);
+        RoleName roleName;
+        BSONObj writeConcern;
+        Status status = auth::parseDropRoleCommand(cmdObj, dbname, &roleName, &writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
-        RoleName roleName;
-        BSONObj writeConcern;
-        status = auth::parseDropRoleCommand(cmdObj, dbname, &roleName, &writeConcern);
+        ServiceContext* serviceContext = txn->getClient()->getServiceContext();
+        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
+
+        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2072,7 +2073,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2697,7 +2698,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(txn, authzManager);
+        status = requireAuthSchemaVersion26Final(txn, authzManager, args.writeConcern);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }

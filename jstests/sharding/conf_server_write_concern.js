@@ -11,10 +11,15 @@ function writeToConfigTest(){
                                           { $set: { stopped: true }},
                                           { writeConcern: { w: 'majority' }}));
 
-    // w:1 should still work
+    // w:1 should still work - it gets automatically upconverted to w:majority
     assert.writeOK(confDB.settings.update({ _id: 'balancer' },
                                           { $set: { stopped: true }},
                                           { writeConcern: { w: 1 }}));
+
+    // Write concerns other than w:1 and w:majority should fail.
+    assert.writeError(confDB.settings.update({ _id: 'balancer' },
+                                             { $set: { stopped: true }},
+                                             { writeConcern: { w: 2 }}));
 
     st.stop();
 }

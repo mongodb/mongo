@@ -130,13 +130,24 @@ Status validateWriteConcern(const WriteConcernOptions& writeConcern) {
     const repl::ReplicationCoordinator::Mode replMode =
         repl::getGlobalReplicationCoordinator()->getReplicationMode();
 
-    if (isConfigServer && replMode != repl::ReplicationCoordinator::modeReplSet) {
-        // SCCC config servers can have a master-slave oplog, but we still don't allow w > 1.
-        if (writeConcern.wNumNodes > 1) {
-            return Status(ErrorCodes::BadValue,
-                          "cannot use 'w' > 1 on a sync cluster connection config server host");
+    if (isConfigServer) {
+        if (!writeConcern.validForConfigServers()) {
+            return Status(
+                ErrorCodes::BadValue,
+                str::stream()
+                    << "w:1 and w:'majority' are the only valid write concerns when writing to "
+                       "config servers, got: " << writeConcern.toBSON().toString());
+        }
+        if (replMode == repl::ReplicationCoordinator::modeReplSet && writeConcern.wMode == "") {
+            invariant(writeConcern.wNumNodes == 1);
+            return Status(
+                ErrorCodes::BadValue,
+                str::stream()
+                    << "w: 'majority' is the only valid write concern when writing to config "
+                       "server replica sets, got: " << writeConcern.toBSON().toString());
         }
     }
+
     if (replMode == repl::ReplicationCoordinator::modeNone) {
         if (writeConcern.wNumNodes > 1) {
             return Status(ErrorCodes::BadValue, "cannot use 'w' > 1 when a host is not replicated");

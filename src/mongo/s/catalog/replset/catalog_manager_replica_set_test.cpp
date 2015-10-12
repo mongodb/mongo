@@ -700,9 +700,84 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandSuccess) {
 
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("test", request.dbname);
+        // Since no write concern was sent we will add w:majority
         ASSERT_EQUALS(BSON("dropUser"
                            << "test"
-                           << "maxTimeMS" << 30000),
+                           << "writeConcern" << BSON("w"
+                                                     << "majority"
+                                                     << "wtimeout" << 0) << "maxTimeMS" << 30000),
+                      request.cmdObj);
+
+        ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+
+        BSONObjBuilder responseBuilder;
+        Command::appendCommandStatus(responseBuilder,
+                                     Status(ErrorCodes::UserNotFound, "User test@test not found"));
+        return responseBuilder.obj();
+    });
+
+    // Now wait for the runUserManagementWriteCommand call to return
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandInvalidWriteConcern) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    BSONObjBuilder responseBuilder;
+    bool ok =
+        catalogManager()->runUserManagementWriteCommand(operationContext(),
+                                                        "dropUser",
+                                                        "test",
+                                                        BSON("dropUser"
+                                                             << "test"
+                                                             << "writeConcern" << BSON("w" << 2)),
+                                                        &responseBuilder);
+    ASSERT_FALSE(ok);
+
+    Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
+    ASSERT_EQUALS(ErrorCodes::InvalidOptions, commandStatus);
+    ASSERT_STRING_CONTAINS(commandStatus.reason(), "Invalid replication write concern");
+}
+
+TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandRewriteWriteConcern) {
+    // Tests that if you send a w:1 write concern it gets replaced with w:majority
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    distLock()->expectLock(
+        [](StringData name,
+           StringData whyMessage,
+           milliseconds waitFor,
+           milliseconds lockTryInterval) {
+            ASSERT_EQUALS("authorizationData", name);
+            ASSERT_EQUALS("dropUser", whyMessage);
+        },
+        Status::OK());
+
+    auto future =
+        launchAsync([this] {
+            BSONObjBuilder responseBuilder;
+            bool ok =
+                catalogManager()->runUserManagementWriteCommand(
+                    operationContext(),
+                    "dropUser",
+                    "test",
+                    BSON("dropUser"
+                         << "test"
+                         << "writeConcern" << BSON("w" << 1 << "wtimeout" << 30)),
+                    &responseBuilder);
+            ASSERT_FALSE(ok);
+
+            Status commandStatus = Command::getStatusFromCommandResult(responseBuilder.obj());
+            ASSERT_EQUALS(ErrorCodes::UserNotFound, commandStatus);
+        });
+
+    onCommand([](const RemoteCommandRequest& request) {
+        ASSERT_EQUALS("test", request.dbname);
+        ASSERT_EQUALS(BSON("dropUser"
+                           << "test"
+                           << "writeConcern" << BSON("w"
+                                                     << "majority"
+                                                     << "wtimeout" << 30) << "maxTimeMS" << 30000),
                       request.cmdObj);
 
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -803,9 +878,12 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMasterRetrySuc
     onCommand([host2](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(host2, request.target);
         ASSERT_EQUALS("test", request.dbname);
+        // Since no write concern was sent we will add w:majority
         ASSERT_EQUALS(BSON("dropUser"
                            << "test"
-                           << "maxTimeMS" << 30000),
+                           << "writeConcern" << BSON("w"
+                                                     << "majority"
+                                                     << "wtimeout" << 0) << "maxTimeMS" << 30000),
                       request.cmdObj);
 
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);

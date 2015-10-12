@@ -187,4 +187,8 @@ bool WriteConcernOptions::shouldWaitForOtherNodes() const {
     return !wMode.empty() || wNumNodes > 1;
 }
 
+bool WriteConcernOptions::validForConfigServers() const {
+    return wNumNodes == 1 || wMode == kMajority;
+}
+
 }  // namespace mongo

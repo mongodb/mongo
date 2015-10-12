@@ -867,6 +867,49 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* t
                                                              const std::string& dbname,
                                                              const BSONObj& cmdObj,
                                                              BSONObjBuilder* result) {
+    BSONObj cmdToRun = cmdObj;
+    {
+        // Make sure that the if the command has a write concern that it is w:1 or w:majority, and
+        // convert w:1 or no write concern to w:majority before sending.
+        WriteConcernOptions writeConcern;
+        const char* writeConcernFieldName = "writeConcern";
+        BSONElement writeConcernElement = cmdObj[writeConcernFieldName];
+        bool initialCmdHadWriteConcern = !writeConcernElement.eoo();
+        if (initialCmdHadWriteConcern) {
+            Status status = writeConcern.parse(writeConcernElement.Obj());
+            if (!status.isOK()) {
+                return Command::appendCommandStatus(*result, status);
+            }
+            if (!writeConcern.validForConfigServers()) {
+                return Command::appendCommandStatus(
+                    *result,
+                    Status(ErrorCodes::InvalidOptions,
+                           str::stream()
+                               << "Invalid replication write concern.  Writes to config server "
+                                  "replica sets must use w:'majority', got: "
+                               << writeConcern.toBSON()));
+            }
+        }
+        writeConcern.wMode = WriteConcernOptions::kMajority;
+        writeConcern.wNumNodes = 0;
+
+        BSONObjBuilder modifiedCmd;
+        if (!initialCmdHadWriteConcern) {
+            modifiedCmd.appendElements(cmdObj);
+        } else {
+            BSONObjIterator cmdObjIter(cmdObj);
+            while (cmdObjIter.more()) {
+                BSONElement e = cmdObjIter.next();
+                if (str::equals(e.fieldName(), writeConcernFieldName)) {
+                    continue;
+                }
+                modifiedCmd.append(e);
+            }
+        }
+        modifiedCmd.append(writeConcernFieldName, writeConcern.toBSON());
+        cmdToRun = modifiedCmd.obj();
+    }
+
     auto scopedDistLock =
         getDistLockManager()->lock(txn, "authorizationData", commandName, Seconds{5});
     if (!scopedDistLock.isOK()) {
@@ -874,7 +917,7 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* t
     }
 
     auto response =
-        grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, dbname, cmdObj);
+        grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, dbname, cmdToRun);
     if (!response.isOK()) {
         return Command::appendCommandStatus(*result, response.getStatus());
     }
