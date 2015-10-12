@@ -123,23 +123,23 @@ public:
     ExportedFTDCDirectorySizeParameter()
         : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
               ServerParameterSet::getGlobal(),
-              "diagnosticDataCollectionDirectorySizeMb",
+              "diagnosticDataCollectionDirectorySizeMB",
               &localMaxDirectorySizeMB) {}
 
     virtual Status validate(const std::int32_t& potentialNewValue) {
         if (potentialNewValue < 10) {
             return Status(
                 ErrorCodes::BadValue,
-                "diagnosticDataCollectionDirectorySizeMb must be greater than or equal to 10");
+                "diagnosticDataCollectionDirectorySizeMB must be greater than or equal to 10");
         }
 
         if (potentialNewValue < localMaxFileSizeMB) {
             return Status(
                 ErrorCodes::BadValue,
                 str::stream()
-                    << "diagnosticDataCollectionDirectorySizeMb must be greater than or equal to '"
+                    << "diagnosticDataCollectionDirectorySizeMB must be greater than or equal to '"
                     << localMaxFileSizeMB
-                    << "' which is the current value of diagnosticDataCollectionFileSizeMb.");
+                    << "' which is the current value of diagnosticDataCollectionFileSizeMB.");
         }
 
         auto controller = getGlobalFTDCController();
@@ -158,22 +158,22 @@ public:
     ExportedFTDCFileSizeParameter()
         : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
               ServerParameterSet::getGlobal(),
-              "diagnosticDataCollectionFileSizeMb",
+              "diagnosticDataCollectionFileSizeMB",
               &localMaxFileSizeMB) {}
 
     virtual Status validate(const std::int32_t& potentialNewValue) {
         if (potentialNewValue < 1) {
             return Status(ErrorCodes::BadValue,
-                          "diagnosticDataCollectionFileSizeMb must be greater than or equal to 1");
+                          "diagnosticDataCollectionFileSizeMB must be greater than or equal to 1");
         }
 
         if (potentialNewValue > localMaxDirectorySizeMB) {
             return Status(
                 ErrorCodes::BadValue,
                 str::stream()
-                    << "diagnosticDataCollectionFileSizeMb must be less than or equal to '"
+                    << "diagnosticDataCollectionFileSizeMB must be less than or equal to '"
                     << localMaxDirectorySizeMB
-                    << "' which is the current value of diagnosticDataCollectionDirectorySizeMb.");
+                    << "' which is the current value of diagnosticDataCollectionDirectorySizeMB.");
         }
 
         auto controller = getGlobalFTDCController();
