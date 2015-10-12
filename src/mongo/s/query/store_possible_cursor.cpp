@@ -91,25 +91,25 @@ StatusWith<BSONObj> storePossibleCursor(const HostAndPort& server,
         return incomingCursorResponse.getStatus();
     }
 
-    if (incomingCursorResponse.getValue().cursorId == CursorId(0)) {
+    if (incomingCursorResponse.getValue().getCursorId() == CursorId(0)) {
         return cmdResult;
     }
 
-    ClusterClientCursorParams params(incomingCursorResponse.getValue().nss);
-    params.remotes.emplace_back(server, incomingCursorResponse.getValue().cursorId);
+    ClusterClientCursorParams params(incomingCursorResponse.getValue().getNSS());
+    params.remotes.emplace_back(server, incomingCursorResponse.getValue().getCursorId());
 
     auto ccc = stdx::make_unique<ClusterClientCursorImpl>(executor, std::move(params));
     auto pinnedCursor =
         cursorManager->registerCursor(std::move(ccc),
-                                      incomingCursorResponse.getValue().nss,
+                                      incomingCursorResponse.getValue().getNSS(),
                                       ClusterCursorManager::CursorType::NamespaceNotSharded,
                                       ClusterCursorManager::CursorLifetime::Mortal);
     CursorId clusterCursorId = pinnedCursor.getCursorId();
     pinnedCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
 
-    CursorResponse outgoingCursorResponse(incomingCursorResponse.getValue().nss,
+    CursorResponse outgoingCursorResponse(incomingCursorResponse.getValue().getNSS(),
                                           clusterCursorId,
-                                          incomingCursorResponse.getValue().batch);
+                                          incomingCursorResponse.getValue().getBatch());
     return outgoingCursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
 }
 

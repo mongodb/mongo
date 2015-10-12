@@ -44,12 +44,12 @@ TEST(CursorResponseTest, parseFromBSONFirstBatch) {
                  << "ok" << 1));
     ASSERT_OK(result.getStatus());
 
-    CursorResponse response = result.getValue();
-    ASSERT_EQ(response.cursorId, CursorId(123));
-    ASSERT_EQ(response.nss.ns(), "db.coll");
-    ASSERT_EQ(response.batch.size(), 2U);
-    ASSERT_EQ(response.batch[0], BSON("_id" << 1));
-    ASSERT_EQ(response.batch[1], BSON("_id" << 2));
+    CursorResponse response = std::move(result.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(123));
+    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getBatch().size(), 2U);
+    ASSERT_EQ(response.getBatch()[0], BSON("_id" << 1));
+    ASSERT_EQ(response.getBatch()[1], BSON("_id" << 2));
 }
 
 TEST(CursorResponseTest, parseFromBSONNextBatch) {
@@ -60,12 +60,12 @@ TEST(CursorResponseTest, parseFromBSONNextBatch) {
                  << "ok" << 1));
     ASSERT_OK(result.getStatus());
 
-    CursorResponse response = result.getValue();
-    ASSERT_EQ(response.cursorId, CursorId(123));
-    ASSERT_EQ(response.nss.ns(), "db.coll");
-    ASSERT_EQ(response.batch.size(), 2U);
-    ASSERT_EQ(response.batch[0], BSON("_id" << 1));
-    ASSERT_EQ(response.batch[1], BSON("_id" << 2));
+    CursorResponse response = std::move(result.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(123));
+    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getBatch().size(), 2U);
+    ASSERT_EQ(response.getBatch()[0], BSON("_id" << 1));
+    ASSERT_EQ(response.getBatch()[1], BSON("_id" << 2));
 }
 
 TEST(CursorResponseTest, parseFromBSONCursorIdZero) {
@@ -76,12 +76,12 @@ TEST(CursorResponseTest, parseFromBSONCursorIdZero) {
                  << "ok" << 1));
     ASSERT_OK(result.getStatus());
 
-    CursorResponse response = result.getValue();
-    ASSERT_EQ(response.cursorId, CursorId(0));
-    ASSERT_EQ(response.nss.ns(), "db.coll");
-    ASSERT_EQ(response.batch.size(), 2U);
-    ASSERT_EQ(response.batch[0], BSON("_id" << 1));
-    ASSERT_EQ(response.batch[1], BSON("_id" << 2));
+    CursorResponse response = std::move(result.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(0));
+    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getBatch().size(), 2U);
+    ASSERT_EQ(response.getBatch()[0], BSON("_id" << 1));
+    ASSERT_EQ(response.getBatch()[1], BSON("_id" << 2));
 }
 
 TEST(CursorResponseTest, parseFromBSONEmptyBatch) {
@@ -91,10 +91,10 @@ TEST(CursorResponseTest, parseFromBSONEmptyBatch) {
                                    << "nextBatch" << BSONArrayBuilder().arr()) << "ok" << 1));
     ASSERT_OK(result.getStatus());
 
-    CursorResponse response = result.getValue();
-    ASSERT_EQ(response.cursorId, CursorId(123));
-    ASSERT_EQ(response.nss.ns(), "db.coll");
-    ASSERT_EQ(response.batch.size(), 0U);
+    CursorResponse response = std::move(result.getValue());
+    ASSERT_EQ(response.getCursorId(), CursorId(123));
+    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getBatch().size(), 0U);
 }
 
 TEST(CursorResponseTest, parseFromBSONMissingCursorField) {

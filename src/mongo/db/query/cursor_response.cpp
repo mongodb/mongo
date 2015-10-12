@@ -69,14 +69,30 @@ void appendGetMoreResponseObject(long long cursorId,
     cursorObj.done();
 }
 
-CursorResponse::CursorResponse(NamespaceString namespaceString,
-                               CursorId id,
-                               std::vector<BSONObj> objs,
-                               boost::optional<long long> nReturnedSoFar)
-    : nss(std::move(namespaceString)),
-      cursorId(id),
-      batch(std::move(objs)),
-      numReturnedSoFar(nReturnedSoFar) {}
+CursorResponse::CursorResponse(NamespaceString nss,
+                               CursorId cursorId,
+                               std::vector<BSONObj> batch,
+                               boost::optional<long long> numReturnedSoFar)
+    : _nss(std::move(nss)),
+      _cursorId(cursorId),
+      _batch(std::move(batch)),
+      _numReturnedSoFar(numReturnedSoFar) {}
+
+#if defined(_MSC_VER) && _MSC_VER < 1900
+CursorResponse::CursorResponse(CursorResponse&& other)
+    : _nss(other._nss),
+      _cursorId(other._cursorId),
+      _batch(other._batch),
+      _numReturnedSoFar(other._numReturnedSoFar) {}
+
+CursorResponse& CursorResponse::operator=(CursorResponse&& other) {
+    _nss = other._nss;
+    _cursorId = other._cursorId;
+    _batch = other._batch;
+    _numReturnedSoFar = other._numReturnedSoFar;
+    return *this;
+}
+#endif
 
 StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdResponse) {
     Status cmdStatus = getStatusFromCommandResult(cmdResponse);
@@ -142,13 +158,13 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
                                BSONObjBuilder* builder) const {
     BSONObjBuilder cursorBuilder(builder->subobjStart(kCursorField));
 
-    cursorBuilder.append(kIdField, cursorId);
-    cursorBuilder.append(kNsField, nss.ns());
+    cursorBuilder.append(kIdField, _cursorId);
+    cursorBuilder.append(kNsField, _nss.ns());
 
     const char* batchFieldName =
         (responseType == ResponseType::InitialResponse) ? kBatchFieldInitial : kBatchField;
     BSONArrayBuilder batchBuilder(cursorBuilder.subarrayStart(batchFieldName));
-    for (const BSONObj& obj : batch) {
+    for (const BSONObj& obj : _batch) {
         batchBuilder.append(obj);
     }
     batchBuilder.doneFast();

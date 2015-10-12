@@ -219,7 +219,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFind) {
     std::vector<BSONObj> batch1 = {
         fromjson("{_id: 1}"), fromjson("{_id: 2}"), fromjson("{_id: 3}")};
     responses.emplace_back(_nss, CursorId(0), batch1);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
 
     // Can't return any results until we have a response from all three shards.
     ASSERT_FALSE(arm->ready());
@@ -231,7 +231,8 @@ TEST_F(AsyncResultsMergerTest, ClusterFind) {
     responses.emplace_back(_nss, CursorId(0), batch2);
     std::vector<BSONObj> batch3 = {fromjson("{_id: 5}"), fromjson("{_id: 6}")};
     responses.emplace_back(_nss, CursorId(0), batch3);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
 
     executor->waitForEvent(readyEvent);
 
@@ -267,7 +268,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
     responses.emplace_back(_nss, CursorId(11), batch2);
     std::vector<BSONObj> batch3 = {fromjson("{_id: 5}"), fromjson("{_id: 6}")};
     responses.emplace_back(_nss, CursorId(12), batch3);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_FALSE(arm->remotesExhausted());
@@ -296,7 +297,8 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
     responses.emplace_back(_nss, CursorId(0), batch5);
     std::vector<BSONObj> batch6 = {fromjson("{_id: 10}")};
     responses.emplace_back(_nss, CursorId(0), batch6);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_FALSE(arm->remotesExhausted());
@@ -317,7 +319,8 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
     responses.clear();
     std::vector<BSONObj> batch7 = {fromjson("{_id: 11}")};
     responses.emplace_back(_nss, CursorId(0), batch7);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->remotesExhausted());
@@ -345,7 +348,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindSorted) {
     std::vector<BSONObj> batch3 = {fromjson("{_id: 4, $sortKey: {'': 4}}"),
                                    fromjson("{_id: 8, $sortKey: {'': 8}}")};
     responses.emplace_back(_nss, CursorId(0), batch3);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -382,7 +385,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMoreSorted) {
     std::vector<BSONObj> batch3 = {fromjson("{$sortKey: {'': 7}}"),
                                    fromjson("{$sortKey: {'': 8}}")};
     responses.emplace_back(_nss, CursorId(2), batch3);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -402,7 +405,8 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMoreSorted) {
     std::vector<BSONObj> batch4 = {fromjson("{$sortKey: {'': 7}}"),
                                    fromjson("{$sortKey: {'': 10}}")};
     responses.emplace_back(_nss, CursorId(0), batch4);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -420,7 +424,8 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMoreSorted) {
     std::vector<BSONObj> batch5 = {fromjson("{$sortKey: {'': 9}}"),
                                    fromjson("{$sortKey: {'': 10}}")};
     responses.emplace_back(_nss, CursorId(0), batch5);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -451,7 +456,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindCompoundSortKey) {
     std::vector<BSONObj> batch3 = {fromjson("{$sortKey: {'': 10, '': 12}}"),
                                    fromjson("{$sortKey: {'': 5, '': 9}}")};
     responses.emplace_back(_nss, CursorId(0), batch3);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -482,7 +487,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindSortedButNoSortKey) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch1 = {fromjson("{a: 2, b: 1}"), fromjson("{a: 1, b: 2}")};
     responses.emplace_back(_nss, CursorId(1), batch1);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -512,7 +517,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindInitialBatchSizeIsZero) {
     std::vector<CursorResponse> responses;
     responses.emplace_back(_nss, CursorId(1), std::vector<BSONObj>());
     responses.emplace_back(_nss, CursorId(0), std::vector<BSONObj>());
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
 
     // In handling the responses from the first shard, the ARM should have already asked
     // for an additional batch from that shard. It won't have anything to return until it
@@ -521,7 +526,8 @@ TEST_F(AsyncResultsMergerTest, ClusterFindInitialBatchSizeIsZero) {
     responses.clear();
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}")};
     responses.emplace_back(_nss, CursorId(1), batch1);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -535,14 +541,16 @@ TEST_F(AsyncResultsMergerTest, ClusterFindInitialBatchSizeIsZero) {
     // do this, but there's no reason the ARM can't handle this by asking for more.
     responses.clear();
     responses.emplace_back(_nss, CursorId(1), std::vector<BSONObj>());
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
 
     // The shard responds with another batch and closes the cursor.
     ASSERT_FALSE(arm->ready());
     responses.clear();
     std::vector<BSONObj> batch2 = {fromjson("{_id: 2}")};
     responses.emplace_back(_nss, CursorId(0), batch2);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -563,7 +571,7 @@ TEST_F(AsyncResultsMergerTest, ExistingCursors) {
     responses.emplace_back(_nss, CursorId(0), batch1);
     std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
     responses.emplace_back(_nss, CursorId(0), batch2);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
 
     executor->waitForEvent(readyEvent);
 
@@ -594,7 +602,7 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     responses.emplace_back(_nss, CursorId(1), batch1);
     std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
     responses.emplace_back(_nss, CursorId(2), batch2);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -615,7 +623,8 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     responses.clear();
     std::vector<BSONObj> batch3 = {fromjson("{_id: 5}"), fromjson("{_id: 6}")};
     responses.emplace_back(_nss, CursorId(1), batch3);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     blackHoleNextRequest();
     executor->waitForEvent(readyEvent);
 
@@ -632,7 +641,8 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     responses.clear();
     std::vector<BSONObj> batch4 = {fromjson("{_id: 7}"), fromjson("{_id: 8}")};
     responses.emplace_back(_nss, CursorId(0), batch4);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -659,7 +669,7 @@ TEST_F(AsyncResultsMergerTest, ErrorOnMismatchedCursorIds) {
     std::vector<BSONObj> batch1 = {
         fromjson("{_id: 1}"), fromjson("{_id: 2}"), fromjson("{_id: 3}")};
     responses.emplace_back(_nss, CursorId(123), batch1);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -677,7 +687,8 @@ TEST_F(AsyncResultsMergerTest, ErrorOnMismatchedCursorIds) {
     std::vector<BSONObj> batch2 = {
         fromjson("{_id: 4}"), fromjson("{_id: 5}"), fromjson("{_id: 6}")};
     responses.emplace_back(_nss, CursorId(456), batch2);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -728,7 +739,7 @@ TEST_F(AsyncResultsMergerTest, ErrorReceivedFromShard) {
     responses.emplace_back(_nss, CursorId(1), batch1);
     std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
     responses.emplace_back(_nss, CursorId(2), batch2);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
 
     scheduleErrorResponse({ErrorCodes::BadValue, "bad thing happened"});
     executor->waitForEvent(readyEvent);
@@ -757,7 +768,7 @@ TEST_F(AsyncResultsMergerTest, ErrorCantScheduleEventBeforeLastSignaled) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
     responses.emplace_back(_nss, CursorId(0), batch);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -827,7 +838,7 @@ TEST_F(AsyncResultsMergerTest, KillAllBatchesReceived) {
     responses.emplace_back(_nss, CursorId(0), batch2);
     std::vector<BSONObj> batch3 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
     responses.emplace_back(_nss, CursorId(123), batch3);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
 
     // Kill should be able to return right away if there are no pending batches.
     auto killedEvent = arm->kill();
@@ -847,7 +858,7 @@ TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
     responses.emplace_back(_nss, CursorId(0), batch1);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
 
     // Kill event will only be signalled once the pending batches are received.
     auto killedEvent = arm->kill();
@@ -860,7 +871,7 @@ TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
     responses.emplace_back(_nss, CursorId(123), batch2);
     std::vector<BSONObj> batch3 = {fromjson("{_id: 4}"), fromjson("{_id: 5}")};
     responses.emplace_back(_nss, CursorId(0), batch2);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
 
     // Only one of the responses has a non-zero cursor id. The ARM should have issued a killCursors
     // command against this id.
@@ -886,7 +897,7 @@ TEST_F(AsyncResultsMergerTest, KillOutstandingGetMore) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
     responses.emplace_back(_nss, CursorId(123), batch1);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
 
     // First batch received.
     ASSERT_TRUE(arm->ready());
@@ -905,7 +916,8 @@ TEST_F(AsyncResultsMergerTest, KillOutstandingGetMore) {
     responses.clear();
     std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
     responses.emplace_back(_nss, CursorId(123), batch2);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
 
     // While processing the getMore response, a killCursors against id 123 should have been
     // scheduled.
@@ -931,7 +943,7 @@ TEST_F(AsyncResultsMergerTest, NextEventErrorsAfterKill) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
     responses.emplace_back(_nss, CursorId(1), batch1);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
 
     auto killedEvent = arm->kill();
 
@@ -963,7 +975,7 @@ TEST_F(AsyncResultsMergerTest, TailableBasic) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
     responses.emplace_back(_nss, CursorId(123), batch1);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -983,7 +995,8 @@ TEST_F(AsyncResultsMergerTest, TailableBasic) {
     responses.clear();
     std::vector<BSONObj> batch2 = {fromjson("{_id: 3}")};
     responses.emplace_back(_nss, CursorId(123), batch2);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -1009,7 +1022,7 @@ TEST_F(AsyncResultsMergerTest, TailableEmptyBatch) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch;
     responses.emplace_back(_nss, CursorId(123), batch);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     // After receiving an empty batch, the ARM should return boost::none, but remotes should not be
@@ -1034,7 +1047,7 @@ TEST_F(AsyncResultsMergerTest, TailableExhaustedCursor) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch;
     responses.emplace_back(_nss, CursorId(0), batch);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     // Afterwards, the ARM should return boost::none and remote cursors should be marked as
@@ -1056,7 +1069,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
     responses.emplace_back(_nss, CursorId(1), batch1);
 
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -1076,7 +1089,8 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     ASSERT_OK(request.getStatus());
     ASSERT_EQ(*request.getValue().batchSize, 1LL);
     ASSERT_EQ(request.getValue().cursorid, 1LL);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -1100,7 +1114,7 @@ TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}")};
     responses.emplace_back(_nss, CursorId(0), batch1);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -1128,7 +1142,7 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
     responses.emplace_back(_nss, CursorId(98), batch1);
     std::vector<BSONObj> batch2 = {fromjson("{_id: 2}")};
     responses.emplace_back(_nss, CursorId(99), batch2);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -1148,7 +1162,8 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
     responses.clear();
     std::vector<BSONObj> batch3 = {fromjson("{_id: 3}")};
     responses.emplace_back(_nss, CursorId(99), batch3);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -1162,7 +1177,8 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
     responses.clear();
     std::vector<BSONObj> batch4 = {};
     responses.emplace_back(_nss, CursorId(0), batch4);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::SubsequentResponse);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -1180,7 +1196,7 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResultsSingleNode) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
     responses.emplace_back(_nss, CursorId(98), batch);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -1218,7 +1234,7 @@ TEST_F(AsyncResultsMergerTest, RetryOnNotMasterNoSlaveOkSingleNode) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
     responses.emplace_back(_nss, CursorId(0), batch);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
     executor->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
@@ -1269,7 +1285,7 @@ TEST_F(AsyncResultsMergerTest, RetryOnHostUnreachableAllowPartialResults) {
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
     responses.emplace_back(_nss, CursorId(0), batch);
-    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
 
     // From the second host all attempts return an error (one attempt plus three retries)
     scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});

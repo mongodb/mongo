@@ -30,6 +30,7 @@
 
 #include <vector>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/clientcursor.h"
@@ -65,7 +66,10 @@ void appendGetMoreResponseObject(long long cursorId,
                                  BSONArray nextBatch,
                                  BSONObjBuilder* builder);
 
-struct CursorResponse {
+class CursorResponse {
+    MONGO_DISALLOW_COPYING(CursorResponse);
+
+public:
     enum class ResponseType {
         InitialResponse,
         SubsequentResponse,
@@ -74,10 +78,38 @@ struct CursorResponse {
     /**
      * Constructs from values for each of the fields.
      */
-    CursorResponse(NamespaceString namspaceString,
-                   CursorId id,
-                   std::vector<BSONObj> objs,
-                   boost::optional<long long> nReturnedSoFar = boost::none);
+    CursorResponse(NamespaceString nss,
+                   CursorId cursorId,
+                   std::vector<BSONObj> batch,
+                   boost::optional<long long> numReturnedSoFar = boost::none);
+
+#if defined(_MSC_VER) && _MSC_VER < 1900
+    CursorResponse(CursorResponse&& other);
+    CursorResponse& operator=(CursorResponse&& other);
+#else
+    CursorResponse(CursorResponse&& other) = default;
+    CursorResponse& operator=(CursorResponse&& other) = default;
+#endif
+
+    //
+    // Accessors.
+    //
+
+    const NamespaceString& getNSS() const {
+        return _nss;
+    }
+
+    CursorId getCursorId() const {
+        return _cursorId;
+    }
+
+    const std::vector<BSONObj>& getBatch() const {
+        return _batch;
+    }
+
+    boost::optional<long long> getNumReturnedSoFar() const {
+        return _numReturnedSoFar;
+    }
 
     /**
      * Constructs a CursorResponse from the command BSON response.
@@ -90,10 +122,11 @@ struct CursorResponse {
     BSONObj toBSON(ResponseType responseType) const;
     void addToBSON(ResponseType responseType, BSONObjBuilder* builder) const;
 
-    const NamespaceString nss;
-    const CursorId cursorId;
-    const std::vector<BSONObj> batch;
-    const boost::optional<long long> numReturnedSoFar;
+private:
+    NamespaceString _nss;
+    CursorId _cursorId;
+    std::vector<BSONObj> _batch;
+    boost::optional<long long> _numReturnedSoFar;
 };
 
 }  // namespace mongo

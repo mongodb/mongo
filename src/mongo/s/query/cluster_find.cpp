@@ -184,11 +184,11 @@ StatusWith<CursorId> runConfigServerQuerySCCC(const CanonicalQuery& query,
         return outgoingCursorResponse.getStatus();
     }
 
-    for (const auto& doc : outgoingCursorResponse.getValue().batch) {
+    for (const auto& doc : outgoingCursorResponse.getValue().getBatch()) {
         results->push_back(doc.getOwned());
     }
 
-    return outgoingCursorResponse.getValue().cursorId;
+    return outgoingCursorResponse.getValue().getCursorId();
 }
 
 StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,

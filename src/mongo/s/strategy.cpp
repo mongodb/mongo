@@ -592,7 +592,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
         BufBuilder buffer(ShardedClientCursor::INIT_REPLY_BUFFER_SIZE);
 
         int numResults = 0;
-        for (const auto& obj : cursorResponse.getValue().batch) {
+        for (const auto& obj : cursorResponse.getValue().getBatch()) {
             buffer.appendBuf((void*)obj.objdata(), obj.objsize());
             ++numResults;
         }
@@ -603,8 +603,8 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
                      buffer.buf(),
                      buffer.len(),
                      numResults,
-                     cursorResponse.getValue().numReturnedSoFar.value_or(0),
-                     cursorResponse.getValue().cursorId);
+                     cursorResponse.getValue().getNumReturnedSoFar().value_or(0),
+                     cursorResponse.getValue().getCursorId());
         return;
     }
 

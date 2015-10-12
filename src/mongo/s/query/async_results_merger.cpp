@@ -356,18 +356,18 @@ StatusWith<CursorResponse> AsyncResultsMerger::parseCursorResponse(const BSONObj
         return getMoreParseStatus.getStatus();
     }
 
-    auto cursorResponse = getMoreParseStatus.getValue();
+    auto cursorResponse = std::move(getMoreParseStatus.getValue());
 
     // If we have a cursor established, and we get a non-zero cursor id that is not equal to the
     // established cursor id, we will fail the operation.
-    if (remote.cursorId && cursorResponse.cursorId != 0 &&
-        *remote.cursorId != cursorResponse.cursorId) {
+    if (remote.cursorId && cursorResponse.getCursorId() != 0 &&
+        *remote.cursorId != cursorResponse.getCursorId()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Expected cursorid " << *remote.cursorId << " but received "
-                                    << cursorResponse.cursorId);
+                                    << cursorResponse.getCursorId());
     }
 
-    return cursorResponse;
+    return std::move(cursorResponse);
 }
 
 void AsyncResultsMerger::handleBatchResponse(
@@ -392,7 +392,7 @@ void AsyncResultsMerger::handleBatchResponse(
         if (cbData.response.isOK()) {
             auto cursorResponse = parseCursorResponse(cbData.response.getValue().data, remote);
             if (cursorResponse.isOK()) {
-                remote.cursorId = cursorResponse.getValue().cursorId;
+                remote.cursorId = cursorResponse.getValue().getCursorId();
             }
         }
 
@@ -471,11 +471,11 @@ void AsyncResultsMerger::handleBatchResponse(
     }
 
     // Cursor id successfully established.
-    auto cursorResponse = cursorResponseStatus.getValue();
-    remote.cursorId = cursorResponse.cursorId;
+    auto cursorResponse = std::move(cursorResponseStatus.getValue());
+    remote.cursorId = cursorResponse.getCursorId();
     remote.initialCmdObj = boost::none;
 
-    for (const auto& obj : cursorResponse.batch) {
+    for (const auto& obj : cursorResponse.getBatch()) {
         // If there's a sort, we're expecting the remote node to give us back a sort key.
         if (!_params.sort.isEmpty() &&
             obj[ClusterClientCursorParams::kSortKeyField].type() != BSONType::Object) {
@@ -492,7 +492,7 @@ void AsyncResultsMerger::handleBatchResponse(
 
     // If we're doing a sorted merge, then we have to make sure to put this remote onto the
     // merge queue.
-    if (!_params.sort.isEmpty() && !cursorResponse.batch.empty()) {
+    if (!_params.sort.isEmpty() && !cursorResponse.getBatch().empty()) {
         _mergeQueue.push(remoteIndex);
     }
 

@@ -43,7 +43,7 @@
 
 namespace mongo {
 
-struct CursorResponse;
+class CursorResponse;
 
 /**
  * AsyncResultsMerger is used to generate results from cursor-generating commands on one or more
