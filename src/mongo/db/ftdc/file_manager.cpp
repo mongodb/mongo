@@ -113,7 +113,7 @@ std::vector<boost::filesystem::path> FTDCFileManager::scanDirectory() {
         auto filename = de.path().filename();
 
         std::string str = filename.generic_string();
-        if (str.compare(0, strlen(kFTDCArchiveFile) - 1, kFTDCArchiveFile) == 0 &&
+        if (str.compare(0, strlen(kFTDCArchiveFile), kFTDCArchiveFile) == 0 &&
             str != kFTDCInterimFile) {
             files.emplace_back(_path / filename);
         }

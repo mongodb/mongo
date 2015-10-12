@@ -54,8 +54,8 @@ namespace mongo {
 TEST(FTDCFileManagerTest, TestFull) {
     Client* client = &cc();
     FTDCConfig c;
-    c.maxFileSizeBytes = 1000;
-    c.maxDirectorySizeBytes = 3000;
+    c.maxFileSizeBytes = 300;
+    c.maxDirectorySizeBytes = 1000;
     c.maxSamplesPerInterimMetricChunk = 1;
 
     unittest::TempDir tempdir("metrics_testpath");
@@ -68,7 +68,7 @@ TEST(FTDCFileManagerTest, TestFull) {
     auto mgr = std::move(swMgr.getValue());
 
     // Test a large numbers of zeros, and incremental numbers in a full buffer
-    for (int j = 0; j < 4; j++) {
+    for (int j = 0; j < 10; j++) {
         ASSERT_OK(
             mgr->writeSampleAndRotateIfNeeded(client,
                                               BSON("name"
@@ -109,7 +109,7 @@ TEST(FTDCFileManagerTest, TestFull) {
         }
     }
 
-    ASSERT_TRUE(sum < c.maxDirectorySizeBytes * 1.10);
+    ASSERT_TRUE(sum < c.maxDirectorySizeBytes * 1.10 && sum > c.maxDirectorySizeBytes * 0.90);
 }
 
 void ValidateInterimFileHasData(const boost::filesystem::path& dir, bool hasData) {
