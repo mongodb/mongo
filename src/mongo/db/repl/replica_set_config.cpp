@@ -666,7 +666,7 @@ Milliseconds ReplicaSetConfig::getPriorityTakeoverDelay(int memberIdx) const {
     return (priorityRank + 1) * getElectionTimeoutPeriod();
 }
 
-int ReplicaSetConfig::_calculatePriorityRank(int priority) const {
+int ReplicaSetConfig::_calculatePriorityRank(double priority) const {
     int count = 0;
     for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
         if (mem->getPriority() > priority) {

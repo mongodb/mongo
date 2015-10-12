@@ -294,7 +294,7 @@ private:
     /**
      * Return the number of members with a priority greater than "priority".
      */
-    int _calculatePriorityRank(int priority) const;
+    int _calculatePriorityRank(double priority) const;
 
     /**
      * Calculates and stores the majority for electing a primary (_majorityVoteCount).
