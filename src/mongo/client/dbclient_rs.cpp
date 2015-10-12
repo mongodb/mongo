@@ -75,7 +75,6 @@ public:
         _secOkCmdList.insert("find");
         _secOkCmdList.insert("geoNear");
         _secOkCmdList.insert("geoSearch");
-        _secOkCmdList.insert("geoWalk");
         _secOkCmdList.insert("group");
     }
 } _populateReadPrefSecOkCmdList;
