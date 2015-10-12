@@ -208,10 +208,8 @@ func (mf *MongoFiles) writeFileToDisk(gridFile *mgo.GridFile) error {
 }
 
 // handle logic for 'put' command.
-func (mf *MongoFiles) handlePut(gfs *mgo.GridFS) (string, error) {
+func (mf *MongoFiles) handlePut(gfs *mgo.GridFS) (output string, err error) {
 	localFileName := mf.getLocalFileName(nil)
-
-	var output string
 
 	// check if --replace flag turned on
 	if mf.StorageOptions.Replace {
@@ -233,7 +231,15 @@ func (mf *MongoFiles) handlePut(gfs *mgo.GridFS) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error while creating '%v' in GridFS: %v\n", mf.FileName, err)
 	}
-	defer gFile.Close()
+	defer func() {
+		// GridFS files flush a buffer on Close(), so it's important we
+		// capture any errors that occur as this function exits and
+		// overwrite the error if earlier writes executed successfully
+		if closeErr := gFile.Close(); err == nil && closeErr != nil {
+			log.Logf(log.DebugHigh, "error occurred while closing GridFS file handler")
+			err = fmt.Errorf("error while storing '%v' into GridFS: %v\n", localFileName, closeErr)
+		}
+	}()
 
 	// set optional mime type
 	if mf.StorageOptions.ContentType != "" {
