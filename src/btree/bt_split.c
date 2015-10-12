@@ -667,16 +667,19 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
 	if (0) {
-err:		__wt_free_ref_index(session, parent, alloc_index, true);
-
-		/*
+err:		/*
 		 * If panic is set, we saw an error after opening up the tree
 		 * to descent through the parent page's new index.  There is
 		 * nothing we can do, the tree is inconsistent and there are
 		 * threads potentially active in both versions of the tree.
 		 */
-		if (panic)
+		if (panic) {
+			__wt_err(session, ret,
+			    "failure after splitting a parent page to deepen "
+			    "the tree, unable to recover");
 			ret = __wt_panic(session);
+		} else
+			__wt_free_ref_index(session, parent, alloc_index, true);
 	}
 	return (ret);
 }
