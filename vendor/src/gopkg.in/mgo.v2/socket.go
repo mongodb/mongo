@@ -28,6 +28,7 @@ package mgo
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -74,6 +75,7 @@ type queryOp struct {
 	flags      queryOpFlags
 	replyFunc  replyFunc
 
+	mode       Mode
 	options    queryWrapper
 	hasOptions bool
 	serverTags []bson.D
@@ -92,9 +94,34 @@ type queryWrapper struct {
 }
 
 func (op *queryOp) finalQuery(socket *mongoSocket) interface{} {
-	if op.flags&flagSlaveOk != 0 && len(op.serverTags) > 0 && socket.ServerInfo().Mongos {
+	if socket.ServerInfo().Mongos {
+		var modeName string
+		if op.flags&flagSlaveOk == 0 {
+			modeName = "primary"
+		} else {
+			switch op.mode {
+			case Strong:
+				modeName = "primary"
+			case Monotonic, Eventual:
+				modeName = "secondaryPreferred"
+			case PrimaryPreferred:
+				modeName = "primaryPreferred"
+			case Secondary:
+				modeName = "secondary"
+			case SecondaryPreferred:
+				modeName = "secondaryPreferred"
+			case Nearest:
+				modeName = "nearest"
+			default:
+				panic(fmt.Sprintf("unsupported read mode: %d", op.mode))
+			}
+		}
 		op.hasOptions = true
-		op.options.ReadPreference = bson.D{{"mode", "secondaryPreferred"}, {"tags", op.serverTags}}
+		op.options.ReadPreference = make(bson.D, 0, 2)
+		op.options.ReadPreference = append(op.options.ReadPreference, bson.DocElem{"mode", modeName})
+		if len(op.serverTags) > 0 {
+			op.options.ReadPreference = append(op.options.ReadPreference, bson.DocElem{"tags", op.serverTags})
+		}
 	}
 	if op.hasOptions {
 		if op.query == nil {

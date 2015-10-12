@@ -2800,7 +2800,7 @@ func (q *Query) One(result interface{}) (err error) {
 	}
 	defer socket.Release()
 
-	op.flags |= session.slaveOkFlag()
+	session.prepareQuery(&op)
 	op.limit = -1
 
 	data, err := socket.SimpleQuery(&op)
@@ -2840,7 +2840,7 @@ func (db *Database) run(socket *mongoSocket, cmd, result interface{}) (err error
 	op.collection = db.Name + ".$cmd"
 
 	// Query.One:
-	op.flags |= session.slaveOkFlag()
+	session.prepareQuery(&op)
 	op.limit = -1
 
 	data, err := socket.SimpleQuery(&op)
@@ -3033,8 +3033,9 @@ func (q *Query) Iter() *Iter {
 	iter.op.limit = op.limit
 	iter.op.replyFunc = iter.replyFunc()
 	iter.docsToReceive++
+
+	session.prepareQuery(&op)
 	op.replyFunc = iter.op.replyFunc
-	op.flags |= session.slaveOkFlag()
 
 	socket, err := session.acquireSocket(true)
 	if err != nil {
@@ -3114,8 +3115,9 @@ func (q *Query) Tail(timeout time.Duration) *Iter {
 	iter.op.limit = op.limit
 	iter.op.replyFunc = iter.replyFunc()
 	iter.docsToReceive++
+	session.prepareQuery(&op)
 	op.replyFunc = iter.op.replyFunc
-	op.flags |= flagTailable | flagAwaitData | session.slaveOkFlag()
+	op.flags |= flagTailable | flagAwaitData
 
 	socket, err := session.acquireSocket(true)
 	if err != nil {
@@ -3134,10 +3136,11 @@ func (q *Query) Tail(timeout time.Duration) *Iter {
 	return iter
 }
 
-func (s *Session) slaveOkFlag() (flag queryOpFlags) {
+func (s *Session) prepareQuery(op *queryOp) {
 	s.m.RLock()
+	op.mode = s.consistency
 	if s.slaveOk {
-		flag = flagSlaveOk
+		op.flags |= flagSlaveOk
 	}
 	s.m.RUnlock()
 	return
