@@ -251,12 +251,17 @@ __evict_workers_resize(WT_SESSION_IMPL *session)
 	for (i = conn->evict_workers_alloc; i < conn->evict_workers_max; i++) {
 		/*
 		 * Eviction worker threads get their own session.
-		 * Eviction worker threads get their own lookaside table cursor.
 		 * Eviction worker threads may be called upon to perform slow
 		 * operations for the block manager.
+		 *
+		 * Eviction worker threads get their own lookaside table cursor
+		 * if the lookaside table is open.  Note that eviction is also
+		 * started during recovery, before the lookaside table is
+		 * created.
 		 */
-		session_flags =
-		    WT_SESSION_CAN_WAIT | WT_SESSION_LOOKASIDE_CURSOR;
+		session_flags = WT_SESSION_CAN_WAIT;
+		if (F_ISSET(conn, WT_CONN_LAS_OPEN))
+			FLD_SET(session_flags, WT_SESSION_LOOKASIDE_CURSOR);
 		WT_ERR(__wt_open_internal_session(conn, "eviction-worker",
 		    false, session_flags, &workers[i].session));
 		workers[i].id = i;
@@ -278,7 +283,7 @@ err:	conn->evict_workers_alloc = conn->evict_workers_max;
  *	Start the eviction server thread.
  */
 int
-__wt_evict_create(WT_SESSION_IMPL *session, bool with_las)
+__wt_evict_create(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	uint32_t session_flags;
@@ -297,7 +302,8 @@ __wt_evict_create(WT_SESSION_IMPL *session, bool with_las)
 	 * perform slow operations for the block manager.  (The flag is not
 	 * reset if reconfigured later, but I doubt that's a problem.)
 	 */
-	session_flags = with_las ? WT_SESSION_LOOKASIDE_CURSOR : 0;
+	session_flags = F_ISSET(conn, WT_CONN_LAS_OPEN) ?
+	    WT_SESSION_LOOKASIDE_CURSOR : 0;
 	if (conn->evict_workers_max == 0)
 		FLD_SET(session_flags, WT_SESSION_CAN_WAIT);
 	WT_RET(__wt_open_internal_session(conn,

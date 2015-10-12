@@ -111,8 +111,8 @@ extern int __wt_debug_offset_blind( WT_SESSION_IMPL *session, wt_off_t offset, c
 extern int __wt_debug_offset(WT_SESSION_IMPL *session, wt_off_t offset, uint32_t size, uint32_t cksum, const char *ofile);
 extern int __wt_debug_disk( WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, const char *ofile);
 extern int __wt_debug_tree_shape( WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
-extern int __wt_debug_tree_all(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
-extern int __wt_debug_tree(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
+extern int __wt_debug_tree_all( WT_SESSION_IMPL *session, WT_BTREE *btree, WT_PAGE *page, const char *ofile);
+extern int __wt_debug_tree( WT_SESSION_IMPL *session, WT_BTREE *btree, WT_PAGE *page, const char *ofile);
 extern int __wt_debug_page(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
 extern int __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp);
 extern void __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref);
@@ -319,7 +319,7 @@ extern int __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, const c
 extern int __wt_evict_file(WT_SESSION_IMPL *session, int syncop);
 extern void __wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
-extern int __wt_evict_create(WT_SESSION_IMPL *session, bool with_las);
+extern int __wt_evict_create(WT_SESSION_IMPL *session);
 extern int __wt_evict_destroy(WT_SESSION_IMPL *session);
 extern int __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session, bool *evict_resetp);
 extern void __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session);
@@ -337,7 +337,7 @@ extern int __wt_log_get_all_files(WT_SESSION_IMPL *session, char ***filesp, u_in
 extern void __wt_log_files_free(WT_SESSION_IMPL *session, char **files, u_int count);
 extern int __wt_log_extract_lognum( WT_SESSION_IMPL *session, const char *name, uint32_t *id);
 extern int __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot);
-extern int __wt_log_allocfile( WT_SESSION_IMPL *session, uint32_t lognum, const char *dest, bool prealloc);
+extern int __wt_log_allocfile( WT_SESSION_IMPL *session, uint32_t lognum, const char *dest);
 extern int __wt_log_remove(WT_SESSION_IMPL *session, const char *file_prefix, uint32_t lognum);
 extern int __wt_log_open(WT_SESSION_IMPL *session);
 extern int __wt_log_close(WT_SESSION_IMPL *session);
@@ -446,7 +446,6 @@ extern int __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_metadata_search( WT_SESSION_IMPL *session, const char *key, char **valuep);
 extern void __wt_meta_track_discard(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_on(WT_SESSION_IMPL *session);
-extern int __wt_meta_track_find_handle( WT_SESSION_IMPL *session, const char *name, const char *checkpoint);
 extern int __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll);
 extern int __wt_meta_track_sub_on(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_sub_off(WT_SESSION_IMPL *session);

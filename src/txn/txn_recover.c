@@ -501,7 +501,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * regular eviction to manage paging.  Start eviction threads for
 	 * recovery without LAS cursors.
 	 */
-	WT_ERR(__wt_evict_create(session, false));
+	WT_ERR(__wt_evict_create(session));
 	eviction_started = true;
 
 	/*
@@ -532,6 +532,9 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 done:	FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE);
 err:	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
+
+	if (ret != 0)
+		__wt_err(session, ret, "Recovery failed");
 
 	/*
 	 * Destroy the eviction threads that were started in support of

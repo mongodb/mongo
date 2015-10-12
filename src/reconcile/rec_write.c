@@ -44,7 +44,6 @@ typedef struct {
 	 * Track maximum transaction ID seen and first unwritten transaction ID.
 	 */
 	uint64_t max_txn;
-	uint64_t first_dirty_txn;
 
 	/*
 	 * When we can't mark the page clean (for example, checkpoint found some
@@ -292,7 +291,7 @@ typedef struct {
 } WT_RECONCILE;
 
 static void __rec_bnd_cleanup(WT_SESSION_IMPL *, WT_RECONCILE *, bool);
-static void __rec_cell_build_addr(
+static void __rec_cell_build_addr(WT_SESSION_IMPL *,
 		WT_RECONCILE *, const void *, size_t, u_int, uint64_t);
 static int  __rec_cell_build_int_key(WT_SESSION_IMPL *,
 		WT_RECONCILE *, const void *, size_t, bool *);
@@ -538,11 +537,6 @@ __rec_write_status(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 */
 	if (r->leave_dirty) {
 		/*
-		 * Update the page's first unwritten transaction ID.
-		 */
-		mod->first_dirty_txn = r->first_dirty_txn;
-
-		/*
 		 * The page remains dirty.
 		 *
 		 * Any checkpoint call cleared the tree's modified flag before
@@ -625,7 +619,6 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	switch (mod->rec_result) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 	case WT_PM_REC_REPLACE:				/* 1-for-1 page swap */
-	case WT_PM_REC_REWRITE:				/* Rewrite */
 		return (0);
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
 		break;
@@ -880,12 +873,6 @@ __rec_write_init(WT_SESSION_IMPL *session,
 
 	r->cache_write_lookaside = r->cache_write_restore = false;
 
-	/*
-	 * Running transactions may update the page after we write it, so
-	 * this is the highest ID we can be confident we will see.
-	 */
-	r->first_dirty_txn = conn->txn_global.last_running;
-
 	return (0);
 }
 
@@ -1083,17 +1070,11 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		if ((txnid = upd->txnid) == WT_TXN_ABORTED)
 			continue;
 
-		/*
-		 * Track the largest/smallest transaction IDs on the list and
-		 * the smallest not-globally-visible transaction on the page.
-		 */
+		/* Track the largest/smallest transaction IDs on the list. */
 		if (WT_TXNID_LT(max_txn, txnid))
 			max_txn = txnid;
 		if (WT_TXNID_LT(txnid, min_txn))
 			min_txn = txnid;
-		if (WT_TXNID_LT(txnid, r->first_dirty_txn) &&
-		    !__wt_txn_visible_all(session, txnid))
-			r->first_dirty_txn = txnid;
 
 		/*
 		 * Find the first update we can use.
@@ -3802,8 +3783,6 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			case WT_PM_REC_REPLACE:
 				addr = &child->modify->mod_replace;
 				break;
-			case WT_PM_REC_REWRITE:
-				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
 			break;
@@ -3837,7 +3816,8 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			val->cell_len = 0;
 			val->len = val->buf.size;
 		} else
-			__rec_cell_build_addr(r, addr->addr, addr->size,
+			__rec_cell_build_addr(session, r,
+			    addr->addr, addr->size,
 			    __rec_vtype(addr), ref->key.recno);
 		WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
@@ -3883,7 +3863,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/* Build the value cell. */
 		addr = &multi->addr;
-		__rec_cell_build_addr(r,
+		__rec_cell_build_addr(session, r,
 		    addr->addr, addr->size, __rec_vtype(addr), r->recno);
 
 		/* Boundary: split or write the page. */
@@ -4708,7 +4688,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			vtype = state == WT_CHILD_PROXY ?
 			    WT_CELL_ADDR_DEL : (u_int)vpack->raw;
 		}
-		__rec_cell_build_addr(r, p, size, vtype, WT_RECNO_OOB);
+		__rec_cell_build_addr(session, r, p, size, vtype, WT_RECNO_OOB);
 		WT_CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/*
@@ -4794,8 +4774,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		r->cell_zero = false;
 
 		addr = &multi->addr;
-		__rec_cell_build_addr(
-		    r, addr->addr, addr->size, __rec_vtype(addr), WT_RECNO_OOB);
+		__rec_cell_build_addr(session, r,
+		    addr->addr, addr->size, __rec_vtype(addr), WT_RECNO_OOB);
 
 		/* Boundary: split or write the page. */
 		if (key->len + val->len > r->space_avail)
@@ -5345,7 +5325,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BM *bm;
 	WT_BOUNDARY *bnd;
 	WT_BTREE *btree;
-	WT_MULTI *multi;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
 	size_t addr_size;
@@ -5393,7 +5372,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	case WT_PM_REC_EMPTY:				/* Page deleted */
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
-	case WT_PM_REC_REWRITE:				/* Rewrite */
 		/*
 		 * Discard the multiple replacement blocks.
 		 */
@@ -5459,24 +5437,13 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		bnd = &r->bnd[0];
 
 		/*
-		 * If we're saving/restoring changes for this page, there's
-		 * nothing to write. Allocate, then initialize the array of
-		 * replacement blocks.
+		 * If saving/restoring changes for this page and there's only
+		 * one block, there's nothing to write. This is a special case
+		 * of forced eviction: set up a single block as if to split,
+		 * then use that block to rewrite the page in memory.
 		 */
-		if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) {
-			WT_RET(__wt_calloc_def(
-			    session, r->bnd_next, &mod->mod_multi));
-			multi = mod->mod_multi;
-			multi->supd = bnd->supd;
-			multi->supd_entries = bnd->supd_next;
-			bnd->supd = NULL;
-			multi->supd_dsk = bnd->dsk;
-			bnd->dsk = NULL;
-			mod->mod_multi_entries = 1;
-
-			mod->rec_result = WT_PM_REC_REWRITE;
-			break;
-		}
+		if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL)
+			goto split;
 
 		/*
 		 * If this is a root page, then we don't have an address and we
@@ -5554,7 +5521,7 @@ err:			__wt_scr_free(session, &tkey);
 			    session, rec_multiblock_max, r->bnd_next_max);
 		}
 
-		switch (page->type) {
+split:		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
 			WT_RET(__rec_split_row(session, r, page));
@@ -5592,14 +5559,10 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * information (otherwise we might think the backing block is being
 	 * reused on a subsequent reconciliation where we want to free it).
 	 */
-	switch (mod->rec_result) {
-	case WT_PM_REC_MULTIBLOCK:
-	case WT_PM_REC_REWRITE:
+	if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
 		for (multi = mod->mod_multi,
 		    i = 0; i < mod->mod_multi_entries; ++multi, ++i)
 			multi->addr.reuse = 0;
-		break;
-	}
 
 	/*
 	 * On error, discard blocks we've written, they're unreferenced by the
@@ -5863,12 +5826,14 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
  * on the page.
  */
 static void
-__rec_cell_build_addr(WT_RECONCILE *r,
+__rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     const void *addr, size_t size, u_int cell_type, uint64_t recno)
 {
 	WT_KV *val;
 
 	val = &r->v;
+
+	WT_ASSERT(session, size != 0 || cell_type == WT_CELL_ADDR_DEL);
 
 	/*
 	 * We don't check the address size because we can't store an address on

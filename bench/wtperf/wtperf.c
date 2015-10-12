@@ -1198,8 +1198,12 @@ monitor(void *arg)
 		if (latency_max != 0 &&
 		    (read_max > latency_max || insert_max > latency_max ||
 		     update_max > latency_max))
+			/*
+			 * Make this a non-fatal error and print WARNING in
+			 * the output so Jenkins can flag it as unstable.
+			 */
 			lprintf(cfg, 0, 0,
-			    "max latency exceeded: threshold %" PRIu32
+			    "WARNING: max latency exceeded: threshold %" PRIu32
 			    " read max %" PRIu32 " insert max %" PRIu32
 			    " update max %" PRIu32, latency_max,
 			    read_max, insert_max, update_max);
