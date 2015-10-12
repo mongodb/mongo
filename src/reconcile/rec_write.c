@@ -619,7 +619,6 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	switch (mod->rec_result) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 	case WT_PM_REC_REPLACE:				/* 1-for-1 page swap */
-	case WT_PM_REC_REWRITE:				/* Rewrite */
 		return (0);
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
 		break;
@@ -3784,8 +3783,6 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			case WT_PM_REC_REPLACE:
 				addr = &child->modify->mod_replace;
 				break;
-			case WT_PM_REC_REWRITE:
-				break;
 			WT_ILLEGAL_VALUE_ERR(session);
 			}
 			break;
@@ -5328,7 +5325,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BM *bm;
 	WT_BOUNDARY *bnd;
 	WT_BTREE *btree;
-	WT_MULTI *multi;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
 	size_t addr_size;
@@ -5376,7 +5372,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	case WT_PM_REC_EMPTY:				/* Page deleted */
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
-	case WT_PM_REC_REWRITE:				/* Rewrite */
 		/*
 		 * Discard the multiple replacement blocks.
 		 */
@@ -5442,24 +5437,13 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		bnd = &r->bnd[0];
 
 		/*
-		 * If we're saving/restoring changes for this page, there's
-		 * nothing to write. Allocate, then initialize the array of
-		 * replacement blocks.
+		 * If saving/restoring changes for this page and there's only
+		 * one block, there's nothing to write. This is a special case
+		 * of forced eviction: set up a single block as if to split,
+		 * then use that block to rewrite the page in memory.
 		 */
-		if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) {
-			WT_RET(__wt_calloc_def(
-			    session, r->bnd_next, &mod->mod_multi));
-			multi = mod->mod_multi;
-			multi->supd = bnd->supd;
-			multi->supd_entries = bnd->supd_next;
-			bnd->supd = NULL;
-			multi->supd_dsk = bnd->dsk;
-			bnd->dsk = NULL;
-			mod->mod_multi_entries = 1;
-
-			mod->rec_result = WT_PM_REC_REWRITE;
-			break;
-		}
+		if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL)
+			goto split;
 
 		/*
 		 * If this is a root page, then we don't have an address and we
@@ -5537,7 +5521,7 @@ err:			__wt_scr_free(session, &tkey);
 			    session, rec_multiblock_max, r->bnd_next_max);
 		}
 
-		switch (page->type) {
+split:		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
 			WT_RET(__rec_split_row(session, r, page));
@@ -5575,14 +5559,10 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * information (otherwise we might think the backing block is being
 	 * reused on a subsequent reconciliation where we want to free it).
 	 */
-	switch (mod->rec_result) {
-	case WT_PM_REC_MULTIBLOCK:
-	case WT_PM_REC_REWRITE:
+	if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
 		for (multi = mod->mod_multi,
 		    i = 0; i < mod->mod_multi_entries; ++multi, ++i)
 			multi->addr.reuse = 0;
-		break;
-	}
 
 	/*
 	 * On error, discard blocks we've written, they're unreferenced by the
