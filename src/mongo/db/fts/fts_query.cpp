@@ -52,15 +52,14 @@ using std::vector;
 const bool FTSQuery::caseSensitiveDefault = false;
 const bool FTSQuery::diacriticSensitiveDefault = false;
 
-Status FTSQuery::parse(const string& query,
-                       StringData language,
-                       bool caseSensitive,
-                       bool diacriticSensitive,
-                       TextIndexVersion textIndexVersion) {
+void FTSQuery::parse(const string& query,
+                     StringData language,
+                     bool caseSensitive,
+                     bool diacriticSensitive,
+                     TextIndexVersion textIndexVersion) {
     StatusWithFTSLanguage swl = FTSLanguage::make(language, textIndexVersion);
-    if (!swl.getStatus().isOK()) {
-        return swl.getStatus();
-    }
+    uassertStatusOK(swl.getStatus());
+
     _language = swl.getValue();
     _caseSensitive = caseSensitive;
     _diacriticSensitive = diacriticSensitive;
@@ -131,8 +130,6 @@ Status FTSQuery::parse(const string& query,
 
     _addTerms(tokenizer.get(), positiveTermSentence, false);
     _addTerms(tokenizer.get(), negativeTermSentence, true);
-
-    return Status::OK();
 }
 
 void FTSQuery::_addTerms(FTSTokenizer* tokenizer, const string& sentence, bool negated) {

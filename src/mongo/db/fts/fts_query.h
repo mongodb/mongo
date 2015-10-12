@@ -50,11 +50,11 @@ public:
     // version 1 (see fts_language.cpp for a list of language strings specific to version
     // 1). Note that the diacritic sensitive option has no effect on FTS queries below index version
     // 3.
-    Status parse(const std::string& query,
-                 StringData language,
-                 bool caseSensitive,
-                 bool diacriticSensitive,
-                 TextIndexVersion textIndexVersion);
+    void parse(const std::string& query,
+               StringData language,
+               bool caseSensitive,
+               bool diacriticSensitive,
+               TextIndexVersion textIndexVersion);
 
     const std::set<std::string>& getPositiveTerms() const {
         return _positiveTerms;

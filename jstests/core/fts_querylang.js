@@ -49,6 +49,11 @@ results = t.find({$text: {$search: "content -irrelevant"},
 assert.eq(results.length, 1);
 assert.eq(results[0]._id, 1);
 
+// Test $and of basic text query with indexed expression, and bad language
+assert.throws(function() {
+    t.find({$text: {$search: "content -irrelevant", $language: "spanglish"}, _id: 1})
+    .itcount()});
+
 // Test $and of basic text query with unindexed expression.
 results = t.find({$text: {$search: "content -irrelevant"},
                   unindexedField: 1}).toArray();

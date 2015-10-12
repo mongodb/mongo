@@ -54,13 +54,6 @@ TEST(MatchExpressionParserText, Basic) {
     ASSERT_EQUALS(textExp->getDiacriticSensitive(), fts::FTSQuery::diacriticSensitiveDefault);
 }
 
-TEST(MatchExpressionParserText, LanguageError) {
-    BSONObj query = fromjson("{$text: {$search:\"awesome\", $language:\"spanglish\"}}");
-
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query);
-    ASSERT_FALSE(result.isOK());
-}
-
 TEST(MatchExpressionParserText, CaseSensitiveTrue) {
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $caseSensitive: true}}");
 
