@@ -180,6 +180,8 @@ void BatchedUpdateRequest::cloneTo(BatchedUpdateRequest* other) const {
 
     other->_ordered = _ordered;
     other->_isOrderedSet = _isOrderedSet;
+
+    other->_shouldBypassValidation = _shouldBypassValidation;
 }
 
 std::string BatchedUpdateRequest::toString() const {

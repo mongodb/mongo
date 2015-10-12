@@ -104,6 +104,7 @@ TEST(BatchedCommandRequest, InsertClone) {
     batchedRequest.setNS(NamespaceString("xyz.abc"));
     batchedRequest.setOrdered(true);
     batchedRequest.setWriteConcern(BSON("w" << 2));
+    batchedRequest.setShouldBypassValidation(true);
 
     BatchedCommandRequest clonedRequest(BatchedCommandRequest::BatchType_Insert);
     batchedRequest.cloneTo(&clonedRequest);
@@ -112,6 +113,11 @@ TEST(BatchedCommandRequest, InsertClone) {
     ASSERT_EQ("xyz.abc", clonedRequest.getTargetingNSS().toString());
     ASSERT_TRUE(clonedRequest.getOrdered());
     ASSERT_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
+    ASSERT_TRUE(clonedRequest.shouldBypassValidation());
+
+    batchedRequest.setShouldBypassValidation(false);
+    batchedRequest.cloneTo(&clonedRequest);
+    ASSERT_FALSE(clonedRequest.shouldBypassValidation());
 }
 
 TEST(BatchedCommandRequest, InsertIndexClone) {
@@ -149,6 +155,7 @@ TEST(BatchedCommandRequest, InsertCloneWithId) {
     insertRequest->setOrdered(true);
     insertRequest->setWriteConcern(BSON("w" << 2));
     insertRequest->addToDocuments(BSON("x" << 4));
+    insertRequest->setShouldBypassValidation(true);
 
     BatchedCommandRequest batchedRequest(insertRequest.release());
     batchedRequest.setNS(NamespaceString("xyz.abc"));
@@ -160,6 +167,7 @@ TEST(BatchedCommandRequest, InsertCloneWithId) {
     ASSERT_EQ("xyz.abc", clonedRequest->getTargetingNSS().toString());
     ASSERT_TRUE(clonedRequest->getOrdered());
     ASSERT_EQ(BSON("w" << 2), clonedRequest->getWriteConcern());
+    ASSERT_TRUE(clonedRequest->shouldBypassValidation());
 
     auto* clonedInsert = clonedRequest->getInsertRequest();
     ASSERT_TRUE(clonedInsert != nullptr);
@@ -179,6 +187,7 @@ TEST(BatchedCommandRequest, UpdateClone) {
     batchedRequest.setNS(NamespaceString("xyz.abc"));
     batchedRequest.setOrdered(true);
     batchedRequest.setWriteConcern(BSON("w" << 2));
+    batchedRequest.setShouldBypassValidation(true);
 
     BatchedCommandRequest clonedRequest(BatchedCommandRequest::BatchType_Update);
     batchedRequest.cloneTo(&clonedRequest);
@@ -187,6 +196,7 @@ TEST(BatchedCommandRequest, UpdateClone) {
     ASSERT_EQ("xyz.abc", clonedRequest.getTargetingNSS().toString());
     ASSERT_TRUE(clonedRequest.getOrdered());
     ASSERT_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
+    ASSERT_TRUE(clonedRequest.shouldBypassValidation());
 }
 
 TEST(BatchedCommandRequest, DeleteClone) {
