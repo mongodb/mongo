@@ -80,10 +80,12 @@ public:
 
         LOG(1) << "starting " << name() << " thread";
 
-        auto session = _sessionCache->getSession();
+        auto deleter = [this](WiredTigerSession* ptr) { _sessionCache->releaseSession(ptr); };
+        auto session = std::unique_ptr<WiredTigerSession, decltype(deleter)>(
+            _sessionCache->getSession(), deleter);
 
         while (!_shuttingDown.load()) {
-            _sessionCache->waitUntilDurable(session);
+            _sessionCache->waitUntilDurable(session.get());
 
             int ms = storageGlobalParams.journalCommitIntervalMs;
             if (!ms) {
