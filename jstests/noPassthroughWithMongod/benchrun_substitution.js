@@ -17,18 +17,12 @@ function benchrun_sub_insert(use_write_command) {
 
     assert.gt(res.insert, 0);
 
-    var now = new Date();
     t.find().forEach(function(doc) {
             var field = doc.x;
             assert.gte(field, 0);
             assert.lt(field, 100);
-            var curDate = doc.curDate;
-            assert.lte(curDate, now);
-            var futureDate = doc.futureDate;
-            assert.gt(futureDate, curDate);
-            assert.gte(new Date(now.getTime() + offset), futureDate);
-            var pastDate = doc.pastDate;
-            assert.lte(pastDate, new Date(now.getTime() - offset));
+            assert.lt(doc.pastDate, doc.curDate);
+            assert.lt(doc.curDate, doc.futureDate);
         }
     );
 }
