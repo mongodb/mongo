@@ -1557,7 +1557,6 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_PAGE_HEADER *dsk;
 	WT_PAGE_MODIFY *mod;
 	WT_REF **ref_new;
 	size_t parent_incr;
