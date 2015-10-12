@@ -111,8 +111,8 @@ extern int __wt_debug_offset_blind( WT_SESSION_IMPL *session, wt_off_t offset, c
 extern int __wt_debug_offset(WT_SESSION_IMPL *session, wt_off_t offset, uint32_t size, uint32_t cksum, const char *ofile);
 extern int __wt_debug_disk( WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, const char *ofile);
 extern int __wt_debug_tree_shape( WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
-extern int __wt_debug_tree_all(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
-extern int __wt_debug_tree(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
+extern int __wt_debug_tree_all( WT_SESSION_IMPL *session, WT_BTREE *btree, WT_PAGE *page, const char *ofile);
+extern int __wt_debug_tree( WT_SESSION_IMPL *session, WT_BTREE *btree, WT_PAGE *page, const char *ofile);
 extern int __wt_debug_page(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
 extern int __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp);
 extern void __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref);
