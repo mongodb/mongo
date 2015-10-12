@@ -541,14 +541,6 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	saved_dhandle = session->dhandle;
 
 	/*
-	 * If we already have the checkpoint locked, don't attempt to lock
-	 * it again.
-	 */
-	if ((ret = __wt_meta_track_find_handle(
-	    session, saved_dhandle->name, checkpoint)) != WT_NOTFOUND)
-		return (ret);
-
-	/*
 	 * Get the checkpoint handle exclusive, so no one else can access it
 	 * while we are creating the new checkpoint.
 	 */
