@@ -789,7 +789,7 @@ err:	/* Free any resources that may have been cached in the cursor. */
 	__wt_scr_free(session, &key);
 
 	if (ret == 0)
-		return (0);
+		return (ret);
 
 	/*
 	 * A note on error handling: if handling a page with unresolved changes,
