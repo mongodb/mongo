@@ -238,6 +238,7 @@ struct __wt_block {
 	 */
 	WT_SPINLOCK	live_lock;	/* Live checkpoint lock */
 	WT_BLOCK_CKPT	live;		/* Live checkpoint */
+	bool		live_open;	/* Live system is open */
 	bool		ckpt_inprogress;/* Live checkpoint in progress */
 
 				/* Compaction support */
