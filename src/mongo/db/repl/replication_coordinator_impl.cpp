@@ -2679,22 +2679,31 @@ void ReplicationCoordinatorImpl::resetLastOpTimeFromOplog(OperationContext* txn)
 void ReplicationCoordinatorImpl::_shouldChangeSyncSource(
     const ReplicationExecutor::CallbackArgs& cbData,
     const HostAndPort& currentSource,
+    const OpTime& syncSourceLastOpTime,
+    bool syncSourceHasSyncSource,
     bool* shouldChange) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
 
-    *shouldChange =
-        _topCoord->shouldChangeSyncSource(currentSource, getMyLastOptime(), _replExecutor.now());
+    *shouldChange = _topCoord->shouldChangeSyncSource(currentSource,
+                                                      getMyLastOptime(),
+                                                      syncSourceLastOpTime,
+                                                      syncSourceHasSyncSource,
+                                                      _replExecutor.now());
 }
 
-bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource) {
+bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
+                                                        const OpTime& syncSourceLastOpTime,
+                                                        bool syncSourceHasSyncSource) {
     bool shouldChange(false);
     CBHStatus cbh =
         _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_shouldChangeSyncSource,
                                               this,
                                               stdx::placeholders::_1,
                                               currentSource,
+                                              syncSourceLastOpTime,
+                                              syncSourceHasSyncSource,
                                               &shouldChange));
     if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
         return false;

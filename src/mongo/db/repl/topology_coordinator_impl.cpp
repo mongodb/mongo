@@ -2300,6 +2300,8 @@ long long TopologyCoordinatorImpl::getTerm() {
 
 bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
                                                      const OpTime& myLastOpTime,
+                                                     const OpTime& syncSourceLastOpTime,
+                                                     bool syncSourceHasSyncSource,
                                                      Date_t now) const {
     // Methodology:
     // If there exists a viable sync source member other than currentSource, whose oplog has
@@ -2319,8 +2321,8 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
     }
     invariant(currentSourceIndex != _selfIndex);
 
-    const auto& currentSourceHBData = _hbdata[currentSourceIndex];
-    OpTime currentSourceOpTime = currentSourceHBData.getOpTime();
+    OpTime currentSourceOpTime =
+        std::max(syncSourceLastOpTime, _hbdata[currentSourceIndex].getOpTime());
 
     if (currentSourceOpTime.isNull()) {
         // Haven't received a heartbeat from the sync source yet, so can't tell if we should
@@ -2328,8 +2330,9 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
         return false;
     }
 
-    if (currentSourceHBData.getSyncSource().empty() && currentSourceOpTime <= myLastOpTime &&
-        currentSourceHBData.getState() != MemberState::RS_PRIMARY) {
+    if (_rsConfig.getProtocolVersion() == 1 && !syncSourceHasSyncSource &&
+        currentSourceOpTime <= myLastOpTime &&
+        _hbdata[currentSourceIndex].getState() != MemberState::RS_PRIMARY) {
         return true;
     }
 
@@ -2359,11 +2362,13 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
 void TopologyCoordinatorImpl::prepareReplResponseMetadata(rpc::ReplSetMetadata* metadata,
                                                           const OpTime& lastVisibleOpTime,
                                                           const OpTime& lastCommittedOpTime) const {
-    *metadata = rpc::ReplSetMetadata(_term,
-                                     lastCommittedOpTime,
-                                     lastVisibleOpTime,
-                                     _rsConfig.getConfigVersion(),
-                                     _currentPrimaryIndex);
+    *metadata =
+        rpc::ReplSetMetadata(_term,
+                             lastCommittedOpTime,
+                             lastVisibleOpTime,
+                             _rsConfig.getConfigVersion(),
+                             _currentPrimaryIndex,
+                             _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()));
 }
 
 void TopologyCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {

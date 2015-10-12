@@ -46,6 +46,7 @@ const char kLastOpCommittedFieldName[] = "lastOpCommitted";
 const char kLastOpVisibleFieldName[] = "lastOpVisible";
 const char kConfigVersionFieldName[] = "configVersion";
 const char kPrimaryIndexFieldName[] = "primaryIndex";
+const char kSyncSourceIndexFieldName[] = "syncSourceIndex";
 const char kTermFieldName[] = "term";
 
 }  // unnamed namespace
@@ -58,12 +59,14 @@ ReplSetMetadata::ReplSetMetadata(long long term,
                                  OpTime committedOpTime,
                                  OpTime visibleOpTime,
                                  long long configVersion,
-                                 int currentPrimaryIndex)
+                                 int currentPrimaryIndex,
+                                 int currentSyncSourceIndex)
     : _lastOpCommitted(std::move(committedOpTime)),
       _lastOpVisible(std::move(visibleOpTime)),
       _currentTerm(term),
       _configVersion(configVersion),
-      _currentPrimaryIndex(currentPrimaryIndex) {}
+      _currentPrimaryIndex(currentPrimaryIndex),
+      _currentSyncSourceIndex(currentSyncSourceIndex) {}
 
 StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& metadataObj) {
     BSONElement replMetadataElement;
@@ -84,6 +87,11 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
     if (!status.isOK())
         return status;
 
+    long long syncSourceIndex;
+    status = bsonExtractIntegerField(replMetadataObj, kSyncSourceIndexFieldName, &syncSourceIndex);
+    if (!status.isOK())
+        return status;
+
     long long term;
     status = bsonExtractIntegerField(replMetadataObj, kTermFieldName, &term);
     if (!status.isOK())
@@ -99,7 +107,8 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
     if (!status.isOK())
         return status;
 
-    return ReplSetMetadata(term, lastOpCommitted, lastOpVisible, configVersion, primaryIndex);
+    return ReplSetMetadata(
+        term, lastOpCommitted, lastOpVisible, configVersion, primaryIndex, syncSourceIndex);
 }
 
 Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
@@ -109,6 +118,7 @@ Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     _lastOpVisible.append(&replMetadataBuilder, kLastOpVisibleFieldName);
     replMetadataBuilder.append(kConfigVersionFieldName, _configVersion);
     replMetadataBuilder.append(kPrimaryIndexFieldName, _currentPrimaryIndex);
+    replMetadataBuilder.append(kSyncSourceIndexFieldName, _currentSyncSourceIndex);
     replMetadataBuilder.doneFast();
 
     return Status::OK();

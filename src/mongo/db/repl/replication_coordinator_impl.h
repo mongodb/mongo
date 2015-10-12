@@ -255,7 +255,9 @@ public:
 
     virtual void resetLastOpTimeFromOplog(OperationContext* txn) override;
 
-    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) override;
+    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
+                                        const OpTime& syncSourceLastOpTime,
+                                        bool syncSourceHasSyncSource) override;
 
     virtual OpTime getLastCommittedOpTime() const override;
 
@@ -946,6 +948,8 @@ private:
      */
     void _shouldChangeSyncSource(const ReplicationExecutor::CallbackArgs& cbData,
                                  const HostAndPort& currentSource,
+                                 const OpTime& syncSourceLastOpTime,
+                                 bool syncSourceHasSyncSource,
                                  bool* shouldChange);
 
     /**

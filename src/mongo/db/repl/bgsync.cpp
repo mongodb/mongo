@@ -426,6 +426,8 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     }
 
     const auto& queryResponse = result.getValue();
+    bool syncSourceHasSyncSource = false;
+    OpTime sourcesLastOp;
 
     // Forward metadata (containing liveness information) to replication coordinator.
     bool receivedMetadata =
@@ -443,6 +445,8 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
         if (metadata.getPrimaryIndex() != rpc::ReplSetMetadata::kNoPrimary) {
             _replCoord->cancelAndRescheduleElectionTimeout();
         }
+        syncSourceHasSyncSource = metadata.getSyncSourceIndex() != -1;
+        sourcesLastOp = metadata.getLastOpVisible();
     }
 
     const auto& documents = queryResponse.documents;
@@ -542,7 +546,7 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     }
 
     // re-evaluate quality of sync target
-    if (_shouldChangeSyncSource(source)) {
+    if (_shouldChangeSyncSource(source, sourcesLastOp, syncSourceHasSyncSource)) {
         return;
     }
 
@@ -562,7 +566,9 @@ void BackgroundSync::_fetcherCallback(const StatusWith<Fetcher::QueryResponse>& 
     }
 }
 
-bool BackgroundSync::_shouldChangeSyncSource(const HostAndPort& syncSource) {
+bool BackgroundSync::_shouldChangeSyncSource(const HostAndPort& syncSource,
+                                             const OpTime& syncSourceLastOpTime,
+                                             bool syncSourceHasSyncSource) {
     // is it even still around?
     if (getSyncTarget().empty() || syncSource.empty()) {
         return true;
@@ -570,7 +576,8 @@ bool BackgroundSync::_shouldChangeSyncSource(const HostAndPort& syncSource) {
 
     // check other members: is any member's optime more than MaxSyncSourceLag seconds
     // ahead of the current sync source?
-    return _replCoord->shouldChangeSyncSource(syncSource);
+    return _replCoord->shouldChangeSyncSource(
+        syncSource, syncSourceLastOpTime, syncSourceHasSyncSource);
 }
 
 

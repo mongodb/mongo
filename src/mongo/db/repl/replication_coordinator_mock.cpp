@@ -320,7 +320,9 @@ void ReplicationCoordinatorMock::resetLastOpTimeFromOplog(OperationContext* txn)
     invariant(false);
 }
 
-bool ReplicationCoordinatorMock::shouldChangeSyncSource(const HostAndPort& currentSource) {
+bool ReplicationCoordinatorMock::shouldChangeSyncSource(const HostAndPort& currentSource,
+                                                        const OpTime& syncSourceLastOpTime,
+                                                        bool syncSourceHasSyncSource) {
     invariant(false);
 }
 

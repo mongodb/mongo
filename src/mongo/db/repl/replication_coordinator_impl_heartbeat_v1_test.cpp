@@ -338,12 +338,13 @@ TEST_F(ReplCoordHBV1Test, ArbiterRecordsCommittedOpTimeFromHeartbeat) {
     auto test = [this](OpTime committedOpTime, OpTime expected) {
         // process heartbeat metadata directly
         StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
-            rpc::kReplSetMetadataFieldName << BSON(
-                "lastOpCommitted" << BSON("ts" << committedOpTime.getTimestamp() << "t"
-                                               << committedOpTime.getTerm()) << "lastOpVisible"
-                                  << BSON("ts" << committedOpTime.getTimestamp() << "t"
-                                               << committedOpTime.getTerm()) << "configVersion" << 1
-                                  << "primaryIndex" << 1 << "term" << committedOpTime.getTerm())));
+            rpc::kReplSetMetadataFieldName
+            << BSON("lastOpCommitted" << BSON("ts" << committedOpTime.getTimestamp() << "t"
+                                                   << committedOpTime.getTerm()) << "lastOpVisible"
+                                      << BSON("ts" << committedOpTime.getTimestamp() << "t"
+                                                   << committedOpTime.getTerm()) << "configVersion"
+                                      << 1 << "primaryIndex" << 1 << "term"
+                                      << committedOpTime.getTerm() << "syncSourceIndex" << 1)));
         ASSERT_OK(metadata.getStatus());
         getReplCoord()->processReplSetMetadata(metadata.getValue());
 

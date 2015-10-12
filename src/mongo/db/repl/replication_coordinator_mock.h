@@ -185,7 +185,9 @@ public:
 
     virtual void resetLastOpTimeFromOplog(OperationContext* txn);
 
-    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
+    virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
+                                        const OpTime& syncSourceLastOpTime,
+                                        bool syncSourceHasSyncSource);
 
     virtual OpTime getLastCommittedOpTime() const;
 
