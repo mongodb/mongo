@@ -88,7 +88,7 @@ functions:
           set -o verbose
           virtualenv ./venv
           source ./venv/bin/activate
-          python compare.py -b stand.json -c node.json
+          python compare.py -b stand.json -c node.json -t ${threshold}
   "analyze":
     - command: s3.get
       params:
@@ -332,110 +332,313 @@ tasks:
         compare_task : "singleThreaded"
         variant1 : "linux-wt-standalone"
         variant2 : "linux-wt-repl"
+        threshold : 75
 - name: insert-wt-repl-comp
   depends_on:
     - name : compile
       variant : linux-wt-standalone
     - name : insert
       variant : linux-wt-standalone
+      status : "*"
     - name : insert
       variant :  linux-wt-repl
+      status : "*"
   commands:
     - func: "compare"
       vars:
         compare_task : "insert"
         variant1 : "linux-wt-standalone"
         variant2 : "linux-wt-repl"
-    - func: "analyze"
+        threshold : 75
 - name: update-wt-repl-comp
   depends_on:
     - name : compile
       variant : linux-wt-standalone
     - name : update
       variant : linux-wt-standalone
+      status : "*"
     - name : update
       variant :  linux-wt-repl
+      status : "*"
   commands:
     - func: "compare"
       vars:
         compare_task : "update"
         variant1 : "linux-wt-standalone"
         variant2 : "linux-wt-repl"
-    - func: "analyze"
+        threshold : 75
 - name: misc-wt-repl-comp
   depends_on:
     - name : compile
       variant : linux-wt-standalone
     - name : misc
       variant : linux-wt-standalone
+      status : "*"
     - name : misc
       variant :  linux-wt-repl
+      status : "*"
   commands:
     - func: "compare"
       vars:
         compare_task : "misc"
         variant1 : "linux-wt-standalone"
         variant2 : "linux-wt-repl"
-    - func: "analyze"
+        threshold : 75
+- name: singleThreaded-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : singleThreaded
+      variant : linux-wt-standalone
+      status : "*"
+    - name : singleThreaded
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task : "singleThreaded"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: query-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : query
+      variant : linux-wt-standalone
+      status : "*"
+    - name : query
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task : "query"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: where-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : where
+      variant : linux-wt-standalone
+      status : "*"
+    - name : where
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task : "where"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: geo-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : geo
+      variant : linux-wt-standalone
+      status : "*"
+    - name : geo
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task : "geo"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: insert-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : insert
+      variant : linux-wt-standalone
+      status : "*"
+    - name : insert
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task : "insert"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: update-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : update
+      variant : linux-wt-standalone
+      status : "*"
+    - name : update
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task : "update"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: misc-wt-mmap-standalone-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : misc
+      variant : linux-wt-standalone
+      status : "*"
+    - name : misc
+      variant :  linux-mmap-standalone
+      status : "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task : "misc"
+        variant2 : "linux-wt-standalone"
+        variant1 : "linux-mmap-standalone"
+        threshold : 85
+- name: singleThreaded-wt-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : singleThreaded
+      variant : linux-wt-repl
+      status : "*"
+    - name : singleThreaded
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task : "singleThreaded"
+        variant2 : "linux-wt-repl"
+        variant1 : "linux-mmap-repl"
+        threshold : 85
+- name: insert-wt-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : insert
+      variant : linux-wt-repl
+      status : "*"
+    - name : insert
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task : "insert"
+        variant2 : "linux-wt-repl"
+        variant1 : "linux-mmap-repl"
+        threshold : 85
+- name: update-wt-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+    - name : update
+      variant : linux-wt-repl
+      status : "*"
+    - name : update
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task : "update"
+        variant2 : "linux-wt-repl"
+        variant1 : "linux-mmap-repl"
+        threshold : 85
+- name: misc-wt-mmap-repl-comp
+  depends_on:
+    - name : compile
+      variant : linux-wt-standalone
+      status : "*"
+    - name : misc
+      variant : linux-wt-repl
+    - name : misc
+      variant :  linux-mmap-repl
+      status : "*"
+  commands:
+    - func: "compare"
+      vars:
+        compare_task : "misc"
+        variant2 : "linux-wt-repl"
+        variant1 : "linux-mmap-repl"
+        threshold : 85
 - name: singleThreaded-mmap-repl-comp
   depends_on:
     - name : compile
       variant : linux-wt-standalone
     - name : singleThreaded
       variant : linux-mmap-standalone
+      status : "*"
     - name : singleThreaded
       variant :  linux-mmap-repl
+      status : "*"
   commands:
     - func: "compare"
       vars:
         compare_task : "singleThreaded"
         variant1 : "linux-mmap-standalone"
         variant2 : "linux-mmap-repl"
+        threshold : 75
 - name: insert-mmap-repl-comp
   depends_on:
     - name : compile
       variant : linux-wt-standalone
     - name : insert
       variant : linux-mmap-standalone
+      status : "*"
     - name : insert
       variant :  linux-mmap-repl
+      status : "*"
   commands:
     - func: "compare"
       vars:
         compare_task : "insert"
         variant1 : "linux-mmap-standalone"
         variant2 : "linux-mmap-repl"
-    - func: "analyze"
+        threshold : 75
 - name: update-mmap-repl-comp
   depends_on:
     - name : compile
       variant : linux-wt-standalone
     - name : update
       variant : linux-mmap-standalone
+      status : "*"
     - name : update
       variant :  linux-mmap-repl
+      status : "*"
   commands:
     - func: "compare"
       vars:
         compare_task : "update"
         variant1 : "linux-mmap-standalone"
         variant2 : "linux-mmap-repl"
-    - func: "analyze"
+        threshold : 75
 - name: misc-mmap-repl-comp
   depends_on:
     - name : compile
       variant : linux-wt-standalone
     - name : misc
       variant : linux-mmap-standalone
+      status : "*"
     - name : misc
       variant :  linux-mmap-repl
+      status : "*"
   commands:
     - func: "compare"
       vars:
         compare_task : "misc"
         variant1 : "linux-mmap-standalone"
         variant2 : "linux-mmap-repl"
-    - func: "analyze"
+        threshold : 75
 
 buildvariants:
 - name: linux-wt-standalone
@@ -499,7 +702,7 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-mmap-repl
-  display_name: Linux MMapv1 1-Node ReplSet
+  display_name: Linux MMAPv1 1-Node ReplSet
   batchtime: 360 # 6 hours
   expansions:
     compile_flags: *compile_flags 
@@ -548,3 +751,41 @@ buildvariants:
   - name: insert-mmap-repl-comp
   - name: update-mmap-repl-comp
   - name: misc-mmap-repl-comp
+
+- name: linux-wt-mmap-standalone-compare
+  display_name: Linux WT-MMAP Standalone Compare
+  batchtime: 90 # 1.5 hours
+  expansions:
+    compile_flags: *compile_flags 
+    mongod_exec_wrapper: *exec_wrapper
+    perf_exec_wrapper: *perf_wrapper
+    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000"
+  run_on:
+  - "centos6-perf"
+#    - "ubuntu1404-docker"
+  tasks:
+  - name: singleThreaded-wt-mmap-standalone-comp
+  - name: insert-wt-mmap-standalone-comp
+  - name: update-wt-mmap-standalone-comp
+  - name: misc-wt-mmap-standalone-comp
+  - name: query-wt-mmap-standalone-comp
+  - name: where-wt-mmap-standalone-comp
+  - name: geo-wt-mmap-standalone-comp
+
+- name: linux-wt-mmap-repl-compare
+  display_name: Linux WT-MMAP 1-Node ReplSet Compare
+  batchtime: 360 # 6 hours
+  expansions:
+    compile_flags: *compile_flags 
+    mongod_exec_wrapper: *exec_wrapper
+    perf_exec_wrapper: *perf_wrapper
+    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000"
+  run_on:
+  - "centos6-perf"
+#    - "ubuntu1404-docker"
+  tasks:
+  - name: singleThreaded-wt-mmap-repl-comp
+  - name: insert-wt-mmap-repl-comp
+  - name: update-wt-mmap-repl-comp
+  - name: misc-wt-mmap-repl-comp
+

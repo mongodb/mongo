@@ -8,13 +8,16 @@ parser.add_argument("-b", "--baseline", default="base.json", dest="baseline",
                     help="path to json file containing baseline data")
 parser.add_argument("-c", "--comparison", default="compare.json", dest="compare",
                     help="path to json file containing comparison data")
+parser.add_argument("-t", "--threshold", default=75, dest="threshold", 
+                    help="Comparison threshold in percent. Ex. -t 75 will fail if\n"
+                    "the comparison is less than 75% of the reference value")
 args = parser.parse_args()
 
 compare = json.load(open(args.compare))
 baseline = json.load(open(args.baseline))
 baselinedict = dict((s['name'], s) for s in baseline['results'])
 
-threshold = 75
+threshold = float(args.threshold)
 
 # Note, we're putting things in an ops_per_sec fields, but it's really
 # a ratio. Would like to rename and have evergreen pick it up.
