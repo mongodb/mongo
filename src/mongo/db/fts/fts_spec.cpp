@@ -163,7 +163,7 @@ const FTSLanguage* FTSSpec::_getLanguageToUseV2(const BSONObj& userDoc,
     uassert(17261,
             "found language override field in document with non-string type",
             e.type() == mongo::String);
-    StatusWithFTSLanguage swl = FTSLanguage::make(e.String(), TEXT_INDEX_VERSION_2);
+    StatusWithFTSLanguage swl = FTSLanguage::make(e.String(), getTextIndexVersion());
     uassert(17262, "language override unsupported: " + e.String(), swl.getStatus().isOK());
     return swl.getValue();
 }
