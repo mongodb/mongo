@@ -124,7 +124,12 @@ func (dump *MongoDump) Init() error {
 		return fmt.Errorf("can't use --oplog option when dumping from a mongos")
 	}
 
-	var mode = mgo.Nearest
+	var mode mgo.Mode
+	if dump.ToolOptions.ReplicaSetName != "" || dump.isMongos {
+		mode = mgo.Primary
+	} else {
+		mode = mgo.Nearest
+	}
 	var tags bson.D
 
 	if dump.InputOptions.ReadPreference != "" {
@@ -137,16 +142,9 @@ func (dump *MongoDump) Init() error {
 		}
 	}
 
-	// ensure we allow secondary reads on mongods and disable TCP timeouts
-	if dump.isMongos {
-		log.Logf(log.Info, "connecting to mongos; secondary reads disabled")
-		if mode != mgo.Primary {
-			mode = mgo.Primary
-			if dump.InputOptions.ReadPreference != "" {
-				log.Logf(log.Always, "overwriting specified readPreference with "+
-					"'primary' because connected to mongos")
-			}
-		}
+	// warn if we are trying to dump from a secondary in a sharded cluster
+	if dump.isMongos && mode != mgo.Primary {
+		log.Logf(log.Always, db.WarningNonPrimaryMongosConnection)
 	}
 
 	dump.sessionProvider.SetReadPreference(mode)

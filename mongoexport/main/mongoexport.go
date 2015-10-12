@@ -55,6 +55,14 @@ func main() {
 
 	provider, err := db.NewSessionProvider(*opts)
 
+	// temporarily allow secondary reads for the isMongos check
+	provider.SetReadPreference(mgo.Nearest)
+	isMongos, err := provider.IsMongos()
+	if err != nil {
+		log.Logf(log.Always, "%v", err)
+		os.Exit(util.ExitError)
+	}
+
 	provider.SetFlags(db.DisableSocketTimeout)
 
 	if inputOpts.SlaveOk {
@@ -66,7 +74,12 @@ func main() {
 		inputOpts.ReadPreference = "nearest"
 	}
 
-	var mode = mgo.Nearest
+	var mode mgo.Mode
+	if opts.ReplicaSetName != "" || isMongos {
+		mode = mgo.Primary
+	} else {
+		mode = mgo.Nearest
+	}
 	var tags bson.D
 	if inputOpts.ReadPreference != "" {
 		mode, tags, err = db.ParseReadPreference(inputOpts.ReadPreference)
@@ -78,6 +91,12 @@ func main() {
 			provider.SetTags(tags)
 		}
 	}
+
+	// warn if we are trying to export from a secondary in a sharded cluster
+	if isMongos && mode != mgo.Primary {
+		log.Logf(log.Always, db.WarningNonPrimaryMongosConnection)
+	}
+
 	provider.SetReadPreference(mode)
 
 	if err != nil {

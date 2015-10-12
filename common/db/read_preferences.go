@@ -13,6 +13,11 @@ type readPrefDoc struct {
 	Tags bson.D
 }
 
+const (
+	WarningNonPrimaryMongosConnection = "Warning: using a non-primary readPreference with a " +
+		"connection to mongos may produce inconsistent duplicates or miss some documents."
+)
+
 func ParseReadPreference(rp string) (mgo.Mode, bson.D, error) {
 	var mode string
 	var tags bson.D
