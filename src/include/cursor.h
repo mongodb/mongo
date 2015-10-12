@@ -228,7 +228,7 @@ struct __wt_cursor_bulk {
 	uint32_t nrecs;			/* Max records per chunk */
 
 	/* Special bitmap bulk load for fixed-length column stores. */
-	int	bitmap;
+	bool	bitmap;
 
 	void	*reconcile;		/* Reconciliation information */
 };
@@ -301,8 +301,8 @@ struct __wt_cursor_metadata {
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
 
-	int	notinitialized;		/* Cursor not initialized */
-	int	notpositioned;		/* Cursor not positioned */
+	bool	notinitialized;		/* Cursor not initialized */
+	bool	notpositioned;		/* Cursor not positioned */
 
 	int64_t	     *stats;		/* Statistics */
 	int	      stats_base;	/* Base statistics value */

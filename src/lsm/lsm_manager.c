@@ -203,12 +203,14 @@ __wt_lsm_manager_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 int
 __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
 	WT_SESSION_IMPL *worker_session;
 	uint32_t i;
 
-	manager = &S2C(session)->lsm_manager;
+	conn = S2C(session);
+	manager = &conn->lsm_manager;
 
 	/*
 	 * We need at least a manager, a switch thread and a generic
@@ -225,7 +227,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	 */
 	for (i = 0; i < WT_LSM_MAX_WORKERS; i++) {
 		WT_ERR(__wt_open_internal_session(
-		    S2C(session), "lsm-worker", true, false, &worker_session));
+		    conn, "lsm-worker", false, 0, &worker_session));
 		worker_session->isolation = WT_ISO_READ_UNCOMMITTED;
 		manager->lsm_worker_cookies[i].session = worker_session;
 	}
@@ -234,7 +236,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_thread_create(session, &manager->lsm_worker_cookies[0].tid,
 	    __lsm_worker_manager, &manager->lsm_worker_cookies[0]));
 
-	F_SET(S2C(session), WT_CONN_SERVER_LSM);
+	F_SET(conn, WT_CONN_SERVER_LSM);
 
 	if (0) {
 err:		for (i = 0;

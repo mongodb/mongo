@@ -90,7 +90,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 
 			WT_ASSERT(session,
 			    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
-			    __wt_page_can_evict(session, page, false, NULL));
+			    __wt_page_can_evict(session, ref, false, NULL));
 			__wt_evict_page_clean_update(session, ref, 1);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);

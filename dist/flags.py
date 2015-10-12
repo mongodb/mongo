@@ -92,6 +92,7 @@ flags = {
         'CONN_CKPT_SYNC',
         'CONN_CLOSING',
         'CONN_EVICTION_RUN',
+        'CONN_LAS_OPEN',
         'CONN_LEAK_MEMORY',
         'CONN_LOG_SERVER_RUN',
         'CONN_LSM_MERGE',
