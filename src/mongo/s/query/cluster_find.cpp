@@ -369,10 +369,10 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
         }
         auto status = std::move(cursorId.getStatus());
 
-        if (status != ErrorCodes::SendStaleConfig && status != ErrorCodes::RecvStaleConfig &&
-            status != ErrorCodes::HostUnreachable) {
-            // Errors other than receiving a stale config message from mongoD or an unreachable host
-            // are fatal to the operation.
+        if (status != ErrorCodes::SendStaleConfig && status != ErrorCodes::RecvStaleConfig) {
+            // Errors other than receiving a stale config message from MongoD are fatal to the
+            // operation. Network errors and replication retries happen at the level of the
+            // AsyncResultsMerger.
             return status;
         }
 
@@ -388,7 +388,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
 
     return {ErrorCodes::StaleShardVersion,
             str::stream() << "Retried " << kMaxStaleConfigRetries
-                          << " times without establishing shard version on a reachable host."};
+                          << " times without successfully establishing shard version."};
 }
 
 StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,

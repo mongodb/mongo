@@ -42,9 +42,25 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+namespace {
+
+// Maximum number of retries for network and replication notMaster errors (per host).
+const int kMaxNumFailedHostRetryAttempts = 3;
+
+/**
+ * Returns whether a particular error code returned from the initial cursor establishment should
+ * be retried.
+ */
+bool isPerShardRetriableError(ErrorCodes::Error err) {
+    return (ErrorCodes::isNetworkError(err) || ErrorCodes::isNotMasterError(err) ||
+            err == ErrorCodes::NotMasterOrSecondary);
+}
+
+}  // namespace
 
 AsyncResultsMerger::AsyncResultsMerger(executor::TaskExecutor* executor,
                                        ClusterClientCursorParams params)
@@ -407,24 +423,37 @@ void AsyncResultsMerger::handleBatchResponse(
                                : cbData.response.getStatus());
 
     if (!cursorResponseStatus.isOK()) {
-        remote.status = cursorResponseStatus.getStatus();
-
-        // Errors other than HostUnreachable have no special handling.
-        if (remote.status != ErrorCodes::HostUnreachable) {
-            return;
-        }
-
         // Notify the shard registry of the failure.
         if (remote.shardId) {
             auto shard = grid.shardRegistry()->getShard(_params.txn, *remote.shardId);
             if (!shard) {
-                remote.status = Status(ErrorCodes::HostUnreachable,
+                remote.status = Status(cursorResponseStatus.getStatus().code(),
                                        str::stream() << "Could not find shard " << *remote.shardId
                                                      << " containing host "
                                                      << remote.getTargetHost().toString());
             } else {
-                shard->getTargeter()->markHostUnreachable(remote.getTargetHost());
+                ShardRegistry::updateReplSetMonitor(
+                    shard->getTargeter(), remote.getTargetHost(), cursorResponseStatus.getStatus());
             }
+        }
+
+        // If the error is retriable, schedule another request.
+        if (!remote.cursorId && remote.retryCount < kMaxNumFailedHostRetryAttempts &&
+            isPerShardRetriableError(cursorResponseStatus.getStatus().code())) {
+            ++remote.retryCount;
+
+            // Since we potentially updated the targeter that the last host it chose might be
+            // faulty, the call below may end up getting a different host.
+            remote.status = askForNextBatch_inlock(remoteIndex);
+            if (remote.status.isOK()) {
+                return;
+            }
+
+            // If we end up here, it means we failed to schedule the retry request, which is a more
+            // severe error that should not be retried. Just pass through to the error handling
+            // logic below.
+        } else {
+            remote.status = cursorResponseStatus.getStatus();
         }
 
         // Unreachable host errors are swallowed if the 'allowPartialResults' option is set. We
@@ -441,6 +470,7 @@ void AsyncResultsMerger::handleBatchResponse(
         return;
     }
 
+    // Cursor id successfully established.
     auto cursorResponse = cursorResponseStatus.getValue();
     remote.cursorId = cursorResponse.cursorId;
     remote.initialCmdObj = boost::none;
@@ -478,9 +508,8 @@ void AsyncResultsMerger::handleBatchResponse(
     // We do not ask for the next batch if the cursor is tailable, as batches received from remote
     // tailable cursors should be passed through to the client without asking for more batches.
     if (!_params.isTailable && !remote.hasNext() && !remote.exhausted()) {
-        auto nextBatchStatus = askForNextBatch_inlock(remoteIndex);
-        if (!nextBatchStatus.isOK()) {
-            remote.status = nextBatchStatus;
+        remote.status = askForNextBatch_inlock(remoteIndex);
+        if (!remote.status.isOK()) {
             return;
         }
     }

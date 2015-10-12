@@ -79,16 +79,6 @@ const BSONObj kReplSecondaryOkMetadata{
     BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1)};
 const BSONObj kSecondaryOkMetadata{BSON(rpc::kSecondaryOkFieldName << 1)};
 
-void updateReplSetMonitor(const std::shared_ptr<RemoteCommandTargeter>& targeter,
-                          const HostAndPort& remoteHost,
-                          const Status& remoteCommandStatus) {
-    if (ErrorCodes::NotMaster == remoteCommandStatus) {
-        targeter->markHostNotMaster(remoteHost);
-    } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
-        targeter->markHostUnreachable(remoteHost);
-    }
-}
-
 BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
     Seconds maxTime = kConfigCommandTimeout;
 
@@ -683,6 +673,18 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
     }
 
     return cmdResponse;
+}
+
+void ShardRegistry::updateReplSetMonitor(const std::shared_ptr<RemoteCommandTargeter>& targeter,
+                                         const HostAndPort& remoteHost,
+                                         const Status& remoteCommandStatus) {
+    if (ErrorCodes::isNotMasterError(remoteCommandStatus.code())) {
+        targeter->markHostNotMaster(remoteHost);
+    } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
+        targeter->markHostUnreachable(remoteHost);
+    } else if (remoteCommandStatus == ErrorCodes::NotMasterOrSecondary) {
+        targeter->markHostUnreachable(remoteHost);
+    }
 }
 
 }  // namespace mongo

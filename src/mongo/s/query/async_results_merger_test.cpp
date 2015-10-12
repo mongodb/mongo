@@ -55,10 +55,10 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
-const std::vector<std::string> kTestShardIds = {"FakeShardId1", "FakeShardId2", "FakeShardId3"};
-const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShardHost1", 12345),
-                                                  HostAndPort("FakeShardHost2", 12345),
-                                                  HostAndPort("FakeShardHost3", 12345)};
+const std::vector<std::string> kTestShardIds = {"FakeShard1", "FakeShard2", "FakeShard3"};
+const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShard1Host", 12345),
+                                                  HostAndPort("FakeShard2Host", 12345),
+                                                  HostAndPort("FakeShard3Host", 12345)};
 
 class AsyncResultsMergerTest : public ShardingTestFixture {
 public:
@@ -83,7 +83,7 @@ public:
 
             std::unique_ptr<RemoteCommandTargeterMock> targeter(
                 stdx::make_unique<RemoteCommandTargeterMock>());
-            targeter->setConnectionStringReturnValue(ConnectionString(kTestConfigShardHost));
+            targeter->setConnectionStringReturnValue(ConnectionString(kTestShardHosts[i]));
             targeter->setFindHostReturnValue(kTestShardHosts[i]);
 
             targeterFactory()->addTargeterToReturn(ConnectionString(kTestShardHosts[i]),
@@ -582,7 +582,7 @@ TEST_F(AsyncResultsMergerTest, ExistingCursors) {
 
 TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, {kTestShardHosts[0].toString(), kTestShardHosts[1].toString()});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0], kTestShardIds[0]});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -1117,8 +1117,8 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
-    // The network layer reports that the first host is unreachable.
-    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
+    // An unretriable error occurs with the first host.
+    scheduleErrorResponse({ErrorCodes::AuthenticationFailed, "authentication failed"});
     ASSERT_FALSE(arm->ready());
 
     // Instead of propagating the error, we should be willing to return results from the two
@@ -1142,7 +1142,7 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
 
     // Now the second host becomes unreachable. We should still be willing to return results from
     // the third shard.
-    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
+    scheduleErrorResponse({ErrorCodes::AuthenticationFailed, "authentication failed"});
     ASSERT_FALSE(arm->ready());
 
     responses.clear();
@@ -1192,12 +1192,105 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResultsSingleNode) {
     readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
-    // The lone host involved in this query becomes unreachable. This should simply cause us to
-    // return EOF.
-    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
+    // The lone host involved in this query returns an error. This should simply cause us to return
+    // EOF.
+    scheduleErrorResponse({ErrorCodes::AuthenticationFailed, "authentication failed"});
     ASSERT_TRUE(arm->ready());
     ASSERT(!unittest::assertGet(arm->nextReady()));
 }
+
+TEST_F(AsyncResultsMergerTest, RetryOnNotMasterNoSlaveOkSingleNode) {
+    BSONObj findCmd = fromjson("{find: 'testcoll'}");
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // First and second attempts return an error.
+    scheduleErrorResponse({ErrorCodes::NotMasterNoSlaveOk, "not master and not slave"});
+    ASSERT_FALSE(arm->ready());
+
+    scheduleErrorResponse({ErrorCodes::NotMasterNoSlaveOk, "not master and not slave"});
+    ASSERT_FALSE(arm->ready());
+
+    // Third attempt succeeds.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
+    responses.emplace_back(_nss, CursorId(0), batch);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
+
+    ASSERT_TRUE(arm->remotesExhausted());
+    ASSERT_TRUE(arm->ready());
+}
+
+TEST_F(AsyncResultsMergerTest, RetryOnNotMasterNoSlaveOkAllFailSingleNode) {
+    BSONObj findCmd = fromjson("{find: 'testcoll'}");
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // All attempts return an error (one attempt plus three retries)
+    scheduleErrorResponse({ErrorCodes::NotMasterNoSlaveOk, "not master and not slave"});
+    ASSERT_FALSE(arm->ready());
+
+    scheduleErrorResponse({ErrorCodes::NotMasterNoSlaveOk, "not master and not slave"});
+    ASSERT_FALSE(arm->ready());
+
+    scheduleErrorResponse({ErrorCodes::NotMasterNoSlaveOk, "not master and not slave"});
+    ASSERT_FALSE(arm->ready());
+
+    scheduleErrorResponse({ErrorCodes::NotMasterNoSlaveOk, "not master and not slave"});
+    ASSERT_TRUE(arm->ready());
+
+    auto status = arm->nextReady();
+    ASSERT_EQ(status.getStatus().code(), ErrorCodes::NotMasterNoSlaveOk);
+
+    // Protocol is to kill the 'arm' on error before destruction.
+    auto killEvent = arm->kill();
+    executor->waitForEvent(killEvent);
+}
+
+TEST_F(AsyncResultsMergerTest, RetryOnHostUnreachableAllowPartialResults) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', allowPartialResults: true}");
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0], kTestShardIds[1]});
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // First host returns single result
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
+    responses.emplace_back(_nss, CursorId(0), batch);
+    scheduleNetworkResponses(responses, CursorResponse::ResponseType::InitialResponse);
+
+    // From the second host all attempts return an error (one attempt plus three retries)
+    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
+    ASSERT_FALSE(arm->ready());
+
+    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
+    ASSERT_FALSE(arm->ready());
+
+    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
+    ASSERT_FALSE(arm->ready());
+
+    scheduleErrorResponse({ErrorCodes::HostUnreachable, "host unreachable"});
+    ASSERT_TRUE(arm->ready());
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
+
+    ASSERT_TRUE(arm->remotesExhausted());
+    ASSERT_TRUE(arm->ready());
+}
+
 
 }  // namespace
 

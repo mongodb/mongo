@@ -216,6 +216,11 @@ private:
         executor::TaskExecutor::CallbackHandle cbHandle;
         Status status = Status::OK();
 
+        // Counts how many times we retried the initial cursor establishment command. It is used to
+        // make a decision based on the error type and the retry count about whether we are allowed
+        // to retry sending the request to another host from this shard.
+        int retryCount = 0;
+
         // Count of fetched docs during ARM processing of the current batch. Used to reduce the
         // batchSize in getMore when mongod returned less docs than the requested batchSize.
         long long fetchedCount = 0;

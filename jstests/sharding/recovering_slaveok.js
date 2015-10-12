@@ -5,10 +5,9 @@
 
 'use strict';
 
-var shardTest = new ShardingTest({ name: "clusteredstale",
+var shardTest = new ShardingTest({ name: "recovering_slaveok",
                                    shards: 2,
                                    mongos: 2,
-                                   verbose: 0,
                                    other: { rs: true } });
 
 var mongos = shardTest.s0;
@@ -63,15 +62,16 @@ assert.soon(function() { return coll.find().itcount() == collSOk.find().itcount(
 assert.eq(shardAColl.find().itcount(), 1);
 assert.eq(shardAColl.findOne()._id, -1);
 
-print("5: overflow oplog");
+print("5: make one of the secondaries RECOVERING");
 
 var secs = rsA.getSecondaries();
 var goodSec = secs[0];
 var badSec = secs[1];
 
-rsA.overflow(badSec);
+assert.commandWorked(badSec.adminCommand("replSetMaintenance"));
+rsA.waitForState(badSec, ReplSetTest.State.RECOVERING);
 
-print("6: stop non-overflowed secondary");
+print("6: stop non-RECOVERING secondary");
 
 rsA.stop(goodSec);
 

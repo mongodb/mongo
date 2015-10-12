@@ -8,9 +8,8 @@ selector:
     - jstests/sharding/*.js
     - jstests/sharding/replset_config/*.js
     exclude_files:
-    - jstests/sharding/csrs_upgrade.js  # SERVER-20694
-    - jstests/sharding/csrs_upgrade_during_migrate.js  # SERVER-20580
-    - jstests/sharding/stale_clustered.js  # SERVER-20646
+    - jstests/sharding/csrs_upgrade.js                     # SERVER-20694
+    - jstests/sharding/csrs_upgrade_during_migrate.js      # flaky - SERVER-20580
 
 executor:
   js_test:

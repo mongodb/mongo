@@ -266,6 +266,14 @@ public:
                                                                const std::string& dbname,
                                                                const BSONObj& cmdObj);
 
+    /**
+     * Notifies the specified RemoteCommandTargeter of a particular mode of failure for the
+     * specified host.
+     */
+    static void updateReplSetMonitor(const std::shared_ptr<RemoteCommandTargeter>& targeter,
+                                     const HostAndPort& remoteHost,
+                                     const Status& remoteCommandStatus);
+
 private:
     typedef std::map<ShardId, std::shared_ptr<Shard>> ShardMap;
 
