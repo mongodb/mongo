@@ -77,6 +77,9 @@ variables:
   - amazon
   - debian71
 
+- &MAX_PRIORITY
+  priority: 2147483647 # special case to make sure compiles aren't blocked in patches
+
 #######################################
 #            Functions                #
 #######################################
@@ -2050,6 +2053,7 @@ buildvariants:
     test_flags: --continueOnFailure
   tasks:
   - name: compile
+    <<: *MAX_PRIORITY
     distros:
     - rhel55
   - name: lint
@@ -2154,6 +2158,7 @@ buildvariants:
     test_flags: --continueOnFailure --repeat=10 --shuffle
   tasks:
   - name: compile
+    <<: *MAX_PRIORITY
     distros:
     - rhel55
   - name: dbtest
@@ -2188,6 +2193,7 @@ buildvariants:
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
   tasks:
   - name: compile
+    <<: *MAX_PRIORITY
     distros:
     - rhel55
   - name: aggregation
@@ -2272,6 +2278,7 @@ buildvariants:
     test_flags: --continueOnFailure --nojournal
   tasks:
   - name: compile
+    <<: *MAX_PRIORITY
     distros:
     - rhel55
   - name: aggregation
@@ -2747,6 +2754,7 @@ buildvariants:
     test_flags: --continueOnFailure --storageEngine=mmapv1 -j1  # Avoid starting too many mongod's on 32-bit systems.
   tasks:
   - name: compile
+    <<: *MAX_PRIORITY
     distros:
     - rhel55
   - name: dbtest
@@ -2777,6 +2785,7 @@ buildvariants:
     test_flags: --continueOnFailure
   tasks:
   - name: compile
+    <<: *MAX_PRIORITY
     distros:
     - rhel55
   - name: dbtest
@@ -3633,6 +3642,7 @@ buildvariants:
     packager_distro: rhel55
   tasks:
   - name: compile
+    <<: *MAX_PRIORITY
     distros:
     - rhel55
   - name: aggregation
