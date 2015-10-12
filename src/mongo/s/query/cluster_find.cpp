@@ -39,7 +39,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_common.h"
@@ -215,14 +214,12 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         }
     }
 
-    ClusterClientCursorParams params(query.nss());
+    ClusterClientCursorParams params(txn, query.nss(), readPref);
     params.txn = txn;
-    params.shardRegistry = shardRegistry;
     params.limit = query.getParsed().getLimit();
     params.batchSize = query.getParsed().getEffectiveBatchSize();
     params.skip = query.getParsed().getSkip();
     params.isTailable = query.getParsed().isTailable();
-    params.isSecondaryOk = (readPref.pref != ReadPreference::PrimaryOnly);
     params.isAllowPartialResults = query.getParsed().isAllowPartialResults();
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
@@ -254,12 +251,6 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
             return runConfigServerQuerySCCC(query, *shard, results);
         }
 
-        auto targeter = shard->getTargeter();
-        auto hostAndPort = targeter->findHost(readPref);
-        if (!hostAndPort.isOK()) {
-            return hostAndPort.getStatus();
-        }
-
         // Build the find command, and attach shard version if necessary.
         BSONObjBuilder cmdBuilder;
         lpqToForward->asFindCommand(&cmdBuilder);
@@ -272,8 +263,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
             version.appendForCommands(&cmdBuilder);
         }
 
-        params.remotes.emplace_back(
-            std::move(hostAndPort.getValue()), shard->getId(), cmdBuilder.obj());
+        params.remotes.emplace_back(shard->getId(), cmdBuilder.obj());
     }
 
     auto ccc =

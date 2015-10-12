@@ -30,6 +30,8 @@
 
 #include "mongo/s/query/async_results_merger.h"
 
+#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
@@ -38,6 +40,9 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/sharding_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
@@ -49,21 +54,44 @@ using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
-class AsyncResultsMergerTest : public executor::ThreadPoolExecutorTest {
+const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
+const std::vector<std::string> kTestShardIds = {"FakeShardId1", "FakeShardId2", "FakeShardId3"};
+const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShardHost1", 12345),
+                                                  HostAndPort("FakeShardHost2", 12345),
+                                                  HostAndPort("FakeShardHost3", 12345)};
+
+class AsyncResultsMergerTest : public ShardingTestFixture {
 public:
-    AsyncResultsMergerTest()
-        : _nss("testdb.testcoll"),
-          _remotes({HostAndPort("localhost", -1),
-                    HostAndPort("localhost", -2),
-                    HostAndPort("localhost", -3)}) {}
+    AsyncResultsMergerTest() : _nss("testdb.testcoll") {}
 
-    void setUp() final {
-        ThreadPoolExecutorTest::setUp();
-        launchExecutorThread();
-        executor = &getExecutor();
+    void setUp() override {
+        ShardingTestFixture::setUp();
+
+        executor = shardRegistry()->getExecutor();
+
+        getMessagingPort()->setRemote(HostAndPort("ClientHost", 12345));
+        configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
+
+        std::vector<ShardType> shards;
+
+        for (size_t i = 0; i < kTestShardIds.size(); i++) {
+            ShardType shardType;
+            shardType.setName(kTestShardIds[i]);
+            shardType.setHost(kTestShardHosts[i].toString());
+
+            shards.push_back(shardType);
+
+            std::unique_ptr<RemoteCommandTargeterMock> targeter(
+                stdx::make_unique<RemoteCommandTargeterMock>());
+            targeter->setConnectionStringReturnValue(ConnectionString(kTestConfigShardHost));
+            targeter->setFindHostReturnValue(kTestShardHosts[i]);
+
+            targeterFactory()->addTargeterToReturn(ConnectionString(kTestShardHosts[i]),
+                                                   std::move(targeter));
+        }
+
+        setupShards(shards);
     }
-
-    void postExecutorThreadLaunch() final {}
 
 protected:
     /**
@@ -73,30 +101,26 @@ protected:
      * If 'batchSize' is set (i.e. not equal to boost::none), this batchSize is used for each
      * getMore. If 'findCmd' has a batchSize, this is used just for the initial find operation.
      */
-    void makeCursorFromFindCmd(const BSONObj& findCmd,
-                               const std::vector<HostAndPort>& remotes,
-                               boost::optional<long long> getMoreBatchSize = boost::none,
-                               bool isSecondaryOk = false) {
+    void makeCursorFromFindCmd(
+        const BSONObj& findCmd,
+        const std::vector<ShardId>& shardIds,
+        boost::optional<long long> getMoreBatchSize = boost::none,
+        ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly)) {
         const bool isExplain = true;
         const auto lpq =
             unittest::assertGet(LiteParsedQuery::makeFromFindCommand(_nss, findCmd, isExplain));
 
-        params = ClusterClientCursorParams(_nss);
+        ClusterClientCursorParams params =
+            ClusterClientCursorParams(operationContext(), _nss, readPref);
         params.sort = lpq->getSort();
         params.limit = lpq->getLimit();
         params.batchSize = getMoreBatchSize ? getMoreBatchSize : lpq->getBatchSize();
         params.skip = lpq->getSkip();
         params.isTailable = lpq->isTailable();
         params.isAllowPartialResults = lpq->isAllowPartialResults();
-        params.isSecondaryOk = isSecondaryOk;
 
-        for (const auto& hostAndPort : remotes) {
-            // Pass boost::none in place of a ShardId. If there is a ShardId and the ARM receives an
-            // UnreachableHost error, it will attempt to look inside the shard registry in order to
-            // find the Shard to which the host belongs and notify it of the unreachable host. Since
-            // this text fixture is not passing down the shard registry (or an OperationContext),
-            // we must skip this unreachable host handling.
-            params.remotes.emplace_back(hostAndPort, boost::none, findCmd);
+        for (const auto& shardId : shardIds) {
+            params.remotes.emplace_back(shardId, findCmd);
         }
 
         arm = stdx::make_unique<AsyncResultsMerger>(executor, params);
@@ -108,7 +132,7 @@ protected:
      */
     void makeCursorFromExistingCursors(
         const std::vector<std::pair<HostAndPort, CursorId>>& remotes) {
-        params = ClusterClientCursorParams(_nss);
+        ClusterClientCursorParams params = ClusterClientCursorParams(_nss);
 
         for (const auto& hostIdPair : remotes) {
             params.remotes.emplace_back(hostIdPair.first, hostIdPair.second);
@@ -133,7 +157,7 @@ protected:
      * Schedules a list of raw BSON command responses to be returned by the mock network.
      */
     void scheduleNetworkResponseObjs(std::vector<BSONObj> objs) {
-        executor::NetworkInterfaceMock* net = getNet();
+        executor::NetworkInterfaceMock* net = network();
         net->enterNetwork();
         for (const auto& obj : objs) {
             ASSERT_TRUE(net->hasReadyRequests());
@@ -147,7 +171,7 @@ protected:
     }
 
     RemoteCommandRequest getFirstPendingRequest() {
-        executor::NetworkInterfaceMock* net = getNet();
+        executor::NetworkInterfaceMock* net = network();
         net->enterNetwork();
         ASSERT_TRUE(net->hasReadyRequests());
         NetworkInterfaceMock::NetworkOperationIterator noi = net->getFrontOfUnscheduledQueue();
@@ -158,7 +182,7 @@ protected:
 
     void scheduleErrorResponse(Status status) {
         invariant(!status.isOK());
-        executor::NetworkInterfaceMock* net = getNet();
+        executor::NetworkInterfaceMock* net = network();
         net->enterNetwork();
         ASSERT_TRUE(net->hasReadyRequests());
         net->scheduleResponse(net->getNextReadyRequest(), net->now(), status);
@@ -167,7 +191,7 @@ protected:
     }
 
     void blackHoleNextRequest() {
-        executor::NetworkInterfaceMock* net = getNet();
+        executor::NetworkInterfaceMock* net = network();
         net->enterNetwork();
         ASSERT_TRUE(net->hasReadyRequests());
         net->blackHole(net->getNextReadyRequest());
@@ -175,17 +199,15 @@ protected:
     }
 
     const NamespaceString _nss;
-    const std::vector<HostAndPort> _remotes;
 
     executor::TaskExecutor* executor;
 
-    ClusterClientCursorParams params;
     std::unique_ptr<AsyncResultsMerger> arm;
 };
 
 TEST_F(AsyncResultsMergerTest, ClusterFind) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -232,7 +254,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFind) {
 
 TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -307,7 +329,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMore) {
 
 TEST_F(AsyncResultsMergerTest, ClusterFindSorted) {
     BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}, batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -344,7 +366,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindSorted) {
 
 TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMoreSorted) {
     BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}, batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -413,7 +435,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindAndGetMoreSorted) {
 
 TEST_F(AsyncResultsMergerTest, ClusterFindCompoundSortKey) {
     BSONObj findCmd = fromjson("{find: 'testcoll', sort: {a: -1, b: 1}, batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -450,7 +472,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindCompoundSortKey) {
 
 TEST_F(AsyncResultsMergerTest, ClusterFindSortedButNoSortKey) {
     BSONObj findCmd = fromjson("{find: 'testcoll', sort: {a: -1, b: 1}, batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -479,7 +501,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindInitialBatchSizeIsZero) {
     // command is one.
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 0}");
     const long long getMoreBatchSize = 1LL;
-    makeCursorFromFindCmd(findCmd, {_remotes[0], _remotes[1]}, getMoreBatchSize);
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0], kTestShardIds[1]}, getMoreBatchSize);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -530,7 +552,7 @@ TEST_F(AsyncResultsMergerTest, ClusterFindInitialBatchSizeIsZero) {
 }
 
 TEST_F(AsyncResultsMergerTest, ExistingCursors) {
-    makeCursorFromExistingCursors({{_remotes[0], 5}, {_remotes[1], 6}});
+    makeCursorFromExistingCursors({{kTestShardHosts[0], 5}, {kTestShardHosts[1], 6}});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -560,7 +582,7 @@ TEST_F(AsyncResultsMergerTest, ExistingCursors) {
 
 TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0], _remotes[1]});
+    makeCursorFromFindCmd(findCmd, {kTestShardHosts[0].toString(), kTestShardHosts[1].toString()});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -627,7 +649,7 @@ TEST_F(AsyncResultsMergerTest, StreamResultsFromOneShardIfOtherDoesntRespond) {
 
 TEST_F(AsyncResultsMergerTest, ErrorOnMismatchedCursorIds) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -668,7 +690,7 @@ TEST_F(AsyncResultsMergerTest, ErrorOnMismatchedCursorIds) {
 
 TEST_F(AsyncResultsMergerTest, BadResponseReceivedFromShard) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -695,7 +717,7 @@ TEST_F(AsyncResultsMergerTest, BadResponseReceivedFromShard) {
 
 TEST_F(AsyncResultsMergerTest, ErrorReceivedFromShard) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -724,7 +746,7 @@ TEST_F(AsyncResultsMergerTest, ErrorReceivedFromShard) {
 
 TEST_F(AsyncResultsMergerTest, ErrorCantScheduleEventBeforeLastSignaled) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -752,7 +774,7 @@ TEST_F(AsyncResultsMergerTest, ErrorCantScheduleEventBeforeLastSignaled) {
 
 TEST_F(AsyncResultsMergerTest, NextEventAfterTaskExecutorShutdown) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
     executor->shutdown();
     ASSERT_NOT_OK(arm->nextEvent().getStatus());
     auto killEvent = arm->kill();
@@ -761,7 +783,7 @@ TEST_F(AsyncResultsMergerTest, NextEventAfterTaskExecutorShutdown) {
 
 TEST_F(AsyncResultsMergerTest, KillAfterTaskExecutorShutdownWithOutstandingBatches) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
 
     // Make a request to the shard that will never get answered.
     ASSERT_FALSE(arm->ready());
@@ -777,7 +799,7 @@ TEST_F(AsyncResultsMergerTest, KillAfterTaskExecutorShutdownWithOutstandingBatch
 
 TEST_F(AsyncResultsMergerTest, KillNoBatchesRequested) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
 
     ASSERT_FALSE(arm->ready());
     auto killedEvent = arm->kill();
@@ -792,7 +814,7 @@ TEST_F(AsyncResultsMergerTest, KillNoBatchesRequested) {
 
 TEST_F(AsyncResultsMergerTest, KillAllBatchesReceived) {
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -816,7 +838,7 @@ TEST_F(AsyncResultsMergerTest, KillAllBatchesReceived) {
 
 TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -855,7 +877,7 @@ TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
 
 TEST_F(AsyncResultsMergerTest, KillOutstandingGetMore) {
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -900,7 +922,7 @@ TEST_F(AsyncResultsMergerTest, KillOutstandingGetMore) {
 
 TEST_F(AsyncResultsMergerTest, NextEventErrorsAfterKill) {
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -921,7 +943,7 @@ TEST_F(AsyncResultsMergerTest, NextEventErrorsAfterKill) {
 
 TEST_F(AsyncResultsMergerTest, KillCalledTwice) {
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
     auto killedEvent1 = arm->kill();
     ASSERT(killedEvent1.isValid());
     auto killedEvent2 = arm->kill();
@@ -932,7 +954,7 @@ TEST_F(AsyncResultsMergerTest, KillCalledTwice) {
 
 TEST_F(AsyncResultsMergerTest, TailableBasic) {
     BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -977,7 +999,7 @@ TEST_F(AsyncResultsMergerTest, TailableBasic) {
 
 TEST_F(AsyncResultsMergerTest, TailableEmptyBatch) {
     BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -1002,7 +1024,7 @@ TEST_F(AsyncResultsMergerTest, TailableEmptyBatch) {
 
 TEST_F(AsyncResultsMergerTest, TailableExhaustedCursor) {
     BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -1024,7 +1046,7 @@ TEST_F(AsyncResultsMergerTest, TailableExhaustedCursor) {
 
 TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 3}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -1065,8 +1087,8 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
 
 TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
     BSONObj findCmd = fromjson("{find: 'testcoll', batchSize: 2}");
-    const bool isSecondaryOk = true;
-    makeCursorFromFindCmd(findCmd, {_remotes[0]}, boost::none, isSecondaryOk);
+    makeCursorFromFindCmd(
+        findCmd, {kTestShardIds[0]}, boost::none, ReadPreferenceSetting(ReadPreference::Nearest));
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -1089,7 +1111,7 @@ TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
 
 TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
     BSONObj findCmd = fromjson("{find: 'testcoll', allowPartialResults: true}");
-    makeCursorFromFindCmd(findCmd, _remotes);
+    makeCursorFromFindCmd(findCmd, kTestShardIds);
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());
@@ -1149,7 +1171,7 @@ TEST_F(AsyncResultsMergerTest, AllowPartialResults) {
 
 TEST_F(AsyncResultsMergerTest, AllowPartialResultsSingleNode) {
     BSONObj findCmd = fromjson("{find: 'testcoll', allowPartialResults: true}");
-    makeCursorFromFindCmd(findCmd, {_remotes[0]});
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
 
     ASSERT_FALSE(arm->ready());
     auto readyEvent = unittest::assertGet(arm->nextEvent());

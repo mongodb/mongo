@@ -160,7 +160,23 @@ private:
      * reported from the remote.
      */
     struct RemoteCursorData {
-        RemoteCursorData(const ClusterClientCursorParams::Remote& params);
+        /**
+         * Creates a new uninitialized remote cursor state, which will have to send a command in
+         * order to establish its cursor id. Must only be used if the remote cursor ids are not yet
+         * known.
+         */
+        RemoteCursorData(ShardId shardId, BSONObj cmdObj);
+
+        /**
+         * Instantiates a new initialized remote cursor, which has an established cursor id. It may
+         * only be used for getMore operations.
+         */
+        RemoteCursorData(HostAndPort hostAndPort, CursorId establishedCursorId);
+
+        /**
+         * Returns the resolved host and port on which the remote cursor resides.
+         */
+        const HostAndPort& getTargetHost() const;
 
         /**
          * Returns whether there is another buffered result available for this remote node.
@@ -173,13 +189,22 @@ private:
          */
         bool exhausted() const;
 
-        HostAndPort hostAndPort;
-        boost::optional<ShardId> shardId;
+        /**
+         * Given the shard id with which the cursor was initialized and a read preference, selects
+         * a host on which the cursor should be created.
+         *
+         * May not be called once a cursor has already been established.
+         */
+        Status resolveShardIdToHostAndPort(OperationContext* txn,
+                                           const ReadPreferenceSetting& readPref);
+
+        // ShardId on which a cursor will be created.
+        const boost::optional<ShardId> shardId;
 
         // The command object for sending to the remote to establish the cursor. If a remote cursor
         // has not been established yet, this member will be set to a valid command object. If a
         // remote cursor has already been established, this member will be unset.
-        boost::optional<BSONObj> cmdObj;
+        boost::optional<BSONObj> initialCmdObj;
 
         // The cursor id for the remote cursor. If a remote cursor has not been established yet,
         // this member will be unset. If a remote cursor has been established and is not yet
@@ -194,6 +219,11 @@ private:
         // Count of fetched docs during ARM processing of the current batch. Used to reduce the
         // batchSize in getMore when mongod returned less docs than the requested batchSize.
         long long fetchedCount = 0;
+
+    private:
+        // For a cursor, which has shard id associated contains the exact host on which the remote
+        // cursor resides.
+        boost::optional<HostAndPort> _shardHostAndPort;
     };
 
     class MergingComparator {
