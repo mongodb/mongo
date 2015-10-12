@@ -514,24 +514,31 @@ tasks:
           set -o verbose
 
           git clone git@github.com:10gen/jstestfuzz.git
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
+
           if [ "Windows_NT" != "$OS" ]; then
             curl --silent --max-time 600 http://boxes.10gen.com/build/node-v0.12.7-linux-x64.tar.gz --output node.tar.gz
             ${decompress} node.tar.gz
           fi
+
+          cp mongodb*/bin/mongod .
     - command: shell.exec
       params:
-        working_dir: src
+        working_dir: src/jstestfuzz
         script: |
           set -o errexit
           set -o verbose
 
-          cp mongodb*/bin/mongod .
+          if [ "Windows_NT" = "$OS" ]; then
+            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
+            # Work around the issue by specifying a different %APPDATA% path.
+            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
+            export APPDATA=${workdir}/npm-app-data
+            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs"
+          else
+            export PATH="$PATH:${workdir}/src/node-v0.12.7-linux-x64/bin"
+          fi
+
+          npm install
     - command: shell.exec
       type: test
       params:
@@ -550,13 +557,12 @@ tasks:
             export PATH="$PATH:${workdir}/src/node-v0.12.7-linux-x64/bin"
           fi
 
-          # Create an output directory for the generated test cases and ensure it always contains at least one JS file
-          # for resmoke to run so that glob expansion cannot result in an error.
-          mkdir -p out
-          touch out/dummy.js
+          # Run jstestfuzz self-tests; redirect to /dev/null to avoid polluting the logs.
+          echo "jstestfuzz self-tests are starting"
+          npm test > /dev/null 2>&1
+          echo "jstestfuzz self-tests finished"
 
-          npm install || true
-          npm start -- --jsTestsDir ../jstests || true
+          npm start -- --jsTestsDir ../jstests
     - command: archive.targz_pack
       params:
         target: "jstests.tgz"
