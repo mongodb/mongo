@@ -331,7 +331,9 @@ StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationC
 
 StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
     OperationContext* txn, const std::string& dbName) {
-    invariant(nsIsDbOnly(dbName));
+    if (!NamespaceString::validDBName(dbName)) {
+        return {ErrorCodes::InvalidNamespace, stream() << dbName << " is not a valid db name"};
+    }
 
     // The two databases that are hosted on the config server are config and admin
     if (dbName == "config" || dbName == "admin") {

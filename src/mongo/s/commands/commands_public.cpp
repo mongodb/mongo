@@ -566,7 +566,9 @@ public:
              BSONObjBuilder& result) {
         const string todb = cmdObj.getStringField("todb");
         uassert(ErrorCodes::EmptyFieldName, "missing todb argument", !todb.empty());
-        uassert(ErrorCodes::InvalidNamespace, "invalid todb argument", nsIsDbOnly(todb));
+        uassert(ErrorCodes::InvalidNamespace,
+                "invalid todb argument",
+                NamespaceString::validDBName(todb));
 
         auto confTo = uassertStatusOK(grid.implicitCreateDb(txn, todb));
         uassert(ErrorCodes::IllegalOperation,

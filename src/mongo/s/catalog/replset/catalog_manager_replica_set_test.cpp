@@ -139,6 +139,12 @@ TEST_F(CatalogManagerReplSetTest, GetCollectionNotExisting) {
     future.timed_get(kFutureTimeout);
 }
 
+TEST_F(CatalogManagerReplSetTest, GetDatabaseInvalidName) {
+    auto status = catalogManager()->getDatabase(operationContext(), "b.c").getStatus();
+    ASSERT_EQ(ErrorCodes::InvalidNamespace, status.code());
+    ASSERT_FALSE(status.reason().empty());
+}
+
 TEST_F(CatalogManagerReplSetTest, GetDatabaseExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
