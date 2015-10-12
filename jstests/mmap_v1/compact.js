@@ -3,6 +3,12 @@
 var mydb = db.getSiblingDB('compact');
 t = mydb.compacttest;
 t.drop();
+
+// Assert that you can't compact a capped collection in MMAP.
+assert.commandWorked(mydb.createCollection(t.getName(), {size: 4096, capped: true}));
+assert.commandFailedWithCode(t.runCommand('compact'), ErrorCodes.CommandNotSupported);
+t.drop(); // uncap the collection.
+
 t.insert({ x: 3 });
 t.insert({ x: 3 });
 t.insert({ x: 5 });
