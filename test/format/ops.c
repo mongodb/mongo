@@ -393,7 +393,7 @@ ops(void *arg)
 		 * have to do the reset outside of a transaction.
 		 */
 		if (tinfo->ops > reset_op && !intxn) {
-			if (session->reset(session) != 0)
+			if ((ret = session->reset(session)) != 0)
 				die(ret, "session.reset");
 
 			/* Pick the next reset operation. */
