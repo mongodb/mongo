@@ -118,7 +118,7 @@ void ReplCoordElectTest::simulateFreshEnoughForElectability() {
     net->exitNetwork();
 }
 
-TEST_F(ReplCoordElectTest, ElectTooSoon) {
+TEST_F(ReplCoordElectTest, StartElectionDoesNotStartAnElectionWhenNodeHasNoOplogEntries) {
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     // Election never starts because we haven't set a lastOpTimeApplied value yet, via a
     // heartbeat.
@@ -141,7 +141,7 @@ TEST_F(ReplCoordElectTest, ElectTooSoon) {
  * This test checks that an election can happen when only one node is up, and it has the
  * vote(s) to win.
  */
-TEST_F(ReplCoordElectTest, ElectTwoNodesWithOneZeroVoter) {
+TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
     OperationContextReplMock txn;
     assertStartSuccess(
         BSON("_id"
@@ -188,7 +188,7 @@ TEST_F(ReplCoordElectTest, ElectTwoNodesWithOneZeroVoter) {
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
 }
 
-TEST_F(ReplCoordElectTest, Elect1NodeSuccess) {
+TEST_F(ReplCoordElectTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     OperationContextReplMock txn;
     startCapturingLogMessages();
     assertStartSuccess(BSON("_id"
@@ -215,7 +215,7 @@ TEST_F(ReplCoordElectTest, Elect1NodeSuccess) {
     ASSERT_FALSE(imResponse.isSecondary()) << imResponse.toBSON().toString();
 }
 
-TEST_F(ReplCoordElectTest, ElectManyNodesSuccess) {
+TEST_F(ReplCoordElectTest, ElectionSucceedsWhenAllNodesVoteYea) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
                              << "version" << 1 << "members"
@@ -235,7 +235,7 @@ TEST_F(ReplCoordElectTest, ElectManyNodesSuccess) {
     ASSERT_EQUALS(1, countLogLinesContaining("election succeeded"));
 }
 
-TEST_F(ReplCoordElectTest, ElectNotEnoughVotes) {
+TEST_F(ReplCoordElectTest, ElectionFailsWhenOneNodeVotesNay) {
     // one responds with -10000 votes, and one doesn't respond, and we are not elected
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
@@ -280,7 +280,7 @@ TEST_F(ReplCoordElectTest, ElectNotEnoughVotes) {
     ASSERT_EQUALS(1, countLogLinesContaining("couldn't elect self, only received -9999 votes"));
 }
 
-TEST_F(ReplCoordElectTest, ElectWrongTypeForVote) {
+TEST_F(ReplCoordElectTest, VotesWithStringValuesAreNotCountedAsYeas) {
     // one responds with a bad 'vote' field, and one doesn't respond, and we are not elected
     startCapturingLogMessages();
     BSONObj configObj = BSON("_id"
@@ -327,7 +327,7 @@ TEST_F(ReplCoordElectTest, ElectWrongTypeForVote) {
                   countLogLinesContaining("wrong type for vote argument in replSetElect command"));
 }
 
-TEST_F(ReplCoordElectTest, ElectionDuringHBReconfigFails) {
+TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     // start up, receive reconfig via heartbeat while at the same time, become candidate.
     // candidate state should be cleared.
     OperationContextNoop txn;
