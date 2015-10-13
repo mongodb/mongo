@@ -1,16 +1,13 @@
 selector:
   js_test:
     roots:
-    - jstests/noPassthroughWithMongod/*.js
-
+    - jstests/httpinterface/*.js
+    exclude_files:
+    # SERVER-19093 No longer have proper HTTP support in the shell.
+    - jstests/httpinterface/httpinterface.js
 executor:
   js_test:
-    config:
-      shell_options:
-        readMode: commands
     hooks:
-    - class: CleanEveryN
-      n: 20
     fixture:
       class: MongoDFixture
       mongod_options:

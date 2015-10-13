@@ -839,6 +839,14 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: httpinterface
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=httpinterface
+
+- <<: *task_template
   name: integration_tests_standalone
   commands:
   - func: "do setup"
@@ -2077,6 +2085,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough_WT
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: httpinterface
   - name: integration_tests_standalone
   - name: integration_tests_replset
   - name: sharding_gle_auth_basics_passthrough
@@ -3014,6 +3023,7 @@ buildvariants:
   - name: disk
   - name: durability
   - name: failpoints
+  - name: httpinterface
   - name: integration_tests_standalone
   - name: integration_tests_replset
   - name: jsCore
@@ -3263,6 +3273,7 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: httpinterface
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
@@ -4201,6 +4212,7 @@ buildvariants:
   - name: disk
   - name: durability
   - name: failpoints
+  - name: httpinterface
   - name: jsCore
   - name: jsCore_compatibility
   - name: jsCore_compatibility_WT
@@ -4507,6 +4519,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd_WT
   - name: gle_auth_write_cmd
   - name: gle_auth_write_cmd_WT
+  - name: httpinterface
   - name: integration_tests_standalone
   - name: integration_tests_replset
   - name: jsCore
