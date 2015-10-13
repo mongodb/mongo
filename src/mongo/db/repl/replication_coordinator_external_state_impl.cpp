@@ -149,6 +149,7 @@ void ReplicationCoordinatorExternalStateImpl::initiateOplog(OperationContext* tx
             // directly so that we can override the replication mode and keep _logO from updating
             // the replication coordinator's op time (illegal operation when replication is not
             // enabled).
+            repl::oplogCheckCloseDatabase(txn, nullptr);
             repl::_logOp(txn,
                          "n",
                          "",
@@ -158,6 +159,7 @@ void ReplicationCoordinatorExternalStateImpl::initiateOplog(OperationContext* tx
                          rsOplogName,
                          ReplicationCoordinator::modeReplSet,
                          updateReplOpTime);
+            repl::oplogCheckCloseDatabase(txn, nullptr);
         }
         wuow.commit();
     }
