@@ -52,7 +52,6 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	uint8_t *endp;
-	bool is_open;
 
 	WT_UNUSED(addr_size);
 	ci = NULL;
@@ -88,15 +87,12 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * fast if we open the live system in two handles, or salvage,
 		 * truncate or verify the live/running file.
 		 */
+#ifdef HAVE_DIAGNOSTIC
 		__wt_spin_lock(session, &block->live_lock);
-		is_open = block->live_open;
-		if (!is_open)
-			block->live_open = true;
+		WT_ASSERT(session, block->live_open == false);
+		block->live_open = true;
 		__wt_spin_unlock(session, &block->live_lock);
-		if (is_open)
-			WT_ERR_MSG(session, WT_ERROR,
-			    "%s: open failed, live system already open",
-			    block->name);
+#endif
 		ci = &block->live;
 		WT_ERR(__wt_block_ckpt_init(session, ci, "live"));
 	}
@@ -199,11 +195,10 @@ __wt_block_checkpoint_unload(
 		    __wt_block_truncate(session, block->fh, block->fh->size));
 
 		__wt_spin_lock(session, &block->live_lock);
-
 		__wt_block_ckpt_destroy(session, &block->live);
-
+#ifdef HAVE_DIAGNOSTIC
 		block->live_open = false;
-
+#endif
 		__wt_spin_unlock(session, &block->live_lock);
 	}
 
