@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
@@ -78,7 +79,7 @@ void ReplSetDistLockManager::startUp() {
     }
 }
 
-void ReplSetDistLockManager::shutDown(bool allowNetworking) {
+void ReplSetDistLockManager::shutDown(OperationContext* txn, bool allowNetworking) {
     invariant(allowNetworking);
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -93,7 +94,7 @@ void ReplSetDistLockManager::shutDown(bool allowNetworking) {
         _execThread.reset();
     }
 
-    auto status = _catalog->stopPing(_processID);
+    auto status = _catalog->stopPing(txn, _processID);
     if (!status.isOK()) {
         warning() << "error encountered while cleaning up distributed ping entry for " << _processID
                   << causedBy(status);
@@ -110,40 +111,45 @@ void ReplSetDistLockManager::doTask() {
            << " (sleeping for " << _pingInterval << ")";
 
     Timer elapsedSincelastPing(_serviceContext->getTickSource());
+    Client::initThread("replSetDistLockPinger");
+
     while (!isShutDown()) {
-        auto pingStatus = _catalog->ping(_processID, Date_t::now());
-
-        if (!pingStatus.isOK()) {
-            warning() << "pinging failed for distributed lock pinger" << causedBy(pingStatus);
-        }
-
-        const milliseconds elapsed(elapsedSincelastPing.millis());
-        if (elapsed > 10 * _pingInterval) {
-            warning() << "Lock pinger for proc: " << _processID << " was inactive for " << elapsed
-                      << " ms";
-        }
-        elapsedSincelastPing.reset();
-
-        std::deque<DistLockHandle> toUnlockBatch;
         {
-            stdx::unique_lock<stdx::mutex> lk(_mutex);
-            toUnlockBatch.swap(_unlockList);
-        }
+            auto txn = cc().makeOperationContext();
+            auto pingStatus = _catalog->ping(txn.get(), _processID, Date_t::now());
 
-        for (const auto& toUnlock : toUnlockBatch) {
-            auto unlockStatus = _catalog->unlock(toUnlock);
-
-            if (!unlockStatus.isOK()) {
-                warning() << "Failed to unlock lock with " << LocksType::lockID() << ": "
-                          << toUnlock << causedBy(unlockStatus);
-                queueUnlock(toUnlock);
-            } else {
-                LOG(0) << "distributed lock with " << LocksType::lockID() << ": " << toUnlock
-                       << "' unlocked.";
+            if (!pingStatus.isOK()) {
+                warning() << "pinging failed for distributed lock pinger" << causedBy(pingStatus);
             }
 
-            if (isShutDown()) {
-                return;
+            const milliseconds elapsed(elapsedSincelastPing.millis());
+            if (elapsed > 10 * _pingInterval) {
+                warning() << "Lock pinger for proc: " << _processID << " was inactive for "
+                          << elapsed << " ms";
+            }
+            elapsedSincelastPing.reset();
+
+            std::deque<DistLockHandle> toUnlockBatch;
+            {
+                stdx::unique_lock<stdx::mutex> lk(_mutex);
+                toUnlockBatch.swap(_unlockList);
+            }
+
+            for (const auto& toUnlock : toUnlockBatch) {
+                auto unlockStatus = _catalog->unlock(txn.get(), toUnlock);
+
+                if (!unlockStatus.isOK()) {
+                    warning() << "Failed to unlock lock with " << LocksType::lockID() << ": "
+                              << toUnlock << causedBy(unlockStatus);
+                    queueUnlock(toUnlock);
+                } else {
+                    LOG(0) << "distributed lock with " << LocksType::lockID() << ": " << toUnlock
+                           << "' unlocked.";
+                }
+
+                if (isShutDown()) {
+                    return;
+                }
             }
         }
 
@@ -152,10 +158,11 @@ void ReplSetDistLockManager::doTask() {
     }
 }
 
-StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc,
+StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(OperationContext* txn,
+                                                         LocksType lockDoc,
                                                          const milliseconds& lockExpiration) {
     const auto& processID = lockDoc.getProcess();
-    auto pingStatus = _catalog->getPing(processID);
+    auto pingStatus = _catalog->getPing(txn, processID);
 
     Date_t pingValue;
     if (pingStatus.isOK()) {
@@ -173,7 +180,7 @@ StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc,
     }  // else use default pingValue if ping document does not exist.
 
     Timer timer(_serviceContext->getTickSource());
-    auto serverInfoStatus = _catalog->getServerInfo();
+    auto serverInfoStatus = _catalog->getServerInfo(txn);
     if (!serverInfoStatus.isOK()) {
         return serverInfoStatus.getStatus();
     }
@@ -245,7 +252,11 @@ StatusWith<bool> ReplSetDistLockManager::canOvertakeLock(LocksType lockDoc,
 }
 
 StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
-    StringData name, StringData whyMessage, milliseconds waitFor, milliseconds lockTryInterval) {
+    OperationContext* txn,
+    StringData name,
+    StringData whyMessage,
+    milliseconds waitFor,
+    milliseconds lockTryInterval) {
     Timer timer(_serviceContext->getTickSource());
     Timer msgTimer(_serviceContext->getTickSource());
 
@@ -264,8 +275,8 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
                << " ms, process : " << _processID << " )"
                << " with lockSessionID: " << lockSessionID << ", why: " << whyMessage;
 
-        auto lockResult =
-            _catalog->grabLock(name, lockSessionID, who, _processID, Date_t::now(), whyMessage);
+        auto lockResult = _catalog->grabLock(
+            txn, name, lockSessionID, who, _processID, Date_t::now(), whyMessage);
 
         auto status = lockResult.getStatus();
 
@@ -274,7 +285,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
             // the lock document.
             LOG(0) << "distributed lock '" << name << "' acquired for '" << whyMessage
                    << "', ts : " << lockSessionID;
-            return ScopedDistLock(lockSessionID, this);
+            return ScopedDistLock(txn, lockSessionID, this);
         }
 
         if (status != ErrorCodes::LockStateChangeFailed) {
@@ -285,7 +296,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
         }
 
         // Get info from current lock and check if we can overtake it.
-        auto getLockStatusResult = _catalog->getLockByName(name);
+        auto getLockStatusResult = _catalog->getLockByName(txn, name);
         const auto& getLockStatus = getLockStatusResult.getStatus();
 
         if (!getLockStatusResult.isOK() && getLockStatus != ErrorCodes::LockNotFound) {
@@ -296,14 +307,15 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
         // found, use the normal grab lock path to acquire it.
         if (getLockStatusResult.isOK()) {
             auto currentLock = getLockStatusResult.getValue();
-            auto canOvertakeResult = canOvertakeLock(currentLock, lockExpiration);
+            auto canOvertakeResult = canOvertakeLock(txn, currentLock, lockExpiration);
 
             if (!canOvertakeResult.isOK()) {
                 return canOvertakeResult.getStatus();
             }
 
             if (canOvertakeResult.getValue()) {
-                auto overtakeResult = _catalog->overtakeLock(name,
+                auto overtakeResult = _catalog->overtakeLock(txn,
+                                                             name,
                                                              lockSessionID,
                                                              currentLock.getLockID(),
                                                              who,
@@ -319,7 +331,7 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
 
                     LOG(0) << "lock '" << name << "' successfully forced";
                     LOG(0) << "distributed lock '" << name << "' acquired, ts : " << lockSessionID;
-                    return ScopedDistLock(lockSessionID, this);
+                    return ScopedDistLock(txn, lockSessionID, this);
                 }
 
                 if (overtakeStatus != ErrorCodes::LockStateChangeFailed) {
@@ -353,8 +365,8 @@ StatusWith<DistLockManager::ScopedDistLock> ReplSetDistLockManager::lock(
     return {ErrorCodes::LockBusy, str::stream() << "timed out waiting for " << name};
 }
 
-void ReplSetDistLockManager::unlock(const DistLockHandle& lockSessionID) {
-    auto unlockStatus = _catalog->unlock(lockSessionID);
+void ReplSetDistLockManager::unlock(OperationContext* txn, const DistLockHandle& lockSessionID) {
+    auto unlockStatus = _catalog->unlock(txn, lockSessionID);
 
     if (!unlockStatus.isOK()) {
         queueUnlock(lockSessionID);
@@ -364,8 +376,9 @@ void ReplSetDistLockManager::unlock(const DistLockHandle& lockSessionID) {
     }
 }
 
-Status ReplSetDistLockManager::checkStatus(const DistLockHandle& lockHandle) {
-    return _catalog->getLockByTS(lockHandle).getStatus();
+Status ReplSetDistLockManager::checkStatus(OperationContext* txn,
+                                           const DistLockHandle& lockHandle) {
+    return _catalog->getLockByTS(txn, lockHandle).getStatus();
 }
 
 void ReplSetDistLockManager::queueUnlock(const DistLockHandle& lockSessionID) {

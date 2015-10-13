@@ -624,7 +624,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommand) {
                       request.metadata);
 
         ASSERT_EQUALS("test", request.dbname);
-        ASSERT_EQUALS(BSON("usersInfo" << 1), request.cmdObj);
+        ASSERT_EQUALS(BSON("usersInfo" << 1 << "maxTimeMS" << 30000), request.cmdObj);
 
         return BSON("ok" << 1 << "users" << BSONArrayBuilder().arr());
     });
@@ -701,7 +701,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandSuccess) {
     onCommand([](const RemoteCommandRequest& request) {
         ASSERT_EQUALS("test", request.dbname);
         ASSERT_EQUALS(BSON("dropUser"
-                           << "test"),
+                           << "test"
+                           << "maxTimeMS" << 30000),
                       request.cmdObj);
 
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -803,7 +804,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMasterRetrySuc
         ASSERT_EQUALS(host2, request.target);
         ASSERT_EQUALS("test", request.dbname);
         ASSERT_EQUALS(BSON("dropUser"
-                           << "test"),
+                           << "test"
+                           << "maxTimeMS" << 30000),
                       request.cmdObj);
 
         ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -2083,7 +2085,8 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingNoDBExists) {
                 multi: false,
                 upsert: true
             }],
-            writeConcern: { w: "majority" }
+            writeConcern: { w: "majority" },
+            maxTimeMS: 30000
         })"));
 
         ASSERT_EQ(expectedCmd, request.cmdObj);
@@ -2180,7 +2183,8 @@ TEST_F(CatalogManagerReplSetTest, EnableShardingDBExists) {
                 multi: false,
                 upsert: true
             }],
-            writeConcern: { w: "majority" }
+            writeConcern: { w: "majority" },
+            maxTimeMS: 30000
         })"));
 
         ASSERT_EQ(expectedCmd, request.cmdObj);

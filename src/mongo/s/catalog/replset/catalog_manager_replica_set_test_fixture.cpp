@@ -281,8 +281,9 @@ void CatalogManagerReplSetTestFixture::expectChangeLogCreate(const HostAndPort& 
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
-        BSONObj expectedCreateCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true
-                                                  << "size" << 1024 * 1024 * 10);
+        BSONObj expectedCreateCmd =
+            BSON("create" << ChangeLogType::ConfigNS << "capped" << true << "size"
+                          << 1024 * 1024 * 10 << "maxTimeMS" << 30000);
         ASSERT_EQUALS(expectedCreateCmd, request.cmdObj);
 
         return response;

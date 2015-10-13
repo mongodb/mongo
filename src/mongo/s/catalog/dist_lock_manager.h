@@ -35,6 +35,7 @@
 namespace mongo {
 
 using DistLockHandle = OID;
+class OperationContext;
 class Status;
 template <typename T>
 class StatusWith;
@@ -70,7 +71,9 @@ public:
         MONGO_DISALLOW_COPYING(ScopedDistLock);
 
     public:
-        ScopedDistLock(DistLockHandle lockHandle, DistLockManager* lockManager);
+        ScopedDistLock(OperationContext* txn,
+                       DistLockHandle lockHandle,
+                       DistLockManager* lockManager);
         ~ScopedDistLock();
 
         ScopedDistLock(ScopedDistLock&& other);
@@ -82,6 +85,7 @@ public:
         Status checkStatus();
 
     private:
+        OperationContext* _txn;
         DistLockHandle _lockID;
         DistLockManager* _lockManager;  // Not owned here.
     };
@@ -99,7 +103,7 @@ public:
      * involves sending network messages. Implementation do not need to guarantee thread safety
      * so callers should employ proper synchronization when calling this method.
      */
-    virtual void shutDown(bool allowNetworking) = 0;
+    virtual void shutDown(OperationContext* txn, bool allowNetworking) = 0;
 
     /**
      * Tries multiple times to lock, using the specified lock try interval, until
@@ -115,6 +119,7 @@ public:
      * Returns ErrorCodes::LockBusy if the lock is being held.
      */
     virtual StatusWith<ScopedDistLock> lock(
+        OperationContext* txn,
         StringData name,
         StringData whyMessage,
         stdx::chrono::milliseconds waitFor = kDefaultSingleLockAttemptTimeout,
@@ -125,11 +130,11 @@ protected:
      * Unlocks the given lockHandle. Will attempt to retry again later if the config
      * server is not reachable.
      */
-    virtual void unlock(const DistLockHandle& lockHandle) = 0;
+    virtual void unlock(OperationContext* txn, const DistLockHandle& lockHandle) = 0;
 
     /**
      * Checks if the lockHandle still exists in the config server.
      */
-    virtual Status checkStatus(const DistLockHandle& lockHandle) = 0;
+    virtual Status checkStatus(OperationContext* txn, const DistLockHandle& lockHandle) = 0;
 };
 }

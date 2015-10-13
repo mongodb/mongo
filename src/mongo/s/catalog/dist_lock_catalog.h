@@ -36,6 +36,7 @@ namespace mongo {
 
 class LockpingsType;
 class LocksType;
+class OperationContext;
 class Status;
 template <typename T>
 class StatusWith;
@@ -66,13 +67,13 @@ public:
      * Returns the ping document of the specified processID.
      * Common status errors include socket errors.
      */
-    virtual StatusWith<LockpingsType> getPing(StringData processID) = 0;
+    virtual StatusWith<LockpingsType> getPing(OperationContext* txn, StringData processID) = 0;
 
     /**
      * Updates the ping document. Creates a new entry if it does not exists.
      * Common status errors include socket errors.
      */
-    virtual Status ping(StringData processID, Date_t ping) = 0;
+    virtual Status ping(OperationContext* txn, StringData processID, Date_t ping) = 0;
 
     /**
      * Attempts to update the owner of a lock identified by lockID to lockSessionID.
@@ -90,7 +91,8 @@ public:
      *
      * Common status errors include socket and duplicate key errors.
      */
-    virtual StatusWith<LocksType> grabLock(StringData lockID,
+    virtual StatusWith<LocksType> grabLock(OperationContext* txn,
+                                           StringData lockID,
                                            const OID& lockSessionID,
                                            StringData who,
                                            StringData processId,
@@ -112,7 +114,8 @@ public:
      *
      * Common status errors include socket errors.
      */
-    virtual StatusWith<LocksType> overtakeLock(StringData lockID,
+    virtual StatusWith<LocksType> overtakeLock(OperationContext* txn,
+                                               StringData lockID,
                                                const OID& lockSessionID,
                                                const OID& currentHolderTS,
                                                StringData who,
@@ -124,31 +127,31 @@ public:
      * Attempts to set the state of the lock document with lockSessionID to unlocked.
      * Common status errors include socket errors.
      */
-    virtual Status unlock(const OID& lockSessionID) = 0;
+    virtual Status unlock(OperationContext* txn, const OID& lockSessionID) = 0;
 
     /**
      * Get some information from the config server primary.
      * Common status errors include socket errors.
      */
-    virtual StatusWith<ServerInfo> getServerInfo() = 0;
+    virtual StatusWith<ServerInfo> getServerInfo(OperationContext* txn) = 0;
 
     /**
      * Returns the lock document.
      * Returns LockNotFound if lock document doesn't exist.
      * Common status errors include socket errors.
      */
-    virtual StatusWith<LocksType> getLockByTS(const OID& lockSessionID) = 0;
+    virtual StatusWith<LocksType> getLockByTS(OperationContext* txn, const OID& lockSessionID) = 0;
 
     /**
      * Returns the lock document.
      * Common status errors include socket errors.
      */
-    virtual StatusWith<LocksType> getLockByName(StringData name) = 0;
+    virtual StatusWith<LocksType> getLockByName(OperationContext* txn, StringData name) = 0;
 
     /**
      * Attempts to delete the ping document corresponding to the given processId.
      * Common status errors include socket errors.
      */
-    virtual Status stopPing(StringData processId) = 0;
+    virtual Status stopPing(OperationContext* txn, StringData processId) = 0;
 };
 }

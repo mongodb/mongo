@@ -109,7 +109,8 @@ public:
             BSONObj expectedCmd(fromjson(R"({
                 delete: "chunks",
                 deletes: [{ q: { ns: "test.user" }, limit: 0 }],
-                writeConcern: { w: "majority" }
+                writeConcern: { w: "majority" },
+                maxTimeMS: 30000
             })"));
 
             ASSERT_EQ(expectedCmd, request.cmdObj);

@@ -34,12 +34,14 @@
 
 #include <set>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/query_fetcher.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
@@ -54,6 +56,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -84,6 +87,39 @@ void updateReplSetMonitor(const std::shared_ptr<RemoteCommandTargeter>& targeter
     } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
         targeter->markHostUnreachable(remoteHost);
     }
+}
+
+BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
+    Seconds maxTime = kConfigCommandTimeout;
+
+    Microseconds remainingTxnMaxTime(maxTimeMicros);
+    bool hasTxnMaxTime(remainingTxnMaxTime != Microseconds::zero());
+    bool hasUserMaxTime = !cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS].eoo();
+
+    if (hasTxnMaxTime) {
+        maxTime = duration_cast<Seconds>(remainingTxnMaxTime);
+    } else if (hasUserMaxTime) {
+        return cmdObj;
+    }
+
+    BSONObjBuilder updatedCmdBuilder;
+    if (hasTxnMaxTime && hasUserMaxTime) {  // Need to remove user provided maxTimeMS.
+        BSONObjIterator cmdObjIter(cmdObj);
+        const char* maxTimeFieldName = LiteParsedQuery::cmdOptionMaxTimeMS.c_str();
+        while (cmdObjIter.more()) {
+            BSONElement e = cmdObjIter.next();
+            if (str::equals(e.fieldName(), maxTimeFieldName)) {
+                continue;
+            }
+            updatedCmdBuilder.append(e);
+        }
+    } else {
+        updatedCmdBuilder.appendElements(cmdObj);
+    }
+
+    updatedCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
+                             durationCount<Milliseconds>(maxTime));
+    return updatedCmdBuilder.obj();
 }
 
 }  // unnamed namespace
@@ -352,6 +388,7 @@ OpTime ShardRegistry::getConfigOpTime() {
 }
 
 StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
+    OperationContext* txn,
     const ReadPreferenceSetting& readPref,
     const NamespaceString& nss,
     const BSONObj& query,
@@ -418,6 +455,14 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
 
     BSONObjBuilder findCmdBuilder;
     lpq->asFindCommand(&findCmdBuilder);
+
+    Seconds maxTime = kConfigCommandTimeout;
+    Microseconds remainingTxnMaxTime(txn->getRemainingMaxTimeMicros());
+    if (remainingTxnMaxTime != Microseconds::zero()) {
+        maxTime = duration_cast<Seconds>(remainingTxnMaxTime);
+    }
+    findCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
+                          durationCount<Milliseconds>(maxTime));
 
     QueryFetcher fetcher(_executor.get(),
                          host.getValue(),
@@ -498,7 +543,8 @@ StatusWith<BSONObj> ShardRegistry::runCommandForAddShard(OperationContext* txn,
     return status.getValue().response;
 }
 
-StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(const ReadPreferenceSetting& readPref,
+StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(OperationContext* txn,
+                                                      const ReadPreferenceSetting& readPref,
                                                       const std::string& dbName,
                                                       const BSONObj& cmdObj) {
     auto response = _runCommandWithMetadata(
@@ -506,7 +552,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(const ReadPreferenceSettin
         getConfigShard(),
         readPref,
         dbName,
-        cmdObj,
+        appendMaxTimeToCmdObj(txn->getRemainingMaxTimeMicros(), cmdObj),
         readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata : kReplSecondaryOkMetadata);
 
     if (!response.isOK()) {
@@ -517,10 +563,15 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(const ReadPreferenceSettin
     return response.getValue().response;
 }
 
-StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(const std::string& dbname,
+StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(OperationContext* txn,
+                                                                          const std::string& dbname,
                                                                           const BSONObj& cmdObj) {
     auto response = _runCommandWithNotMasterRetries(
-        _executor.get(), getConfigShard(), dbname, cmdObj, kReplMetadata);
+        _executor.get(),
+        getConfigShard(),
+        dbname,
+        appendMaxTimeToCmdObj(txn->getRemainingMaxTimeMicros(), cmdObj),
+        kReplMetadata);
 
     if (!response.isOK()) {
         return response.getStatus();

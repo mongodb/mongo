@@ -65,8 +65,9 @@ public:
 
             ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
-            BSONObj expectedCreateCmd = BSON("create" << ActionLogType::ConfigNS << "capped" << true
-                                                      << "size" << 1024 * 1024 * 2);
+            BSONObj expectedCreateCmd =
+                BSON("create" << ActionLogType::ConfigNS << "capped" << true << "size"
+                              << 1024 * 1024 * 2 << "maxTimeMS" << 30000);
             ASSERT_EQUALS(expectedCreateCmd, request.cmdObj);
 
             return response;

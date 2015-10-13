@@ -262,7 +262,7 @@ void CatalogManagerLegacy::shutDown(OperationContext* txn, bool allowNetworking)
         _consistencyCheckerThread.join();
 
     invariant(_distLockManager);
-    _distLockManager->shutDown(allowNetworking);
+    _distLockManager->shutDown(txn, allowNetworking);
 }
 
 Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
@@ -273,7 +273,7 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
                                              const set<ShardId>& initShardIds) {
     // Lock the collection globally so that no other mongos can try to shard or drop the collection
     // at the same time.
-    auto scopedDistLock = getDistLockManager()->lock(ns, "shardCollection");
+    auto scopedDistLock = getDistLockManager()->lock(txn, ns, "shardCollection");
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
@@ -564,7 +564,8 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
         waitFor = stdx::chrono::seconds(data["waitForSecs"].numberInt());
     }
     const stdx::chrono::milliseconds lockTryInterval(500);
-    auto scopedDistLock = getDistLockManager()->lock(ns.ns(), "drop", waitFor, lockTryInterval);
+    auto scopedDistLock =
+        getDistLockManager()->lock(txn, ns.ns(), "drop", waitFor, lockTryInterval);
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
@@ -972,7 +973,8 @@ bool CatalogManagerLegacy::runUserManagementWriteCommand(OperationContext* txn,
         dispatcher.addCommand(configServer, dbname, cmdObj);
     }
 
-    auto scopedDistLock = getDistLockManager()->lock("authorizationData", commandName, Seconds{5});
+    auto scopedDistLock =
+        getDistLockManager()->lock(txn, "authorizationData", commandName, Seconds{5});
     if (!scopedDistLock.isOK()) {
         return Command::appendCommandStatus(*result, scopedDistLock.getStatus());
     }

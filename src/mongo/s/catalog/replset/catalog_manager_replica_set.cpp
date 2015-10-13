@@ -128,7 +128,7 @@ void CatalogManagerReplicaSet::shutDown(OperationContext* txn, bool allowNetwork
     }
 
     invariant(_distLockManager);
-    _distLockManager->shutDown(allowNetworking);
+    _distLockManager->shutDown(txn, allowNetworking);
 }
 
 Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
@@ -139,7 +139,7 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
                                                  const set<ShardId>& initShardIds) {
     // Lock the collection globally so that no other mongos can try to shard or drop the collection
     // at the same time.
-    auto scopedDistLock = getDistLockManager()->lock(ns, "shardCollection");
+    auto scopedDistLock = getDistLockManager()->lock(txn, ns, "shardCollection");
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
@@ -483,7 +483,8 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
         waitFor = stdx::chrono::seconds(data["waitForSecs"].numberInt());
     }
     const stdx::chrono::milliseconds lockTryInterval(500);
-    auto scopedDistLock = getDistLockManager()->lock(ns.ns(), "drop", waitFor, lockTryInterval);
+    auto scopedDistLock =
+        getDistLockManager()->lock(txn, ns.ns(), "drop", waitFor, lockTryInterval);
     if (!scopedDistLock.isOK()) {
         return scopedDistLock.getStatus();
     }
@@ -596,7 +597,7 @@ void CatalogManagerReplicaSet::logAction(OperationContext* txn, const ActionLogT
         BSONObj createCmd = BSON("create" << ActionLogType::ConfigNS << "capped" << true << "size"
                                           << kActionLogCollectionSize);
         auto result =
-            grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries("config", createCmd);
+            grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, "config", createCmd);
         if (!result.isOK()) {
             LOG(1) << "couldn't create actionlog collection: " << causedBy(result.getStatus());
             return;
@@ -626,7 +627,7 @@ Status CatalogManagerReplicaSet::logChange(OperationContext* txn,
         BSONObj createCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true << "size"
                                           << kChangeLogCollectionSize);
         auto result =
-            grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries("config", createCmd);
+            grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, "config", createCmd);
         if (!result.isOK()) {
             LOG(1) << "couldn't create changelog collection: " << causedBy(result.getStatus());
             return result.getStatus();
@@ -866,12 +867,14 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* t
                                                              const std::string& dbname,
                                                              const BSONObj& cmdObj,
                                                              BSONObjBuilder* result) {
-    auto scopedDistLock = getDistLockManager()->lock("authorizationData", commandName, Seconds{5});
+    auto scopedDistLock =
+        getDistLockManager()->lock(txn, "authorizationData", commandName, Seconds{5});
     if (!scopedDistLock.isOK()) {
         return Command::appendCommandStatus(*result, scopedDistLock.getStatus());
     }
 
-    auto response = grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(dbname, cmdObj);
+    auto response =
+        grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, dbname, cmdObj);
     if (!response.isOK()) {
         return Command::appendCommandStatus(*result, response.getStatus());
     }
@@ -901,7 +904,8 @@ Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
                                                          const BSONArray& updateOps,
                                                          const BSONArray& preCondition) {
     BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition);
-    auto response = grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries("config", cmd);
+    auto response =
+        grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, "config", cmd);
 
     if (!response.isOK()) {
         return response.getStatus();
@@ -929,7 +933,8 @@ void CatalogManagerReplicaSet::writeConfigServerDirect(OperationContext* txn,
     invariant(dbname == "config" || dbname == "admin");
     const BSONObj cmdObj = batchRequest.toBSON();
 
-    auto response = grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(dbname, cmdObj);
+    auto response =
+        grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, dbname, cmdObj);
     if (!response.isOK()) {
         _toBatchError(response.getStatus(), batchResponse);
         return;
@@ -1181,7 +1186,7 @@ StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFin
                                           repl::ReadConcernLevel::kMajorityReadConcern};
 
         auto result = grid.shardRegistry()->exhaustiveFindOnConfig(
-            readPref, nss, query, sort, limit, readConcern);
+            txn, readPref, nss, query, sort, limit, readConcern);
 
         if (ErrorCodes::isNetworkError(result.getStatus().code())) {
             lastStatus = result.getStatus();
@@ -1212,7 +1217,7 @@ bool CatalogManagerReplicaSet::_runReadCommand(OperationContext* txn,
                                                BSONObjBuilder* result) {
     Status lastStatus = Status::OK();
     for (int retry = 0; retry < kMaxReadRetry; retry++) {
-        auto resultStatus = grid.shardRegistry()->runCommandOnConfig(settings, dbname, cmdObj);
+        auto resultStatus = grid.shardRegistry()->runCommandOnConfig(txn, settings, dbname, cmdObj);
 
         if (ErrorCodes::isNetworkError(resultStatus.getStatus().code())) {
             lastStatus = resultStatus.getStatus();
