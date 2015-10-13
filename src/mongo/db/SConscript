@@ -719,7 +719,7 @@ serveronlyLibdeps = [
     "stats/counters",
     "stats/top",
     "storage/devnull/storage_devnull",
-    "storage/in_memory/storage_in_memory",
+    "storage/ephemeral_for_test/storage_ephemeral_for_test",
     "storage/mmap_v1/mmap",
     "storage/mmap_v1/storage_mmapv1",
     "storage/storage_engine_lock_file",

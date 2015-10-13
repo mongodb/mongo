@@ -1,4 +1,4 @@
-// in_memory_record_store_test.cpp
+// ephemeral_for_test_record_store_test.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -28,30 +28,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/in_memory/in_memory_record_store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 
 
-#include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-class InMemoryHarnessHelper final : public HarnessHelper {
+class EphemeralForTestHarnessHelper final : public HarnessHelper {
 public:
-    InMemoryHarnessHelper() {}
+    EphemeralForTestHarnessHelper() {}
 
     std::unique_ptr<RecordStore> newNonCappedRecordStore() final {
-        return stdx::make_unique<InMemoryRecordStore>("a.b", &data);
+        return stdx::make_unique<EphemeralForTestRecordStore>("a.b", &data);
     }
     std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
                                                       int64_t cappedMaxDocs) final {
-        return stdx::make_unique<InMemoryRecordStore>(
+        return stdx::make_unique<EphemeralForTestRecordStore>(
             "a.b", &data, true, cappedSizeBytes, cappedMaxDocs);
     }
 
     RecoveryUnit* newRecoveryUnit() final {
-        return new InMemoryRecoveryUnit();
+        return new EphemeralForTestRecoveryUnit();
     }
 
     bool supportsDocLocking() final {
@@ -62,6 +62,6 @@ public:
 };
 
 std::unique_ptr<HarnessHelper> newHarnessHelper() {
-    return stdx::make_unique<InMemoryHarnessHelper>();
+    return stdx::make_unique<EphemeralForTestHarnessHelper>();
 }
 }

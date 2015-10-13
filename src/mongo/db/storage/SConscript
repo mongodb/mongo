@@ -3,7 +3,7 @@ Import("env")
 env.SConscript(
     dirs=[
         'devnull',
-        'in_memory',
+        'ephemeral_for_test',
         'kv',
         'mmap_v1',
         'wiredtiger',

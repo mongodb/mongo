@@ -142,7 +142,7 @@ void RSRollbackTest::setUp() {
         unittest::TempDir tempDir("rs_rollback_test");
         mongo::storageGlobalParams.dbpath = tempDir.path();
         mongo::storageGlobalParams.dbpath = tempDir.path();
-        mongo::storageGlobalParams.engine = "inMemoryExperiment";
+        mongo::storageGlobalParams.engine = "ephemeralForTest";
         mongo::storageGlobalParams.engineSetByUser = true;
         serviceContext->initializeGlobalStorageEngine();
     }

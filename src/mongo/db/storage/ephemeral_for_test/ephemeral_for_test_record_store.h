@@ -1,4 +1,4 @@
-// in_memory_record_store.h
+// ephemeral_for_test_record_store.h
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -43,14 +43,14 @@ namespace mongo {
  *
  * @param cappedMaxSize - required if isCapped. limit uses dataSize() in this impl.
  */
-class InMemoryRecordStore : public RecordStore {
+class EphemeralForTestRecordStore : public RecordStore {
 public:
-    explicit InMemoryRecordStore(StringData ns,
-                                 std::shared_ptr<void>* dataInOut,
-                                 bool isCapped = false,
-                                 int64_t cappedMaxSize = -1,
-                                 int64_t cappedMaxDocs = -1,
-                                 CappedCallback* cappedCallback = nullptr);
+    explicit EphemeralForTestRecordStore(StringData ns,
+                                         std::shared_ptr<void>* dataInOut,
+                                         bool isCapped = false,
+                                         int64_t cappedMaxSize = -1,
+                                         int64_t cappedMaxDocs = -1,
+                                         CappedCallback* cappedCallback = nullptr);
 
     virtual const char* name() const;
 
@@ -129,9 +129,9 @@ public:
     }
 
 protected:
-    struct InMemoryRecord {
-        InMemoryRecord() : size(0) {}
-        InMemoryRecord(int size) : size(size), data(new char[size]) {}
+    struct EphemeralForTestRecord {
+        EphemeralForTestRecord() : size(0) {}
+        EphemeralForTestRecord(int size) : size(size), data(new char[size]) {}
 
         RecordData toRecordData() const {
             return RecordData(data.get(), size);
@@ -141,15 +141,15 @@ protected:
         boost::shared_array<char> data;
     };
 
-    virtual const InMemoryRecord* recordFor(const RecordId& loc) const;
-    virtual InMemoryRecord* recordFor(const RecordId& loc);
+    virtual const EphemeralForTestRecord* recordFor(const RecordId& loc) const;
+    virtual EphemeralForTestRecord* recordFor(const RecordId& loc);
 
 public:
     //
     // Not in RecordStore interface
     //
 
-    typedef std::map<RecordId, InMemoryRecord> Records;
+    typedef std::map<RecordId, EphemeralForTestRecord> Records;
 
     bool isCapped() const {
         return _isCapped;

@@ -1,4 +1,4 @@
-// in_memory_btree_impl.h
+// ephemeral_for_test_btree_impl_test.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -28,20 +28,34 @@
  *    it in the license file.
  */
 
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_btree_impl.h"
 
-#include "mongo/db/storage/sorted_data_interface.h"
 
-#pragma once
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
+#include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-class IndexCatalogEntry;
+class EphemeralForTestHarnessHelper final : public HarnessHelper {
+public:
+    EphemeralForTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
 
-/**
- * Caller takes ownership.
- * All permanent data will be stored and fetch from dataInOut.
- */
-SortedDataInterface* getInMemoryBtreeImpl(const Ordering& ordering,
-                                          std::shared_ptr<void>* dataInOut);
+    std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) final {
+        return std::unique_ptr<SortedDataInterface>(getEphemeralForTestBtreeImpl(_order, &_data));
+    }
 
-}  // namespace mongo
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
+        return stdx::make_unique<EphemeralForTestRecoveryUnit>();
+    }
+
+private:
+    std::shared_ptr<void> _data;  // used by EphemeralForTestBtreeImpl
+    Ordering _order;
+};
+
+std::unique_ptr<HarnessHelper> newHarnessHelper() {
+    return stdx::make_unique<EphemeralForTestHarnessHelper>();
+}
+}

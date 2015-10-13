@@ -1,4 +1,4 @@
-// in_memory_btree_impl.cpp
+// ephemeral_for_test_btree_impl.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -30,13 +30,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/in_memory/in_memory_btree_impl.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_btree_impl.h"
 
 #include <set>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/storage/index_entry_comparison.h"
-#include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -89,9 +89,9 @@ bool isDup(const IndexSet& data, const BSONObj& key, RecordId loc) {
     return it->loc != loc;
 }
 
-class InMemoryBtreeBuilderImpl : public SortedDataBuilderInterface {
+class EphemeralForTestBtreeBuilderImpl : public SortedDataBuilderInterface {
 public:
-    InMemoryBtreeBuilderImpl(IndexSet* data, long long* currentKeySize, bool dupsAllowed)
+    EphemeralForTestBtreeBuilderImpl(IndexSet* data, long long* currentKeySize, bool dupsAllowed)
         : _data(data),
           _currentKeySize(currentKeySize),
           _dupsAllowed(dupsAllowed),
@@ -136,14 +136,14 @@ private:
     IndexSet::const_iterator _last;    // or (key, RecordId) ordering violations
 };
 
-class InMemoryBtreeImpl : public SortedDataInterface {
+class EphemeralForTestBtreeImpl : public SortedDataInterface {
 public:
-    InMemoryBtreeImpl(IndexSet* data) : _data(data) {
+    EphemeralForTestBtreeImpl(IndexSet* data) : _data(data) {
         _currentKeySize = 0;
     }
 
     virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed) {
-        return new InMemoryBtreeBuilderImpl(_data, &_currentKeySize, dupsAllowed);
+        return new EphemeralForTestBtreeBuilderImpl(_data, &_currentKeySize, dupsAllowed);
     }
 
     virtual Status insert(OperationContext* txn,
@@ -155,8 +155,8 @@ public:
 
         if (key.objsize() >= TempKeyMaxSize) {
             string msg = mongoutils::str::stream()
-                << "InMemoryBtree::insert: key too large to index, failing " << ' ' << key.objsize()
-                << ' ' << key;
+                << "EphemeralForTestBtree::insert: key too large to index, failing " << ' '
+                << key.objsize() << ' ' << key;
             return Status(ErrorCodes::KeyTooLong, msg);
         }
 
@@ -484,13 +484,13 @@ private:
 
 // IndexCatalogEntry argument taken by non-const pointer for consistency with other Btree
 // factories. We don't actually modify it.
-SortedDataInterface* getInMemoryBtreeImpl(const Ordering& ordering,
-                                          std::shared_ptr<void>* dataInOut) {
+SortedDataInterface* getEphemeralForTestBtreeImpl(const Ordering& ordering,
+                                                  std::shared_ptr<void>* dataInOut) {
     invariant(dataInOut);
     if (!*dataInOut) {
         *dataInOut = std::make_shared<IndexSet>(IndexEntryComparison(ordering));
     }
-    return new InMemoryBtreeImpl(static_cast<IndexSet*>(dataInOut->get()));
+    return new EphemeralForTestBtreeImpl(static_cast<IndexSet*>(dataInOut->get()));
 }
 
 }  // namespace mongo

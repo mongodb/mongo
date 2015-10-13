@@ -1,9 +1,9 @@
 Import("env")
 
 env.Library(
-    target= 'in_memory_record_store',
+    target= 'ephemeral_for_test_record_store',
     source= [
-        'in_memory_record_store.cpp'
+        'ephemeral_for_test_record_store.cpp'
         ],
     LIBDEPS= [
         '$BUILD_DIR/mongo/base',
@@ -13,14 +13,14 @@ env.Library(
     )
 
 env.Library(
-    target= 'storage_in_memory_core',
+    target= 'storage_ephemeral_for_test_core',
     source= [
-        'in_memory_btree_impl.cpp',
-        'in_memory_engine.cpp',
-        'in_memory_recovery_unit.cpp',
+        'ephemeral_for_test_btree_impl.cpp',
+        'ephemeral_for_test_engine.cpp',
+        'ephemeral_for_test_recovery_unit.cpp',
         ],
     LIBDEPS= [
-        'in_memory_record_store',
+        'ephemeral_for_test_record_store',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
@@ -31,42 +31,42 @@ env.Library(
     )
 
 env.Library(
-    target= 'storage_in_memory',
+    target= 'storage_ephemeral_for_test',
     source= [
-        'in_memory_init.cpp',
+        'ephemeral_for_test_init.cpp',
         ],
     LIBDEPS= [
-        'storage_in_memory_core',
+        'storage_ephemeral_for_test_core',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
         ]
     )
 
 env.CppUnitTest(
-   target='storage_in_memory_btree_test',
-   source=['in_memory_btree_impl_test.cpp'
+   target='storage_ephemeral_for_test_btree_test',
+   source=['ephemeral_for_test_btree_impl_test.cpp'
            ],
    LIBDEPS=[
-        'storage_in_memory_core',
+        'storage_ephemeral_for_test_core',
         '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
         ]
    )
 
 env.CppUnitTest(
-   target='storage_in_memory_record_store_test',
-   source=['in_memory_record_store_test.cpp'
+   target='storage_ephemeral_for_test_record_store_test',
+   source=['ephemeral_for_test_record_store_test.cpp'
            ],
    LIBDEPS=[
-        'storage_in_memory_core',
+        'storage_ephemeral_for_test_core',
         '$BUILD_DIR/mongo/db/storage/record_store_test_harness'
         ]
    )
 
 env.CppUnitTest(
-    target='storage_in_memory_engine_test',
-    source=['in_memory_engine_test.cpp',
+    target='storage_ephemeral_for_test_engine_test',
+    source=['ephemeral_for_test_engine_test.cpp',
             ],
     LIBDEPS=[
-        'storage_in_memory_core',
+        'storage_ephemeral_for_test_core',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
         ],
     )

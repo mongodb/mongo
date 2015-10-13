@@ -1,4 +1,4 @@
-// in_memory_recovery_unit.h
+// ephemeral_for_test_recovery_unit.h
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -39,7 +39,7 @@ namespace mongo {
 
 class SortedDataInterface;
 
-class InMemoryRecoveryUnit : public RecoveryUnit {
+class EphemeralForTestRecoveryUnit : public RecoveryUnit {
 public:
     void beginUnitOfWork(OperationContext* opCtx) final{};
     void commitUnitOfWork() final;

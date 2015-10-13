@@ -1,4 +1,4 @@
-// in_memory_engine.h
+// ephemeral_for_test_engine.h
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class InMemoryEngine : public KVEngine {
+class EphemeralForTestEngine : public KVEngine {
 public:
     virtual RecoveryUnit* newRecoveryUnit();
 

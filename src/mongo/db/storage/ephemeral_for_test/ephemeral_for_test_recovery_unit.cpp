@@ -1,4 +1,4 @@
-// in_memory_recovery_unit.cpp
+// ephemeral_for_test_recovery_unit.cpp
 
 /**
 *    Copyright (C) 2014 MongoDB Inc.
@@ -30,14 +30,14 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/storage/in_memory/in_memory_recovery_unit.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-void InMemoryRecoveryUnit::commitUnitOfWork() {
+void EphemeralForTestRecoveryUnit::commitUnitOfWork() {
     try {
         for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
             (*it)->commit();
@@ -48,7 +48,7 @@ void InMemoryRecoveryUnit::commitUnitOfWork() {
     }
 }
 
-void InMemoryRecoveryUnit::abortUnitOfWork() {
+void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
     try {
         for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend(); it != end;
              ++it) {

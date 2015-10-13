@@ -1,4 +1,4 @@
-// in_memory_engine_test.cpp
+// ephemeral_for_test_init.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -6,6 +6,7 @@
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
+ *
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -28,30 +29,48 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/in_memory/in_memory_engine.h"
-#include "mongo/db/storage/kv/kv_engine_test_harness.h"
+#include "mongo/base/init.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
+#include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
 
-class InMemoryKVHarnessHelper : public KVHarnessHelper {
+namespace {
+
+class EphemeralForTestFactory : public StorageEngine::Factory {
 public:
-    InMemoryKVHarnessHelper() : _engine(new InMemoryEngine()) {}
-
-    virtual KVEngine* restartEngine() {
-        // Intentionally not restarting since the in-memory storage engine
-        // does not persist data across restarts
-        return _engine.get();
+    virtual ~EphemeralForTestFactory() {}
+    virtual StorageEngine* create(const StorageGlobalParams& params,
+                                  const StorageEngineLockFile& lockFile) const {
+        KVStorageEngineOptions options;
+        options.directoryPerDB = params.directoryperdb;
+        options.forRepair = params.repair;
+        return new KVStorageEngine(new EphemeralForTestEngine(), options);
     }
 
-    virtual KVEngine* getEngine() {
-        return _engine.get();
+    virtual StringData getCanonicalName() const {
+        return "ephemeralForTest";
     }
 
-private:
-    std::unique_ptr<InMemoryEngine> _engine;
+    virtual Status validateMetadata(const StorageEngineMetadata& metadata,
+                                    const StorageGlobalParams& params) const {
+        return Status::OK();
+    }
+
+    virtual BSONObj createMetadataOptions(const StorageGlobalParams& params) const {
+        return BSONObj();
+    }
 };
 
-KVHarnessHelper* KVHarnessHelper::create() {
-    return new InMemoryKVHarnessHelper();
+}  // namespace
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(EphemeralForTestEngineInit, ("SetGlobalEnvironment"))
+(InitializerContext* context) {
+    getGlobalServiceContext()->registerStorageEngine("ephemeralForTest",
+                                                     new EphemeralForTestFactory());
+    return Status::OK();
 }
-}
+
+}  // namespace mongo

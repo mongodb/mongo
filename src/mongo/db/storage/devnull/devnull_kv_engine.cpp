@@ -31,7 +31,7 @@
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/storage/in_memory/in_memory_record_store.h"
+#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/stdx/memory.h"
@@ -243,7 +243,7 @@ RecordStore* DevNullKVEngine::getRecordStore(OperationContext* opCtx,
                                              StringData ident,
                                              const CollectionOptions& options) {
     if (ident == "_mdb_catalog") {
-        return new InMemoryRecordStore(ns, &_catalogInfo);
+        return new EphemeralForTestRecordStore(ns, &_catalogInfo);
     }
     return new DevNullRecordStore(ns, options);
 }

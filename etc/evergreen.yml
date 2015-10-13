@@ -977,12 +977,12 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: inMemoryExperiment
+  name: ephemeralForTest
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core --storageEngine=inMemoryExperiment
+      resmoke_args: --suites=core --storageEngine=ephemeralForTest
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -2083,7 +2083,7 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: inMemoryExperiment
+  - name: ephemeralForTest
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_auth
