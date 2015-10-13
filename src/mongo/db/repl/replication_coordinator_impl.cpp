@@ -606,10 +606,10 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     //     _isWaitingForDrainToComplete, set the flag allowing non-local database writes and
     //     drop the mutex.  At this point, no writes can occur from other threads, due to the
     //     global exclusive lock.
-    // 4.) Drop the global exclusive lock.
-    // 5.) Drop all temp collections.
-    // 6.) Log transition to primary in the oplog and set that OpTime as the floor for what we will
+    // 4.) Drop all temp collections.
+    // 5.) Log transition to primary in the oplog and set that OpTime as the floor for what we will
     //     consider to be committed.
+    // 6.) Drop the global exclusive lock.
     //
     // Because replicatable writes are forbidden while in drain mode, and we don't exit drain
     // mode until we have the global exclusive lock, which forbids all other threads from making
