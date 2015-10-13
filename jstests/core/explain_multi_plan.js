@@ -8,8 +8,8 @@
     coll.drop();
 
     // Create indices to ensure there are multiple plans available.
-    coll.ensureIndex({a: 1, b: 1});
-    coll.ensureIndex({a: 1, b: -1});
+    assert.commandWorked(coll.ensureIndex({a: 1, b: 1}));
+    assert.commandWorked(coll.ensureIndex({a: 1, b: -1}));
 
     // Insert some data to work with.
     var bulk = coll.initializeOrderedBulkOp();
@@ -37,7 +37,7 @@
     });
 
     assert.doesNotThrow(function() {
-        coll.explain("allPlansExecution").find({a: {$gte: 1}});
+        coll.explain("allPlansExecution").find({a: {$gte: 1}}).next();
     });
 
     assert.doesNotThrow(function() {
