@@ -213,6 +213,13 @@ void WiredTigerRecordStore::OplogStones::createNewStoneIfNeeded(RecordId lastRec
         return;
     }
 
+    if (!_stones.empty() && lastRecord < _stones.back().lastRecord) {
+        // Skip creating a new stone when the record's position comes before the most recently
+        // created stone. We likely raced with another batch of inserts that caused us to try and
+        // make multiples stones.
+        return;
+    }
+
     OplogStones::Stone stone = {_currentRecords.swap(0), _currentBytes.swap(0), lastRecord};
     _stones.push_back(stone);
 

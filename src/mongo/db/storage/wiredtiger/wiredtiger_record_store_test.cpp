@@ -1279,7 +1279,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
     }
 }
 
-// Verify that oplog stones are not reclaimed even if the size of the record store exeeds
+// Verify that oplog stones are not reclaimed even if the size of the record store exceeds
 // 'cappedMaxSize'.
 TEST(WiredTigerRecordStoreTest, OplogStones_ExceedCappedMaxSize) {
     WiredTigerHarnessHelper harnessHelper;
@@ -1318,6 +1318,53 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ExceedCappedMaxSize) {
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(330, rs->dataSize(opCtx.get()));
         ASSERT_EQ(3U, oplogStones->numStones());
+        ASSERT_EQ(0, oplogStones->currentRecords());
+        ASSERT_EQ(0, oplogStones->currentBytes());
+    }
+}
+
+// Verify that an oplog stone isn't created if it would cause the logical representation of the
+// records to not be in increasing order.
+TEST(WiredTigerRecordStoreTest, OplogStones_AscendingOrder) {
+    WiredTigerHarnessHelper harnessHelper;
+
+    const int64_t cappedMaxSize = 10 * 1024;  // 10KB
+    unique_ptr<RecordStore> rs(
+        harnessHelper.newCappedRecordStore("local.oplog.stones", cappedMaxSize, -1));
+
+    WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
+    WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
+
+    oplogStones->setMinBytesPerStone(100);
+
+    {
+        unique_ptr<OperationContext> opCtx(harnessHelper.newOperationContext());
+
+        ASSERT_EQ(0U, oplogStones->numStones());
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 2), 50), RecordId(2, 2));
+        ASSERT_EQ(0U, oplogStones->numStones());
+        ASSERT_EQ(1, oplogStones->currentRecords());
+        ASSERT_EQ(50, oplogStones->currentBytes());
+
+        // Inserting a record that has a smaller RecordId than the previously inserted record should
+        // be able to create a new stone when no stones already exist.
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 1), 50), RecordId(2, 1));
+        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(0, oplogStones->currentRecords());
+        ASSERT_EQ(0, oplogStones->currentBytes());
+
+        // However, inserting a record that has a smaller RecordId than most recently created
+        // stone's last record shouldn't cause a new stone to be created, even if the size of the
+        // inserted record exceeds 'minBytesPerStone'.
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 100), RecordId(1, 1));
+        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1, oplogStones->currentRecords());
+        ASSERT_EQ(100, oplogStones->currentBytes());
+
+        // Inserting a record that has a larger RecordId than the most recently created stone's last
+        // record should then cause a new stone to be created.
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 3), 50), RecordId(2, 3));
+        ASSERT_EQ(2U, oplogStones->numStones());
         ASSERT_EQ(0, oplogStones->currentRecords());
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
