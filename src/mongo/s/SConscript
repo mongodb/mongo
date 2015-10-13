@@ -192,6 +192,7 @@ env.Library(
         'cursors.cpp',
         'request.cpp',
         's_only.cpp',
+        's_sharding_server_status.cpp',
         'strategy.cpp',
         'version_mongos.cpp',
     ],
@@ -230,6 +231,7 @@ env.Library(
     source=[
         "d_merge.cpp",
         "d_migrate.cpp",
+        'd_sharding_server_status.cpp',
         "d_split.cpp",
         "d_state.cpp",
         "distlock_test.cpp",
