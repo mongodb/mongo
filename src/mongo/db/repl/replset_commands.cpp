@@ -57,6 +57,7 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {
@@ -694,11 +695,19 @@ public:
 
         /* we want to keep heartbeat connections open when relinquishing primary.
            tag them here. */
-        {
-            AbstractMessagingPort* mp = txn->getClient()->port();
-            if (mp)
-                mp->tag |= executor::NetworkInterface::kMessagingPortKeepOpen;
+        AbstractMessagingPort* mp = txn->getClient()->port();
+        unsigned originalTag = 0;
+        if (mp) {
+            originalTag = mp->tag;
+            mp->tag |= executor::NetworkInterface::kMessagingPortKeepOpen;
         }
+
+        // Unset the tag on block exit
+        ON_BLOCK_EXIT([mp, originalTag]() {
+            if (mp) {
+                mp->tag = originalTag;
+            }
+        });
 
         // Process heartbeat based on the version of request. The missing fields in mismatched
         // version will be empty.

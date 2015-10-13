@@ -79,8 +79,10 @@ public:
     void closeAll(unsigned skip_mask) {
         stdx::lock_guard<stdx::mutex> bl(m);
         for (std::set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++) {
-            if ((*i)->tag & skip_mask)
+            if ((*i)->tag & skip_mask) {
+                LOG(3) << "Skip closing connection # " << (*i)->connectionId();
                 continue;
+            }
             (*i)->shutdown();
         }
     }

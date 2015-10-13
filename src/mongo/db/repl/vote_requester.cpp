@@ -107,6 +107,8 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
         }
 
         if (voteResponse.getVoteGranted()) {
+            LOG(3) << "VoteRequester: Got yes vote from " << request.target
+                   << ", resp:" << response.getValue().data;
             _votes++;
         } else {
             log() << "VoteRequester: Got no vote from " << request.target
