@@ -50,7 +50,7 @@ __wt_std_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 	WT_DECL_RET;
 
 	WT_SYSCALL_RETRY(
-	    fallocate(fh->fd, FALLOC_FL_KEEP_SIZE, offset, len), ret);
+	    fallocate(fh->fd, 0, offset, len), ret);
 	return (ret);
 #else
 	WT_UNUSED(fh);
@@ -77,7 +77,7 @@ __wt_sys_fallocate(WT_FH *fh, wt_off_t offset, wt_off_t len)
 	 * This allows it to work everywhere the kernel supports it.
 	 */
 	WT_SYSCALL_RETRY(syscall(
-	    SYS_fallocate, fh->fd, FALLOC_FL_KEEP_SIZE, offset, len), ret);
+	    SYS_fallocate, fh->fd, 0, offset, len), ret);
 	return (ret);
 #else
 	WT_UNUSED(fh);
