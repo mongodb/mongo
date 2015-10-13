@@ -227,9 +227,13 @@ MozJSImplScope::MozRuntime::MozRuntime() {
 
         _runtime = JS_NewRuntime(kMaxBytesBeforeGC);
 
-        static_assert(kMaxStackBytes > (32 * 1024), "kMaxStackBytes must be larger than 32k");
-
-        JS_SetNativeStackQuota(_runtime, kMaxStackBytes - (32 * 1024));
+        // TODO: Re-enable this when it can be done in a way that does
+        // not conflict with the performance fix in SERVER-20678. The
+        // jscore/recursion.js tes tshould be re-enabled when this is
+        // uncommented.
+        //
+        // static_assert(kMaxStackBytes > (32 * 1024), "kMaxStackBytes must be larger than 32k");
+        // JS_SetNativeStackQuota(_runtime, kMaxStackBytes - (32 * 1024));
     }
 
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSRuntime", _runtime);
