@@ -269,8 +269,10 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
 	    !F_ISSET(chunk, WT_LSM_CHUNK_STABLE) &&
 	    !chunk->evicted) {
-		if ((ret = __lsm_discard_handle(
-		    session, chunk->uri, NULL)) == 0)
+		WT_WITH_HANDLE_LIST_LOCK(session,
+		    ret = __lsm_discard_handle(
+		    session, chunk->uri, NULL));
+		if (ret == 0)
 			chunk->evicted = 1;
 		else if (ret == EBUSY)
 			ret = 0;
@@ -487,7 +489,9 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 	 *
 	 * This will fail with EBUSY if the file is still in use.
 	 */
-	WT_RET(__lsm_discard_handle(session, uri, WT_CHECKPOINT));
+	WT_WITH_HANDLE_LIST_LOCK(session,
+	   ret = __lsm_discard_handle(session, uri, WT_CHECKPOINT));
+	WT_RET(ret);
 
 	/*
 	 * Take the schema lock for the drop operation.  Since __wt_schema_drop
