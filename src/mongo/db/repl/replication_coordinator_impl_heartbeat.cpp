@@ -289,10 +289,15 @@ void ReplicationCoordinatorImpl::_stepDownStart() {
     }
     _stepDownFinishedEvent = stepDownFinishEvh.getValue();
     _replExecutor.scheduleWorkWithGlobalExclusiveLock(
-        stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish, this, stdx::placeholders::_1));
+        stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish,
+                   this,
+                   stdx::placeholders::_1,
+                   _stepDownFinishedEvent));
 }
 
-void ReplicationCoordinatorImpl::_stepDownFinish(const ReplicationExecutor::CallbackArgs& cbData) {
+void ReplicationCoordinatorImpl::_stepDownFinish(
+    const ReplicationExecutor::CallbackArgs& cbData,
+    const ReplicationExecutor::EventHandle& finishedEvent) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
@@ -304,9 +309,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(const ReplicationExecutor::Call
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator_inlock();
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
-    if (_stepDownFinishedEvent.isValid()) {
-        _replExecutor.signalEvent(_stepDownFinishedEvent);
-    }
+    _replExecutor.signalEvent(finishedEvent);
 }
 
 void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConfig& newConfig) {

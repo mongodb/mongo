@@ -302,11 +302,16 @@ env.Library('repl_coordinator_test_fixture',
                 'topology_coordinator_impl',\
             ])
 
-env.CppUnitTest('repl_coordinator_impl_test',
-                [
-                    'replication_coordinator_impl_test.cpp',
-                ],
-                LIBDEPS=['repl_coordinator_test_fixture'])
+env.CppUnitTest(
+    target='repl_coordinator_impl_test',
+    source=[
+        'replication_coordinator_impl_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/concurrency',
+        'repl_coordinator_test_fixture',
+    ],
+)
 
 env.CppUnitTest('replica_set_config_checks_test',
                 'replica_set_config_checks_test.cpp',

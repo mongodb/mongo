@@ -61,6 +61,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -1283,6 +1284,70 @@ TEST_F(ReplCoordTest, UpdateTerm) {
     Handle cbHandle;
     ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(2).code());
     ASSERT_EQUALS(2, getReplCoord()->getTerm());
+    getReplCoord()->waitForStepDownFinish_forTest();
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+}
+
+TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreThanOnce) {
+    init("mySet/test1:1234,test2:1234,test3:1234");
+
+    assertStartSuccess(
+        BSON("_id"
+             << "mySet"
+             << "version" << 1 << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "test1:1234")
+                           << BSON("_id" << 1 << "host"
+                                         << "test2:1234") << BSON("_id" << 2 << "host"
+                                                                        << "test3:1234"))
+             << "protocolVersion" << 1),
+        HostAndPort("test1", 1234));
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 1), 0));
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+    simulateSuccessfulV1Election();
+
+    ASSERT_EQUALS(1, getReplCoord()->getTerm());
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    auto replExec = getReplExec();
+
+    // Prevent _stepDownFinish() from running and becoming secondary by blocking in this
+    // exclusive task.
+    unittest::Barrier barrier(2U);
+    auto stepDownFinishBlocker = [&barrier](const executor::TaskExecutor::CallbackArgs& args) {
+        barrier.countDownAndWait();
+    };
+    replExec->scheduleWorkWithGlobalExclusiveLock(stepDownFinishBlocker);
+
+    bool termUpdated2 = false;
+    auto updateTermResult2 = getReplCoord()->updateTerm_nonBlocking(2, &termUpdated2);
+    ASSERT_OK(updateTermResult2.getStatus());
+
+    bool termUpdated3 = false;
+    auto updateTermResult3 = getReplCoord()->updateTerm_nonBlocking(3, &termUpdated3);
+    ASSERT_OK(updateTermResult3.getStatus());
+
+    // Unblock 'stepDownFinishBlocker'. Tasks for updateTerm and _stepDownFinish should proceed.
+    barrier.countDownAndWait();
+
+    // Both _updateTerm_incallback tasks should be scheduled.
+    auto handle2 = updateTermResult2.getValue();
+    ASSERT_TRUE(handle2.isValid());
+    replExec->wait(handle2);
+    ASSERT_TRUE(termUpdated2);
+
+    auto handle3 = updateTermResult3.getValue();
+    ASSERT_TRUE(handle3.isValid());
+    replExec->wait(handle3);
+    ASSERT_TRUE(termUpdated3);
+
+    ASSERT_EQUALS(3, getReplCoord()->getTerm());
+
+    // Ensure all global exclusive lock tasks (eg. _stepDownFinish) run to completion.
+    auto work = [](const executor::TaskExecutor::CallbackArgs&) {};
+    replExec->wait(unittest::assertGet(replExec->scheduleWorkWithGlobalExclusiveLock(work)));
     getReplCoord()->waitForStepDownFinish_forTest();
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }

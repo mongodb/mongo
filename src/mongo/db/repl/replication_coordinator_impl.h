@@ -971,8 +971,10 @@ private:
     /**
      * Completes a step-down of the current node.  Must be run with a global
      * shared or global exclusive lock.
+     * Signals 'finishedEvent' on successful completion.
      */
-    void _stepDownFinish(const ReplicationExecutor::CallbackArgs& cbData);
+    void _stepDownFinish(const ReplicationExecutor::CallbackArgs& cbData,
+                         const ReplicationExecutor::EventHandle& finishedEvent);
 
     /**
      * Schedules a replica set config change.
