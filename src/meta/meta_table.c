@@ -151,8 +151,11 @@ __wt_metadata_update(
 	    key, value, WT_META_TRACKING(session) ? "true" : "false",
 	    __metadata_turtle(key) ? "" : "not "));
 
-	if (__metadata_turtle(key))
-		return (__wt_turtle_update(session, key, value));
+	if (__metadata_turtle(key)) {
+		WT_WITH_TURTLE_LOCK(session,
+		    ret = __wt_turtle_update(session, key, value));
+		return (ret);
+	}
 
 	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_update(session, key));
