@@ -1863,6 +1863,11 @@ Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& 
     }
     fassert(18508, cbh.getStatus());
     _replExecutor.wait(cbh.getValue());
+
+    // Wait if heartbeat causes stepdown.
+    if (_stepDownFinishedEvent.isValid()) {
+        _replExecutor.waitForEvent(_stepDownFinishedEvent);
+    }
     return result;
 }
 
@@ -2807,6 +2812,12 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
     if (!termStatus.isOK() && termStatus.code() != ErrorCodes::StaleTerm)
         return termStatus;
 
+    // Term update may cause current primary step down, we need to wait until it
+    // finishes so that it won't close our connection.
+    if (_stepDownFinishedEvent.isValid()) {
+        _replExecutor.waitForEvent(_stepDownFinishedEvent);
+    }
+
     Status result{ErrorCodes::InternalError, "didn't set status in processReplSetRequestVotes"};
     CBHStatus cbh = _replExecutor.scheduleWork(
         stdx::bind(&ReplicationCoordinatorImpl::_processReplSetRequestVotes_finish,
@@ -2949,6 +2960,11 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
     }
     fassert(28645, cbh.getStatus());
     _replExecutor.wait(cbh.getValue());
+
+    // Wait if heartbeat causes stepdown.
+    if (_stepDownFinishedEvent.isValid()) {
+        _replExecutor.waitForEvent(_stepDownFinishedEvent);
+    }
     return result;
 }
 

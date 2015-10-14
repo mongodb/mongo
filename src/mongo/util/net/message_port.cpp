@@ -83,6 +83,7 @@ public:
                 LOG(3) << "Skip closing connection # " << (*i)->connectionId();
                 continue;
             }
+            LOG(3) << "Closing connection # " << (*i)->connectionId();
             (*i)->shutdown();
         }
     }
