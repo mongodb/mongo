@@ -31,6 +31,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include <iostream>
+#include <regex>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
@@ -54,6 +55,27 @@ using std::string;
 using std::vector;
 
 ShellGlobalParams shellGlobalParams;
+
+/* https://github.com/mongodb/mongo-cxx-driver/blob/legacy/src/mongo/client/dbclient.cpp#L82-L97 */
+namespace {
+    const char kMongoDBURL[] =
+        // scheme: non-capturing
+        "mongodb://"
+
+        // credentials: two inner captures for user and password
+        "(?:([^:]+)(?::([^@]+))?@)?"
+
+        // servers: grabs all host:port or UNIX socket names
+        "((?:(?:[^\\/]+|/.+.sock?),?)+)"
+
+        // database: matches anything but the chars that cannot
+        // be part of a MongoDB database name.
+        "(?:/([^/\\.\\ \"*<>:\\|\\?]*))?"
+
+        // options
+        "(?:\\?(?:(.+=.+)&?)+)*";
+
+} // namespace
 
 Status addMongoShellOptions(moe::OptionSection* options) {
     options->addOptionChaining(
@@ -175,6 +197,7 @@ std::string getMongoShellHelp(StringData name, const moe::OptionSection& options
        << "  foo                   foo database on local machine\n"
        << "  192.169.0.5/foo       foo database on 192.168.0.5 machine\n"
        << "  192.169.0.5:9999/foo  foo database on 192.168.0.5 machine on port 9999\n"
+       << "  mongodb://username:password@host:port/database\n"
        << options.helpString() << "\n"
        << "file names: a list of files to run. files have to end in .js and will exit after "
        << "unless --shell is specified";
@@ -310,6 +333,22 @@ Status storeMongoShellOptions(const moe::Environment& params,
      *   - it doesn't end in '.js' and it doesn't specify a path to an existing file */
     if (params.count("dbaddress")) {
         string dbaddress = params["dbaddress"].as<string>();
+        
+        /* Support Connection String URI Format */
+        if (dbaddress.find_first_of("mongodb://") == 0) {
+            std::cmatch cm;
+            std::regex_match(dbaddress.c_str(), cm, std::regex(kMongoDBURL));
+            if (cm.size() == 6){
+                shellGlobalParams.username = cm[1];
+                shellGlobalParams.usingPassword = true;
+                if (cm[2] != "") {
+                    shellGlobalParams.password = cm[2];
+                }
+                dbaddress = string(cm[3]) + string("/") + string(cm[4]);
+            }
+
+        }
+
         if (shellGlobalParams.nodb) {
             shellGlobalParams.files.insert(shellGlobalParams.files.begin(), dbaddress);
         } else {
