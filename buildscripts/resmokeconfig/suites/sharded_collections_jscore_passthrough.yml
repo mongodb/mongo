@@ -59,6 +59,12 @@ selector:
     - jstests/core/dbcase2.js
     - jstests/core/no_db_created.js
     - jstests/core/ns_length.js
+    # If one of these tests runs before a database is created by another test, then these tests will fail.
+    # See: SERVER-20852, db.eval doesn't implicitly create databases on mongos nodes.
+    - jstests/core/constructors.js
+    - jstests/core/eval0.js
+    - jstests/core/eval7.js
+    - jstests/core/eval9.js
 
 executor:
   js_test:
