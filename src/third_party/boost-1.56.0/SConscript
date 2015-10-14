@@ -58,7 +58,10 @@ env.Library('boost_chrono', [
             'boost_system',
         ])
 
-env.Library('boost_regex', [
+regexEnv = env.Clone()
+if regexEnv.ToolchainIs("clang"):
+    regexEnv.AppendUnique(CCFLAGS=["-Wno-deprecated-register"])
+regexEnv.Library('boost_regex', [
         'libs/regex/src/c_regex_traits.cpp',
         'libs/regex/src/cpp_regex_traits.cpp',
         'libs/regex/src/cregex.cpp',
