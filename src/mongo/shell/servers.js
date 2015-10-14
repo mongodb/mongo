@@ -107,21 +107,19 @@ MongoRunner.VersionSub = function(regex, version) {
     this.version = version;
 }
 
-// These patterns allow substituting the binary versions used for each
-// version string to support the dev/stable MongoDB release cycle.
+// These patterns allow substituting the binary versions used for each version string to support the
+// dev/stable MongoDB release cycle.
+//
+// If you add a new version substitution to this list, you should add it to the lists of versions
+// being checked in '0_test_launching.js' to verify it is susbstituted correctly.
 MongoRunner.binVersionSubs = [ new MongoRunner.VersionSub(/^latest$/, ""),
-                               new MongoRunner.VersionSub(/^oldest-supported$/, "1.8"),
-                               // To-be-updated when 3.4 becomes available
+                               // To-be-updated when we branch for the next release.
                                new MongoRunner.VersionSub(/^last-stable$/, "3.0"),
-                               // Latest unstable and next stable are effectively the
-                               // same release
-                               // 2.8 and 3.0 are equivalent.
-                               new MongoRunner.VersionSub(/^2\.8(\..*){0,1}/, "3.0"),
                                new MongoRunner.VersionSub(/^3\.1(\..*){0,1}/, ""),
                                new MongoRunner.VersionSub(/^3\.2(\..*){0,1}/, "") ];
 
 MongoRunner.getBinVersionFor = function(version) {
- 
+
     // If this is a version iterator, iterate the version via toString()
     if (version instanceof MongoRunner.versionIterator.iterator) {
         version = version.toString();
@@ -142,7 +140,7 @@ MongoRunner.getBinVersionFor = function(version) {
     }
 
     return version;
-}
+};
 
 MongoRunner.areBinVersionsTheSame = function(versionA, versionB) {
 
