@@ -69,6 +69,7 @@ if env['MONGO_BUILD_SASL_CLIENT']:
     saslClientSource.extend([
         'cyrus_sasl_client_session.cpp',
         'sasl_sspi.cpp',
+        'sasl_sspi_options.cpp',
     ])
 
     saslLibs.extend(['sasl2'])
@@ -86,7 +87,7 @@ saslClientEnv.Library(
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/md5',
-        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
     ],
     SYSLIBDEPS=saslLibs
 )

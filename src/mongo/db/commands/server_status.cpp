@@ -43,9 +43,12 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_internal.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/hostname_canonicalization_worker.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
@@ -93,10 +96,14 @@ public:
         BSONObjBuilder timeBuilder(256);
 
         const auto authSession = AuthorizationSession::get(ClientBasic::getCurrent());
+        auto service = txn->getServiceContext();
+        auto canonicalizer = HostnameCanonicalizationWorker::get(service);
 
         // --- basic fields that are global
 
         result.append("host", prettyHostName());
+        result.append("advisoryHostFQDNs", canonicalizer->getCanonicalizedFQDNs());
+
         result.append("version", versionString);
         result.append("process", serverGlobalParams.binaryName);
         result.append("pid", ProcessId::getCurrent().asLongLong());
@@ -319,4 +326,5 @@ public:
     }
 } memBase;
 }
-}
+
+}  // namespace mongo

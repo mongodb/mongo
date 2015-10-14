@@ -25,6 +25,7 @@ env.CppUnitTest(
 env.Library(
     target='network',
     source=[
+        "hostname_canonicalization.cpp",
         "httpclient.cpp",
         "listen.cpp",
         "message.cpp",
@@ -67,6 +68,18 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/concurrency/synchronization',
+        'network',
+    ],
+)
+
+env.Library(
+    target="hostname_canonicalization_worker",
+    source=[
+        "hostname_canonicalization_worker.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
         'network',
     ],
 )

@@ -107,6 +107,7 @@
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/hostname_canonicalization_worker.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
@@ -616,6 +617,8 @@ static void _initAndListen(int listenPort) {
     startClientCursorMonitor();
 
     PeriodicTask::startRunningPeriodicTasks();
+
+    HostnameCanonicalizationWorker::start(getGlobalServiceContext());
 
     startFTDC();
 

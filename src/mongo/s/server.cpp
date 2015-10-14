@@ -76,6 +76,7 @@
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/hostname_canonicalization_worker.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -237,6 +238,8 @@ static ExitCode runMongosServer() {
         stdx::thread web(stdx::bind(&webServerListenThread, dbWebServer));
         web.detach();
     }
+
+    HostnameCanonicalizationWorker::start(getGlobalServiceContext());
 
     Status status = getGlobalAuthorizationManager()->initialize(NULL);
     if (!status.isOK()) {

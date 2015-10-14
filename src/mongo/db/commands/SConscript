@@ -16,6 +16,7 @@ env.Library(
         'server_status_metric.cpp',
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/net/hostname_canonicalization_worker',
         '$BUILD_DIR/mongo/base'
         ]
     )
