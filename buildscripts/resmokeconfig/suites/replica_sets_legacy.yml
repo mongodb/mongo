@@ -4,6 +4,7 @@ selector:
     - jstests/replsets/*.js
     exclude_files:
     - jstests/replsets/config_server_checks.js
+    - jstests/replsets/oplog_truncated_on_recovery.js
 
 executor:
   js_test:
