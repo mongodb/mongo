@@ -130,7 +130,18 @@ StatusWith<ChunkMoveWriteConcernOptions> ChunkMoveWriteConcernOptions::initFromC
     return ChunkMoveWriteConcernOptions(secThrottleObj, writeConcernOptions);
 }
 
-ChunkMoveOperationState::ChunkMoveOperationState(NamespaceString ns) : _nss(std::move(ns)) {}
+ChunkMoveOperationState::ChunkMoveOperationState(OperationContext* txn, NamespaceString ns)
+    : _txn(txn), _nss(std::move(ns)) {}
+
+ChunkMoveOperationState::~ChunkMoveOperationState() {
+    if (!_isRunning) {
+        return;
+    }
+
+    auto migrationSourceManager = ShardingState::get(_txn)->migrationSourceManager();
+    invariant(migrationSourceManager);
+    migrationSourceManager->done(_txn);
+}
 
 Status ChunkMoveOperationState::initialize(OperationContext* txn, const BSONObj& cmdObj) {
     // Make sure we're as up-to-date as possible with shard information. This catches the case where
@@ -551,6 +562,9 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
                                         _nss.ns(),
                                         commitInfo.obj());
 
+    shardingState->migrationSourceManager()->done(txn);
+    _isRunning = false;
+
     return Status::OK();
 }
 
@@ -566,5 +580,17 @@ std::shared_ptr<CollectionMetadata> ChunkMoveOperationState::getCollMetadata() c
     return _collMetadata;
 }
 
+Status ChunkMoveOperationState::start(OperationContext* txn, BSONObj shardKeyPattern) {
+    auto migrationSourceManager = ShardingState::get(txn)->migrationSourceManager();
+    if (!migrationSourceManager->start(txn, _nss.ns(), _minKey, _maxKey, shardKeyPattern)) {
+        return {ErrorCodes::ConflictingOperationInProgress,
+                "Not starting chunk migration because another migration is already in progress "
+                "from this shard"};
+    }
+
+    _isRunning = true;
+
+    return Status::OK();
+}
 
 }  // namespace mongo

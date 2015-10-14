@@ -88,10 +88,14 @@ class ChunkMoveOperationState {
     MONGO_DISALLOW_COPYING(ChunkMoveOperationState);
 
 public:
-    ChunkMoveOperationState(NamespaceString ns);
+    /**
+     * Note: Saves the txn for cleanup.
+     */
+    ChunkMoveOperationState(OperationContext* txn, NamespaceString ns);
+    ~ChunkMoveOperationState();
 
     /**
-     * Starts a new chunk move operation from the beginning.
+     * Extracts and validates the move chunk parameters from the given cmdObj.
      */
     Status initialize(OperationContext* txn, const BSONObj& cmdObj);
 
@@ -110,6 +114,11 @@ public:
      */
     StatusWith<ForwardingCatalogManager::ScopedDistLock*> acquireMoveMetadata(
         OperationContext* txn);
+
+    /**
+     * Starts the move chunk operation.
+     */
+    Status start(OperationContext* txn, BSONObj shardKeyPattern);
 
     /**
      * Implements the migration critical section. Needs to be invoked after all data has been moved
@@ -165,6 +174,8 @@ public:
     std::shared_ptr<CollectionMetadata> getCollMetadata() const;
 
 private:
+    // The context of which the migration is running on.
+    OperationContext* const _txn = nullptr;
     const NamespaceString _nss;
 
     // The source and recipient shard ids
@@ -194,6 +205,9 @@ private:
     // completion, because the distributed lock is being held.
     ChunkVersion _shardVersion;
     std::shared_ptr<CollectionMetadata> _collMetadata;
+
+    // True if this migration is running.
+    bool _isRunning = false;
 };
 
 }  // namespace mongo

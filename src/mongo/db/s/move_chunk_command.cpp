@@ -66,36 +66,6 @@ MONGO_FP_DECLARE(moveChunkHangAtStep6);
 
 Tee* const migrateLog = RamLog::get("migrate");
 
-class MigrateStatusHolder {
-public:
-    MigrateStatusHolder(OperationContext* txn,
-                        MigrationSourceManager* migrateSourceManager,
-                        const std::string& ns,
-                        const BSONObj& min,
-                        const BSONObj& max,
-                        const BSONObj& shardKeyPattern)
-        : _txn(txn), _migrateSourceManager(migrateSourceManager) {
-        _isAnotherMigrationActive =
-            !_migrateSourceManager->start(txn, ns, min, max, shardKeyPattern);
-    }
-
-    ~MigrateStatusHolder() {
-        if (!_isAnotherMigrationActive) {
-            _migrateSourceManager->done(_txn);
-        }
-    }
-
-    bool isAnotherMigrationActive() const {
-        return _isAnotherMigrationActive;
-    }
-
-private:
-    OperationContext* const _txn;
-    MigrationSourceManager* const _migrateSourceManager;
-
-    bool _isAnotherMigrationActive;
-};
-
 /**
  * This is the main entry for moveChunk, which is called to initiate a move by a donor side. It can
  * be called by either mongos as a result of a user request or an automatic balancing action.
@@ -202,7 +172,7 @@ public:
             shardingState->initialize(txn, configdb);
         }
 
-        ChunkMoveOperationState chunkMoveState{NamespaceString(ns)};
+        ChunkMoveOperationState chunkMoveState{txn, NamespaceString(ns)};
         uassertStatusOK(chunkMoveState.initialize(txn, cmdObj));
 
         // Initialize our current shard name in the shard state if needed
@@ -280,20 +250,11 @@ public:
 
         // 3.
 
-        MigrateStatusHolder statusHolder(txn,
-                                         shardingState->migrationSourceManager(),
-                                         ns,
-                                         chunkMoveState.getMinKey(),
-                                         chunkMoveState.getMaxKey(),
-                                         shardKeyPattern);
+        auto moveChunkStartStatus = chunkMoveState.start(txn, shardKeyPattern);
 
-        if (statusHolder.isAnotherMigrationActive()) {
-            const std::string msg =
-                "Not starting chunk migration because another migration is already in progress "
-                "from this shard";
-            warning() << msg;
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::ConflictingOperationInProgress, msg));
+        if (!moveChunkStartStatus.isOK()) {
+            warning() << moveChunkStartStatus.toString();
+            return appendCommandStatus(result, moveChunkStartStatus);
         }
 
         {
@@ -508,9 +469,6 @@ public:
         }
 
         uassertStatusOK(chunkMoveState.commitMigration(txn));
-
-        shardingState->migrationSourceManager()->done(txn);
-
         timing.done(5);
 
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
