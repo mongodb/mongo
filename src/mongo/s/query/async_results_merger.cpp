@@ -63,7 +63,7 @@ bool isPerShardRetriableError(ErrorCodes::Error err) {
 }  // namespace
 
 AsyncResultsMerger::AsyncResultsMerger(executor::TaskExecutor* executor,
-                                       ClusterClientCursorParams params)
+                                       ClusterClientCursorParams&& params)
     : _executor(executor),
       _params(std::move(params)),
       _mergeQueue(MergingComparator(_remotes, _params.sort)) {

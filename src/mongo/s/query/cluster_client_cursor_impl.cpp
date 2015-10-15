@@ -42,7 +42,7 @@
 namespace mongo {
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
-                                                 ClusterClientCursorParams params)
+                                                 ClusterClientCursorParams&& params)
     : _isTailable(params.isTailable), _root(buildMergerPlan(executor, std::move(params))) {}
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock> root)
@@ -86,20 +86,24 @@ bool ClusterClientCursorImpl::remotesExhausted() {
 }
 
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
-    executor::TaskExecutor* executor, ClusterClientCursorParams params) {
+    executor::TaskExecutor* executor, ClusterClientCursorParams&& params) {
+    const auto skip = params.skip;
+    const auto limit = params.limit;
+    const bool hasSort = !params.sort.isEmpty();
+
     // The first stage is always the one which merges from the remotes.
-    auto leaf = stdx::make_unique<RouterStageMerge>(executor, params);
+    std::unique_ptr<RouterExecStage> root =
+        stdx::make_unique<RouterStageMerge>(executor, std::move(params));
 
-    std::unique_ptr<RouterExecStage> root = std::move(leaf);
-    if (params.skip) {
-        root = stdx::make_unique<RouterStageSkip>(std::move(root), *params.skip);
+    if (skip) {
+        root = stdx::make_unique<RouterStageSkip>(std::move(root), *skip);
     }
 
-    if (params.limit) {
-        root = stdx::make_unique<RouterStageLimit>(std::move(root), *params.limit);
+    if (limit) {
+        root = stdx::make_unique<RouterStageLimit>(std::move(root), *limit);
     }
 
-    if (!params.sort.isEmpty()) {
+    if (hasSort) {
         root = stdx::make_unique<RouterStageRemoveSortKey>(std::move(root));
     }
 

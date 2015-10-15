@@ -123,7 +123,7 @@ protected:
             params.remotes.emplace_back(shardId, findCmd);
         }
 
-        arm = stdx::make_unique<AsyncResultsMerger>(executor, params);
+        arm = stdx::make_unique<AsyncResultsMerger>(executor, std::move(params));
     }
 
     /**
@@ -138,7 +138,7 @@ protected:
             params.remotes.emplace_back(hostIdPair.first, hostIdPair.second);
         }
 
-        arm = stdx::make_unique<AsyncResultsMerger>(executor, params);
+        arm = stdx::make_unique<AsyncResultsMerger>(executor, std::move(params));
     }
 
     /**

@@ -72,10 +72,10 @@ class AsyncResultsMerger {
 
 public:
     /**
-     * Constructs a new AsyncResultsMerger. The TaskExecutor* and ClusterClientCursorParams& must
-     * remain valid for the lifetime of the ARM.
+     * Constructs a new AsyncResultsMerger. The TaskExecutor* must remain valid for the lifetime of
+     * the ARM.
      */
-    AsyncResultsMerger(executor::TaskExecutor* executor, ClusterClientCursorParams params);
+    AsyncResultsMerger(executor::TaskExecutor* executor, ClusterClientCursorParams&& params);
 
     /**
      * In order to be destroyed, either

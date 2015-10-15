@@ -37,7 +37,7 @@
 namespace mongo {
 
 RouterStageMerge::RouterStageMerge(executor::TaskExecutor* executor,
-                                   ClusterClientCursorParams params)
+                                   ClusterClientCursorParams&& params)
     : _executor(executor), _arm(executor, std::move(params)) {}
 
 StatusWith<boost::optional<BSONObj>> RouterStageMerge::next() {
