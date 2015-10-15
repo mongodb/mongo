@@ -1,6 +1,6 @@
 // Ensure stepDown operations that are waiting for replication can be interrupted with killOp()
 // 1. Start up a 3 node set (1 arbiter).
-// 2. Isolate the SECONDARY.
+// 2. Stop replication on the SECONDARY using a fail point.
 // 3. Do one write and then spin up a second shell which asks the PRIMARY to StepDown.
 // 4. Once StepDown has begun, spin up a third shell which will attempt to do writes, which should
 //    block waiting for stepDown to release its lock, which it never will do because no secondaries
@@ -20,12 +20,18 @@
                            {"_id" : 1, "host" : nodes[1]},
                            {"_id" : 2, "host" : nodes[2], "arbiterOnly" : true}]});
 
-     jsTestLog("Isolating primary");
-     replSet.bridge();
-     replSet.partition(1,0);
-     replSet.partition(1,2);
+     replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
 
-    replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
+     var secondary = replSet.getSecondary();
+     jsTestLog('Disable replication on the SECONDARY ' + secondary.host);
+     assert.commandWorked(
+         secondary.getDB('admin').runCommand(
+             {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}
+         ),
+         'Failed to configure rsSyncApplyStop failpoint.'
+     );
+
+     replSet.waitForState(replSet.nodes[0], replSet.PRIMARY, 60 * 1000);
 
      var primary = replSet.getPrimary();
      assert.eq(primary.host, nodes[0], "primary assumed to be node 0");
