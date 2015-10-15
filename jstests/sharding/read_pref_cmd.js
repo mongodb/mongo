@@ -149,7 +149,6 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
         formatProfileQuery({ geoNear: 'user' }));
 
     // Mongos doesn't implement geoSearch; test it only with ReplicaSetConnection.
-    // We'll omit geoWalk, it's not a public command.
     if (!isMongos) {
         cmdTest(
             {
