@@ -17,12 +17,10 @@ post:
           set -e 
           set -o verbose
           cd ./clusters/${cluster}
-          # configure mongodb cluster with wiredTiger
-          yes yes | ./terraform destroy
-          echo "Cluster DESTROYED."
+          if [ ! -f "test.success" ]; then yes yes | ./terraform destroy; fi
+          if [ ! -f "test.success" ]; then echo "Cluster DESTROYED."; fi
           echo "Test Results: "
           egrep "name|ops_per_sec" ../perf.json
-
 
 functions:
   "prepare environment":
@@ -49,6 +47,7 @@ functions:
         script: |
           cd ./clusters/${cluster}
           # stage aws credential for terraform
+          cp ../../terraform/* .
           ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/dsi/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
           # generate aws private key file
           echo "${ec2_pem}" > ../../keys/aws.pem
@@ -61,31 +60,42 @@ functions:
         silent: true
         script: |
           # to create a mongod EC2 cluster
-          set -e 
+          set -e
           set -o verbose
           cd ./clusters/${cluster}
           # create all resources and instances
           ./setup-cluster.sh
           echo "EC2 Cluster CREATED."
-  "bring up 3 shard cluster":
+          tar -czvf cluster_config.tgz ips.sh terraform.tfstate.backup terraform.tfstate
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "dsi/clusters/${cluster}/cluster_config.tgz"
+        remote_file: dsi/${build_variant}/${revision}/cluster_configs/cluster_config-${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: ${cluster}-cluster-config
+
+  "restore cluster":
+    - command: s3.get
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        remote_file: dsi/${build_variant}/${revision}/cluster_configs/cluster_config-${build_id}.tgz
+        bucket: mciuploads
+        local_file: "dsi/clusters/${cluster}/cluster_config.tgz"
     - command: shell.exec
-      # bring up the cluster
       params:
         working_dir: dsi
         silent: true
         script: |
-          # create a mongod EC2 cluster
-          set -e 
+          set -e
           set -o verbose
           cd ./clusters/${cluster}
-          cp ../../terraform/* .
-          # create all resources and instances
-          ./terraform apply -var="count=3" > t
-          # workaround for failure to bring up all at the same time
-          ./terraform apply -var="count=9" > t
-          # this will extract all public and private IP address information
-          ./env.sh
-          echo "EC2 Cluster STARTED."
+          tar -xf cluster_config.tgz
+
   "configure mongodb cluster":
     - command: shell.exec
       # bring up the mongod
@@ -126,6 +136,14 @@ functions:
       params:
          name: "perf"
          file: "dsi/clusters/perf.json"
+    - command: shell.exec
+      params:
+        working_dir: dsi
+        script: |
+          set -e
+          set -v
+          cd ./clusters/${cluster}
+          touch test.success
 
   "destroy cluster":
     - command: shell.exec
@@ -152,7 +170,7 @@ functions:
           cd ./clusters/${cluster}/reports
           # move additional file here
           cp ../ips.sh .
-          cp ../terraform.log .
+          if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
           cp ../../perf.json .
           cd ..
           rm -rf ../reports
@@ -232,7 +250,14 @@ tasks:
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb.tar.gz
 
-- name: single_cluster_test
+# The industry_benchmarks_WT task runs the "bring up cluster" task and is
+# the only one to do so - all other tasks run "restore cluster".  As such,
+# all buildvariants must run industry_benchmarks_WT and run it first.
+
+# When adding or removing tasks, you also must ensure that the final task
+# and only the final task runs the "destroy cluster" function.
+
+- name: industry_benchmarks_WT
   depends_on:
     - name: compile
   commands:
@@ -240,86 +265,28 @@ tasks:
     - func: "bring up cluster"
     - func: "configure mongodb cluster"
       vars:
-        test: "ycsb"
-        storageEngine: "wiredTiger"
-    - func: "run test"
-      vars:
         storageEngine: "wiredTiger"
         test: "ycsb"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
-
     - func: "run test"
       vars:
         storageEngine: "wiredTiger"
-        test: "benchRun"
+        test: "ycsb"
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
-        test: "benchRun-wiredTiger"
-
-    - func: "configure mongodb cluster"
-      vars:
-        test: "ycsb-mmap"
-        storageEngine: "mmapv1"
-
-    - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "ycsb-mmap"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb-mmap"
-
-    - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "benchRun-mmap"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "benchRun-mmap"
-
+        test: "ycsb"
     - func: "analyze"
-    - func: "destroy cluster"
 
-- name: shard_cluster_test
+- name: industry_benchmarks_MMAPv1
   depends_on:
     - name: compile
   commands:
     - func: "prepare environment"
-    - func: "bring up cluster"
+    - func: "restore cluster"
     - func: "configure mongodb cluster"
       vars:
-        test: "ycsb"
-        storageEngine: "wiredTiger"
-
-    - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "ycsb"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
-
-    - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "benchRun"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "benchRun-wiredTiger"
-
-    - func: "configure mongodb cluster"
-      vars:
-        test: "ycsb-mmap"
         storageEngine: "mmapv1"
-
+        test: "ycsb"
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
@@ -327,40 +294,15 @@ tasks:
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
-        test: "ycsb-mmap"
-
-    - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "benchRun-mmap"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "benchRun-mmap"
-
+        test: "ycsb"
     - func: "analyze"
-    - func: "destroy cluster"
 
-- name: replica_cluster_test
+- name: core_workloads_WT
   depends_on:
     - name: compile
   commands:
     - func: "prepare environment"
-    - func: "bring up cluster"
-    - func: "configure mongodb cluster"
-      vars:
-        test: "ycsb"
-        storageEngine: "wiredTiger"
-
-    - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "ycsb"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
-
+    - func: "restore cluster"
     - func: "run test"
       vars:
         storageEngine: "wiredTiger"
@@ -368,37 +310,29 @@ tasks:
     - func: "make test log artifact"
     - func: "upload log file"
       vars:
-        test: "benchRun-wiredTiger"
-
-    - func: "configure mongodb cluster"
-      vars:
-        test: "ycsb-mmap"
-        storageEngine: "mmapv1"
-
-    - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "ycsb-mmap"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb-mmap"
-
-    - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "benchRun-mmap"
-    - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "benchRun-mmap"
-
+        test: "core_workloads_WT"
     - func: "analyze"
-    - func: "destroy cluster"
+
+- name: core_workloads_MMAPv1
+  depends_on:
+    - name: compile
+  commands:
+    - func: "prepare environment"
+    - func: "restore cluster"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "benchRun-mmap"
+    - func: "make test log artifact"
+    - func: "upload log file"
+      vars:
+        test: "core_workloads_MMAPv1"
+    - func: "analyze"
+    - func: "destroy cluster"      
 
 
 buildvariants:
-- name: linux-wt-repl-1
+- name: linux-1-node-replSet
   display_name: Linux 1-Node ReplSet
   batchtime: 1440 # 24 hours
   expansions:
@@ -413,7 +347,16 @@ buildvariants:
     - name: compile
       distros:
       - rhel55
-    - name: single_cluster_test
+    - name: industry_benchmarks_WT
+    - name: core_workloads_WT
+      depends_on:
+        - name: industry_benchmarks_WT
+    - name: industry_benchmarks_MMAPv1
+      depends_on:
+        - name: core_workloads_WT
+    - name: core_workloads_MMAPv1
+      depends_on:
+      - name: industry_benchmarks_MMAPv1
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -430,9 +373,18 @@ buildvariants:
     - name: compile
       distros:
       - rhel55
-    - name: single_cluster_test
+    - name: industry_benchmarks_WT
+    - name: core_workloads_WT
+      depends_on:
+        - name: industry_benchmarks_WT
+    - name: industry_benchmarks_MMAPv1
+      depends_on:
+        - name: core_workloads_WT
+    - name: core_workloads_MMAPv1
+      depends_on:
+      - name: industry_benchmarks_MMAPv1
 
-- name: linux-wt-shard
+- name: linux-3-shard
   display_name: Linux 3-Shard Cluster
   batchtime: 1440 # 24 hours
   expansions:
@@ -447,7 +399,16 @@ buildvariants:
     - name: compile
       distros:
       - rhel55
-    - name: shard_cluster_test
+    - name: industry_benchmarks_WT
+    - name: core_workloads_WT
+      depends_on:
+        - name: industry_benchmarks_WT
+    - name: industry_benchmarks_MMAPv1
+      depends_on:
+        - name: core_workloads_WT
+    - name: core_workloads_MMAPv1
+      depends_on:
+      - name: industry_benchmarks_MMAPv1
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet Cluster
@@ -464,5 +425,13 @@ buildvariants:
     - name: compile
       distros:
       - rhel55
-    - name: replica_cluster_test
-
+    - name: industry_benchmarks_WT
+    - name: core_workloads_WT
+      depends_on:
+        - name: industry_benchmarks_WT
+    - name: industry_benchmarks_MMAPv1
+      depends_on:
+        - name: core_workloads_WT
+    - name: core_workloads_MMAPv1
+      depends_on:
+      - name: industry_benchmarks_MMAPv1
