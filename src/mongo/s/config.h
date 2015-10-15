@@ -166,6 +166,10 @@ public:
 
     void setPrimary(OperationContext* txn, const std::string& s);
 
+    /**
+     * Returns true if it is successful at loading the DBConfig, false if the database is not found,
+     * and throws on all other errors.
+     */
     bool load(OperationContext* txn);
     bool reload(OperationContext* txn);
 
@@ -182,6 +186,10 @@ protected:
                                  std::set<ShardId>& shardIds,
                                  std::string& errmsg);
 
+    /**
+     * Returns true if it is successful at loading the DBConfig, false if the database is not found,
+     * and throws on all other errors.
+     */
     bool _load(OperationContext* txn);
 
     void _save(OperationContext* txn, bool db = true, bool coll = true);

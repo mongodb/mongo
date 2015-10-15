@@ -424,8 +424,9 @@ void _generateErrorResponse(OperationContext* txn,
             static_cast<const SendStaleConfigException&>(exception);
         replyBuilder->setCommandReply(scex.toStatus(),
                                       BSON("ns" << scex.getns() << "vReceived"
-                                                << scex.getVersionReceived().toBSON() << "vWanted"
-                                                << scex.getVersionWanted().toBSON()));
+                                                << BSONArray(scex.getVersionReceived().toBSON())
+                                                << "vWanted"
+                                                << BSONArray(scex.getVersionWanted().toBSON())));
     } else {
         replyBuilder->setCommandReply(exception.toStatus());
     }

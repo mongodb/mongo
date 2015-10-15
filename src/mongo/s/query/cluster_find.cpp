@@ -369,8 +369,8 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
         }
         auto status = std::move(cursorId.getStatus());
 
-        if (status != ErrorCodes::SendStaleConfig && status != ErrorCodes::RecvStaleConfig) {
-            // Errors other than receiving a stale config message from MongoD are fatal to the
+        if (!ErrorCodes::isStaleShardingError(status.code())) {
+            // Errors other than receiving a stale metadata message from MongoD are fatal to the
             // operation. Network errors and replication retries happen at the level of the
             // AsyncResultsMerger.
             return status;
@@ -379,7 +379,16 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
         LOG(1) << "Received error status for query " << query.toStringShort() << " on attempt "
                << retries << " of " << kMaxStaleConfigRetries << ": " << status;
 
-        chunkManager = dbConfig.getValue()->getChunkManagerIfExists(txn, query.nss().ns(), true);
+        const bool staleEpoch = (status == ErrorCodes::StaleEpoch);
+        if (staleEpoch) {
+            if (!dbConfig.getValue()->reload(txn)) {
+                // If the reload failed that means the database wasn't found, so successfully return
+                // an empty result set without creating a cursor.
+                return CursorId(0);
+            }
+        }
+        chunkManager =
+            dbConfig.getValue()->getChunkManagerIfExists(txn, query.nss().ns(), true, staleEpoch);
         if (!chunkManager) {
             dbConfig.getValue()->getChunkManagerOrPrimary(
                 txn, query.nss().ns(), chunkManager, primary);
