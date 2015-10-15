@@ -80,16 +80,16 @@ CursorResponse::CursorResponse(NamespaceString nss,
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
 CursorResponse::CursorResponse(CursorResponse&& other)
-    : _nss(other._nss),
-      _cursorId(other._cursorId),
-      _batch(other._batch),
-      _numReturnedSoFar(other._numReturnedSoFar) {}
+    : _nss(std::move(other._nss)),
+      _cursorId(std::move(other._cursorId)),
+      _batch(std::move(other._batch)),
+      _numReturnedSoFar(std::move(other._numReturnedSoFar)) {}
 
 CursorResponse& CursorResponse::operator=(CursorResponse&& other) {
-    _nss = other._nss;
-    _cursorId = other._cursorId;
-    _batch = other._batch;
-    _numReturnedSoFar = other._numReturnedSoFar;
+    _nss = std::move(other._nss);
+    _cursorId = std::move(other._cursorId);
+    _batch = std::move(other._batch);
+    _numReturnedSoFar = std::move(other._numReturnedSoFar);
     return *this;
 }
 #endif
