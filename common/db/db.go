@@ -29,8 +29,7 @@ const (
 
 // MongoDB enforced limits.
 const (
-	MaxBSONSize    = 16 * 1024 * 1024     // 16MB - maximum BSON document size
-	MaxMessageSize = 2 * 16 * 1024 * 1024 // 32MB - maximum message size in wire protocol
+	MaxBSONSize = 16 * 1024 * 1024 // 16MB - maximum BSON document size
 )
 
 // Default port for integration tests
