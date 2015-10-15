@@ -471,9 +471,14 @@ env.Library(
 )
 
 env.Library(
-    target="coredb",
+    target="audit",
     source=[
         "audit.cpp",
+    ])
+
+env.Library(
+    target="coredb",
+    source=[
         "commands.cpp",
         "commands/authentication_commands.cpp",
         "commands/conn_pool_stats.cpp",
@@ -503,6 +508,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/processinfo',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
+        'audit',
         'auth/authcommon',
         'auth/authorization_manager_global',
         'auth/serverauth',

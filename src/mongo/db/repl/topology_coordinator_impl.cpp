@@ -34,6 +34,8 @@
 
 #include <limits>
 
+#include "mongo/db/audit.h"
+#include "mongo/db/client_basic.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/is_master_response.h"
@@ -1886,6 +1888,10 @@ void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig,
 
     _updateHeartbeatDataForReconfig(newConfig, selfIndex, now);
     _stepDownPending = false;
+    BSONObj oldConfigObjForAudit = _rsConfig.toBSON();
+    BSONObj newConfigObjForAudit = newConfig.toBSON();
+    audit::logReplSetReconfig(
+        ClientBasic::getCurrent(), &oldConfigObjForAudit, &newConfigObjForAudit);
     _rsConfig = newConfig;
     _selfIndex = selfIndex;
     _forceSyncSourceIndex = -1;

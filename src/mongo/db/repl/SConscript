@@ -237,6 +237,7 @@ env.Library('topology_coordinator_impl',
                 'topology_coordinator_impl.cpp',
             ],
             LIBDEPS=[
+                '$BUILD_DIR/mongo/db/audit',
                 'replication_executor',
                 'replica_set_messages',
                 'repl_settings',
