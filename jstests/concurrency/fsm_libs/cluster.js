@@ -11,6 +11,7 @@ var Cluster = function(options) {
 
     function validateClusterOptions(options) {
         var allowedKeys = [
+            'enableBalancer',
             'masterSlave',
             'replication',
             'sameCollection',
@@ -25,6 +26,9 @@ var Cluster = function(options) {
                 'invalid option: ' + tojson(option) +
                 '; valid options are: ' + tojson(allowedKeys));
         });
+
+        options.enableBalancer = options.enableBalancer || false;
+        assert.eq('boolean', typeof options.enableBalancer);
 
         options.masterSlave = options.masterSlave || false;
         assert.eq('boolean', typeof options.masterSlave);
@@ -96,7 +100,8 @@ var Cluster = function(options) {
                 mongos: 2,
                 // Legacy config servers are pre-3.2 style, 3-node non-replica-set config servers
                 sync: options.useLegacyConfigServers,
-                verbose: verbosityLevel
+                verbose: verbosityLevel,
+                other: { enableBalancer: options.enableBalancer }
             };
 
             // TODO: allow 'options' to specify an 'rs' config
@@ -376,6 +381,49 @@ var Cluster = function(options) {
 
                 var totalTime = Date.now() - startTime;
                 jsTest.log(primary.host + ': awaitReplication completed in ' + totalTime + ' ms');
+            });
+        }
+    };
+
+    this.increaseDropDistLockTimeout = function increaseDropDistLockTimeout() {
+        assert(this.isSharded(), 'cluster is not sharded');
+
+        var waitTime = 600; // in seconds, i.e. 10 minutes
+        if (options.useLegacyConfigServers) {
+            this.executeOnMongosNodes(function(db) {
+                assert.commandWorked(db.runCommand({
+                    configureFailPoint: 'setSCCCDropCollDistLockWait',
+                    mode: 'alwaysOn',
+                    data: { waitForSecs: waitTime }
+                }));
+            });
+        } else {
+            this.executeOnMongosNodes(function(db) {
+                assert.commandWorked(db.runCommand({
+                    configureFailPoint: 'setDropCollDistLockWait',
+                    mode: 'alwaysOn',
+                    data: { waitForSecs: waitTime }
+                }));
+            });
+        }
+    };
+
+    this.resetDropDistLockTimeout = function resetDropDistLockTimeout() {
+        assert(this.isSharded(), 'cluster is not sharded');
+
+        if (options.useLegacyConfigServers) {
+            this.executeOnMongosNodes(function(db) {
+                assert.commandWorked(db.runCommand({
+                    configureFailPoint: 'setSCCCDropCollDistLockWait',
+                    mode: 'off'
+                }));
+            });
+        } else {
+            this.executeOnMongosNodes(function(db) {
+                assert.commandWorked(db.runCommand({
+                    configureFailPoint: 'setDropCollDistLockWait',
+                    mode: 'off'
+                }));
             });
         }
     };
