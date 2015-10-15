@@ -350,6 +350,15 @@ public:
                                                                  bool* success);
 
     /**
+     * Non-blocking version of updateTerm.
+     * Returns callback handle that we can use to wait for the operation to complete.
+     * When the operation is complete (wait() returns), 'updated' will be set to true
+     * if the term increased.
+     */
+    StatusWith<ReplicationExecutor::CallbackHandle> updateTerm_nonBlocking(long long term,
+                                                                           bool* updated);
+
+    /**
      * Waits until _memberState becomes 'expectedState'.
      */
     void waitForMemberState_forTest(const MemberState& expectedState);

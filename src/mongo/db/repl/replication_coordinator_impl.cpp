@@ -3055,7 +3055,8 @@ void ReplicationCoordinatorImpl::_getTerm_helper(const ReplicationExecutor::Call
     *term = _topCoord->getTerm();
 }
 
-Status ReplicationCoordinatorImpl::updateTerm(long long term) {
+StatusWith<ReplicationExecutor::CallbackHandle> ReplicationCoordinatorImpl::updateTerm_nonBlocking(
+    long long term, bool* updated) {
     // Term is only valid if we are replicating.
     if (getReplicationMode() != modeReplSet) {
         return {ErrorCodes::BadValue, "cannot supply 'term' without active replication"};
@@ -3066,10 +3067,21 @@ Status ReplicationCoordinatorImpl::updateTerm(long long term) {
         return Status::OK();
     }
 
-    bool updated = false;
     auto work =
-        [this, term, &updated](const CallbackArgs&) { updated = _updateTerm_incallback(term); };
-    _scheduleWorkAndWaitForCompletion(work);
+        [this, term, updated](const CallbackArgs&) { *updated = _updateTerm_incallback(term); };
+    return _scheduleWork(work);
+}
+
+Status ReplicationCoordinatorImpl::updateTerm(long long term) {
+    bool updated = false;
+    auto result = updateTerm_nonBlocking(term, &updated);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+    auto handle = result.getValue();
+    if (handle.isValid()) {
+        _replExecutor.wait(handle);
+    }
 
     if (updated) {
         return {ErrorCodes::StaleTerm, "Replication term of this node was stale; retry query"};
@@ -3092,7 +3104,7 @@ bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term) {
     }
 
     if (updated && getMemberState().primary()) {
-        log() << "stepping down from primary, because a new term has begun";
+        log() << "stepping down from primary, because a new term has begun: " << term;
         _topCoord->prepareForStepDown();
         _stepDownStart();
     }
