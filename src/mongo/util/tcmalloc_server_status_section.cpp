@@ -64,8 +64,8 @@ void threadStateChange() {
 // Register threadStateChange callback
 MONGO_INITIALIZER(TCMallocThreadIdleListener)(InitializerContext*) {
     registerThreadIdleCallback(&threadStateChange);
-    MallocExtension::instance()->GetNumericProperty("tcmalloc.max_total_thread_cache_bytes",
-                                                    &tcmallocPoolSize);
+    invariant(MallocExtension::instance()->GetNumericProperty(
+        "tcmalloc.max_total_thread_cache_bytes", &tcmallocPoolSize));
     LOG(1) << "tcmallocPoolSize: " << tcmallocPoolSize << "\n";
     return Status::OK();
 }
