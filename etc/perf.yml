@@ -25,14 +25,14 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${build_variant}/${revision}/mongod-${build_id}
+        remote_file: perf/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         local_file: src/mongod
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${build_variant}/${revision}/mongo-${build_id}
+        remote_file: perf/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         local_file: src/mongo
     - command: shell.exec
@@ -64,7 +64,7 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${build_variant}/${revision}/compare.py-${build_id}
+        remote_file: perf/${version_id}/${revision}/compare.py-${version_id}
         bucket: mciuploads
         local_file: src/compare.py
     - command: json.get
@@ -94,14 +94,14 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${build_variant}/${revision}/perf_regression_check.py-${build_id}
+        remote_file: perf/${version_id}/${revision}/perf_regression_check.py-${version_id}
         bucket: mciuploads
         local_file: src/perf_regression_check.py
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${build_variant}/${revision}/override.json-${build_id}
+        remote_file: perf/${version_id}/${revision}/override.json-${version_id}
         bucket: mciuploads
         local_file: src/override.json
     - command: shell.exec
@@ -181,7 +181,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongod
-        remote_file: perf/${build_variant}/${revision}/mongod-${build_id}
+        remote_file: perf/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -191,7 +191,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongo
-        remote_file: perf/${build_variant}/${revision}/mongo-${build_id}
+        remote_file: perf/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -201,7 +201,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/buildscripts/perf_regression_check.py
-        remote_file: perf/${build_variant}/${revision}/perf_regression_check.py-${build_id}
+        remote_file: perf/${version_id}/${revision}/perf_regression_check.py-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -211,7 +211,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/buildscripts/compare.py
-        remote_file: perf/${build_variant}/${revision}/compare.py-${build_id}
+        remote_file: perf/${version_id}/${revision}/compare.py-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -221,7 +221,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/etc/override.json
-        remote_file: perf/${build_variant}/${revision}/override.json-${build_id}
+        remote_file: perf/${version_id}/${revision}/override.json-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -229,7 +229,8 @@ tasks:
 
 - name: query
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -241,7 +242,8 @@ tasks:
     - func: "analyze"
 - name: where
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -253,7 +255,8 @@ tasks:
     - func: "analyze"
 - name: update
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -265,7 +268,8 @@ tasks:
     - func: "analyze"
 - name: insert
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -277,7 +281,8 @@ tasks:
     - func: "analyze"
 - name: geo
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -289,7 +294,8 @@ tasks:
     - func: "analyze"
 - name: misc
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -301,7 +307,8 @@ tasks:
     - func: "analyze"
 - name: singleThreaded
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -314,6 +321,7 @@ tasks:
 - name: singleThreaded-wt-repl-comp
   depends_on:
     - name : compile
+      variant : linux-wt-standalone
     - name : singleThreaded
       variant : linux-wt-standalone
     - name : singleThreaded
@@ -327,6 +335,7 @@ tasks:
 - name: insert-wt-repl-comp
   depends_on:
     - name : compile
+      variant : linux-wt-standalone
     - name : insert
       variant : linux-wt-standalone
     - name : insert
@@ -341,6 +350,7 @@ tasks:
 - name: update-wt-repl-comp
   depends_on:
     - name : compile
+      variant : linux-wt-standalone
     - name : update
       variant : linux-wt-standalone
     - name : update
@@ -355,6 +365,7 @@ tasks:
 - name: misc-wt-repl-comp
   depends_on:
     - name : compile
+      variant : linux-wt-standalone
     - name : misc
       variant : linux-wt-standalone
     - name : misc
@@ -369,6 +380,7 @@ tasks:
 - name: singleThreaded-mmap-repl-comp
   depends_on:
     - name : compile
+      variant : linux-wt-standalone
     - name : singleThreaded
       variant : linux-mmap-standalone
     - name : singleThreaded
@@ -382,6 +394,7 @@ tasks:
 - name: insert-mmap-repl-comp
   depends_on:
     - name : compile
+      variant : linux-wt-standalone
     - name : insert
       variant : linux-mmap-standalone
     - name : insert
@@ -396,6 +409,7 @@ tasks:
 - name: update-mmap-repl-comp
   depends_on:
     - name : compile
+      variant : linux-wt-standalone
     - name : update
       variant : linux-mmap-standalone
     - name : update
@@ -410,6 +424,7 @@ tasks:
 - name: misc-mmap-repl-comp
   depends_on:
     - name : compile
+      variant : linux-wt-standalone
     - name : misc
       variant : linux-mmap-standalone
     - name : misc
@@ -458,9 +473,6 @@ buildvariants:
   run_on:
   - "centos6-perf"
   tasks:
-  - name: compile
-    distros:
-    - rhel55
   - name: query
   - name: where
   - name: update
@@ -481,9 +493,6 @@ buildvariants:
   run_on:
   - "centos6-perf"
   tasks:
-  - name: compile
-    distros:
-    - rhel55
   - name: update
   - name: insert
   - name: misc
@@ -501,9 +510,6 @@ buildvariants:
   run_on:
   - "centos6-perf"
   tasks:
-  - name: compile
-    distros:
-    - rhel55
   - name: update
   - name: insert
   - name: misc
@@ -521,9 +527,6 @@ buildvariants:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
   tasks:
-  - name: compile
-    distros:
-      - rhel55
   - name: singleThreaded-wt-repl-comp
   - name: insert-wt-repl-comp
   - name: update-wt-repl-comp
@@ -541,9 +544,6 @@ buildvariants:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
   tasks:
-  - name: compile
-    distros:
-      - rhel55
   - name: singleThreaded-mmap-repl-comp
   - name: insert-mmap-repl-comp
   - name: update-mmap-repl-comp
