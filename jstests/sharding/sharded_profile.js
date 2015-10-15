@@ -25,11 +25,10 @@ var inserts = [{ _id: 0 }, { _id: 1 }, { _id: 2 }];
 
 assert.writeOK(st.s1.getCollection(coll.toString()).insert(inserts));
 
-printjson(profileColl.find().toArray());
-
-for (var i = 0; i < inserts.length; i++) {
-    assert.neq(null, profileColl.findOne({ 'query._id': i }));
-}
+profileEntry = profileColl.findOne();
+assert.neq(null, profileEntry);
+printjson(profileEntry);
+assert.eq(profileEntry.query.documents, inserts);
 
 st.stop();
 

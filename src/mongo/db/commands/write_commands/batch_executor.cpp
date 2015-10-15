@@ -507,28 +507,17 @@ static void beginCurrentOp(OperationContext* txn, const BatchItemRef& currWrite)
     }
 }
 
-void WriteBatchExecutor::incOpStats(const BatchItemRef& currWrite) {
-    if (currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert) {
-        _opCounters->gotInsert();
-    } else if (currWrite.getOpType() == BatchedCommandRequest::BatchType_Update) {
-        _opCounters->gotUpdate();
-    } else {
-        dassert(currWrite.getOpType() == BatchedCommandRequest::BatchType_Delete);
-        _opCounters->gotDelete();
-    }
-}
-
-void WriteBatchExecutor::incWriteStats(const BatchItemRef& currWrite,
+void WriteBatchExecutor::incWriteStats(const BatchedCommandRequest::BatchType opType,
                                        const WriteOpStats& stats,
                                        const WriteErrorDetail* error,
                                        CurOp* currentOp) {
-    if (currWrite.getOpType() == BatchedCommandRequest::BatchType_Insert) {
+    if (opType == BatchedCommandRequest::BatchType_Insert) {
         _stats->numInserted += stats.n;
         currentOp->debug().ninserted += stats.n;
         if (!error) {
             _le->recordInsert(stats.n);
         }
-    } else if (currWrite.getOpType() == BatchedCommandRequest::BatchType_Update) {
+    } else if (opType == BatchedCommandRequest::BatchType_Update) {
         if (stats.upsertedID.isEmpty()) {
             _stats->numMatched += stats.n;
             _stats->numModified += stats.nModified;
@@ -540,7 +529,7 @@ void WriteBatchExecutor::incWriteStats(const BatchItemRef& currWrite,
             _le->recordUpdate(stats.upsertedID.isEmpty() && stats.n > 0, stats.n, stats.upsertedID);
         }
     } else {
-        dassert(currWrite.getOpType() == BatchedCommandRequest::BatchType_Delete);
+        dassert(opType == BatchedCommandRequest::BatchType_Delete);
         _stats->numDeleted += stats.n;
         if (!error) {
             _le->recordDelete(stats.n);
@@ -551,6 +540,15 @@ void WriteBatchExecutor::incWriteStats(const BatchItemRef& currWrite,
     if (error) {
         _le->setLastError(error->getErrCode(), error->getErrMessage().c_str());
     }
+}
+
+static void logCurOpError(CurOp* currentOp, WriteErrorDetail* opError) {
+    invariant(opError != nullptr);
+    currentOp->debug().exceptionInfo =
+        ExceptionInfo(opError->getErrMessage(), opError->getErrCode());
+
+    LOG(3) << " Caught Assertion in " << opToString(currentOp->getNetworkOp()) << ", continuing "
+           << causedBy(opError->getErrMessage());
 }
 
 static void finishCurrentOp(OperationContext* txn, WriteErrorDetail* opError) {
@@ -565,13 +563,8 @@ static void finishCurrentOp(OperationContext* txn, WriteErrorDetail* opError) {
                 currentOp->totalTimeMicros(),
                 currentOp->isCommand());
 
-    if (opError) {
-        currentOp->debug().exceptionInfo =
-            ExceptionInfo(opError->getErrMessage(), opError->getErrCode());
-
-        LOG(3) << " Caught Assertion in " << opToString(currentOp->getNetworkOp())
-               << ", continuing " << causedBy(opError->getErrMessage());
-    }
+    if (opError)
+        logCurOpError(currentOp, opError);
 
     bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kWrite,
                                                        logger::LogSeverity::Debug(1));
@@ -763,6 +756,8 @@ static void normalizeInserts(const BatchedCommandRequest& request,
     }
 }
 
+static void insertOne(WriteBatchExecutor::ExecInsertsState* state, WriteOpResult* result);
+
 void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
                                      std::vector<WriteErrorDetail*>* errors) {
     // Theory of operation:
@@ -787,13 +782,20 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
     ExecInsertsState state(_txn, &request);
     normalizeInserts(request, &state.normalizedInserts);
 
+    CurOp* currentOp;
+    {
+        stdx::lock_guard<Client> lk(*_txn->getClient());
+        currentOp = CurOp::get(_txn);
+        currentOp->setLogicalOp_inlock(dbInsert);
+        currentOp->ensureStarted();
+        currentOp->setNS_inlock(request.getNS().ns());
+    }
+    WriteOpResult result;
     // Yield frequency is based on the same constants used by PlanYieldPolicy.
     ElapsedTracker elapsedTracker(internalQueryExecYieldIterations, internalQueryExecYieldPeriodMS);
-
     for (state.currIndex = 0; state.currIndex < state.request->sizeWriteOps(); ++state.currIndex) {
-        if (state.currIndex + 1 == state.request->sizeWriteOps()) {
+        if (state.currIndex + 1 == state.request->sizeWriteOps())
             setupSynchronousCommit(_txn);
-        }
 
         if (elapsedTracker.intervalHasElapsed()) {
             // Yield between inserts.
@@ -812,13 +814,32 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
             elapsedTracker.resetLastTime();
         }
 
-        WriteErrorDetail* error = NULL;
-        execOneInsert(&state, &error);
-        if (error) {
+        BatchItemRef currInsertItem(state.request, state.currIndex);
+        {
+            stdx::lock_guard<Client> lk(*_txn->getClient());
+            currentOp->setQuery_inlock(currInsertItem.getDocument());
+            currentOp->debug().query = currInsertItem.getDocument();
+            currentOp->debug().ninserted = 0;
+        }
+
+        _opCounters->gotInsert();
+        insertOne(&state, &result);
+
+        incWriteStats(BatchedCommandRequest::BatchType_Insert,
+                      result.getStats(),
+                      result.getError(),
+                      currentOp);
+        result.getStats().n = 0;
+
+        if (result.getError()) {
+            WriteErrorDetail* error = NULL;
+            error = result.releaseError();
             errors->push_back(error);
             error->setIndex(state.currIndex);
+            CurOp* const currentOp = CurOp::get(_txn);
+            logCurOpError(currentOp, error);
             if (request.getOrdered())
-                return;
+                break;
         }
     }
 }
@@ -829,7 +850,7 @@ void WriteBatchExecutor::execUpdate(const BatchItemRef& updateItem,
     // BEGIN CURRENT OP
     CurOp currentOp(_txn);
     beginCurrentOp(_txn, updateItem);
-    incOpStats(updateItem);
+    _opCounters->gotUpdate();
 
     WriteOpResult result;
     multiUpdate(_txn, updateItem, &result);
@@ -838,7 +859,7 @@ void WriteBatchExecutor::execUpdate(const BatchItemRef& updateItem,
         *upsertedId = result.getStats().upsertedID;
     }
     // END CURRENT OP
-    incWriteStats(updateItem, result.getStats(), result.getError(), &currentOp);
+    incWriteStats(updateItem.getOpType(), result.getStats(), result.getError(), &currentOp);
     finishCurrentOp(_txn, result.getError());
 
     // End current transaction and release snapshot.
@@ -856,13 +877,13 @@ void WriteBatchExecutor::execRemove(const BatchItemRef& removeItem, WriteErrorDe
     // BEGIN CURRENT OP
     CurOp currentOp(_txn);
     beginCurrentOp(_txn, removeItem);
-    incOpStats(removeItem);
+    _opCounters->gotDelete();
 
     WriteOpResult result;
     multiRemove(_txn, removeItem, &result);
 
     // END CURRENT OP
-    incWriteStats(removeItem, result.getStats(), result.getError(), &currentOp);
+    incWriteStats(removeItem.getOpType(), result.getStats(), result.getError(), &currentOp);
     finishCurrentOp(_txn, result.getError());
 
     // End current transaction and release snapshot.
@@ -987,7 +1008,7 @@ static void insertOne(WriteBatchExecutor::ExecInsertsState* state, WriteOpResult
                     Status status = state->getCollection()->insertDocument(txn, insertDoc, true);
 
                     if (status.isOK()) {
-                        result->getStats().n = 1;
+                        result->getStats().n++;
                         wunit.commit();
                     } else {
                         result->setError(toWriteError(status));
@@ -1013,23 +1034,6 @@ static void insertOne(WriteBatchExecutor::ExecInsertsState* state, WriteOpResult
     if (result->getError()) {
         txn->recoveryUnit()->abandonSnapshot();
         state->unlock();
-    }
-}
-
-void WriteBatchExecutor::execOneInsert(ExecInsertsState* state, WriteErrorDetail** error) {
-    BatchItemRef currInsertItem(state->request, state->currIndex);
-    CurOp currentOp(_txn);
-    beginCurrentOp(_txn, currInsertItem);
-    incOpStats(currInsertItem);
-
-    WriteOpResult result;
-    insertOne(state, &result);
-
-    incWriteStats(currInsertItem, result.getStats(), result.getError(), &currentOp);
-    finishCurrentOp(_txn, result.getError());
-
-    if (result.getError()) {
-        *error = result.releaseError();
     }
 }
 

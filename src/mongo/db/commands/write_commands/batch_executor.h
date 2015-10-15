@@ -93,11 +93,6 @@ private:
     void execInserts(const BatchedCommandRequest& request, std::vector<WriteErrorDetail*>* errors);
 
     /**
-     * Executes a single insert from a batch, described in the opaque "state" object.
-     */
-    void execOneInsert(ExecInsertsState* state, WriteErrorDetail** error);
-
-    /**
      * Executes an update item (which may update many documents or upsert), and returns the
      * upserted _id on upsert or error on failure.
      *
@@ -115,19 +110,12 @@ private:
     void execRemove(const BatchItemRef& removeItem, WriteErrorDetail** error);
 
     /**
-     * Helper for incrementing stats on the next CurOp.
-     *
-     * No lock requirements.
-     */
-    void incOpStats(const BatchItemRef& currWrite);
-
-    /**
      * Helper for incrementing stats after each individual write op.
      *
      * No lock requirements (though usually done inside write lock to make stats update look
      * atomic).
      */
-    void incWriteStats(const BatchItemRef& currWrite,
+    void incWriteStats(const BatchedCommandRequest::BatchType opType,
                        const WriteOpStats& stats,
                        const WriteErrorDetail* error,
                        CurOp* currentOp);
