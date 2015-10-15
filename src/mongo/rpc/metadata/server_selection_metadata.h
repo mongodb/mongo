@@ -119,6 +119,11 @@ public:
      */
     const boost::optional<ReadPreferenceSetting>& getReadPreference() const;
 
+    /**
+     * Returns true if this operation can run on secondary.
+     */
+    bool canRunOnSecondary() const;
+
     ServerSelectionMetadata(bool secondaryOk,
                             boost::optional<ReadPreferenceSetting> readPreference);
 

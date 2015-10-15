@@ -1206,12 +1206,7 @@ void Command::execCommand(OperationContext* txn,
             bool commandCanRunOnSecondary = command->slaveOk();
 
             bool commandIsOverriddenToRunOnSecondary = command->slaveOverrideOk() &&
-
-                // The $secondaryOk option is set.
-                (rpc::ServerSelectionMetadata::get(txn).isSecondaryOk() ||
-
-                 // Or the command has a read preference (may be incorrect, see SERVER-18194).
-                 (rpc::ServerSelectionMetadata::get(txn).getReadPreference() != boost::none));
+                rpc::ServerSelectionMetadata::get(txn).canRunOnSecondary();
 
             bool iAmStandalone = !txn->writesAreReplicated();
             bool canRunHere = iAmPrimary || commandCanRunOnSecondary ||

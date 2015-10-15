@@ -142,8 +142,7 @@ public:
         bool commandCanRunOnSecondary = commToExplain->slaveOk();
 
         bool commandIsOverriddenToRunOnSecondary = commToExplain->slaveOverrideOk() &&
-            (rpc::ServerSelectionMetadata::get(txn).isSecondaryOk() ||
-             rpc::ServerSelectionMetadata::get(txn).getReadPreference() != boost::none);
+            rpc::ServerSelectionMetadata::get(txn).canRunOnSecondary();
         bool iAmStandalone = !txn->writesAreReplicated();
 
         const bool canRunHere = iAmPrimary || commandCanRunOnSecondary ||

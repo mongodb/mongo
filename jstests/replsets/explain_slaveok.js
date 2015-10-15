@@ -120,7 +120,7 @@ explainOut = secondary.getDB("test").explain_slaveok.explain("executionStats")
 assert.commandWorked(explainOut, "explain .find() on secondary, slaveOk set to true");
 
 // Explain .find() on a secondary, setting slaveOk to false with various read preferences.
-var readPrefModes = ["primary", "secondary", "secondaryPreferred", "primaryPreferred", "nearest"];
+var readPrefModes = ["secondary", "secondaryPreferred", "primaryPreferred", "nearest"];
 readPrefModes.forEach(function(prefString) {
     secondary.getDB("test").getMongo().setSlaveOk(false);
     explainOut = secondary.getDB("test").explain_slaveok.explain("executionStats")
@@ -142,6 +142,31 @@ readPrefModes.forEach(function(prefString) {
     // Unset read pref on the connection.
     secondary.setReadPref();
 });
+
+// Fail explain find() on a secondary, setting slaveOk to false with read preference set to primary.
+var prefStringPrimary = "primary";
+secondary.getDB("test").getMongo().setSlaveOk(false);
+explainOut = secondary.getDB("test").runCommand({
+    explain: {
+        find: "explain_slaveok",
+        query: {a: 1}
+    },
+    verbosity: "executionStats"
+});
+assert.commandFailed(explainOut, "not master and slaveOk=false");
+
+// Similarly should fail if a read preference is set on the connection.
+secondary.setReadPref(prefStringPrimary);
+explainOut = secondary.getDB("test").runCommand({
+    explain: {
+        find: "explain_slaveok",
+        query: {a: 1}
+    },
+    verbosity: "executionStats"
+});
+assert.commandFailed(explainOut, "not master and slaveOk=false");
+// Unset read pref on the connection.
+secondary.setReadPref();
 
 // Explain an update on the secondary with slaveOk off. Should fail because
 // slaveOk is required for explains on a secondary.

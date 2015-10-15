@@ -264,6 +264,11 @@ const boost::optional<ReadPreferenceSetting>& ServerSelectionMetadata::getReadPr
     return _readPreference;
 }
 
+bool ServerSelectionMetadata::canRunOnSecondary() const {
+    return _secondaryOk ||
+        (_readPreference && (_readPreference->pref != ReadPreference::PrimaryOnly));
+}
+
 #if defined(_MSC_VER) && _MSC_VER < 1900
 ServerSelectionMetadata::ServerSelectionMetadata(ServerSelectionMetadata&& ssm)
     : _secondaryOk(ssm._secondaryOk), _readPreference(std::move(ssm._readPreference)) {}
