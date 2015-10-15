@@ -33,14 +33,14 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf-3.0/${build_variant}/${revision}/mongod-${build_id}
+        remote_file: perf-3.0/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         local_file: src/mongod
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf-3.0/${build_variant}/${revision}/mongo-${build_id}
+        remote_file: perf-3.0/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         local_file: src/mongo
     - command: shell.exec
@@ -78,7 +78,7 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf-3.0/${build_variant}/${revision}/perf_regression_check.py-${build_id}
+        remote_file: perf-3.0/${version_id}/${revision}/perf_regression_check.py-${version_id}
         bucket: mciuploads
         local_file: src/perf_regression_check.py
     - command: shell.exec
@@ -158,7 +158,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongod
-        remote_file: perf-3.0/${build_variant}/${revision}/mongod-${build_id}
+        remote_file: perf-3.0/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -168,7 +168,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongo
-        remote_file: perf-3.0/${build_variant}/${revision}/mongo-${build_id}
+        remote_file: perf-3.0/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -178,7 +178,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/buildscripts/perf_regression_check.py
-        remote_file: perf-3.0/${build_variant}/${revision}/perf_regression_check.py-${build_id}
+        remote_file: perf-3.0/${version_id}/${revision}/perf_regression_check.py-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -186,7 +186,8 @@ tasks:
 
 - name: query
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -198,7 +199,8 @@ tasks:
     - func: "analyze"
 - name: where
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -210,7 +212,8 @@ tasks:
     - func: "analyze"
 - name: update
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -222,7 +225,8 @@ tasks:
     - func: "analyze"
 - name: insert
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -234,7 +238,8 @@ tasks:
     - func: "analyze"
 - name: geo
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -246,7 +251,8 @@ tasks:
     - func: "analyze"
 - name: misc
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -258,7 +264,8 @@ tasks:
     - func: "analyze"
 - name: singleThreaded
   depends_on:
-  - name: compile
+  - variant: linux-wt-standalone
+    name: compile
   commands:
     - func: "start server"
     - func: "run perf tests"
@@ -268,7 +275,7 @@ tasks:
         excludeFilter : "none"
         threads : "1"
     - func: "analyze"
-
+ 
 buildvariants:
 - name: linux-wt-standalone
   display_name: Standalone Linux WT
@@ -305,9 +312,6 @@ buildvariants:
   run_on:
   - "centos6-perf"
   tasks:
-  - name: compile
-    distros:
-    - rhel55
   - name: query
   - name: where
   - name: update
@@ -328,9 +332,6 @@ buildvariants:
   run_on:
   - "centos6-perf"
   tasks:
-  - name: compile
-    distros:
-    - rhel55
   - name: update
   - name: insert
   - name: misc
@@ -348,9 +349,6 @@ buildvariants:
   run_on:
   - "centos6-perf"
   tasks:
-  - name: compile
-    distros:
-    - rhel55
   - name: update
   - name: insert
   - name: misc
