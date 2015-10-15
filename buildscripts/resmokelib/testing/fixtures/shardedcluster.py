@@ -74,14 +74,18 @@ class ShardedClusterFixture(interface.Fixture):
 
     def setup(self):
         if self.separate_configsvr:
-            self.configsvr = self._new_configsvr()
+            if self.configsvr is None:
+                self.configsvr = self._new_configsvr()
             self.configsvr.setup()
 
+        if not self.shards:
+            for i in xrange(self.num_shards):
+                shard = self._new_shard(i)
+                self.shards.append(shard)
+
         # Start up each of the shards
-        for i in xrange(self.num_shards):
-            shard = self._new_shard(i)
+        for shard in self.shards:
             shard.setup()
-            self.shards.append(shard)
 
     def await_ready(self):
         # Wait for the config server
@@ -92,8 +96,10 @@ class ShardedClusterFixture(interface.Fixture):
         for shard in self.shards:
             shard.await_ready()
 
+        if self.mongos is None:
+            self.mongos = self._new_mongos()
+
         # Start up the mongos
-        self.mongos = self._new_mongos()
         self.mongos.setup()
 
         # Wait for the mongos

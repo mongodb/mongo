@@ -60,10 +60,13 @@ class ReplicaSetFixture(interface.ReplFixture):
     def setup(self):
         self.replset_name = self.mongod_options.get("replSet", "rs")
 
-        for i in xrange(self.num_nodes):
-            node = self._new_mongod(i, self.replset_name)
+        if not self.nodes:
+            for i in xrange(self.num_nodes):
+                node = self._new_mongod(i, self.replset_name)
+                self.nodes.append(node)
+
+        for node in self.nodes:
             node.setup()
-            self.nodes.append(node)
 
         self.port = self.get_primary().port
 
