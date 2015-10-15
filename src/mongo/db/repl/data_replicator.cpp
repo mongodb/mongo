@@ -499,6 +499,11 @@ void DatabasesCloner::_doNextActions() {
 }
 
 void DatabasesCloner::_failed() {
+    if (!_active) {
+        return;
+    }
+    _active = false;
+
     // TODO: cancel outstanding work, like any cloners active
     invariant(_finishFn);
     _finishFn(_status);
