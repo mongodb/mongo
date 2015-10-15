@@ -910,17 +910,13 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* t
         cmdToRun = modifiedCmd.obj();
     }
 
-    auto scopedDistLock =
-        getDistLockManager()->lock(txn, "authorizationData", commandName, Seconds{5});
-    if (!scopedDistLock.isOK()) {
-        return Command::appendCommandStatus(*result, scopedDistLock.getStatus());
-    }
-
     auto response =
         grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, dbname, cmdToRun);
+
     if (!response.isOK()) {
         return Command::appendCommandStatus(*result, response.getStatus());
     }
+
     result->appendElements(response.getValue());
     return Command::getStatusFromCommandResult(response.getValue()).isOK();
 }

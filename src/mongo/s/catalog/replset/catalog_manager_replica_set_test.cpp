@@ -646,43 +646,8 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommandUnsatisfiedReadPre
     ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference, commandStatus);
 }
 
-TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandDistLockHeld) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
-
-    distLock()->expectLock(
-        [](StringData name,
-           StringData whyMessage,
-           milliseconds waitFor,
-           milliseconds lockTryInterval) {
-            ASSERT_EQUALS("authorizationData", name);
-            ASSERT_EQUALS("dropUser", whyMessage);
-        },
-        Status(ErrorCodes::LockBusy, "lock already held"));
-
-    BSONObjBuilder responseBuilder;
-    bool ok = catalogManager()->runUserManagementWriteCommand(operationContext(),
-                                                              "dropUser",
-                                                              "test",
-                                                              BSON("dropUser"
-                                                                   << "test"),
-                                                              &responseBuilder);
-    ASSERT_FALSE(ok);
-    BSONObj response = responseBuilder.obj();
-    ASSERT_EQUALS(ErrorCodes::LockBusy, Command::getStatusFromCommandResult(response));
-}
-
 TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandSuccess) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
-
-    distLock()->expectLock(
-        [](StringData name,
-           StringData whyMessage,
-           milliseconds waitFor,
-           milliseconds lockTryInterval) {
-            ASSERT_EQUALS("authorizationData", name);
-            ASSERT_EQUALS("dropUser", whyMessage);
-        },
-        Status::OK());
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
@@ -795,16 +760,6 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandRewriteWriteConce
 TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMaster) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    distLock()->expectLock(
-        [](StringData name,
-           StringData whyMessage,
-           milliseconds waitFor,
-           milliseconds lockTryInterval) {
-            ASSERT_EQUALS("authorizationData", name);
-            ASSERT_EQUALS("dropUser", whyMessage);
-        },
-        Status::OK());
-
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
         bool ok = catalogManager()->runUserManagementWriteCommand(operationContext(),
@@ -836,18 +791,7 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementWriteCommandNotMasterRetrySuc
     HostAndPort host1("TestHost1");
     HostAndPort host2("TestHost2");
 
-
     configTargeter()->setFindHostReturnValue(host1);
-
-    distLock()->expectLock(
-        [](StringData name,
-           StringData whyMessage,
-           milliseconds waitFor,
-           milliseconds lockTryInterval) {
-            ASSERT_EQUALS("authorizationData", name);
-            ASSERT_EQUALS("dropUser", whyMessage);
-        },
-        Status::OK());
 
     auto future = launchAsync([this] {
         BSONObjBuilder responseBuilder;
