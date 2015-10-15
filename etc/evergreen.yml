@@ -615,6 +615,8 @@ tasks:
 
 - <<: *task_template
   name: aggregation_auth
+  depends_on:
+  - name: aggregation_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -866,6 +868,8 @@ tasks:
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough
+  depends_on:
+  - name: gle_auth_basics_passthrough
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -875,6 +879,8 @@ tasks:
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_WT
+  depends_on:
+  - name: gle_auth_basics_passthrough_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -884,6 +890,8 @@ tasks:
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_write_cmd
+  depends_on:
+  - name: gle_auth_basics_passthrough_write_cmd
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -893,6 +901,8 @@ tasks:
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  depends_on:
+  - name: gle_auth_basics_passthrough_write_cmd_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1240,7 +1250,7 @@ tasks:
 - <<: *task_template
   name: parallel_compatibility
   depends_on:
-  - name: jsCore
+  - name: jsCore_compatibility
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1250,7 +1260,7 @@ tasks:
 - <<: *task_template
   name: parallel_compatibility_WT
   depends_on:
-  - name: jsCore_WT
+  - name: jsCore_compatibility_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1325,6 +1335,8 @@ tasks:
 
 - <<: *task_template
   name: read_concern_majority_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1403,6 +1415,8 @@ tasks:
 
 - <<: *task_template
   name: replication_auth
+  depends_on:
+  - name: replication_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -2291,6 +2305,7 @@ buildvariants:
     distros:
     - rhel55
   - name: aggregation
+  - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
   - name: dbtest
@@ -2318,6 +2333,7 @@ buildvariants:
   - name: replicasets
   - name: replicasets_auth
   - name: replication
+  - name: replication_WT
   - name: replication_auth
   - name: sharding
   - name: sharding_auth
@@ -2599,6 +2615,7 @@ buildvariants:
     - linux-64-amzn-build
   - name: lint
   - name: aggregation_auth
+  - name: aggregation_WT
   - name: audit
   - name: audit_WT
   - name: auth
@@ -2624,6 +2641,7 @@ buildvariants:
   - name: replicasets_auth
   - name: replicasets_WT_ese
   - name: replication_auth
+  - name: replication_WT
   - name: sasl
   - name: sharding_auth
   - name: sharding_auth_audit_WT
@@ -4427,6 +4445,7 @@ buildvariants:
     - ubuntu1404-build
   # - name: lint
   - name: aggregation
+  - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
   - name: dbtest
@@ -4458,6 +4477,7 @@ buildvariants:
   - name: replicasets
   - name: replicasets_auth
   - name: replication
+  - name: replication_WT
   - name: replication_auth
   - name: sharding
   - name: sharding_auth
