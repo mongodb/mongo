@@ -104,12 +104,14 @@ TEST(FTDCFileManagerTest, TestFull) {
     for (auto& file : files) {
         int fs = boost::filesystem::file_size(file);
         ASSERT_TRUE(fs < c.maxFileSizeBytes * 1.10);
+        unittest::log() << "File " << file.generic_string() << " has size " << fs;
         if (file.generic_string().find("interim") == std::string::npos) {
             sum += fs;
         }
     }
 
-    ASSERT_TRUE(sum < c.maxDirectorySizeBytes * 1.10 && sum > c.maxDirectorySizeBytes * 0.90);
+    ASSERT_LESS_THAN_OR_EQUALS(sum, c.maxDirectorySizeBytes * 1.10);
+    ASSERT_GREATER_THAN_OR_EQUALS(sum, c.maxDirectorySizeBytes * 0.90);
 }
 
 void ValidateInterimFileHasData(const boost::filesystem::path& dir, bool hasData) {
@@ -238,7 +240,7 @@ TEST(FTDCFileManagerTest, TestCorruptCrashRestart) {
 
         mgr->close();
 
-        auto swFile = FTDCFileManager::generateArchiveFileName(dir, "0test-crash");
+        auto swFile = mgr->generateArchiveFileName(dir, "0test-crash");
         ASSERT_OK(swFile);
 
         std::ofstream stream(swFile.getValue().c_str());
@@ -261,8 +263,6 @@ TEST(FTDCFileManagerTest, TestNormalCrashInterim) {
     unittest::TempDir tempdir("metrics_testpath");
     boost::filesystem::path dir(tempdir.path());
 
-    createDirectoryClean(dir);
-
     BSONObj mdoc1 = BSON("name"
                          << "some_metadata"
                          << "key1" << 34 << "something" << 98);
@@ -274,13 +274,24 @@ TEST(FTDCFileManagerTest, TestNormalCrashInterim) {
                          << "joe"
                          << "key3" << 34 << "key5" << 45);
 
-    auto swFile = FTDCFileManager::generateArchiveFileName(dir, "0test-crash");
-    ASSERT_OK(swFile);
+    boost::filesystem::path fileOut;
+
+    {
+        FTDCCollectorCollection rotate;
+        auto swMgr = FTDCFileManager::create(&c, dir, &rotate, client);
+        ASSERT_OK(swMgr.getStatus());
+        auto swFile = swMgr.getValue()->generateArchiveFileName(dir, "0test-crash");
+        ASSERT_OK(swFile);
+        fileOut = swFile.getValue();
+        ASSERT_OK(swMgr.getValue()->close());
+    }
+
+    createDirectoryClean(dir);
 
     {
         FTDCFileWriter writer(&c);
 
-        ASSERT_OK(writer.open(swFile.getValue()));
+        ASSERT_OK(writer.open(fileOut));
 
         ASSERT_OK(writer.writeMetadata(mdoc1));
 

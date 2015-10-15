@@ -88,7 +88,7 @@ StatusWith<std::unique_ptr<FTDCFileManager>> FTDCFileManager::create(
     auto interimDocs = mgr->recoverInterimFile();
 
     // Open the archive file for writing
-    auto swFile = generateArchiveFileName(path, terseUTCCurrentTime());
+    auto swFile = mgr->generateArchiveFileName(path, terseUTCCurrentTime());
     if (!swFile.isOK()) {
         return swFile.getStatus();
     }
@@ -131,14 +131,18 @@ StatusWith<boost::filesystem::path> FTDCFileManager::generateArchiveFileName(
     fileName += std::string(".");
     fileName += suffix.toString();
 
+    if (_previousArchiveFileSuffix != suffix) {
+        // If the suffix has changed, reset the uniquifier counter to zero
+        _previousArchiveFileSuffix = suffix.toString();
+        _fileNameUniquifier = 0;
+    }
+
     if (boost::filesystem::exists(path)) {
-        // TODO: keep track of a high watermark for the current suffix so that after rotate the
-        // counter does not reset.
-        for (std::uint32_t i = 0; i < FTDCConfig::kMaxFileUniqifier; ++i) {
+        for (; _fileNameUniquifier < FTDCConfig::kMaxFileUniqifier; ++_fileNameUniquifier) {
             char buf[20];
 
             // Use leading zeros so the numbers sort lexigraphically
-            int ret = snprintf(&buf[0], sizeof(buf), "%05u", i);
+            int ret = snprintf(&buf[0], sizeof(buf), "%05u", _fileNameUniquifier);
             invariant(ret > 0 && ret < static_cast<int>((sizeof(buf) - 1)));
 
             auto fileNameUnique = fileName;
@@ -206,11 +210,12 @@ void FTDCFileManager::trimDirectory(std::vector<boost::filesystem::path>& files)
     dassert(std::is_sorted(files.begin(), files.end()));
 
     for (auto it = files.rbegin(); it != files.rend(); ++it) {
-        size += boost::filesystem::file_size(*it);
+        std::uint64_t fileSize = boost::filesystem::file_size(*it);
+        size += fileSize;
 
         if (size >= maxSize) {
             LOG(1) << "Cleaning file over full-time diagnostic data capture quota, file: "
-                   << (*it).generic_string();
+                   << (*it).generic_string() << " with size " << fileSize;
             boost::filesystem::remove(*it);
         }
     }

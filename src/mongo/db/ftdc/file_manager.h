@@ -94,8 +94,8 @@ public:
      * Generate a new file name for the archive.
      * Public for use by unit tests only.
      */
-    static StatusWith<boost::filesystem::path> generateArchiveFileName(
-        const boost::filesystem::path& path, StringData suffix);
+    StatusWith<boost::filesystem::path> generateArchiveFileName(const boost::filesystem::path& path,
+                                                                StringData suffix);
 
 private:
     FTDCFileManager(const FTDCConfig* config,
@@ -136,6 +136,13 @@ private:
 
     // file to log samples to
     FTDCFileWriter _writer;
+
+    // last archive file name suffix used
+    std::string _previousArchiveFileSuffix;
+
+    // last file name id uniquifier used
+    // this starts from zero for each new file suffix
+    std::uint32_t _fileNameUniquifier = 0;
 
     // Path of metrics directory
     boost::filesystem::path _path;
