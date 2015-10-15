@@ -242,15 +242,21 @@ functions:
         fi
 
         cp mongodb*/bin/* .
+
+        extra_args=""
         if [ ${run_multiple_jobs|false} = true ]; then
           if [ ${max_jobs|0} -gt 0 ] && [ ${max_jobs|0} -lt ${num_jobs_available|1} ]; then
-              ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${max_jobs} --shuffle ${test_flags} --log=buildlogger --reportFile=report.json
+            extra_args="$extra_args --jobs=${max_jobs}"
           else
-              ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=${num_jobs_available|1} --shuffle ${test_flags} --log=buildlogger --reportFile=report.json
+            extra_args="$extra_args --jobs=${num_jobs_available|1}"
           fi
-        else
-          ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} --jobs=1 --shuffle ${test_flags} --log=buildlogger --reportFile=report.json
         fi
+
+        if [ ${should_shuffle|true} = true ]; then
+          extra_args="$extra_args --shuffle"
+        fi
+
+        ${asan_symbolizer} ${enable_lsan} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
   "setup release credentials":
     command: shell.exec
@@ -575,6 +581,7 @@ tasks:
       timeout_secs: 1800
       vars:
         resmoke_args: --suites=jstestfuzz
+        should_shuffle: false
 
 ## unit tests ##
 - <<: *task_template
