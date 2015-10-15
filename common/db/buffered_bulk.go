@@ -50,7 +50,7 @@ func (bb *BufferedBulkInserter) Insert(doc interface{}) error {
 		return fmt.Errorf("bson encoding error: %v", err)
 	}
 	// flush if we are full
-	if bb.docCount >= bb.docLimit || bb.byteCount+len(rawBytes) > MaxMessageSize {
+	if bb.docCount >= bb.docLimit || bb.byteCount+len(rawBytes) > MaxBSONSize {
 		err = bb.Flush()
 	}
 	// buffer the document
