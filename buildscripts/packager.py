@@ -227,7 +227,7 @@ class Distro(object):
         for SUSE)"""
 
         if re.search("(suse)", self.n):
-            return [ "suse11" ]
+            return [ "suse11", "suse12" ]
         elif re.search("(redhat|fedora|centos)", self.n):
             return [ "rhel70", "rhel62", "rhel55" ]
         elif self.n == 'amazon':
