@@ -53,7 +53,7 @@
  *          Can be used to specify options that are common all shards.
  * 
  *       sync {boolean}: Use SyncClusterConnection, and readies
- *          3 config servers.
+ *          1 or 3 config servers, based on the value of numConfigs.
  *       configOptions {Object}: same as the config property above.
  *          Can be used to specify options that are common all config servers.
  *       mongosOptions {Object}: same as the mongos property above.
@@ -278,7 +278,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     // and the user didn't explicity specify a different config server configuration
     if (jsTestOptions().useLegacyConfigServers &&
             otherParams.sync !== false &&
-            (typeof otherParams.config === 'undefined' || numConfigs === 3)) {
+            (typeof(otherParams.config) === 'undefined' || numConfigs === 3)) {
         otherParams.sync = true;
     }
 
@@ -287,8 +287,12 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     // Start the config servers
     if (otherParams.sync) {
+        if (numConfigs !== 1 && numConfigs !== 3) {
+            throw Error('Sync config servers only supported with 1 or 3 nodes');
+        }
+
         var configNames = [];
-        for ( var i = 0; i < 3 ; i++ ) {
+        for (var i = 0; i < numConfigs; i++) {
             var options = { useHostname : otherParams.useHostname,
                             noJournalPrealloc : otherParams.nopreallocj,
                             pathOpts : Object.merge( pathOpts, { config : i } ),

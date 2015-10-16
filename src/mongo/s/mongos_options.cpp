@@ -264,15 +264,16 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
     std::vector<HostAndPort> configServers = mongosGlobalParams.configdbs.getServers();
 
     if (mongosGlobalParams.configdbs.type() != ConnectionString::SYNC &&
-        mongosGlobalParams.configdbs.type() != ConnectionString::SET) {
-        return Status(
-            ErrorCodes::BadValue,
-            "Must have either 3 node legacy config servers, or a replica set config server");
+        mongosGlobalParams.configdbs.type() != ConnectionString::SET &&
+        mongosGlobalParams.configdbs.type() != ConnectionString::MASTER) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid config server value "
+                                    << mongosGlobalParams.configdbs.toString());
     }
 
     if (configServers.size() < 3) {
-        warning() << "running with less than 3 config servers should be done only for testing "
-                     "purposes and is not recommended for production";
+        warning() << "Running a sharded cluster with fewer than 3 config servers should only be "
+                     "done for testing purposes and is not recommended for production.";
     }
 
     return Status::OK();
