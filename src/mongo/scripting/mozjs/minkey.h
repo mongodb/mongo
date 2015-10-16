@@ -43,6 +43,10 @@ namespace mozjs {
 struct MinKeyInfo : public BaseInfo {
     static void call(JSContext* cx, JS::CallArgs args);
     static void construct(JSContext* cx, JS::CallArgs args);
+    static void hasInstance(JSContext* cx,
+                            JS::HandleObject obj,
+                            JS::MutableHandleValue vp,
+                            bool* bp);
 
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(tojson);

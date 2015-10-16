@@ -77,6 +77,13 @@ void MaxKeyInfo::call(JSContext* cx, JS::CallArgs args) {
     args.rval().set(val);
 }
 
+void MaxKeyInfo::hasInstance(JSContext* cx,
+                             JS::HandleObject obj,
+                             JS::MutableHandleValue vp,
+                             bool* bp) {
+    *bp = getScope(cx)->getProto<MaxKeyInfo>().instanceOf(vp);
+}
+
 void MaxKeyInfo::Functions::tojson::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromStringData("{ \"$maxKey\" : 1 }");
 }

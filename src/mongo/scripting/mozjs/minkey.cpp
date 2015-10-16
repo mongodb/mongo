@@ -77,6 +77,13 @@ void MinKeyInfo::call(JSContext* cx, JS::CallArgs args) {
     args.rval().set(val);
 }
 
+void MinKeyInfo::hasInstance(JSContext* cx,
+                             JS::HandleObject obj,
+                             JS::MutableHandleValue vp,
+                             bool* bp) {
+    *bp = getScope(cx)->getProto<MinKeyInfo>().instanceOf(vp);
+}
+
 void MinKeyInfo::Functions::tojson::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromStringData("{ \"$minKey\" : 1 }");
 }
