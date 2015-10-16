@@ -909,12 +909,6 @@ private:
     void _onVoteRequestComplete(long long originalTerm);
 
     /**
-     * Callback called when the ElectWinnerDeclarer has completed; checks the results and
-     * if we received any negative responses, relinquish primary.
-     */
-    void _onElectionWinnerDeclarerComplete();
-
-    /**
      * Callback called after a random delay, to prevent repeated election ties.
      */
     void _recoverFromElectionTie(const ReplicationExecutor::CallbackArgs& cbData);

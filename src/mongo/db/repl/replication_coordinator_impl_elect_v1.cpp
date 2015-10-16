@@ -302,25 +302,5 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
     lossGuard.dismiss();
 }
 
-void ReplicationCoordinatorImpl::_onElectionWinnerDeclarerComplete() {
-    LoseElectionGuardV1 lossGuard(this);
-
-    invariant(_voteRequester);
-    invariant(_electionWinnerDeclarer);
-
-    const Status endResult = _electionWinnerDeclarer->getStatus();
-
-    if (!endResult.isOK()) {
-        log() << "stepping down from primary, because: " << endResult;
-        _topCoord->prepareForStepDown();
-        _stepDownStart();
-    }
-
-    lossGuard.dismiss();
-    _voteRequester.reset(nullptr);
-    _electionWinnerDeclarer.reset(nullptr);
-    _replExecutor.signalEvent(_electionFinishedEvent);
-}
-
 }  // namespace repl
 }  // namespace mongo
