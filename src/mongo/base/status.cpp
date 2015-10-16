@@ -37,8 +37,9 @@ Status::ErrorInfo::ErrorInfo(ErrorCodes::Error aCode, std::string aReason, int a
     : code(aCode), reason(std::move(aReason)), location(aLocation) {}
 
 Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error c, std::string r, int l) {
-    const bool needRep = ((c != ErrorCodes::OK) || !r.empty() || (l != 0));
-    return needRep ? new ErrorInfo(c, std::move(r), l) : NULL;
+    if (c == ErrorCodes::OK)
+        return nullptr;
+    return new ErrorInfo(c, std::move(r), l);
 }
 
 Status::Status(ErrorCodes::Error code, std::string reason, int location)

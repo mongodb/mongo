@@ -73,7 +73,10 @@ public:
     /**
      * Builds an error status given the error code, a textual description of what
      * caused the error, and a unique position in the where the error occurred
-     * (similar to an assert number)
+     * (similar to an assert number).
+     *
+     * For OK Statuses prefer using Status::OK(). If code is OK, the remaining arguments are
+     * ignored.
      */
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
                                         std::string reason,

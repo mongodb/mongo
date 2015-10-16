@@ -60,7 +60,7 @@ inline Status::~Status() {
 }
 
 inline bool Status::isOK() const {
-    return code() == ErrorCodes::OK;
+    return !_error;
 }
 
 inline ErrorCodes::Error Status::code() const {
