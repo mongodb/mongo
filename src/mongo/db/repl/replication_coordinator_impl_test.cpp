@@ -2798,6 +2798,59 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
     ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
 }
 
+TEST_F(ReplCoordTest,
+       TermAndLastCommittedOpTimeUpdateWhenHeartbeatResponseWithMetadataHasFresherValues) {
+    // Ensure that the metadata is processed if it is contained in a heartbeat response.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members" << BSON_ARRAY(BSON("host"
+                                                                              << "node1:12345"
+                                                                              << "_id" << 0)
+                                                                         << BSON("host"
+                                                                                 << "node2:12345"
+                                                                                 << "_id" << 1))
+                            << "protocolVersion" << 1),
+                       HostAndPort("node1", 12345));
+    ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
+    getReplCoord()->updateTerm(1);
+    ASSERT_EQUALS(1, getReplCoord()->getTerm());
+
+    auto replCoord = getReplCoord();
+    auto config = replCoord->getConfig();
+
+    // Higher term - should update term and lastCommittedOpTime.
+    StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
+        rpc::kReplSetMetadataFieldName
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 3) << "lastOpVisible"
+                                  << BSON("ts" << Timestamp(10, 0) << "t" << 3) << "configVersion"
+                                  << config.getConfigVersion() << "primaryIndex" << 1 << "term" << 3
+                                  << "syncSourceIndex" << 1)));
+    BSONObjBuilder metadataBuilder;
+    ASSERT_OK(metadata.getValue().writeToMetadata(&metadataBuilder));
+    auto metadataObj = metadataBuilder.obj();
+
+    auto net = getNet();
+    net->enterNetwork();
+
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto noi = net->getNextReadyRequest();
+    const auto& request = noi->getRequest();
+    ASSERT_EQUALS(HostAndPort("node2", 12345), request.target);
+    ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+    ReplSetHeartbeatResponse hbResp;
+    hbResp.setConfigVersion(config.getConfigVersion());
+    hbResp.setSetName(config.getReplSetName());
+    hbResp.setState(MemberState::RS_SECONDARY);
+    net->scheduleResponse(noi, net->now(), makeResponseStatus(hbResp.toBSON(true), metadataObj));
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+
+    ASSERT_EQUALS(OpTime(Timestamp(10, 0), 3), getReplCoord()->getLastCommittedOpTime());
+    ASSERT_EQUALS(3, getReplCoord()->getTerm());
+    ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
+}
+
 TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeout) {
     assertStartSuccess(BSON("_id"
                             << "mySet"

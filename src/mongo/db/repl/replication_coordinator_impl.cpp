@@ -3308,6 +3308,15 @@ CallbackHandle ReplicationCoordinatorImpl::_wrapAndScheduleWork(ScheduleFn sched
     return cbh.getValue();
 }
 
+EventHandle ReplicationCoordinatorImpl::_makeEvent() {
+    auto eventResult = this->_replExecutor.makeEvent();
+    if (eventResult.getStatus() == ErrorCodes::ShutdownInProgress) {
+        return EventHandle();
+    }
+    fassert(28825, eventResult.getStatus());
+    return eventResult.getValue();
+}
+
 void ReplicationCoordinatorImpl::_scheduleElectionWinNotification() {
     auto electionWinNotificationCallback = [this](const CallbackArgs& cbData) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {

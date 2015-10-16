@@ -386,6 +386,8 @@ private:
 
     using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 
+    using EventHandle = executor::TaskExecutor::EventHandle;
+
     using ScheduleFn = stdx::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
         const executor::TaskExecutor::CallbackFn& work)>;
 
@@ -1141,6 +1143,13 @@ private:
      * Do not call this function directly.
      */
     static CallbackHandle _wrapAndScheduleWork(ScheduleFn scheduleFn, const CallbackFn& work);
+
+    /**
+     * Creates an event.
+     * Returns invalid event handle if the executor is shutting down.
+     * Otherwise aborts on non-shutdown error.
+     */
+    EventHandle _makeEvent();
 
     /**
      * Schedule notification of election win.

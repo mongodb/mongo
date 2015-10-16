@@ -108,19 +108,17 @@ void ReplicationCoordinatorImpl::_startElectSelfV1() {
             fassertFailed(28641);
     }
 
-    const StatusWith<ReplicationExecutor::EventHandle> finishEvh = _replExecutor.makeEvent();
-    if (finishEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
+    auto finishedEvent = _makeEvent();
+    if (!finishedEvent) {
         return;
     }
-    fassert(28642, finishEvh.getStatus());
-    _electionFinishedEvent = finishEvh.getValue();
+    _electionFinishedEvent = finishedEvent;
 
-    const StatusWith<ReplicationExecutor::EventHandle> dryRunFinishEvh = _replExecutor.makeEvent();
-    if (dryRunFinishEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
+    auto dryRunFinishedEvent = _makeEvent();
+    if (!dryRunFinishedEvent) {
         return;
     }
-    fassert(28767, dryRunFinishEvh.getStatus());
-    _electionDryRunFinishedEvent = dryRunFinishEvh.getValue();
+    _electionDryRunFinishedEvent = dryRunFinishedEvent;
 
     LoseElectionDryRunGuardV1 lossGuard(this);
 

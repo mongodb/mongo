@@ -64,6 +64,14 @@ public:
                                              Milliseconds millis = Milliseconds(0));
 
     /**
+     * Makes a ResponseStatus with the given "doc" response, metadata and optional elapsed time
+     * "millis".
+     */
+    static ResponseStatus makeResponseStatus(const BSONObj& doc,
+                                             const BSONObj& metadata,
+                                             Milliseconds millis = Milliseconds(0));
+
+    /**
      * Constructs a ReplicaSetConfig from the given BSON, or raises a test failure exception.
      */
     static ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBSON);

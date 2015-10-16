@@ -172,8 +172,15 @@ void ReplCoordTest::assertStartSuccess(const BSONObj& configDoc, const HostAndPo
 }
 
 ResponseStatus ReplCoordTest::makeResponseStatus(const BSONObj& doc, Milliseconds millis) {
-    log() << "Responding with " << doc;
-    return ResponseStatus(RemoteCommandResponse(doc, BSONObj(), millis));
+    return makeResponseStatus(doc, BSONObj(), millis);
+}
+
+ResponseStatus ReplCoordTest::makeResponseStatus(const BSONObj& doc,
+                                                 const BSONObj& metadata,
+                                                 Milliseconds millis) {
+    log() << "Responding with " << doc << " (metadata: " << metadata << "; elapsed: " << millis
+          << ")";
+    return ResponseStatus(RemoteCommandResponse(doc, metadata, millis));
 }
 
 void ReplCoordTest::simulateSuccessfulDryRun(
