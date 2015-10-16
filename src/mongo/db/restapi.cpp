@@ -167,9 +167,10 @@ public:
 
             char* temp;
 
-            // TODO: this is how i guess if something is a number.  pretty lame right now
+            // TODO: this is how i guess if something is a number.  pretty lame right now,
+            // but less lame than it used to be
             double number = strtod(val, &temp);
-            if (temp != val)
+            if (temp && !*temp)
                 queryBuilder.append(field, number);
             else
                 queryBuilder.append(field, val);
