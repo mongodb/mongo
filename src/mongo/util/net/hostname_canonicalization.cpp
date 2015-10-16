@@ -33,6 +33,7 @@
 #include "mongo/util/net/hostname_canonicalization.h"
 
 #if !defined(_WIN32)
+#include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -87,7 +88,7 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
     auto nativeHostName = shim_toNativeString(hostName.c_str());
     if ((err = shim_getaddrinfo(nativeHostName.c_str(), nullptr, &hints, &info)) != 0) {
         ONCE {
-            warning() << "Failed to obtain address info for hostname " << hostName << ": "
+            warning() << "Failed to obtain address information for hostname " << hostName << ": "
                       << getAddrInfoStrError(err);
         }
         return results;
@@ -99,15 +100,48 @@ std::vector<std::string> getHostFQDNs(std::string hostName, HostnameCanonicaliza
         return results;
     }
 
+    bool encounteredErrors = false;
+    std::stringstream getNameInfoErrors;
+    getNameInfoErrors << "Failed to obtain name info for: [ ";
     for (shim_addrinfo* p = info; p; p = p->ai_next) {
         shim_char host[NI_MAXHOST] = {};
         if ((err = shim_getnameinfo(
                  p->ai_addr, p->ai_addrlen, host, sizeof(host), nullptr, 0, NI_NAMEREQD)) == 0) {
             results.emplace_back(shim_fromNativeString(host));
         } else {
-            // We can't do much better than this without writting some specific IPv4/6 address
-            // handling logic.
-            warning() << "Failed to obtain name info for an address: " << getAddrInfoStrError(err);
+            if (encounteredErrors) {
+                getNameInfoErrors << ", ";
+            }
+            encounteredErrors = true;
+
+            // Format the addrinfo structure we have into a string for reporting
+            char ip_str[INET6_ADDRSTRLEN];
+            struct sockaddr* addr = p->ai_addr;
+            void* sin_addr = nullptr;
+
+            if (p->ai_family == AF_INET) {
+                struct sockaddr_in* addr_in = reinterpret_cast<struct sockaddr_in*>(addr);
+                sin_addr = reinterpret_cast<void*>(&addr_in->sin_addr);
+            } else if (p->ai_family == AF_INET6) {
+                struct sockaddr_in6* addr_in6 = reinterpret_cast<struct sockaddr_in6*>(addr);
+                sin_addr = reinterpret_cast<void*>(&addr_in6->sin6_addr);
+            }
+
+            getNameInfoErrors << "(";
+            if (sin_addr) {
+                invariant(inet_ntop(p->ai_family, sin_addr, ip_str, sizeof(ip_str)) != nullptr);
+                getNameInfoErrors << ip_str;
+            } else {
+                getNameInfoErrors << "Unknown address family: " << p->ai_family;
+            }
+
+            getNameInfoErrors << ", \"" << getAddrInfoStrError(err) << "\")";
+        }
+    }
+
+    if (encounteredErrors) {
+        OCCASIONALLY {
+            warning() << getNameInfoErrors.str() << " ]";
         }
     }
 
