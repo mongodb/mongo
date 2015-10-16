@@ -81,7 +81,7 @@ __curstat_size_only(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_config_subinit(session, &cparser, &colconf));
 	if ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
-		WT_ERR(WT_NOTFOUND);
+		goto err;
 
 	/* Build up a file name from a table URI. */
 	WT_ERR(__wt_buf_fmt(
@@ -98,11 +98,10 @@ __curstat_size_only(WT_SESSION_IMPL *session,
 	cst->u.dsrc_stats.block_size = filesize;
 	__wt_curstat_dsrc_final(cst);
 
+	*was_fast = true;
+
 err:	__wt_free(session, tableconf);
 	__wt_buf_free(session, &namebuf);
-
-	if (ret == 0)
-		*was_fast = true;
 
 	return (ret);
 }
