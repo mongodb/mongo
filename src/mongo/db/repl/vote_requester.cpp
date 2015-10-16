@@ -127,13 +127,13 @@ bool VoteRequester::Algorithm::hasReceivedSufficientResponses() const {
         _responsesProcessed == static_cast<int>(_targets.size());
 }
 
-VoteRequester::VoteRequestResult VoteRequester::Algorithm::getResult() const {
+VoteRequester::Result VoteRequester::Algorithm::getResult() const {
     if (_staleTerm) {
-        return StaleTerm;
+        return Result::kStaleTerm;
     } else if (_votes >= _rsConfig.getMajorityVoteCount()) {
-        return SuccessfullyElected;
+        return Result::kSuccessfullyElected;
     } else {
-        return InsufficientVotes;
+        return Result::kInsufficientVotes;
     }
 }
 
@@ -162,7 +162,7 @@ void VoteRequester::cancel(ReplicationExecutor* executor) {
     _runner->cancel(executor);
 }
 
-VoteRequester::VoteRequestResult VoteRequester::getResult() const {
+VoteRequester::Result VoteRequester::getResult() const {
     return _algorithm->getResult();
 }
 

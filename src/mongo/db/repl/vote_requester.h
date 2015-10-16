@@ -53,10 +53,10 @@ class VoteRequester {
     MONGO_DISALLOW_COPYING(VoteRequester);
 
 public:
-    enum VoteRequestResult {
-        SuccessfullyElected,
-        StaleTerm,
-        InsufficientVotes,
+    enum class Result {
+        kSuccessfullyElected,
+        kStaleTerm,
+        kInsufficientVotes,
     };
 
     class Algorithm : public ScatterGatherAlgorithm {
@@ -73,11 +73,11 @@ public:
         virtual bool hasReceivedSufficientResponses() const;
 
         /**
-         * Returns a VoteRequestResult indicating the result of the election.
+         * Returns a VoteRequest::Result indicating the result of the election.
          *
          * It is invalid to call this before hasReceivedSufficientResponses returns true.
          */
-        VoteRequestResult getResult() const;
+        Result getResult() const;
 
         /**
          * Returns the list of nodes that responded to the VoteRequest command.
@@ -126,7 +126,7 @@ public:
      */
     void cancel(ReplicationExecutor* executor);
 
-    VoteRequestResult getResult() const;
+    Result getResult() const;
     unordered_set<HostAndPort> getResponders() const;
 
 private:

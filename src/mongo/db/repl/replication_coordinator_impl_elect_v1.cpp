@@ -168,15 +168,15 @@ void ReplicationCoordinatorImpl::_onDryRunComplete(long long originalTerm) {
         return;
     }
 
-    const VoteRequester::VoteRequestResult endResult = _voteRequester->getResult();
+    const VoteRequester::Result endResult = _voteRequester->getResult();
 
-    if (endResult == VoteRequester::InsufficientVotes) {
+    if (endResult == VoteRequester::Result::kInsufficientVotes) {
         log() << "not running for primary, we received insufficient votes";
         return;
-    } else if (endResult == VoteRequester::StaleTerm) {
+    } else if (endResult == VoteRequester::Result::kStaleTerm) {
         log() << "not running for primary, we have been superceded already";
         return;
-    } else if (endResult != VoteRequester::SuccessfullyElected) {
+    } else if (endResult != VoteRequester::Result::kSuccessfullyElected) {
         log() << "not running for primary, we received an unexpected problem";
         return;
     }
@@ -264,20 +264,20 @@ void ReplicationCoordinatorImpl::_onVoteRequestComplete(long long originalTerm) 
         return;
     }
 
-    const VoteRequester::VoteRequestResult endResult = _voteRequester->getResult();
+    const VoteRequester::Result endResult = _voteRequester->getResult();
 
-    if (endResult == VoteRequester::InsufficientVotes) {
-        log() << "not becoming primary, we received insufficient votes";
-        return;
-    } else if (endResult == VoteRequester::StaleTerm) {
-        log() << "not becoming primary, we have been superceded already";
-        return;
-    } else if (endResult != VoteRequester::SuccessfullyElected) {
-        log() << "not becoming primary, we received an unexpected problem";
-        return;
+    switch (endResult) {
+        case VoteRequester::Result::kInsufficientVotes:
+            log() << "not becoming primary, we received insufficient votes";
+            return;
+        case VoteRequester::Result::kStaleTerm:
+            log() << "not becoming primary, we have been superceded already";
+            return;
+        case VoteRequester::Result::kSuccessfullyElected:
+            log() << "election succeeded, assuming primary role in term " << _topCoord->getTerm();
+            break;
     }
 
-    log() << "election succeeded, assuming primary role in term " << _topCoord->getTerm();
     {
         // Mark all nodes that responded to our vote request as up to avoid immediately
         // relinquishing primary.
