@@ -29,8 +29,7 @@
 
 namespace mongo {
 
-TimerHolder::TimerHolder(TimerStats& stats) : _stats(stats), _recorded(false) {
-}
+TimerHolder::TimerHolder(TimerStats& stats) : _stats(stats), _recorded(false) {}
 
 TimerHolder::~TimerHolder() {
     if (!_recorded) {
@@ -62,4 +61,4 @@ BSONObj TimerStats::getReport() const {
     return b.obj();
 }
 
-} // namespace mongo
+}  // namespace mongo
