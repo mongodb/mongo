@@ -38,32 +38,19 @@ namespace {
 using namespace mongo;
 
 TEST(TimerStatsTest, GetReportNoRecording) {
-    ASSERT_EQUALS(
-        BSON(
-            "num" << 0 <<
-            "totalMillis" << 0 <<
-            "totalMicros" << 0
-        ),
-        TimerStats().getReport()
-    );
+    ASSERT_EQUALS(BSON("num" << 0 << "totalMillis" << 0 << "totalMicros" << 0),
+                  TimerStats().getReport());
 }
 
 TEST(TimerStatsTest, GetReportOneRecording) {
     TimerStats timerStats;
     Timer timer;
-    auto micros = timerStats.record(timer);
-    auto microsAsLongLong = static_cast<long long>(micros.count());
-    auto millisAsInt = static_cast<int>(
-        duration_cast<Milliseconds>(micros).count()
-    );
+    auto timerDuration = timerStats.record(timer);
+    auto microsAsLongLong = durationCount<Microseconds>(timerDuration);
+    auto millisAsInt = static_cast<int>(durationCount<Milliseconds>(timerDuration));
     ASSERT_EQUALS(
-        BSON(
-            "num" << 1 <<
-            "totalMillis" << millisAsInt <<
-            "totalMicros" << microsAsLongLong
-        ),
-        timerStats.getReport()
-    );
+        BSON("num" << 1 << "totalMillis" << millisAsInt << "totalMicros" << microsAsLongLong),
+        timerStats.getReport());
 }
 
 }  // namespace
