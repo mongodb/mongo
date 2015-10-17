@@ -43,12 +43,12 @@ public:
     /**
      * \brief Increments the timing information
      *
-     * \param micros The number of microseconds to increment the timing stats
+     * \param duration The duration in which to increment the timing count
      */
     template <typename DType>
     void recordDuration(DType duration) {
         _num.fetchAndAdd(1);
-        _totalMicros.fetchAndAdd(duration_cast<Microseconds>(duration).count());
+        _totalMicros.fetchAndAdd(durationCount<Microseconds>(duration));
     }
 
     /**
@@ -127,4 +127,4 @@ private:
     Timer _t;
 };
 
-} // namespace mongo
+}  // namespace mongo
