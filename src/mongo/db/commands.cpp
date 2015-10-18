@@ -38,10 +38,7 @@
 #include <string>
 #include <vector>
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/global_conn_pool.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -55,7 +52,6 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/wc_error_detail.h"
 #include "mongo/util/log.h"
@@ -80,6 +76,8 @@ namespace {
 ExportedServerParameter<bool, ServerParameterType::kStartupOnly> testCommandsParameter(
     ServerParameterSet::getGlobal(), "enableTestCommands", &Command::testCommandsEnabled);
 }
+
+Command::~Command() = default;
 
 string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const {
     BSONElement first = cmdObj.firstElement();
@@ -502,38 +500,5 @@ void runCommands(OperationContext* txn,
         Command::generateErrorResponse(txn, replyBuilder, ex, request);
     }
 }
-
-class PoolFlushCmd : public Command {
-public:
-    PoolFlushCmd() : Command("connPoolSync", false, "connpoolsync") {}
-    virtual void help(stringstream& help) const {
-        help << "internal";
-    }
-    virtual bool isWriteCommandForConfigServer() const {
-        return false;
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::connPoolSync);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-    }
-
-    virtual bool run(OperationContext* txn,
-                     const string&,
-                     mongo::BSONObj&,
-                     int,
-                     std::string&,
-                     mongo::BSONObjBuilder& result) {
-        shardConnectionPool.flush();
-        globalConnPool.flush();
-        return true;
-    }
-    virtual bool slaveOk() const {
-        return true;
-    }
-
-} poolFlushCmd;
 
 }  // namespace mongo

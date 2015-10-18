@@ -79,6 +79,10 @@ protected:
 public:
     typedef StringMap<Command*> CommandMap;
 
+    // NOTE: Do not remove this declaration, or relocate it in this class. We
+    // are using this method to control where the vtable is emitted.
+    virtual ~Command();
+
     // Return the namespace for the command. If the first field in 'cmdObj' is of type
     // mongo::String, then that field is interpreted as the collection name, and is
     // appended to 'dbname' after a '.' character. If the first field is not of type
@@ -249,8 +253,6 @@ public:
         @param oldName an optional old, deprecated name for the command
     */
     Command(StringData _name, bool webUI = false, StringData oldName = StringData());
-
-    virtual ~Command() {}
 
 protected:
     /**

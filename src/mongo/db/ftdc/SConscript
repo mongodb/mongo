@@ -38,7 +38,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/server_parameters',
         'ftdc'
     ],

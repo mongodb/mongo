@@ -147,7 +147,6 @@ env.CppUnitTest(
     LIBDEPS=[
         'coreshard',
         'mongoscore',
-        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
     ]
 )
@@ -167,7 +166,6 @@ env.Library(
         'version_manager.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
         'catalog/forwarding_catalog_manager',
         'catalog/catalog_types',
@@ -219,7 +217,6 @@ env.CppUnitTest(
         'shard_key_pattern_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/coredb',
         "$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init",
         'coreshard',
         'mongoscore',

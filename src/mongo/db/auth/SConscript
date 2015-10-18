@@ -76,7 +76,7 @@ env.Library('authservercommon',
                 'security_key.cpp',
             ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/db/coredb',
+                '$BUILD_DIR/mongo/db/commands/core',
                 'authcommon',
                 'authcore',
                 'authmocks',

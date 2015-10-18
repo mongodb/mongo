@@ -392,7 +392,6 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/clientdriver",
         "$BUILD_DIR/mongo/db/auth/authservercommon",
-        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/rpc/command_reply",
         "$BUILD_DIR/mongo/rpc/command_request",
         "$BUILD_DIR/mongo/rpc/metadata",
@@ -417,7 +416,6 @@ env.Library(
         "repl/replset_web_handler.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/coredb",
         "$BUILD_DIR/mongo/db/curop",
         "$BUILD_DIR/mongo/util/net/miniwebserver",
         "mongodandmongos",
@@ -436,7 +434,6 @@ env.Library(
         "mongod_options.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         'server_options',
@@ -474,69 +471,36 @@ env.Library(
     target="audit",
     source=[
         "audit.cpp",
-    ])
-
-env.Library(
-    target="coredb",
-    source=[
-        "commands.cpp",
-        "commands/authentication_commands.cpp",
-        "commands/conn_pool_stats.cpp",
-        "commands/connection_status.cpp",
-        "commands/copydb_common.cpp",
-        "commands/fail_point_cmd.cpp",
-        "commands/find_and_modify_common.cpp",
-        "commands/hashcmd.cpp",
-        "commands/isself.cpp",
-        "repl/isself.cpp",
-        "commands/mr_common.cpp",
-        "commands/rename_collection_common.cpp",
-        "commands/server_status.cpp",
-        "commands/parameters.cpp",
-        "commands/user_management_commands_common.cpp",
-        "commands/write_commands/write_commands_common.cpp",
-        "dbcommands_generic.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
-        '$BUILD_DIR/mongo/logger/parse_log_component_settings',
-        '$BUILD_DIR/mongo/scripting/scripting_common',
-        '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
-        '$BUILD_DIR/mongo/util/foundation',
-        '$BUILD_DIR/mongo/util/processinfo',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
-        'audit',
-        'auth/authcommon',
-        'auth/authorization_manager_global',
-        'auth/serverauth',
-        'commands/server_status_core',
-        'common',
-        'curop',
-        'exec/working_set',
-        'index/key_generator',
-        'index_names',
-        'log_process_details',
-        'lasterror',
-        'matcher/expressions',
-        'matcher/expressions_geo',
-        'matcher/expressions_text',
-        'server_options',
-        'server_parameters',
-        'startup_warnings_common',
-        'stats/counters',
-        'stats/timer_stats',
-    ],
-    LIBDEPS_TAGS=[
-        # Dependencies on Command::registerError and
-        # Command::execCommand, which are not uniquely defined. Also
-        # depends on mongo::exitCleanly.
-        'incomplete',
     ],
 )
 
+env.Library(
+    target="commands",
+    source=[
+        'commands.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/rpc/rpc',
+        '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
+        'audit',
+        'auth/authorization_manager_global',
+        'commands/server_status_core',
+        'commands/test_commands_enabled',
+        'curop',
+        'service_context',
+    ],
+    LIBDEPS_TAGS=[
+        # Dependencies on Command::registerError and
+        # Command::execCommand, which are not uniquely defined.
+        'incomplete',
+    ],
+)
 
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.

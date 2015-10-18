@@ -256,7 +256,10 @@ if get_option('allocator') == 'tcmalloc':
             'tcmalloc_set_parameter.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/coredb',
+            # TODO: This is needless, the definition of
+            # ServerStatusSection should live in its own library, as
+            # it doesn't require all of the other commands.
+            '$BUILD_DIR/mongo/db/commands/core',
             '$BUILD_DIR/mongo/db/server_parameters',
             '$BUILD_DIR/mongo/util/net/network',
         ],

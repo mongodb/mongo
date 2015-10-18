@@ -154,6 +154,21 @@ env.Library(
     ]
 )
 
+env.Library(
+    target="isself",
+    source=[
+        'isself.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
 env.CppUnitTest(
     target='rs_rollback_test',
     source=[
@@ -163,7 +178,6 @@ env.CppUnitTest(
         'oplog_interface_mock',
         'replmocks',
         'rs_rollback',
-        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/util/ntservice_mock',
     ],
@@ -214,7 +228,6 @@ env.CppUnitTest(
     LIBDEPS=[
         'replmocks',
         'sync_tail',
-        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/util/ntservice_mock',
     ],
@@ -252,12 +265,16 @@ env.CppUnitTest('repl_set_heartbeat_response_test',
 env.CppUnitTest('topology_coordinator_impl_test',
                 'topology_coordinator_impl_test.cpp',
                 LIBDEPS=['topology_coordinator_impl',
-                         'replica_set_messages'])
+                         'replica_set_messages',
+                         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+                ])
 
 env.CppUnitTest('topology_coordinator_impl_v1_test',
                 'topology_coordinator_impl_v1_test.cpp',
                 LIBDEPS=['topology_coordinator_impl',
-                         'replica_set_messages'])
+                         'replica_set_messages',
+                         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+                ])
 
 env.Library('repl_coordinator_impl',
             [
@@ -298,6 +315,7 @@ env.Library('repl_coordinator_test_fixture',
             ],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/unittest/unittest',
+                '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
                 'repl_coordinator_impl',
                 'replmocks',
                 'topology_coordinator_impl',\
@@ -461,7 +479,6 @@ env.CppUnitTest('isself_test',
                 ],
                 LIBDEPS=[
                     '$BUILD_DIR/mongo/db/serveronly',
-                    '$BUILD_DIR/mongo/db/coredb',
                     "$BUILD_DIR/mongo/util/ntservice_mock",
                 ],
                 NO_CRUTCH = True)
@@ -477,7 +494,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/coredb',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         'replica_set_messages',
     ],

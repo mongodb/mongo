@@ -237,7 +237,7 @@ generateConfigHeaderFile = env.Substfile(
 env.Alias('generated-sources', generateConfigHeaderFile)
 
 mongodLibDeps = [
-    "db/coredb",
+    "db/commands/core",
     "db/conn_pool_options",
     "db/mongod_options",
     "db/mongodandmongos",
@@ -275,7 +275,6 @@ env.Install(
                         "client/examples/mongoperf.cpp",
                     ],
                     LIBDEPS=[
-                        "db/coredb",
                         "db/serveronly",
                         "util/ntservice_mock",
                     ]),
@@ -293,7 +292,7 @@ env.Install(
         ],
         LIBDEPS=[
             'db/conn_pool_options',
-            'db/coredb',
+            'db/commands/core',
             'db/mongodandmongos',
             's/client/sharding_connection_hook',
             's/commands/cluster_commands',
@@ -325,7 +324,6 @@ if env.TargetOSIs('osx') or env["_HAVEPCAP"]:
     sniffEnv.Install( '#/', sniffEnv.Program( "mongosniff", "tools/sniffer.cpp",
                                               LIBDEPS = [
                                                  "db/serveronly",
-                                                 "db/coredb",
                                               ] ) )
 
 # --- shell ---

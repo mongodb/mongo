@@ -1,5 +1,3 @@
-/** @file dbcommands_generic.cpp commands suited for any mongo server (both mongod, mongos) */
-
 /**
 *    Copyright (C) 2012 10gen Inc.
 *
