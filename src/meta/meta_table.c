@@ -160,7 +160,7 @@ __wt_metadata_update(
 	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_update(session, key));
 
-	WT_RET(__wt_metadata_cursor(session, "overwrite", &cursor));
+	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	WT_ERR(cursor->insert(cursor));
