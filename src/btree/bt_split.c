@@ -805,7 +805,6 @@ __split_multi_inmem_final(WT_PAGE *orig, WT_MULTI *multi)
 			supd->ins->upd = NULL;
 			break;
 		case WT_PAGE_ROW_LEAF:
-			/* Build a key. */
 			if (supd->ins == NULL) {
 				slot = WT_ROW_SLOT(orig, supd->rip);
 				orig->pg_row_upd[slot] = NULL;
@@ -1615,15 +1614,16 @@ err:		/*
 		 * created, there's a second pass to remove the updates from the
 		 * original page. If an error occurs, we can't simply free the
 		 * newly created pages, that would discard the original page's
-		 * updates. Free the page's disk image (that's the big chunk),
-		 * and leak the rest.
+		 * updates. Set a flag so the discard function doesn't discard
+		 * the updates on the page.
 		 */
-		for (i = 0; i < new_entries; ++i) {
-			if (ref_new[i]->page != NULL)
-				__wt_free(session, ref_new[i]->page->dsk);
-			__wt_free_ref(
-			    session, ref_new[i]->page, ref_new[i], false);
-		}
+		for (i = 0; i < new_entries; ++i)
+			if (ref_new[i]->page != NULL) {
+				F_SET_ATOMIC(
+				    ref_new[i]->page, WT_PAGE_UPDATE_IGNORE);
+				__wt_free_ref(session,
+				    ref_new[i]->page, ref_new[i], true);
+			}
 	}
 
 	__wt_free(session, ref_new);
