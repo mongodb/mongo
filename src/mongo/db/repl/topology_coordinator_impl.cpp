@@ -1888,10 +1888,6 @@ void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig,
 
     _updateHeartbeatDataForReconfig(newConfig, selfIndex, now);
     _stepDownPending = false;
-    BSONObj oldConfigObjForAudit = _rsConfig.toBSON();
-    BSONObj newConfigObjForAudit = newConfig.toBSON();
-    audit::logReplSetReconfig(
-        ClientBasic::getCurrent(), &oldConfigObjForAudit, &newConfigObjForAudit);
     _rsConfig = newConfig;
     _selfIndex = selfIndex;
     _forceSyncSourceIndex = -1;
