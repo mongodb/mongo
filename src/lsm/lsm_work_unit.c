@@ -270,8 +270,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	    !F_ISSET(chunk, WT_LSM_CHUNK_STABLE) &&
 	    !chunk->evicted) {
 		WT_WITH_HANDLE_LIST_LOCK(session,
-		    ret = __lsm_discard_handle(
-		    session, chunk->uri, NULL));
+		    ret = __lsm_discard_handle(session, chunk->uri, NULL));
 		if (ret == 0)
 			chunk->evicted = 1;
 		else if (ret == EBUSY)
