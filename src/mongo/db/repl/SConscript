@@ -322,7 +322,7 @@ env.Library('repl_coordinator_test_fixture',
             ])
 
 env.CppUnitTest(
-    target='repl_coordinator_impl_test',
+    target='replication_coordinator_impl_test',
     source=[
         'replication_coordinator_impl_test.cpp',
     ],
@@ -376,23 +376,23 @@ env.CppUnitTest('elect_cmd_runner_test',
                          'replica_set_messages',
                          'replmocks'])
 
-env.CppUnitTest('repl_coordinator_impl_elect_test',
+env.CppUnitTest('replication_coordinator_impl_elect_test',
                 'replication_coordinator_impl_elect_test.cpp',
                 LIBDEPS=['repl_coordinator_test_fixture'])
 
-env.CppUnitTest('repl_coordinator_impl_elect_v1_test',
+env.CppUnitTest('replication_coordinator_impl_elect_v1_test',
                 'replication_coordinator_impl_elect_v1_test.cpp',
                 LIBDEPS=['repl_coordinator_test_fixture'])
 
-env.CppUnitTest('repl_coordinator_impl_heartbeat_v1_test',
+env.CppUnitTest('replication_coordinator_impl_heartbeat_v1_test',
                 'replication_coordinator_impl_heartbeat_v1_test.cpp',
                 LIBDEPS=['repl_coordinator_test_fixture'])
 
-env.CppUnitTest('repl_coordinator_impl_heartbeat_test',
+env.CppUnitTest('replication_coordinator_impl_heartbeat_test',
                 'replication_coordinator_impl_heartbeat_test.cpp',
                 LIBDEPS=['repl_coordinator_test_fixture'])
 
-env.CppUnitTest('repl_coordinator_impl_reconfig_test',
+env.CppUnitTest('replication_coordinator_impl_reconfig_test',
                 'replication_coordinator_impl_reconfig_test.cpp',
                 LIBDEPS=['repl_coordinator_test_fixture'])
 

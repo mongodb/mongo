@@ -83,7 +83,8 @@ ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(const ReplicaSe
     return response;
 }
 
-TEST_F(ReplCoordHBV1Test, JoinExistingReplSet) {
+TEST_F(ReplCoordHBV1Test,
+       NodeJoinsExistingReplSetWhenReceivingAConfigContainingTheNodeViaHeartbeat) {
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
@@ -146,7 +147,8 @@ TEST_F(ReplCoordHBV1Test, JoinExistingReplSet) {
     ASSERT_TRUE(getExternalState()->threadsStarted());
 }
 
-TEST_F(ReplCoordHBV1Test, JoinExistingReplSetAsArbiter) {
+TEST_F(ReplCoordHBV1Test,
+       ArbiterJoinsExistingReplSetWhenReceivingAConfigContainingTheArbiterViaHeartbeat) {
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     ReplicaSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
@@ -210,7 +212,8 @@ TEST_F(ReplCoordHBV1Test, JoinExistingReplSetAsArbiter) {
     ASSERT_FALSE(getExternalState()->threadsStarted());
 }
 
-TEST_F(ReplCoordHBV1Test, DoNotJoinReplSetIfNotAMember) {
+TEST_F(ReplCoordHBV1Test,
+       NodeDoesNotJoinExistingReplSetWhenReceivingAConfigNotContainingTheNodeViaHeartbeat) {
     // Tests that a node in RS_STARTUP will not transition to RS_REMOVED if it receives a
     // configuration that does not contain it.
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
@@ -270,7 +273,8 @@ TEST_F(ReplCoordHBV1Test, DoNotJoinReplSetIfNotAMember) {
     exitNetwork();
 }
 
-TEST_F(ReplCoordHBV1Test, NotYetInitializedConfigStateEarlyReturn) {
+TEST_F(ReplCoordHBV1Test,
+       NodeReturnsNotYetInitializedInResponseToAHeartbeatReceivedPriorToAConfig) {
     // ensure that if we've yet to receive an initial config, we return NotYetInitialized
     init("mySet");
     ReplSetHeartbeatArgsV1 hbArgs;
@@ -286,7 +290,8 @@ TEST_F(ReplCoordHBV1Test, NotYetInitializedConfigStateEarlyReturn) {
     ASSERT_EQUALS(ErrorCodes::NotYetInitialized, status.code());
 }
 
-TEST_F(ReplCoordHBV1Test, OnlyUnauthorizedUpCausesRecovering) {
+TEST_F(ReplCoordHBV1Test,
+       NodeChangesToRecoveringStateWhenAllNodesRespondToHeartbeatsWithUnauthorized) {
     // Tests that a node that only has auth error heartbeats is recovering
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     assertStartSuccess(BSON("_id"
@@ -324,7 +329,7 @@ TEST_F(ReplCoordHBV1Test, OnlyUnauthorizedUpCausesRecovering) {
     assertMemberState(MemberState::RS_RECOVERING, "0");
 }
 
-TEST_F(ReplCoordHBV1Test, ArbiterRecordsCommittedOpTimeFromHeartbeat) {
+TEST_F(ReplCoordHBV1Test, ArbiterRecordsCommittedOpTimeFromHeartbeatMetadata) {
     // Tests that an arbiter will update its committed optime from the heartbeat metadata
     assertStartSuccess(fromjson(
                            "{_id:'mySet', version:1, protocolVersion:1, members:["

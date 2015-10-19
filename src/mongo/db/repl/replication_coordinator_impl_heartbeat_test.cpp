@@ -86,7 +86,7 @@ ReplSetHeartbeatResponse ReplCoordHBTest::receiveHeartbeatFrom(const ReplicaSetC
     return response;
 }
 
-TEST_F(ReplCoordHBTest, JoinExistingReplSet) {
+TEST_F(ReplCoordHBTest, NodeJoinsExistingReplSetWhenReceivingAConfigContainingTheNodeViaHeartbeat) {
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     ReplicaSetConfig rsConfig = assertMakeRSConfigV0(BSON("_id"
                                                           << "mySet"
@@ -147,7 +147,8 @@ TEST_F(ReplCoordHBTest, JoinExistingReplSet) {
     exitNetwork();
 }
 
-TEST_F(ReplCoordHBTest, DoNotJoinReplSetIfNotAMember) {
+TEST_F(ReplCoordHBTest,
+       NodeDoesNotJoinExistingReplSetWhenReceivingAConfigNotContainingTheNodeViaHeartbeat) {
     // Tests that a node in RS_STARTUP will not transition to RS_REMOVED if it receives a
     // configuration that does not contain it.
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
@@ -207,7 +208,7 @@ TEST_F(ReplCoordHBTest, DoNotJoinReplSetIfNotAMember) {
     exitNetwork();
 }
 
-TEST_F(ReplCoordHBTest, NotYetInitializedConfigStateEarlyReturn) {
+TEST_F(ReplCoordHBTest, NodeReturnsNotYetInitializedInResponseToAHeartbeatReceivedPriorToAConfig) {
     // ensure that if we've yet to receive an initial config, we return NotYetInitialized
     init("mySet");
     ReplSetHeartbeatArgs hbArgs;
@@ -223,7 +224,8 @@ TEST_F(ReplCoordHBTest, NotYetInitializedConfigStateEarlyReturn) {
     ASSERT_EQUALS(ErrorCodes::NotYetInitialized, status.code());
 }
 
-TEST_F(ReplCoordHBTest, OnlyUnauthorizedUpCausesRecovering) {
+TEST_F(ReplCoordHBTest,
+       NodeChangesToRecoveringStateWhenAllNodesRespondToHeartbeatsWithUnauthorized) {
     // Tests that a node that only has auth error heartbeats is recovering
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
     assertStartSuccess(BSON("_id"

@@ -53,7 +53,7 @@ using executor::RemoteCommandResponse;
 
 typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 
-TEST_F(ReplCoordTest, ReconfigBeforeInitialized) {
+TEST_F(ReplCoordTest, NodeReturnsNotYetInitializedWhenReconfigReceivedPriorToInitialization) {
     // start up but do not initiate
     OperationContextNoop txn;
     init();
@@ -66,7 +66,7 @@ TEST_F(ReplCoordTest, ReconfigBeforeInitialized) {
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
-TEST_F(ReplCoordTest, ReconfigWhileNotPrimary) {
+TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigReceivedWhileSecondary) {
     // start up, become secondary, receive reconfig
     OperationContextNoop txn;
     init();
@@ -79,6 +79,9 @@ TEST_F(ReplCoordTest, ReconfigWhileNotPrimary) {
                                                         << "node2:12345"))),
                        HostAndPort("node1", 12345));
 
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->setMyLastOptime(OpTime(Timestamp(100, 0), 0));
+
     BSONObjBuilder result;
     ReplSetReconfigArgs args;
     args.force = false;
@@ -87,7 +90,7 @@ TEST_F(ReplCoordTest, ReconfigWhileNotPrimary) {
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
-TEST_F(ReplCoordTest, ReconfigWithUninitializableConfig) {
+TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWithInvalidConfig) {
     // start up, become primary, receive uninitializable config
     OperationContextNoop txn;
     assertStartSuccess(BSON("_id"
@@ -120,7 +123,7 @@ TEST_F(ReplCoordTest, ReconfigWithUninitializableConfig) {
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
-TEST_F(ReplCoordTest, ReconfigWithWrongReplSetName) {
+TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWithIncorrectSetName) {
     // start up, become primary, receive config with incorrect replset name
     OperationContextNoop txn;
     assertStartSuccess(BSON("_id"
@@ -151,7 +154,8 @@ TEST_F(ReplCoordTest, ReconfigWithWrongReplSetName) {
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
-TEST_F(ReplCoordTest, ReconfigValidateFails) {
+TEST_F(ReplCoordTest,
+       NodeReturnsNewReplicaSetConfigurationIncompatibleWhenANewConfigFailsToValidate) {
     // start up, become primary, validate fails
     OperationContextNoop txn;
     assertStartSuccess(BSON("_id"
@@ -213,7 +217,8 @@ void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord, Status* status) {
     *status = replCoord->processReplSetReconfig(&txn, args, &garbage);
 }
 
-TEST_F(ReplCoordTest, ReconfigQuorumCheckFails) {
+TEST_F(ReplCoordTest,
+       NodeReturnsNewReplicaSetConfigurationIncompatibleWhenQuorumCheckFailsDuringReconfig) {
     // start up, become primary, fail during quorum check due to a heartbeat
     // containing a higher config version
     OperationContextNoop txn;
@@ -252,7 +257,7 @@ TEST_F(ReplCoordTest, ReconfigQuorumCheckFails) {
     ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
 }
 
-TEST_F(ReplCoordTest, ReconfigStoreLocalConfigDocumentFails) {
+TEST_F(ReplCoordTest, NodeReturnsOutOfDiskSpaceWhenSavingANewConfigFailsDuringReconfig) {
     // start up, become primary, saving the config fails
     OperationContextNoop txn;
     assertStartSuccess(BSON("_id"
@@ -277,7 +282,8 @@ TEST_F(ReplCoordTest, ReconfigStoreLocalConfigDocumentFails) {
     ASSERT_EQUALS(ErrorCodes::OutOfDiskSpace, status);
 }
 
-TEST_F(ReplCoordTest, ReconfigWhileReconfiggingFails) {
+TEST_F(ReplCoordTest,
+       NodeReturnsConfigurationInProgressWhenReceivingAReconfigWhileInTheMidstOfAnotherReconfig) {
     // start up, become primary, reconfig, then before that reconfig concludes, reconfig again
     OperationContextNoop txn;
     assertStartSuccess(BSON("_id"
@@ -319,7 +325,7 @@ TEST_F(ReplCoordTest, ReconfigWhileReconfiggingFails) {
     reconfigThread.join();
 }
 
-TEST_F(ReplCoordTest, ReconfigWhileInitializingFails) {
+TEST_F(ReplCoordTest, NodeReturnsConfigurationInProgressWhenReceivingAReconfigWhileInitiating) {
     // start up, initiate, then before that initiate concludes, reconfig
     OperationContextNoop txn;
     init();
@@ -354,7 +360,7 @@ TEST_F(ReplCoordTest, ReconfigWhileInitializingFails) {
     initateThread.join();
 }
 
-TEST_F(ReplCoordTest, ReconfigSuccessful) {
+TEST_F(ReplCoordTest, PrimaryNodeAcceptsNewConfigWhenReceivingAReconfigWithACompatibleConfig) {
     // start up, become primary, reconfig successfully
     OperationContextNoop txn;
     assertStartSuccess(BSON("_id"
@@ -392,7 +398,9 @@ TEST_F(ReplCoordTest, ReconfigSuccessful) {
     ASSERT_OK(status);
 }
 
-TEST_F(ReplCoordTest, ReconfigDuringHBReconfigFails) {
+TEST_F(
+    ReplCoordTest,
+    NodeReturnsConfigurationInProgressWhenReceivingAReconfigWhileInTheMidstOfAHeartbeatReconfig) {
     // start up, become primary, receive reconfig via heartbeat, then a second one
     // from reconfig
     OperationContextNoop txn;
@@ -448,7 +456,7 @@ TEST_F(ReplCoordTest, ReconfigDuringHBReconfigFails) {
     getExternalState()->setStoreLocalConfigDocumentToHang(false);
 }
 
-TEST_F(ReplCoordTest, HBReconfigDuringReconfigFails) {
+TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfig) {
     // start up, become primary, reconfig, while reconfigging receive reconfig via heartbeat
     OperationContextNoop txn;
     assertStartSuccess(BSON("_id"
@@ -509,7 +517,7 @@ TEST_F(ReplCoordTest, HBReconfigDuringReconfigFails) {
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
 }
 
-TEST_F(ReplCoordTest, ForceReconfigWhileNotPrimarySuccessful) {
+TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary) {
     // start up, become a secondary, receive a forced reconfig
     OperationContextNoop txn;
     init();
