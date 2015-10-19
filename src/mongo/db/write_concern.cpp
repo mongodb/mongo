@@ -73,9 +73,12 @@ void addJournalSyncForWMajority(WriteConcernOptions* writeConcern) {
         writeConcern->syncMode = WriteConcernOptions::JOURNAL;
     }
 }
+
+const std::string kLocalDB = "local";
 }  // namespace
 
-StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj) {
+StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj,
+                                                    const std::string& dbName) {
     // The default write concern if empty is w : 1
     // Specifying w : 0 is/was allowed, but is interpreted identically to w : 1
     WriteConcernOptions writeConcern =
@@ -107,7 +110,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj) {
         return wcStatus;
     }
 
-    wcStatus = validateWriteConcern(writeConcern);
+    wcStatus = validateWriteConcern(writeConcern, dbName);
     if (!wcStatus.isOK()) {
         return wcStatus;
     }
@@ -117,8 +120,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj) {
 
     return writeConcern;
 }
-
-Status validateWriteConcern(const WriteConcernOptions& writeConcern) {
+Status validateWriteConcern(const WriteConcernOptions& writeConcern, const std::string& dbName) {
     const bool isJournalEnabled = getGlobalServiceContext()->getGlobalStorageEngine()->isDurable();
 
     if (writeConcern.syncMode == WriteConcernOptions::JOURNAL && !isJournalEnabled) {
@@ -127,6 +129,7 @@ Status validateWriteConcern(const WriteConcernOptions& writeConcern) {
     }
 
     const bool isConfigServer = serverGlobalParams.configsvr;
+    const bool isLocalDb(dbName == kLocalDB);
     const repl::ReplicationCoordinator::Mode replMode =
         repl::getGlobalReplicationCoordinator()->getReplicationMode();
 
@@ -138,7 +141,8 @@ Status validateWriteConcern(const WriteConcernOptions& writeConcern) {
                     << "w:1 and w:'majority' are the only valid write concerns when writing to "
                        "config servers, got: " << writeConcern.toBSON().toString());
         }
-        if (replMode == repl::ReplicationCoordinator::modeReplSet && writeConcern.wMode == "") {
+        if (replMode == repl::ReplicationCoordinator::modeReplSet && !isLocalDb &&
+            writeConcern.wMode.empty()) {
             invariant(writeConcern.wNumNodes == 1);
             return Status(
                 ErrorCodes::BadValue,
@@ -216,8 +220,9 @@ Status waitForWriteConcern(OperationContext* txn,
                            const OpTime& replOpTime,
                            const WriteConcernOptions& writeConcern,
                            WriteConcernResult* result) {
-    // We assume all options have been validated earlier, if not, programming error
-    dassert(validateWriteConcern(writeConcern).isOK());
+    // We assume all options have been validated earlier, if not, programming error.
+    // Passing localDB name is a hack to avoid more rigorous check that performed for non local DB.
+    dassert(validateWriteConcern(writeConcern, kLocalDB).isOK());
 
     // Next handle blocking on disk
 

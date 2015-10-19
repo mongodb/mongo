@@ -131,7 +131,7 @@ bool WriteCmd::run(OperationContext* txn,
         return appendCommandStatus(result, Status(ErrorCodes::FailedToParse, errMsg));
     }
 
-    StatusWith<WriteConcernOptions> wcStatus = extractWriteConcern(cmdObj);
+    StatusWith<WriteConcernOptions> wcStatus = extractWriteConcern(cmdObj, dbName);
 
     if (!wcStatus.isOK()) {
         return appendCommandStatus(result, wcStatus.getStatus());

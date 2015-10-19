@@ -54,12 +54,13 @@ void setupSynchronousCommit(OperationContext* txn);
  * Verifies that the writeConcern is of type Object (BSON type) and
  * that the resulting writeConcern is valid for this particular host.
  */
-StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj);
+StatusWith<WriteConcernOptions> extractWriteConcern(const BSONObj& cmdObj,
+                                                    const std::string& dbName);
 
 /**
  * Verifies that a WriteConcern is valid for this particular host.
  */
-Status validateWriteConcern(const WriteConcernOptions& writeConcern);
+Status validateWriteConcern(const WriteConcernOptions& writeConcern, const std::string& dbName);
 
 struct WriteConcernResult {
     WriteConcernResult() {

@@ -224,7 +224,7 @@ public:
 
         if (status.isOK()) {
             // Ensure options are valid for this host
-            status = validateWriteConcern(writeConcern);
+            status = validateWriteConcern(writeConcern, dbname);
         }
 
         if (!status.isOK()) {
