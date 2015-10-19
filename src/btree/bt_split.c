@@ -1535,6 +1535,14 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_RET(__split_multi_inmem(session, page, &new, &mod->mod_multi[0]));
 
 	/*
+	 * The rewrite succeeded, we can no longer fail.
+	 *
+	 * Finalize the move, discarding moved update lists from the original
+	 * page.
+	 */
+	__split_multi_inmem_final(page, &mod->mod_multi[0]);
+
+	/*
 	 * Discard the original page.
 	 *
 	 * Pages with unresolved changes are not marked clean during
