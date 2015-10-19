@@ -58,8 +58,6 @@ public:
      * If cursor ID is zero, there are no additional batches.
      */
     struct QueryResponse {
-        QueryResponse() = default;
-        QueryResponse(CursorId theCursorId, const NamespaceString& theNss, Documents theDocuments);
         CursorId cursorId = 0;
         NamespaceString nss;
         Documents documents;
@@ -67,7 +65,7 @@ public:
             BSONObj metadata;
         } otherFields;
         Milliseconds elapsedMillis = Milliseconds(0);
-        bool first;
+        bool first = false;
     };
 
     using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
