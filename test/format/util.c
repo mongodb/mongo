@@ -32,6 +32,34 @@
 #define	MAX(a, b)	(((a) > (b)) ? (a) : (b))
 #endif
 
+/*
+ * dmalloc --
+ *	Call malloc, dying on failure.
+ */
+void *
+dmalloc(size_t len)
+{
+	void *p;
+
+	if ((p = malloc(len)) == NULL)
+		die(errno, "malloc");
+	return (p);
+}
+
+/*
+ * dstrdup --
+ *	Call strdup, dying on failure.
+ */
+static char *
+dstrdup(const char *str)
+{
+	char *p;
+
+	if ((p = strdup(str)) == NULL)
+		die(errno, "strdup");
+	return (p);
+}
+
 static inline uint32_t
 kv_len(WT_RAND_STATE *rnd, uint64_t keyno, uint32_t min, uint32_t max)
 {
@@ -409,32 +437,4 @@ fclose_and_clear(FILE **fpp)
 	if (fclose(fp) != 0)
 		die(errno, "fclose");
 	return;
-}
-
-/*
- * dmalloc --
- *	Call malloc, dying on failure.
- */
-void *
-dmalloc(size_t len)
-{
-	void *p;
-
-	if ((p = malloc(len)) == NULL)
-		die(errno, "malloc");
-	return (p);
-}
-
-/*
- * dstrdup --
- *	Call strdup, dying on failure.
- */
-char *
-dstrdup(const char *str)
-{
-	char *p;
-
-	if ((p = strdup(str)) == NULL)
-		die(errno, "strdup");
-	return (p);
 }
