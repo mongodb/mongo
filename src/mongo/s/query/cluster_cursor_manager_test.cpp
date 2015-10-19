@@ -664,8 +664,8 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorNotExhausted) {
     ASSERT_OK(checkedOutCursor.getStatus());
 }
 
-// Test that returning a pinned cursor with 'Exhausted' correctly de-registers the cursor, and
-// leaves the pin owning no cursor.
+// Test that returning a pinned cursor with 'Exhausted' correctly de-registers and destroys the
+// cursor, and leaves the pin owning no cursor.
 TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhausted) {
     auto registeredCursor =
         getManager()->registerCursor(allocateMockCursor(),
@@ -677,7 +677,41 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhausted) {
     ASSERT_OK(registeredCursor.next().getStatus());
     registeredCursor.returnCursor(ClusterCursorManager::CursorState::Exhausted);
     ASSERT_EQ(0, registeredCursor.getCursorId());
+
+    // Cursor should have been destroyed without ever being killed. To be sure that the cursor has
+    // not been marked kill pending but not yet destroyed (i.e. that the cursor is not a zombie), we
+    // reapZombieCursors() and check that the cursor still has not been killed.
     ASSERT_NOT_OK(getManager()->checkOutCursor(nss, cursorId).getStatus());
+    ASSERT(!isMockCursorKilled(0));
+    getManager()->reapZombieCursors();
+    ASSERT(!isMockCursorKilled(0));
+}
+
+// Test that when a cursor is returned as exhausted but is still managing non-exhausted remote
+// cursors, the cursor is not destroyed immediately. Instead, it should be marked kill pending, and
+// should be killed and destroyed by reapZombieCursors().
+TEST_F(ClusterCursorManagerTest, PinnedCursorReturnCursorExhaustedWithNonExhaustedRemotes) {
+    auto mockCursor = allocateMockCursor();
+
+    // The mock should indicate that is has open remote cursors.
+    mockCursor->markRemotesNotExhausted();
+
+    auto registeredCursor =
+        getManager()->registerCursor(std::move(mockCursor),
+                                     nss,
+                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
+                                     ClusterCursorManager::CursorLifetime::Mortal);
+    CursorId cursorId = registeredCursor.getCursorId();
+    ASSERT_NE(0, cursorId);
+    ASSERT_OK(registeredCursor.next().getStatus());
+    registeredCursor.returnCursor(ClusterCursorManager::CursorState::Exhausted);
+    ASSERT_EQ(0, registeredCursor.getCursorId());
+
+    // Cursor should be kill pending, so it will be killed during reaping.
+    ASSERT_NOT_OK(getManager()->checkOutCursor(nss, cursorId).getStatus());
+    ASSERT(!isMockCursorKilled(0));
+    getManager()->reapZombieCursors();
+    ASSERT(isMockCursorKilled(0));
 }
 
 // Test that the PinnedCursor move assignment operator correctly kills the cursor if it has not yet
@@ -703,25 +737,6 @@ TEST_F(ClusterCursorManagerTest, PinnedCursorDestructorKill) {
                                          ClusterCursorManager::CursorType::NamespaceNotSharded,
                                          ClusterCursorManager::CursorLifetime::Mortal);
     }
-    ASSERT(!isMockCursorKilled(0));
-    getManager()->reapZombieCursors();
-    ASSERT(isMockCursorKilled(0));
-}
-
-// Test that cursors checked back in as exhausted are killed. Even exhausted cursors may have open
-// cursors on the remote shards, so they need to be killed in order to properly clean up these
-// remote cursors.
-TEST_F(ClusterCursorManagerTest, ExhaustedCursorKill) {
-    auto pinnedCursor =
-        getManager()->registerCursor(allocateMockCursor(),
-                                     nss,
-                                     ClusterCursorManager::CursorType::NamespaceNotSharded,
-                                     ClusterCursorManager::CursorLifetime::Mortal);
-    ASSERT(!isMockCursorKilled(0));
-    pinnedCursor.returnCursor(ClusterCursorManager::CursorState::Exhausted);
-
-    // Despite being returned as exhausted, the cursor should be alive until zombie cursors are
-    // reaped.
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors();
     ASSERT(isMockCursorKilled(0));

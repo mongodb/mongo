@@ -327,9 +327,14 @@ private:
 
     /**
      * Transfers ownership of the given pinned cursor back to the manager, and moves the cursor to
-     * the 'idle' state.  If 'cursorState' is 'Exhausted' and the cursor is not marked as 'kill
-     * pending', destroys the cursor (if the cursor is marked as 'kill pending', destruction of the
-     * cursor is delayed until it reaped).  Thread-safe.
+     * the 'idle' state.
+     *
+     * If 'cursorState' is 'Exhausted', the cursor will be destroyed.  However, destruction will be
+     * delayed until reapZombieCursors() is called under the following circumstances:
+     *   - The cursor is already marked as 'kill pending'.
+     *   - The cursor is managing open remote cursors which still need to be cleaned up.
+     *
+     * Thread-safe.
      *
      * Intentionally private.  Clients should use public methods on PinnedCursor to check a cursor
      * back in.
@@ -480,14 +485,15 @@ private:
         CursorEntryMap entryMap;
     };
 
-    // Synchronizes access to all private state.
+    // Clock source.  Used when the 'last active' time for a cursor needs to be set/updated.  May be
+    // concurrently accessed by multiple threads.
+    ClockSource* _clockSource;
+
+    // Synchronizes access to all private state variables below.
     mutable stdx::mutex _mutex;
 
     // Randomness source.  Used for cursor id generation.
     PseudoRandom _pseudoRandom;
-
-    // Clock source.  Used when the 'last active' time for a cursor needs to be set/updated.
-    ClockSource* _clockSource;
 
     // Map from cursor id prefix to associated namespace.  Exists only to provide namespace lookup
     // for (deprecated) getNamespaceForCursorId() method.

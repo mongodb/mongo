@@ -163,8 +163,8 @@ void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
 }
 
 ClusterCursorManager::ClusterCursorManager(ClockSource* clockSource)
-    : _pseudoRandom(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()),
-      _clockSource(clockSource) {
+    : _clockSource(clockSource),
+      _pseudoRandom(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()) {
     invariant(_clockSource);
 }
 
@@ -178,6 +178,9 @@ ClusterCursorManager::PinnedCursor ClusterCursorManager::registerCursor(
     const NamespaceString& nss,
     CursorType cursorType,
     CursorLifetime cursorLifetime) {
+    // Read the clock out of the lock.
+    const auto now = _clockSource->now();
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     invariant(cursor);
@@ -214,8 +217,8 @@ ClusterCursorManager::PinnedCursor ClusterCursorManager::registerCursor(
     } while (cursorId == 0 || entryMap.count(cursorId) > 0);
 
     // Create a new CursorEntry and register it in the CursorEntryContainer's map.
-    auto emplaceResult = entryMap.emplace(
-        cursorId, CursorEntry(std::move(cursor), cursorType, cursorLifetime, _clockSource->now()));
+    auto emplaceResult =
+        entryMap.emplace(cursorId, CursorEntry(std::move(cursor), cursorType, cursorLifetime, now));
     invariant(emplaceResult.second);
 
     // Pin and return the cursor.  Note that pinning a cursor transfers ownership of the underlying
@@ -227,6 +230,9 @@ ClusterCursorManager::PinnedCursor ClusterCursorManager::registerCursor(
 
 StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursor(
     const NamespaceString& nss, CursorId cursorId) {
+    // Read the clock out of the lock.
+    const auto now = _clockSource->now();
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     CursorEntry* entry = getEntry_inlock(nss, cursorId);
@@ -241,7 +247,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
         return cursorInUseStatus(nss, cursorId);
     }
 
-    entry->setLastActive(_clockSource->now());
+    entry->setLastActive(now);
 
     // Note that pinning a cursor transfers ownership of the underlying ClusterClientCursor object
     // to the pin; the CursorEntry is left with a null ClusterClientCursor.
@@ -252,9 +258,11 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
                                          const NamespaceString& nss,
                                          CursorId cursorId,
                                          CursorState cursorState) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     invariant(cursor);
+
+    const bool remotesExhausted = cursor->remotesExhausted();
 
     CursorEntry* entry = getEntry_inlock(nss, cursorId);
     invariant(entry);
@@ -265,9 +273,21 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
         return;
     }
 
-    // The cursor is exhausted, and the cursor doesn't already have a pending kill. Schedule for
-    // deletion by setting the kill pending flag.
-    entry->setKillPending();
+    if (!remotesExhausted) {
+        // The cursor still has open remote cursors that need to be cleaned up. Schedule for
+        // deletion by the reaper thread by setting the kill pending flag.
+        entry->setKillPending();
+        return;
+    }
+
+    // The cursor is exhausted, is not already scheduled for deletion, and does not have any
+    // remote cursor state left to clean up. We can delete the cursor right away.
+    auto detachedCursor = detachCursor_inlock(nss, cursorId);
+    invariantOK(detachedCursor.getStatus());
+
+    // Deletion of the cursor can happen out of the lock.
+    lk.unlock();
+    detachedCursor.getValue().reset();
 }
 
 Status ClusterCursorManager::killCursor(const NamespaceString& nss, CursorId cursorId) {
@@ -336,8 +356,8 @@ void ClusterCursorManager::reapZombieCursors() {
 
         lk.unlock();
         zombieCursor.getValue()->kill();
+        zombieCursor.getValue().reset();
         lk.lock();
-        // Cursor deleted as it goes out of scope.
     }
 }
 
