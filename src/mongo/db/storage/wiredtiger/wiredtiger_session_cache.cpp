@@ -191,6 +191,10 @@ void WiredTigerSessionCache::closeAll() {
     }
 }
 
+bool WiredTigerSessionCache::isEphemeral() {
+    return _engine && _engine->isEphemeral();
+}
+
 WiredTigerSession* WiredTigerSessionCache::getSession() {
     // We should never be able to get here after _shuttingDown is set, because no new
     // operations should be allowed to start.

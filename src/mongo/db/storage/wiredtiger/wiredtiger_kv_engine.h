@@ -50,9 +50,10 @@ class WiredTigerSizeStorer;
 class WiredTigerKVEngine final : public KVEngine {
 public:
     WiredTigerKVEngine(const std::string& path,
-                       const std::string& extraOpenOptions = "",
-                       bool durable = true,
-                       bool repair = false);
+                       const std::string& extraOpenOptions,
+                       bool durable,
+                       bool ephemeral,
+                       bool repair);
     virtual ~WiredTigerKVEngine();
 
     void setRecordStoreExtraOptions(const std::string& options);
@@ -64,6 +65,10 @@ public:
 
     virtual bool isDurable() const {
         return _durable;
+    }
+
+    virtual bool isEphemeral() {
+        return _ephemeral;
     }
 
     virtual RecoveryUnit* newRecoveryUnit();
@@ -152,6 +157,7 @@ private:
     std::string _path;
 
     bool _durable;
+    bool _ephemeral;
     std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;
 
     std::string _rsOptions;

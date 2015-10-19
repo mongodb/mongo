@@ -60,8 +60,12 @@ public:
         if (lockFile.createdByUncleanShutdown()) {
             warning() << "Recovering data from the last clean checkpoint.";
         }
-        WiredTigerKVEngine* kv = new WiredTigerKVEngine(
-            params.dbpath, wiredTigerGlobalOptions.engineConfig, params.dur, params.repair);
+        const bool ephemeral = false;
+        WiredTigerKVEngine* kv = new WiredTigerKVEngine(params.dbpath,
+                                                        wiredTigerGlobalOptions.engineConfig,
+                                                        params.dur,
+                                                        ephemeral,
+                                                        params.repair);
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
         // Intentionally leaked.

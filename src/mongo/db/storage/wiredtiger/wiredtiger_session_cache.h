@@ -152,6 +152,7 @@ public:
      */
     void shuttingDown();
 
+    bool isEphemeral();
     /**
      * Waits until all commits that happened before this call are durable.
      */

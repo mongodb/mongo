@@ -110,10 +110,12 @@ private:
 WiredTigerKVEngine::WiredTigerKVEngine(const std::string& path,
                                        const std::string& extraOpenOptions,
                                        bool durable,
+                                       bool ephemeral,
                                        bool repair)
     : _eventHandler(WiredTigerUtil::defaultEventHandlers()),
       _path(path),
       _durable(durable),
+      _ephemeral(ephemeral),
       _sizeStorerSyncTracker(100000, 60 * 1000) {
     size_t cacheSizeGB = wiredTigerGlobalOptions.cacheSizeGB;
     if (cacheSizeGB == 0) {
@@ -262,6 +264,9 @@ int64_t WiredTigerKVEngine::getIdentSize(OperationContext* opCtx, StringData ide
 Status WiredTigerKVEngine::repairIdent(OperationContext* opCtx, StringData ident) {
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession(opCtx);
     session->closeAllCursors();
+    if (isEphemeral()) {
+        return Status::OK();
+    }
     string uri = _uri(ident);
     return _salvageIfNeeded(uri.c_str());
 }
@@ -372,13 +377,14 @@ RecordStore* WiredTigerKVEngine::getRecordStore(OperationContext* opCtx,
                                          ns,
                                          _uri(ident),
                                          options.capped,
+                                         _ephemeral,
                                          options.cappedSize ? options.cappedSize : 4096,
                                          options.cappedMaxDocs ? options.cappedMaxDocs : -1,
                                          NULL,
                                          _sizeStorer.get());
     } else {
         return new WiredTigerRecordStore(
-            opCtx, ns, _uri(ident), false, -1, -1, NULL, _sizeStorer.get());
+            opCtx, ns, _uri(ident), false, _ephemeral, -1, -1, NULL, _sizeStorer.get());
     }
 }
 

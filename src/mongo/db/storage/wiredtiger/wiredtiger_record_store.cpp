@@ -725,6 +725,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
                                              StringData ns,
                                              StringData uri,
                                              bool isCapped,
+                                             bool isEphemeral,
                                              int64_t cappedMaxSize,
                                              int64_t cappedMaxDocs,
                                              CappedCallback* cappedCallback,
@@ -733,6 +734,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
       _uri(uri.toString()),
       _tableId(WiredTigerSession::genTableId()),
       _isCapped(isCapped),
+      _isEphemeral(isEphemeral),
       _isOplog(NamespaceString::oplog(ns)),
       _cappedMaxSize(cappedMaxSize),
       _cappedMaxSizeSlack(std::min(cappedMaxSize / 10, int64_t(16 * 1024 * 1024))),
@@ -848,6 +850,9 @@ int64_t WiredTigerRecordStore::cappedMaxSize() const {
 int64_t WiredTigerRecordStore::storageSize(OperationContext* txn,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel) const {
+    if (_isEphemeral) {
+        return dataSize(txn);
+    }
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession(txn);
     StatusWith<int64_t> result =
         WiredTigerUtil::getStatisticsValueAs<int64_t>(session->getSession(),
@@ -1407,11 +1412,13 @@ Status WiredTigerRecordStore::compact(OperationContext* txn,
                                       const CompactOptions* options,
                                       CompactStats* stats) {
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
-    WiredTigerSession* session = cache->getSession();
-    WT_SESSION* s = session->getSession();
-    int ret = s->compact(s, getURI().c_str(), "timeout=0");
-    invariantWTOK(ret);
-    cache->releaseSession(session);
+    if (!cache->isEphemeral()) {
+        WiredTigerSession* session = cache->getSession();
+        WT_SESSION* s = session->getSession();
+        int ret = s->compact(s, getURI().c_str(), "timeout=0");
+        invariantWTOK(ret);
+        cache->releaseSession(session);
+    }
     return Status::OK();
 }
 
@@ -1421,7 +1428,7 @@ Status WiredTigerRecordStore::validate(OperationContext* txn,
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results,
                                        BSONObjBuilder* output) {
-    {
+    if (!_isEphemeral) {
         int err = WiredTigerUtil::verifyTable(txn, _uri, &results->errors);
         if (err == EBUSY) {
             const char* msg = "verify() returned EBUSY. Not treating as invalid.";

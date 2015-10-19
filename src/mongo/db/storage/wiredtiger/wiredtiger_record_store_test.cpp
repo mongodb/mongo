@@ -107,7 +107,7 @@ public:
             uow.commit();
         }
 
-        return stdx::make_unique<WiredTigerRecordStore>(&txn, ns, uri);
+        return stdx::make_unique<WiredTigerRecordStore>(&txn, ns, uri, false, false);
     }
 
     std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
@@ -138,7 +138,7 @@ public:
         }
 
         return stdx::make_unique<WiredTigerRecordStore>(
-            &txn, ns, uri, true, cappedMaxSize, cappedMaxDocs);
+            &txn, ns, uri, true, false, cappedMaxSize, cappedMaxDocs);
     }
 
     RecoveryUnit* newRecoveryUnit() final {
@@ -345,7 +345,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
     {
         unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
-        rs.reset(new WiredTigerRecordStore(opCtx.get(), "a.b", uri, false, -1, -1, NULL, &ss));
+        rs.reset(
+            new WiredTigerRecordStore(opCtx.get(), "a.b", uri, false, false, -1, -1, NULL, &ss));
     }
 
     {
@@ -500,8 +501,8 @@ TEST_F(SizeStorerValidateTest, InvalidSizeStorerAtCreation) {
 
     unique_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
     sizeStorer->storeToCache(uri, expectedNumRecords * 2, expectedDataSize * 2);
-    rs.reset(
-        new WiredTigerRecordStore(opCtx.get(), "a.b", uri, false, -1, -1, NULL, sizeStorer.get()));
+    rs.reset(new WiredTigerRecordStore(
+        opCtx.get(), "a.b", uri, false, false, -1, -1, NULL, sizeStorer.get()));
     ASSERT_EQUALS(expectedNumRecords * 2, rs->numRecords(NULL));
     ASSERT_EQUALS(expectedDataSize * 2, rs->dataSize(NULL));
 

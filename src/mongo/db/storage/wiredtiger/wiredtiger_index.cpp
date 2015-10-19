@@ -262,7 +262,7 @@ void WiredTigerIndex::fullValidate(OperationContext* txn,
                                    bool full,
                                    long long* numKeysOut,
                                    BSONObjBuilder* output) const {
-    {
+    if (!WiredTigerRecoveryUnit::get(txn)->getSessionCache()->isEphemeral()) {
         std::vector<std::string> errors;
         int err = WiredTigerUtil::verifyTable(txn, _uri, output ? &errors : NULL);
         if (err == EBUSY) {

@@ -86,7 +86,8 @@ public:
     WiredTigerRecordStore(OperationContext* txn,
                           StringData ns,
                           StringData uri,
-                          bool isCapped = false,
+                          bool isCapped,
+                          bool isEphemeral,
                           int64_t cappedMaxSize = -1,
                           int64_t cappedMaxDocs = -1,
                           CappedCallback* cappedCallback = nullptr,
@@ -263,6 +264,8 @@ private:
 
     // The capped settings should not be updated once operations have started
     const bool _isCapped;
+    // True if the storage engine is an in-memory storage engine
+    const bool _isEphemeral;
     // True if the namespace of this record store starts with "local.oplog.", and false otherwise.
     const bool _isOplog;
     const int64_t _cappedMaxSize;

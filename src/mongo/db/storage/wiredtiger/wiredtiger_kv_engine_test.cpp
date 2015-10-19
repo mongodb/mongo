@@ -39,7 +39,7 @@ namespace mongo {
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper() : _dbpath("wt-kv-harness") {
-        _engine.reset(new WiredTigerKVEngine(_dbpath.path()));
+        _engine.reset(new WiredTigerKVEngine(_dbpath.path(), "", false, false, false));
     }
 
     virtual ~WiredTigerKVHarnessHelper() {
@@ -48,7 +48,7 @@ public:
 
     virtual KVEngine* restartEngine() {
         _engine.reset(NULL);
-        _engine.reset(new WiredTigerKVEngine(_dbpath.path()));
+        _engine.reset(new WiredTigerKVEngine(_dbpath.path(), "", false, false, false));
         return _engine.get();
     }
 

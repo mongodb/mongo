@@ -112,6 +112,13 @@ public:
     virtual bool isDurable() const = 0;
 
     /**
+     * See StorageEngine::isEphemeral for details
+     */
+    virtual bool isEphemeral() {
+        return false;
+    }
+
+    /**
      * This must not change over the lifetime of the engine.
      */
     virtual bool supportsDocLocking() const = 0;
