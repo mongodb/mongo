@@ -331,7 +331,7 @@ Status addMongodOptions(moe::OptionSection* options) {
 
     storage_options.addOptionChaining("storage.journal.commitIntervalMs",
                                       "journalCommitInterval",
-                                      moe::Unsigned,
+                                      moe::Int,
                                       "how often to group/batch commit (ms)",
                                       "storage.mmapv1.journal.commitIntervalMs");
 
