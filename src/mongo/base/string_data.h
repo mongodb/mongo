@@ -59,13 +59,13 @@ class StringData {
     StringData(const char* c, size_t len, TrustedInitTag) : _data(c), _size(len) {}
 
 public:
-    /** Constructs an empty StringData */
+    /** Constructs an empty StringData. */
     StringData() = default;
 
     /**
      * Constructs a StringData, for the case where the length of the
-     * string is not known. 'c' must be a pointer to a null-terminated
-     * string.
+     * string is not known. 'c' must either be NULL, or a pointer to a
+     * null-terminated string.
      */
     StringData(const char* str) : StringData(str, str ? std::strlen(str) : 0) {}
 
@@ -80,21 +80,22 @@ public:
     StringData(const char(&val)[N], LiteralTag)
         : StringData(&val[0], N - 1) {}
 
-    /** Constructs a StringData, for the case of a std::string. We can
+    /**
+     * Constructs a StringData, for the case of a std::string. We can
      * use the trusted init path with no follow on checks because
      * string::data is assured to never return nullptr.
      */
     StringData(const std::string& s) : StringData(s.data(), s.length(), TrustedInitTag()) {}
 
     /**
-     * Constructs a StringData with an explicit length. 'c' must be a
+     * Constructs a StringData with an explicit length. 'c' must
+     * either be NULL (in which case len must be zero), or be a
      * pointer into a character array. The StringData will refer to
      * the first 'len' characters starting at 'c'. The range of
      * characters c to c+len must be valid.
      */
     StringData(const char* c, size_t len) : StringData(c, len, TrustedInitTag()) {
-        if (kDebugBuild)
-            invariant(_data || (_size == 0));
+        invariant(_data || (_size == 0));
     }
 
     /**
