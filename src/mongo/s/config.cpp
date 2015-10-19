@@ -32,7 +32,6 @@
 
 #include "mongo/s/config.h"
 
-
 #include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
 #include "mongo/db/lasterror.h"
@@ -146,10 +145,6 @@ DBConfig::DBConfig(std::string name, const DatabaseType& dbt, repl::OpTime confi
 DBConfig::~DBConfig() = default;
 
 bool DBConfig::isSharded(const string& ns) {
-    if (!_shardingEnabled) {
-        return false;
-    }
-
     stdx::lock_guard<stdx::mutex> lk(_lock);
 
     if (!_shardingEnabled) {
@@ -181,9 +176,10 @@ void DBConfig::invalidateNs(const std::string& ns) {
 }
 
 void DBConfig::enableSharding(OperationContext* txn) {
-    verify(_name != "config");
+    invariant(_name != "config");
 
     stdx::lock_guard<stdx::mutex> lk(_lock);
+
     if (_shardingEnabled) {
         return;
     }
