@@ -41,7 +41,7 @@
 
 /*
  * WT_WITH_TURTLE_LOCK --
- *	Acquire the turlte file lock, perform an operation, drop the lock.
+ *	Acquire the turtle file lock, perform an operation, drop the lock.
  */
 #define	WT_WITH_TURTLE_LOCK(session, op) do {				\
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_TURTLE));\
