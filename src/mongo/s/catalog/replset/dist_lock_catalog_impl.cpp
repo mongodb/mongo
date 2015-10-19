@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/dist_lock_catalog_impl.h"
+#include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
 
 #include <string>
 

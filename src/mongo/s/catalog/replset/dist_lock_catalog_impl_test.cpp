@@ -44,7 +44,7 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/s/catalog/catalog_manager_mock.h"
-#include "mongo/s/catalog/dist_lock_catalog_impl.h"
+#include "mongo/s/catalog/replset/dist_lock_catalog_impl.h"
 #include "mongo/s/catalog/type_lockpings.h"
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/client/shard_registry.h"

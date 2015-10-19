@@ -141,10 +141,6 @@ void DistributedLock::LastPings::setLastPing(const ConnectionString& conn,
     _lastPings[std::make_pair(conn.toString(), lockName)] = pd;
 }
 
-Date_t DistributedLock::getRemoteTime() const {
-    return DistributedLock::remoteTime(_conn, _maxNetSkew);
-}
-
 bool DistributedLock::isRemoteTimeSkewed() const {
     return !DistributedLock::checkSkew(_conn, NUM_LOCK_SKEW_CHECKS, _maxClockSkew, _maxNetSkew);
 }

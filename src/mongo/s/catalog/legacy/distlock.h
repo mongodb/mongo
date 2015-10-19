@@ -177,8 +177,6 @@ public:
      */
     bool unlock(const OID& lockID);
 
-    Date_t getRemoteTime() const;
-
     bool isRemoteTimeSkewed() const;
 
     const std::string& getProcessId() const;
