@@ -236,6 +236,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
             stdx::unique_lock<stdx::mutex> lk(_mutex);
             if (!_priorityTakeoverCbh.isValid()) {
                 auto when = _replExecutor.now() + _rsConfig.getPriorityTakeoverDelay(_selfIndex);
+                log() << "Scheduling priority takeover at " << when;
                 _priorityTakeoverCbh = _scheduleWorkAt(
                     when,
                     stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this));
@@ -659,6 +660,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleLivenessUpdate_inlock(int u
 
 void ReplicationCoordinatorImpl::_cancelPriorityTakeover_inlock() {
     if (_priorityTakeoverCbh.isValid()) {
+        log() << "Canceling priority takeover callback";
         _replExecutor.cancel(_priorityTakeoverCbh);
         _priorityTakeoverCbh = CallbackHandle();
     }
@@ -666,6 +668,7 @@ void ReplicationCoordinatorImpl::_cancelPriorityTakeover_inlock() {
 
 void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
     if (_handleElectionTimeoutCbh.isValid()) {
+        LOG(4) << "Canceling election timeout callback at " << _handleElectionTimeoutWhen;
         _replExecutor.cancel(_handleElectionTimeoutCbh);
         _handleElectionTimeoutCbh = CallbackHandle();
         _handleElectionTimeoutWhen = Date_t();
@@ -693,6 +696,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
     auto now = _replExecutor.now();
     auto when = now + _rsConfig.getElectionTimeoutPeriod() + randomOffset;
     invariant(when > now);
+    LOG(4) << "Scheduling election timeout callback at " << when;
     _handleElectionTimeoutWhen = when;
     _handleElectionTimeoutCbh = _scheduleWorkAt(
         when, stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this));

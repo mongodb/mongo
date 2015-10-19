@@ -211,6 +211,7 @@ private:
         hb.setState(memberState);
         hb.setOpTime(lastOpTimeSender);
         hb.setElectionTime(electionTime);
+        hb.setTerm(getTopoCoord().getTerm());
 
         StatusWith<ReplSetHeartbeatResponse> hbResponse = responseStatus.isOK()
             ? StatusWith<ReplSetHeartbeatResponse>(hb)
@@ -2723,6 +2724,56 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPriorTakeoverDueToHigherPrior
                                                             lastOpTimeApplied);
     ASSERT_EQUALS(HeartbeatResponseAction::PriorityTakeover, nextAction.getAction());
     ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+}
+
+TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataTermPreventsPriorityTakeover) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "members" << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                              << "host0:27017"
+                                                                              << "priority" << 2)
+                                                                   << BSON("_id" << 1 << "host"
+                                                                                 << "host1:27017"
+                                                                                 << "priority" << 3)
+                                                                   << BSON("_id" << 2 << "host"
+                                                                                 << "host2:27017"))
+                      << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+                 0);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    OpTime election = OpTime(Timestamp(400, 0), 0);
+    OpTime lastOpTimeApplied = OpTime(Timestamp(300, 0), 0);
+
+    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+
+    // Host 2 is the current primary in term 1.
+    getTopoCoord().updateTerm(1, now());
+    ASSERT_EQUALS(getTopoCoord().getTerm(), 1);
+    HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                            "rs0",
+                                                            MemberState::RS_PRIMARY,
+                                                            election,
+                                                            election,
+                                                            lastOpTimeApplied);
+    ASSERT_EQUALS(HeartbeatResponseAction::PriorityTakeover, nextAction.getAction());
+    ASSERT_EQUALS(2, getCurrentPrimaryIndex());
+
+    now()++;
+    // Host 1 starts an election due to higher priority by sending vote requests.
+    // Vote request updates my term.
+    getTopoCoord().updateTerm(2, now());
+
+    // This heartbeat shouldn't schedule priority takeover, because the current primary
+    // host 1 is not in my term.
+    nextAction = receiveUpHeartbeat(HostAndPort("host1"),
+                                    "rs0",
+                                    MemberState::RS_SECONDARY,
+                                    election,
+                                    election,
+                                    lastOpTimeApplied);
+    ASSERT_EQUALS(HeartbeatResponseAction::NoAction, nextAction.getAction());
+    ASSERT_EQUALS(2, getCurrentPrimaryIndex());
 }
 
 TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPrimaryDownMajorityOfVotersUp) {

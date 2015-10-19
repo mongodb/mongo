@@ -204,6 +204,11 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
 
     _isReplSet = doc[kIsReplSetFieldName].trueValue();
 
+    Status termStatus = bsonExtractIntegerField(doc, kTermFieldName, &_term);
+    if (!termStatus.isOK() && termStatus != ErrorCodes::NoSuchKey) {
+        return termStatus;
+    }
+
     // In order to support both the 3.0(V0) and 3.2(V1) heartbeats we must parse the OpTime
     // field based on its type. If it is a Date, we parse it as the timestamp and use
     // initialize's term argument to complete the OpTime type. If it is an Object, then it's
