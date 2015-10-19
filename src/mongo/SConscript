@@ -345,13 +345,15 @@ if not has_option('noshell') and usemozjs:
                     "shell/shell_options_init.cpp"
                 ],
                 LIBDEPS=[
-                    'db/index/external_key_generator',
                     'db/catalog/index_key_validate',
+                    'db/index/external_key_generator',
+                    'db/query/command_request_response',
+                    'db/query/lite_parsed_query',
+                    'linenoise_utf8',
                     'scripting/scripting',
+                    'shell/mongojs',
                     'util/processinfo',
                     'util/signal_handlers',
-                    'linenoise_utf8',
-                    'shell/mongojs',
                 ],
                 LIBDEPS_TAGS=[
                     # Circular with shell_options below. It is unclear

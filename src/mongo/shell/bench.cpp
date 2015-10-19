@@ -39,6 +39,9 @@
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/thread.h"
@@ -358,6 +361,57 @@ bool BenchRunWorker::shouldCollectStats() const {
 
 void doNothing(const BSONObj&) {}
 
+/**
+ * Issues the query 'lpq' against 'conn' using read commands.  Returns the size of the result set
+ * returned by the query.
+ *
+ * If 'lpq' has the 'wantMore' flag set to false and the 'limit' option set to 1LL, then the caller
+ * may optionally specify a pointer to an object in 'objOut', which will be filled in with the
+ * single object in the query result set (or the empty object, if the result set is empty).
+ * If 'lpq' doesn't have these options set, then nullptr must be passed for 'objOut'.
+ *
+ * On error, throws a UserException.
+ */
+int runQueryWithReadCommands(DBClientBase* conn,
+                             unique_ptr<LiteParsedQuery> lpq,
+                             BSONObj* objOut = nullptr) {
+    std::string dbName = lpq->nss().db().toString();
+    BSONObj findCommandResult;
+    bool res = conn->runCommand(dbName, lpq->asFindCommand(), findCommandResult);
+    uassert(ErrorCodes::CommandFailed,
+            str::stream() << "find command failed; reply was: " << findCommandResult,
+            res);
+
+    CursorResponse cursorResponse =
+        uassertStatusOK(CursorResponse::parseFromBSON(findCommandResult));
+    int count = cursorResponse.getBatch().size();
+
+    if (objOut) {
+        invariant(lpq->getLimit() && *lpq->getLimit() == 1 && !lpq->wantMore());
+        // Since this is a "single batch" query, we can simply grab the first item in the result set
+        // and return here.
+        *objOut = (count > 0) ? cursorResponse.getBatch()[0] : BSONObj();
+        return count;
+    }
+
+    while (cursorResponse.getCursorId() != 0) {
+        GetMoreRequest getMoreRequest(lpq->nss(),
+                                      cursorResponse.getCursorId(),
+                                      lpq->getBatchSize(),
+                                      boost::none,   // term
+                                      boost::none);  // lastKnownCommittedOpTime
+        BSONObj getMoreCommandResult;
+        res = conn->runCommand(dbName, getMoreRequest.toBSON(), getMoreCommandResult);
+        uassert(ErrorCodes::CommandFailed,
+                str::stream() << "getMore command failed; reply was: " << getMoreCommandResult,
+                res);
+        cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(getMoreCommandResult));
+        count += cursorResponse.getBatch().size();
+    }
+
+    return count;
+}
+
 void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
     verify(conn);
     long long count = 0;
@@ -386,8 +440,14 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
 
             int delay = e["delay"].eoo() ? 0 : e["delay"].Int();
 
-            // Let's default to writeCmd == false.
-            bool useWriteCmd = e["writeCmd"].eoo() ? false : e["writeCmd"].Bool();
+            bool useWriteCmd = false;  // By default, don't use write commands.
+            if (e["writeCmd"]) {
+                useWriteCmd = e["writeCmd"].Bool();
+            }
+            bool useReadCmd = false;  // By default, don't use read commands.
+            if (e["readCmd"]) {
+                useReadCmd = e["readCmd"].Bool();
+            }
 
             BSONObj context = e["context"].eoo() ? BSONObj() : e["context"].Obj();
 
@@ -421,11 +481,26 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                 if (op == "nop") {
                     // do nothing
                 } else if (op == "findOne") {
+                    BSONObj fixedQuery = fixQuery(e["query"].Obj(), bsonTemplateEvaluator);
                     BSONObj result;
-                    {
+                    if (useReadCmd) {
+                        unique_ptr<LiteParsedQuery> lpq =
+                            LiteParsedQuery::makeAsFindCmd(NamespaceString(ns),
+                                                           fixedQuery,
+                                                           BSONObj(),    // projection
+                                                           BSONObj(),    // sort
+                                                           BSONObj(),    // hint
+                                                           BSONObj(),    // readConcern
+                                                           boost::none,  // skip
+                                                           1LL,          // limit
+                                                           boost::none,  // batchSize
+                                                           boost::none,  // ntoreturn
+                                                           false);       // wantMore
                         BenchRunEventTrace _bret(&stats.findOneCounter);
-                        result =
-                            conn->findOne(ns, fixQuery(e["query"].Obj(), bsonTemplateEvaluator));
+                        runQueryWithReadCommands(conn, std::move(lpq), &result);
+                    } else {
+                        BenchRunEventTrace _bret(&stats.findOneCounter);
+                        result = conn->findOne(ns, fixedQuery);
                     }
 
                     if (check) {
@@ -475,24 +550,46 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                     int skip = e["skip"].eoo() ? 0 : e["skip"].Int();
                     int options = e["options"].eoo() ? 0 : e["options"].Int();
                     int batchSize = e["batchSize"].eoo() ? 0 : e["batchSize"].Int();
-                    BSONObj filter = e["filter"].eoo() ? BSONObj() : e["filter"].Obj();
                     int expected = e["expected"].eoo() ? -1 : e["expected"].Int();
 
-                    unique_ptr<DBClientCursor> cursor;
+                    // TODO: The following option should be named "projection".  The work to rename
+                    // it is being tracked at SERVER-21013.
+                    BSONObj projection = e["filter"].eoo() ? BSONObj() : e["filter"].Obj();
+
                     int count;
 
                     BSONObj fixedQuery = fixQuery(e["query"].Obj(), bsonTemplateEvaluator);
 
-                    // use special query function for exhaust query option
-                    if (options & QueryOption_Exhaust) {
+                    if (useReadCmd) {
+                        uassert(28824,
+                                "cannot use 'options' in combination with read commands",
+                                !options);
+                        unique_ptr<LiteParsedQuery> lpq = LiteParsedQuery::makeAsFindCmd(
+                            NamespaceString(ns),
+                            fixedQuery,
+                            projection,
+                            BSONObj(),  // sort
+                            BSONObj(),  // hint
+                            BSONObj(),  // readConcern
+                            skip ? boost::optional<long long>(skip) : boost::none,
+                            limit ? boost::optional<long long>(limit) : boost::none,
+                            batchSize ? boost::optional<long long>(batchSize) : boost::none);
                         BenchRunEventTrace _bret(&stats.queryCounter);
-                        stdx::function<void(const BSONObj&)> castedDoNothing(doNothing);
-                        count = conn->query(castedDoNothing, ns, fixedQuery, &filter, options);
+                        count = runQueryWithReadCommands(conn, std::move(lpq));
                     } else {
-                        BenchRunEventTrace _bret(&stats.queryCounter);
-                        cursor =
-                            conn->query(ns, fixedQuery, limit, skip, &filter, options, batchSize);
-                        count = cursor->itcount();
+                        // Use special query function for exhaust query option.
+                        if (options & QueryOption_Exhaust) {
+                            BenchRunEventTrace _bret(&stats.queryCounter);
+                            stdx::function<void(const BSONObj&)> castedDoNothing(doNothing);
+                            count =
+                                conn->query(castedDoNothing, ns, fixedQuery, &projection, options);
+                        } else {
+                            BenchRunEventTrace _bret(&stats.queryCounter);
+                            unique_ptr<DBClientCursor> cursor;
+                            cursor = conn->query(
+                                ns, fixedQuery, limit, skip, &projection, options, batchSize);
+                            count = cursor->itcount();
+                        }
                     }
 
                     if (expected >= 0 && count != expected) {
