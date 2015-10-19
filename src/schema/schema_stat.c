@@ -73,27 +73,30 @@ __curstat_size_only(WT_SESSION_IMPL *session,
 	WT_CLEAR(namebuf);
 	*was_fast = false;
 
-	if (!F_ISSET(cst, WT_CONN_STAT_SIZE))
-		return (0);
-
+	/* Retrieve the metadata for this table. */
 	WT_RET(__wt_metadata_search(session, uri, &tableconf));
-	WT_ERR(__wt_config_getones(session, tableconf, "columns", &colconf));
 
+	/*
+	 * The fast path only works if the table consists of a single file
+	 * and does not have any indexes. The absence of named columns is how
+	 * we determine that neither of those conditions can be satisfied.
+	 */
+	WT_ERR(__wt_config_getones(session, tableconf, "columns", &colconf));
 	WT_ERR(__wt_config_subinit(session, &cparser, &colconf));
 	if ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
 		goto err;
 
-	/* Build up a file name from a table URI. */
+	/* Build up the file name from the table URI. */
 	WT_ERR(__wt_buf_fmt(
 	    session, &namebuf, "%s.wt", uri + strlen("table:")));
 	/*
-	 * Get the size of the underlying file.
-	 * TODO: It's possible that we will race with a table drop here, if
-	 * we do then there will be an error message generated.
+	 * Get the size of the underlying file.  There is nothing stopping a
+	 * race with schema level table operations (for example drop) if there
+	 * is a race there will be an error message generated.
 	 */
 	WT_ERR(__wt_filesize_name(session, namebuf.data, &filesize));
 
-	/* Setup the statistics structure */
+	/* Setup and populate the statistics structure */
 	__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
 	cst->u.dsrc_stats.block_size = filesize;
 	__wt_curstat_dsrc_final(cst);
@@ -123,9 +126,15 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 	const char *name;
 	bool was_fast;
 
-	WT_RET(__curstat_size_only(session, uri, &was_fast, cst));
-	if (was_fast)
-		return (0);
+	/*
+	 * If only gathering table size statistics, try a fast path that
+	 * avoids the schema and table list locks.
+	 */
+	if (F_ISSET(cst, WT_CONN_STAT_SIZE)) {
+		WT_RET(__curstat_size_only(session, uri, &was_fast, cst));
+		if (was_fast)
+			return (0);
+	}
 
 	name = uri + strlen("table:");
 	WT_RET(__wt_schema_get_table(
