@@ -62,8 +62,6 @@
 #define	WT_GCC_ATTRIBUTE(x)
 #endif
 
-extern WT_EXTENSION_API *wt_api;
-
 #define	EXTPATH	"../../ext/"			/* Extensions path */
 
 #define	BZIP_PATH							\
@@ -94,8 +92,6 @@ extern WT_EXTENSION_API *wt_api;
 #define	KILOBYTE(v)	((v) * 1024)
 #undef	MEGABYTE
 #define	MEGABYTE(v)	((v) * 1048576)
-#undef	GIGABYTE
-#define	GIGABYTE(v)	((v) * 1073741824ULL)
 
 #define	WT_NAME	"wt"				/* Object name */
 
@@ -311,7 +307,6 @@ void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
 void	*dmalloc(size_t);
-char	*dstrdup(const char *);
 void	 fclose_and_clear(FILE **);
 void	 key_gen(uint8_t *, size_t *, uint64_t);
 void	 key_gen_insert(WT_RAND_STATE *, uint8_t *, size_t *, uint64_t);
