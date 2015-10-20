@@ -507,8 +507,6 @@ public:
             return appendCommandStatus(result, Status(lockStatus.code(), msg));
         }
 
-        log() << "About to enter migrate critical section";
-
         uassertStatusOK(chunkMoveState.commitMigration(txn));
 
         shardingState->migrationSourceManager()->done(txn);

@@ -269,6 +269,8 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
     invariant(_distLockStatus.is_initialized());
     invariant(_distLockStatus->isOK());
 
+    log() << "About to enter migrate critical section";
+
     // We're under the collection distributed lock here, so no other migrate can change maxVersion
     // or CollectionMetadata state.
     ShardingState* const shardingState = ShardingState::get(txn);

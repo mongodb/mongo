@@ -32,6 +32,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/operation_context.h"
@@ -223,6 +224,12 @@ Status waitForWriteConcern(OperationContext* txn,
     // We assume all options have been validated earlier, if not, programming error.
     // Passing localDB name is a hack to avoid more rigorous check that performed for non local DB.
     dassert(validateWriteConcern(writeConcern, kLocalDB).isOK());
+
+    // We should never be waiting for write concern while holding any sort of lock, because this may
+    // lead to situations where the replication heartbeats are stalled.
+    //
+    // This check does not hold for writes done through dbeval because it runs with a global X lock.
+    dassert(!txn->lockState()->isLocked() || txn->getClient()->isInDirectClient());
 
     // Next handle blocking on disk
 
