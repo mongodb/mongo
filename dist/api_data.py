@@ -1019,6 +1019,9 @@ methods = {
         fail if the database already exists, generally used with the
         \c create option''',
         type='boolean'),
+    Config('in_memory', 'true', r'''
+        keep data in-memory only, minimize disk I/O''',
+        type='boolean', undoc=True),
     Config('use_environment_priv', 'false', r'''
         use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
         variables regardless of whether or not the process is running
