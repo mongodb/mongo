@@ -923,6 +923,7 @@ tasks:
           ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} tool
 
 - name: push
+  patchable: false
   depends_on:
   - name: "*"
   stepback: false
