@@ -68,10 +68,13 @@ public:
         return _name;
     }
 
-    void _deleteExcessDocuments() {
+    /**
+     * Returns true iff there was an oplog to delete from.
+     */
+    bool _deleteExcessDocuments() {
         if (!getGlobalServiceContext()->getGlobalStorageEngine()) {
-            LOG(1) << "no global storage engine yet";
-            return;
+            LOG(2) << "no global storage engine yet";
+            return false;
         }
 
         OperationContextImpl txn;
@@ -84,14 +87,14 @@ public:
             Database* db = autoDb.getDb();
             if (!db) {
                 LOG(2) << "no local database yet";
-                return;
+                return false;
             }
 
             Lock::CollectionLock collectionLock(txn.lockState(), _ns.ns(), MODE_IX);
             Collection* collection = db->getCollection(_ns);
             if (!collection) {
                 LOG(2) << "no collection " << _ns;
-                return;
+                return false;
             }
 
             OldClientContext ctx(&txn, _ns.ns(), false);
@@ -99,7 +102,7 @@ public:
                 checked_cast<WiredTigerRecordStore*>(collection->getRecordStore());
 
             if (!rs->yieldAndAwaitOplogDeletionRequest(&txn)) {
-                return;  // Oplog went away.
+                return false;  // Oplog went away.
             }
             rs->reclaimOplog(&txn);
         } catch (const std::exception& e) {
@@ -108,13 +111,16 @@ public:
         } catch (...) {
             fassertFailedNoTrace(!"unknown error in WiredTigerRecordStoreThread");
         }
+        return true;
     }
 
     virtual void run() {
         Client::initThread(_name.c_str());
 
         while (!inShutdown()) {
-            _deleteExcessDocuments();
+            if (!_deleteExcessDocuments()) {
+                sleepmillis(1000);  // Back off in case there were problems deleting.
+            }
         }
     }
 
