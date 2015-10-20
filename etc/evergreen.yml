@@ -1369,7 +1369,6 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets --storageEngine=mmapv1
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: replicasets_WT
@@ -1379,7 +1378,6 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets --storageEngine=wiredTiger
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: replicasets_WT_ese
@@ -1389,7 +1387,6 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets_ese --storageEngine=wiredTiger
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: replicasets_auth
@@ -1399,7 +1396,6 @@ tasks:
     vars:
       resmoke_args: --suites=replica_sets_auth
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: replicasets_legacy
@@ -1418,7 +1414,6 @@ tasks:
     vars:
       resmoke_args: --suites=replication --storageEngine=mmapv1
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: replication_WT
@@ -1428,7 +1423,6 @@ tasks:
     vars:
       resmoke_args: --suites=replication --storageEngine=wiredTiger
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: replication_auth
@@ -1440,7 +1434,6 @@ tasks:
     vars:
       resmoke_args: --suites=replication_auth
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: sasl
@@ -1459,7 +1452,6 @@ tasks:
     vars:
       resmoke_args: --suites=sharding --storageEngine=mmapv1
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: sharding_WT
@@ -1469,7 +1461,6 @@ tasks:
     vars:
       resmoke_args: --suites=sharding --storageEngine=wiredTiger
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: sharding_WT_ese
@@ -1479,7 +1470,6 @@ tasks:
     vars:
       resmoke_args: --suites=sharding_ese --storageEngine=wiredTiger
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: sharding_auth
@@ -1489,7 +1479,6 @@ tasks:
     vars:
       resmoke_args: --suites=sharding_auth
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: sharding_auth_audit_WT
@@ -1501,7 +1490,6 @@ tasks:
     vars:
       resmoke_args: --suites=sharding_auth_audit --storageEngine=wiredTiger
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: sharding_legacy
@@ -1511,7 +1499,6 @@ tasks:
     vars:
       resmoke_args: --suites=sharding_legacy
       run_multiple_jobs: true
-      max_jobs: 2
 
 - <<: *task_template
   name: snmp
