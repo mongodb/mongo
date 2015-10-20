@@ -1019,7 +1019,7 @@ methods = {
         fail if the database already exists, generally used with the
         \c create option''',
         type='boolean'),
-    Config('in_memory', 'true', r'''
+    Config('in_memory', 'false', r'''
         keep data in-memory only, minimize disk I/O''',
         type='boolean', undoc=True),
     Config('use_environment_priv', 'false', r'''

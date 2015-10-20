@@ -975,7 +975,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "eviction_target=80,eviction_trigger=95,exclusive=0,extensions=,"
 	  "file_extend=,file_manager=(close_handle_minimum=250,"
 	  "close_idle_time=30,close_scan_interval=10),hazard_max=1000,"
-	  "in_memory=,log=(archive=,compressor=,enabled=0,file_max=100MB,"
+	  "in_memory=0,log=(archive=,compressor=,enabled=0,file_max=100MB,"
 	  "path=,prealloc=,recover=on,zero_fill=0),lsm_manager=(merge=,"
 	  "worker_thread_max=4),lsm_merge=,mmap=,multiprocess=0,"
 	  "session_max=100,session_scratch_max=2MB,shared_cache=(chunk=10MB"
