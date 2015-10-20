@@ -2961,7 +2961,6 @@ buildvariants:
   - name: jsCore
   - name: jsDecimalCore
   - name: jsDecimalCore_WT
-  - name: jstestfuzz
   - name: unittests
 
 ###########################################
