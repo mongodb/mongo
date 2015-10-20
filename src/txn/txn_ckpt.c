@@ -371,7 +371,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	full = idle = logging = tracking = false;
 
 	/* Ensure the metadata table is open before taking any locks. */
-	WT_RET(__wt_metadata_open(session));
+	WT_RET(__wt_metadata_session_cursor(session, NULL));
 
 	/*
 	 * Do a pass over the configuration arguments and figure out what kind
@@ -551,14 +551,16 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		saved_meta_next = session->meta_track_next;
 		session->meta_track_next = NULL;
 		WT_WITH_DHANDLE(session,
-		    session->meta_dhandle, ret = __wt_checkpoint(session, cfg));
+		    WT_CURSOR_DHANDLE(session->meta_cursor),
+		    ret = __wt_checkpoint(session, cfg));
 		session->meta_track_next = saved_meta_next;
 		WT_ERR(ret);
 
 		WT_ERR(__checkpoint_verbose_track(session,
 		    "metadata sync completed", &verb_timer));
 	} else
-		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		WT_WITH_DHANDLE(session,
+		    WT_CURSOR_DHANDLE(session->meta_cursor),
 		    ret = __wt_txn_checkpoint_log(
 		    session, false, WT_TXN_LOG_CKPT_SYNC, NULL));
 
@@ -601,8 +603,8 @@ err:	/*
 	 */
 	if (full && logging) {
 		if (ret == 0 &&
-		    F_ISSET((WT_BTREE *)session->meta_dhandle->handle,
-		    WT_BTREE_SKIP_CKPT))
+		    F_ISSET(((WT_CURSOR_BTREE *)
+		    session->meta_cursor)->btree, WT_BTREE_SKIP_CKPT))
 			idle = true;
 		WT_TRET(__wt_txn_checkpoint_log(session, full,
 		    (ret == 0 && !idle) ?

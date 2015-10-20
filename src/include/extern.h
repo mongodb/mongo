@@ -438,12 +438,12 @@ extern int __wt_ext_metadata_search(WT_EXTENSION_API *wt_api, WT_SESSION *wt_ses
 extern int __wt_ext_metadata_update(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *key, const char *value);
 extern int __wt_metadata_get_ckptlist( WT_SESSION *session, const char *name, WT_CKPT **ckptbasep);
 extern void __wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase);
-extern int __wt_metadata_open(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor( WT_SESSION_IMPL *session, const char *config, WT_CURSOR **cursorp);
+extern int __wt_metadata_session_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
 extern int __wt_metadata_insert( WT_SESSION_IMPL *session, const char *key, const char *value);
 extern int __wt_metadata_update( WT_SESSION_IMPL *session, const char *key, const char *value);
 extern int __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key);
-extern int __wt_metadata_search( WT_SESSION_IMPL *session, const char *key, char **valuep);
+extern int __wt_metadata_search(WT_SESSION_IMPL *session, const char *key, char **valuep);
 extern void __wt_meta_track_discard(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_on(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll);

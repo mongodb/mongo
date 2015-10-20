@@ -188,15 +188,16 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	/*
 	 * Read-uncommitted transactions see all other changes.
 	 *
-	 * All metadata reads are at read-uncommitted isolation.  That's
-	 * because once a schema-level operation completes, subsequent
-	 * operations must see the current version of checkpoint metadata, or
-	 * they may try to read blocks that may have been freed from a file.
-	 * Metadata updates use non-transactional techniques (such as the
-	 * schema and metadata locks) to protect access to in-flight updates.
+	 * All metadata reads are at read-uncommitted isolation because once a
+	 * schema-level operation completes, subsequent operations must see the
+	 * current version of checkpoint metadata, or they may try to read
+	 * blocks that may have been freed from a file. Metadata updates use
+	 * non-transactional techniques (such as the schema and metadata locks)
+	 * to protect access to in-flight updates.
 	 */
 	if (txn->isolation == WT_ISO_READ_UNCOMMITTED ||
-	    session->dhandle == session->meta_dhandle)
+	    session->meta_cursor == NULL ||
+	    session->dhandle == WT_CURSOR_DHANDLE(session->meta_cursor))
 		return (true);
 
 	/* Transactions see their own changes. */

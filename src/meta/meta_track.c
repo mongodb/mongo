@@ -261,23 +261,26 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 	}
 
 	/*
-	 * If we don't have the metadata handle (e.g, we're in the process of
+	 * If we don't have the metadata cursor (e.g, we're in the process of
 	 * creating the metadata), we can't sync it.
 	 */
-	if (!need_sync || session->meta_dhandle == NULL)
+	if (!need_sync || session->meta_cursor == NULL)
 		goto done;
 
 	/* If we're logging, make sure the metadata update was flushed. */
 	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED)) {
-		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		WT_WITH_DHANDLE(session,
+		    WT_CURSOR_DHANDLE(session->meta_cursor),
 		    ret = __wt_txn_checkpoint_log(
 			session, false, WT_TXN_LOG_CKPT_SYNC, NULL));
 		WT_RET(ret);
 	} else {
-		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		WT_WITH_DHANDLE(session,
+		    WT_CURSOR_DHANDLE(session->meta_cursor),
 		    ret = __wt_checkpoint(session, NULL));
 		WT_RET(ret);
-		WT_WITH_DHANDLE(session, session->meta_dhandle,
+		WT_WITH_DHANDLE(session,
+		    WT_CURSOR_DHANDLE(session->meta_cursor),
 		    ret = __wt_checkpoint_sync(session, NULL));
 		WT_RET(ret);
 	}

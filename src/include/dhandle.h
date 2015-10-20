@@ -33,6 +33,10 @@
 	(F_ISSET(dhandle, WT_DHANDLE_DEAD) ||				\
 	!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_OPEN))
 
+/* Cursor's data handle. */
+#define	WT_CURSOR_DHANDLE(c)						\
+	(((WT_CURSOR_BTREE *)(c))->btree->dhandle)
+
 /*
  * WT_DATA_HANDLE --
  *	A handle for a generic named data source.

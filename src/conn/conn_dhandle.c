@@ -708,6 +708,15 @@ restart:
 	__wt_session_close_cache(session);
 	F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 
+	/*
+	 * The connection may have an open metadata cursor handle. We cannot
+	 * close it before now because it's potentially used when discarding
+	 * other open data handles. Close it before discarding the underlying
+	 * metadata handle.
+	 */
+	if (session->meta_cursor != NULL)
+		WT_TRET(session->meta_cursor->close(session->meta_cursor));
+
 	/* Close the metadata file handle. */
 	while ((dhandle = TAILQ_FIRST(&conn->dhqh)) != NULL)
 		WT_WITH_DHANDLE(session, dhandle,

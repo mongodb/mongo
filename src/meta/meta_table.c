@@ -31,21 +31,21 @@ __metadata_turtle(const char *key)
 }
 
 /*
- * __wt_metadata_open --
- *	Opens the metadata file, sets session->meta_dhandle.
+ * __wt_metadata_cursor --
+ *	Opens a cursor on the metadata.
  */
 int
-__wt_metadata_open(WT_SESSION_IMPL *session)
+__wt_metadata_cursor(
+    WT_SESSION_IMPL *session, const char *config, WT_CURSOR **cursorp)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
+	const char *open_cursor_cfg[] = {
+	    WT_CONFIG_BASE(session, WT_SESSION_open_cursor), config, NULL };
 
-	if (session->meta_dhandle != NULL)
-		return (0);
-
-	WT_RET(__wt_session_get_btree(session, WT_METAFILE_URI, NULL, NULL, 0));
-
-	session->meta_dhandle = session->dhandle;
-	WT_ASSERT(session, session->meta_dhandle != NULL);
+	WT_WITHOUT_DHANDLE(session, ret = __wt_open_cursor(
+	    session, WT_METAFILE_URI, NULL, open_cursor_cfg, cursorp));
+	WT_RET(ret);
 
 	/* 
 	 * Set special flags for the metadata file: eviction (the metadata file
@@ -56,7 +56,7 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 	 * opens (the first update is safe because it's single-threaded from
 	 * wiredtiger_open).
 	 */
-	btree = S2BT(session);
+	btree = ((WT_CURSOR_BTREE *)(*cursorp))->btree;
 	if (!F_ISSET(btree, WT_BTREE_IN_MEMORY))
 		F_SET(btree, WT_BTREE_IN_MEMORY);
 	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
@@ -64,44 +64,22 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 	if (F_ISSET(btree, WT_BTREE_NO_LOGGING))
 		F_CLR(btree, WT_BTREE_NO_LOGGING);
 
-	/* The metadata handle doesn't need to stay locked -- release it. */
-	return (__wt_session_release_btree(session));
+	return (0);
 }
 
 /*
- * __wt_metadata_cursor --
- *	Opens a cursor on the metadata.
+ * __wt_metadata_session_cursor --
+ *	Opens the session's cached metadata cursor.
  */
 int
-__wt_metadata_cursor(
-    WT_SESSION_IMPL *session, const char *config, WT_CURSOR **cursorp)
+__wt_metadata_session_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 {
-	WT_DATA_HANDLE *saved_dhandle;
-	WT_DECL_RET;
-	bool is_dead;
-	const char *cfg[] =
-	    { WT_CONFIG_BASE(session, WT_SESSION_open_cursor), config, NULL };
-
-	saved_dhandle = session->dhandle;
-	WT_ERR(__wt_metadata_open(session));
-
-	session->dhandle = session->meta_dhandle;
-
-	/* 
-	 * We use the metadata a lot, so we have a handle cached; lock it and
-	 * increment the in-use counter once the cursor is open.
-	 */
-	WT_ERR(__wt_session_lock_dhandle(session, 0, &is_dead));
-
-	/* The metadata should never be closed. */
-	WT_ASSERT(session, !is_dead);
-
-	WT_ERR(__wt_curfile_create(session, NULL, cfg, false, false, cursorp));
-	__wt_cursor_dhandle_incr_use(session);
-
-	/* Restore the caller's btree. */
-err:	session->dhandle = saved_dhandle;
-	return (ret);
+	if (session->meta_cursor == NULL)
+		WT_RET(__wt_metadata_cursor(
+		    session, NULL, &session->meta_cursor));
+	if (cursorp != NULL)
+		*cursorp = session->meta_cursor;
+	return (0);
 }
 
 /*
@@ -113,7 +91,6 @@ __wt_metadata_insert(
     WT_SESSION_IMPL *session, const char *key, const char *value)
 {
 	WT_CURSOR *cursor;
-	WT_DECL_RET;
 
 	WT_RET(__wt_verbose(session, WT_VERB_METADATA,
 	    "Insert: key: %s, value: %s, tracking: %s, %s" "turtle",
@@ -124,15 +101,14 @@ __wt_metadata_insert(
 		WT_RET_MSG(session, EINVAL,
 		    "%s: insert not supported on the turtle file", key);
 
-	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
+
+	WT_RET(__wt_metadata_session_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
-	WT_ERR(cursor->insert(cursor));
+	WT_RET(cursor->insert(cursor));
 	if (WT_META_TRACKING(session))
-		WT_ERR(__wt_meta_track_insert(session, key));
-
-err:	WT_TRET(cursor->close(cursor));
-	return (ret);
+		WT_RET(__wt_meta_track_insert(session, key));
+	return (cursor->reset(cursor));
 }
 
 /*
@@ -160,13 +136,11 @@ __wt_metadata_update(
 	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_update(session, key));
 
-	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_RET(__wt_metadata_session_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
-	WT_ERR(cursor->insert(cursor));
-
-err:	WT_TRET(cursor->close(cursor));
-	return (ret);
+	WT_RET(cursor->insert(cursor));
+	return (cursor->reset(cursor));
 }
 
 /*
@@ -177,7 +151,6 @@ int
 __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 {
 	WT_CURSOR *cursor;
-	WT_DECL_RET;
 
 	WT_RET(__wt_verbose(session, WT_VERB_METADATA,
 	    "Remove: key: %s, tracking: %s, %s" "turtle",
@@ -188,15 +161,15 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 		WT_RET_MSG(session, EINVAL,
 		    "%s: remove not supported on the turtle file", key);
 
-	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
-	cursor->set_key(cursor, key);
-	WT_ERR(cursor->search(cursor));
-	if (WT_META_TRACKING(session))
-		WT_ERR(__wt_meta_track_update(session, key));
-	WT_ERR(cursor->remove(cursor));
 
-err:	WT_TRET(cursor->close(cursor));
-	return (ret);
+	WT_RET(__wt_metadata_session_cursor(session, &cursor));
+	cursor->set_key(cursor, key);
+	WT_RET(cursor->search(cursor));
+	if (WT_META_TRACKING(session))
+		WT_RET(__wt_meta_track_update(session, key));
+	cursor->set_key(cursor, key);
+	WT_RET(cursor->remove(cursor));
+	return (cursor->reset(cursor));
 }
 
 /*
@@ -205,11 +178,9 @@ err:	WT_TRET(cursor->close(cursor));
  *	The caller is responsible for freeing the allocated memory.
  */
 int
-__wt_metadata_search(
-    WT_SESSION_IMPL *session, const char *key, char **valuep)
+__wt_metadata_search(WT_SESSION_IMPL *session, const char *key, char **valuep)
 {
 	WT_CURSOR *cursor;
-	WT_DECL_RET;
 	const char *value;
 
 	*valuep = NULL;
@@ -222,12 +193,10 @@ __wt_metadata_search(
 	if (__metadata_turtle(key))
 		return (__wt_turtle_read(session, key, valuep));
 
-	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_RET(__wt_metadata_session_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
-	WT_ERR(cursor->search(cursor));
-	WT_ERR(cursor->get_value(cursor, &value));
-	WT_ERR(__wt_strdup(session, value, valuep));
-
-err:	WT_TRET(cursor->close(cursor));
-	return (ret);
+	WT_RET(cursor->search(cursor));
+	WT_RET(cursor->get_value(cursor, &value));
+	WT_RET(__wt_strdup(session, value, valuep));
+	return (cursor->reset(cursor));
 }
