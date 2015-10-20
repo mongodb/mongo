@@ -489,8 +489,14 @@ class ExpressionAbs final : public ExpressionSingleNumericArg<ExpressionAbs> {
 class ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
 public:
     Value evaluateInternal(Variables* vars) const final;
+
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };
@@ -506,9 +512,16 @@ public:
 class ExpressionAnd final : public ExpressionVariadic<ExpressionAnd> {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
+
     Value evaluateInternal(Variables* vars) const final;
+
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };
@@ -939,8 +952,14 @@ public:
 class ExpressionMultiply final : public ExpressionVariadic<ExpressionMultiply> {
 public:
     Value evaluateInternal(Variables* vars) const final;
+
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };
@@ -1076,9 +1095,16 @@ private:
 class ExpressionOr final : public ExpressionVariadic<ExpressionOr> {
 public:
     boost::intrusive_ptr<Expression> optimize() final;
+
     Value evaluateInternal(Variables* vars) const final;
+
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };
@@ -1118,8 +1144,14 @@ public:
 class ExpressionSetIntersection final : public ExpressionVariadic<ExpressionSetIntersection> {
 public:
     Value evaluateInternal(Variables* vars) const final;
+
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };
@@ -1140,9 +1172,16 @@ private:
 class ExpressionSetUnion final : public ExpressionVariadic<ExpressionSetUnion> {
 public:
     // intrusive_ptr<Expression> optimize() final;
+
     Value evaluateInternal(Variables* vars) const final;
+
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };

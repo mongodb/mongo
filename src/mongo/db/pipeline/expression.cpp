@@ -2171,7 +2171,7 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
     }
 
     // Remaining optimizations are only for associative and commutative expressions.
-    if (!isAssociativeAndCommutative())
+    if (!isAssociative() || !isCommutative())
         return this;
 
     // Process vpOperand to split it into constant and nonconstant vectors.
@@ -2187,8 +2187,8 @@ intrusive_ptr<Expression> ExpressionNary::optimize() {
             // commutative, then we can extract its operands and inline them here. We detect
             // sameness of the child operator by checking for equality of the opNames
             ExpressionNary* nary = dynamic_cast<ExpressionNary*>(expr.get());
-            if (!nary || !str::equals(nary->getOpName(), getOpName()) ||
-                !nary->isAssociativeAndCommutative()) {
+            if (!nary || !str::equals(nary->getOpName(), getOpName()) || !nary->isAssociative() ||
+                !nary->isCommutative()) {
                 nonConstExprs.push_back(expr);
             } else {
                 // same expression, so flatten by adding to vpOperand which

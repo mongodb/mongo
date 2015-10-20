@@ -1707,23 +1707,31 @@ public:
         }
         return Value(values);
     }
+
     virtual const char* getOpName() const {
         return "$testable";
     }
-    virtual bool isAssociativeAndCommutative() const {
-        return _isAssociativeAndCommutative;
+
+    virtual bool isAssociative() const {
+        return _isAssociative;
     }
-    static intrusive_ptr<Testable> create(bool associativeAndCommutative = false) {
-        return new Testable(associativeAndCommutative);
+
+    virtual bool isCommutative() const {
+        return _isCommutative;
+    }
+
+    static intrusive_ptr<Testable> create(bool associative = false, bool commutative = false) {
+        return new Testable(associative, commutative);
     }
     static intrusive_ptr<ExpressionNary> factory() {
-        return new Testable(true);
+        return new Testable(true, true);
     }
     static intrusive_ptr<Testable> createFromOperands(const BSONArray& operands,
-                                                      bool haveFactory = false) {
+                                                      bool associative = false,
+                                                      bool commutative = false) {
         VariablesIdGenerator idGenerator;
         VariablesParseState vps(&idGenerator);
-        intrusive_ptr<Testable> testable = create(haveFactory);
+        intrusive_ptr<Testable> testable = create(associative, commutative);
         BSONObjIterator i(operands);
         while (i.more()) {
             BSONElement element = i.next();
@@ -1736,9 +1744,10 @@ public:
     }
 
 private:
-    Testable(bool isAssociativeAndCommutative)
-        : _isAssociativeAndCommutative(isAssociativeAndCommutative) {}
-    bool _isAssociativeAndCommutative;
+    Testable(bool isAssociative, bool isCommutative)
+        : _isAssociative(isAssociative), _isCommutative(isCommutative) {}
+    bool _isAssociative;
+    bool _isCommutative;
 };
 
 /** Adding operands to the expression. */
@@ -1870,6 +1879,7 @@ class StringConstant : public NoFactoryOptimizeBase {
         return Testable::createFromOperands(BSON_ARRAY("abc"
                                                        << "def"
                                                        << "$path"),
+                                            true,
                                             true);
     }
 };
@@ -1878,7 +1888,7 @@ class StringConstant : public NoFactoryOptimizeBase {
  */
 class SingleConstant : public NoFactoryOptimizeBase {
     intrusive_ptr<Testable> createTestable() {
-        return Testable::createFromOperands(BSON_ARRAY(55 << "$path"), true);
+        return Testable::createFromOperands(BSON_ARRAY(55 << "$path"), true, true);
     }
 };
 
@@ -1894,7 +1904,7 @@ class FactoryOptimize {
 public:
     void run() {
         intrusive_ptr<Testable> testable =
-            Testable::createFromOperands(BSON_ARRAY(55 << 66 << "$path"), true);
+            Testable::createFromOperands(BSON_ARRAY(55 << 66 << "$path"), true, true);
         intrusive_ptr<Expression> optimized = testable->optimize();
         // The constant expressions are evaluated separately and placed at the
         // end.
@@ -1912,10 +1922,11 @@ public:
                        // $and has a factory, but it's a different factory from
                        // $testable.
                        BSON("$add" << BSON_ARRAY(5 << 6 << "$q")) << 66),
+            true,
             true);
         // Add a nested $testable operand.
         testable->addOperand(
-            Testable::createFromOperands(BSON_ARRAY(99 << 100 << "$another_path"), true));
+            Testable::createFromOperands(BSON_ARRAY(99 << 100 << "$another_path"), true, true));
         intrusive_ptr<Expression> optimized = testable->optimize();
         ASSERT_EQUALS(constify(BSON("$testable" << BSON_ARRAY(  // non constant parts
                                         "$path" << BSON("$add" << BSON_ARRAY("$q" << 11))
@@ -1931,10 +1942,10 @@ class FlattenThreeLayers {
 public:
     void run() {
         intrusive_ptr<Testable> top =
-            Testable::createFromOperands(BSON_ARRAY(1 << 2 << "$a"), true);
+            Testable::createFromOperands(BSON_ARRAY(1 << 2 << "$a"), true, true);
         intrusive_ptr<Testable> nested =
-            Testable::createFromOperands(BSON_ARRAY(3 << 4 << "$b"), true);
-        nested->addOperand(Testable::createFromOperands(BSON_ARRAY(5 << 6 << "$c"), true));
+            Testable::createFromOperands(BSON_ARRAY(3 << 4 << "$b"), true, true);
+        nested->addOperand(Testable::createFromOperands(BSON_ARRAY(5 << 6 << "$c"), true, true));
         top->addOperand(nested);
         intrusive_ptr<Expression> optimized = top->optimize();
         ASSERT_EQUALS(
