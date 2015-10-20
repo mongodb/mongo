@@ -21,14 +21,14 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	const char *uri;
-	int cmp, tret;
+	int cmp;
 
 	saved_dhandle = session->dhandle;
 	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, "file:");
-	if ((tret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
-		tret = cursor->next(cursor);
-	for (; tret == 0; tret = cursor->next(cursor)) {
+	if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
+		ret = cursor->next(cursor);
+	for (; ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor, &uri));
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
@@ -43,8 +43,7 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 		 */
 		ret = __wt_session_get_btree(session, uri, NULL, NULL, 0);
 		if (ret == 0) {
-			WT_SAVE_DHANDLE(session,
-			    ret = func(session, cfg));
+			WT_SAVE_DHANDLE(session, ret = func(session, cfg));
 			if (WT_META_TRACKING(session))
 				WT_TRET(__wt_meta_track_handle_lock(
 				    session, false));
@@ -55,9 +54,9 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 			    session, uri, NULL, func, cfg);
 		WT_ERR(ret);
 	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
 
-	if (tret != WT_NOTFOUND)
-		WT_TRET(tret);
 err:	WT_TRET(cursor->close(cursor));
 	session->dhandle = saved_dhandle;
 	return (ret);
