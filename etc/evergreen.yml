@@ -1799,6 +1799,7 @@ tasks:
           ${asan_symbolizer} ${python|python} buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --storageEngine=wiredTiger tool
 
 - name: push
+  patchable: false
   depends_on:
   - name: "*"
   stepback: false
