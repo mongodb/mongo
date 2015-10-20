@@ -101,7 +101,6 @@ __wt_metadata_insert(
 		WT_RET_MSG(session, EINVAL,
 		    "%s: insert not supported on the turtle file", key);
 
-
 	WT_RET(__wt_metadata_session_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
@@ -160,7 +159,6 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 	if (__metadata_turtle(key))
 		WT_RET_MSG(session, EINVAL,
 		    "%s: remove not supported on the turtle file", key);
-
 
 	WT_RET(__wt_metadata_session_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
