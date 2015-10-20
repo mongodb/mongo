@@ -120,14 +120,14 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 	 * If a file was being bulk-loaded during the hot backup, it will appear
 	 * in the metadata file, but the file won't exist.  Create on demand.
 	 */
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_RET(__wt_metadata_session_cursor(session, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
-		WT_ERR(cursor->get_key(cursor, &key));
+		WT_RET(cursor->get_key(cursor, &key));
 		if (!WT_PREFIX_SKIP(key, "file:"))
 			continue;
 
 		/* If the file exists, it's all good. */
-		WT_ERR(__wt_exist(session, key, &exist));
+		WT_RET(__wt_exist(session, key, &exist));
 		if (exist)
 			continue;
 
@@ -135,16 +135,13 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 		 * If the file doesn't exist, assume it's a bulk-loaded file;
 		 * retrieve the allocation size and re-create the file.
 		 */
-		WT_ERR(__wt_direct_io_size_check(
+		WT_RET(__wt_direct_io_size_check(
 		    session, filecfg, "allocation_size", &allocsize));
-		WT_ERR(__wt_block_manager_create(session, key, allocsize));
+		WT_RET(__wt_block_manager_create(session, key, allocsize));
 	}
-	WT_ERR_NOTFOUND_OK(ret);
+	WT_RET_NOTFOUND_OK(ret);
 
-err:	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
-
-	return (ret);
+	return (0);
 }
 
 /*
