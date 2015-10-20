@@ -234,7 +234,7 @@ void setOplogCollectionName() {
 }
 
 namespace {
-void createOplog(OperationContext* txn, const std::string& oplogCollectionName) {
+void cacheOplogCollection(OperationContext* txn, const std::string& oplogCollectionName) {
     Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
     Lock::CollectionLock lk2(txn->lockState(), oplogCollectionName, MODE_IX);
 
@@ -370,7 +370,7 @@ void _logOp(OperationContext* txn,
         return;
 
     if (_localOplogCollection == nullptr)
-        createOplog(txn, oplogCollectionName);
+        cacheOplogCollection(txn, oplogCollectionName);
 
     Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
 
