@@ -511,13 +511,7 @@ void WriteBatchExecutor::incWriteStats(const BatchedCommandRequest::BatchType op
                                        const WriteOpStats& stats,
                                        const WriteErrorDetail* error,
                                        CurOp* currentOp) {
-    if (opType == BatchedCommandRequest::BatchType_Insert) {
-        _stats->numInserted += stats.n;
-        currentOp->debug().ninserted += stats.n;
-        if (!error) {
-            _le->recordInsert(stats.n);
-        }
-    } else if (opType == BatchedCommandRequest::BatchType_Update) {
+    if (opType == BatchedCommandRequest::BatchType_Update) {
         if (stats.upsertedID.isEmpty()) {
             _stats->numMatched += stats.n;
             _stats->numModified += stats.nModified;
@@ -758,27 +752,57 @@ static void normalizeInserts(const BatchedCommandRequest& request,
 
 static void insertOne(WriteBatchExecutor::ExecInsertsState* state, WriteOpResult* result);
 
+// Loops over the specified subset of the batch, processes one document at a time.
+void WriteBatchExecutor::insertMany(WriteBatchExecutor::ExecInsertsState* state,
+                                    size_t startIndex,
+                                    size_t endIndex,
+                                    CurOp* currentOp,
+                                    std::vector<WriteErrorDetail*>* errors,
+                                    bool ordered) {
+    for (state->currIndex = startIndex; state->currIndex < endIndex; ++state->currIndex) {
+        WriteOpResult result;
+        BatchItemRef currInsertItem(state->request, state->currIndex);
+        {
+            stdx::lock_guard<Client> lk(*_txn->getClient());
+            currentOp->setQuery_inlock(currInsertItem.getDocument());
+            currentOp->debug().query = currInsertItem.getDocument();
+        }
+
+        _opCounters->gotInsert();
+        // Internally, insertOne retries the single insert until it completes without a write
+        // conflict exception, or until it fails with some kind of error.  Errors are mostly
+        // propagated via the request->error field, but DBExceptions or std::exceptions may escape,
+        // particularly on operation interruption.  These kinds of errors necessarily prevent
+        // further insertOne calls, and stop the batch.  As a result, the only expected source of
+        // such exceptions are interruptions.
+        insertOne(state, &result);
+
+        uint64_t nInserted = result.getStats().n;
+        _stats->numInserted += nInserted;
+        currentOp->debug().ninserted += nInserted;
+
+        const WriteErrorDetail* error = result.getError();
+        if (error) {
+            _le->setLastError(error->getErrCode(), error->getErrMessage().c_str());
+            WriteErrorDetail* error = NULL;
+            error = result.releaseError();
+            errors->push_back(error);
+            error->setIndex(state->currIndex);
+            CurOp* const currentOp = CurOp::get(_txn);
+            logCurOpError(currentOp, error);
+            if (ordered)
+                break;
+        } else {
+            _le->recordInsert(nInserted);
+        }
+    }
+}
+
+// Instantiates an ExecInsertsState, which represents all of the state for the batch.
+// Breaks out into manageably sized chunks for insertMany, between which we can yield.
+// Encapsulates the lock state.
 void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
                                      std::vector<WriteErrorDetail*>* errors) {
-    // Theory of operation:
-    //
-    // Instantiates an ExecInsertsState, which represents all of the state involved in the batch
-    // insert execution algorithm.  Most importantly, encapsulates the lock state.
-    //
-    // Every iteration of the loop in execInserts() processes one document insertion, by calling
-    // insertOne() exactly once for a given value of state.currIndex.
-    //
-    // If the ExecInsertsState indicates that the requisite write locks are not held, insertOne
-    // acquires them and performs lock-acquisition-time checks.  However, on non-error
-    // execution, it does not release the locks.  Therefore, the yielding logic in the while
-    // loop in execInserts() is solely responsible for lock release in the non-error case.
-    //
-    // Internally, insertOne loops performing the single insert until it completes without a
-    // PageFaultException, or until it fails with some kind of error.  Errors are mostly
-    // propagated via the request->error field, but DBExceptions or std::exceptions may escape,
-    // particularly on operation interruption.  These kinds of errors necessarily prevent
-    // further insertOne calls, and stop the batch.  As a result, the only expected source of
-    // such exceptions are interruptions.
     ExecInsertsState state(_txn, &request);
     normalizeInserts(request, &state.normalizedInserts);
 
@@ -789,57 +813,39 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
         currentOp->setLogicalOp_inlock(dbInsert);
         currentOp->ensureStarted();
         currentOp->setNS_inlock(request.getNS().ns());
+        currentOp->debug().ninserted = 0;
     }
-    WriteOpResult result;
-    // Yield frequency is based on the same constants used by PlanYieldPolicy.
-    ElapsedTracker elapsedTracker(internalQueryExecYieldIterations, internalQueryExecYieldPeriodMS);
-    for (state.currIndex = 0; state.currIndex < state.request->sizeWriteOps(); ++state.currIndex) {
-        if (state.currIndex + 1 == state.request->sizeWriteOps())
+
+    int64_t chunkCount = 0;
+    int64_t chunkBytes = 0;
+    const int64_t chunkMaxCount = internalQueryExecYieldIterations / 2;
+    size_t startIndex = 0;
+    size_t maxIndex = state.request->sizeWriteOps() - 1;
+
+    for (size_t i = 0; i <= maxIndex; ++i) {
+        if (i == maxIndex)
             setupSynchronousCommit(_txn);
+        state.currIndex = i;
+        BatchItemRef currInsertItem(state.request, state.currIndex);
+        chunkBytes += currInsertItem.getDocument().objsize();
+        chunkCount++;
 
-        if (elapsedTracker.intervalHasElapsed()) {
-            // Yield between inserts.
+        if ((chunkCount >= chunkMaxCount) || (chunkBytes >= insertVectorMaxBytes) ||
+            (i == maxIndex)) {
+            insertMany(&state, startIndex, i + 1, currentOp, errors, request.getOrdered());
+            startIndex = i + 1;
+            chunkCount = 0;
+            chunkBytes = 0;
+
             if (state.hasLock()) {
-                // Release our locks. They get reacquired when insertOne() calls
-                // ExecInsertsState::lockAndCheck(). Since the lock manager guarantees FIFO
-                // queues waiting on locks, there is no need to explicitly sleep or give up
-                // control of the processor here.
+                // insertOne acquires the locks, but does not release them on non-error cases,
+                // so we release them here. insertOne() reacquires them via lockAndCheck().
                 state.unlock();
-
                 // This releases any storage engine held locks/snapshots.
                 _txn->recoveryUnit()->abandonSnapshot();
+                // Since the lock manager guarantees FIFO queues waiting on locks,
+                // there is no need to explicitly sleep or give up control of the processor here.
             }
-
-            _txn->checkForInterrupt();
-            elapsedTracker.resetLastTime();
-        }
-
-        BatchItemRef currInsertItem(state.request, state.currIndex);
-        {
-            stdx::lock_guard<Client> lk(*_txn->getClient());
-            currentOp->setQuery_inlock(currInsertItem.getDocument());
-            currentOp->debug().query = currInsertItem.getDocument();
-            currentOp->debug().ninserted = 0;
-        }
-
-        _opCounters->gotInsert();
-        insertOne(&state, &result);
-
-        incWriteStats(BatchedCommandRequest::BatchType_Insert,
-                      result.getStats(),
-                      result.getError(),
-                      currentOp);
-        result.getStats().n = 0;
-
-        if (result.getError()) {
-            WriteErrorDetail* error = NULL;
-            error = result.releaseError();
-            errors->push_back(error);
-            error->setIndex(state.currIndex);
-            CurOp* const currentOp = CurOp::get(_txn);
-            logCurOpError(currentOp, error);
-            if (request.getOrdered())
-                break;
         }
     }
 }

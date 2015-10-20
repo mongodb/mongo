@@ -84,6 +84,16 @@ private:
                      std::vector<WriteErrorDetail*>* errors);
 
     /**
+     * Inserts a subset of an insert batch.
+     */
+    void insertMany(WriteBatchExecutor::ExecInsertsState* state,
+                    size_t startIndex,
+                    size_t endIndex,
+                    CurOp* currentOp,
+                    std::vector<WriteErrorDetail*>* errors,
+                    bool ordered);
+
+    /**
      * Executes the inserts of an insert batch and returns the write errors.
      *
      * Internally uses the DBLock of the request namespace.

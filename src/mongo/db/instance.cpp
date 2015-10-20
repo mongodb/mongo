@@ -153,8 +153,6 @@ MONGO_FP_DECLARE(rsStopGetMore);
 
 namespace {
 
-const int64_t maxInsertGroupSize = 256 * 1024;
-
 unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongod() {
     return stdx::make_unique<AuthzManagerExternalStateMongod>();
 }
@@ -1033,7 +1031,7 @@ NOINLINE_DECL void insertMulti(OperationContext* txn,
         // Limit chunk size, actual size chosen is a tradeoff: larger sizes are more efficient,
         // but smaller chunk sizes allow yielding to other threads and lower chance of WCEs
         if ((++chunkCount >= internalQueryExecYieldIterations / 2) ||
-            (chunkSize >= maxInsertGroupSize)) {
+            (chunkSize >= insertVectorMaxBytes)) {
             if (it == chunkBegin)  // there is only one doc to process, so avoid retry on failure
                 insertMultiSingletons(txn, ctx, keepGoing, ns, op, chunkBegin, it + 1);
             else
