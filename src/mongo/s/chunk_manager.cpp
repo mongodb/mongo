@@ -170,7 +170,8 @@ ChunkManager::ChunkManager(const CollectionType& coll)
       _unique(coll.getUnique()),
       _sequenceNumber(NextSequenceNumber.addAndFetch(1)),
       _chunkRanges() {
-    _version = ChunkVersion::fromBSON(coll.toBSON());
+    // coll does not have correct version. Use same initial version as _load and createFirstChunks.
+    _version = ChunkVersion(0, 0, coll.getEpoch());
 }
 
 void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager* oldManager) {
