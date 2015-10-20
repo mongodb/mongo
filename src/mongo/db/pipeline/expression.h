@@ -339,8 +339,11 @@ public:
     */
     virtual void addOperand(const boost::intrusive_ptr<Expression>& pExpression);
 
-    // TODO split this into two functions
-    virtual bool isAssociativeAndCommutative() const {
+    virtual bool isAssociative() const {
+        return false;
+    }
+
+    virtual bool isCommutative() const {
         return false;
     }
 
@@ -443,13 +446,17 @@ public:
         return accum.getValue(false);
     }
 
-    bool isAssociativeAndCommutative() const final {
+    bool isAssociative() const final {
         // Return false if a single argument is given to avoid a single array argument being treated
         // as an array instead of as a list of arguments.
         if (this->vpOperand.size() == 1) {
             return false;
         }
-        return Accumulator().isAssociativeAndCommutative();
+        return Accumulator().isAssociative();
+    }
+
+    bool isCommutative() const final {
+        return Accumulator().isCommutative();
     }
 
     const char* getOpName() const final {
@@ -463,6 +470,8 @@ public:
 template <typename SubClass>
 class ExpressionSingleNumericArg : public ExpressionFixedArity<SubClass, 1> {
 public:
+    virtual ~ExpressionSingleNumericArg() {}
+
     Value evaluateInternal(Variables* vars) const final {
         Value arg = this->vpOperand[0]->evaluateInternal(vars);
         if (arg.nullish())
@@ -490,7 +499,12 @@ class ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
 public:
     Value evaluateInternal(Variables* vars) const final;
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };
@@ -508,7 +522,12 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value evaluateInternal(Variables* vars) const final;
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };
@@ -554,7 +573,6 @@ public:
     static boost::intrusive_ptr<ExpressionCoerceToBool> create(
         const boost::intrusive_ptr<Expression>& pExpression);
 
-
 private:
     explicit ExpressionCoerceToBool(const boost::intrusive_ptr<Expression>& pExpression);
 
@@ -596,6 +614,10 @@ class ExpressionConcat final : public ExpressionVariadic<ExpressionConcat> {
 public:
     Value evaluateInternal(Variables* vars) const final;
     const char* getOpName() const final;
+
+    bool isAssociative() const final {
+        return true;
+    }
 };
 
 
@@ -603,6 +625,10 @@ class ExpressionConcatArrays final : public ExpressionVariadic<ExpressionConcatA
 public:
     Value evaluateInternal(Variables* vars) const final;
     const char* getOpName() const final;
+
+    bool isAssociative() const final {
+        return true;
+    }
 };
 
 
@@ -940,7 +966,12 @@ class ExpressionMultiply final : public ExpressionVariadic<ExpressionMultiply> {
 public:
     Value evaluateInternal(Variables* vars) const final;
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };
@@ -1078,7 +1109,12 @@ public:
     boost::intrusive_ptr<Expression> optimize() final;
     Value evaluateInternal(Variables* vars) const final;
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };
@@ -1119,7 +1155,12 @@ class ExpressionSetIntersection final : public ExpressionVariadic<ExpressionSetI
 public:
     Value evaluateInternal(Variables* vars) const final;
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };
@@ -1142,7 +1183,12 @@ public:
     // intrusive_ptr<Expression> optimize() final;
     Value evaluateInternal(Variables* vars) const final;
     const char* getOpName() const final;
-    bool isAssociativeAndCommutative() const final {
+
+    bool isAssociative() const final {
+        return true;
+    }
+
+    bool isCommutative() const final {
         return true;
     }
 };

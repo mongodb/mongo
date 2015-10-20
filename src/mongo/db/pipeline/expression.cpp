@@ -48,6 +48,7 @@ using Parser = Expression::Parser;
 using namespace mongoutils;
 
 using boost::intrusive_ptr;
+using std::move;
 using std::set;
 using std::string;
 using std::vector;
@@ -2144,74 +2145,104 @@ const char* ExpressionLog10::getOpName() const {
 
 /* ------------------------ ExpressionNary ----------------------------- */
 
+/**
+ * Optimize a general Nary expression.
+ *
+ * The optimization has the following properties:
+ *   1) Optimize each of the operators.
+ *   2) If the operand is associative, flatten internal operators of the same type. I.e.:
+ *      A+B+(C+D)+E => A+B+C+D+E
+ *   3) If the operand is commutative & associative, group all constant operators. For example:
+ *      c1 + c2 + n1 + c3 + n2 => n1 + n2 + c1 + c2 + c3
+ *   4) If the operand is associative, execute the operation over all the contiguous constant
+ *      operators and replacing them by the result. For example: c1 + c2 + n1 + c3 + c4 + n5 =>
+ *      c5 = c1 + c2, c6 = c3 + c4 => c5 + n1 + c6 + n5
+ *
+ * It returns the optimized expression. It can be exactly the same expression, a modified version
+ * of the same expression or a completely different expression.
+ */
 intrusive_ptr<Expression> ExpressionNary::optimize() {
-    const size_t n = vpOperand.size();
+    uint32_t constOperandCount = 0;
 
-    // optimize sub-expressions and count constants
-    unsigned constCount = 0;
-    for (size_t i = 0; i < n; ++i) {
-        intrusive_ptr<Expression> optimized = vpOperand[i]->optimize();
-
-        // substitute the optimized expression
-        vpOperand[i] = optimized;
-
-        // check to see if the result was a constant
-        if (dynamic_cast<ExpressionConstant*>(optimized.get())) {
-            constCount++;
+    for (auto& operand : vpOperand) {
+        operand = operand->optimize();
+        if (dynamic_cast<ExpressionConstant*>(operand.get())) {
+            ++constOperandCount;
         }
     }
-
-    // If all the operands are constant, we can replace this expression with a constant. Using
-    // an empty Variables since it will never be accessed.
-    if (constCount == n) {
+    // If all the operands are constant expressions, collapse the expression into one constant
+    // expression.
+    if (constOperandCount == vpOperand.size()) {
         Variables emptyVars;
-        Value pResult(evaluateInternal(&emptyVars));
-        intrusive_ptr<Expression> pReplacement(ExpressionConstant::create(pResult));
-        return pReplacement;
+        return intrusive_ptr<Expression>(ExpressionConstant::create(evaluateInternal(&emptyVars)));
     }
 
-    // Remaining optimizations are only for associative and commutative expressions.
-    if (!isAssociativeAndCommutative())
-        return this;
-
-    // Process vpOperand to split it into constant and nonconstant vectors.
-    // This can leave vpOperand in an invalid state that is cleaned up after the loop.
-    ExpressionVector constExprs;
-    ExpressionVector nonConstExprs;
-    for (size_t i = 0; i < vpOperand.size(); ++i) {  // NOTE: vpOperand grows in loop
-        intrusive_ptr<Expression> expr = vpOperand[i];
-        if (dynamic_cast<ExpressionConstant*>(expr.get())) {
-            constExprs.push_back(expr);
-        } else {
-            // If the child operand is the same type as this and is also associative and
-            // commutative, then we can extract its operands and inline them here. We detect
-            // sameness of the child operator by checking for equality of the opNames
-            ExpressionNary* nary = dynamic_cast<ExpressionNary*>(expr.get());
-            if (!nary || !str::equals(nary->getOpName(), getOpName()) ||
-                !nary->isAssociativeAndCommutative()) {
-                nonConstExprs.push_back(expr);
-            } else {
-                // same expression, so flatten by adding to vpOperand which
-                // will be processed later in this loop.
-                vpOperand.insert(vpOperand.end(), nary->vpOperand.begin(), nary->vpOperand.end());
+    // If the expression is associative, we can collapse all the consecutive constant operands into
+    // one by applying the expression to those consecutive constant operands.
+    // If the expression is also commutative we can reorganize all the operands so that all of the
+    // constant ones are together (arbitrarily at the back) and we can collapse all of them into
+    // one.
+    if (isAssociative()) {
+        ExpressionVector constExpressions;
+        ExpressionVector optimizedOperands;
+        for (size_t i = 0; i < vpOperand.size();) {
+            intrusive_ptr<Expression> operand = vpOperand[i];
+            // If the operand is a constant one, add it to the current list of consecutive constant
+            // operands.
+            if (dynamic_cast<ExpressionConstant*>(operand.get())) {
+                constExpressions.push_back(operand);
+                ++i;
+                continue;
             }
+
+            // If the operand is exactly the same type as the one we are currently optimizing and
+            // is also associative, replace the expression for the operands it has.
+            // E.g: sum(a, b, sum(c, d), e) => sum(a, b, c, d, e)
+            ExpressionNary* nary = dynamic_cast<ExpressionNary*>(operand.get());
+            if (nary && str::equals(nary->getOpName(), getOpName()) && nary->isAssociative()) {
+                invariant(!nary->vpOperand.empty());
+                vpOperand[i] = std::move(nary->vpOperand[0]);
+                vpOperand.insert(
+                    vpOperand.begin() + i + 1, nary->vpOperand.begin() + 1, nary->vpOperand.end());
+                continue;
+            }
+
+            // If the operand is not a constant nor a same-type expression and the expression is
+            // not commutative, evaluate an expression of the same type as the one we are
+            // optimizing on the list of consecutive constant operands and use the resulting value
+            // as a constant expression operand.
+            // If the list of consecutive constant operands has less than 2 operands just place
+            // back the operands.
+            if (!isCommutative()) {
+                if (constExpressions.size() > 1) {
+                    ExpressionVector vpOperandSave = std::move(vpOperand);
+                    vpOperand = std::move(constExpressions);
+                    Variables emptyVars;
+                    optimizedOperands.emplace_back(
+                        ExpressionConstant::create(evaluateInternal(&emptyVars)));
+                    vpOperand = std::move(vpOperandSave);
+                } else {
+                    optimizedOperands.insert(
+                        optimizedOperands.end(), constExpressions.begin(), constExpressions.end());
+                }
+                constExpressions.clear();
+            }
+            optimizedOperands.push_back(operand);
+            ++i;
         }
-    }
 
-    // collapse all constant expressions (if any)
-    Value constValue;
-    if (!constExprs.empty()) {
-        vpOperand = constExprs;
-        Variables emptyVars;
-        constValue = evaluateInternal(&emptyVars);
-    }
+        if (constExpressions.size() > 1) {
+            vpOperand = std::move(constExpressions);
+            Variables emptyVars;
+            optimizedOperands.emplace_back(
+                ExpressionConstant::create(evaluateInternal(&emptyVars)));
+        } else {
+            optimizedOperands.insert(
+                optimizedOperands.end(), constExpressions.begin(), constExpressions.end());
+        }
 
-    // now set the final expression list with constant (if any) at the end
-    vpOperand = nonConstExprs;
-    if (!constExprs.empty()) {
-        vpOperand.push_back(ExpressionConstant::create(constValue));
+        vpOperand = std::move(optimizedOperands);
     }
-
     return this;
 }
 
