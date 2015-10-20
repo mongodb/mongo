@@ -155,6 +155,14 @@ public:
     virtual MemberState getMemberState() const = 0;
 
     /**
+     * Waits for 'timeout' ms for member state to become 'state'.
+     * Returns OK if member state is 'state'.
+     * Returns ErrorCodes::ExceededTimeLimit if we timed out waiting for the state change.
+     * Returns ErrorCodes::BadValue if timeout is negative.
+     */
+    virtual Status waitForMemberState(MemberState expectedState, Milliseconds timeout) = 0;
+
+    /**
      * Returns true if this node is in state PRIMARY or SECONDARY.
      *
      * It is invalid to call this unless getReplicationMode() == modeReplSet.
@@ -370,6 +378,15 @@ public:
      * a successful election triggers the draining of the applier buffer.
      */
     virtual void signalDrainComplete(OperationContext* txn) = 0;
+
+    /**
+     * Waits duration of 'timeout' for applier to finish draining its buffer of operations.
+     * Returns OK if isWaitingForApplierToDrain() returns false.
+     * Returns ErrorCodes::ExceededTimeLimit if we timed out waiting for the applier to drain its
+     * buffer.
+     * Returns ErrorCodes::BadValue if timeout is negative.
+     */
+    virtual Status waitForDrainFinish(Milliseconds timeout) = 0;
 
     /**
      * Signals the sync source feedback thread to wake up and send a handshake and

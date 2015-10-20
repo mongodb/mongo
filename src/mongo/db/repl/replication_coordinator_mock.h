@@ -59,6 +59,8 @@ public:
 
     virtual MemberState getMemberState() const;
 
+    virtual Status waitForMemberState(MemberState expectedState, Milliseconds timeout) override;
+
     virtual bool isInPrimaryOrSecondaryState() const;
 
     virtual Seconds getSlaveDelaySecs() const;
@@ -116,6 +118,8 @@ public:
     virtual bool isWaitingForApplierToDrain();
 
     virtual void signalDrainComplete(OperationContext*);
+
+    virtual Status waitForDrainFinish(Milliseconds timeout) override;
 
     virtual void signalUpstreamUpdater();
 

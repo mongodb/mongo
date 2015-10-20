@@ -77,14 +77,31 @@
     assert.eq(ErrorCodes.NotMasterOrSecondary, res.code,
             "find failed with unexpected error code: " + tojson(res));
     secondary.slaveOk = false;
-    
+
+    assert.commandFailedWithCode(
+        secondary.adminCommand({
+            replSetTest: 1,
+            waitForDrainFinish: 5000,
+        }),
+        ErrorCodes.ExceededTimeLimit,
+        'replSetTest waitForDrainFinish should time out when draining is not allowed to complete'
+    );
+
     // Allow draining to complete
-    jsTestLog('Enabling fail point on new primary to allow draining to complete');
+    jsTestLog('Disabling fail point on new primary to allow draining to complete');
     assert.commandWorked(
         secondary.getDB("admin").runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
         'failed to disable fail point on new primary');
     primary = replSet.getPrimary();
     
+    assert.commandWorked(
+        secondary.adminCommand({
+            replSetTest: 1,
+            waitForDrainFinish: 5000,
+        }),
+        'replSetTest waitForDrainFinish should work when draining is allowed to complete'
+    );
+
     // Ensure new primary is writable
     jsTestLog('New primary should be writable after draining is complete');
     assert.writeOK(primary.getDB("foo").flag.insert({sentinel:1}));

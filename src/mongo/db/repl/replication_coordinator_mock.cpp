@@ -78,6 +78,12 @@ MemberState ReplicationCoordinatorMock::getMemberState() const {
     return _memberState;
 }
 
+Status ReplicationCoordinatorMock::waitForMemberState(MemberState expectedState,
+                                                      Milliseconds timeout) {
+    invariant(false);
+    return Status::OK();
+}
+
 bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState() const {
     invariant(false);
 }
@@ -189,6 +195,11 @@ bool ReplicationCoordinatorMock::isWaitingForApplierToDrain() {
 }
 
 void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*) {}
+
+Status ReplicationCoordinatorMock::waitForDrainFinish(Milliseconds timeout) {
+    invariant(false);
+    return Status::OK();
+}
 
 void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
 

@@ -1814,7 +1814,7 @@ TEST_F(ReplCoordTest, SetMaintenanceMode) {
 
     // Step down from primary.
     getReplCoord()->updateTerm(getReplCoord()->getTerm() + 1);
-    getReplCoord()->waitForMemberState_forTest(MemberState::RS_SECONDARY);
+    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_SECONDARY, Seconds(1)));
 
     status = getReplCoord()->setMaintenanceMode(false);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
@@ -2949,7 +2949,7 @@ TEST_F(ReplCoordTest, CancelAndRescheduleElectionTimeoutWhenRemovedDueToReconfig
     net->runReadyNetworkOperations();
     net->exitNetwork();
 
-    getReplCoord()->waitForMemberState_forTest(MemberState::RS_REMOVED);
+    ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_REMOVED, Seconds(1)));
     ASSERT_EQUALS(config.getConfigVersion(), getReplCoord()->getConfig().getConfigVersion());
 
     getReplCoord()->cancelAndRescheduleElectionTimeout();
@@ -3259,6 +3259,64 @@ TEST_F(ReplCoordTest, LivenessElectionTimeout) {
     getNet()->exitNetwork();
     getReplCoord()->waitForStepDownFinish_forTest();
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getReplCoord()->getMemberState().s);
+}
+
+TEST_F(ReplCoordTest, WaitForMemberState) {
+    init("mySet");
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234"))),
+                       HostAndPort("test1", 1234));
+    auto replCoord = this->getReplCoord();
+    replCoord->setMyLastOptime(OpTime(Timestamp(1, 0), 0));
+    ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // Single node cluster - this node should transition to PRIMARY from SECONDARY immediately.
+    auto timeout = Milliseconds(10);
+    ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, timeout));
+    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                  replCoord->waitForMemberState(MemberState::RS_REMOVED, timeout));
+
+    ASSERT_EQUALS(ErrorCodes::BadValue,
+                  replCoord->waitForMemberState(MemberState::RS_PRIMARY, Milliseconds(-1)));
+
+    // Zero timeout is fine.
+    ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, Milliseconds(0)));
+    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                  replCoord->waitForMemberState(MemberState::RS_ARBITER, Milliseconds(0)));
+}
+
+TEST_F(ReplCoordTest, WaitForDrainFinish) {
+    init("mySet");
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234"))),
+                       HostAndPort("test1", 1234));
+    auto replCoord = this->getReplCoord();
+    replCoord->setMyLastOptime(OpTime(Timestamp(1, 0), 0));
+    ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    // Single node cluster - this node should transition to PRIMARY from SECONDARY immediately.
+    auto timeout = Milliseconds(10);
+    ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, timeout));
+
+    ASSERT_TRUE(replCoord->isWaitingForApplierToDrain());
+    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, replCoord->waitForDrainFinish(timeout));
+
+    ASSERT_EQUALS(ErrorCodes::BadValue, replCoord->waitForDrainFinish(Milliseconds(-1)));
+
+    OperationContextReplMock txn;
+    replCoord->signalDrainComplete(&txn);
+    ASSERT_OK(replCoord->waitForDrainFinish(timeout));
+
+    // Zero timeout is fine.
+    ASSERT_OK(replCoord->waitForDrainFinish(Milliseconds(0)));
 }
 
 // TODO(schwerin): Unit test election id updating

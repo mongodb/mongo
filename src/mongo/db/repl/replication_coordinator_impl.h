@@ -114,6 +114,8 @@ public:
 
     virtual MemberState getMemberState() const override;
 
+    virtual Status waitForMemberState(MemberState expectedState, Milliseconds timeout) override;
+
     virtual bool isInPrimaryOrSecondaryState() const override;
 
     virtual Seconds getSlaveDelaySecs() const override;
@@ -183,6 +185,8 @@ public:
     virtual bool isWaitingForApplierToDrain() override;
 
     virtual void signalDrainComplete(OperationContext* txn) override;
+
+    virtual Status waitForDrainFinish(Milliseconds timeout) override;
 
     virtual void signalUpstreamUpdater() override;
 
@@ -357,11 +361,6 @@ public:
      */
     StatusWith<ReplicationExecutor::CallbackHandle> updateTerm_nonBlocking(long long term,
                                                                            bool* updated);
-
-    /**
-     * Waits until _memberState becomes 'expectedState'.
-     */
-    void waitForMemberState_forTest(const MemberState& expectedState);
 
     /**
      * If called after _startElectSelfV1(), blocks until all asynchronous
@@ -1238,6 +1237,9 @@ private:
 
     // Current ReplicaSet state.
     MemberState _memberState;  // (MX)
+
+    // Used to signal threads waiting for changes to _memberState.
+    stdx::condition_variable _drainFinishedCond;  // (M)
 
     // True if we are waiting for the applier to finish draining.
     bool _isWaitingForDrainToComplete;  // (M)

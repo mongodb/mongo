@@ -500,6 +500,23 @@ MemberState ReplicationCoordinatorImpl::_getMemberState_inlock() const {
     return _memberState;
 }
 
+Status ReplicationCoordinatorImpl::waitForMemberState(MemberState expectedState,
+                                                      Milliseconds timeout) {
+    if (timeout < Milliseconds(0)) {
+        return Status(ErrorCodes::BadValue, "Timeout duration cannot be negative");
+    }
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    auto pred = [this, expectedState]() { return _memberState == expectedState; };
+    if (!_memberStateChange.wait_for(lk, timeout, pred)) {
+        return Status(ErrorCodes::ExceededTimeLimit,
+                      str::stream() << "Timed out waiting for state to become "
+                                    << expectedState.toString() << ". Current state is "
+                                    << _memberState.toString());
+    }
+    return Status::OK();
+}
+
 Seconds ReplicationCoordinatorImpl::getSlaveDelaySecs() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_rsConfig.isInitialized());
@@ -638,6 +655,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     }
     _isWaitingForDrainToComplete = false;
     _canAcceptNonLocalWrites = true;
+    _drainFinishedCond.notify_all();
     lk.unlock();
 
     _externalState->dropAllTempCollections(txn);
@@ -648,6 +666,21 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     _setFirstOpTimeOfMyTerm(lastOpTime.getValue());
 
     log() << "transition to primary complete; database writes are now permitted" << rsLog;
+}
+
+Status ReplicationCoordinatorImpl::waitForDrainFinish(Milliseconds timeout) {
+    if (timeout < Milliseconds(0)) {
+        return Status(ErrorCodes::BadValue, "Timeout duration cannot be negative");
+    }
+
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    auto pred = [this]() { return !_isWaitingForDrainToComplete; };
+    if (!_drainFinishedCond.wait_for(lk, timeout, pred)) {
+        return Status(ErrorCodes::ExceededTimeLimit,
+                      "Timed out waiting to finish draining applier buffer");
+    }
+
+    return Status::OK();
 }
 
 void ReplicationCoordinatorImpl::signalUpstreamUpdater() {
@@ -2271,7 +2304,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
 
     _cancelAndRescheduleElectionTimeout_inlock();
 
-    // Notifies waiters blocked in waitForMemberState_forTest().
+    // Notifies waiters blocked in waitForMemberState().
     // For testing only.
     _memberStateChange.notify_all();
 
@@ -3183,13 +3216,6 @@ void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {
     _uncommittedSnapshots.clear();
     _currentCommittedSnapshot = boost::none;
     _externalState->dropAllSnapshots();
-}
-
-void ReplicationCoordinatorImpl::waitForMemberState_forTest(const MemberState& expectedState) {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
-    while (_memberState != expectedState) {
-        _memberStateChange.wait(lk);
-    }
 }
 
 void ReplicationCoordinatorImpl::waitForElectionFinish_forTest() {

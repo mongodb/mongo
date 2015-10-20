@@ -69,7 +69,7 @@ using std::stringstream;
 class CmdReplSetTest : public ReplSetCommand {
 public:
     virtual void help(stringstream& help) const {
-        help << "Just for regression tests.\n";
+        help << "Just for tests.\n";
     }
     // No auth needed because it only works when enabled via command line.
     virtual Status checkAuthForCommand(ClientBasic* client,
@@ -86,18 +86,56 @@ public:
                      BSONObjBuilder& result) {
         log() << "replSetTest command received: " << cmdObj.toString();
 
+        auto replCoord = ReplicationCoordinator::get(getGlobalServiceContext());
+
         if (cmdObj.hasElement("forceInitialSyncFailure")) {
             replSetForceInitialSyncFailure = (unsigned)cmdObj["forceInitialSyncFailure"].Number();
             return true;
+        } else if (cmdObj.hasElement("waitForMemberState")) {
+            long long stateVal;
+            auto status = bsonExtractIntegerField(cmdObj, "waitForMemberState", &stateVal);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+            MemberState expectedState(stateVal);
+            if (expectedState.toString().empty()) {
+                return appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::BadValue,
+                           str::stream() << "Unrecognized numerical state: " << stateVal));
+            }
+
+            long long timeoutMillis;
+            status = bsonExtractIntegerField(cmdObj, "timeoutMillis", &timeoutMillis);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+            Milliseconds timeout(timeoutMillis);
+            log() << "replSetTest: waiting " << timeout << " for member state to become "
+                  << expectedState;
+
+            status = replCoord->waitForMemberState(expectedState, timeout);
+
+            return appendCommandStatus(result, status);
+        } else if (cmdObj.hasElement("waitForDrainFinish")) {
+            long long timeoutMillis;
+            auto status = bsonExtractIntegerField(cmdObj, "waitForDrainFinish", &timeoutMillis);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+            Milliseconds timeout(timeoutMillis);
+            log() << "replSetTest: waiting " << timeout << " for applier buffer to finish draining";
+
+            status = replCoord->waitForDrainFinish(timeout);
+
+            return appendCommandStatus(result, status);
         }
 
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return appendCommandStatus(result, status);
-
-        return false;
+        Status status = replCoord->checkReplEnabledForCommand(&result);
+        return appendCommandStatus(result, status);
     }
 };
+
 MONGO_INITIALIZER(RegisterReplSetTestCmd)(InitializerContext* context) {
     if (Command::testCommandsEnabled) {
         // Leaked intentionally: a Command registers itself when constructed.
