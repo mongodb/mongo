@@ -9,27 +9,23 @@
 #include "wt_internal.h"
 
 /*
- * __wt_meta_btree_apply --
+ * __meta_btree_apply --
  *	Apply a function to all files listed in the metadata, apart from the
  *	metadata file.
  */
-int
-__wt_meta_btree_apply(WT_SESSION_IMPL *session,
+static inline int
+__meta_btree_apply(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
-	WT_CURSOR *cursor;
-	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	const char *uri;
 	int cmp;
 
-	saved_dhandle = session->dhandle;
-	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, "file:");
 	if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
 		ret = cursor->next(cursor);
 	for (; ret == 0; ret = cursor->next(cursor)) {
-		WT_ERR(cursor->get_key(cursor, &uri));
+		WT_RET(cursor->get_key(cursor, &uri));
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
 		if (strcmp(uri, WT_METAFILE_URI) == 0)
@@ -52,12 +48,36 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 		} else if (ret == EBUSY)
 			ret = __wt_conn_btree_apply_single(
 			    session, uri, NULL, func, cfg);
-		WT_ERR(ret);
+		WT_RET(ret);
 	}
-	if (ret == WT_NOTFOUND)
-		ret = 0;
+	WT_RET_NOTFOUND_OK(ret);
 
-err:	WT_TRET(cursor->close(cursor));
-	session->dhandle = saved_dhandle;
+	return (0);
+}
+
+/*
+ * __wt_meta_btree_apply --
+ *	Apply a function to all files listed in the metadata, apart from the
+ *	metadata file.
+ */
+int
+__wt_meta_btree_apply(WT_SESSION_IMPL *session,
+    int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
+{
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+
+	/*
+	 * Use a new cursor rather than the cached session cursor, because the
+	 * loop calls code that repositions the cursor and our loop walking the
+	 * metadata table will fail.
+	 */
+	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
+
+	WT_SAVE_DHANDLE(session,
+	    ret = __meta_btree_apply(session, cursor, func, cfg));
+
+	WT_TRET(cursor->close(cursor));
+
 	return (ret);
 }
