@@ -1602,6 +1602,7 @@ tasks:
       run_multiple_jobs: true
 
 - name: push
+  patchable: false
   depends_on:
   - name: "*"
   stepback: false
@@ -2005,6 +2006,7 @@ tasks:
                'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl', 'windows-32'], }
 
 - name: jira_versions
+  patchable: false
   depends_on:
     - name: push
       variant: linux-64
@@ -2028,6 +2030,7 @@ tasks:
     - func: "cleanup release credentials"
 
 - name: docs_ticket
+  patchable: false
   depends_on:
     - name: push
       variant: "*"
