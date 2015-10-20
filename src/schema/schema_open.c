@@ -280,7 +280,6 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 	if (idxname == NULL && table->idx_complete)
 		return (0);
 
-	cursor = NULL;
 	idx = NULL;
 	match = false;
 
@@ -291,7 +290,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_fmt(session, tmp, "index:%s:", tablename));
 
 	/* Find matching indices. */
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_ERR(__wt_metadata_session_cursor(session, &cursor));
 	cursor->set_key(cursor, tmp->data);
 	if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
 		ret = cursor->next(cursor);
@@ -381,8 +380,6 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 
 err:	__wt_scr_free(session, &tmp);
 	WT_TRET(__wt_schema_destroy_index(session, &idx));
-	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
 	return (ret);
 }
 
@@ -413,7 +410,6 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	const char *tconfig;
 	char *tablename;
 
-	cursor = NULL;
 	table = NULL;
 	tablename = NULL;
 
@@ -423,7 +419,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_fmt(session, buf, "table:%.*s", (int)namelen, name));
 	WT_ERR(__wt_strndup(session, buf->data, buf->size, &tablename));
 
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_ERR(__wt_metadata_session_cursor(session, &cursor));
 	cursor->set_key(cursor, tablename);
 	WT_ERR(cursor->search(cursor));
 	WT_ERR(cursor->get_value(cursor, &tconfig));
@@ -493,8 +489,6 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	if (0) {
 err:		WT_TRET(__wt_schema_destroy_table(session, &table));
 	}
-	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
 
 	__wt_free(session, tablename);
 	__wt_scr_free(session, &buf);

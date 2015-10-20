@@ -56,9 +56,9 @@ __checkpoint_name_check(WT_SESSION_IMPL *session, const char *uri)
 	 * confirm the metadata file contains no non-file objects.
 	 */
 	if (uri == NULL) {
-		WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+		WT_RET(__wt_metadata_session_cursor(session, &cursor));
 		while ((ret = cursor->next(cursor)) == 0) {
-			WT_ERR(cursor->get_key(cursor, &uri));
+			WT_RET(cursor->get_key(cursor, &uri));
 			if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
 			    !WT_PREFIX_MATCH(uri, "file:") &&
 			    !WT_PREFIX_MATCH(uri, "index:") &&
@@ -67,7 +67,7 @@ __checkpoint_name_check(WT_SESSION_IMPL *session, const char *uri)
 				break;
 			}
 		}
-		WT_ERR_NOTFOUND_OK(ret);
+		WT_RET_NOTFOUND_OK(ret);
 	} else
 		if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
 		    !WT_PREFIX_MATCH(uri, "file:") &&
@@ -76,12 +76,10 @@ __checkpoint_name_check(WT_SESSION_IMPL *session, const char *uri)
 			fail = uri;
 
 	if (fail != NULL)
-		WT_ERR_MSG(session, EINVAL,
+		WT_RET_MSG(session, EINVAL,
 		    "%s object does not support named checkpoints", fail);
 
-err:	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
-	return (ret);
+	return (0);
 }
 
 /*
