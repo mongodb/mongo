@@ -776,7 +776,8 @@ __split_multi_inmem(
 	 * transaction to an impossibly old value so this page is never skipped
 	 * in a checkpoint.
 	 */
-	page->modify->first_dirty_txn = WT_TXN_FIRST;
+	if (page->modify != NULL)
+		page->modify->first_dirty_txn = WT_TXN_FIRST;
 
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt, true));
@@ -815,7 +816,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	 */
 	ref->home = NULL;
 
-	if (multi->supd == NULL) {
+	if (multi->supd == NULL && !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
 		/*
 		 * Copy the address: we could simply take the buffer, but that
 		 * would complicate error handling, freeing the reference array
@@ -844,7 +845,9 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		break;
 	}
 
-	ref->state = multi->supd == NULL ? WT_REF_DISK : WT_REF_MEM;
+	ref->state = multi->supd == NULL &&
+	    !F_ISSET(S2C(session), WT_CONN_IN_MEMORY) ?
+	    WT_REF_DISK : WT_REF_MEM;
 
 	/*
 	 * If our caller wants to track the memory allocations, we have a return

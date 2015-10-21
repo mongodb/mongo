@@ -192,6 +192,9 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	    (!checkpoint && addr != NULL && addr_sizep != NULL) ||
 	    (checkpoint && addr == NULL && addr_sizep == NULL));
 
+	/* In-memory databases shouldn't write pages. */
+	WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+
 #ifdef HAVE_DIAGNOSTIC
 	/*
 	 * We're passed a table's disk image.  Decompress if necessary and
