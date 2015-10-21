@@ -264,7 +264,8 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 	 * If we don't have the metadata handle (e.g, we're in the process of
 	 * creating the metadata), we can't sync it.
 	 */
-	if (!need_sync || session->meta_dhandle == NULL)
+	if (!need_sync || session->meta_dhandle == NULL ||
+	    F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
 		goto done;
 
 	/* If we're logging, make sure the metadata update was flushed. */
