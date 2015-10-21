@@ -307,11 +307,11 @@ class History(object):
         s = self.seriesAtRevision(testname, revision)
         if s==[]:
             return []
-        refdate = parser.parse(s["end"]) - timedelta(days=n)
+        refdate = parser.parse(s["create_time"]) - timedelta(days=n)
 
         s = self.series(testname)
         for result in s:
-            if parser.parse(result["end"]) < refdate:
+            if parser.parse(result["create_time"]) < refdate:
                 results = result
         return results
 
@@ -325,7 +325,7 @@ class History(object):
                 result = matching[0]
                 result["revision"] = commit["revision"]
                 result["tag"] = commit["tag"]
-                result["end"] = commit["data"]["end"]
+                result["create_time"] = commit["create_time"]
                 result["order"] = commit["order"]
                 result["max"] = max(f["ops_per_sec"] for f in result["results"].values()
                                     if type(f) == type({}))
