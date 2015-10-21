@@ -157,6 +157,10 @@ if ( typeof _threadInject != "undefined" ){
                                    "update_setOnInsert.js", // SERVER-9982
                                    "max_time_ms.js", // Sensitive to query execution time, by design
                                    "collection_info_cache_race.js", // Requires collection exists
+
+                                   // This overwrites MinKey/MaxKey's singleton which breaks
+                                   // any other test that uses MinKey/MaxKey
+                                   "type6.js",
                                ] );
         
         var parallelFilesDir = "jstests/core";
