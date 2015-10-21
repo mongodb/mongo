@@ -300,7 +300,8 @@ public:
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() override;
 
-    virtual void waitForNewSnapshot(OperationContext* txn) override;
+    virtual void waitUntilSnapshotCommitted(OperationContext* txn,
+                                            const SnapshotName& untilSnapshot) override;
 
     virtual void appendConnectionStats(BSONObjBuilder* b) override;
 
@@ -1256,9 +1257,6 @@ private:
     // Used to signal threads waiting for changes to _rsConfigState.
     stdx::condition_variable _rsConfigStateChange;  // (M)
 
-    // Used to signal threads that are waiting for new snapshots.
-    stdx::condition_variable _snapshotCreatedCond;  // (M)
-
     // Represents the configuration state of the coordinator, which controls how and when
     // _rsConfig may change.  See the state transition diagram in the type definition of
     // ConfigState for details.
@@ -1334,6 +1332,9 @@ private:
     // there is one.
     // When engaged, this must be <= _lastCommittedOpTime and < _uncommittedSnapshots.front().
     boost::optional<SnapshotInfo> _currentCommittedSnapshot;  // (M)
+
+    // Used to signal threads that are waiting for new committed snapshots.
+    stdx::condition_variable _currentCommittedSnapshotCond;  // (M)
 
     // The cached current term. It's in sync with the term in topology coordinator.
     long long _cachedTerm = OpTime::kUninitializedTerm;  // (M)

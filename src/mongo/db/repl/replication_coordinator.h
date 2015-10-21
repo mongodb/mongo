@@ -703,10 +703,12 @@ public:
     virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) = 0;
 
     /**
-     * Called by threads that wish to be alerted of the creation of a new snapshot. "txn" is used
-     * to checkForInterrupt and enforce maxTimeMS.
+     * Blocks until either the current committed snapshot is at least as high as 'untilSnapshot',
+     * or we are interrupted for any reason, including shutdown or maxTimeMs expiration.
+     * 'txn' is used to checkForInterrupt and enforce maxTimeMS.
      */
-    virtual void waitForNewSnapshot(OperationContext* txn) = 0;
+    virtual void waitUntilSnapshotCommitted(OperationContext* txn,
+                                            const SnapshotName& untilSnapshot) = 0;
 
     /**
      * Resets all information related to snapshotting.

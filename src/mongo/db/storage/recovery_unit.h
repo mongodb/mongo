@@ -94,7 +94,7 @@ public:
      * change snapshots.
      *
      * If no snapshot has yet been marked as Majority Committed, returns a status with error
-     * code ReadConcernNotAvailableYet. After this returns successfully, at any point where
+     * code ReadConcernMajorityNotAvailableYet. After this returns successfully, at any point where
      * implementations attempt to acquire committed snapshot, if there are none available due to a
      * call to SnapshotManager::dropAllSnapshots(), a UserException with the same code should be
      * thrown.

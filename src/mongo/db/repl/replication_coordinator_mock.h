@@ -228,7 +228,8 @@ public:
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() override;
 
-    virtual void waitForNewSnapshot(OperationContext* txn) override;
+    virtual void waitUntilSnapshotCommitted(OperationContext* txn,
+                                            const SnapshotName& untilSnapshot) override;
 
 private:
     AtomicUInt64 _snapshotNameGenerator;

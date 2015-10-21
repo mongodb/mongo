@@ -1318,10 +1318,10 @@ bool Command::run(OperationContext* txn,
 
     repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
 
-    repl::ReadConcernArgs readConcern;
+    repl::ReadConcernArgs readConcernArgs;
     {
         // parse and validate ReadConcernArgs
-        auto readConcernParseStatus = readConcern.initialize(request.getCommandArgs());
+        auto readConcernParseStatus = readConcernArgs.initialize(request.getCommandArgs());
         if (!readConcernParseStatus.isOK()) {
             replyBuilder->setMetadata(rpc::makeEmptyMetadata())
                 .setCommandReply(readConcernParseStatus);
@@ -1331,8 +1331,8 @@ bool Command::run(OperationContext* txn,
         if (!supportsReadConcern()) {
             // Only return an error if a non-nullish readConcern was parsed, but do not process
             // readConcern regardless.
-            if (!readConcern.getOpTime().isNull() ||
-                readConcern.getLevel() != repl::ReadConcernLevel::kLocalReadConcern) {
+            if (!readConcernArgs.getOpTime().isNull() ||
+                readConcernArgs.getLevel() != repl::ReadConcernLevel::kLocalReadConcern) {
                 replyBuilder->setMetadata(rpc::makeEmptyMetadata())
                     .setCommandReply({ErrorCodes::InvalidOptions,
                                       str::stream()
@@ -1344,7 +1344,7 @@ bool Command::run(OperationContext* txn,
             // Skip waiting for the OpTime when testing snapshot behavior.
             if (!testingSnapshotBehaviorInIsolation) {
                 // Wait for readConcern to be satisfied.
-                auto readConcernResult = replCoord->waitUntilOpTime(txn, readConcern);
+                auto readConcernResult = replCoord->waitUntilOpTime(txn, readConcernArgs);
                 readConcernResult.appendInfo(&replyBuilderBob);
                 if (!readConcernResult.getStatus().isOK()) {
                     replyBuilder->setMetadata(rpc::makeEmptyMetadata())
@@ -1356,12 +1356,12 @@ bool Command::run(OperationContext* txn,
             if ((replCoord->getReplicationMode() ==
                      repl::ReplicationCoordinator::Mode::modeReplSet ||
                  testingSnapshotBehaviorInIsolation) &&
-                readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+                readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
                 Status status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
 
                 // Wait until a snapshot is available.
                 while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
-                    replCoord->waitForNewSnapshot(txn);
+                    replCoord->waitUntilSnapshotCommitted(txn, SnapshotName::min());
                     status = txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
                 }
 
@@ -1392,7 +1392,7 @@ bool Command::run(OperationContext* txn,
         repl::OpTime lastOpTimeFromClient =
             repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
         replCoord->prepareReplResponseMetadata(
-            request, lastOpTimeFromClient, readConcern, &metadataBob);
+            request, lastOpTimeFromClient, readConcernArgs, &metadataBob);
 
         // For commands from mongos, append some info to help getLastError(w) work.
         // TODO: refactor out of here as part of SERVER-18326

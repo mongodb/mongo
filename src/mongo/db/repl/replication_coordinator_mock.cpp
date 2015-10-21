@@ -391,7 +391,8 @@ OpTime ReplicationCoordinatorMock::getCurrentCommittedSnapshotOpTime() {
     return OpTime();
 }
 
-void ReplicationCoordinatorMock::waitForNewSnapshot(OperationContext* txn) {}
+void ReplicationCoordinatorMock::waitUntilSnapshotCommitted(OperationContext* txn,
+                                                            const SnapshotName& untilSnapshot) {}
 
 }  // namespace repl
 }  // namespace mongo

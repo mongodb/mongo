@@ -130,7 +130,7 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const Nam
         // Yield locks.
         _autoColl = {};
 
-        repl::ReplicationCoordinator::get(_txn)->waitForNewSnapshot(_txn);
+        repl::ReplicationCoordinator::get(_txn)->waitUntilSnapshotCommitted(_txn, *minSnapshot);
 
         uassertStatusOK(_txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 

@@ -673,6 +673,12 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     fassert(28665, lastOpTime.getStatus().isOK());
     _setFirstOpTimeOfMyTerm(lastOpTime.getValue());
 
+    lk.lock();
+    // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged
+    // our election in logTransitionToPrimaryToOplog(), above.
+    _updateLastCommittedOpTime_inlock();
+    lk.unlock();
+
     log() << "transition to primary complete; database writes are now permitted" << rsLog;
 }
 
@@ -892,23 +898,18 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
                    "--enableMajorityReadConcern."));
     }
 
-    const auto ts = settings.getOpTime();
-    // Note that if 'settings' has no explicit after-optime, 'ts' will be the earliest
-    // possible optime, which means the comparisons with 'ts' below are always false.  This is
-    // intentional.
+    const auto targetOpTime = settings.getOpTime();
+    if (targetOpTime.isNull()) {
+        return ReadConcernResponse(Status::OK(), Milliseconds(0));
+    }
 
     if (getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
         // For master/slave and standalone nodes, readAfterOpTime is not supported, so we return
         // an error. However, we consider all writes "committed" and can treat MajorityReadConcern
         // as LocalReadConcern, which is immediately satisfied since there is no OpTime to wait for.
-        if (!ts.isNull()) {
-            return ReadConcernResponse(
-                Status(ErrorCodes::NotAReplicaSet,
-                       "node needs to be a replica set member to use read concern"));
-
-        } else {
-            return ReadConcernResponse(Status::OK(), Milliseconds(0));
-        }
+        return ReadConcernResponse(
+            Status(ErrorCodes::NotAReplicaSet,
+                   "node needs to be a replica set member to use read concern"));
     }
 
     Timer timer;
@@ -919,10 +920,10 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
                    "Current storage engine does not support majority readConcerns"));
     }
 
-    auto loopCondition = [this, isMajorityReadConcern, ts] {
+    auto loopCondition = [this, isMajorityReadConcern, targetOpTime] {
         return isMajorityReadConcern
-            ? !_currentCommittedSnapshot || ts > _currentCommittedSnapshot->opTime
-            : ts > _getMyLastOptime_inlock();
+            ? !_currentCommittedSnapshot || targetOpTime > _currentCommittedSnapshot->opTime
+            : targetOpTime > _getMyLastOptime_inlock();
     };
 
     while (loopCondition()) {
@@ -942,7 +943,7 @@ ReadConcernResponse ReplicationCoordinatorImpl::waitUntilOpTime(OperationContext
 
         WaiterInfo waitInfo(isMajorityReadConcern ? &_replicationWaiterList : &_opTimeWaiterList,
                             txn->getOpID(),
-                            &ts,
+                            &targetOpTime,
                             isMajorityReadConcern ? &writeConcern : nullptr,
                             &condVar);
 
@@ -1037,8 +1038,8 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
 
 void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    // Wake ops waiting for a new snapshot.
-    _snapshotCreatedCond.notify_all();
+    // Wake ops waiting for a new committed snapshot.
+    _currentCommittedSnapshotCond.notify_all();
 
     for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
          it != _replicationWaiterList.end();
@@ -1062,8 +1063,8 @@ void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
 
 void ReplicationCoordinatorImpl::interruptAll() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    // Wake ops waiting for a new snapshot.
-    _snapshotCreatedCond.notify_all();
+    // Wake ops waiting for a new committed snapshot.
+    _currentCommittedSnapshotCond.notify_all();
 
     for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
          it != _replicationWaiterList.end();
@@ -2781,13 +2782,11 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     if (votingNodesOpTimes.size() < static_cast<unsigned long>(_rsConfig.getWriteMajority())) {
         return;
     }
-
     std::sort(votingNodesOpTimes.begin(), votingNodesOpTimes.end());
 
     // need the majority to have this OpTime
     OpTime committedOpTime =
         votingNodesOpTimes[votingNodesOpTimes.size() - _rsConfig.getWriteMajority()];
-
     _setLastCommittedOpTime_inlock(committedOpTime);
 }
 
@@ -3166,17 +3165,25 @@ void ReplicationCoordinatorImpl::forceSnapshotCreation() {
     _externalState->forceSnapshotCreation();
 }
 
-void ReplicationCoordinatorImpl::waitForNewSnapshot(OperationContext* txn) {
+void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* txn,
+                                                            const SnapshotName& untilSnapshot) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _snapshotCreatedCond.wait_for(lock, Microseconds(txn->getRemainingMaxTimeMicros()));
-    txn->checkForInterrupt();
+
+    while (!_currentCommittedSnapshot || _currentCommittedSnapshot->name < untilSnapshot) {
+        Microseconds waitTime(txn->getRemainingMaxTimeMicros());
+        if (waitTime == Microseconds(0)) {
+            _currentCommittedSnapshotCond.wait(lock);
+        } else {
+            _currentCommittedSnapshotCond.wait_for(lock, waitTime);
+        }
+        txn->checkForInterrupt();
+    }
 }
 
 void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     auto snapshotInfo = SnapshotInfo{timeOfSnapshot, name};
-    _snapshotCreatedCond.notify_all();
 
     if (timeOfSnapshot <= _lastCommittedOpTime) {
         // This snapshot is ready to be marked as committed.
@@ -3208,6 +3215,7 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
         invariant(newCommittedSnapshot < _uncommittedSnapshots.front());
 
     _currentCommittedSnapshot = newCommittedSnapshot;
+    _currentCommittedSnapshotCond.notify_all();
 
     _externalState->updateCommittedSnapshot(newCommittedSnapshot.name);
 
