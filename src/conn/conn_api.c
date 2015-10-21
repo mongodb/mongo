@@ -1765,6 +1765,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    "create=,"
 	    "encryption=(secretkey=),"
 	    "exclusive=,"
+	    "in_memory=,"
 	    "log=(recover=),"
 	    "use_environment_priv=,"
 	    "verbose=,", &base_config));
@@ -1889,9 +1890,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR(__wt_strndup(
 		    session, cval.str, cval.len, &conn->error_prefix));
 
-	WT_ERR(__wt_config_gets(session, cfg, "in_memory", &cval));
-	if (cval.val != 0)
-		F_SET(conn, WT_CONN_IN_MEMORY);
+	/*
+	 * XXX ideally, we would check "in_memory" here, so we could completely
+	 * avoid having a database directory.  However, it can be convenient to
+	 * pass "in_memory" via the WIREDTIGER_CONFIG environment variable, and
+	 * we haven't read it yet.
+	 */
 
 	/* Get the database home. */
 	WT_ERR(__conn_home(session, home, cfg));
@@ -1963,6 +1967,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__wt_config_gets(session, cfg, "session_scratch_max", &cval));
 	conn->session_scratch_max = (size_t)cval.val;
+
+	WT_ERR(__wt_config_gets(session, cfg, "in_memory", &cval));
+	if (cval.val != 0)
+		F_SET(conn, WT_CONN_IN_MEMORY);
 
 	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
 	if (cval.val)
