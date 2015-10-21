@@ -40,7 +40,7 @@ class Database;
 class OperationContext;
 
 long long deleteObjects(OperationContext* txn,
-                        Database* db,
+                        Collection* collection,
                         StringData ns,
                         BSONObj pattern,
                         PlanExecutor::YieldPolicy policy,

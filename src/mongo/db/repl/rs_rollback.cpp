@@ -687,7 +687,7 @@ void syncFixUp(OperationContext* txn,
                             }
                         } else {
                             deleteObjects(txn,
-                                          ctx.db(),
+                                          collection,
                                           doc.ns,
                                           pattern,
                                           PlanExecutor::YIELD_MANUAL,

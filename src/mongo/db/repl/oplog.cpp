@@ -830,7 +830,7 @@ Status applyOperation_inlock(OperationContext* txn,
                 o.hasField("_id"));
 
         if (opType[1] == 0) {
-            deleteObjects(txn, db, ns, o, PlanExecutor::YIELD_MANUAL, /*justOne*/ valueB);
+            deleteObjects(txn, collection, ns, o, PlanExecutor::YIELD_MANUAL, /*justOne*/ valueB);
         } else
             verify(opType[1] == 'b');  // "db" advertisement
     } else if (*opType == 'n') {

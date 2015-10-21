@@ -45,7 +45,7 @@ namespace mongo {
    god:     allow access to system namespaces, and don't yield
 */
 long long deleteObjects(OperationContext* txn,
-                        Database* db,
+                        Collection* collection,
                         StringData ns,
                         BSONObj pattern,
                         PlanExecutor::YieldPolicy policy,
@@ -59,11 +59,6 @@ long long deleteObjects(OperationContext* txn,
     request.setGod(god);
     request.setFromMigrate(fromMigrate);
     request.setYieldPolicy(policy);
-
-    Collection* collection = NULL;
-    if (db) {
-        collection = db->getCollection(nsString.ns());
-    }
 
     ParsedDelete parsedDelete(txn, &request);
     uassertStatusOK(parsedDelete.parseRequest());

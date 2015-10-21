@@ -562,7 +562,8 @@ void Helpers::emptyCollection(OperationContext* txn, const char* ns) {
     bool shouldReplicateWrites = txn->writesAreReplicated();
     txn->setReplicatedWrites(false);
     ON_BLOCK_EXIT(&OperationContext::setReplicatedWrites, txn, shouldReplicateWrites);
-    deleteObjects(txn, context.db(), ns, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
+    Collection* collection = context.db() ? context.db()->getCollection(ns) : nullptr;
+    deleteObjects(txn, collection, ns, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
 }
 
 Helpers::RemoveSaver::RemoveSaver(const string& a, const string& b, const string& why) {

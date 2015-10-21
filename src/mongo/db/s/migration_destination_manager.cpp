@@ -836,7 +836,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* txn,
             }
 
             deleteObjects(txn,
-                          ctx.db(),
+                          ctx.db() ? ctx.db()->getCollection(ns) : nullptr,
                           ns,
                           id,
                           PlanExecutor::YIELD_MANUAL,
