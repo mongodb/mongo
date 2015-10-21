@@ -22,6 +22,8 @@ func main() {
 	sourceOpts := &mongooplog.SourceOptions{}
 	opts.AddOptions(sourceOpts)
 
+	log.Logf(log.Always, "warning: mongooplog is deprecated, and will be removed completely in a future release")
+
 	// parse the command line options
 	args, err := opts.Parse()
 	if err != nil {
