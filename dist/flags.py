@@ -45,9 +45,10 @@ flags = {
         'READ_WONT_NEED',
     ],
     'rec_write' : [
+        'EVICT_IN_MEMORY',
         'EVICT_LOOKASIDE',
-        'EVICTING',
         'EVICT_UPDATE_RESTORE',
+        'EVICTING',
         'VISIBILITY_ERR',
     ],
     'txn_log_checkpoint' : [

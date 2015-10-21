@@ -535,7 +535,7 @@ __rec_write_status(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/*
 	 * Set the page's status based on whether or not we cleaned the page.
 	 */
-	if (r->leave_dirty) {
+	if (r->leave_dirty || F_ISSET(r, WT_EVICT_IN_MEMORY)) {
 		/*
 		 * The page remains dirty.
 		 *
@@ -809,7 +809,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	r->flags = flags;
 
 	/* Track if the page can be marked clean. */
-	r->leave_dirty = F_ISSET(S2C(session), WT_CONN_IN_MEMORY);
+	r->leave_dirty = 0;
 
 	/* Raw compression. */
 	r->raw_compression =
@@ -1435,7 +1435,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * If there are deleted child pages we can't discard immediately, keep
 	 * the page dirty so they are eventually freed.
 	 */
-	r->leave_dirty = 1;
+	r->leave_dirty = true;
 
 	/*
 	 * If the original page cannot be freed, we need to keep a slot on the
@@ -3215,7 +3215,7 @@ supd_check_complete:
 	 * With an in-memory database, we always take this path.
 	 */
 	if ((F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) ||
-	    F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
+	    F_ISSET(r, WT_EVICT_IN_MEMORY)) {
 		r->cache_write_restore = true;
 
 		/*
@@ -5281,8 +5281,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_free(session, multi->key.ikey);
 			break;
 		}
-		/* TODO: cleanup here is wrong for in-memory. */
-		if (multi->supd == NULL) {
+		if (multi->supd == NULL && multi->supd_dsk == NULL) {
 			if (multi->addr.reuse)
 				multi->addr.addr = NULL;
 			else {
