@@ -21,7 +21,7 @@ __schema_add_table(WT_SESSION_IMPL *session,
 	uint64_t bucket;
 
 	/* Make sure the metadata is open before getting other locks. */
-	WT_RET(__wt_metadata_session_cursor(session, NULL));
+	WT_RET(__wt_metadata_cursor(session, NULL));
 
 	WT_WITH_TABLE_LOCK(session,
 	    ret = __wt_schema_open_table(

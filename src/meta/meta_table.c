@@ -31,11 +31,11 @@ __metadata_turtle(const char *key)
 }
 
 /*
- * __wt_metadata_cursor --
+ * __wt_metadata_cursor_open --
  *	Opens a cursor on the metadata.
  */
 int
-__wt_metadata_cursor(
+__wt_metadata_cursor_open(
     WT_SESSION_IMPL *session, const char *config, WT_CURSOR **cursorp)
 {
 	WT_BTREE *btree;
@@ -68,14 +68,14 @@ __wt_metadata_cursor(
 }
 
 /*
- * __wt_metadata_session_cursor --
+ * __wt_metadata_cursor --
  *	Opens the session's cached metadata cursor.
  */
 int
-__wt_metadata_session_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
+__wt_metadata_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 {
 	if (session->meta_cursor == NULL)
-		WT_RET(__wt_metadata_cursor(
+		WT_RET(__wt_metadata_cursor_open(
 		    session, NULL, &session->meta_cursor));
 	if (cursorp != NULL)
 		*cursorp = session->meta_cursor;
@@ -101,7 +101,7 @@ __wt_metadata_insert(
 		WT_RET_MSG(session, EINVAL,
 		    "%s: insert not supported on the turtle file", key);
 
-	WT_RET(__wt_metadata_session_cursor(session, &cursor));
+	WT_RET(__wt_metadata_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	WT_RET(cursor->insert(cursor));
@@ -135,7 +135,7 @@ __wt_metadata_update(
 	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_update(session, key));
 
-	WT_RET(__wt_metadata_session_cursor(session, &cursor));
+	WT_RET(__wt_metadata_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	WT_RET(cursor->insert(cursor));
@@ -160,7 +160,7 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 		WT_RET_MSG(session, EINVAL,
 		    "%s: remove not supported on the turtle file", key);
 
-	WT_RET(__wt_metadata_session_cursor(session, &cursor));
+	WT_RET(__wt_metadata_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
 	WT_RET(cursor->search(cursor));
 	if (WT_META_TRACKING(session))
@@ -191,7 +191,7 @@ __wt_metadata_search(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	if (__metadata_turtle(key))
 		return (__wt_turtle_read(session, key, valuep));
 
-	WT_RET(__wt_metadata_session_cursor(session, &cursor));
+	WT_RET(__wt_metadata_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
 	WT_RET(cursor->search(cursor));
 	WT_RET(cursor->get_value(cursor, &value));

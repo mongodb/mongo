@@ -120,7 +120,7 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 	 * If a file was being bulk-loaded during the hot backup, it will appear
 	 * in the metadata file, but the file won't exist.  Create on demand.
 	 */
-	WT_RET(__wt_metadata_session_cursor(session, &cursor));
+	WT_RET(__wt_metadata_cursor(session, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
 		WT_RET(cursor->get_key(cursor, &key));
 		if (!WT_PREFIX_SKIP(key, "file:"))

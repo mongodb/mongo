@@ -469,7 +469,7 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	 * use the existing, cached session metadata cursor, the configuration
 	 * may not be the same.
 	 */
-	WT_ERR(__wt_metadata_cursor(session, cfg[1], &mdc->file_cursor));
+	WT_ERR(__wt_metadata_cursor_open(session, cfg[1], &mdc->file_cursor));
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 

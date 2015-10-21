@@ -338,7 +338,7 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	const char *key, *value;
 
 	/* Copy all of the metadata entries to the hot backup file. */
-	WT_RET(__wt_metadata_session_cursor(session, &cursor));
+	WT_RET(__wt_metadata_cursor(session, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
 		WT_RET(cursor->get_key(cursor, &key));
 		WT_RET(cursor->get_value(cursor, &value));

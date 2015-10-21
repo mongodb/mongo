@@ -72,7 +72,7 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 	 * loop calls code that repositions the cursor and our loop walking the
 	 * metadata table will fail.
 	 */
-	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_RET(__wt_metadata_cursor_open(session, NULL, &cursor));
 
 	WT_SAVE_DHANDLE(session,
 	    ret = __meta_btree_apply(session, cursor, func, cfg));

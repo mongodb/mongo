@@ -1320,7 +1320,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	 */
 	if (open_metadata) {
 		WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
-		if ((ret = __wt_metadata_session_cursor(session, NULL)) != 0) {
+		if ((ret = __wt_metadata_cursor(session, NULL)) != 0) {
 			wt_session = &session->iface;
 			WT_TRET(wt_session->close(wt_session, NULL));
 			return (ret);

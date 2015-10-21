@@ -56,7 +56,7 @@ __checkpoint_name_check(WT_SESSION_IMPL *session, const char *uri)
 	 * confirm the metadata file contains no non-file objects.
 	 */
 	if (uri == NULL) {
-		WT_RET(__wt_metadata_session_cursor(session, &cursor));
+		WT_RET(__wt_metadata_cursor(session, &cursor));
 		while ((ret = cursor->next(cursor)) == 0) {
 			WT_RET(cursor->get_key(cursor, &uri));
 			if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
@@ -369,7 +369,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	full = idle = logging = tracking = false;
 
 	/* Ensure the metadata table is open before taking any locks. */
-	WT_RET(__wt_metadata_session_cursor(session, NULL));
+	WT_RET(__wt_metadata_cursor(session, NULL));
 
 	/*
 	 * Do a pass over the configuration arguments and figure out what kind
