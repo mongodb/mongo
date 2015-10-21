@@ -143,10 +143,10 @@ ChunkMoveOperationState::~ChunkMoveOperationState() {
     migrationSourceManager->done(_txn);
 }
 
-Status ChunkMoveOperationState::initialize(OperationContext* txn, const BSONObj& cmdObj) {
+Status ChunkMoveOperationState::initialize(const BSONObj& cmdObj) {
     // Make sure we're as up-to-date as possible with shard information. This catches the case where
     // we might have changed a shard's host by removing/adding a shard with the same name.
-    grid.shardRegistry()->reload(txn);
+    grid.shardRegistry()->reload(_txn);
 
     _fromShard = cmdObj["fromShard"].str();
     if (_fromShard.empty()) {
@@ -174,7 +174,7 @@ Status ChunkMoveOperationState::initialize(OperationContext* txn, const BSONObj&
     }
 
     {
-        std::shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(txn, _fromShard);
+        std::shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(_txn, _fromShard);
         if (!fromShard) {
             return {ErrorCodes::ShardNotFound,
                     stream() << "Source shard " << _fromShard
@@ -185,7 +185,7 @@ Status ChunkMoveOperationState::initialize(OperationContext* txn, const BSONObj&
     }
 
     {
-        std::shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(txn, _toShard);
+        std::shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(_txn, _toShard);
         if (!toShard) {
             return {ErrorCodes::ShardNotFound,
                     stream() << "Destination shard " << _toShard
@@ -198,12 +198,12 @@ Status ChunkMoveOperationState::initialize(OperationContext* txn, const BSONObj&
     return Status::OK();
 }
 
-StatusWith<ForwardingCatalogManager::ScopedDistLock*> ChunkMoveOperationState::acquireMoveMetadata(
-    OperationContext* txn) {
+StatusWith<ForwardingCatalogManager::ScopedDistLock*>
+ChunkMoveOperationState::acquireMoveMetadata() {
     // Get the distributed lock
     const string whyMessage(stream() << "migrating chunk [" << _minKey << ", " << _maxKey << ") in "
                                      << _nss.ns());
-    _distLockStatus = grid.forwardingCatalogManager()->distLock(txn, _nss.ns(), whyMessage);
+    _distLockStatus = grid.forwardingCatalogManager()->distLock(_txn, _nss.ns(), whyMessage);
 
     if (!_distLockStatus->isOK()) {
         const string msg = stream() << "could not acquire collection lock for " << _nss.ns()
@@ -213,10 +213,10 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock*> ChunkMoveOperationState::a
         return Status(_distLockStatus->getStatus().code(), msg);
     }
 
-    ShardingState* const shardingState = ShardingState::get(txn);
+    ShardingState* const shardingState = ShardingState::get(_txn);
 
     // Snapshot the metadata
-    Status refreshStatus = shardingState->refreshMetadataNow(txn, _nss.ns(), &_shardVersion);
+    Status refreshStatus = shardingState->refreshMetadataNow(_txn, _nss.ns(), &_shardVersion);
     if (!refreshStatus.isOK()) {
         const string msg = stream() << "moveChunk cannot start migrate of chunk "
                                     << "[" << _minKey << "," << _maxKey << ")"
@@ -237,7 +237,7 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock*> ChunkMoveOperationState::a
     {
         // Mongos >= v3.2 sends the full version, v3.0 only sends the epoch.
         // TODO(SERVER-20742): Stop parsing epoch separately after 3.2.
-        auto& operationVersion = OperationShardVersion::get(txn);
+        auto& operationVersion = OperationShardVersion::get(_txn);
         if (operationVersion.hasShardVersion()) {
             _collectionVersion = operationVersion.getShardVersion(_nss);
             _collectionEpoch = _collectionVersion.epoch();
@@ -276,7 +276,7 @@ StatusWith<ForwardingCatalogManager::ScopedDistLock*> ChunkMoveOperationState::a
     return &_distLockStatus->getValue();
 }
 
-Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
+Status ChunkMoveOperationState::commitMigration() {
     invariant(_distLockStatus.is_initialized());
     invariant(_distLockStatus->isOK());
 
@@ -284,9 +284,9 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
 
     // We're under the collection distributed lock here, so no other migrate can change maxVersion
     // or CollectionMetadata state.
-    ShardingState* const shardingState = ShardingState::get(txn);
+    ShardingState* const shardingState = ShardingState::get(_txn);
 
-    Status startStatus = ShardingStateRecovery::startMetadataOp(txn);
+    Status startStatus = ShardingStateRecovery::startMetadataOp(_txn);
     if (!startStatus.isOK())
         return startStatus;
 
@@ -298,16 +298,16 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
     myVersion.incMajor();
 
     {
-        ScopedTransaction transaction(txn, MODE_IX);
-        Lock::DBLock lk(txn->lockState(), _nss.db(), MODE_IX);
-        Lock::CollectionLock collLock(txn->lockState(), _nss.ns(), MODE_X);
+        ScopedTransaction transaction(_txn, MODE_IX);
+        Lock::DBLock lk(_txn->lockState(), _nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(_txn->lockState(), _nss.ns(), MODE_X);
 
         invariant(myVersion > shardingState->getVersion(_nss.ns()));
 
         // Bump the metadata's version up and "forget" about the chunk being moved. This is
         // not the commit point, but in practice the state in this shard won't change until
         // the commit it done.
-        shardingState->donateChunk(txn, _nss.ns(), _minKey, _maxKey, myVersion);
+        shardingState->donateChunk(_txn, _nss.ns(), _minKey, _maxKey, myVersion);
     }
 
     log() << "moveChunk setting version to: " << myVersion << migrateLog;
@@ -339,15 +339,15 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
               << " resetting shard version to: " << getShardVersion() << migrateLog;
 
         {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbLock(txn->lockState(), _nss.db(), MODE_IX);
-            Lock::CollectionLock collLock(txn->lockState(), _nss.ns(), MODE_X);
+            ScopedTransaction transaction(_txn, MODE_IX);
+            Lock::DBLock dbLock(_txn->lockState(), _nss.db(), MODE_IX);
+            Lock::CollectionLock collLock(_txn->lockState(), _nss.ns(), MODE_X);
 
             log() << "moveChunk collection lock acquired to reset shard version from "
                      "failed migration";
 
             // Revert the chunk manager back to the state before "forgetting" about the chunk
-            shardingState->undoDonateChunk(txn, _nss.ns(), getCollMetadata());
+            shardingState->undoDonateChunk(_txn, _nss.ns(), getCollMetadata());
         }
 
         log() << "Shard version successfully reset to clean up failed migration";
@@ -458,11 +458,11 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
         }
 
         applyOpsStatus =
-            grid.catalogManager(txn)->applyChunkOpsDeprecated(txn, updates.arr(), preCond.arr());
+            grid.catalogManager(_txn)->applyChunkOpsDeprecated(_txn, updates.arr(), preCond.arr());
 
         if (MONGO_FAIL_POINT(failMigrationApplyOps)) {
             throw SocketException(SocketException::RECV_ERROR,
-                                  shardingState->getConfigServer(txn).toString());
+                                  shardingState->getConfigServer(_txn).toString());
         }
     } catch (const DBException& ex) {
         warning() << ex << migrateLog;
@@ -479,12 +479,12 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
               << "failed migration";
 
         {
-            ScopedTransaction transaction(txn, MODE_IX);
-            Lock::DBLock dbLock(txn->lockState(), _nss.db(), MODE_IX);
-            Lock::CollectionLock collLock(txn->lockState(), _nss.ns(), MODE_X);
+            ScopedTransaction transaction(_txn, MODE_IX);
+            Lock::DBLock dbLock(_txn->lockState(), _nss.db(), MODE_IX);
+            Lock::CollectionLock collLock(_txn->lockState(), _nss.ns(), MODE_X);
 
             // Revert the metadata back to the state before "forgetting" about the chunk
-            shardingState->undoDonateChunk(txn, _nss.ns(), getCollMetadata());
+            shardingState->undoDonateChunk(_txn, _nss.ns(), getCollMetadata());
         }
 
         log() << "Shard version successfully reset to clean up failed migration";
@@ -510,12 +510,12 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
         try {
             std::vector<ChunkType> newestChunk;
             Status status =
-                grid.catalogManager(txn)->getChunks(txn,
-                                                    BSON(ChunkType::ns(_nss.ns())),
-                                                    BSON(ChunkType::DEPRECATED_lastmod() << -1),
-                                                    1,
-                                                    &newestChunk,
-                                                    nullptr);
+                grid.catalogManager(_txn)->getChunks(_txn,
+                                                     BSON(ChunkType::ns(_nss.ns())),
+                                                     BSON(ChunkType::DEPRECATED_lastmod() << -1),
+                                                     1,
+                                                     &newestChunk,
+                                                     nullptr);
             uassertStatusOK(status);
 
             ChunkVersion checkVersion;
@@ -544,7 +544,7 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
     shardingState->migrationSourceManager()->setInCriticalSection(false);
-    ShardingStateRecovery::endMetadataOp(txn);
+    ShardingStateRecovery::endMetadataOp(_txn);
 
     // Migration is done, just log some diagnostics information
     BSONObj chunkInfo =
@@ -556,13 +556,13 @@ Status ChunkMoveOperationState::commitMigration(OperationContext* txn) {
         commitInfo.appendElements(res["counts"].Obj());
     }
 
-    grid.catalogManager(txn)->logChange(txn,
-                                        txn->getClient()->clientAddress(true),
-                                        "moveChunk.commit",
-                                        _nss.ns(),
-                                        commitInfo.obj());
+    grid.catalogManager(_txn)->logChange(_txn,
+                                         _txn->getClient()->clientAddress(true),
+                                         "moveChunk.commit",
+                                         _nss.ns(),
+                                         commitInfo.obj());
 
-    shardingState->migrationSourceManager()->done(txn);
+    shardingState->migrationSourceManager()->done(_txn);
     _isRunning = false;
 
     return Status::OK();
@@ -580,9 +580,9 @@ std::shared_ptr<CollectionMetadata> ChunkMoveOperationState::getCollMetadata() c
     return _collMetadata;
 }
 
-Status ChunkMoveOperationState::start(OperationContext* txn, BSONObj shardKeyPattern) {
-    auto migrationSourceManager = ShardingState::get(txn)->migrationSourceManager();
-    if (!migrationSourceManager->start(txn, _nss.ns(), _minKey, _maxKey, shardKeyPattern)) {
+Status ChunkMoveOperationState::start(BSONObj shardKeyPattern) {
+    auto migrationSourceManager = ShardingState::get(_txn)->migrationSourceManager();
+    if (!migrationSourceManager->start(_txn, _nss.ns(), _minKey, _maxKey, shardKeyPattern)) {
         return {ErrorCodes::ConflictingOperationInProgress,
                 "Not starting chunk migration because another migration is already in progress "
                 "from this shard"};

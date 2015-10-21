@@ -88,16 +88,13 @@ class ChunkMoveOperationState {
     MONGO_DISALLOW_COPYING(ChunkMoveOperationState);
 
 public:
-    /**
-     * Note: Saves the txn for cleanup.
-     */
     ChunkMoveOperationState(OperationContext* txn, NamespaceString ns);
     ~ChunkMoveOperationState();
 
     /**
      * Extracts and validates the move chunk parameters from the given cmdObj.
      */
-    Status initialize(OperationContext* txn, const BSONObj& cmdObj);
+    Status initialize(const BSONObj& cmdObj);
 
     /**
      * Acquires the distributed lock for the collection, whose chunk is being moved and fetches the
@@ -112,13 +109,12 @@ public:
      * TODO: Once the entire chunk move process is moved to be inside this state machine, there
      *       will not be any need to expose the distributed lock.
      */
-    StatusWith<ForwardingCatalogManager::ScopedDistLock*> acquireMoveMetadata(
-        OperationContext* txn);
+    StatusWith<ForwardingCatalogManager::ScopedDistLock*> acquireMoveMetadata();
 
     /**
      * Starts the move chunk operation.
      */
-    Status start(OperationContext* txn, BSONObj shardKeyPattern);
+    Status start(BSONObj shardKeyPattern);
 
     /**
      * Implements the migration critical section. Needs to be invoked after all data has been moved
@@ -129,7 +125,7 @@ public:
      * Since some migration failures are non-recoverable, it may also shut down the server on
      * certain errors.
      */
-    Status commitMigration(OperationContext* txn);
+    Status commitMigration();
 
     const NamespaceString& getNss() const {
         return _nss;

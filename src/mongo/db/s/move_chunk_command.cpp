@@ -173,7 +173,7 @@ public:
         }
 
         ChunkMoveOperationState chunkMoveState{txn, NamespaceString(ns)};
-        uassertStatusOK(chunkMoveState.initialize(txn, cmdObj));
+        uassertStatusOK(chunkMoveState.initialize(cmdObj));
 
         // Initialize our current shard name in the shard state if needed
         shardingState->setShardName(chunkMoveState.getFromShard());
@@ -223,7 +223,7 @@ public:
                                        Status(ErrorCodes::ConflictingOperationInProgress, msg));
         }
 
-        auto distLock = uassertStatusOK(chunkMoveState.acquireMoveMetadata(txn));
+        auto distLock = uassertStatusOK(chunkMoveState.acquireMoveMetadata());
 
         BSONObj chunkInfo = BSON(
             "min" << chunkMoveState.getMinKey() << "max" << chunkMoveState.getMaxKey() << "from"
@@ -250,7 +250,7 @@ public:
 
         // 3.
 
-        auto moveChunkStartStatus = chunkMoveState.start(txn, shardKeyPattern);
+        auto moveChunkStartStatus = chunkMoveState.start(shardKeyPattern);
 
         if (!moveChunkStartStatus.isOK()) {
             warning() << moveChunkStartStatus.toString();
@@ -468,7 +468,7 @@ public:
             return appendCommandStatus(result, Status(lockStatus.code(), msg));
         }
 
-        uassertStatusOK(chunkMoveState.commitMigration(txn));
+        uassertStatusOK(chunkMoveState.commitMigration());
         timing.done(5);
 
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
