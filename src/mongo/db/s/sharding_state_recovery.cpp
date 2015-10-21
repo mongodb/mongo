@@ -46,6 +46,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/client/shard_registry.h"
@@ -65,6 +66,8 @@ const Seconds kWriteTimeout(15);
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::NONE,
                                                 kWriteTimeout);
+
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(recoverShardingState, bool, true);
 
 /**
  * Encapsulates the parsing and construction of the config server min opTime recovery document.
@@ -237,6 +240,13 @@ void ShardingStateRecovery::endMetadataOp(OperationContext* txn) {
 }
 
 Status ShardingStateRecovery::recover(OperationContext* txn) {
+    if (!recoverShardingState) {
+        warning()
+            << "Not checking for ShardingState recovery document because the recoverShardingState "
+               "server parameter is set to false";
+        return Status::OK();
+    }
+
     BSONObj recoveryDocBSON;
 
     try {
