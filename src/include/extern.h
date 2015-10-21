@@ -186,7 +186,7 @@ extern int __wt_las_create(WT_SESSION_IMPL *session);
 extern int __wt_las_destroy(WT_SESSION_IMPL *session);
 extern void __wt_las_set_written(WT_SESSION_IMPL *session);
 extern bool __wt_las_is_written(WT_SESSION_IMPL *session);
-extern int __wt_las_cursor_create(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
+extern int __wt_las_cursor_open(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
 extern int __wt_las_cursor( WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t *session_flags);
 extern int __wt_las_cursor_close( 	WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t session_flags);
 extern int __wt_las_sweep(WT_SESSION_IMPL *session);
