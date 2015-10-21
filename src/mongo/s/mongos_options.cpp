@@ -83,7 +83,13 @@ Status addMongosOptions(moe::OptionSection* options) {
     moe::OptionSection sharding_options("Sharding options");
 
     sharding_options.addOptionChaining(
-        "sharding.configDB", "configdb", moe::String, "1 or 3 comma separated config servers");
+        "sharding.configDB",
+        "configdb",
+        moe::String,
+        "Connection string for communicating with config servers. Acceptable forms:\n"
+        "CSRS: <config replset name>/<host1:port>,<host2:port>,[...]\n"
+        "SCCC (deprecated): <host1:port>,<host2:port>,<host3:port>\n"
+        "Single-node (for testing only): <host1:port>");
 
     sharding_options.addOptionChaining(
         "replication.localPingThresholdMs",
