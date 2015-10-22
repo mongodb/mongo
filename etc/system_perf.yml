@@ -400,7 +400,7 @@ tasks:
 buildvariants:
 - name: linux-wt-repl-1
   display_name: Linux 1-Node ReplSet
-  batchtime: 720 # 12 hours
+  batchtime: 1440 # 12 hours
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: single-replica
@@ -417,7 +417,7 @@ buildvariants:
 
 - name: linux-wt-shard
   display_name: Linux 3-Shard Cluster
-  batchtime: 720 # 12 hours
+  batchtime: 1440 # 12 hours
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: shard
@@ -434,7 +434,7 @@ buildvariants:
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet Cluster
-  batchtime: 720 # 12 hours
+  batchtime: 1440 # 12 hours
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: replica
