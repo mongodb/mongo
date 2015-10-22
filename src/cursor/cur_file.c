@@ -323,7 +323,7 @@ __curfile_remove(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_UPDATE_API_CALL(cursor, session, remove, cbt->btree);
+	CURSOR_REMOVE_API_CALL(cursor, session, cbt->btree);
 
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NOVALUE(cursor);

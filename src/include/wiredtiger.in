@@ -2910,6 +2910,13 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * if recovery is required to use the database.
  */
 #define	WT_RUN_RECOVERY	-31806
+/*!
+ * Not enough space in the cache to complete the operation.
+ * This error is generated when wiredtiger_open is configured         to run in-
+ * memory, and an insert or update operation requires more                 than
+ * the configured cache size to complete.
+ */
+#define	WT_CACHE_FULL	-31807
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.

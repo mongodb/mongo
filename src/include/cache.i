@@ -193,6 +193,22 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
 }
 
 /*
+ * __wt_cache_full --
+ *	Return if the cache is at (or over) capacity.
+ */
+static inline bool
+__wt_cache_full(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CACHE *cache;
+
+	conn = S2C(session);
+	cache = conn->cache;
+
+        return (__wt_cache_bytes_inuse(cache) >= conn->cache_size);
+}
+
+/*
  * __wt_cache_eviction_check --
  *	Evict pages if the cache crosses its boundaries.
  */
