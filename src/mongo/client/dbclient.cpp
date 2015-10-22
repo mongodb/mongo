@@ -309,7 +309,7 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     requestBuilder->setCommandArgs(commandArgs);
     auto requestMsg = requestBuilder->done();
 
-    auto replyMsg = stdx::make_unique<Message>();
+    Message replyMsg;
 
     // We always want to throw if there was a network error, we do it here
     // instead of passing 'true' for the 'assertOk' parameter so we can construct a
@@ -318,14 +318,14 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
             str::stream() << "network error while attempting to run "
                           << "command '" << command << "' "
                           << "on host '" << host << "' ",
-            call(*requestMsg, *replyMsg, false, &host));
+            call(requestMsg, replyMsg, false, &host));
 
-    auto commandReply = rpc::makeReply(replyMsg.get());
+    auto commandReply = rpc::makeReply(&replyMsg);
 
     uassert(ErrorCodes::RPCProtocolNegotiationFailed,
             str::stream() << "Mismatched RPC protocols - request was '"
-                          << opToString(requestMsg->operation()) << "' '"
-                          << " but reply was '" << opToString(replyMsg->operation()) << "' ",
+                          << opToString(requestMsg.operation()) << "' '"
+                          << " but reply was '" << opToString(replyMsg.operation()) << "' ",
             requestBuilder->getProtocol() == commandReply->getProtocol());
 
     if (ErrorCodes::SendStaleConfig ==

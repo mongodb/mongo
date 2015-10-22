@@ -78,7 +78,7 @@ TEST(RequestBuilder, RoundTrip) {
                    .addInputDocs(inputDocRange)
                    .done();
 
-    rpc::CommandRequest parsed(msg.get());
+    rpc::CommandRequest parsed(&msg);
 
     ASSERT_EQUALS(parsed.getDatabase(), databaseName);
     ASSERT_EQUALS(parsed.getCommandName(), commandName);

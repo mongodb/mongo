@@ -342,13 +342,15 @@ class Message {
 public:
     // we assume here that a vector with initial size 0 does no allocation (0 is the default, but
     // wanted to make it explicit).
-    Message() : _buf(0), _data(0), _freeIt(false) {}
-    Message(void* data, bool freeIt) : _buf(0), _data(0), _freeIt(false) {
-        _setData(reinterpret_cast<char*>(data), freeIt);
-    };
-    Message(Message&& r) : _buf(0), _data(0), _freeIt(false) {
-        *this = std::move(r);
+    Message() = default;
+
+    Message(void* data, bool freeIt) : _buf(reinterpret_cast<char*>(data)), _freeIt(freeIt) {}
+
+    Message(Message&& r) : _buf(r._buf), _data(std::move(r._data)), _freeIt(r._freeIt) {
+        r._buf = nullptr;
+        r._freeIt = false;
     }
+
     ~Message() {
         reset();
     }
@@ -420,30 +422,31 @@ public:
         if (&r == this)
             return *this;
 
-        verify(empty());  // This means that our _data must be empty() when we swap below.
-        verify(r._freeIt);
-        _buf = r._buf;
-        r._buf = 0;
-        if (r._data.size() > 0) {
-            _data.swap(r._data);
+        if (!empty()) {
+            reset();
         }
+
+        _buf = r._buf;
+        _data = std::move(r._data);
+        _freeIt = r._freeIt;
+
+        r._buf = nullptr;
         r._freeIt = false;
-        _freeIt = true;
         return *this;
     }
 
     void reset() {
         if (_freeIt) {
             if (_buf) {
-                free(_buf);
+                std::free(_buf);
             }
             for (std::vector<std::pair<char*, int>>::const_iterator i = _data.begin();
                  i != _data.end();
                  ++i) {
-                free(i->first);
+                std::free(i->first);
             }
         }
-        _buf = 0;
+        _buf = nullptr;
         _data.clear();
         _freeIt = false;
     }
@@ -505,12 +508,12 @@ private:
         _buf = d;
     }
     // if just one buffer, keep it in _buf, otherwise keep a sequence of buffers in _data
-    char* _buf;
+    char* _buf{nullptr};
     // byte buffer(s) - the first must contain at least a full MsgData unless using _buf for storage
     // instead
     typedef std::vector<std::pair<char*, int>> MsgVec;
-    MsgVec _data;
-    bool _freeIt;
+    MsgVec _data{};
+    bool _freeIt{false};
 };
 
 

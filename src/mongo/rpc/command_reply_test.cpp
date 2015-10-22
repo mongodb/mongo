@@ -51,12 +51,10 @@ using std::end;
 class ReplyTest : public mongo::unittest::Test {
 protected:
     std::vector<char> _cmdData{};
-    // using unique ptr so we can destroy and replace easily
-    // since message does not have operator= or swap defined...
-    std::unique_ptr<Message> _message{};
+    Message _message{};
 
     virtual void setUp() override {
-        _message = stdx::make_unique<Message>();
+        _message.reset();
     }
 
     virtual void tearDown() override {
@@ -73,8 +71,8 @@ protected:
 
     const Message* buildMessage() {
         _cmdData.shrink_to_fit();
-        _message->setData(dbCommandReply, _cmdData.data(), _cmdData.size());
-        return _message.get();
+        _message.setData(dbCommandReply, _cmdData.data(), _cmdData.size());
+        return &_message;
     }
 };
 

@@ -172,7 +172,7 @@ rpc::UniqueReply MockRemoteDBServer::runCommandWithMetadata(MockRemoteDBServer::
                        .setMetadata(rpc::makeEmptyMetadata())
                        .setCommandReply(reply)
                        .done();
-    auto replyView = stdx::make_unique<rpc::CommandReply>(message.get());
+    auto replyView = stdx::make_unique<rpc::CommandReply>(&message);
     return rpc::UniqueReply(std::move(message), std::move(replyView));
 }
 

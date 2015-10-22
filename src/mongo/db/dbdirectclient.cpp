@@ -121,11 +121,11 @@ bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, str
     DbResponse dbResponse;
     CurOp curOp(_txn);
     assembleResponse(_txn, toSend, dbResponse, dummyHost);
-    verify(dbResponse.response);
+    verify(!dbResponse.response.empty());
 
     // can get rid of this if we make response handling smarter
-    dbResponse.response->concat();
-    response = std::move(*dbResponse.response);
+    dbResponse.response.concat();
+    response = std::move(dbResponse.response);
 
     return true;
 }

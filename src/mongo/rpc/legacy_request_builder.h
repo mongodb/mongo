@@ -44,7 +44,7 @@ public:
     LegacyRequestBuilder();
     ~LegacyRequestBuilder() final;
 
-    LegacyRequestBuilder(std::unique_ptr<Message>);
+    LegacyRequestBuilder(Message&&);
 
     LegacyRequestBuilder& setDatabase(StringData database) final;
     LegacyRequestBuilder& setCommandName(StringData commandName) final;
@@ -58,10 +58,10 @@ public:
 
     Protocol getProtocol() const final;
 
-    std::unique_ptr<Message> done() final;
+    Message done() final;
 
 private:
-    std::unique_ptr<Message> _message;
+    Message _message;
     BufBuilder _builder{};
 
     // we need to stash this as we need commandArgs to

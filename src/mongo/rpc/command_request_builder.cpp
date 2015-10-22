@@ -39,13 +39,11 @@
 namespace mongo {
 namespace rpc {
 
-CommandRequestBuilder::CommandRequestBuilder()
-    : CommandRequestBuilder(stdx::make_unique<Message>()) {}
+CommandRequestBuilder::CommandRequestBuilder() : CommandRequestBuilder(Message()) {}
 
 CommandRequestBuilder::~CommandRequestBuilder() {}
 
-CommandRequestBuilder::CommandRequestBuilder(std::unique_ptr<Message> message)
-    : _message{std::move(message)} {
+CommandRequestBuilder::CommandRequestBuilder(Message&& message) : _message{std::move(message)} {
     _builder.skip(mongo::MsgData::MsgDataHeaderSize);  // Leave room for message header.
 }
 
@@ -98,13 +96,13 @@ Protocol CommandRequestBuilder::getProtocol() const {
     return rpc::Protocol::kOpCommandV1;
 }
 
-std::unique_ptr<Message> CommandRequestBuilder::done() {
+Message CommandRequestBuilder::done() {
     invariant(_state == State::kInputDocs);
     MsgData::View msg = _builder.buf();
     msg.setLen(_builder.len());
     msg.setOperation(dbCommand);
-    _builder.decouple();                      // release ownership from BufBuilder.
-    _message->setData(msg.view2ptr(), true);  // transfer ownership to Message.
+    _builder.decouple();                     // release ownership from BufBuilder.
+    _message.setData(msg.view2ptr(), true);  // transfer ownership to Message.
     _state = State::kDone;
     return std::move(_message);
 }

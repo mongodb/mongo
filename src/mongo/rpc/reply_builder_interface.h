@@ -131,7 +131,7 @@ public:
      * Writes data then transfers ownership of the message to the caller. The behavior of
      * calling any methods on the builder is subsequently undefined.
      */
-    virtual std::unique_ptr<Message> done() = 0;
+    virtual Message done() = 0;
 
 protected:
     ReplyBuilderInterface() = default;

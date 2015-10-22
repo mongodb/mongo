@@ -201,9 +201,9 @@ void replyToQuery(int queryResultFlags,
 }
 
 void replyToQuery(int queryResultFlags, Message& m, DbResponse& dbresponse, BSONObj obj) {
-    Message* resp = new Message();
-    replyToQuery(queryResultFlags, *resp, obj);
-    dbresponse.response = resp;
+    Message resp;
+    replyToQuery(queryResultFlags, resp, obj);
+    dbresponse.response = std::move(resp);
     dbresponse.responseTo = m.header().getId();
 }
 

@@ -59,7 +59,7 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
 
     // Set current command to ismaster request and run
     auto beginStatus = op->beginCommand(
-        std::move(*(requestBuilder.done())), AsyncCommand::CommandType::kRPC, op->request().target);
+        requestBuilder.done(), AsyncCommand::CommandType::kRPC, op->request().target);
     if (!beginStatus.isOK()) {
         return _completeOperation(op, beginStatus);
     }

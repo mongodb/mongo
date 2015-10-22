@@ -34,9 +34,9 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/request_interface.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
-class Message;
 namespace rpc {
 
 /**
@@ -48,7 +48,7 @@ class UniqueMessage {
     MONGO_DISALLOW_COPYING(UniqueMessage);
 
 public:
-    UniqueMessage(std::unique_ptr<Message> message, std::unique_ptr<MessageViewType> view)
+    UniqueMessage(Message&& message, std::unique_ptr<MessageViewType> view)
         : _message{std::move(message)}, _view{std::move(view)} {}
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
@@ -77,13 +77,13 @@ public:
      * Releases ownership of the underlying message. The result of calling any other methods
      * on the object afterward is undefined.
      */
-    std::unique_ptr<Message> releaseMessage() {
+    Message releaseMessage() {
         _view.reset();
         return std::move(_message);
     }
 
 private:
-    std::unique_ptr<Message> _message;
+    Message _message;
     std::unique_ptr<MessageViewType> _view;
 };
 

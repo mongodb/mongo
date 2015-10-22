@@ -312,16 +312,11 @@ public:
  * A response to a DbMessage.
  */
 struct DbResponse {
-    Message* response;
+    Message response;
     MSGID responseTo;
     std::string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
-    DbResponse(Message* r, MSGID rt) : response(r), responseTo(rt) {}
-    DbResponse() {
-        response = 0;
-    }
-    ~DbResponse() {
-        delete response;
-    }
+    DbResponse(Message r, MSGID rt) : response(std::move(r)), responseTo(rt) {}
+    DbResponse() = default;
 };
 
 void replyToQuery(int queryResultFlags,

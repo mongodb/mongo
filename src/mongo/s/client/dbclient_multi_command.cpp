@@ -96,7 +96,8 @@ static void sayAsCmd(DBClientBase* conn, StringData dbName, const BSONObj& cmdOb
     requestBuilder->setMetadata(metadataBob.done());
     requestBuilder->setCommandArgs(upconvertedCmd);
     // Send our command
-    conn->say(*requestBuilder->done());
+    auto requestMsg = requestBuilder->done();
+    conn->say(requestMsg);
 }
 
 // THROWS

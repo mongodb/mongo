@@ -53,9 +53,9 @@ using asio::ip::tcp;
 namespace {
 
 // Metadata listener can be nullptr.
-StatusWith<std::unique_ptr<Message>> messageFromRequest(const RemoteCommandRequest& request,
-                                                        rpc::Protocol protocol,
-                                                        rpc::EgressMetadataHook* metadataHook) {
+StatusWith<Message> messageFromRequest(const RemoteCommandRequest& request,
+                                       rpc::Protocol protocol,
+                                       rpc::EgressMetadataHook* metadataHook) {
     BSONObj query = request.cmdObj;
     auto requestBuilder = rpc::makeRequestBuilder(protocol);
 
@@ -179,7 +179,7 @@ Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& r
             return newCommand.getStatus();
         }
         return beginCommand(
-            std::move(*newCommand.getValue()), AsyncCommand::CommandType::kRPC, request.target);
+            std::move(newCommand.getValue()), AsyncCommand::CommandType::kRPC, request.target);
     } else if (isFindCmd) {
         auto downconvertedFind = downconvertFindCommandRequest(request);
         if (!downconvertedFind.isOK()) {

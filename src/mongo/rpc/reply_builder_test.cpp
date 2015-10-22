@@ -96,7 +96,7 @@ TEST(CommandReplyBuilder, MemAccess) {
     replyBuilder.setCommandReply(commandReply);
     auto msg = replyBuilder.done();
 
-    rpc::CommandReply parsed(msg.get());
+    rpc::CommandReply parsed(&msg);
 
     ASSERT_EQUALS(parsed.getMetadata(), metadata);
     ASSERT_EQUALS(parsed.getCommandReply(), commandReply);
@@ -110,7 +110,7 @@ TEST(LegacyReplyBuilder, MemAccess) {
     replyBuilder.setCommandReply(commandReply);
     auto msg = replyBuilder.done();
 
-    rpc::LegacyReply parsed(msg.get());
+    rpc::LegacyReply parsed(&msg);
 
     ASSERT_EQUALS(parsed.getMetadata(), metadata);
     ASSERT_EQUALS(parsed.getCommandReply(), commandReply);
@@ -164,7 +164,7 @@ void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder) {
 
     auto msg = replyBuilder.done();
 
-    T parsed(msg.get());
+    T parsed(&msg);
 
     ASSERT_EQUALS(parsed.getMetadata(), metadata);
     ASSERT_TRUE(parsed.getOutputDocs() == outputDocRange);
@@ -207,10 +207,10 @@ TEST(LegacyReplyBuilderSpaceTest, DocSize) {
     replyBuilder0.setCommandReply(commandReply);
     auto msg0 = replyBuilder0.done();
 
-    QueryResult::View qr0 = msg0->singleData().view2ptr();
+    QueryResult::View qr0 = msg0.singleData().view2ptr();
     auto dataLen0 = static_cast<std::size_t>(qr0.msgdata().dataLen());
 
-    QueryResult::View qr = msg->singleData().view2ptr();
+    QueryResult::View qr = msg.singleData().view2ptr();
     auto dataLen = static_cast<std::size_t>(qr.msgdata().dataLen());
 
     // below tests the array space estimates
@@ -276,7 +276,7 @@ TEST_F(CommandReplyBuilderSpaceTest, MaxDocSize1) {
         availSpace = replyBuilder.availableBytes();
     }
     auto msg = replyBuilder.done();
-    auto sizeUInt = static_cast<std::size_t>(msg->size());
+    auto sizeUInt = static_cast<std::size_t>(msg.size());
 
     ASSERT_EQUALS(sizeUInt, mongo::MaxMessageSizeBytes);
 }
@@ -304,7 +304,7 @@ TEST_F(CommandReplyBuilderSpaceTest, MaxDocSize2) {
         availSpace = replyBuilder.availableBytes();
     }
     auto msg = replyBuilder.done();
-    auto sizeUInt = static_cast<std::size_t>(msg->size());
+    auto sizeUInt = static_cast<std::size_t>(msg.size());
 
     ASSERT_EQUALS(sizeUInt, mongo::MaxMessageSizeBytes);
 }
@@ -338,7 +338,7 @@ TEST_F(CommandReplyBuilderSpaceTest, MaxDocSize3) {
 
     auto msg = replyBuilder.done();
 
-    auto sizeUInt = static_cast<std::size_t>(msg->size());
+    auto sizeUInt = static_cast<std::size_t>(msg.size());
 
     ASSERT_EQUALS(sizeUInt, mongo::MaxMessageSizeBytes);
 }

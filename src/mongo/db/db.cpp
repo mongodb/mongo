@@ -173,10 +173,10 @@ public:
                 // results after the response reaches the client
             }
 
-            if (dbresponse.response) {
-                port->reply(m, *dbresponse.response, dbresponse.responseTo);
+            if (!dbresponse.response.empty()) {
+                port->reply(m, dbresponse.response, dbresponse.responseTo);
                 if (dbresponse.exhaustNS.size() > 0) {
-                    MsgData::View header = dbresponse.response->header();
+                    MsgData::View header = dbresponse.response.header();
                     QueryResult::View qr = header.view2ptr();
                     long long cursorid = qr.getCursorId();
                     if (cursorid) {

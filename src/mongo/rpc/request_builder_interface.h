@@ -108,7 +108,7 @@ public:
      * The behavior of calling any methods on the object is subsequently
      * undefined.
      */
-    virtual std::unique_ptr<Message> done() = 0;
+    virtual Message done() = 0;
 
 protected:
     RequestBuilderInterface() = default;

@@ -260,9 +260,9 @@ static void receivedCommand(OperationContext* txn,
 
     auto response = builder.done();
 
-    op->debug().responseLength = response->header().dataLen();
+    op->debug().responseLength = response.header().dataLen();
 
-    dbResponse.response = response.release();
+    dbResponse.response = std::move(response);
     dbResponse.responseTo = responseTo;
 }
 
@@ -301,9 +301,9 @@ void receivedRpc(OperationContext* txn, Client& client, DbResponse& dbResponse, 
 
     auto response = replyBuilder.done();
 
-    curOp->debug().responseLength = response->header().dataLen();
+    curOp->debug().responseLength = response.header().dataLen();
 
-    dbResponse.response = response.release();
+    dbResponse.response = std::move(response);
     dbResponse.responseTo = responseTo;
 }
 
@@ -378,7 +378,6 @@ static void receivedQuery(OperationContext* txn,
 
     DbMessage d(m);
     QueryMessage q(d);
-    unique_ptr<Message> resp(new Message());
 
     CurOp& op = *CurOp::get(txn);
 
@@ -388,16 +387,13 @@ static void receivedQuery(OperationContext* txn,
         audit::logQueryAuthzCheck(client, nss, q.query, status.code());
         uassertStatusOK(status);
 
-        dbResponse.exhaustNS = runQuery(txn, q, nss, *resp);
-        verify(!resp->empty());
+        dbResponse.exhaustNS = runQuery(txn, q, nss, dbResponse.response);
     } catch (const AssertionException& exception) {
-        resp.reset(new Message());
-        generateLegacyQueryErrorResponse(&exception, q, &op, resp.get());
+        dbResponse.response.reset();
+        generateLegacyQueryErrorResponse(&exception, q, &op, &dbResponse.response);
     }
 
-    op.debug().responseLength = resp->header().dataLen();
-
-    dbResponse.response = resp.release();
+    op.debug().responseLength = dbResponse.response.header().dataLen();
     dbResponse.responseTo = responseTo;
 }
 
@@ -536,13 +532,11 @@ void assembleResponse(OperationContext* txn,
             log(LogComponent::kQuery) << curTimeMillis64() % 10000
                                       << " long msg received, len:" << len << endl;
 
-        Message* resp = new Message();
         if (strcmp("end", p) == 0)
-            resp->setData(opReply, "dbMsg end no longer supported");
+            dbresponse.response.setData(opReply, "dbMsg end no longer supported");
         else
-            resp->setData(opReply, "i am fine - dbMsg deprecated");
+            dbresponse.response.setData(opReply, "i am fine - dbMsg deprecated");
 
-        dbresponse.response = resp;
         dbresponse.responseTo = m.header().getId();
     } else {
         try {
@@ -923,17 +917,15 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
         curop.debug().exceptionInfo = e.getInfo();
 
         replyToQuery(ResultFlag_ErrSet, m, dbresponse, errObj);
-        curop.debug().responseLength = dbresponse.response->header().dataLen();
+        curop.debug().responseLength = dbresponse.response.header().dataLen();
         curop.debug().nreturned = 1;
         return false;
     }
 
-    Message* resp = new Message();
-    resp->setData(msgdata.view2ptr(), true);
-    curop.debug().responseLength = resp->header().dataLen();
+    dbresponse.response.setData(msgdata.view2ptr(), true);
+    curop.debug().responseLength = dbresponse.response.header().dataLen();
     curop.debug().nreturned = msgdata.getNReturned();
 
-    dbresponse.response = resp;
     dbresponse.responseTo = m.header().getId();
 
     if (exhaust) {
@@ -1106,11 +1098,11 @@ static void insertSystemIndexes(OperationContext* txn, DbMessage& d, CurOp& curO
                                      .setMetadata(rpc::makeEmptyMetadata())
                                      .setCommandArgs(cmdObj)
                                      .done();
-            rpc::LegacyRequest cmdRequest{cmdRequestMsg.get()};
+            rpc::LegacyRequest cmdRequest{&cmdRequestMsg};
             rpc::LegacyReplyBuilder cmdReplyBuilder{};
             Command::execCommand(txn, createIndexesCmd, cmdRequest, &cmdReplyBuilder);
             auto cmdReplyMsg = cmdReplyBuilder.done();
-            rpc::LegacyReply cmdReply{cmdReplyMsg.get()};
+            rpc::LegacyReply cmdReply{&cmdReplyMsg};
             uassertStatusOK(Command::getStatusFromCommandResult(cmdReply.getCommandReply()));
         } catch (const DBException& ex) {
             LastError::get(txn->getClient()).setLastError(ex.getCode(), ex.getInfo().msg);

@@ -146,7 +146,7 @@ Message ASIOConnection::makeIsMasterRequest(ASIOConnection* conn) {
     requestBuilder.setMetadata(rpc::makeEmptyMetadata());
     requestBuilder.setCommandArgs(BSON("isMaster" << 1));
 
-    return std::move(*(requestBuilder.done()));
+    return requestBuilder.done();
 }
 
 void ASIOConnection::setTimeout(Milliseconds timeout, TimeoutCallback cb) {

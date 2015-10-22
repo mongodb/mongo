@@ -40,10 +40,9 @@
 namespace mongo {
 namespace rpc {
 
-CommandReplyBuilder::CommandReplyBuilder() : CommandReplyBuilder(stdx::make_unique<Message>()) {}
+CommandReplyBuilder::CommandReplyBuilder() : CommandReplyBuilder(Message{}) {}
 
-CommandReplyBuilder::CommandReplyBuilder(std::unique_ptr<Message> message)
-    : _message{std::move(message)} {
+CommandReplyBuilder::CommandReplyBuilder(Message&& message) : _message{std::move(message)} {
     _builder.skip(mongo::MsgData::MsgDataHeaderSize);
 }
 
@@ -105,17 +104,17 @@ void CommandReplyBuilder::reset() {
     }
     _builder.reset();
     _builder.skip(mongo::MsgData::MsgDataHeaderSize);
-    _message = stdx::make_unique<Message>();
+    _message.reset();
     _state = State::kMetadata;
 }
 
-std::unique_ptr<Message> CommandReplyBuilder::done() {
+Message CommandReplyBuilder::done() {
     invariant(_state == State::kOutputDocs);
     MsgData::View msg = _builder.buf();
     msg.setLen(_builder.len());
     msg.setOperation(dbCommandReply);
-    _builder.decouple();                      // release ownership from BufBuilder
-    _message->setData(msg.view2ptr(), true);  // transfer ownership to Message
+    _builder.decouple();                     // release ownership from BufBuilder
+    _message.setData(msg.view2ptr(), true);  // transfer ownership to Message
     _state = State::kDone;
     return std::move(_message);
 }

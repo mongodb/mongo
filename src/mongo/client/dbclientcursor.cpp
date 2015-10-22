@@ -59,10 +59,10 @@ namespace {
  * This code is mostly duplicated from DBClientWithCommands::runCommand. It may not
  * be worth de-duplicating as this codepath will eventually be removed anyway.
  */
-std::unique_ptr<Message> assembleCommandRequest(DBClientWithCommands* cli,
-                                                StringData database,
-                                                int legacyQueryOptions,
-                                                BSONObj legacyQuery) {
+Message assembleCommandRequest(DBClientWithCommands* cli,
+                               StringData database,
+                               int legacyQueryOptions,
+                               BSONObj legacyQuery) {
     // TODO: Rewrite this to a common utility shared between this and DBClientMultiCommand.
 
     // Can be an OP_COMMAND or OP_QUERY message.
@@ -117,8 +117,7 @@ void DBClientCursor::_assembleInit(Message& toSend) {
         bool hasValidFlagsForCommand = !(opts & mongo::QueryOption_Exhaust);
 
         if (_isCommand && hasValidNToReturnForCommand && hasValidFlagsForCommand) {
-            toSend =
-                std::move(*assembleCommandRequest(_client, nsToDatabaseSubstring(ns), opts, query));
+            toSend = assembleCommandRequest(_client, nsToDatabaseSubstring(ns), opts, query);
             return;
         }
         assembleQueryRequest(ns, query, nextBatchSize(), nToSkip, fieldsToReturn, opts, toSend);
@@ -137,12 +136,12 @@ bool DBClientCursor::init() {
     Message toSend;
     _assembleInit(toSend);
     verify(_client);
-    if (!_client->call(toSend, *batch.m, false, &_originalHost)) {
+    if (!_client->call(toSend, batch.m, false, &_originalHost)) {
         // log msg temp?
         log() << "DBClientCursor::init call() failed" << endl;
         return false;
     }
-    if (batch.m->empty()) {
+    if (batch.m.empty()) {
         // log msg temp?
         log() << "DBClientCursor::init message from call() was empty" << endl;
         return false;
@@ -161,13 +160,13 @@ void DBClientCursor::initLazy(bool isRetry) {
 }
 
 bool DBClientCursor::initLazyFinish(bool& retry) {
-    bool recvd = _client->recv(*batch.m);
+    bool recvd = _client->recv(batch.m);
 
     // If we get a bad response, return false
-    if (!recvd || batch.m->empty()) {
+    if (!recvd || batch.m.empty()) {
         if (!recvd)
             log() << "DBClientCursor::init lazy say() failed" << endl;
-        if (batch.m->empty())
+        if (batch.m.empty())
             log() << "DBClientCursor::init message from say() was empty" << endl;
 
         _client->checkResponse(NULL, -1, &retry, &_lazyHost);
@@ -184,7 +183,7 @@ bool DBClientCursor::initCommand() {
     BSONObj res;
 
     bool ok = _client->runCommand(nsGetDB(ns), query, res, opts);
-    replyToQuery(0, *batch.m, res);
+    replyToQuery(0, batch.m, res);
     dataReceived();
 
     return ok;
@@ -205,16 +204,16 @@ void DBClientCursor::requestMore() {
 
     Message toSend;
     toSend.setData(dbGetMore, b.buf(), b.len());
-    unique_ptr<Message> response(new Message());
+    Message response;
 
     if (_client) {
-        _client->call(toSend, *response);
+        _client->call(toSend, response);
         this->batch.m = std::move(response);
         dataReceived();
     } else {
         verify(_scopedHost.size());
         ScopedDbConnection conn(_scopedHost);
-        conn->call(toSend, *response);
+        conn->call(toSend, response);
         _client = conn.get();
         ON_BLOCK_EXIT([this] { _client = nullptr; });
         this->batch.m = std::move(response);
@@ -227,9 +226,9 @@ void DBClientCursor::requestMore() {
 void DBClientCursor::exhaustReceiveMore() {
     verify(cursorId && batch.pos == batch.nReturned);
     verify(!haveLimit);
-    unique_ptr<Message> response(new Message());
+    Message response;
     verify(_client);
-    if (!_client->recv(*response)) {
+    if (!_client->recv(response)) {
         uasserted(16465, "recv failed while exhausting cursor");
     }
     batch.m = std::move(response);
@@ -237,13 +236,13 @@ void DBClientCursor::exhaustReceiveMore() {
 }
 
 void DBClientCursor::commandDataReceived() {
-    int op = batch.m->operation();
+    int op = batch.m.operation();
     invariant(op == opReply || op == dbCommandReply);
 
     batch.nReturned = 1;
     batch.pos = 0;
 
-    auto commandReply = rpc::makeReply(batch.m.get());
+    auto commandReply = rpc::makeReply(&batch.m);
 
     auto commandStatus = getStatusFromCommandResult(commandReply->getCommandReply());
 
@@ -264,11 +263,11 @@ void DBClientCursor::commandDataReceived() {
     if (op == dbCommandReply) {
         // Need to take ownership here as we destroy the underlying message.
         BSONObj reply = commandReply->getCommandReply().getOwned();
-        batch.m = stdx::make_unique<Message>();
-        replyToQuery(0, *batch.m, reply);
+        batch.m.reset();
+        replyToQuery(0, batch.m, reply);
     }
 
-    QueryResult::View qr = batch.m->singleData().view2ptr();
+    QueryResult::View qr = batch.m.singleData().view2ptr();
     batch.data = qr.data();
 }
 
@@ -279,7 +278,7 @@ void DBClientCursor::dataReceived(bool& retry, string& host) {
         return;
     }
 
-    QueryResult::View qr = batch.m->singleData().view2ptr();
+    QueryResult::View qr = batch.m.singleData().view2ptr();
     resultFlags = qr.getResultFlags();
 
     if (qr.getResultFlags() & ResultFlag_ErrSet) {

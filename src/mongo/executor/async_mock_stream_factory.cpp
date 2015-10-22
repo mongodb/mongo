@@ -308,22 +308,22 @@ void AsyncMockStreamFactory::MockStream::simulateServer(
     replyBuilder->setCommandReply(resp.data);
 
     auto replyMsg = replyBuilder->done();
-    replyMsg->header().setResponseTo(messageId);
+    replyMsg.header().setResponseTo(messageId);
 
     {
         // The first read will be for the header.
         ReadEvent read{this};
-        auto hdrBytes = reinterpret_cast<const uint8_t*>(replyMsg->header().view2ptr());
+        auto hdrBytes = reinterpret_cast<const uint8_t*>(replyMsg.header().view2ptr());
         pushRead({hdrBytes, hdrBytes + sizeof(MSGHEADER::Value)});
     }
 
     {
         // The second read will be for the message data.
         ReadEvent read{this};
-        auto dataBytes = reinterpret_cast<const uint8_t*>(replyMsg->buf());
+        auto dataBytes = reinterpret_cast<const uint8_t*>(replyMsg.buf());
         auto pastHeader = dataBytes;
         std::advance(pastHeader, sizeof(MSGHEADER::Value));
-        pushRead({pastHeader, dataBytes + static_cast<std::size_t>(replyMsg->size())});
+        pushRead({pastHeader, dataBytes + static_cast<std::size_t>(replyMsg.size())});
     }
 
     if (ex) {

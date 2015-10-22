@@ -35,6 +35,7 @@
 #include "mongo/rpc/document_range.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {
@@ -45,7 +46,7 @@ public:
     static const char kFirstBatchTag[];
 
     LegacyReplyBuilder();
-    LegacyReplyBuilder(std::unique_ptr<Message>);
+    LegacyReplyBuilder(Message&&);
     ~LegacyReplyBuilder() final;
 
     LegacyReplyBuilder& setMetadata(const BSONObj& metadata) final;
@@ -58,7 +59,7 @@ public:
 
     void reset() final;
 
-    std::unique_ptr<Message> done() final;
+    Message done() final;
 
     Protocol getProtocol() const final;
 
@@ -78,7 +79,7 @@ private:
     BSONObj _commandReply{};
     std::size_t _currentLength;
     std::size_t _currentIndex = 0U;
-    std::unique_ptr<Message> _message;
+    Message _message;
     BSONObj _metadata{};
     std::vector<BSONObj> _outputDocs{};
     State _state{State::kMetadata};

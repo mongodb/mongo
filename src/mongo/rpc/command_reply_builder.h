@@ -54,7 +54,7 @@ public:
      * Constructs an OP_COMMANDREPLY in an existing buffer. Ownership of the buffer
      * will be transfered to the CommandReplyBuilder.
      */
-    CommandReplyBuilder(std::unique_ptr<Message> message);
+    CommandReplyBuilder(Message&& message);
 
     CommandReplyBuilder& setMetadata(const BSONObj& metadata) final;
     CommandReplyBuilder& setRawCommandReply(const BSONObj& commandReply) final;
@@ -73,7 +73,7 @@ public:
      * The behavior of calling any methods on the object is subsequently
      * undefined.
      */
-    std::unique_ptr<Message> done() final;
+    Message done() final;
 
     std::size_t availableBytes() const final;
 
@@ -86,7 +86,7 @@ private:
 
     // Default values are all empty.
     BufBuilder _builder{};
-    std::unique_ptr<Message> _message;
+    Message _message;
     State _state{State::kMetadata};
 };
 

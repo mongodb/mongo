@@ -424,24 +424,24 @@ public:
         replyBuilder->setCommandReply(BSON("hello!" << 1));
 
         auto message = replyBuilder->done();
-        message->header().setResponseTo(messageId);
+        message.header().setResponseTo(messageId);
 
-        auto actualSize = message->header().getLen();
+        auto actualSize = message.header().getLen();
 
         // Allow caller to mess with the Message
-        hook(message->header());
+        hook(message.header());
 
         {
             // Load the header
             ReadEvent read{stream};
-            auto headerBytes = reinterpret_cast<const uint8_t*>(message->header().view2ptr());
+            auto headerBytes = reinterpret_cast<const uint8_t*>(message.header().view2ptr());
             stream->pushRead({headerBytes, headerBytes + sizeof(MSGHEADER::Value)});
         }
 
         if (loadBody) {
             // Load the body if we need to
             ReadEvent read{stream};
-            auto dataBytes = reinterpret_cast<const uint8_t*>(message->buf());
+            auto dataBytes = reinterpret_cast<const uint8_t*>(message.buf());
             auto body = dataBytes;
             std::advance(body, sizeof(MSGHEADER::Value));
             stream->pushRead({body, dataBytes + static_cast<std::size_t>(actualSize)});

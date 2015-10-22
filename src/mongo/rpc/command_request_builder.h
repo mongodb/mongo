@@ -56,7 +56,7 @@ public:
      * Construct an OP_COMMAND in an existing buffer. Ownership of the buffer will be
      * transfered to the CommandRequestBuilder.
      */
-    CommandRequestBuilder(std::unique_ptr<Message> message);
+    CommandRequestBuilder(Message&& message);
 
     CommandRequestBuilder& setDatabase(StringData database) final;
 
@@ -79,11 +79,11 @@ public:
      * The behavior of calling any methods on the object is subsequently
      * undefined.
      */
-    std::unique_ptr<Message> done() final;
+    Message done() final;
 
 private:
     BufBuilder _builder{};
-    std::unique_ptr<Message> _message;
+    Message _message;
 
     State _state{State::kDatabase};
 };

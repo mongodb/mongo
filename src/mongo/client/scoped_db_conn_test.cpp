@@ -119,10 +119,12 @@ public:
             commandResponse.append("minWireVersion", WireVersion::RELEASE_2_4_AND_BEFORE);
         }
 
-        port->reply(m,
-                    *reply->setMetadata(rpc::makeEmptyMetadata())
-                         .setCommandReply(commandResponse.done())
-                         .done());
+
+        auto response = reply->setMetadata(rpc::makeEmptyMetadata())
+                            .setCommandReply(commandResponse.done())
+                            .done();
+
+        port->reply(m, response);
     }
 
 } dummyHandler;

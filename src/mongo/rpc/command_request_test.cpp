@@ -115,7 +115,7 @@ TEST(CommandRequest, InvalidNSThrows) {
     crb.setMetadata(BSONObj());
     crb.setCommandArgs(BSON("ping" << 1));
     auto msg = crb.done();
-    ASSERT_THROWS(rpc::CommandRequest{msg.get()}, AssertionException);
+    ASSERT_THROWS(rpc::CommandRequest{&msg}, AssertionException);
 }
 
 }  // namespace

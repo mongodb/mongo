@@ -65,9 +65,9 @@ bool isEmptyCommandReply(const BSONObj& bson) {
 const char LegacyReplyBuilder::kCursorTag[] = "cursor";
 const char LegacyReplyBuilder::kFirstBatchTag[] = "firstBatch";
 
-LegacyReplyBuilder::LegacyReplyBuilder() : LegacyReplyBuilder(stdx::make_unique<Message>()) {}
+LegacyReplyBuilder::LegacyReplyBuilder() : LegacyReplyBuilder(Message()) {}
 
-LegacyReplyBuilder::LegacyReplyBuilder(std::unique_ptr<Message> message)
+LegacyReplyBuilder::LegacyReplyBuilder(Message&& message)
     : _currentLength{kReservedSize}, _message{std::move(message)} {}
 
 LegacyReplyBuilder::~LegacyReplyBuilder() {}
@@ -164,14 +164,14 @@ void LegacyReplyBuilder::reset() {
     if (_state == State::kMetadata) {
         return;
     }
-    _message = stdx::make_unique<Message>();
+    _message.reset();
     _currentLength = kReservedSize;
     _currentIndex = 0U;
     _state = State::kMetadata;
 }
 
 
-std::unique_ptr<Message> LegacyReplyBuilder::done() {
+Message LegacyReplyBuilder::done() {
     invariant(_state == State::kOutputDocs);
 
     BSONObj reply = uassertStatusOK(rpc::downconvertReplyMetadata(_commandReply, _metadata));
@@ -221,7 +221,7 @@ std::unique_ptr<Message> LegacyReplyBuilder::done() {
     qr.setStartingFrom(0);
     qr.setNReturned(1);
 
-    _message->setData(qr.view2ptr(), true);
+    _message.setData(qr.view2ptr(), true);
     bufBuilder.decouple();
 
     _state = State::kDone;

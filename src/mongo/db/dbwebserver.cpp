@@ -280,13 +280,13 @@ public:
             .setCommandArgs(cmdObj);
 
         auto cmdRequestMsg = requestBuilder.done();
-        rpc::CommandRequest cmdRequest{cmdRequestMsg.get()};
+        rpc::CommandRequest cmdRequest{&cmdRequestMsg};
         rpc::CommandReplyBuilder cmdReplyBuilder{};
 
         Command::execCommand(txn, c, cmdRequest, &cmdReplyBuilder);
 
         auto cmdReplyMsg = cmdReplyBuilder.done();
-        rpc::CommandReply cmdReply{cmdReplyMsg.get()};
+        rpc::CommandReply cmdReply{&cmdReplyMsg};
 
         responseCode = 200;
 

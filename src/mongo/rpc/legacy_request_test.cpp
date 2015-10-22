@@ -46,7 +46,7 @@ TEST(LegacyRequest, InvalidNSThrows) {
     crb.setMetadata(BSONObj());
     crb.setCommandArgs(BSON("ping" << 1));
     auto msg = crb.done();
-    ASSERT_THROWS(rpc::LegacyRequest{msg.get()}, AssertionException);
+    ASSERT_THROWS(rpc::LegacyRequest{&msg}, AssertionException);
 }
 
 }  // namespace
