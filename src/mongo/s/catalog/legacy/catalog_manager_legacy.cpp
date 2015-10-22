@@ -375,7 +375,7 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
     finishDetail.append("version", manager->getVersion().toString());
 
     logChange(
-        txn, txn->getClient()->clientAddress(true), "shardCollection", ns, finishDetail.obj());
+        txn, txn->getClient()->clientAddress(true), "shardCollection.end", ns, finishDetail.obj());
 
     return Status::OK();
 }

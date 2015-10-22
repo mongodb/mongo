@@ -223,7 +223,7 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
 
     logChange(txn,
               txn->getClient()->clientAddress(true),
-              "shardCollection",
+              "shardCollection.end",
               ns,
               BSON("version" << manager->getVersion().toString()));
 

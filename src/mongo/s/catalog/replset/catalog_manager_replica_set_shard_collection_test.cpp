@@ -445,7 +445,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     expectChangeLogInsert(configHost,
                           clientHost.toString(),
                           network()->now(),
-                          "shardCollection",
+                          "shardCollection.end",
                           ns,
                           BSON("version" << actualVersion.toString()));
 
@@ -629,7 +629,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     expectChangeLogInsert(configHost,
                           clientHost.toString(),
                           network()->now(),
-                          "shardCollection",
+                          "shardCollection.end",
                           ns,
                           BSON("version" << expectedChunks[4].getVersion().toString()));
 
@@ -813,7 +813,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
     expectChangeLogInsert(configHost,
                           clientHost.toString(),
                           network()->now(),
-                          "shardCollection",
+                          "shardCollection.end",
                           ns,
                           BSON("version" << expectedChunks[4].getVersion().toString()));
 
