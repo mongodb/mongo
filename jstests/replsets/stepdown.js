@@ -32,6 +32,7 @@ var replTest = new ReplSetTest({
 });
 var nodes = replTest.startSet();
 replTest.initiate();
+replTest.waitForState(nodes[0], replTest.PRIMARY, 60 * 1000);
 var master = replTest.getMaster();
 
 // do a write
@@ -45,7 +46,7 @@ replTest.liveNodes.slaves.forEach(function(slave) {
     printjson(assert.commandWorked(slave.getDB("admin").runCommand({fsync : 1, lock : 1})));
 });
 
-print("\nwaiting 11ish seconds");
+print("\nwaiting several seconds before stepdown");
 
 sleep(2000);
 
