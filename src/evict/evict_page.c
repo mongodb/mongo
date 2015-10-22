@@ -303,6 +303,7 @@ __evict_review(
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t flags;
+	bool modified;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -324,6 +325,15 @@ __evict_review(
 	/* Now that we have exclusive access, review the page. */
 	page = ref->page;
 
+	modified = __wt_page_is_modified(ref->page);
+
+	/*
+	 * Clean pages can't be evicted when running in memory only. This
+	 * should be uncommon - we don't add clean pages to the queue.
+	 */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !modified)
+		return (EBUSY);
+
 	/*
 	 * Fail if an internal has active children, the children must be evicted
 	 * first. The test is necessary but shouldn't fire much: the eviction
@@ -342,7 +352,7 @@ __evict_review(
 		 * Update the oldest ID to avoid wasted effort should it have
 		 * fallen behind current.
 		 */
-		if (__wt_page_is_modified(page))
+		if (modified)
 			__wt_txn_update_oldest(session, true);
 
 		if (!__wt_page_can_evict(session, ref, false, inmem_splitp))
