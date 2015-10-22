@@ -432,6 +432,7 @@ struct __wt_page {
 
 			struct __wt_page_index {
 				uint32_t entries;
+				uint32_t deleted_entries;
 				WT_REF	**index;
 			} * volatile __index;	/* Collated children */
 
