@@ -17,18 +17,32 @@
         ],
     });
 
-    assert.commandFailedWithCode(
-        replSet.nodes[0].getDB(name).runCommand({
+    // Stabilize replica set with node 0 as primary.
+
+    assert.commandWorked(
+        replSet.nodes[0].adminCommand({
             replSetTest: 1,
             waitForMemberState: replSet.PRIMARY,
             timeoutMillis: 60 * 1000,
+        }),
+        'node 0' + replSet.nodes[0].host + ' failed to become primary'
+    );
+
+    var primary = replSet.getPrimary();
+    var secondary = replSet.getSecondary();
+
+    // Check replication mode.
+
+    assert.commandFailedWithCode(
+        primary.getDB(name).runCommand({
+            replSetTest: 1,
         }),
         ErrorCodes.Unauthorized,
         'replSetTest should fail against non-admin database'
     );
 
     assert.commandWorked(
-        replSet.nodes[0].adminCommand({
+        primary.adminCommand({
             replSetTest: 1,
         }),
         'failed to check replication mode'
@@ -37,7 +51,7 @@
     // waitForMemberState tests.
 
     assert.commandFailedWithCode(
-        replSet.nodes[0].adminCommand({
+        primary.adminCommand({
             replSetTest: 1,
             waitForMemberState: 'what state',
             timeoutMillis: 1000,
@@ -47,7 +61,7 @@
     );
 
     assert.commandFailedWithCode(
-        replSet.nodes[0].adminCommand({
+        primary.adminCommand({
             replSetTest: 1,
             waitForMemberState: replSet.PRIMARY,
             timeoutMillis: "what timeout",
@@ -57,7 +71,7 @@
     );
 
     assert.commandFailedWithCode(
-        replSet.nodes[0].adminCommand({
+        primary.adminCommand({
             replSetTest: 1,
             waitForMemberState: 9999,
             timeoutMillis: 1000,
@@ -67,7 +81,7 @@
     );
 
     assert.commandFailedWithCode(
-        replSet.nodes[0].adminCommand({
+        primary.adminCommand({
             replSetTest: 1,
             waitForMemberState: replSet.PRIMARY,
             timeoutMillis: -1000,
@@ -76,41 +90,31 @@
         'replSetTest waitForMemberState should fail on negative timeout'
     );
 
-    assert.commandWorked(
-        replSet.nodes[0].adminCommand({
-            replSetTest: 1,
-            waitForMemberState: replSet.PRIMARY,
-            timeoutMillis: 60 * 1000,
-        }),
-        'node 0' + replSet.nodes[0] + ' failed to become primary'
-    );
-
-    assert.commandWorked(
-        replSet.nodes[1].adminCommand({
-            replSetTest: 1,
-            waitForMemberState: replSet.SECONDARY,
-            timeoutMillis: 1000,
-        }),
-        ErrorCodes.ExceededTimeLimit,
-        'replSetTest waitForMemberState(SECONDARY) failed on node 1 ' +
-        replSet.nodes[1]
-    );
-
     assert.commandFailedWithCode(
-        replSet.nodes[0].adminCommand({
+        primary.adminCommand({
             replSetTest: 1,
             waitForMemberState: replSet.SECONDARY,
             timeoutMillis: 1000,
         }),
         ErrorCodes.ExceededTimeLimit,
         'replSetTest waitForMemberState(SECONDARY) should time out on node 0 ' +
-        replSet.nodes[0]
+        primary.host
+    );
+
+    assert.commandWorked(
+        secondary.adminCommand({
+            replSetTest: 1,
+            waitForMemberState: replSet.SECONDARY,
+            timeoutMillis: 1000,
+        }),
+        'replSetTest waitForMemberState(SECONDARY) failed on node 1 ' +
+        secondary.host
     );
 
     // waitForDrainFinish tests.
 
     assert.commandFailedWithCode(
-        replSet.nodes[0].adminCommand({
+        primary.adminCommand({
             replSetTest: 1,
             waitForDrainFinish: 'what state',
         }),
@@ -119,7 +123,7 @@
     );
 
     assert.commandFailedWithCode(
-        replSet.nodes[0].adminCommand({
+        primary.adminCommand({
             replSetTest: 1,
             waitForDrainFinish: -1000,
         }),
@@ -128,18 +132,18 @@
     );
 
     assert.commandWorked(
-        replSet.nodes[0].adminCommand({
+        primary.adminCommand({
             replSetTest: 1,
             waitForDrainFinish: 1000,
         }),
-        'node 0' + replSet.nodes[0] + ' failed to wait for drain to finish'
+        'node 0' + primary.host + ' failed to wait for drain to finish'
     );
 
     assert.commandWorked(
-        replSet.nodes[1].adminCommand({
+        secondary.adminCommand({
             replSetTest: 1,
             waitForDrainFinish: 0,
         }),
-        'node 1' + replSet.nodes[0] + ' failed to wait for drain to finish'
+        'node 1' + primary.host + ' failed to wait for drain to finish'
     );
  })();
