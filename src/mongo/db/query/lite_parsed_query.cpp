@@ -47,8 +47,8 @@ using std::unique_ptr;
 const std::string LiteParsedQuery::kUnwrappedReadPrefField("$queryOptions");
 const std::string LiteParsedQuery::kWrappedReadPrefField("$readPreference");
 
-const string LiteParsedQuery::cmdOptionMaxTimeMS("maxTimeMS");
-const string LiteParsedQuery::queryOptionMaxTimeMS("$maxTimeMS");
+const char LiteParsedQuery::cmdOptionMaxTimeMS[] = "maxTimeMS";
+const char LiteParsedQuery::queryOptionMaxTimeMS[] = "$maxTimeMS";
 
 const string LiteParsedQuery::metaGeoNearDistance("geoNearDistance");
 const string LiteParsedQuery::metaGeoNearPoint("geoNearPoint");
@@ -258,7 +258,7 @@ StatusWith<unique_ptr<LiteParsedQuery>> LiteParsedQuery::makeFromFindCommand(Nam
             }
 
             pq->_maxScan = maxScan;
-        } else if (str::equals(fieldName, cmdOptionMaxTimeMS.c_str())) {
+        } else if (str::equals(fieldName, cmdOptionMaxTimeMS)) {
             StatusWith<int> maxTimeMS = parseMaxTimeMS(el);
             if (!maxTimeMS.isOK()) {
                 return maxTimeMS.getStatus();

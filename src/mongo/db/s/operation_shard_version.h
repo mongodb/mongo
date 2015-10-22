@@ -53,6 +53,8 @@ public:
 
     OperationShardVersion();
 
+    static StringData fieldName();
+
     /**
      * Retrieves a reference to the shard version decorating the OperationContext, 'txn'.
      */
@@ -66,6 +68,7 @@ public:
      * Expects the format { ..., shardVersion: [<version>, <epoch>] }.
      */
     void initializeFromCommand(NamespaceString ns, const BSONObj& cmdObj);
+    void initializeFromCommand(NamespaceString ns, const BSONElement& shardVersionElement);
 
     /**
      * Returns whether or not there is a shard version associated with this operation.

@@ -393,7 +393,9 @@ public:
     /**
      * Returns true if this a request for the 'help' information associated with the command.
      */
-    static bool isHelpRequest(const rpc::RequestInterface& request);
+    static bool isHelpRequest(const BSONElement& helpElem);
+
+    static const char kHelpFieldName[];
 
     /**
      * Generates a reply from the 'help' information associated with a command. The state of

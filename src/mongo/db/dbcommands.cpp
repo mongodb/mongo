@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <array>
 #include <boost/optional.hpp>
 #include <time.h>
 
@@ -1161,6 +1162,22 @@ private:
     bool maintenanceModeSet;
 };
 
+namespace {
+
+// Symbolic names for indexes to make code more readable.
+const std::size_t kCmdOptionMaxTimeMSField = 0;
+const std::size_t kHelpField = 1;
+const std::size_t kShardVersionField = 2;
+const std::size_t kQueryOptionMaxTimeMSField = 3;
+
+// We make an array of the fields we need so we can call getFields once. This saves repeated
+// scans over the command object.
+const std::array<StringData, 4> neededFieldNames{LiteParsedQuery::cmdOptionMaxTimeMS,
+                                                 Command::kHelpFieldName,
+                                                 OperationShardVersion::fieldName(),
+                                                 LiteParsedQuery::queryOptionMaxTimeMS};
+}  // namespace
+
 /**
  * this handles
  - auth
@@ -1188,7 +1205,12 @@ void Command::execCommand(OperationContext* txn,
         std::string dbname = request.getDatabase().toString();
         unique_ptr<MaintenanceModeSetter> mmSetter;
 
-        if (isHelpRequest(request)) {
+
+        std::array<BSONElement, std::tuple_size<decltype(neededFieldNames)>::value>
+            extractedFields{};
+        request.getCommandArgs().getFields(neededFieldNames, &extractedFields);
+
+        if (isHelpRequest(extractedFields[kHelpField])) {
             CurOp::get(txn)->ensureStarted();
             generateHelpResponse(txn, request, replyBuilder, *command);
             return;
@@ -1241,12 +1263,12 @@ void Command::execCommand(OperationContext* txn,
         }
 
         // Handle command option maxTimeMS.
-        int maxTimeMS =
-            uassertStatusOK(LiteParsedQuery::parseMaxTimeMSCommand(request.getCommandArgs()));
+        int maxTimeMS = uassertStatusOK(
+            LiteParsedQuery::parseMaxTimeMS(extractedFields[kCmdOptionMaxTimeMSField]));
 
         uassert(ErrorCodes::InvalidOptions,
                 "no such command option $maxTimeMs; use maxTimeMS instead",
-                !request.getCommandArgs().hasField("$maxTimeMS"));
+                extractedFields[kQueryOptionMaxTimeMSField].eoo());
 
         CurOp::get(txn)->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS) * 1000);
 
@@ -1259,7 +1281,8 @@ void Command::execCommand(OperationContext* txn,
             invariant(!operationShardVersion.hasShardVersion());
 
             auto commandNS = NamespaceString(command->parseNs(dbname, request.getCommandArgs()));
-            operationShardVersion.initializeFromCommand(commandNS, request.getCommandArgs());
+            operationShardVersion.initializeFromCommand(commandNS,
+                                                        extractedFields[kShardVersionField]);
 
             auto shardingState = ShardingState::get(txn);
             if (shardingState->enabled()) {

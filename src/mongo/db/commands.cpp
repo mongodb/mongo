@@ -383,9 +383,11 @@ Status Command::_checkAuthorization(Command* c,
     return status;
 }
 
-bool Command::isHelpRequest(const rpc::RequestInterface& request) {
-    return request.getCommandArgs()["help"].trueValue();
+bool Command::isHelpRequest(const BSONElement& helpElem) {
+    return !helpElem.eoo() && helpElem.trueValue();
 }
+
+const char Command::kHelpFieldName[] = "help";
 
 void Command::generateHelpResponse(OperationContext* txn,
                                    const rpc::RequestInterface& request,

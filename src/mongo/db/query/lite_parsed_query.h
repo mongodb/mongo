@@ -161,8 +161,9 @@ public:
     static const std::string kUnwrappedReadPrefField;
 
     // Names of the maxTimeMS command and query option.
-    static const std::string cmdOptionMaxTimeMS;
-    static const std::string queryOptionMaxTimeMS;
+    // Char arrays because they are used in static initialization.
+    static const char cmdOptionMaxTimeMS[];
+    static const char queryOptionMaxTimeMS[];
 
     // Names of the $meta projection values.
     static const std::string metaGeoNearDistance;
@@ -297,6 +298,8 @@ public:
     static StatusWith<std::unique_ptr<LiteParsedQuery>> fromLegacyQueryMessage(
         const QueryMessage& qm);
 
+    static StatusWith<int> parseMaxTimeMS(const BSONElement& maxTimeMSElt);
+
 private:
     LiteParsedQuery(NamespaceString nss);
 
@@ -314,8 +317,6 @@ private:
                 bool fromQueryMessage);
 
     Status initFullQuery(const BSONObj& top);
-
-    static StatusWith<int> parseMaxTimeMS(const BSONElement& maxTimeMSElt);
 
     /**
      * Updates the projection object with a $meta projection for the returnKey option.

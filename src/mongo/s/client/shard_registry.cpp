@@ -100,7 +100,7 @@ BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
     BSONObjBuilder updatedCmdBuilder;
     if (hasTxnMaxTime && hasUserMaxTime) {  // Need to remove user provided maxTimeMS.
         BSONObjIterator cmdObjIter(cmdObj);
-        const char* maxTimeFieldName = LiteParsedQuery::cmdOptionMaxTimeMS.c_str();
+        const char* maxTimeFieldName = LiteParsedQuery::cmdOptionMaxTimeMS;
         while (cmdObjIter.more()) {
             BSONElement e = cmdObjIter.next();
             if (str::equals(e.fieldName(), maxTimeFieldName)) {

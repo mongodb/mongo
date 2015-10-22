@@ -39,7 +39,7 @@ namespace {
 const OperationContext::Decoration<OperationShardVersion> shardingMetadataDecoration =
     OperationContext::declareDecoration<OperationShardVersion>();
 
-const char* kShardVersionField = "shardVersion";
+const char kShardVersionField[] = "shardVersion";
 const ChunkVersion kUnshardedVersion(ChunkVersion::UNSHARDED());
 
 }  // namespace mongo
@@ -50,26 +50,32 @@ OperationShardVersion& OperationShardVersion::get(OperationContext* txn) {
     return shardingMetadataDecoration(txn);
 }
 
+StringData OperationShardVersion::fieldName() {
+    return kShardVersionField;
+}
+
 void OperationShardVersion::initializeFromCommand(NamespaceString ns, const BSONObj& cmdObj) {
+    initializeFromCommand(std::move(ns), cmdObj[fieldName()]);
+}
+
+void OperationShardVersion::initializeFromCommand(NamespaceString ns,
+                                                  const BSONElement& shardVersionElt) {
     if (ns.isSystemDotIndexes()) {
         setShardVersion(std::move(ns), ChunkVersion::IGNORED());
         return;
     }
 
-    BSONElement versionElt;
-    Status status = bsonExtractTypedField(cmdObj, kShardVersionField, BSONType::Array, &versionElt);
-    if (!status.isOK()) {
+    if (shardVersionElt.eoo() || shardVersionElt.type() != BSONType::Array) {
         return;
     }
 
-    const BSONArray versionArr(versionElt.Obj());
+    const BSONArray versionArr(shardVersionElt.Obj());
     bool hasVersion = false;
     ChunkVersion newVersion = ChunkVersion::fromBSON(versionArr, &hasVersion);
 
     if (!hasVersion) {
         return;
     }
-
     setShardVersion(std::move(ns), std::move(newVersion));
 }
 

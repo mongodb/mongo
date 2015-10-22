@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <bitset>
 #include <list>
 #include <set>
 #include <string>
@@ -244,7 +245,17 @@ public:
         @param fields if a field is found its element is stored in its corresponding position in
                 this array. if not found the array element is unchanged.
      */
+
     void getFields(unsigned n, const char** fieldNames, BSONElement* fields) const;
+
+    /**
+     * Get several fields at once. This is faster than separate getField() calls as the size of
+     * elements iterated can then be calculated only once each.
+     */
+    template <size_t N>
+    void getFields(const std::array<StringData, N>& fieldNames,
+                   std::array<BSONElement, N>* fields) const;
+
 
     /** Get the field of the specified name. eoo() is true on the returned
         element if not found.
@@ -802,4 +813,22 @@ struct DataType::Handler<BSONObj> {
         return BSONObj();
     }
 };
+
+template <size_t N>
+inline void BSONObj::getFields(const std::array<StringData, N>& fieldNames,
+                               std::array<BSONElement, N>* fields) const {
+    std::bitset<N> foundFields;
+    auto iter = this->begin();
+    while (iter.more() && !foundFields.all()) {
+        auto el = iter.next();
+        auto fieldName = el.fieldNameStringData();
+        for (std::size_t i = 0; i < N; ++i) {
+            if (!foundFields.test(i) && (fieldNames[i] == fieldName)) {
+                (*fields)[i] = std::move(el);
+                foundFields.set(i);
+                break;
+            }
+        }
+    }
 }
+}  // namespace mongo
