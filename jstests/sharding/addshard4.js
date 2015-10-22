@@ -1,6 +1,10 @@
-// a replica set's passive nodes should be okay to add as part of a shard config
+// A replica set's passive nodes should be okay to add as part of a shard config
+(function() {
 
-s = new ShardingTest( "addshard4", 2 , 0 , 1 , {useHostname : true});
+var s = new ShardingTest({ name: "addshard4",
+                           shards: 2,
+                           mongos: 1,
+                           other: {useHostname : true} });
 
 var r = new ReplSetTest({name: "addshard4", nodes: 3});
 r.startSet();
@@ -50,3 +54,7 @@ result = s.adminCommand({"addshard" : "addshard42/"+config.members[2].host});
 
 printjson(result);
 assert.eq(result, true);
+
+s.stop();
+
+})();

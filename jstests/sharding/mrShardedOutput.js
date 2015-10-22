@@ -4,7 +4,7 @@
 // collection input twice the size of the first and outputs it to the new sharded
 // collection created in the first pass.
 
-var st = new ShardingTest({ shards: 2, verbose: 1, other: { chunksize : 1 }});
+var st = new ShardingTest({ shards: 2, verbose: 1, other: { chunkSize: 1 }});
 
 st.stopBalancer();
 

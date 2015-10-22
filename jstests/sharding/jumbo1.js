@@ -1,6 +1,9 @@
-// jump1.js
+(function() {
 
-s = new ShardingTest( "jump1" , 2 /* numShards */, 2 /* verboseLevel */, 1 /* numMongos */, { chunksize : 1 } )
+var s = new ShardingTest({ name: "jumbo1",
+                           shards: 2,
+                           mongos: 1,
+                           other: { chunkSize: 1 } });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
@@ -51,4 +54,6 @@ assert.soon( function(){
 } , "balance didn't happen" , 1000 * 60 * 5 , 5000 );
 
 
-s.stop()
+s.stop();
+
+})();

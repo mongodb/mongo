@@ -1,10 +1,13 @@
 // SERVER-2068
+(function() {
 
-chunksize = 25
+var chunkSize = 25
 
-s = new ShardingTest( "migrate_cursor1" , 2 , 1 , 1 , { chunksize : chunksize } );
-
-s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );
+var s = new ShardingTest({ name: "migrate_cursor1",
+                           shards: 2,
+                           mongos: 1,
+                           verbose: 1,
+                           other: { chunkSize : chunkSize } });
 
 s.adminCommand( { enablesharding : "test" } );
 db = s.getDB( "test" )
@@ -18,7 +21,7 @@ while ( bigString.length < stringSize )
     bigString += "asdasdas";
 
 stringSize = bigString.length
-docsPerChunk = Math.ceil( ( chunksize * 1024 * 1024 ) / ( stringSize - 12 ) )
+docsPerChunk = Math.ceil( ( chunkSize * 1024 * 1024 ) / ( stringSize - 12 ) )
 numChunks = 5
 numDocs = 20 * docsPerChunk
 
@@ -74,4 +77,6 @@ join();
 // Use itcount() to ignore orphan docments.
 assert.eq( numDocs , t.find().itcount() , "at end 2" )
 
-s.stop()
+s.stop();
+
+})();

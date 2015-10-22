@@ -1,9 +1,11 @@
-// sharding_balance4.js
+// Check that doing updates done during a migrate all go to the right place
+(function() {
 
-// check that doing updates done during a migrate all go to the right place
-
-s = new ShardingTest( "slow_sharding_balance4" , 2 , 1 , 1 , { chunksize : 1 } )
-s.stopBalancer();
+var s = new ShardingTest({ name: "slow_sharding_balance4",
+                           shards: 2,
+                           mongos: 1,
+                           verbose: 1,
+                           other: { chunkSize: 1 } });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
@@ -134,3 +136,5 @@ assert.soon( function(){
 } , "balance didn't happen" , 1000 * 60 * 20 , 1 );
 
 s.stop();
+
+})();

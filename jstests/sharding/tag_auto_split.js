@@ -1,6 +1,9 @@
 // test to make sure that tag ranges get split
 
-s = new ShardingTest( "tag_auto_split", 2, 0, 1, { nopreallocj : true, enableBalancer : true } );
+var s = new ShardingTest({ name: "tag_auto_split",
+                           shards: 2,
+                           mongos: 1,
+                           other: { enableBalancer : true } });
 
 db = s.getDB( "test" );
 

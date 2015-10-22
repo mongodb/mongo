@@ -3,7 +3,7 @@
 function testReadLoadBalancing(numReplicas) {
 
     var s = new ShardingTest({ shards: { rs0: { nodes: numReplicas }},
-        verbose: 2, other: { chunksize: 1 }});
+        verbose: 2, other: { chunkSize: 1 }});
 
     s.adminCommand({enablesharding : "test"})
     s.config.settings.find().forEach(printjson)

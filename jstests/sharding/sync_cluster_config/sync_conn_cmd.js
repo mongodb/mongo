@@ -3,9 +3,11 @@
  * Test SyncClusterConnection commands using call instead of findOne
  */
 
-// Note: count command uses call
+(function() {
 
-var st = new ShardingTest({ shards: [], other: { sync: true }});
+var st = new ShardingTest({ name: 'sync_conn_cmd',
+                            shards: 0,
+                            other: { sync: true }});
 var configDB = st.config;
 var coll = configDB.test;
 
@@ -58,3 +60,4 @@ testInvalidCount();
 
 st.stop();
 
+})();

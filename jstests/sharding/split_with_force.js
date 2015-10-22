@@ -2,7 +2,7 @@
 // Tests autosplit locations with force : true
 //
 
-var options = { chunksize : 1, // MB
+var options = { chunkSize: 1, // MB
                 mongosOptions : { noAutoSplit : "" }
               };
 

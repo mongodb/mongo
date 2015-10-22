@@ -1,4 +1,11 @@
-s = new ShardingTest( "stats" , 2 , 1 , 1, { enableBalancer : 1 } );
+(function () {
+
+var s = new ShardingTest({ name: "stats",
+                           shards: 2,
+                           mongos: 1,
+                           verbose: 1,
+                           other: { enableBalancer: true } });
+
 s.adminCommand( { enablesharding : "test" } );
 
 a = s._connections[0].getDB( "test" );
@@ -188,4 +195,6 @@ collStatComp(coll_not_scaled, coll_scaled_1024, 1024, true);
     checkIndexDetails({indexDetails: true, indexDetailsName: indexName}, indexName);
 }());
 
-s.stop()
+s.stop();
+
+})();

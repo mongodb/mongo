@@ -1,7 +1,10 @@
-// sharding_balance1.js
+(function() {
 
-
-s = new ShardingTest( "slow_sharding_balance1" , 2 , 1 , 1 , { chunksize : 1, enableBalancer : true } )
+var s = new ShardingTest({ name: "slow_sharding_balance1",
+                           shards: 2,
+                           mongos: 1,
+                           verbose: 1,
+                           other: { chunkSize: 1, enableBalancer : true } });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
@@ -56,3 +59,5 @@ assert.soon( function(){
 } , "removeshard didn't happen" , 1000 * 60 * 3 , 5000 );
 
 s.stop();
+
+})();

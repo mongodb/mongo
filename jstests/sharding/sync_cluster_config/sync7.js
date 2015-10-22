@@ -1,6 +1,9 @@
 // Test that the clock skew of the distributed lock disallows getting locks for moving and splitting.
+(function() {
 
-s = new ShardingTest( "moveDistLock", 3, 0, undefined, { sync : true } );
+var s = new ShardingTest({ name: "moveDistLock",
+                           shards: 3,
+                           other: { sync : true } });
 
 // Enable sharding on DB and collection before skewing the clocks
 result = s.getDB("admin").runCommand( { enablesharding : "test1" } );
@@ -66,3 +69,5 @@ printjson(result);
 assert.eq( result.ok, 1, "Move command should have succeeded again!" )
 
 s.stop();
+
+})();

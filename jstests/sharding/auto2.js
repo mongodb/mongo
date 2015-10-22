@@ -1,6 +1,9 @@
-// auto2.js
+(function() {
 
-s = new ShardingTest( "auto2" , 2 , 1 , 2 );
+var s = new ShardingTest({ name: "auto2",
+                           shards: 2,
+                           mongos: 2,
+                           verbose: 1 });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
@@ -83,8 +86,6 @@ for ( i=0; i<j*100; i++ ){
     }
 }
 
-
-
 s.printChangeLog();
 
 print( "missing: " + tojson( missing ) )
@@ -147,3 +148,5 @@ assert.throws( function(){ s.getDB( "test" ).foo.find().sort( { s : 1 } ).forEac
 print( "checkpoint G")
 
 s.stop();
+
+})();

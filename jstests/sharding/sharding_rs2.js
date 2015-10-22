@@ -1,7 +1,9 @@
 // mostly for testing mongos w/replica sets
+(function() {
 
-var s = new ShardingTest({ shards: { rs0: { nodes: 2 }, rs1: { nodes: 2 }},
-                           verbose: 1, chunkSize: 1 });
+var s = new ShardingTest({ shards: { rs0: { nodes: 2 }, rs1: { nodes: 2 } },
+                           verbose: 1,
+                           chunkSize: 1 });
 
 db = s.getDB( "test" )
 t = db.foo
@@ -215,5 +217,6 @@ for ( i=0; i<10; i++ ) {
 
 printjson( db.adminCommand( "getShardMap" ) );
 
+s.stop();
 
-s.stop()
+})();

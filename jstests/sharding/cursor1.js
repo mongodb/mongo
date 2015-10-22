@@ -1,10 +1,8 @@
 // cursor1.js
 // checks that cursors survive a chunk's move
+(function() {
 
-s = new ShardingTest( "sharding_cursor1" , 2 , 2 )
-
-// take the balancer out of the equation
-s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );
+var s = new ShardingTest({ name: "sharding_cursor1", shards: 2 });
 s.config.settings.find().forEach( printjson )
 
 // create a sharded 'test.foo', for the moment with just one chunk
@@ -63,4 +61,6 @@ assert.throws( function(){ cur.next(); } , null , "T5" )
 after = db.serverStatus().metrics.cursor;
 gc(); gc()
 
-s.stop()
+s.stop();
+
+})();

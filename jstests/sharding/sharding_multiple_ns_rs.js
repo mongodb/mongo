@@ -1,5 +1,10 @@
+(function() {
 
-s = new ShardingTest( "blah" , 1 /* numShards */, 1 /* verboseLevel */, 1 /* numMongos */, { rs : true , chunksize : 1 } )
+var s = new ShardingTest({ name: "Sharding multiple ns",
+                           shards: 1,
+                           mongos: 1,
+                           verbose: 1,
+                           other: { rs : true , chunkSize: 1 } });
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
@@ -26,9 +31,7 @@ assert.eq( 5 , dbother.foo.findOne( { _id : 5 } ).x );
 assert.eq( 5 , db.bar.findOne( { _id : 5 } ).x );
 assert.eq( 5 , dbother.bar.findOne( { _id : 5 } ).x );
 
-
 s._rs[0].test.awaitReplication();
-
 s._rs[0].test.stopMaster(15);
 
 // Wait for the primary to come back online...
@@ -50,6 +53,6 @@ assert.eq( 5 , yetagain.getDB( "test" ).foo.findOne( { _id : 5 } ).x )
 assert.eq( 5 , dbother.bar.findOne( { _id : 5 } ).x );
 assert.eq( 5 , dbother.foo.findOne( { _id : 5 } ).x );
 
-
 s.stop();
 
+})();

@@ -1,9 +1,7 @@
-// multi_mongos2.js
 // This tests sharding an existing collection that both shards are aware of (SERVER-2828)
+(function() {
 
-
-// setup sharding with two mongos, s1 and s2
-s1 = new ShardingTest( "multi_mongos1" , 2 , 1 , 2 );
+var s1 = new ShardingTest({ name: "multi_mongos1", shards: 2, mongos: 2 });
 s2 = s1._mongos[1];
 
 s1.adminCommand( { enablesharding : "test" } );
@@ -67,3 +65,5 @@ assert.eq(1 , res.ok, tojson(res));
 s1.setBalancer( true )
 
 s1.stop();
+
+})();

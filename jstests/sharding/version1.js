@@ -1,6 +1,6 @@
-// version1.js
+(function() {
 
-s = new ShardingTest( "version1" , 1 , 2 )
+var s = new ShardingTest({ name: "version1", shards: 1, verbose: 2 });
 
 s.adminCommand( { enablesharding : "alleyinsider" } );
 s.adminCommand( { shardcollection : "alleyinsider.foo" , key : { num : 1 } } );
@@ -69,3 +69,5 @@ assert( a.runCommand({ setShardVersion: "alleyinsider.foo",
 // assert.eq( a.runCommand( { "getShardVersion" : "alleyinsider.foo" } ).global.i , 3 , "my get version B" );
 
 s.stop();
+
+})();

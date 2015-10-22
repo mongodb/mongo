@@ -1,5 +1,10 @@
+(function() {
+
 // Don't start any shards, yet
-var s = new ShardingTest("add_shard2", 1, 0, 1, {useHostname : true});
+var s = new ShardingTest({name: "add_shard2",
+                          shards: 1, 
+                          mongos: 1,
+                          other: {useHostname : true} });
 
 // Start two new instances, which will be used for shards
 var conn1 = MongoRunner.runMongod({useHostname: true});
@@ -110,8 +115,11 @@ assert(!wRes.hasWriteError() && wRes.nInserted === 1,
 assert.commandFailed(s.admin.runCommand({addshard: rs5.getURL()}));
 
 s.stop();
+
 rs1.stopSet();
 rs2.stopSet();
 rs3.stopSet();
 rs4.stopSet();
 rs5.stopSet();
+
+})();

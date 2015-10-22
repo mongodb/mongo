@@ -17,12 +17,11 @@ function aggregateNoOrder(coll, pipeline) {
 
 jsTestLog("Creating sharded cluster");
 var shardedAggTest = new ShardingTest({
-    shards: 2,
-    verbose: 2,
-    mongos: 1,
-    other: { chunksize : 1, enableBalancer: true }
-    }
-);
+        shards: 2,
+        mongos: 1,
+        verbose: 2,
+        other: { chunkSize: 1, enableBalancer: true }
+    });
 
 jsTestLog("Setting up sharded cluster");
 shardedAggTest.adminCommand( { enablesharding : "aggShard" } );

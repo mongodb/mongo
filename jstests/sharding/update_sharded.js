@@ -1,15 +1,18 @@
 // Test simple updates issued through mongos. Updates have different constraints through mongos,
 // since shard key is immutable.
+(function() {
 
-s = new ShardingTest( "auto1" , 2 , 1 , 1 );
+var s = new ShardingTest({ name: "auto1", shards: 2, mongos: 1 });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
+
 // repeat same tests with hashed shard key, to ensure identical behavior
 s.adminCommand( { shardcollection : "test.update0" , key : { key : 1 } } );
 s.adminCommand( { shardcollection : "test.update1" , key : { key : "hashed" } } );
 
 db = s.getDB( "test" )
+
 for(i=0; i < 2; i++){
     coll = db.getCollection("update" + i);
 
@@ -96,5 +99,6 @@ for(i=0; i < 2; i++){
     assert.writeOK(coll.update({_id : ObjectId(), 'key.x' : 1}, {$set : {x : 1}}, {multi : false}));
 }
 
-s.stop()
+s.stop();
 
+})();

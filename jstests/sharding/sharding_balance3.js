@@ -1,8 +1,12 @@
-// sharding_balance3.js
+// Simple test to make sure things get balanced 
 
-// simple test to make sure things get balanced 
+(function() {
 
-s = new ShardingTest( "slow_sharding_balance3" , 2 , 3 , 1 , { chunksize : 1, enableBalancer : true } );
+var s = new ShardingTest({ name: "slow_sharding_balance3",
+                           shards: 2,
+                           mongos: 1,
+                           verbose: 2,
+                           other: { chunkSize: 1, enableBalancer : true } });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
@@ -56,4 +60,6 @@ assert.repeat( function(){
     return d != currDiff;
 } , "balance with stopped flag should not have happened" , 1000 * 60 , 5000 );
 
-s.stop()
+s.stop();
+
+})();

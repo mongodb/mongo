@@ -1,10 +1,6 @@
-// features2.js
+(function() {
 
-s = new ShardingTest( "features2" , 2 , 1 , 1 );
-
-// The counts and the tests for "on-num-shards" only works for previous assumptions in balancer 
-// behavior and assumes migrations do not occur during count() commands.
-s.stopBalancer()
+var s = new ShardingTest({ name: "features2", shards: 2, mongos: 1 });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');
@@ -202,3 +198,5 @@ delete im2.localTime;
 assert.eq( isMaster, im2 );
 
 s.stop();
+
+})();

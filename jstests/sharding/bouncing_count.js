@@ -1,6 +1,9 @@
 // Tests whether new sharding is detected on insert by mongos
+(function() {
 
-var st = new ShardingTest( name = "test", shards = 10, verbose = 0, mongos = 3 )
+var st = new ShardingTest({ name: "test",
+                            shards: 10,
+                            mongos: 3 });
 
 var mongosA = st.s0
 var mongosB = st.s1
@@ -47,4 +50,6 @@ jsTestLog( "Running count!" )
 printjson( collB.count() )
 printjson( collC.find().toArray() )
 
-st.stop()
+st.stop();
+
+})();

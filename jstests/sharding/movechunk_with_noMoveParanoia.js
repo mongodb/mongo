@@ -6,7 +6,7 @@
 var st = new ShardingTest( { shards: 2,
                              mongos:1,
                              other : {
-                                 chunksize : 1,
+                                 chunkSize: 1,
                                  shardOptions: { noMoveParanoia:"" }}});
 
 load("jstests/sharding/movechunk_include.js")

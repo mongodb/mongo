@@ -8,7 +8,7 @@ Random.srand( seed )
 print( "Seeded with " + seed )
 
 
-var st = new ShardingTest({ name : jsTestName(), shards : 4, chunksize : 1 })
+var st = new ShardingTest({ name : jsTestName(), shards : 4, chunkSize: 1 })
 
 // Turn off balancer initially
 st.setBalancer( false )

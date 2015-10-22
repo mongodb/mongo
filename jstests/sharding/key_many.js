@@ -1,8 +1,7 @@
-// key_many.js
+(function() {
 
-// values have to be sorted
-// you must have exactly 6 values in each array
-types =  [
+// Values have to be sorted - you must have exactly 6 values in each array
+var types =  [
     { name : "string" , values : [ "allan" , "bob" , "eliot" , "joe" , "mark" , "sara" ] , keyfield: "k" } ,
     { name : "double" , values : [ 1.2 , 3.5 , 4.5 , 4.6 , 6.7 , 9.9 ] , keyfield : "a" } ,
     { name : "date" , values : [ new Date( 1000000 ) , new Date( 2000000 ) , new Date( 3000000 ) , new Date( 4000000 ) , new Date( 5000000 ) , new Date( 6000000 )  ] , keyfield : "a" } ,
@@ -15,8 +14,7 @@ types =  [
     { name : "oid_other" , values : [ ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() , ObjectId() ] , keyfield : "o" } ,
     ]
 
-s = new ShardingTest( "key_many" , 2 );
-s.setBalancer( false )
+var s = new ShardingTest({ name: "key_many", shards: 2 });
 
 s.adminCommand( { enablesharding : "test" } )
 db = s.getDB( "test" );
@@ -72,8 +70,6 @@ function getKey( o ){
     }
     return o;
 }
-
-
 
 for ( var i=0; i<types.length; i++ ){
     curT = types[i]; //global
@@ -156,7 +152,6 @@ for ( var i=0; i<types.length; i++ ){
     // TODO remove
 }
 
-  
 s.stop();
 
-
+})();

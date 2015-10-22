@@ -1,6 +1,6 @@
 (function() {
 "use strict";
-var otherOptions = { rs: true , numReplicas: 2 , chunksize: 1 , nopreallocj: true };
+var otherOptions = { rs: true , numReplicas: 2 , chunkSize: 1 , nopreallocj: true };
 var s = new ShardingTest({ shards: 2, verbose: 1, other: otherOptions });
 assert.writeOK(s.config.settings.update({ _id: "balancer" },
                          { $set: { stopped: true }}, true ));

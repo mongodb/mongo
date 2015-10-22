@@ -1,6 +1,6 @@
+(function() {
 
-
-s = new ShardingTest( "movePrimary1" , 2 );
+var s = new ShardingTest({ name: "movePrimary1", shards: 2 });
 
 initDB = function( name ){
     var db = s.getDB( name );
@@ -49,3 +49,4 @@ assert.eq(res.code, 70, 'ShardNotFound code not used');
 
 s.stop();
 
+})();

@@ -1,4 +1,6 @@
-s = new ShardingTest( "remove_shard1", 2 );
+(function() {
+
+var s = new ShardingTest({ name: "remove_shard1", shards: 2 });
 
 assert.eq( 2, s.config.shards.count() , "initial server count wrong" );
 
@@ -23,3 +25,5 @@ assert.eq( 2, s.config.shards.count(), "new server does not appear in count" );
 
 MongoRunner.stopMongod(conn);
 s.stop();
+
+})();

@@ -1,7 +1,11 @@
 // This test fails when run with authentication because benchRun with auth is broken: SERVER-6388
-numShards = 3
-s = new ShardingTest( "parallel" , numShards , 2 , 2 , { sync : true } );
-s.setBalancer( false )
+var numShards = 3
+
+var s = new ShardingTest({ name: "parallel",
+                           shards: numShards,
+                           mongos: 2,
+                           verbose: 1,
+                           other: { sync : true } });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');

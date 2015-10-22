@@ -7,7 +7,7 @@
 
 var MaxSizeMB = 1;
 
-var s = new ShardingTest({ shards: 2, other: { chunksize: 1, manualAddShard: true }});
+var s = new ShardingTest({ shards: 2, other: { chunkSize: 1, manualAddShard: true }});
 var db = s.getDB( "test" );
 s.stopBalancer();
 

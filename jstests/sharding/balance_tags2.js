@@ -1,6 +1,10 @@
 // Test balancing all chunks to one shard by tagging the full shard-key range on that collection
-var s = new ShardingTest("balance_tags2", 3, 1, 1, { sync:true, chunksize : 1, nopreallocj : true });
-s.config.settings.update({ _id: "balancer" }, { $set: { stopped: false }}, true);
+var s = new ShardingTest({ name: "balance_tags2",
+                           shards: 3,
+                           mongos: 1,
+                           verbose: 1,
+                           other: { chunkSize: 1,
+                                    enableBalancer : true } });
 
 s.adminCommand({ enablesharding: "test" });
 s.ensurePrimaryShard('test', 'shard0001');

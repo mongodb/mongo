@@ -1,6 +1,6 @@
 (function() {
 
-var st = new ShardingTest("add_shard3", 1);
+var st = new ShardingTest({ name: "add_shard3", shards: 1 });
 
 var result = st.admin.runCommand({addshard: st.s.host});
 
