@@ -42,9 +42,10 @@ conf.configsvr = true;
 rs5.initiate(conf);
 
 
-// step 1. name given
-assert(s.admin.runCommand({"addshard" : getHostName()+":" + conn1.port, "name" : "bar"}).ok,
-       "failed to add shard in step 1");
+// step 1. name given. maxSize zero means no limit. Make sure it is allowed.
+assert.commandWorked(s.admin.runCommand({ addshard: getHostName() + ":" + conn1.port,
+                                          name: "bar",
+                                          maxSize: 0 }));
 var shard = s.getDB("config").shards.findOne({"_id" : {"$nin" : ["shard0000"]}});
 assert(shard, "shard wasn't found");
 assert.eq("bar", shard._id, "shard has incorrect name");
@@ -87,6 +88,9 @@ assert(!s.admin.runCommand({
                      ",foo:" + portWithoutHostRunning
        }).ok,
        "accepted bad hostname in step 6");
+
+// Cannot add invalid stand alone host.
+assert.commandFailed(s.admin.runCommand({ addshard: 'dummy:12345' }));
 
 //
 // SERVER-17231 Adding replica set w/ set name = 'config'

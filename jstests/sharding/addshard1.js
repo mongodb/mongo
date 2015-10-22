@@ -13,9 +13,19 @@ for (i=0; i<3; i++){
     numObjs++;
 }
 
+var configDB = s.s.getDB('config');
+assert.eq(null, configDB.databases.findOne({ _id: 'testDB' }));
+
 newShard = "myShard";
-assert( s.admin.runCommand( { addshard: "localhost:" + conn1.port , name: newShard } ).ok,
-        "did not accept non-duplicated shard" );
+assert.commandWorked(s.admin.runCommand({ addshard: "localhost:" + conn1.port,
+                                          name: newShard,
+                                          maxSize: 1024
+                                        }));
+
+assert.neq(null, configDB.databases.findOne({ _id: 'testDB' }));
+
+var newShardDoc = configDB.shards.findOne({ _id: newShard });
+assert.eq(1024, newShardDoc.maxSize);
 
 // a mongod with an existing database name should not be allowed to become a shard
 conn2 = MongoRunner.runMongod({});

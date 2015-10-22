@@ -8,6 +8,9 @@ assert.writeOK(s.config.databases.insert({ _id: 'needToMove',
                                            partitioned: false,
                                            primary: 'shard0000'}));
 
+// Returns an error when trying to remove a shard that doesn't exist.
+assert.commandFailed(s.admin.runCommand({ removeshard: "shardz" }));
+
 // first remove puts in draining mode, the second tells me a db needs to move, the third actually removes
 assert( s.admin.runCommand( { removeshard: "shard0000" } ).ok , "failed to start draining shard" );
 assert( !s.admin.runCommand( { removeshard: "shard0001" } ).ok , "allowed two draining shards" );
