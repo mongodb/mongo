@@ -205,7 +205,7 @@ __wt_cache_full(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
-        return (__wt_cache_bytes_inuse(cache) >= conn->cache_size);
+	return (__wt_cache_bytes_inuse(cache) >= conn->cache_size);
 }
 
 /*

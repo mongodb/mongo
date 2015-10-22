@@ -127,7 +127,7 @@
 	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle);	\
 	if (F_ISSET(S2C(s), WT_CONN_IN_MEMORY) && __wt_cache_full(s))	\
 		return (WT_CACHE_FULL);
-  
+
 #define	CURSOR_UPDATE_API_END(s, ret)					\
 	TXN_API_END(s, ret)
 

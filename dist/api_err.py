@@ -52,10 +52,10 @@ errors = [
         This error is generated when wiredtiger_open is configured
         to return an error if recovery is required to use the database.'''),
     Error('WT_CACHE_FULL', -31807,
-        'not enough space in the cache to complete the operation', '''
+        'operation would overflow cache', '''
         This error is generated when wiredtiger_open is configured
         to run in-memory, and an insert or update operation requires more
-		than the configured cache size to complete.'''),
+        than the configured cache size to complete.'''),
 ]
 
 # Update the #defines in the wiredtiger.in file.

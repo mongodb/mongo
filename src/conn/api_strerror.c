@@ -39,7 +39,7 @@ __wt_wiredtiger_error(int error)
 	case WT_RUN_RECOVERY:
 		return ("WT_RUN_RECOVERY: recovery must be run to continue");
 	case WT_CACHE_FULL:
-		return ("WT_CACHE_FULL: not enough space in the cache to complete the operation");
+		return ("WT_CACHE_FULL: operation would overflow cache");
 	}
 
 	/*
