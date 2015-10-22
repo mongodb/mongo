@@ -216,8 +216,8 @@ add_option( "cc", "compiler to use for c" , 1 , True )
 add_option( "cc-use-shell-environment", "use $CC from shell for C compiler" , 0 , False )
 add_option( "cxx-use-shell-environment", "use $CXX from shell for C++ compiler" , 0 , False )
 add_option( "ld", "linker to use" , 1 , True )
-add_option( "c++11", "enable c++11 support (experimental)", "?", True,
-            type="choice", choices=["on", "off", "auto"], const="on", default="auto" )
+add_option( "c++11", "enable c++11 support (required as of 3.0.5)", "?", True,
+            type="choice", choices=["on"], const="on", default="on" )
 add_option( "disable-minimum-compiler-version-enforcement",
             "allow use of unsupported older compilers (NEVER for production builds)",
             0, False )
@@ -1728,7 +1728,7 @@ def doConfigure(myenv):
                     if cxx11_mode == "auto":
                         cxx11_mode = "off"
                     else:
-                        print( 'C++11 mode requested, but cannot find a flag to enable it' )
+                        print( 'C++11 compiler support is required, but cannot find a flag to enable it' )
                         Exit(1)
 
         # We appear to have C++11, or at least a flag to enable it, which is now set in the
@@ -1766,7 +1766,7 @@ def doConfigure(myenv):
                 if cxx11_mode == "auto":
                     cxx11_mode = "off"
                 else:
-                    print( "C++11 mode selected for C++ files, but can't enable C99 for C files" )
+                    print( "C99 compiler support is required, but compiler doesn't honor -std=c99" )
                     Exit(1)
 
         # If we got here and cxx11_mode hasn't become false, then its true, so swap in the
