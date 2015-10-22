@@ -54,7 +54,8 @@ namespace {
 class PrefixStrippingIterator : public RocksIterator {
 public:
     // baseIterator is consumed
-    PrefixStrippingIterator(std::string prefix, Iterator* baseIterator,
+    PrefixStrippingIterator(std::string prefix,
+                            Iterator* baseIterator,
                             RocksCompactionScheduler* compactionScheduler,
                             std::unique_ptr<rocksdb::Slice> upperBound,
                             std::function<void(RocksIterator*)> deletionCallback)
@@ -70,7 +71,9 @@ public:
         *_upperBound.get() = rocksdb::Slice(_nextPrefix);
     }
 
-    ~PrefixStrippingIterator() { _deletionCallback(this); }
+    ~PrefixStrippingIterator() {
+        _deletionCallback(this);
+    }
 
     virtual bool Valid() const {
         return _baseIterator->Valid() && _baseIterator->key().starts_with(_prefixSlice) &&
@@ -108,7 +111,9 @@ public:
         endOp();
     }
 
-    virtual rocksdb::Slice* GetUpperBound() override { return _upperBound.get(); }
+    virtual rocksdb::Slice* GetUpperBound() override {
+        return _upperBound.get();
+    }
 
     virtual void Refresh(rocksdb::Iterator* newBaseIterator) override {
         if (_baseIterator->Valid()) {
