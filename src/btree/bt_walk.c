@@ -82,9 +82,10 @@ __wt_tree_walk(WT_SESSION_IMPL *session,
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *couple_orig, *ref;
 	bool empty_internal, prev, skip;
-	uint32_t slot;
+	uint32_t delete_count, slot;
 
 	btree = S2BT(session);
+	delete_count = 0;
 	empty_internal = false;
 
 	/*
@@ -174,12 +175,15 @@ ascend:	/*
 
 			/*
 			 * If we got all the way through an internal page and
-			 * all of the child pages were deleted, evict it.
+			 * all of the child pages were deleted, mark it for
+			 * eviction.  If we see enough deleted refs at either
+			 * end, try a reverse split immediately.
 			 */
-			if (empty_internal) {
+			if (empty_internal && pindex->entries > 1) {
 				__wt_page_evict_soon(ref->page);
 				empty_internal = false;
-			}
+			} else if (delete_count > 0)
+				WT_ERR(__wt_split_reverse(session, ref));
 
 			/* Optionally skip internal pages. */
 			if (LF_ISSET(WT_READ_SKIP_INTL))
@@ -294,8 +298,10 @@ ascend:	/*
 				 * Try to skip deleted pages visible to us.
 				 */
 				if (ref->state == WT_REF_DELETED &&
-				    __wt_delete_page_skip(session, ref))
+				    __wt_delete_page_skip(session, ref)) {
+					++delete_count;
 					break;
+				}
 			}
 
 			ret = __wt_page_swap(session, couple, ref, flags);
@@ -358,6 +364,7 @@ descend:		couple = ref;
 			if (WT_PAGE_IS_INTERNAL(page)) {
 				WT_INTL_INDEX_GET(session, page, pindex);
 				slot = prev ? pindex->entries - 1 : 0;
+				delete_count = 0;
 				empty_internal = true;
 			} else {
 				*refp = ref;
