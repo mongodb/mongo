@@ -10,18 +10,14 @@ post:
         file_location: src/report.json
     - command: shell.cleanup
     - command: shell.exec
-      # destroy the cluster after the test is done
       params:
         working_dir: dsi
         script: |
           set -e 
           set -o verbose
           cd ./clusters/${cluster}
-          # destroy the cluster post test
-          yes yes | ./terraform destroy
           # clean all file to be safe
           rm -rf *
-          echo "Cluster DESTROYED."
 
 functions:
   "prepare environment":
@@ -118,6 +114,7 @@ functions:
           set -o verbose
           cd ./clusters/${cluster}
           # destroy the EC2 cluster
+          yes yes | ./terraform destroy
           yes yes | ./terraform destroy
           # clean all file to be safe
           rm -rf *
