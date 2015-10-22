@@ -181,7 +181,7 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python ../dsi/bin/post_run_check.py --rev ${revision} -f longevity_history -t longevity_tag --refTag 3.0.6-BASELINE --overrideFile ../dsi/bin/override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
+          python ../dsi/bin/post_run_check.py --rev ${revision} -f longevity_history -t longevity_tag --refTag 3.0.6-Baseline --overrideFile ../dsi/bin/override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
 
 
 tasks:
