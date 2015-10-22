@@ -36,6 +36,7 @@ flags = {
     'page_read' : [
         'READ_CACHE',
         'READ_COMPACT',
+        'READ_NO_EMPTY',
         'READ_NO_EVICT',
         'READ_NO_GEN',
         'READ_NO_WAIT',

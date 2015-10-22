@@ -95,6 +95,9 @@ __wt_tree_walk(WT_SESSION_IMPL *session,
 	 */
 	WT_ENTER_PAGE_INDEX(session);
 
+	/* Walk should never instantiate deleted pages. */
+	LF_SET(WT_READ_NO_EMPTY);
+
 	/*
 	 * !!!
 	 * Fast-truncate currently only works on row-store trees.
@@ -308,7 +311,7 @@ ascend:	/*
 
 			/*
 			 * Not-found is an expected return when only walking
-			 * in-cache pages.
+			 * in-cache pages, or if we see a deleted page.
 			 */
 			if (ret == WT_NOTFOUND) {
 				ret = 0;
