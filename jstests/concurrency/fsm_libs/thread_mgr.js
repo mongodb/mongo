@@ -116,6 +116,7 @@ var ThreadManager = function(clusterOptions, executionMode) {
                     latch: latch,
                     dbName: _context[workload].dbName,
                     collName: _context[workload].collName,
+                    cluster: cluster.getSerializedCluster(),
                     clusterOptions: clusterOptions,
                     seed: Random.randInt(1e13), // contains range of Date.getTime()
                     globalAssertLevel: globalAssertLevel

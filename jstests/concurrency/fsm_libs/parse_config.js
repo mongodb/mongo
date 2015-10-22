@@ -9,6 +9,7 @@ function parseConfig(config) {
     var allowedKeys = [
         'data',
         'iterations',
+        'passConnectionCache',
         'setup',
         'startState',
         'states',
@@ -39,8 +40,15 @@ function parseConfig(config) {
     Object.keys(config.states).forEach(function(k) {
         assert.eq('function', typeof config.states[k],
                    'config.states.' + k + ' is not a function');
-        assert.eq(2, config.states[k].length,
-                  'state functions should accept 2 parameters: db and collName');
+        if (config.passConnectionCache) {
+             assert.eq(3, config.states[k].length,
+                      'if passConnectionCache is true, state functions should ' +
+                      'accept 3 parameters: db, collName, and connCache');
+        } else {
+            assert.eq(2, config.states[k].length,
+                      'if passConnectionCache is false, state functions should ' +
+                      'accept 2 parameters: db and collName');
+        }
     });
 
     // assert all states mentioned in config.transitions are present in config.states
@@ -71,6 +79,9 @@ function parseConfig(config) {
     config.data = config.data || {};
     assert.eq('object', typeof config.data);
     // TODO: assert that 'tid' is not a key of 'config.data'
+
+    config.passConnectionCache = config.passConnectionCache || false;
+    assert.eq('boolean', typeof config.passConnectionCache);
 
     return config;
 }
