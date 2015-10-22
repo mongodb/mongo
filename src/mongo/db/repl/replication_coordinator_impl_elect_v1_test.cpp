@@ -750,6 +750,67 @@ TEST_F(ReplCoordElectV1Test, ElectionWillNotStartWhenNodeHasRecentlyLearnedAbout
     ASSERT(getReplCoord()->getMemberState().primary())
         << getReplCoord()->getMemberState().toString();
 }
+
+TEST_F(ReplCoordElectV1Test, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurrentPrimary) {
+    startCapturingLogMessages();
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345"
+                                                      << "priority" << 2)
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345")) << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+
+    OperationContextNoop txn;
+    OpTime time1(Timestamp(100, 1), 0);
+    replCoord->setMyLastOptime(time1);
+    ASSERT(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    ASSERT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
+
+    auto net = getNet();
+    net->enterNetwork();
+    auto now = net->now();
+    while (net->hasReadyRequests()) {
+        auto noi = net->getNextReadyRequest();
+        auto&& request = noi->getRequest();
+        log() << request.target << " processing " << request.cmdObj;
+        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+        ReplSetHeartbeatArgsV1 hbArgs;
+        if (hbArgs.initialize(request.cmdObj).isOK()) {
+            ReplSetHeartbeatResponse hbResp;
+            hbResp.setSetName(config.getReplSetName());
+            if (request.target == HostAndPort("node2", 12345)) {
+                hbResp.setState(MemberState::RS_PRIMARY);
+            } else {
+                hbResp.setState(MemberState::RS_SECONDARY);
+            }
+            hbResp.setConfigVersion(config.getConfigVersion());
+            hbResp.setTerm(replCoord->getTerm());
+            auto response = makeResponseStatus(hbResp.toBSON(replCoord->isV1ElectionProtocol()));
+            net->scheduleResponse(noi, net->now(), response);
+        } else {
+            error() << "Black holing unexpected request to " << request.target << ": "
+                    << request.cmdObj;
+            net->blackHole(noi);
+        }
+    }
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+
+    ASSERT_NOT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
+    ASSERT_EQUALS(now + config.getPriorityTakeoverDelay(0),
+                  replCoord->getPriorityTakeover_forTest());
 }
-}
-}
+
+}  // namespace
+}  // namespace repl
+}  // namespace mongo

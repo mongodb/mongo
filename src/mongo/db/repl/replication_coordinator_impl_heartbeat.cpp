@@ -235,10 +235,11 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
         case HeartbeatResponseAction::PriorityTakeover: {
             stdx::unique_lock<stdx::mutex> lk(_mutex);
             if (!_priorityTakeoverCbh.isValid()) {
-                auto when = _replExecutor.now() + _rsConfig.getPriorityTakeoverDelay(_selfIndex);
-                log() << "Scheduling priority takeover at " << when;
+                _priorityTakeoverWhen =
+                    _replExecutor.now() + _rsConfig.getPriorityTakeoverDelay(_selfIndex);
+                log() << "Scheduling priority takeover at " << _priorityTakeoverWhen;
                 _priorityTakeoverCbh = _scheduleWorkAt(
-                    when,
+                    _priorityTakeoverWhen,
                     stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this));
             }
             break;
@@ -663,6 +664,7 @@ void ReplicationCoordinatorImpl::_cancelPriorityTakeover_inlock() {
         log() << "Canceling priority takeover callback";
         _replExecutor.cancel(_priorityTakeoverCbh);
         _priorityTakeoverCbh = CallbackHandle();
+        _priorityTakeoverWhen = Date_t();
     }
 }
 

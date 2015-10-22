@@ -324,6 +324,12 @@ public:
     Date_t getElectionTimeout_forTest() const;
 
     /**
+     * Returns scheduled time of priority takeover callback.
+     * Returns Date_t() if callback is not scheduled.
+     */
+    Date_t getPriorityTakeover_forTest() const;
+
+    /**
      * Simple wrapper around _setLastOptime_inlock to make it easier to test.
      */
     Status setLastOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
@@ -1345,6 +1351,11 @@ private:
 
     // Callback Handle used to cancel a scheduled PriorityTakover callback.
     ReplicationExecutor::CallbackHandle _priorityTakeoverCbh;  // (M)
+
+    // Priority takeover callback will not run before this time.
+    // If this date is Date_t(), the callback is either unscheduled or canceled.
+    // Used for testing only.
+    Date_t _priorityTakeoverWhen;  // (M)
 
     // Callback handle used by waitForStartUpComplete() to block until configuration
     // is loaded and external state threads have been started (unless this node is an arbiter).
