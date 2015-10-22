@@ -23,6 +23,7 @@
 
     var primary = replSet.getPrimary();
     var secondary = replSet.getSecondary();
+    var isPV0 = replSet.getConfigFromPrimary().protocolVersion != 1;
 
     // Do an initial insert to prevent the secondary from going into recovery
     var numDocuments = 20;
@@ -56,7 +57,8 @@
     // Kill primary; secondary will enter drain mode to catch up
     primary.getDB("admin").shutdownServer({force:true});
 
-    replSet.waitForState(secondary, replSet.PRIMARY, 30000);
+    var electionTimeout = (isPV0 ? 60 : 10 ) * 1000; // Timeout in milliseconds
+    replSet.waitForState(secondary, replSet.PRIMARY, electionTimeout);
 
     // Ensure new primary is not yet writable
     jsTestLog('New primary should not be writable yet');

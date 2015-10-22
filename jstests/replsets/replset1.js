@@ -132,7 +132,7 @@ var doTest = function( signal ) {
     printjson(result);
     var lastOp = result.lastOp;
     var lastOplogOp = master.getDB("local").oplog.rs.find().sort({$natural : -1}).limit(1).next();
-    if (replTest.getReplSetConfig().protocolVersion === 0) {
+    if (replTest.getConfigFromPrimary().protocolVersion != 1) {
         assert.eq(lastOplogOp['ts'], lastOp);
     }
     else {

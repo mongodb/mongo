@@ -470,20 +470,32 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     }
 }
 
+/**
+ * Gets the current replica set config from the primary.
+ *
+ * throws if any error occurs on the command.
+ */
+ReplSetTest.prototype.getConfigFromPrimary = function() {
+    var primary = this.getPrimary(90 * 1000 /* 90 sec timeout */);
+    return assert.commandWorked(primary.getDB("admin").adminCommand("replSetGetConfig")).config;
+}
+
+// alias to match rs.conf* behavior in the shell.
+ReplSetTest.prototype.conf = ReplSetTest.prototype.getConfigFromPrimary;
+ReplSetTest.prototype.config = ReplSetTest.prototype.conf;
+
 ReplSetTest.prototype.reInitiate = function() {
     "use strict";
 
-    var master = this.getMaster();
-    var res = master.adminCommand({ replSetGetConfig: 1 });
-    assert.commandWorked(res);
     var config = this.getReplSetConfig();
-    config.version = res.config.version + 1;
+    var newVersion = this.getConfigFromPrimary().version + 1;
+    config.version = newVersion;
 
     if (jsTestOptions().useLegacyReplicationProtocol && !config.hasOwnProperty("protocolVersion")) {
         config.protocolVersion = 0;
     }
     try {
-        assert.commandWorked(master.adminCommand({replSetReconfig: config}));
+        assert.commandWorked(this.getPrimary().adminCommand({replSetReconfig: config}));
     }
     catch (e) {
         if (tojson(e).indexOf("error doing query: failed") < 0) {
