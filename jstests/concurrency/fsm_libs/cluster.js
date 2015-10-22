@@ -65,6 +65,8 @@ var Cluster = function(options) {
 
     var conn;
 
+    var st;
+
     var initialized = false;
 
     var _conns = {
@@ -108,8 +110,7 @@ var Cluster = function(options) {
                 };
             }
 
-            var st = new ShardingTest(shardConfig);
-            st.stopBalancer();
+            st = new ShardingTest(shardConfig);
 
             conn = st.s; // mongos
 
@@ -147,7 +148,6 @@ var Cluster = function(options) {
                 ++i;
                 mongod = st['d' + i];
             }
-
         } else if (options.replication) {
             // TODO: allow 'options' to specify the number of nodes
             var replSetConfig = {
@@ -197,7 +197,7 @@ var Cluster = function(options) {
         }
 
         initialized = true;
-        
+
         this.executeOnMongodNodes(options.setupFunctions.mongod);
         this.executeOnMongosNodes(options.setupFunctions.mongos);
     };
@@ -217,12 +217,12 @@ var Cluster = function(options) {
         }
         if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
             throw new Error('mongod function must be a function that takes a db as an argument');
-        } 
+        }
         _conns.mongod.forEach(function(mongodConn) {
             fn(mongodConn.getDB('admin'));
         });
     };
-        
+
     this.executeOnMongosNodes = function executeOnMongosNodes(fn) {
         if (!initialized) {
             throw new Error('cluster must be initialized before functions can be executed ' +
@@ -230,12 +230,12 @@ var Cluster = function(options) {
         }
         if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
             throw new Error('mongos function must be a function that takes a db as an argument');
-        } 
+        }
         _conns.mongos.forEach(function(mongosConn) {
             fn(mongosConn.getDB('admin'));
         });
     };
-        
+
     this.teardown = function teardown() { };
 
     this.getDB = function getDB(dbName) {
@@ -269,6 +269,86 @@ var Cluster = function(options) {
     this.shardCollection = function shardCollection() {
         assert(this.isSharded(), 'cluster is not sharded');
         throw new Error('cluster has not been initialized yet');
+    };
+
+    // Provide a serializable form of the cluster for use in workload states. This
+    // method is required because we don't currently support the serialization of Mongo
+    // connection objects.
+    //
+    // Serialized format:
+    // {
+    //      mongos: [
+    //          "localhost:30998",
+    //          "localhost:30999"
+    //      ],
+    //      config: [
+    //          "localhost:29000",
+    //          "localhost:29001",
+    //          "localhost:29002"
+    //      ],
+    //      shards: {
+    //          "test-rs0": [
+    //              "localhost:20006",
+    //              "localhost:20007",
+    //              "localhost:20008"
+    //          ],
+    //          "test-rs1": [
+    //              "localhost:20009",
+    //              "localhost:20010",
+    //              "localhost:20011"
+    //          ]
+    //      }
+    // }
+    this.getSerializedCluster = function getSerializedCluster() {
+        var cluster = {
+            mongos: [],
+            config: [],
+            shards: {}
+        };
+
+        var i = 0;
+        var mongos = st.s0;
+        while (mongos) {
+            cluster.mongos.push(mongos.name);
+            ++i;
+            mongos = st['s' + i];
+        }
+
+        i = 0;
+        var config = st.c0;
+        while (config) {
+            cluster.config.push(config.name);
+            ++i;
+            config = st['c' + i];
+        }
+
+        i = 0;
+        var shard = st.shard0;
+        while (shard) {
+            if (shard.name.includes('/')) {
+                // If the shard is a replica set, the format of st.shard0.name in ShardingTest is
+                // "test-rs0/localhost:20006,localhost:20007,localhost:20008".
+                var [setName, shards] = shard.name.split('/');
+                cluster.shards[setName] = shards.split(',');
+            } else {
+                // If the shard is a standalone mongod, the format of st.shard0.name in ShardingTest
+                // is "localhost:20006".
+                cluster.shards[i] = [shard.name];
+            }
+            ++i;
+            shard = st['shard' + i];
+        }
+        return cluster;
+    }
+
+    this.startBalancer = function startBalancer() {
+        assert(this.isSharded(), 'cluster is not sharded');
+        st.startBalancer();
+    };
+
+    this.stopBalancer = function stopBalancer() {
+        assert(this.isSharded(), 'cluster is not sharded');
+        st.stopBalancer();
     };
 
     this.awaitReplication = function awaitReplication() {
