@@ -438,11 +438,12 @@ void mongo::exitCleanly(ExitCode code) {
         }
 
         auto catalogMgr = grid.catalogManager(txn);
-        catalogMgr->shutDown(txn);
-
-        auto cursorManager = grid.getCursorManager();
-        cursorManager->killAllCursors();
-        cursorManager->reapZombieCursors();
+        if (catalogMgr) {
+            catalogMgr->shutDown(txn);
+            auto cursorManager = grid.getCursorManager();
+            cursorManager->killAllCursors();
+            cursorManager->reapZombieCursors();
+        }
     }
 
     mongo::dbexit(code);
