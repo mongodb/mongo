@@ -214,6 +214,10 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 	    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_SCHEMA))
 		return (0);
 
+	/* In memory configurations don't block when the cache is full. */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		return (0);
+
 	/*
 	 * Threads operating on trees that cannot be evicted are ignored,
 	 * mostly because they're not contributing to the problem.
