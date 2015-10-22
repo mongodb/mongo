@@ -105,7 +105,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             if is_master:
                 break
             self.logger.info("Waiting for primary on port %d to be elected.", self.port)
-            time.sleep(1)  # Wait a little bit before trying again.
+            time.sleep(0.1)  # Wait a little bit before trying again.
 
         # Wait for the secondaries to become available.
         for secondary in self.get_secondaries():
@@ -117,7 +117,7 @@ class ReplicaSetFixture(interface.ReplFixture):
                     break
                 self.logger.info("Waiting for secondary on port %d to become available.",
                                  secondary.port)
-                time.sleep(1)  # Wait a little bit before trying again.
+                time.sleep(0.1)  # Wait a little bit before trying again.
 
     def teardown(self):
         running_at_start = self.is_running()

@@ -312,7 +312,7 @@ class _MongoSFixture(interface.Fixture):
                         % (self.port, standalone.MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
 
                 self.logger.info("Waiting to connect to mongos on port %d.", self.port)
-                time.sleep(1)  # Wait a little bit before trying again.
+                time.sleep(0.1)  # Wait a little bit before trying again.
 
         self.logger.info("Successfully contacted the mongos on port %d.", self.port)
 

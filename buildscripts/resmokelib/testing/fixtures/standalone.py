@@ -110,7 +110,7 @@ class MongoDFixture(interface.Fixture):
                         % (self.port, MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
 
                 self.logger.info("Waiting to connect to mongod on port %d.", self.port)
-                time.sleep(1)  # Wait a little bit before trying again.
+                time.sleep(0.1)  # Wait a little bit before trying again.
 
         self.logger.info("Successfully contacted the mongod on port %d.", self.port)
 
