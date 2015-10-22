@@ -324,8 +324,10 @@ tasks:
       variant : linux-wt-standalone
     - name : singleThreaded
       variant : linux-wt-standalone
+      status : "*"
     - name : singleThreaded
       variant :  linux-wt-repl
+      status : "*"
   commands:
     - func: "compare"
       vars:
