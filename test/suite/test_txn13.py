@@ -64,6 +64,7 @@ class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr(`conn`)
         return conn
 
+    @wttest.longtest('txn tests with huge values')
     def test_large_values(self):
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)
         # print "Running with %d" % (self.valuesize)
