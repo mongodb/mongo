@@ -13,7 +13,6 @@ var workerThread = (function() {
     // args.latch = CountDownLatch instance for starting all threads
     // args.dbName = the database name
     // args.collName = the collection name
-    // args.cluster = connection strings for all cluster nodes (see cluster.js for format)
     // args.clusterOptions = the configuration of the cluster
     // args.seed = seed for the random number generator
     // args.globalAssertLevel = the global assertion level to use
@@ -62,8 +61,6 @@ var workerThread = (function() {
                     data: data,
                     db: myDB,
                     collName: args.collName,
-                    cluster: args.cluster,
-                    passConnectionCache: config.passConnectionCache,
                     startState: config.startState,
                     states: config.states,
                     transitions: config.transitions,
