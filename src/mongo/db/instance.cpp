@@ -615,7 +615,6 @@ void assembleResponse(OperationContext* txn,
     }
 
     recordCurOpMetrics(txn);
-    debug.reset();
 }
 
 void receivedKillCursors(OperationContext* txn, Message& m) {

@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -148,8 +149,10 @@ public:
         unique_ptr<PlanExecutor> exec = std::move(statusWithPlanExecutor.getValue());
 
         // Store the plan summary string in CurOp.
-        if (NULL != CurOp::get(txn)) {
-            CurOp::get(txn)->debug().planSummary = Explain::getPlanSummary(exec.get());
+        {
+            auto curOp = CurOp::get(txn);
+            stdx::lock_guard<Client> lk(*txn->getClient());
+            curOp->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
         }
 
         Status execPlanStatus = exec->executePlan();

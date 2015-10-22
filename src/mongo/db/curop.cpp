@@ -236,19 +236,6 @@ CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
     } else {
         _stack->push_nolock(this);
     }
-    _start = 0;
-    _isCommand = false;
-    _dbprofile = 0;
-    _end = 0;
-    _maxTimeMicros = 0;
-    _maxTimeTracker.reset();
-    _message = "";
-    _progressMeter.finished();
-    _numYields = 0;
-    _expectedLatencyMs = 0;
-    _networkOp = opInvalid;
-    _logicalOp = opInvalid;
-    _command = NULL;
 }
 
 ProgressMeter& CurOp::setMessage_inlock(const char* msg,
@@ -326,8 +313,8 @@ void CurOp::reportState(BSONObjBuilder* builder) {
         _query.append(*builder, "query");
     }
 
-    if (!debug().planSummary.empty()) {
-        builder->append("planSummary", debug().planSummary.toString());
+    if (!_planSummary.empty()) {
+        builder->append("planSummary", _planSummary);
     }
 
     if (!_message.empty()) {
@@ -380,16 +367,6 @@ bool CurOp::maxTimeHasExpired() {
 
 uint64_t CurOp::getRemainingMaxTimeMicros() const {
     return _maxTimeTracker.getRemainingMicros();
-}
-
-CurOp::MaxTimeTracker::MaxTimeTracker() {
-    reset();
-}
-
-void CurOp::MaxTimeTracker::reset() {
-    _enabled = false;
-    _targetEpochMicros = 0;
-    _approxTargetServerMillis = 0;
 }
 
 void CurOp::MaxTimeTracker::setTimeLimit(uint64_t startEpochMicros, uint64_t durationMicros) {
@@ -453,43 +430,6 @@ uint64_t CurOp::MaxTimeTracker::getRemainingMicros() const {
     return _targetEpochMicros - now;
 }
 
-void OpDebug::reset() {
-    networkOp = opInvalid;
-    logicalOp = opInvalid;
-    iscommand = false;
-    query = BSONObj();
-    updateobj = BSONObj();
-
-    cursorid = -1;
-    ntoreturn = -1;
-    ntoskip = -1;
-    exhaust = false;
-
-    keysExamined = -1;
-    docsExamined = -1;
-    idhack = false;
-    hasSortStage = false;
-    nMatched = -1;
-    nModified = -1;
-    ninserted = -1;
-    ndeleted = -1;
-    nmoved = -1;
-    fastmod = false;
-    fastmodinsert = false;
-    upsert = false;
-    cursorExhausted = false;
-    keyUpdates = 0;  // unsigned, so -1 not possible
-    writeConflicts = 0;
-    planSummary = "";
-    execStats.reset();
-
-    exceptionInfo.reset();
-
-    executionTime = 0;
-    nreturned = -1;
-    responseLength = -1;
-}
-
 namespace {
 StringData getProtoString(int op) {
     if (op == dbQuery) {
@@ -535,8 +475,8 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
         }
     }
 
-    if (!planSummary.empty()) {
-        s << " planSummary: " << planSummary.toString();
+    if (!curop.getPlanSummary().empty()) {
+        s << " planSummary: " << curop.getPlanSummary();
     }
 
     if (!updateobj.isEmpty()) {

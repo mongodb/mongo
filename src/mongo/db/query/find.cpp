@@ -168,7 +168,8 @@ void endQueryOp(OperationContext* txn,
     if (dbProfilingLevel > 0 || curop->elapsedMillis() > serverGlobalParams.slowMS ||
         logger::globalLogDomain()->shouldLog(queryLogComponent, logLevelOne)) {
         // Generate plan summary string.
-        curop->debug().planSummary = Explain::getPlanSummary(&exec);
+        stdx::lock_guard<Client>(*txn->getClient());
+        curop->setPlanSummary_inlock(Explain::getPlanSummary(&exec));
     }
 
     // Set debug information for consumption by the profiler only.
@@ -180,9 +181,9 @@ void endQueryOp(OperationContext* txn,
         curop->debug().execStats.set(statsBob.obj());
 
         // Replace exec stats with plan summary if stats cannot fit into CachedBSONObj.
-        if (curop->debug().execStats.tooBig() && !curop->debug().planSummary.empty()) {
+        if (curop->debug().execStats.tooBig() && !curop->getPlanSummary().empty()) {
             BSONObjBuilder bob;
-            bob.append("summary", curop->debug().planSummary.toString());
+            bob.append("summary", curop->getPlanSummary());
             curop->debug().execStats.set(bob.done());
         }
     }
@@ -579,7 +580,10 @@ std::string runQuery(OperationContext* txn,
     // uint64_t numMisplacedDocs = 0;
 
     // Get summary info about which plan the executor is using.
-    curop.debug().planSummary = Explain::getPlanSummary(exec.get());
+    {
+        stdx::lock_guard<Client> lk(*txn->getClient());
+        curop.setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
+    }
 
     while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
         // Add result to output buffer.

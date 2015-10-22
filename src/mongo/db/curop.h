@@ -129,11 +129,7 @@ private:
 /* lifespan is different than CurOp because of recursives with DBDirectClient */
 class OpDebug {
 public:
-    OpDebug() : planSummary(2048) {
-        reset();
-    }
-
-    void reset();
+    OpDebug() = default;
 
     std::string report(const CurOp& curop, const SingleThreadedLockStats& lockStats) const;
 
@@ -151,38 +147,42 @@ public:
 
     // basic options
     // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_COMMAND, etc.
-    Operation networkOp;  // only set this through setNetworkOp_inlock() to keep synced
+    Operation networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
     // _logicalOp is the logical operation type, ie 'dbQuery' regardless of whether this is an
     // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_COMMAND.
     // Similarly, the return value will be dbGetMore for both OP_GET_MORE and getMore command.
-    Operation logicalOp;  // only set this through setNetworkOp_inlock() to keep synced
-    bool iscommand;
-    BSONObj query;
-    BSONObj updateobj;
+    Operation logicalOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
+    bool iscommand{false};
+    BSONObj query{};
+    BSONObj updateobj{};
 
     // detailed options
-    long long cursorid;
-    long long ntoreturn;
-    long long ntoskip;
-    bool exhaust;
+    long long cursorid{-1};
+    long long ntoreturn{-1};
+    long long ntoskip{-1};
+    bool exhaust{false};
 
     // debugging/profile info
-    long long keysExamined;
-    long long docsExamined;
-    bool idhack;  // indicates short circuited code path on an update to make the update faster
-    bool hasSortStage;    // true if the query plan involves an in-memory sort
-    long long nMatched;   // number of records that match the query
-    long long nModified;  // number of records written (no no-ops)
-    long long nmoved;     // updates resulted in a move (moves are expensive)
-    long long ninserted;
-    long long ndeleted;
-    bool fastmod;
-    bool fastmodinsert;    // upsert of an $operation. builds a default object
-    bool upsert;           // true if the update actually did an insert
-    bool cursorExhausted;  // true if the cursor has been closed at end a find/getMore operation
-    int keyUpdates;
-    long long writeConflicts;
-    ThreadSafeString planSummary;  // a brief std::string describing the query solution
+    long long keysExamined{-1};
+    long long docsExamined{-1};
+
+    // indicates short circuited code path on an update to make the update faster
+    bool idhack{false};
+
+    bool hasSortStage{false};  // true if the query plan involves an in-memory sort
+
+    long long nMatched{-1};   // number of records that match the query
+    long long nModified{-1};  // number of records written (no no-ops)
+    long long nmoved{-1};     // updates resulted in a move (moves are expensive)
+    long long ninserted{-1};
+    long long ndeleted{-1};
+    bool fastmod{false};
+    bool fastmodinsert{false};  // upsert of an $operation. builds a default object
+    bool upsert{false};         // true if the update actually did an insert
+    bool cursorExhausted{
+        false};  // true if the cursor has been closed at end a find/getMore operation
+    int keyUpdates{0};
+    long long writeConflicts{0};
 
     // New Query Framework debugging/profiling info
     // TODO: should this really be an opaque BSONObj?  Not sure.
@@ -192,9 +192,9 @@ public:
     ExceptionInfo exceptionInfo;
 
     // response info
-    int executionTime;
-    long long nreturned;
-    int responseLength;
+    int executionTime{0};
+    long long nreturned{-1};
+    int responseLength{-1};
 
 private:
     /**
@@ -473,6 +473,18 @@ public:
      */
     void setNS_inlock(StringData ns);
 
+    StringData getPlanSummary() const {
+        return _planSummary;
+    }
+
+    void setPlanSummary_inlock(StringData summary) {
+        _planSummary = summary.toString();
+    }
+
+    void setPlanSummary_inlock(std::string summary) {
+        _planSummary = std::move(summary);
+    }
+
 private:
     class CurOpStack;
 
@@ -481,34 +493,36 @@ private:
     CurOp(OperationContext*, CurOpStack*);
 
     CurOpStack* _stack;
-    CurOp* _parent = nullptr;
-    Command* _command;
-    long long _start;
-    long long _end;
+    CurOp* _parent{nullptr};
+    Command* _command{nullptr};
+    long long _start{0};
+    long long _end{0};
 
     // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_COMMAND, etc.
-    Operation _networkOp;  // only set this through setNetworkOp_inlock() to keep synced
+    Operation _networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
     // _logicalOp is the logical operation type, ie 'dbQuery' regardless of whether this is an
     // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_COMMAND.
     // Similarly, the return value will be dbGetMore for both OP_GET_MORE and getMore command.
-    Operation _logicalOp;  // only set this through setNetworkOp_inlock() to keep synced
+    Operation _logicalOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
 
-    bool _isCommand;
-    int _dbprofile;  // 0=off, 1=slow, 2=all
+    bool _isCommand{false};
+    int _dbprofile{0};  // 0=off, 1=slow, 2=all
     std::string _ns;
     CachedBSONObj<512> _query;  // CachedBSONObj is thread safe
     OpDebug _debug;
     std::string _message;
     ProgressMeter _progressMeter;
-    int _numYields;
+    int _numYields{0};
 
     // this is how much "extra" time a query might take
     // a writebacklisten for example will block for 30s
     // so this should be 30000 in that case
-    long long _expectedLatencyMs;
+    long long _expectedLatencyMs{0};
 
     // Time limit for this operation.  0 if the operation has no time limit.
-    uint64_t _maxTimeMicros;
+    uint64_t _maxTimeMicros{0u};
+
+    std::string _planSummary;
 
     /** Nested class that implements tracking of a time limit for a CurOp object. */
     class MaxTimeTracker {
@@ -516,10 +530,7 @@ private:
 
     public:
         /** Newly-constructed MaxTimeTracker objects have the time limit disabled. */
-        MaxTimeTracker();
-
-        /** Disables the time tracker. */
-        void reset();
+        MaxTimeTracker() = default;
 
         /** Returns whether or not time tracking is enabled. */
         bool isEnabled() const {
@@ -551,15 +562,15 @@ private:
 
     private:
         // Whether or not time tracking is enabled for this operation.
-        bool _enabled;
+        bool _enabled{false};
 
         // Point in time at which the time limit is hit.  Units of microseconds since the
         // epoch.
-        uint64_t _targetEpochMicros;
+        uint64_t _targetEpochMicros{0};
 
         // Approximate point in time at which the time limit is hit.   Units of milliseconds
         // since the server process was started.
-        int64_t _approxTargetServerMillis;
+        int64_t _approxTargetServerMillis{0};
     } _maxTimeTracker;
 };
 }

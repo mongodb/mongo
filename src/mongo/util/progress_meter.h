@@ -49,7 +49,7 @@ public:
         reset(total, secondsBetween, checkInterval);
     }
 
-    ProgressMeter() : _active(0), _showTotal(true), _units("") {
+    ProgressMeter() {
         _name = "Progress";
     }
 
@@ -57,7 +57,7 @@ public:
     void reset(unsigned long long total, int secondsBetween = 3, int checkInterval = 100);
 
     void finished() {
-        _active = 0;
+        _active = false;
     }
     bool isActive() const {
         return _active;
@@ -110,12 +110,12 @@ public:
     }
 
 private:
-    bool _active;
+    bool _active{false};
 
     unsigned long long _total;
-    bool _showTotal;
-    int _secondsBetween;
-    int _checkInterval;
+    bool _showTotal{true};
+    int _secondsBetween{3};
+    int _checkInterval{100};
 
     unsigned long long _done;
     unsigned long long _hits;
