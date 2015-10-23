@@ -151,6 +151,7 @@ __evict_ref_delete(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *pindex;
+	uint32_t deleted_entries;
 
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	if (__wt_ref_is_root(ref))
@@ -158,7 +159,8 @@ __evict_ref_delete(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	parent = ref->home;
 	WT_INTL_INDEX_GET(session, parent, pindex);
-	if (__wt_atomic_addv32(&pindex->deleted_entries, 1) % 10 == 0)
+	deleted_entries = __wt_atomic_addv32(&pindex->deleted_entries, 1);
+	if (deleted_entries > pindex->entries / 10)
 		WT_RET(__wt_split_reverse(session, parent->pg_intl_parent_ref));
 
 	return (0);
