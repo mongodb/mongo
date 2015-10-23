@@ -405,7 +405,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	uint64_t split_gen;
 	uint32_t children, chunk, i, j, moved_entries, new_entries, remain;
 	uint32_t skip_leading, slots;
-	bool panic;
+	bool complete;
 	void *p;
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
@@ -414,7 +414,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	btree = S2BT(session);
 	alloc_index = NULL;
 	parent_incr = parent_decr = 0;
-	panic = false;
+	complete = false;
 
 	/*
 	 * Our caller is holding the parent page locked to single-thread splits,
@@ -559,21 +559,21 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	/*
 	 * Confirm the parent page's index hasn't moved, then update it, which
 	 * makes the split visible to threads descending the tree. From this
-	 * point on, we're committed to the split.  If subsequent work fails,
-	 * we have to panic because we may have threads of control using the
-	 * new page index we swap in.
+	 * point on, we're committed to the split.
 	 *
 	 * A note on error handling: until this point, there's no problem with
 	 * unwinding on error.  We allocated a new page index, a new set of
 	 * WT_REFs and a new set of child pages -- if an error occurred, the
 	 * parent remained unchanged, although it may have an incorrect memory
 	 * footprint.  From now on we've modified the parent page, attention
-	 * needs to be paid.
+	 * needs to be paid. However, subsequent failures are relatively benign,
+	 * the split is OK and complete. For that reason, we ignore errors past
+	 * this point unless there's a panic.
 	 */
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
 	WT_INTL_INDEX_SET(parent, alloc_index);
 	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
-	panic = true;
+	complete = true;
 
 #ifdef HAVE_DIAGNOSTIC
 	WT_WITH_PAGE_INDEX(session,
@@ -657,7 +657,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * be using the new index.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	WT_ERR(__split_safe_free(session, split_gen, 0, pindex, size));
+	WT_TRET(__split_safe_free(session, split_gen, 0, pindex, size));
 	parent_decr += size;
 
 	/*
@@ -666,19 +666,24 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
-	if (0) {
-err:		__wt_free_ref_index(session, parent, alloc_index, true);
+err:	/*
+	 * If complete is true, we saw an error after opening up the tree to
+	 * descent through the parent page's new index. There is nothing we
+	 * can do, there are threads potentially active in both versions of
+	 * the tree.
+	 *
+	 * A note on error handling: if we completed the split, return success,
+	 * nothing really bad can have happened, and our caller has to proceed
+	 * with the split.
+	 */
+	if (!complete)
+		__wt_free_ref_index(session, parent, alloc_index, true);
 
-		/*
-		 * If panic is set, we saw an error after opening up the tree
-		 * to descent through the parent page's new index.  There is
-		 * nothing we can do, the tree is inconsistent and there are
-		 * threads potentially active in both versions of the tree.
-		 */
-		if (panic)
-			ret = __wt_panic(session);
-	}
-	return (ret);
+	if (ret != 0 && ret != WT_PANIC)
+		__wt_err(session, ret,
+		    "ignoring not-fatal error during parent page split to "
+		    "deepen the tree");
+	return (ret == WT_PANIC || !complete ? ret : 0);
 }
 
 /*
@@ -699,13 +704,10 @@ __split_multi_inmem(
 	uint64_t recno;
 	uint32_t i, slot;
 
-	__wt_btcur_init(session, &cbt);
-	__wt_btcur_open(&cbt);
-
 	/*
 	 * We can find unresolved updates when attempting to evict a page, which
-	 * can't be written. This code re-creates the in-memory page and applies
-	 * the unresolved updates to that page.
+	 * can't be written. This code re-creates the in-memory page and adds
+	 * references to the unresolved update chains to that page.
 	 *
 	 * Clear the disk image and link the page into the passed-in WT_REF to
 	 * simplify error handling: our caller will not discard the disk image
@@ -720,6 +722,9 @@ __split_multi_inmem(
 	if (orig->type == WT_PAGE_ROW_LEAF)
 		WT_RET(__wt_scr_alloc(session, 0, &key));
 
+	__wt_btcur_init(session, &cbt);
+	__wt_btcur_open(&cbt);
+
 	/* Re-create each modification we couldn't write. */
 	for (i = 0, supd = multi->supd; i < multi->supd_entries; ++i, ++supd)
 		switch (orig->type) {
@@ -727,7 +732,6 @@ __split_multi_inmem(
 		case WT_PAGE_COL_VAR:
 			/* Build a key. */
 			upd = supd->ins->upd;
-			supd->ins->upd = NULL;
 			recno = WT_INSERT_RECNO(supd->ins);
 
 			/* Search the page. */
@@ -742,13 +746,11 @@ __split_multi_inmem(
 			if (supd->ins == NULL) {
 				slot = WT_ROW_SLOT(orig, supd->rip);
 				upd = orig->pg_row_upd[slot];
-				orig->pg_row_upd[slot] = NULL;
 
 				WT_ERR(__wt_row_leaf_key(
 				    session, orig, supd->rip, key, false));
 			} else {
 				upd = supd->ins->upd;
-				supd->ins->upd = NULL;
 
 				key->data = WT_INSERT_KEY(supd->ins);
 				key->size = WT_INSERT_KEY_SIZE(supd->ins);
@@ -781,6 +783,38 @@ err:	/* Free any resources that may have been cached in the cursor. */
 }
 
 /*
+ * __split_multi_inmem_final --
+ *	Discard moved update lists from the original page.
+ */
+static void
+__split_multi_inmem_final(WT_PAGE *orig, WT_MULTI *multi)
+{
+	WT_SAVE_UPD *supd;
+	uint32_t i, slot;
+
+	/*
+	 * We've successfully created new in-memory pages. For error-handling
+	 * reasons, we've left the update chains referenced by both the original
+	 * and new pages. We're ready to discard the original page, terminate
+	 * the original page's reference to any update list we moved.
+	 */
+	for (i = 0, supd = multi->supd; i < multi->supd_entries; ++i, ++supd)
+		switch (orig->type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_VAR:
+			supd->ins->upd = NULL;
+			break;
+		case WT_PAGE_ROW_LEAF:
+			if (supd->ins == NULL) {
+				slot = WT_ROW_SLOT(orig, supd->rip);
+				orig->pg_row_upd[slot] = NULL;
+			} else
+				supd->ins->upd = NULL;
+			break;
+		}
+}
+
+/*
  * __wt_multi_to_ref --
  *	Move a multi-block list into an array of WT_REF structures.
  */
@@ -801,13 +835,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	ref = *refp;
 	incr += sizeof(WT_REF);
 
-	/*
-	 * Any parent reference must be filled in by our caller; the primary
-	 * use of this function is when splitting into a parent page, and we
-	 * aren't holding any locks here that would allow us to know which
-	 * parent we'll eventually split into, if the tree is simultaneously
-	 * being deepened.
-	 */
+	/* Any parent reference is filled in by our caller. */
 	ref->home = NULL;
 
 	if (multi->supd == NULL) {
@@ -1172,20 +1200,21 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	    __split_should_deepen(session, parent_ref))
 		ret = __split_deepen(session, parent);
 
-err:	if (!complete)
+err:	/*
+	 * A note on error handling: if we completed the split, return success,
+	 * nothing really bad can have happened, and our caller has to proceed
+	 * with the split.
+	 */
+	if (!complete) {
 		for (i = 0; i < parent_entries; ++i) {
 			next_ref = pindex->index[i];
 			if (next_ref->state == WT_REF_SPLIT)
 				next_ref->state = WT_REF_DELETED;
 		}
 
-	__wt_free_ref_index(session, NULL, alloc_index, false);
+		__wt_free_ref_index(session, NULL, alloc_index, false);
+	}
 
-	/*
-	 * A note on error handling: if we completed the split, return success,
-	 * nothing really bad can have happened, and our caller has to proceed
-	 * with the split.
-	 */
 	if (ret != 0 && ret != WT_PANIC)
 		__wt_err(session, ret,
 		    "ignoring not-fatal error during parent page split");
@@ -1506,6 +1535,14 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_RET(__split_multi_inmem(session, page, &new, &mod->mod_multi[0]));
 
 	/*
+	 * The rewrite succeeded, we can no longer fail.
+	 *
+	 * Finalize the move, discarding moved update lists from the original
+	 * page.
+	 */
+	__split_multi_inmem_final(page, &mod->mod_multi[0]);
+
+	/*
 	 * Discard the original page.
 	 *
 	 * Pages with unresolved changes are not marked clean during
@@ -1560,33 +1597,43 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split);
 
-	__wt_free(session, ref_new);
+	/*
+	 * The split succeeded, we can no longer fail.
+	 *
+	 * Finalize the move, discarding moved update lists from the original
+	 * page.
+	 */
+	for (i = 0; i < new_entries; ++i)
+		__split_multi_inmem_final(page, &mod->mod_multi[i]);
 
 	/*
-	 * The split succeeded, discard the page.
-	 *
-	 * Pages with unresolved changes are not marked clean during
-	 * reconciliation, do it now.
+	 * Pages with unresolved changes are not marked clean in reconciliation,
+	 * do it now, then discard the page.
 	 */
 	__wt_page_modify_clear(session, page);
 	__wt_page_out(session, &page);
 
-	return (0);
+	if (0) {
+err:		/*
+		 * A note on error handling: when handling unresolved changes,
+		 * we create new in-memory pages with those unresolved changes.
+		 * The problem is the new pages are given references to the
+		 * original page's update lists, and once all of the pages are
+		 * created, there's a second pass to remove the updates from the
+		 * original page. If an error occurs, we can't simply free the
+		 * newly created pages, that would discard the original page's
+		 * updates. Set a flag so the discard function doesn't discard
+		 * the updates on the page.
+		 */
+		for (i = 0; i < new_entries; ++i)
+			if (ref_new[i]->page != NULL) {
+				F_SET_ATOMIC(
+				    ref_new[i]->page, WT_PAGE_UPDATE_IGNORE);
+				__wt_free_ref(session,
+				    ref_new[i]->page, ref_new[i], true);
+			}
+	}
 
-err:	/*
-	 * A note on error handling: in the case of evicting a page that has
-	 * unresolved changes, we just instantiated some in-memory pages that
-	 * reflect those unresolved changes.  The problem is those pages
-	 * reference the same WT_UPDATE chains as the page we're splitting,
-	 * that is, we simply copied references into the new pages.  If the
-	 * split fails, the original page is fine, but discarding the created
-	 * page would free those update chains, and that's wrong.  There isn't
-	 * an easy solution, there's a lot of small memory allocations in some
-	 * common code paths, and unwinding those changes will be difficult.
-	 * For now, leak the memory by not discarding the instantiated pages.
-	 */
-	for (i = 0; i < new_entries; ++i)
-		__wt_free_ref(session, page, ref_new[i], false);
 	__wt_free(session, ref_new);
 	return (ret);
 }

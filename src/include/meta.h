@@ -40,6 +40,16 @@
 #define	WT_METADATA_VERSION_STR	"WiredTiger version string"
 
 /*
+ * WT_WITH_TURTLE_LOCK --
+ *	Acquire the turtle file lock, perform an operation, drop the lock.
+ */
+#define	WT_WITH_TURTLE_LOCK(session, op) do {				\
+	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_TURTLE));\
+	WT_WITH_LOCK(session,						\
+	    &S2C(session)->turtle_lock, WT_SESSION_LOCKED_TURTLE, op);	\
+} while (0)
+
+/*
  * WT_CKPT --
  *	Encapsulation of checkpoint information, shared by the metadata, the
  * btree engine, and the block manager.

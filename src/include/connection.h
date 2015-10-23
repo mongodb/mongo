@@ -178,6 +178,7 @@ struct __wt_connection_impl {
 	WT_SPINLOCK reconfig_lock;	/* Single thread reconfigure */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK table_lock;		/* Table creation spinlock */
+	WT_SPINLOCK turtle_lock;	/* Turtle file spinlock */
 
 	/*
 	 * We distribute the btree page locks across a set of spin locks. Don't

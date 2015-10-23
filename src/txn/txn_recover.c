@@ -421,8 +421,8 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP);
 
 	/* We need a real session for recovery. */
-	WT_RET(__wt_open_session(conn, NULL, NULL, true, &session));
-	F_SET(session, WT_SESSION_NO_LOGGING);
+	WT_RET(__wt_open_internal_session(conn, "txn-recover",
+	    false, WT_SESSION_NO_LOGGING, &session));
 	r.session = session;
 
 	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
