@@ -27,13 +27,6 @@ type IndexDocumentFromDB struct {
 // in readable JSON format.
 func (dump *MongoDump) dumpMetadata(intent *intents.Intent) error {
 	var err error
-	err = intent.MetadataFile.Open()
-	if err != nil {
-		return err
-	}
-	defer intent.MetadataFile.Close()
-	// make a buffered writer for nicer disk i/o
-	w := bufio.NewWriter(intent.MetadataFile)
 
 	nsID := fmt.Sprintf("%v.%v", intent.DB, intent.C)
 	meta := Metadata{
@@ -71,6 +64,10 @@ func (dump *MongoDump) dumpMetadata(intent *intents.Intent) error {
 	if err != nil {
 		return err
 	}
+	if indexesIter == nil {
+		log.Logf(log.Always, "the collection %v appears to have been dropped after the dump started", intent.Namespace())
+		return nil
+	}
 
 	indexOpts := &bson.D{}
 	for indexesIter.Next(indexOpts) {
@@ -90,6 +87,14 @@ func (dump *MongoDump) dumpMetadata(intent *intents.Intent) error {
 	if err != nil {
 		return fmt.Errorf("error marshalling metadata json for collection `%v`: %v", nsID, err)
 	}
+
+	err = intent.MetadataFile.Open()
+	if err != nil {
+		return err
+	}
+	defer intent.MetadataFile.Close()
+	// make a buffered writer for nicer disk i/o
+	w := bufio.NewWriter(intent.MetadataFile)
 	_, err = w.Write(jsonBytes)
 	if err != nil {
 		return fmt.Errorf("error writing metadata for collection `%v` to disk: %v", nsID, err)
