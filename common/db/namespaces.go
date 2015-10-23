@@ -16,6 +16,13 @@ func IsNoCmd(err error) bool {
 	return ok && strings.HasPrefix(e.Message, "no such cmd:")
 }
 
+// IsNoCollection returns true if err indicates a query resulted in a "no collection" error
+// otherwise, returns false.
+func IsNoCollection(err error) bool {
+	e, ok := err.(*mgo.QueryError)
+	return ok && e.Message == "no collection"
+}
+
 // buildBsonArray takes a cursor iterator and returns an array of
 // all of its documents as bson.D objects.
 func buildBsonArray(iter *mgo.Iter) ([]bson.D, error) {
@@ -35,7 +42,8 @@ func buildBsonArray(iter *mgo.Iter) ([]bson.D, error) {
 
 // GetIndexes returns an iterator to thethe raw index info for a collection by
 // using the listIndexes command if available, or by falling back to querying
-// against system.indexes (pre-3.0 systems).
+// against system.indexes (pre-3.0 systems). nil is returned if the collection
+// does not exist.
 func GetIndexes(coll *mgo.Collection) (*mgo.Iter, error) {
 	var cmdResult struct {
 		Cursor struct {
@@ -59,6 +67,8 @@ func GetIndexes(coll *mgo.Collection) (*mgo.Iter, error) {
 	case IsNoCmd(err):
 		log.Logf(log.DebugLow, "No support for listIndexes command, falling back to querying system.indexes")
 		return getIndexesPre28(coll)
+	case IsNoCollection(err):
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("error running `listIndexes`. Collection: `%v` Err: %v", coll.FullName, err)
 	}

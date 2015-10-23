@@ -67,6 +67,10 @@ func (dump *MongoDump) dumpMetadataToWriter(intent *intents.Intent, writer io.Wr
 	if err != nil {
 		return err
 	}
+	if indexesIter == nil {
+		log.Logf(log.Always, "the collection %v appears to have been dropped after the dump started", intent.Namespace())
+		return nil
+	}
 
 	indexOpts := &bson.D{}
 	for indexesIter.Next(indexOpts) {
