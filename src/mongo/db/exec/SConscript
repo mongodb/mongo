@@ -50,6 +50,7 @@ env.Library(
         "geo_near.cpp",
         "group.cpp",
         "idhack.cpp",
+        "index_iterator.cpp",
         "index_scan.cpp",
         "keep_mutations.cpp",
         "limit.cpp",

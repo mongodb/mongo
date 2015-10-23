@@ -35,17 +35,21 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/exec/fetch.h"
+#include "mongo/db/exec/index_iterator.h"
 #include "mongo/db/exec/multi_iterator.h"
-#include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/shard_filter.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/chunk_version.h"
@@ -130,15 +134,43 @@ shared_ptr<PlanExecutor> createRandomCursorExecutor(Collection* collection,
     if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100)
         return {};
 
-    // Attempt to get a random cursor from the storage engine.
-    auto randCursor = collection->getRecordStore()->getRandomCursor(txn);
-
-    if (!randCursor)
-        return {};
+    // Attempt to get a random cursor from the RecordStore. If the RecordStore does not support
+    // random cursors, attempt to get one from the _id index.
+    std::unique_ptr<RecordCursor> rsRandCursor = collection->getRecordStore()->getRandomCursor(txn);
 
     auto ws = stdx::make_unique<WorkingSet>();
-    auto stage = stdx::make_unique<MultiIteratorStage>(txn, ws.get(), collection);
-    stage->addIterator(std::move(randCursor));
+    std::unique_ptr<PlanStage> stage;
+
+    if (rsRandCursor) {
+        stage = stdx::make_unique<MultiIteratorStage>(txn, ws.get(), collection);
+        static_cast<MultiIteratorStage*>(stage.get())->addIterator(std::move(rsRandCursor));
+
+    } else {
+        auto indexCatalog = collection->getIndexCatalog();
+        auto indexDescriptor = indexCatalog->findIdIndex(txn);
+
+        if (!indexDescriptor) {
+            // There was no _id index.
+            return {};
+        }
+
+        IndexAccessMethod* idIam = indexCatalog->getIndex(indexDescriptor);
+        auto idxRandCursor = idIam->newRandomCursor(txn);
+
+        if (!idxRandCursor) {
+            // Storage engine does not support any type of random cursor.
+            return {};
+        }
+
+        auto idxIterator = stdx::make_unique<IndexIteratorStage>(txn,
+                                                                 ws.get(),
+                                                                 collection,
+                                                                 idIam,
+                                                                 indexDescriptor->keyPattern(),
+                                                                 idxRandCursor.release());
+        stage = stdx::make_unique<FetchStage>(
+            txn, ws.get(), idxIterator.release(), nullptr, collection);
+    }
 
     ShardingState* const shardingState = ShardingState::get(txn);
 

@@ -30,6 +30,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <numeric>
+
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_logic.h"
@@ -1907,6 +1910,101 @@ BSONObj BtreeLogic<BtreeLayout>::getKey(OperationContext* txn,
         return BSONObj();
     } else {
         return getFullKey(bucket, keyOffset).data.toBson();
+    }
+}
+
+template <class BtreeLayout>
+IndexKeyEntry BtreeLogic<BtreeLayout>::getRandomEntry(OperationContext* txn) const {
+    // To ensure a uniform distribution, all keys must have an equal probability of being selected.
+    // Specifically, a key from the root should have the same probability of being selected as a key
+    // from a leaf.
+    //
+    // Here we do a random walk until we get to a leaf, storing a random key from each bucket along
+    // the way down. Because the root is always present in the random walk, but any given leaf would
+    // seldom be seen, we assign weights to each key such that the key from the leaf is much more
+    // likely to be selected than the key from the root. These weights attempt to ensure each entry
+    // is equally likely to be selected and avoid bias towards the entries closer to the root.
+    //
+    // As a simplification, we treat all buckets in a given level as having the same number of
+    // children. While this is inaccurate if the tree isn't perfectly balanced or if key-size
+    // greatly varies, it is assumed to be good enough for this purpose.
+    invariant(!isEmpty(txn));
+    BucketType* root = getRoot(txn);
+
+    vector<int64_t> nKeysInLevel;
+    vector<FullKey> selectedKeys;
+
+    auto& prng = txn->getClient()->getPrng();
+
+    int nRetries = 0;
+    const int kMaxRetries = 5;
+    do {
+        // See documentation below for description of parameters.
+        recordRandomWalk(txn, &prng, root, 1, &nKeysInLevel, &selectedKeys);
+    } while (selectedKeys.empty() && nRetries++ < kMaxRetries);
+    massert(28826,
+            str::stream() << "index " << _indexName << " may be corrupt, please repair",
+            !selectedKeys.empty());
+
+    invariant(nKeysInLevel.size() == selectedKeys.size());
+    // Select a key from the random walk such that each key from the B-tree has an equal probability
+    // of being selected.
+    //
+    // Let N be the sum of 'nKeysInLevel'. That is, the total number of keys in the B-tree.
+    //
+    // On our walk down the tree, we selected exactly one key from each level of the B-tree, where
+    // 'selectedKeys[i]' came from the ith level of the tree. On any given level, each key has an
+    // equal probability of being selected. Specifically, a key on level i has a probability of
+    // 1/'nKeysInLevel[i]' of being selected as 'selectedKeys[i]'. Then if, given our selected keys,
+    // we choose to return 'selectedKeys[i]' with a probability of 'nKeysInLevel[i]'/N, that key
+    // will be returned with a probability of 1/'nKeysInLevel[i]' * 'nKeysInLevel[i]'/N = 1/N.
+    //
+    // So 'selectedKeys[i]' should have a probability of 'nKeysInLevel[i]'/N of being returned. We
+    // will do so by picking a random number X in the range [0, N). Then, if X is in the first
+    // 'nKeysInLevel[0]' numbers, we will return 'selectedKeys[0]'. If X is in the next
+    // 'nKeysInLevel[1]' numbers, we will return 'selectedKeys[1]', and so on.
+    int64_t choice = prng.nextInt64(std::accumulate(nKeysInLevel.begin(), nKeysInLevel.end(), 0));
+    for (size_t i = 0; i < nKeysInLevel.size(); i++) {
+        if (choice < nKeysInLevel[i]) {
+            return {selectedKeys[i].data.toBson(), selectedKeys[i].header.recordLoc.toRecordId()};
+        }
+        choice -= nKeysInLevel[i];
+    }
+    MONGO_UNREACHABLE;
+}
+
+/**
+ * Does a random walk through the tree, recording information about the walk along the way.
+ *
+ * 'nKeysInLevel' will be filled in such that 'nKeysInLevel[i]' is an approximation of the number of
+ * keys in the ith level of the B-tree.
+ *
+ * 'selectedKeys' will be filled in such that 'selectedKeys[i]' will be a pseudo-random key selected
+ * from the bucket we went through on the ith level of the B-tree.
+ */
+template <class BtreeLayout>
+void BtreeLogic<BtreeLayout>::recordRandomWalk(OperationContext* txn,
+                                               PseudoRandom* prng,
+                                               BucketType* curBucket,
+                                               int64_t nBucketsInCurrentLevel,
+                                               vector<int64_t>* nKeysInLevel,
+                                               vector<FullKey>* selectedKeys) const {
+    // Select a random key from this bucket, and record it.
+    int nKeys = curBucket->n;
+    int keyToReturn = prng->nextInt32(nKeys);
+    auto fullKey = getFullKey(curBucket, keyToReturn);
+    // If the key is not used, just skip this level.
+    if (fullKey.header.isUsed()) {
+        selectedKeys->push_back(std::move(fullKey));
+        nKeysInLevel->push_back(nBucketsInCurrentLevel * nKeys);
+    }
+
+    // Select a random child and descend (if there are any).
+    int nChildren = nKeys + 1;
+    int nextChild = prng->nextInt32(nChildren);
+    if (auto child = childForPos(txn, curBucket, nextChild)) {
+        recordRandomWalk(
+            txn, prng, child, nBucketsInCurrentLevel * nChildren, nKeysInLevel, selectedKeys);
     }
 }
 

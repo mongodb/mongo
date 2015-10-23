@@ -41,6 +41,7 @@
 
 namespace mongo {
 
+class PseudoRandom;
 class RecordStore;
 class SavedCursorRegistry;
 
@@ -176,6 +177,12 @@ public:
     DiskLoc getDiskLoc(OperationContext* txn, const DiskLoc& bucketLoc, const int keyOffset) const;
 
     BSONObj getKey(OperationContext* txn, const DiskLoc& bucketLoc, const int keyOffset) const;
+
+    /**
+     * Returns a pseudo-random element from the tree. It is an error to call this method if the tree
+     * is empty.
+     */
+    IndexKeyEntry getRandomEntry(OperationContext* txn) const;
 
     DiskLoc getHead(OperationContext* txn) const {
         return DiskLoc::fromRecordId(_headManager->getHead(txn));
@@ -540,6 +547,13 @@ private:
     BucketType* getRoot(OperationContext* txn) const;
 
     DiskLoc getRootLoc(OperationContext* txn) const;
+
+    void recordRandomWalk(OperationContext* txn,
+                          PseudoRandom* prng,
+                          BucketType* curBucket,
+                          int64_t nBucketsInCurrentLevel,
+                          std::vector<int64_t>* nKeysInLevel,
+                          std::vector<FullKey>* selectedKeys) const;
 
     //
     // Data

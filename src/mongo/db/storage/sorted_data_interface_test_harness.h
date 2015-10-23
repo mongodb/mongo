@@ -36,6 +36,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/unowned_ptr.h"
@@ -84,14 +86,18 @@ class RecoveryUnit;
 
 class HarnessHelper {
 public:
-    HarnessHelper() {}
-    virtual ~HarnessHelper() = default;
+    HarnessHelper() : _serviceContext(), _client(_serviceContext.makeClient("hh")) {}
+    virtual ~HarnessHelper() {}
 
     virtual std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) = 0;
     virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() = 0;
 
-    virtual std::unique_ptr<OperationContext> newOperationContext() {
-        return stdx::make_unique<OperationContextNoop>(newRecoveryUnit().release());
+    std::unique_ptr<OperationContext> newOperationContext(Client* client) {
+        return stdx::make_unique<OperationContextNoop>(client, 1, newRecoveryUnit().release());
+    }
+
+    std::unique_ptr<OperationContext> newOperationContext() {
+        return newOperationContext(nullptr);
     }
 
     /**
@@ -101,6 +107,18 @@ public:
      */
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(
         bool unique, std::initializer_list<IndexKeyEntry> toInsert);
+
+    Client* client() {
+        return _client.get();
+    }
+
+    ServiceContext* serviceContext() {
+        return &_serviceContext;
+    }
+
+private:
+    ServiceContextNoop _serviceContext;
+    ServiceContext::UniqueClient _client;
 };
 
 /**

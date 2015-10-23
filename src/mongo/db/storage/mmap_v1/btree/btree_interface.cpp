@@ -346,6 +346,59 @@ public:
         return stdx::make_unique<Cursor>(txn, _btree.get(), isForward);
     }
 
+    class RandomCursor final : public SortedDataInterface::Cursor {
+    public:
+        RandomCursor(OperationContext* txn, const BtreeLogic<OnDiskFormat>* btree)
+            : _txn(txn), _btree(btree) {}
+
+        boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
+            if (_btree->isEmpty(_txn)) {
+                return {};
+            }
+            return _btree->getRandomEntry(_txn);
+        }
+
+        void detachFromOperationContext() final {
+            _txn = nullptr;
+        }
+
+        void reattachToOperationContext(OperationContext* txn) final {
+            _txn = txn;
+        }
+
+        //
+        // Should never be called.
+        //
+        void setEndPosition(const BSONObj& key, bool inclusive) override {
+            MONGO_UNREACHABLE;
+        }
+        boost::optional<IndexKeyEntry> seek(const BSONObj& key,
+                                            bool inclusive,
+                                            RequestedInfo parts) override {
+            MONGO_UNREACHABLE;
+        }
+        boost::optional<IndexKeyEntry> seek(const IndexSeekPoint& seekPoint,
+                                            RequestedInfo parts) override {
+            MONGO_UNREACHABLE;
+        }
+
+        //
+        // May be called, but are no-ops.
+        //
+        void save() override {}
+        void saveUnpositioned() override {}
+        void restore() override {}
+
+    private:
+        OperationContext* _txn;
+        const BtreeLogic<OnDiskFormat>* const _btree;
+    };
+
+    virtual std::unique_ptr<SortedDataInterface::Cursor> newRandomCursor(
+        OperationContext* txn) const {
+        return stdx::make_unique<RandomCursor>(txn, _btree.get());
+    }
+
     virtual Status initAsEmpty(OperationContext* txn) {
         return _btree->initAsEmpty(txn);
     }
