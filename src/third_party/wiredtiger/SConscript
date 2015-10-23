@@ -31,6 +31,11 @@ if conf.CheckFunc("sync_file_range"):
                 "HAVE_SYNC_FILE_RANGE"
     ])
 
+if conf.CheckCHeader('x86intrin.h'):
+        env.Append(CPPDEFINES=[
+            "HAVE_X86INTRIN_H"
+    ])
+
 if env.TargetOSIs('windows'):
     env.Append(CPPPATH=["build_win"])
     env.Append(CFLAGS=[
