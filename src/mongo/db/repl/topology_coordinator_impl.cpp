@@ -1420,7 +1420,13 @@ OpTime TopologyCoordinatorImpl::_latestKnownOpTime(const OpTime& ourLastOpApplie
         if (indexOfIterator(_hbdata, it) == _selfIndex) {
             continue;
         }
+
+        // Ignore down members
         if (!it->up()) {
+            continue;
+        }
+        // Ignore removed nodes (not in config, so not valid).
+        if (it->getState().removed()) {
             continue;
         }
 
