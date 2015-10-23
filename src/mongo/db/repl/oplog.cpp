@@ -976,6 +976,34 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(replSnapshotThreadThrottleMicros, int, 100
 SnapshotThread::SnapshotThread(SnapshotManager* manager)
     : _manager(manager), _thread([this] { run(); }) {}
 
+bool SnapshotThread::shouldSleepMore(int numSleepsDone, size_t numUncommittedSnapshots) {
+    const double kThrottleRatio = 1 / 20.0;
+    const size_t kUncommittedSnapshotLimit = 1000;
+    const size_t kUncommittedSnapshotRestartPoint = kUncommittedSnapshotLimit / 2;
+
+    if (_inShutdown.load())
+        return false;  // Exit the thread quickly without sleeping.
+
+    if (numSleepsDone == 0)
+        return true;  // Always sleep at least once.
+
+    {
+        // Enforce a limit on the number of snapshots.
+        if (numUncommittedSnapshots >= kUncommittedSnapshotLimit)
+            _hitSnapshotLimit = true;  // Don't create new snapshots.
+
+        if (numUncommittedSnapshots < kUncommittedSnapshotRestartPoint)
+            _hitSnapshotLimit = false;  // Begin creating new snapshots again.
+
+        if (_hitSnapshotLimit)
+            return true;
+    }
+
+    // Spread out snapshots in time by sleeping as we collect more uncommitted snapshots.
+    const double numSleepsNeeded = numUncommittedSnapshots * kThrottleRatio;
+    return numSleepsNeeded > numSleepsDone;
+}
+
 void SnapshotThread::run() {
     Client::initThread("SnapshotThread");
     auto& client = cc();
@@ -984,22 +1012,24 @@ void SnapshotThread::run() {
 
     Timestamp lastTimestamp = {};
     while (true) {
-        {
-            // This block logically belongs at the end of the loop, but having it at the top
-            // simplifies handling of the "continue" cases. It is harmless to do these before the
-            // first run of the loop.
+        // This block logically belongs at the end of the loop, but having it at the top
+        // simplifies handling of the "continue" cases. It is harmless to do these before the
+        // first run of the loop.
+        for (int numSleepsDone = 0;
+             shouldSleepMore(numSleepsDone, replCoord->getNumUncommittedSnapshots());
+             numSleepsDone++) {
+            sleepmicros(replSnapshotThreadThrottleMicros);
             _manager->cleanupUnneededSnapshots();
-            sleepmicros(replSnapshotThreadThrottleMicros);  // Throttle by sleeping.
         }
 
         {
             stdx::unique_lock<stdx::mutex> lock(newOpMutex);
             while (true) {
-                if (_inShutdown)
+                if (_inShutdown.load())
                     return;
 
-                if (_forcedSnapshotPending || lastTimestamp != getLastSetTimestamp()) {
-                    _forcedSnapshotPending = false;
+                if (_forcedSnapshotPending.load() || lastTimestamp != getLastSetTimestamp()) {
+                    _forcedSnapshotPending.store(false);
                     lastTimestamp = getLastSetTimestamp();
                     break;
                 }
@@ -1010,8 +1040,7 @@ void SnapshotThread::run() {
 
         while (MONGO_FAIL_POINT(disableSnapshotting)) {
             sleepsecs(1);
-            stdx::unique_lock<stdx::mutex> lock(newOpMutex);
-            if (_inShutdown) {
+            if (_inShutdown.load()) {
                 return;
             }
         }
@@ -1075,8 +1104,8 @@ void SnapshotThread::shutdown() {
     invariant(_thread.joinable());
     {
         stdx::lock_guard<stdx::mutex> lock(newOpMutex);
-        invariant(!_inShutdown);
-        _inShutdown = true;
+        invariant(!_inShutdown.load());
+        _inShutdown.store(true);
         newTimestampNotifier.notify_all();
     }
     _thread.join();
@@ -1084,7 +1113,7 @@ void SnapshotThread::shutdown() {
 
 void SnapshotThread::forceSnapshot() {
     stdx::lock_guard<stdx::mutex> lock(newOpMutex);
-    _forcedSnapshotPending = true;
+    _forcedSnapshotPending.store(true);
     newTimestampNotifier.notify_all();
 }
 

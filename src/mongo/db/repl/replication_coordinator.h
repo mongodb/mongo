@@ -724,6 +724,13 @@ public:
      */
     virtual void appendConnectionStats(BSONObjBuilder* b) = 0;
 
+    /**
+     * Gets the number of uncommitted snapshots currently held.
+     * Warning: This value can change at any time and may not even be accurate at the time of
+     * return. It should not be used when an exact amount is needed.
+     */
+    virtual size_t getNumUncommittedSnapshots() = 0;
+
 protected:
     ReplicationCoordinator();
 };

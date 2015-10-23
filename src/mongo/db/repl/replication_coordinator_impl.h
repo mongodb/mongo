@@ -304,6 +304,8 @@ public:
 
     virtual void appendConnectionStats(BSONObjBuilder* b) override;
 
+    virtual size_t getNumUncommittedSnapshots() override;
+
     // ================== Test support API ===================
 
     /**
@@ -1323,8 +1325,12 @@ private:
     AtomicUInt64 _snapshotNameGenerator;  // (S)
 
     // The OpTimes and SnapshotNames for all snapshots newer than the current commit point, kept in
-    // sorted order.
+    // sorted order. Any time this is changed, you must also update _uncommitedSnapshotsSize.
     std::deque<SnapshotInfo> _uncommittedSnapshots;  // (M)
+
+    // A cache of the size of _uncommittedSnaphots that can be read without any locking.
+    // May only be written to while holding _mutex.
+    AtomicUInt64 _uncommittedSnapshotsSize;  // (I)
 
     // The non-null OpTime and SnapshotName of the current snapshot used for committed reads, if
     // there is one.

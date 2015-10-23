@@ -230,6 +230,8 @@ public:
     virtual void waitUntilSnapshotCommitted(OperationContext* txn,
                                             const SnapshotName& untilSnapshot) override;
 
+    virtual size_t getNumUncommittedSnapshots() override;
+
 private:
     AtomicUInt64 _snapshotNameGenerator;
     const ReplSettings _settings;

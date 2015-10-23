@@ -2823,6 +2823,7 @@ void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& co
 
         // Forget about all snapshots <= the new commit point.
         _uncommittedSnapshots.erase(_uncommittedSnapshots.begin(), onePastCommitPoint);
+        _uncommittedSnapshotsSize.store(_uncommittedSnapshots.size());
 
         // Update committed snapshot and wake up any threads waiting on read concern or
         // write concern.
@@ -3175,6 +3176,10 @@ void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* tx
     }
 }
 
+size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {
+    return _uncommittedSnapshotsSize.load();
+}
+
 void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
@@ -3196,6 +3201,7 @@ void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot, Snapsho
         // isn't worth the effort and potential bugs that would introduce.
     }
     _uncommittedSnapshots.push_back(snapshotInfo);
+    _uncommittedSnapshotsSize.store(_uncommittedSnapshots.size());
 }
 
 void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
@@ -3225,6 +3231,7 @@ void ReplicationCoordinatorImpl::dropAllSnapshots() {
 
 void ReplicationCoordinatorImpl::_dropAllSnapshots_inlock() {
     _uncommittedSnapshots.clear();
+    _uncommittedSnapshotsSize.store(_uncommittedSnapshots.size());
     _currentCommittedSnapshot = boost::none;
     _externalState->dropAllSnapshots();
 }
