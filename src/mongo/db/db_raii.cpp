@@ -128,7 +128,7 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const Nam
         }
 
         // Yield locks.
-        _autoColl = {};
+        _autoColl = boost::none;
 
         repl::ReplicationCoordinator::get(_txn)->waitUntilSnapshotCommitted(_txn, *minSnapshot);
 
