@@ -335,13 +335,10 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * Turn on metadata tracking to ensure the checkpoint gets the
 	 * necessary handle locks.
 	 */
-	WT_RET(__wt_meta_track_on(session));
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, chunk->uri,
-	    __wt_checkpoint, NULL, NULL, 0));
-
+	WT_ERR(__wt_meta_track_on(session));
+	WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_worker(
+	    session, chunk->uri, __wt_checkpoint, NULL, NULL, 0));
 	WT_TRET(__wt_meta_track_off(session, false, ret != 0));
-
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "LSM checkpoint");
 
