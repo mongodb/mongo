@@ -62,7 +62,7 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
 
 /*
  * __session_release_resources --
- *	Release the session's resources, shared by close and reset.
+ *	Release common session resources.
  */
 static int
 __session_release_resources(WT_SESSION_IMPL *session)
@@ -170,7 +170,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Free transaction information. */
 	__wt_txn_destroy(session);
 
-	/* Release other resources, shared with reset. */
+	/* Release common session resources. */
 	WT_TRET(__session_release_resources(session));
 
 	/* Destroy the thread's mutex. */
@@ -569,7 +569,7 @@ __session_reset(WT_SESSION *wt_session)
 
 	WT_TRET(__wt_session_reset_cursors(session, true));
 
-	/* Release other resources, shared with close. */
+	/* Release common session resources. */
 	WT_TRET(__session_release_resources(session));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
@@ -1107,6 +1107,12 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	    ret = __wt_txn_checkpoint(session, cfg));
 
 	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
+
+	/*
+	 * Release common session resources (for example, checkpoint may acquire
+	 * significant reconciliation structures/memory).
+	 */
+	ret = __session_release_resources(session);
 
 err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
 
