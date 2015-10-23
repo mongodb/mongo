@@ -1112,7 +1112,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * Release common session resources (for example, checkpoint may acquire
 	 * significant reconciliation structures/memory).
 	 */
-	ret = __session_release_resources(session);
+	WT_TRET(__session_release_resources(session));
 
 err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
 
