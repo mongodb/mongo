@@ -146,13 +146,12 @@ __session_compact_check_timeout(
 static int
 __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
-	WT_DECL_RET;
-	WT_DECL_ITEM(t);
-	WT_SESSION *wt_session;
-	int i;
 	struct timespec start_time;
-
-	wt_session = &session->iface;
+	WT_DECL_ITEM(t);
+	WT_DECL_RET;
+	int i;
+	const char *checkpoint_cfg[] = {
+	    WT_CONFIG_BASE(session, WT_SESSION_checkpoint), NULL, NULL };
 
 	/*
 	 * Force the checkpoint: we don't want to skip it because the work we
@@ -160,6 +159,7 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	 */
 	WT_ERR(__wt_scr_alloc(session, 128, &t));
 	WT_ERR(__wt_buf_fmt(session, t, "target=(\"%s\"),force=1", uri));
+	checkpoint_cfg[1] = t->data;
 
 	WT_ERR(__wt_epoch(session, &start_time));
 
@@ -171,7 +171,7 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	 * time through the loop.
 	 */
 	for (i = 0; i < 100; ++i) {
-		WT_ERR(wt_session->checkpoint(wt_session, t->data));
+		WT_ERR(__wt_txn_checkpoint(session, checkpoint_cfg));
 
 		session->compaction = false;
 		WT_WITH_SCHEMA_LOCK(session,
@@ -181,8 +181,8 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		if (!session->compaction)
 			break;
 
-		WT_ERR(wt_session->checkpoint(wt_session, t->data));
-		WT_ERR(wt_session->checkpoint(wt_session, t->data));
+		WT_ERR(__wt_txn_checkpoint(session, checkpoint_cfg));
+		WT_ERR(__wt_txn_checkpoint(session, checkpoint_cfg));
 		WT_ERR(__session_compact_check_timeout(session, start_time));
 	}
 
@@ -246,5 +246,12 @@ __wt_session_compact(
 	}
 
 err:	session->compact = NULL;
+
+	/*
+	 * Release common session resources (for example, checkpoint may acquire
+	 * significant reconciliation structures/memory).
+	 */
+	WT_TRET(__wt_session_release_resources(session));
+
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }
