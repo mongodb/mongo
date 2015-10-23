@@ -188,7 +188,8 @@ __wt_evict_page_clean_update(
 	 */
 	__wt_ref_out(session, ref);
 	if (ref->addr == NULL) {
-		WT_WITH_PAGE_INDEX(session, ret = __evict_ref_delete(session, ref));
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __evict_ref_delete(session, ref));
 		WT_RET_BUSY_OK(ret);
 	} else
 		WT_PUBLISH(ref->state, WT_REF_DISK);
@@ -233,7 +234,8 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 */
 		__wt_ref_out(session, ref);
 		ref->addr = NULL;
-		WT_WITH_PAGE_INDEX(session, ret = __evict_ref_delete(session, ref));
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __evict_ref_delete(session, ref));
 		WT_RET(ret);
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
