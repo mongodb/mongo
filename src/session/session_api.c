@@ -576,30 +576,6 @@ err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
- * __session_compact --
- *	WT_SESSION->compact method.
- */
-static int
-__session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)wt_session;
-
-	/* Disallow objects in the WiredTiger name space. */
-	WT_RET(__wt_str_name_check(session, uri));
-
-	if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
-	    !WT_PREFIX_MATCH(uri, "file:") &&
-	    !WT_PREFIX_MATCH(uri, "index:") &&
-	    !WT_PREFIX_MATCH(uri, "lsm:") &&
-	    !WT_PREFIX_MATCH(uri, "table:"))
-		return (__wt_bad_object_type(session, uri));
-
-	return (__wt_session_compact(wt_session, uri, config));
-}
-
-/*
  * __wt_session_drop --
  *	Internal version of WT_SESSION::drop.
  */
@@ -1186,7 +1162,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_strerror,
 		__session_open_cursor,
 		__session_create,
-		__session_compact,
+		__wt_session_compact,
 		__session_drop,
 		__session_log_flush,
 		__session_log_printf,

@@ -216,6 +216,16 @@ __wt_session_compact(
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, compact, config, cfg);
 
+	/* Disallow objects in the WiredTiger name space. */
+	WT_ERR(__wt_str_name_check(session, uri));
+
+	if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+	    !WT_PREFIX_MATCH(uri, "file:") &&
+	    !WT_PREFIX_MATCH(uri, "index:") &&
+	    !WT_PREFIX_MATCH(uri, "lsm:") &&
+	    !WT_PREFIX_MATCH(uri, "table:"))
+		WT_ERR(__wt_bad_object_type(session, uri));
+
 	/* Setup the structure in the session handle */
 	memset(&compact, 0, sizeof(WT_COMPACT));
 	session->compact = &compact;
