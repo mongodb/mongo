@@ -919,8 +919,13 @@ void RecordStoreV1Base::IntraExtentIterator::advance() {
     _curr = (nextOfs == DiskLoc::NullOfs ? DiskLoc() : DiskLoc(_curr.a(), nextOfs));
 }
 
-void RecordStoreV1Base::IntraExtentIterator::invalidate(const RecordId& rid) {
+void RecordStoreV1Base::IntraExtentIterator::invalidate(OperationContext* txn,
+                                                        const RecordId& rid) {
     if (rid == _curr.toRecordId()) {
+        const DiskLoc origLoc = _curr;
+
+        // Undo the advance on rollback, as the deletion that forced it "never happened".
+        txn->recoveryUnit()->onRollback([this, origLoc]() { this->_curr = origLoc; });
         advance();
     }
 }

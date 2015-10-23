@@ -299,7 +299,11 @@ public:
 
         // Remove locs[count].
         scan->saveState();
-        scan->invalidate(&_txn, locs[count], INVALIDATION_DELETION);
+        {
+            WriteUnitOfWork wunit(&_txn);
+            scan->invalidate(&_txn, locs[count], INVALIDATION_DELETION);
+            wunit.commit();  // to avoid rollback of the invalidate
+        }
         remove(coll->docFor(&_txn, locs[count]).value());
         scan->restoreState();
 
@@ -360,7 +364,11 @@ public:
 
         // Remove locs[count].
         scan->saveState();
-        scan->invalidate(&_txn, locs[count], INVALIDATION_DELETION);
+        {
+            WriteUnitOfWork wunit(&_txn);
+            scan->invalidate(&_txn, locs[count], INVALIDATION_DELETION);
+            wunit.commit();  // to avoid rollback of the invalidate
+        }
         remove(coll->docFor(&_txn, locs[count]).value());
         scan->restoreState();
 

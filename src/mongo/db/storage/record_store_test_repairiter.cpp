@@ -157,7 +157,7 @@ TEST(RecordStoreTestHarness, GetIteratorForRepairInvalidateSingleton) {
 
         // Invalidate the record we're pointing at.
         cursor->save();
-        cursor->invalidate(idToInvalidate);
+        cursor->invalidate(opCtx.get(), idToInvalidate);
         cursor->restore();
 
         // Iterator should be EOF now because the only thing in the collection got deleted.

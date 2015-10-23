@@ -181,7 +181,7 @@ bool RecordStoreV1RepairCursor::_advanceToNextValidExtent() {
     return true;
 }
 
-void RecordStoreV1RepairCursor::invalidate(const RecordId& id) {
+void RecordStoreV1RepairCursor::invalidate(OperationContext* txn, const RecordId& id) {
     // If we see this record again it probably means it was reinserted rather than an infinite
     // loop. If we do loop, we should quickly hit another seen record that hasn't been
     // invalidated.
@@ -191,6 +191,8 @@ void RecordStoreV1RepairCursor::invalidate(const RecordId& id) {
     if (_currRecord == dl) {
         // The DiskLoc being invalidated is also the one pointed at by this iterator. We
         // advance the iterator so it's not pointing at invalid data.
+        // We don't worry about undoing invalidations on rollback here, as we shouldn't have
+        // concurrent writes that can rollback to a database we're trying to recover.
         advance();
 
         if (_currRecord == dl) {

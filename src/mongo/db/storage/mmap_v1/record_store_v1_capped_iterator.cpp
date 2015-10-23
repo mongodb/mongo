@@ -86,7 +86,7 @@ boost::optional<Record> CappedRecordStoreV1Iterator::seekExact(const RecordId& i
     return {{id, _recordStore->RecordStore::dataFor(_txn, id)}};
 }
 
-void CappedRecordStoreV1Iterator::invalidate(const RecordId& id) {
+void CappedRecordStoreV1Iterator::invalidate(OperationContext* txn, const RecordId& id) {
     const DiskLoc dl = DiskLoc::fromRecordId(id);
     if (dl == _curr) {
         // We *could* move to the next thing, since there is actually a next
@@ -94,6 +94,8 @@ void CappedRecordStoreV1Iterator::invalidate(const RecordId& id) {
         // "note we cannot advance here. if this condition occurs, writes to the oplog
         //  have "caught" the reader.  skipping ahead, the reader would miss potentially
         //  important data."
+        // We don't really need to worry about rollback here, as the very next write would
+        // invalidate the cursor anyway.
         _curr = DiskLoc();
         _killedByInvalidate = true;
     }

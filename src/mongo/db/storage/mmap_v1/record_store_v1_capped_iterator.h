@@ -57,7 +57,7 @@ public:
     void reattachToOperationContext(OperationContext* txn) final {
         _txn = txn;
     }
-    void invalidate(const RecordId& dl) final;
+    void invalidate(OperationContext* txn, const RecordId& dl) final;
     std::unique_ptr<RecordFetcher> fetcherForNext() const final;
     std::unique_ptr<RecordFetcher> fetcherForId(const RecordId& id) const final;
 

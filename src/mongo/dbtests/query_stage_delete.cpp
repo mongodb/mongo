@@ -162,7 +162,11 @@ public:
 
         // Remove locs[targetDocIndex];
         deleteStage.saveState();
-        deleteStage.invalidate(&_txn, locs[targetDocIndex], INVALIDATION_DELETION);
+        {
+            WriteUnitOfWork wunit(&_txn);
+            deleteStage.invalidate(&_txn, locs[targetDocIndex], INVALIDATION_DELETION);
+            wunit.commit();
+        }
         BSONObj targetDoc = coll->docFor(&_txn, locs[targetDocIndex]).value();
         ASSERT(!targetDoc.isEmpty());
         remove(targetDoc);

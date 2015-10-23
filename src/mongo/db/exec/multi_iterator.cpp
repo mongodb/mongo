@@ -137,7 +137,7 @@ void MultiIteratorStage::doInvalidate(OperationContext* txn,
     switch (type) {
         case INVALIDATION_DELETION:
             for (size_t i = 0; i < _iterators.size(); i++) {
-                _iterators[i]->invalidate(dl);
+                _iterators[i]->invalidate(txn, dl);
             }
             break;
         case INVALIDATION_MUTATION:

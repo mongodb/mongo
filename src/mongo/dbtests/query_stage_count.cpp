@@ -292,11 +292,13 @@ public:
         if (interjection == 0) {
             // At this point, our first interjection, we've counted _locs[0]
             // and are about to count _locs[1]
+            WriteUnitOfWork wunit(&_txn);
             count_stage.invalidate(&_txn, _locs[interjection], INVALIDATION_DELETION);
             remove(_locs[interjection]);
 
             count_stage.invalidate(&_txn, _locs[interjection + 1], INVALIDATION_DELETION);
             remove(_locs[interjection + 1]);
+            wunit.commit();
         }
     }
 };

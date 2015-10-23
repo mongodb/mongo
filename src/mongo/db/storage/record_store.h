@@ -194,13 +194,13 @@ public:
     virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
 
     /**
-     * Inform the cursor that this id is being invalidated.
-     * Must be called between save and restore.
+     * Inform the cursor that this id is being invalidated. Must be called between save and restore.
+     * The txn is that of the operation causing the invalidation, not the txn using the cursor.
      *
      * WARNING: Storage engines other than MMAPv1 should use the default implementation,
      *          and not depend on this being called.
      */
-    virtual void invalidate(const RecordId& id){};
+    virtual void invalidate(OperationContext* txn, const RecordId& id) {}
 
     //
     // RecordFetchers

@@ -101,9 +101,13 @@ void SimpleRecordStoreV1Iterator::advance() {
     }
 }
 
-void SimpleRecordStoreV1Iterator::invalidate(const RecordId& dl) {
+void SimpleRecordStoreV1Iterator::invalidate(OperationContext* txn, const RecordId& dl) {
     // Just move past the thing being deleted.
     if (dl == _curr.toRecordId()) {
+        const DiskLoc origLoc = _curr;
+
+        // Undo the advance on rollback, as the deletion that forced it "never happened".
+        txn->recoveryUnit()->onRollback([this, origLoc]() { this->_curr = origLoc; });
         advance();
     }
 }

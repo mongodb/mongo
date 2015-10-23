@@ -203,7 +203,7 @@ void CollectionScan::doInvalidate(OperationContext* txn,
 
     // Deletions can harm the underlying RecordCursor so we must pass them down.
     if (_cursor) {
-        _cursor->invalidate(id);
+        _cursor->invalidate(txn, id);
     }
 
     if (_params.tailable && id == _lastSeenId) {
