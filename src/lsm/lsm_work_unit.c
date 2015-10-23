@@ -263,6 +263,8 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	WT_TXN_ISOLATION saved_isolation;
 	bool flush_set;
 
+	flush_set = false;
+
 	/*
 	 * If the chunk is already checkpointed, make sure it is also evicted.
 	 * Either way, there is no point trying to checkpoint it again.
@@ -333,13 +335,10 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * Turn on metadata tracking to ensure the checkpoint gets the
 	 * necessary handle locks.
 	 */
-	WT_RET(__wt_meta_track_on(session));
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, chunk->uri,
-	    __wt_checkpoint, NULL, NULL, 0));
-
+	WT_ERR(__wt_meta_track_on(session));
+	WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_worker(
+	    session, chunk->uri, __wt_checkpoint, NULL, NULL, 0));
 	WT_TRET(__wt_meta_track_off(session, false, ret != 0));
-
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "LSM checkpoint");
 
@@ -359,14 +358,11 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	/* Update the throttle time. */
 	__wt_lsm_tree_throttle(session, lsm_tree, true);
 	WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
-
-	if (!__wt_atomic_cas8(&chunk->flushing, 1, 0)) {
-		__wt_errx(session, "Could not reset flushing");
-		__wt_abort(session);
-	}
-	flush_set = false;
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "LSM metadata write");
+
+	WT_PUBLISH(chunk->flushing, 0);
+	flush_set = false;
 
 	/*
 	 * Clear the no-eviction flag so the primary can be evicted and
@@ -391,11 +387,10 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	else
 		WT_ERR(__wt_lsm_manager_push_entry(
 		    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
-err:	if (flush_set && !__wt_atomic_cas8(&chunk->flushing, 1, 0)) {
-		__wt_errx(session, "Could not reset flushing for chunk %s",
-		    chunk->uri);
-		return (__wt_panic(session));
-	}
+
+err:	if (flush_set)
+		WT_PUBLISH(chunk->flushing, 0);
+
 	return (ret);
 }
 
