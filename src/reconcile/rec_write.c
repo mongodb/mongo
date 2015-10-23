@@ -450,12 +450,16 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * Clean up the boundary structures: some workloads result in millions
-	 * of these structures, and if associated with some random session that
-	 * got roped into doing forced eviction, they won't be discarded for the
-	 * life of the session.
+	 * Clean up reconciliation resources: some workloads have millions of
+	 * boundary structures, and if associated with an application session
+	 * pulled into doing forced eviction, they won't be discarded for the
+	 * life of the session (or until session.reset is called). Discard all
+	 * of the reconciliation resources if an application thread, not doing
+	 * a checkpoint.
 	 */
-	__rec_bnd_cleanup(session, r, false);
+	__rec_bnd_cleanup(session, r,
+	    F_ISSET(session, WT_SESSION_INTERNAL) ||
+	    WT_SESSION_IS_CHECKPOINT(session) ? false : true);
 
 	WT_RET(ret);
 
