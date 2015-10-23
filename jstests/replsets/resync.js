@@ -39,7 +39,18 @@
 
     function hasCycled() {
         var oplog = a_conn.getDB("local").oplog.rs;
-        return oplog.find( { "o.x" : 1 } ).sort( { $natural : 1 } ).limit(10).itcount() == 0;
+        try {
+            // Collection scan to determine if the oplog entry from the first insert has been
+            // deleted yet.
+            return oplog.find( { "o.x" : 1 } ).sort( { $natural : 1 } ).limit(10).itcount() == 0;
+        }
+        catch (except) {
+            // An error is expected in the case that capped deletions blow away the position of the
+            // collection scan during a yield. In this case, we just try again.
+            var errorRegex = /CappedPositionLost/;
+            assert(errorRegex.test(except.message));
+            return hasCycled();
+        }
     }
 
     // Make sure the oplog has rolled over on the primary and secondary that is up, 

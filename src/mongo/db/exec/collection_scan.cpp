@@ -35,6 +35,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/storage/record_fetcher.h"
 #include "mongo/util/fail_point_service.h"
@@ -78,6 +79,12 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
     ScopedTimer timer(&_commonStats.executionTimeMillis);
 
     if (_isDead) {
+        Status status(
+            ErrorCodes::CappedPositionLost,
+            str::stream()
+                << "CollectionScan died due to position in capped collection being deleted. "
+                << "Last seen record id: " << _lastSeenLoc);
+        *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
         return PlanStage::DEAD;
     }
 
@@ -85,6 +92,9 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
     if (NULL == _iter) {
         if (_params.collection == NULL) {
             _isDead = true;
+            Status status(ErrorCodes::CappedPositionLost,
+                          str::stream() << "CollectionScan died due to NULL collection param");
+            *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
             return PlanStage::DEAD;
         }
 
@@ -100,6 +110,11 @@ PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
             // the stream. This is related to the _lastSeenLock handling in invalidate.
             if (_iter->getNext() != _lastSeenLoc) {
                 _isDead = true;
+                Status status(ErrorCodes::CappedPositionLost,
+                              str::stream() << "CollectionScan died due to failure to restore "
+                                            << "tailable cursor position. "
+                                            << "Last seen record id: " << _lastSeenLoc);
+                *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
                 return PlanStage::DEAD;
             }
         }
@@ -221,8 +236,7 @@ void CollectionScan::restoreState(OperationContext* opCtx) {
     ++_commonStats.unyields;
     if (NULL != _iter) {
         if (!_iter->restoreState(opCtx)) {
-            warning() << "Collection dropped or state deleted during yield of CollectionScan: "
-                      << opCtx->getNS();
+            warning() << "Could not restore RecordCursor for CollectionScan: " << opCtx->getNS();
             _isDead = true;
         }
     }

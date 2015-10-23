@@ -20,7 +20,7 @@ function makeCapped($config, $super) {
             db[collName].drop();
             assertAlways.commandWorked(db.createCollection(collName, {
                 capped: true,
-                size: 4096 // bytes
+                size: 16384 // bytes
             }));
         });
 

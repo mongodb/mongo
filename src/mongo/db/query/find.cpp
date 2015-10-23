@@ -366,23 +366,9 @@ QueryResult::View getMore(OperationContext* txn,
             // Propagate this error to caller.
             if (PlanExecutor::FAILURE == state) {
                 scoped_ptr<PlanStageStats> stats(exec->getStats());
-                error() << "Plan executor error, stats: " << Explain::statsToBSON(*stats);
-                uasserted(17406,
-                          "getMore executor error: " + WorkingSetCommon::toStatusString(obj));
+                error() << "getMore executor error, stats: " << Explain::statsToBSON(*stats);
             }
-
-            // If we're dead there's no way to get more results.
-            saveClientCursor = false;
-
-            // In the old system tailable capped cursors would be killed off at the
-            // cursorid level.  If a tailable capped cursor is nuked the cursorid
-            // would vanish.
-            //
-            // In the new system they die and are cleaned up later (or time out).
-            // So this is where we get to remove the cursorid.
-            if (0 == numResults) {
-                resultFlags = ResultFlag_CursorNotFound;
-            }
+            uasserted(17406, "getMore executor error: " + WorkingSetCommon::toStatusString(obj));
         } else if (PlanExecutor::IS_EOF == state) {
             // EOF is also end of the line unless it's tailable.
             saveClientCursor = queryOptions & QueryOption_CursorTailable;
@@ -786,16 +772,17 @@ std::string runQuery(OperationContext* txn,
     exec->deregisterExec();
 
     // Caller expects exceptions thrown in certain cases.
-    if (PlanExecutor::FAILURE == state) {
-        scoped_ptr<PlanStageStats> stats(exec->getStats());
-        error() << "Plan executor error, stats: " << Explain::statsToBSON(*stats);
-        uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
+    if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
+        if (PlanExecutor::FAILURE == state) {
+            const std::unique_ptr<PlanStageStats> stats(exec->getStats());
+            error() << "Plan executor error during find: " << PlanExecutor::statestr(state)
+                    << ", stats: " << Explain::statsToBSON(*stats);
+        }
+        uasserted(17144,
+                  "Plan executor error during find: " + WorkingSetCommon::toStatusString(obj));
     }
 
-    // Why save a dead executor?
-    if (PlanExecutor::DEAD == state) {
-        saveClientCursor = false;
-    } else if (pq.getOptions().tailable) {
+    if (pq.getOptions().tailable) {
         // If we're tailing a capped collection, we don't bother saving the cursor if the
         // collection is empty. Otherwise, the semantics of the tailable cursor is that the
         // client will keep trying to read from it. So we'll keep it around.
