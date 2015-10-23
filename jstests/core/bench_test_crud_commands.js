@@ -26,9 +26,9 @@
                                     doc: docs,
                                     writeCmd: writeCmd}]);
 
-        assert.gt(res.insert, 0);
         assert.gt(coll.count(), 0);
         assert.eq(coll.findOne({}, {_id:0}), docs[0]);
+        assert.gt(res.insert, 0, tojson(res));
     }
 
     function testFind(readCmd) {
@@ -42,7 +42,7 @@
                                     query: {},
                                     batchSize: NumberInt(10),
                                     readCmd: readCmd}]);
-        assert.gt(res.query, 0);
+        assert.gt(res.query, 0, tojson(res));
     }
 
     function testFindOne(readCmd) {
@@ -55,7 +55,7 @@
                                     op: "findOne",
                                     query: {},
                                     readCmd: readCmd}]);
-        assert.gt(res.findOne, 0);
+        assert.gt(res.findOne, 0, tojson(res));
     }
 
     testInsert(false);
