@@ -339,8 +339,11 @@ public:
     */
     virtual void addOperand(const boost::intrusive_ptr<Expression>& pExpression);
 
-    // TODO split this into two functions
-    virtual bool isAssociativeAndCommutative() const {
+    virtual bool isAssociative() const {
+        return false;
+    }
+
+    virtual bool isCommutative() const {
         return false;
     }
 
@@ -443,13 +446,22 @@ public:
         return accum.getValue(false);
     }
 
-    bool isAssociativeAndCommutative() const final {
-        // Return false if a single argument is given to avoid a single array argument being treated
-        // as an array instead of as a list of arguments.
+    bool isAssociative() const final {
+        // Return false if a single argument is given to avoid a single array argument being
+        // treated as an array instead of as a list of arguments.
         if (this->vpOperand.size() == 1) {
             return false;
         }
-        return Accumulator().isAssociativeAndCommutative();
+        return Accumulator().isAssociative();
+    }
+
+    bool isCommutative() const final {
+        // Return false if a single argument is given to avoid a single array argument being
+        // treated as an array instead of as a list of arguments.
+        if (this->vpOperand.size() == 1) {
+            return false;
+        }
+        return Accumulator().isCommutative();
     }
 
     const char* getOpName() const final {
@@ -463,6 +475,8 @@ public:
 template <typename SubClass>
 class ExpressionSingleNumericArg : public ExpressionFixedArity<SubClass, 1> {
 public:
+    virtual ~ExpressionSingleNumericArg() {}
+
     Value evaluateInternal(Variables* vars) const final {
         Value arg = this->vpOperand[0]->evaluateInternal(vars);
         if (arg.nullish())
