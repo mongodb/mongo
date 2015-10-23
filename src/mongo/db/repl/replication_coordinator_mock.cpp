@@ -355,7 +355,6 @@ Status ReplicationCoordinatorMock::processReplSetDeclareElectionWinner(
 
 void ReplicationCoordinatorMock::prepareReplResponseMetadata(const rpc::RequestInterface& request,
                                                              const OpTime& lastOpTimeFromClient,
-                                                             const ReadConcernArgs& readConcern,
                                                              BSONObjBuilder* builder) {}
 
 Status ReplicationCoordinatorMock::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,

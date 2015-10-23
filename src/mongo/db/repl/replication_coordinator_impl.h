@@ -274,7 +274,6 @@ public:
 
     void prepareReplResponseMetadata(const rpc::RequestInterface&,
                                      const OpTime& lastOpTimeFromClient,
-                                     const ReadConcernArgs& readConcern,
                                      BSONObjBuilder* builder) override;
 
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
@@ -627,7 +626,6 @@ private:
      */
     void _prepareReplResponseMetadata_finish(const ReplicationExecutor::CallbackArgs& cbData,
                                              const OpTime& lastOpTimeFromClient,
-                                             const ReadConcernArgs& readConcern,
                                              rpc::ReplSetMetadata* metadata);
     /**
      * Scheduled to cause the ReplicationCoordinator to reconsider any state that might

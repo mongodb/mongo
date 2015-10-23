@@ -645,7 +645,6 @@ public:
      */
     virtual void prepareReplResponseMetadata(const rpc::RequestInterface& request,
                                              const OpTime& lastOpTimeFromClient,
-                                             const ReadConcernArgs& readConcern,
                                              BSONObjBuilder* builder) = 0;
 
     /**

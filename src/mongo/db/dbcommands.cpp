@@ -1391,8 +1391,7 @@ bool Command::run(OperationContext* txn,
     if (isReplSet) {
         repl::OpTime lastOpTimeFromClient =
             repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
-        replCoord->prepareReplResponseMetadata(
-            request, lastOpTimeFromClient, readConcernArgs, &metadataBob);
+        replCoord->prepareReplResponseMetadata(request, lastOpTimeFromClient, &metadataBob);
 
         // For commands from mongos, append some info to help getLastError(w) work.
         // TODO: refactor out of here as part of SERVER-18326

@@ -204,7 +204,6 @@ public:
 
     void prepareReplResponseMetadata(const rpc::RequestInterface& request,
                                      const OpTime& lastOpTimeFromClient,
-                                     const ReadConcernArgs& readConcern,
                                      BSONObjBuilder* builder) override;
 
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,

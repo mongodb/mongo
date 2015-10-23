@@ -2940,7 +2940,6 @@ void ReplicationCoordinatorImpl::_processReplSetDeclareElectionWinner_finish(
 
 void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestInterface& request,
                                                              const OpTime& lastOpTimeFromClient,
-                                                             const ReadConcernArgs& readConcern,
                                                              BSONObjBuilder* builder) {
     if (request.getMetadata().hasField(rpc::kReplSetMetadataFieldName)) {
         rpc::ReplSetMetadata metadata;
@@ -2950,7 +2949,6 @@ void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestI
                        this,
                        stdx::placeholders::_1,
                        lastOpTimeFromClient,
-                       readConcern,
                        &metadata));
 
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -2967,11 +2965,8 @@ void ReplicationCoordinatorImpl::prepareReplResponseMetadata(const rpc::RequestI
 void ReplicationCoordinatorImpl::_prepareReplResponseMetadata_finish(
     const ReplicationExecutor::CallbackArgs& cbData,
     const OpTime& lastOpTimeFromClient,
-    const ReadConcernArgs& readConcern,
     rpc::ReplSetMetadata* metadata) {
-    OpTime lastReadableOpTime = readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern
-        ? getCurrentCommittedSnapshotOpTime()
-        : getMyLastOptime();
+    OpTime lastReadableOpTime = getCurrentCommittedSnapshotOpTime();
     OpTime lastVisibleOpTime = std::max(lastOpTimeFromClient, lastReadableOpTime);
     _topCoord->prepareReplResponseMetadata(metadata, lastVisibleOpTime, getLastCommittedOpTime());
 }
