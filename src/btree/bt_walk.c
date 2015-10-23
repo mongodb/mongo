@@ -262,7 +262,7 @@ ascend:	/*
 				 * to delete it again.
 				 */
 				if (ref->state == WT_REF_DELETED &&
-				    __wt_delete_page_skip(session, ref))
+				    __wt_delete_page_skip(session, ref, false))
 					break;
 				/*
 				 * If deleting a range, try to delete the page
@@ -299,7 +299,7 @@ ascend:	/*
 				 * Try to skip deleted pages visible to us.
 				 */
 				if (ref->state == WT_REF_DELETED &&
-				    __wt_delete_page_skip(session, ref))
+				    __wt_delete_page_skip(session, ref, false))
 					break;
 			}
 

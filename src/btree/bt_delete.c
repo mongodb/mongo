@@ -217,7 +217,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
  *	If iterating a cursor, skip deleted pages that are visible to us.
  */
 bool
-__wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 {
 	bool skip;
 
@@ -246,7 +246,8 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 		return (false);
 
 	skip = ref->page_del == NULL ||
-	    __wt_txn_visible(session, ref->page_del->txnid);
+	    (visible_all ? __wt_txn_visible_all(session, ref->page_del->txnid) :
+	     __wt_txn_visible(session, ref->page_del->txnid));
 
 	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	return (skip);

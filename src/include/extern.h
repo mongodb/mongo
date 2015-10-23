@@ -116,7 +116,7 @@ extern int __wt_debug_tree( WT_SESSION_IMPL *session, WT_BTREE *btree, WT_PAGE *
 extern int __wt_debug_page(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
 extern int __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp);
 extern void __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref);
-extern bool __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref);
+extern bool __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all);
 extern int __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);

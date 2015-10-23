@@ -992,7 +992,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 		next_ref = pindex->index[i];
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
 		if (next_ref->state == WT_REF_DELETED &&
-		    __wt_delete_page_skip(session, next_ref) &&
+		    __wt_delete_page_skip(session, next_ref, true) &&
 		    __wt_atomic_casv32(
 		    &next_ref->state, WT_REF_DELETED, WT_REF_SPLIT))
 			deleted_entries++;
