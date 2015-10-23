@@ -5317,6 +5317,44 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __rec_split_dump_keys --
+ *	Dump out the split keys in verbose mode.
+ */
+static int
+__rec_split_dump_keys(WT_SESSION_IMPL *session, WT_PAGE *page, WT_RECONCILE *r)
+{
+	WT_BOUNDARY *bnd;
+	WT_DECL_ITEM(tkey);
+	WT_DECL_RET;
+	uint32_t i;
+
+	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_ROW_LEAF)
+		WT_RET(__wt_scr_alloc(session, 0, &tkey));
+	WT_ERR(__wt_verbose(
+	    session, WT_VERB_SPLIT, "split: %" PRIu32 " pages", r->bnd_next));
+	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
+		switch (page->type) {
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			WT_ERR(__wt_buf_set_printable(
+			    session, tkey, bnd->key.data, bnd->key.size));
+			WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+			    "starting key %.*s",
+			    (int)tkey->size, (const char *)tkey->data));
+			break;
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_COL_VAR:
+			WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+			    "starting recno %" PRIu64, bnd->recno));
+			break;
+		WT_ILLEGAL_VALUE_ERR(session);
+		}
+err:	__wt_scr_free(session, &tkey);
+	return (ret);
+}
+
+/*
  * __rec_write_wrapup --
  *	Finish the reconciliation.
  */
@@ -5480,42 +5518,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ILLEGAL_VALUE(session);
 		}
 
-		/* Display the actual split keys. */
-		if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT)) {
-			WT_DECL_ITEM(tkey);
-			WT_DECL_RET;
-			uint32_t i;
+		/* Optionally display the actual split keys in verbose mode. */
+		if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT))
+			WT_RET(__rec_split_dump_keys(session, page, r));
 
-			if (page->type == WT_PAGE_ROW_INT ||
-			    page->type == WT_PAGE_ROW_LEAF)
-				WT_RET(__wt_scr_alloc(session, 0, &tkey));
-			for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
-				switch (page->type) {
-				case WT_PAGE_ROW_INT:
-				case WT_PAGE_ROW_LEAF:
-					WT_ERR(__wt_buf_set_printable(
-					    session, tkey,
-					    bnd->key.data, bnd->key.size));
-					WT_ERR(__wt_verbose(
-					    session, WT_VERB_SPLIT,
-					    "split: starting key "
-					    "%.*s",
-					    (int)tkey->size,
-					    (const char *)tkey->data));
-					break;
-				case WT_PAGE_COL_FIX:
-				case WT_PAGE_COL_INT:
-				case WT_PAGE_COL_VAR:
-					WT_ERR(__wt_verbose(
-					    session, WT_VERB_SPLIT,
-					    "split: starting recno %" PRIu64,
-					    bnd->recno));
-					break;
-				WT_ILLEGAL_VALUE_ERR(session);
-				}
-err:			__wt_scr_free(session, &tkey);
-			WT_RET(ret);
-		}
+		/* Track the largest set of page-splits. */
 		if (r->bnd_next > r->bnd_next_max) {
 			r->bnd_next_max = r->bnd_next;
 			WT_STAT_FAST_DATA_SET(

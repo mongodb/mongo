@@ -25,10 +25,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <wiredtiger.h>
 #include "wt_internal.h"			/* For __wt_XXX */
 
 #ifdef _WIN32
