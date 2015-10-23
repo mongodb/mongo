@@ -646,6 +646,12 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	WT_INTL_INDEX_GET(session, next, pindex);
 	for (i = 0; i < mod->mod_multi_entries; ++i) {
+		/*
+		 * There's special error handling required when re-instantiating
+		 * pages in memory; it's not needed here, asserted for safety.
+		 */
+		WT_ASSERT(session, mod->mod_multi[i].supd == NULL);
+
 		WT_ERR(__wt_multi_to_ref(session,
 		    next, &mod->mod_multi[i], &pindex->index[i], NULL));
 		pindex->index[i]->home = next;
