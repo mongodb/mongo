@@ -2,10 +2,11 @@
  * Test for making sure that the replica seed list in the config server does not
  * become invalid when a replica set reconfig happens.
  */
+(function() {
+"use strict";
 
 var NODE_COUNT = 3;
-var st = new ShardingTest({ shards: { rs0: { nodes: NODE_COUNT, oplogSize: 10 }},
-                            config : 3, sync: true });
+var st = new ShardingTest({ shards: { rs0: { nodes: NODE_COUNT, oplogSize: 10 }}});
 var replTest = st.rs0;
 var mongos = st.s;
 
@@ -71,3 +72,4 @@ assert.soon(function() {
 
 st.stop();
 
+}());

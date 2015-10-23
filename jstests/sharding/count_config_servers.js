@@ -1,18 +1,23 @@
-// This test fails when run with authentication due to SERVER-6327
 /**
- * Test SyncClusterConnection commands using call instead of findOne
+ * Test count commands against the config servers, including when some of them are down.
+ * This test fails when run with authentication due to SERVER-6327
  */
-
 (function() {
+"use strict";
 
-var st = new ShardingTest({ name: 'sync_conn_cmd',
-                            shards: 0,
-                            other: { sync: true }});
+var st = new ShardingTest({name: 'sync_conn_cmd', shards: 0});
+st.s.setSlaveOk(true);
+
 var configDB = st.config;
 var coll = configDB.test;
 
 for( var x = 0; x < 10; x++ ){
     assert.writeOK(coll.insert({ v: x }));
+}
+
+if (st.configRS) {
+    // Make sure the inserts are replicated to all config servers.
+    st.configRS.awaitReplication();
 }
 
 var testNormalCount = function(){
@@ -40,18 +45,14 @@ testCountWithQuery();
 testInvalidCount();
 
 // Test with the first config server down
-var firstConfigOpts = st.c0.commandLine;
-MongoRunner.stopMongod( firstConfigOpts.port );
+MongoRunner.stopMongod(st.c0);
 
 testNormalCount();
 testCountWithQuery();
 testInvalidCount();
 
-firstConfigOpts.restart = true;
-MongoRunner.runMongod( firstConfigOpts );
-
-// Test with the second config server down
-MongoRunner.stopMongod( st.c1.commandLine.port );
+// Test with the first and second config server down
+MongoRunner.stopMongod(st.c1);
 jsTest.log( 'Second server is down' );
 
 testNormalCount();
@@ -60,4 +61,4 @@ testInvalidCount();
 
 st.stop();
 
-})();
+}());

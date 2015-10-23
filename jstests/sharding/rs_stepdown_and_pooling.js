@@ -1,10 +1,10 @@
 //
 // Tests what happens when a replica set primary goes down with pooled connections.
 //
+(function() {
+"use strict";
 
-var options = {sync : true, mongosOptions : { verbose : 2 }};
-
-var st = new ShardingTest({shards : {rs0 : {nodes : 2}}, mongos : 1, other : options});
+var st = new ShardingTest({shards : {rs0 : {nodes : 2}}, mongos : 1});
 
 // Stop balancer to eliminate weird conn stuff
 st.stopBalancer();
@@ -113,3 +113,4 @@ else {
 jsTest.log("DONE!");
 
 st.stop();
+}());

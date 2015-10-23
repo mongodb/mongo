@@ -406,6 +406,16 @@ ReplSetTest.prototype.getMaster = function( timeout ) {
 
 ReplSetTest.prototype.getPrimary = ReplSetTest.prototype.getMaster
 
+ReplSetTest.prototype.awaitNoPrimary = function(msg, timeout) {
+    msg = msg || "Timed out waiting for there to be no primary in replset: " + this.name;
+    timeout = timeout || 30000;
+    var self = this;
+    assert.soon(function() {
+                    return self.callIsMaster() == false;
+                }, msg, timeout);
+
+}
+
 ReplSetTest.prototype.getSecondaries = function( timeout ){
     var master = this.getMaster( timeout )
     var secs = []

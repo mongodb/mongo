@@ -8,8 +8,8 @@
 
 // Only reason for using localhost name is to make the test consistent with naming host so it
 // will be easier to check for the host name inside error objects.
-var options = {sync : true, useHostname: false};
-var st = new ShardingTest({shards: 2, mongos: 1, other: options});
+var options = {useHostname: false};
+var st = new ShardingTest({shards: 2, mongos: 1, config: 3, other: options});
 st.stopBalancer();
 
 var mongos = st.s0;
@@ -88,16 +88,17 @@ var adminColl = admin.getCollection(coll.getName());
 adminColl.remove({});
 printjson( request = {update : adminColl.getName(),
                       updates : [{ q : { a : 1 }, u : { a : 1 }, upsert : true }]});
-printjson( result = adminColl.runCommand(request) );
-assert(!result.ok);
+var result = adminColl.runCommand(request);
+assert.commandWorked(result);
+assert.eq(1, result.n);
+assert.eq(1, adminColl.count());
 
 //
 // With _id
 adminColl.remove({});
 printjson( request = {update : adminColl.getName(),
                       updates : [{ q : { _id : 1, a : 1 }, u : { a : 1 }, upsert : true }]});
-printjson( result = adminColl.runCommand(request) );
-assert(result.ok);
+assert.commandWorked(adminColl.runCommand(request));
 assert.eq(1, result.n);
 assert.eq(1, adminColl.count());
 
@@ -171,9 +172,11 @@ var configColl = config.getCollection( "batch_write_protocol_sharded" );
 configColl.remove({});
 printjson( request = {insert : configColl.getName(),
                       documents: [{a:1}]} );
-printjson( result = configColl.runCommand(request) );
-assert(result.ok);
+var result = configColl.runCommand(request);
+assert.commandWorked(result);
 assert.eq(1, result.n);
+
+st.configRS.awaitReplication();
 assert.eq(1, st.config0.getCollection(configColl + "").count());
 assert.eq(1, st.config1.getCollection(configColl + "").count());
 assert.eq(1, st.config2.getCollection(configColl + "").count());
@@ -187,6 +190,8 @@ printjson( request = {update : configColl.getName(),
 printjson( result = configColl.runCommand(request) );
 assert(result.ok);
 assert.eq(1, result.n);
+
+st.configRS.awaitReplication();
 assert.eq(1, st.config0.getCollection(configColl + "").count({b:2}));
 assert.eq(1, st.config1.getCollection(configColl + "").count({b:2}));
 assert.eq(1, st.config2.getCollection(configColl + "").count({b:2}));
@@ -200,13 +205,17 @@ printjson( request = {'delete' : configColl.getName(),
 printjson( result = configColl.runCommand(request) );
 assert(result.ok);
 assert.eq(1, result.n);
+
+st.configRS.awaitReplication();
 assert.eq(0, st.config0.getCollection(configColl + "").count());
 assert.eq(0, st.config1.getCollection(configColl + "").count());
 assert.eq(0, st.config2.getCollection(configColl + "").count());
 
-MongoRunner.stopMongod(st.config1.port, 15);
+MongoRunner.stopMongod(st.config1);
+MongoRunner.stopMongod(st.config2);
+st.configRS.awaitNoPrimary();
 
-// Config server insert with 2nd config down.
+// Config server insert with no config PRIMARY
 configColl.remove({});
 printjson( request = {insert : configColl.getName(),
                       documents: [{a:1}]} );
@@ -214,8 +223,8 @@ printjson( result = configColl.runCommand(request) );
 assert(!result.ok);
 assert(result.errmsg != null);
 
-//
-// Config server update with 2nd config down.
+
+// Config server insert with no config PRIMARY
 configColl.remove({});
 configColl.insert({a:1});
 printjson( request = {update : configColl.getName(),
@@ -224,47 +233,11 @@ printjson( result = configColl.runCommand(request) );
 assert(!result.ok);
 assert(result.errmsg != null);
 
-//
-// Config server delete with 2nd config down.
+// Config server insert with no config PRIMARY
 configColl.remove({});
 configColl.insert({a:1});
 printjson( request = {delete : configColl.getName(),
                       deletes: [{q: {a:1}, limit: 0}]} );
-printjson( result = configColl.runCommand(request) );
-assert(!result.ok);
-assert(result.errmsg != null);
-
-//
-// Config server insert with 2nd config down while bypassing fsync check.
-configColl.remove({});
-printjson( request = { insert: configColl.getName(),
-                       documents: [{ a: 1 }],
-                       // { w: 0 } has special meaning for config servers
-                       writeConcern: { w: 0 }} );
-printjson( result = configColl.runCommand(request) );
-assert(!result.ok);
-assert(result.errmsg != null);
-
-//
-// Config server update with 2nd config down while bypassing fsync check.
-configColl.remove({});
-configColl.insert({a:1});
-printjson( request = { update: configColl.getName(),
-                       updates: [{ q: { a: 1 }, u: { $set: { b:2 }}}],
-                       // { w: 0 } has special meaning for config servers
-                       writeConcern: { w: 0 }} );
-printjson( result = configColl.runCommand(request) );
-assert(!result.ok);
-assert(result.errmsg != null);
-
-//
-// Config server update with 2nd config down while bypassing fsync check.
-configColl.remove({});
-configColl.insert({a:1});
-printjson( request = { delete: configColl.getName(),
-                       deletes: [{ q: { a: 1 }, limit: 0 }],
-                       // { w: 0 } has special meaning for config servers
-                       writeConcern: { w: 0 }} );
 printjson( result = configColl.runCommand(request) );
 assert(!result.ok);
 assert(result.errmsg != null);

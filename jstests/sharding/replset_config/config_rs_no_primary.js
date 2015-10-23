@@ -16,9 +16,7 @@ st.s.getDB('test').foo.insert({a:1});
 // Take down two of the config servers so the remaining one goes into SECONDARY state.
 st.configRS.stop(1);
 st.configRS.stop(2);
-assert.soon(function() {
-                return st.configRS.callIsMaster() == false;
-            }, "Timed out waiting for there to be no primary in config replset");
+st.configRS.awaitNoPrimary();
 
 jsTestLog("Starting a new mongos when the config servers have no primary which should work");
 var mongos2 = MongoRunner.runMongos({configdb: st.configRS.getURL()});
