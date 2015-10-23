@@ -723,11 +723,6 @@ buildvariants:
 - name: linux-wt-repl-compare
   display_name: Linux WT 1-Node ReplSet Compare
   batchtime: 360 # 6 hours
-  expansions:
-    compile_flags: *compile_flags 
-    mongod_exec_wrapper: *exec_wrapper
-    perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false "
   run_on:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
@@ -740,11 +735,6 @@ buildvariants:
 - name: linux-mmap-repl-compare
   display_name: Linux MMAP 1-Node ReplSet Compare
   batchtime: 360 # 6 hours
-  expansions:
-    compile_flags: *compile_flags 
-    mongod_exec_wrapper: *exec_wrapper
-    perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false"
   run_on:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
@@ -757,11 +747,6 @@ buildvariants:
 - name: linux-wt-mmap-standalone-compare
   display_name: Linux WT-MMAP Standalone Compare
   batchtime: 90 # 1.5 hours
-  expansions:
-    compile_flags: *compile_flags 
-    mongod_exec_wrapper: *exec_wrapper
-    perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false"
   run_on:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
@@ -777,11 +762,6 @@ buildvariants:
 - name: linux-wt-mmap-repl-compare
   display_name: Linux WT-MMAP 1-Node ReplSet Compare
   batchtime: 360 # 6 hours
-  expansions:
-    compile_flags: *compile_flags 
-    mongod_exec_wrapper: *exec_wrapper
-    perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false"
   run_on:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
