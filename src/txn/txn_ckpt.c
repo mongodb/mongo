@@ -726,8 +726,8 @@ __drop_to(WT_CKPT *ckptbase, const char *name, size_t len)
  *	Checkpoint a tree.
  */
 static int
-__checkpoint_worker(
-    WT_SESSION_IMPL *session, const char *cfg[], bool is_checkpoint)
+__checkpoint_worker(WT_SESSION_IMPL *session,
+    const char *cfg[], bool is_checkpoint, bool need_tracking)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -751,6 +751,16 @@ __checkpoint_worker(
 	was_modified = btree->modified;
 	fake_ckpt = hot_backup_locked = false;
 	name_alloc = NULL;
+
+	/*
+	 * Most callers need meta tracking to be on here, otherwise it is
+	 * possible for this checkpoint to cleanup handles that are still in
+	 * use. The exceptions are:
+	 *  - Checkpointing the metadata handle itself.
+	 *  - On connection close when we know there can't be any races.
+	 */
+	WT_ASSERT(session, !need_tracking ||
+	    WT_IS_METADATA(dhandle) || WT_META_TRACKING(session));
 
 	/*
 	 * Set the checkpoint LSN to the maximum LSN so that if logging is
@@ -1128,7 +1138,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Should be holding the schema lock. */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
 
-	return (__checkpoint_worker(session, cfg, true));
+	return (__checkpoint_worker(session, cfg, true, true));
 }
 
 /*
@@ -1208,7 +1218,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	if (need_tracking)
 		WT_RET(__wt_meta_track_on(session));
 
-	WT_TRET(__checkpoint_worker(session, NULL, false));
+	WT_TRET(__checkpoint_worker(session, NULL, false, need_tracking));
 
 	if (need_tracking)
 		WT_RET(__wt_meta_track_off(session, true, ret != 0));
