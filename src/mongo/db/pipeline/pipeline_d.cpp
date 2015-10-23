@@ -167,7 +167,7 @@ shared_ptr<PlanExecutor> createRandomCursorExecutor(Collection* collection,
                                                                  collection,
                                                                  idIam,
                                                                  indexDescriptor->keyPattern(),
-                                                                 idxRandCursor.release());
+                                                                 std::move(idxRandCursor));
         stage = stdx::make_unique<FetchStage>(
             txn, ws.get(), idxIterator.release(), nullptr, collection);
     }
