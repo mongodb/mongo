@@ -45,19 +45,34 @@ BSONObj makeEmptyMetadata() {
 }
 
 Status readRequestMetadata(OperationContext* txn, const BSONObj& metadataObj) {
-    auto swServerSelectionMetadata = ServerSelectionMetadata::readFromMetadata(metadataObj);
+    BSONElement ssmElem;
+    BSONElement auditElem;
+    BSONElement configSvrElem;
+
+    for (const auto& metadataElem : metadataObj) {
+        auto fieldName = metadataElem.fieldNameStringData();
+        if (fieldName == ServerSelectionMetadata::fieldName()) {
+            ssmElem = metadataElem;
+        } else if (fieldName == AuditMetadata::fieldName()) {
+            auditElem = metadataElem;
+        } else if (fieldName == ConfigServerMetadata::fieldName()) {
+            configSvrElem = metadataElem;
+        }
+    }
+
+    auto swServerSelectionMetadata = ServerSelectionMetadata::readFromMetadata(ssmElem);
     if (!swServerSelectionMetadata.isOK()) {
         return swServerSelectionMetadata.getStatus();
     }
     ServerSelectionMetadata::get(txn) = std::move(swServerSelectionMetadata.getValue());
 
-    auto swAuditMetadata = AuditMetadata::readFromMetadata(metadataObj);
+    auto swAuditMetadata = AuditMetadata::readFromMetadata(auditElem);
     if (!swAuditMetadata.isOK()) {
         return swAuditMetadata.getStatus();
     }
     AuditMetadata::get(txn) = std::move(swAuditMetadata.getValue());
 
-    auto configServerMetadata = ConfigServerMetadata::readFromMetadata(metadataObj);
+    auto configServerMetadata = ConfigServerMetadata::readFromMetadata(configSvrElem);
     if (!configServerMetadata.isOK()) {
         return configServerMetadata.getStatus();
     }

@@ -889,7 +889,8 @@ rpc::UniqueReply DBClientReplicaSet::runCommandWithMetadata(StringData database,
     // so we don't have to re-parse it, however, that will come with its own set of
     // complications (e.g. some kind of base class or concept for MetadataSerializable
     // objects). For now we do it the stupid way.
-    auto ssm = uassertStatusOK(rpc::ServerSelectionMetadata::readFromMetadata(metadata));
+    auto ssm = uassertStatusOK(rpc::ServerSelectionMetadata::readFromMetadata(
+        metadata.getField(rpc::ServerSelectionMetadata::fieldName())));
 
     // If we didn't get a readPref with this query, we assume SecondaryPreferred if secondaryOk
     // is true, and PrimaryOnly otherwise. This logic is replicated from _extractReadPref.

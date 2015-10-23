@@ -52,6 +52,13 @@ using std::vector;
 
 using CatalogManagerReplSetTest = CatalogManagerReplSetTestFixture;
 
+const BSONObj kReplSecondaryOkMetadata{[] {
+    BSONObjBuilder o;
+    o.appendElements(rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+    o.append(rpc::kReplSetMetadataFieldName, 1);
+    return o.obj();
+}()};
+
 TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
     configTargeter()->setFindHostReturnValue(HostAndPort("config:123"));
 
@@ -59,8 +66,7 @@ TEST_F(CatalogManagerReplSetTestFixture, UpgradeNotNeeded) {
         launchAsync([this] { ASSERT_OK(catalogManager()->initConfigVersion(operationContext())); });
 
     onFindCommand([this](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                      request.metadata);
+        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
@@ -354,8 +360,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyNoOpAfterRetry) 
     // Retry starts here
 
     onFindCommand([this](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                      request.metadata);
+        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
@@ -486,8 +491,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionDuplicateKeyTooNewAfterRetry
     // Retry starts here
 
     onFindCommand([this](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                      request.metadata);
+        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);
@@ -572,8 +576,7 @@ TEST_F(CatalogManagerReplSetTestFixture, InitVersionUpsertNoMatchNoOpAfterRetry)
     // Retry starts here
 
     onFindCommand([this](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                      request.metadata);
+        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
 
         ASSERT_EQ(HostAndPort("config:123"), request.target);
         ASSERT_EQ("config", request.dbname);

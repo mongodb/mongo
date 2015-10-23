@@ -57,6 +57,13 @@ using executor::RemoteCommandResponse;
 using std::vector;
 using unittest::assertGet;
 
+const BSONObj kReplSecondaryOkMetadata{[] {
+    BSONObjBuilder o;
+    o.appendElements(rpc::ServerSelectionMetadata(true, boost::none).toBSON());
+    o.append(rpc::kReplSetMetadataFieldName, 1);
+    return o.obj();
+}()};
+
 class AddShardTest : public CatalogManagerReplSetTestFixture {
 protected:
     /**
@@ -219,9 +226,7 @@ TEST_F(AddShardTest, AddShardStandalone) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, configHost);
             if (i == 0) {
-                ASSERT_EQUALS(
-                    BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                    request.metadata);
+                ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
             } else if (i == 1) {
                 // The retry runs with PrimaryOnly read preference
                 ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -247,9 +252,7 @@ TEST_F(AddShardTest, AddShardStandalone) {
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.toString(), DatabaseType::ConfigNS);
             if (i == 0) {
-                ASSERT_EQUALS(
-                    BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                    request.metadata);
+                ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
             } else if (i == 1) {
                 // The retry runs with PrimaryOnly read preference
                 ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -354,9 +357,7 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, configHost);
             if (i == 0) {
-                ASSERT_EQUALS(
-                    BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                    request.metadata);
+                ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
             } else if (i == 1) {
                 // The retry runs with PrimaryOnly read preference
                 ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -380,9 +381,7 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
     for (int i = 0; i < 2; i++) {
         onFindCommand([this, i](const RemoteCommandRequest& request) {
             if (i == 0) {
-                ASSERT_EQUALS(
-                    BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                    request.metadata);
+                ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
             } else if (i == 1) {
                 // The retry runs with PrimaryOnly read preference
                 ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
@@ -409,8 +408,7 @@ TEST_F(AddShardTest, AddShardStandaloneGenerateName) {
 
     // New name is being generated for the new shard
     onFindCommand([this, &existingShard](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
-                      request.metadata);
+        ASSERT_EQUALS(kReplSecondaryOkMetadata, request.metadata);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQ(nss.toString(), ShardType::ConfigNS);
         auto query = assertGet(LiteParsedQuery::makeFromFindCommand(nss, request.cmdObj, false));

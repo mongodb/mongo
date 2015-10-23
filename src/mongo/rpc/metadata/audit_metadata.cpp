@@ -49,7 +49,11 @@ AuditMetadata::AuditMetadata(boost::optional<UsersAndRoles> impersonatedUsersAnd
 #if !defined(MONGO_ENTERPRISE_VERSION)
 
 StatusWith<AuditMetadata> AuditMetadata::readFromMetadata(const BSONObj&) {
-    return AuditMetadata(boost::none);
+    return AuditMetadata{};
+}
+
+StatusWith<AuditMetadata> AuditMetadata::readFromMetadata(const BSONElement&) {
+    return AuditMetadata{};
 }
 
 Status AuditMetadata::writeToMetadata(BSONObjBuilder*) const {

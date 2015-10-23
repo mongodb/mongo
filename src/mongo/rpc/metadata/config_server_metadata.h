@@ -59,7 +59,13 @@ public:
      * Returns a non-ok status on parse error.
      * If no metadata is found, returns a default-constructed ConfigServerMetadata.
      */
-    static StatusWith<ConfigServerMetadata> readFromMetadata(const BSONObj& doc);
+    static StatusWith<ConfigServerMetadata> readFromMetadata(const BSONObj& metadataObj);
+
+    /**
+     * Parses ConfigServerMetadata from a pre-extracted BSONElement. When reading a metadata object,
+     * this form is more efficient as it permits parsing the metadata in one pass.
+     */
+    static StatusWith<ConfigServerMetadata> readFromMetadata(const BSONElement& metadataElem);
 
     /**
      * Writes the metadata to the given BSONObjBuilder for building a command request or response
@@ -74,6 +80,10 @@ public:
      */
     boost::optional<repl::OpTime> getOpTime() const {
         return _opTime;
+    }
+
+    static StringData fieldName() {
+        return "configsvr";
     }
 
 private:

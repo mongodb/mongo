@@ -75,9 +75,14 @@ const Seconds kConfigCommandTimeout{30};
 const int kNotMasterNumRetries = 3;
 const Milliseconds kNotMasterRetryInterval{500};
 const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
-const BSONObj kReplSecondaryOkMetadata{
-    BSON(rpc::kSecondaryOkFieldName << 1 << rpc::kReplSetMetadataFieldName << 1)};
-const BSONObj kSecondaryOkMetadata{BSON(rpc::kSecondaryOkFieldName << 1)};
+const BSONObj kSecondaryOkMetadata{rpc::ServerSelectionMetadata(true, boost::none).toBSON()};
+
+const BSONObj kReplSecondaryOkMetadata{[] {
+    BSONObjBuilder o;
+    o.appendElements(kSecondaryOkMetadata);
+    o.appendElements(kReplMetadata);
+    return o.obj();
+}()};
 
 BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
     Seconds maxTime = kConfigCommandTimeout;

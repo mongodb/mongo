@@ -42,19 +42,6 @@ class StringData;
 /**
  * Utilities for converting metadata between the legacy OP_QUERY format and the new
  * OP_COMMAND format.
- *
- * Metadata consists of information independent of any particular command such as:
- *
- * Request/Reply/Both | (legacy) OP_QUERY format         | OP_COMMAND format
- *__________________________________________________________________________________________________
- * Request            | the slaveOk bit                  | $secondaryOk on metadata obj
- * Request            | $readPreference field of command | $readPreference on metadata obj
- * Request            | $impersonatedUsers on command obj| $impersonatedUsers on metadata obj
- * Request            | $impersonatedRoles on command obj| $impersonatedRoles on metadata obj
- * Request            | maxTimeMS on command obj         | $maxTimeMS on metadata obj
- * Reply              | $gleStats field on command reply | $gleStats on metadata obj
- *
- * TODO: currently only $secondaryOk (request only) is handled. SERVER-18236 will cover the rest.
  */
 namespace rpc {
 

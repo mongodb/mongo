@@ -44,18 +44,6 @@ class StatusWith;
 namespace rpc {
 
 /**
- * Symbolic constant for the "$secondaryOk" metadata field. This field should be of boolean or
- * numeric type, and is treated as a boolean.
- */
-extern const char kSecondaryOkFieldName[];
-
-/**
- * Symbolic constant for the "$readPreference" metadata field. The field should be of Object type
- * when present.
- */
-extern const char kReadPreferenceFieldName[];
-
-/**
  * This class comprises the request metadata fields that concern server selection, that is,
  * the conditions on which servers can execute this operation.
  */
@@ -65,7 +53,6 @@ class ServerSelectionMetadata {
 public:
     static const OperationContext::Decoration<ServerSelectionMetadata> get;
 
-    // TODO: Remove when StatusWith supports default-constructible types (SERVER-18007).
     ServerSelectionMetadata() = default;
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
@@ -83,10 +70,14 @@ public:
      */
     static StatusWith<ServerSelectionMetadata> readFromMetadata(const BSONObj& metadataObj);
 
+    static StatusWith<ServerSelectionMetadata> readFromMetadata(const BSONElement& metadataElem);
+
     /**
      * Writes this operation's ServerSelectionMetadata to a metadata object.
      */
     Status writeToMetadata(BSONObjBuilder* metadataBob) const;
+
+    BSONObj toBSON() const;
 
     /**
      * Rewrites the ServerSelectionMetadata from the metadata object format to the legacy OP_QUERY
@@ -126,6 +117,10 @@ public:
 
     ServerSelectionMetadata(bool secondaryOk,
                             boost::optional<ReadPreferenceSetting> readPreference);
+
+    static StringData fieldName() {
+        return "$ssm";
+    }
 
 private:
     bool _secondaryOk{false};

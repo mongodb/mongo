@@ -40,7 +40,6 @@ using repl::OpTime;
 
 namespace {
 
-const char kRootFieldName[] = "configsvr";
 const char kOpTimeFieldName[] = "opTime";
 
 }  // unnamed namespace
@@ -52,20 +51,23 @@ ConfigServerMetadata::ConfigServerMetadata(OpTime opTime) : _opTime(std::move(op
 
 StatusWith<ConfigServerMetadata> ConfigServerMetadata::readFromMetadata(
     const BSONObj& metadataObj) {
-    BSONElement configMetadataElement;
+    return readFromMetadata(metadataObj.getField(fieldName()));
+}
 
-    Status status =
-        bsonExtractTypedField(metadataObj, kRootFieldName, Object, &configMetadataElement);
-    if (status == ErrorCodes::NoSuchKey) {
+StatusWith<ConfigServerMetadata> ConfigServerMetadata::readFromMetadata(
+    const BSONElement& metadataElem) {
+    if (metadataElem.eoo()) {
         return ConfigServerMetadata{};
-    } else if (!status.isOK()) {
-        return status;
+    } else if (metadataElem.type() != mongo::Object) {
+        return {ErrorCodes::TypeMismatch,
+                str::stream() << "ConfigServerMetadata element has incorrect type: expected"
+                              << mongo::Object << " but got " << metadataElem.type()};
     }
 
-    BSONObj configMetadataObj = configMetadataElement.Obj();
+    BSONObj configMetadataObj = metadataElem.Obj();
 
     repl::OpTime opTime;
-    status = bsonExtractOpTimeField(configMetadataObj, kOpTimeFieldName, &opTime);
+    auto status = bsonExtractOpTimeField(configMetadataObj, kOpTimeFieldName, &opTime);
     if (!status.isOK()) {
         return status;
     }
@@ -75,7 +77,7 @@ StatusWith<ConfigServerMetadata> ConfigServerMetadata::readFromMetadata(
 
 void ConfigServerMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     invariant(_opTime);
-    BSONObjBuilder configMetadataBuilder(builder->subobjStart(kRootFieldName));
+    BSONObjBuilder configMetadataBuilder(builder->subobjStart(fieldName()));
     _opTime->append(&configMetadataBuilder, kOpTimeFieldName);
 }
 

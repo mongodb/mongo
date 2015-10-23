@@ -188,7 +188,8 @@ StatusWith<Message> downconvertFindCommandRequest(const RemoteCommandRequest& re
 
     // We can't downconvert all metadata, since we aren't sending a command, but we do need to
     // downconvert $secondaryOk to the slaveOK bit.
-    auto ssm = rpc::ServerSelectionMetadata::readFromMetadata(request.metadata);
+    auto ssm = rpc::ServerSelectionMetadata::readFromMetadata(
+        request.metadata.getField(rpc::ServerSelectionMetadata::fieldName()));
     if (!ssm.isOK()) {
         return ssm.getStatus();
     }

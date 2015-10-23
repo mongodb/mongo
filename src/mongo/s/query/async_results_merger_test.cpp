@@ -1109,7 +1109,7 @@ TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
     ASSERT_FALSE(arm->ready());
 
     BSONObj cmdRequestMetadata = getFirstPendingRequest().metadata;
-    ASSERT_EQ(cmdRequestMetadata, BSON(rpc::kSecondaryOkFieldName << 1));
+    ASSERT_EQ(cmdRequestMetadata, rpc::ServerSelectionMetadata(true, boost::none).toBSON());
 
     std::vector<CursorResponse> responses;
     std::vector<BSONObj> batch1 = {fromjson("{_id: 1}")};
