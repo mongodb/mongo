@@ -149,21 +149,10 @@ __compact_file(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_DECL_RET;
 	WT_DECL_ITEM(t);
 	WT_SESSION *wt_session;
-	WT_TXN *txn;
 	int i;
 	struct timespec start_time;
 
-	txn = &session->txn;
 	wt_session = &session->iface;
-
-	/*
-	 * File compaction requires checkpoints, which will fail in a
-	 * transactional context.  Check now so the error message isn't
-	 * confusing.
-	 */
-	if (session->compact->file_count != 0 && F_ISSET(txn, WT_TXN_RUNNING))
-		WT_ERR_MSG(session, EINVAL,
-		    " File compaction not permitted in a transaction");
 
 	/*
 	 * Force the checkpoint: we don't want to skip it because the work we
@@ -212,6 +201,7 @@ __wt_session_compact(
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, compact, config, cfg);
@@ -241,8 +231,19 @@ __wt_session_compact(
 	if (session->compact->lsm_count != 0)
 		WT_ERR(__wt_schema_worker(
 		    session, uri, NULL, __wt_lsm_compact, cfg, 0));
-	if (session->compact->file_count != 0)
+	if (session->compact->file_count != 0) {
+		/*
+		 * File compaction requires checkpoints, which will fail in a
+		 * transactional context.  Check now so the error message isn't
+		 * confusing.
+		 */
+		txn = &session->txn;
+		if (F_ISSET(txn, WT_TXN_RUNNING))
+			WT_ERR_MSG(session, EINVAL,
+			    " File compaction not permitted in a transaction");
+
 		WT_ERR(__compact_file(session, uri, cfg));
+	}
 
 err:	session->compact = NULL;
 	API_END_RET_NOTFOUND_MAP(session, ret);
