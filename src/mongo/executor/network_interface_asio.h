@@ -379,7 +379,7 @@ private:
 
     asio::ip::tcp::resolver _resolver;
 
-    std::atomic<State> _state;
+    std::atomic<State> _state;  // NOLINT
 
     std::unique_ptr<AsyncTimerFactoryInterface> _timerFactory;
 

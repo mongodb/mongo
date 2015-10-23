@@ -189,7 +189,7 @@ public:
      * finding any live nodes claiming to be in the set, the ReplicaSetMonitorWatcher will stop
      * periodic background refreshes of this set.
      */
-    static std::atomic<int> maxConsecutiveFailedChecks;
+    static std::atomic<int> maxConsecutiveFailedChecks;  // NOLINT
 
     //
     // internal types (defined in replica_set_monitor_internal.h)

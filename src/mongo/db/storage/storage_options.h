@@ -94,11 +94,11 @@ struct StorageGlobalParams {
 
     // --journalCommitInterval
     static const int kMaxJournalCommitIntervalMs;
-    std::atomic<int> journalCommitIntervalMs;
+    std::atomic<int> journalCommitIntervalMs;  // NOLINT
 
     // --notablescan
     // no table scans allowed
-    std::atomic<bool> noTableScan;
+    std::atomic<bool> noTableScan;  // NOLINT
 
     // --directoryperdb
     // Stores each database’s files in its own folder in the data directory.

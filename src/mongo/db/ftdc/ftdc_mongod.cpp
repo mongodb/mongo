@@ -61,7 +61,7 @@ FTDCController* getGlobalFTDCController() {
     return getFTDCController(getGlobalServiceContext()).get();
 }
 
-std::atomic<bool> localEnabledFlag(FTDCConfig::kEnabledDefault);
+std::atomic<bool> localEnabledFlag(FTDCConfig::kEnabledDefault);  // NOLINT
 
 class ExportedFTDCEnabledParameter
     : public ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> {
@@ -83,7 +83,7 @@ public:
 
 } exportedFTDCEnabledParameter;
 
-std::atomic<std::int32_t> localPeriodMillis(FTDCConfig::kPeriodMillisDefault);
+std::atomic<std::int32_t> localPeriodMillis(FTDCConfig::kPeriodMillisDefault);  // NOLINT
 
 class ExportedFTDCPeriodParameter
     : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
@@ -112,10 +112,11 @@ public:
 } exportedFTDCPeriodParameter;
 
 // Scale the values down since are defaults are in bytes, but the user interface is MB
-std::atomic<std::int32_t> localMaxDirectorySizeMB(FTDCConfig::kMaxDirectorySizeBytesDefault /
-                                                  (1024 * 1024));
+std::atomic<std::int32_t> localMaxDirectorySizeMB(  // NOLINT
+    FTDCConfig::kMaxDirectorySizeBytesDefault / (1024 * 1024));
 
-std::atomic<std::int32_t> localMaxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault / (1024 * 1024));
+std::atomic<std::int32_t> localMaxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault /  // NOLINT
+                                             (1024 * 1024));
 
 class ExportedFTDCDirectorySizeParameter
     : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
@@ -186,7 +187,7 @@ public:
 
 } exportedFTDCFileSizeParameter;
 
-std::atomic<std::int32_t> localMaxSamplesPerArchiveMetricChunk(
+std::atomic<std::int32_t> localMaxSamplesPerArchiveMetricChunk(  // NOLINT
     FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault);
 
 class ExportedFTDCArchiveChunkSizeParameter
@@ -215,7 +216,7 @@ public:
 
 } exportedFTDCArchiveChunkSizeParameter;
 
-std::atomic<std::int32_t> localMaxSamplesPerInterimMetricChunk(
+std::atomic<std::int32_t> localMaxSamplesPerInterimMetricChunk(  // NOLINT
     FTDCConfig::kMaxSamplesPerInterimMetricChunkDefault);
 
 class ExportedFTDCInterimChunkSizeParameter

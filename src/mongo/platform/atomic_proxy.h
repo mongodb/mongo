@@ -79,7 +79,7 @@ public:
     }
 
 private:
-    std::atomic<BaseWordT> _value;
+    std::atomic<BaseWordT> _value;  // NOLINT
 };
 
 using AtomicDouble = AtomicProxy<double, std::uint64_t>;

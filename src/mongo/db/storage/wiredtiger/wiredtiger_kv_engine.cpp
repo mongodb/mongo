@@ -104,7 +104,7 @@ public:
 
 private:
     WiredTigerSessionCache* _sessionCache;
-    std::atomic<bool> _shuttingDown{false};
+    std::atomic<bool> _shuttingDown{false};  // NOLINT
 };
 
 WiredTigerKVEngine::WiredTigerKVEngine(const std::string& path,

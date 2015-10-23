@@ -810,7 +810,7 @@ void ReplSource::syncToTailOfRemoteLog() {
     }
 }
 
-std::atomic<int> replApplyBatchSize(1);
+std::atomic<int> replApplyBatchSize(1);  // NOLINT
 
 class ReplApplyBatchSize
     : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {

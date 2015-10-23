@@ -38,7 +38,7 @@ namespace mongo {
 namespace fts {
 namespace {
 
-std::atomic<bool> dummyEnabledFlag(true);  // Unused, needed for server parameter.
+std::atomic<bool> dummyEnabledFlag(true);  // Unused, needed for server parameter.  NOLINT
 
 /**
  * Declaration for the "textSearchEnabled" server parameter, which is now deprecated.

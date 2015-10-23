@@ -1657,6 +1657,13 @@ def CheckForMongoPolyfill(filename, clean_lines, linenum, error):
     error(filename, linenum, 'mongodb/polyfill', 5,
           'Illegal use of banned name from std::/boost::, use mongo::stdx:: variant instead')
 
+def CheckForMongoAtomic(filename, clean_lines, linenum, error):
+  line = clean_lines.elided[linenum]
+  if re.search('std::atomic', line):
+    error(filename, linenum, 'mongodb/stdatomic', 5,
+          'Illegal use of prohibited std::atomic<T>, use AtomicWord<T> or other types '
+          'from "mongo/platform/atomic_word.h"')
+
 def CheckForCopyright(filename, lines, error):
   """Logs an error if no Copyright message appears at the top of the file."""
 
@@ -5799,6 +5806,7 @@ def ProcessLine(filename, file_extension, clean_lines, line,
   CheckForNamespaceIndentation(filename, nesting_state, clean_lines, line,
                                error)
   CheckForMongoPolyfill(filename, clean_lines, line, error)
+  CheckForMongoAtomic(filename, clean_lines, line, error)
   if nesting_state.InAsmBlock(): return
   CheckForFunctionLengths(filename, clean_lines, line, function_state, error)
   CheckForMultilineCommentsAndStrings(filename, clean_lines, line, error)

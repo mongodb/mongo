@@ -39,7 +39,7 @@
 
 namespace mongo {
 
-std::atomic<long long> ClusterCursorCleanupJob::cursorTimeoutMillis(
+std::atomic<long long> ClusterCursorCleanupJob::cursorTimeoutMillis(  // NOLINT
     durationCount<stdx::chrono::milliseconds>(stdx::chrono::minutes(10)));
 
 ExportedServerParameter<long long, ServerParameterType::kStartupAndRuntime>

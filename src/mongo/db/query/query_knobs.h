@@ -40,70 +40,70 @@ namespace mongo {
 
 // Max number of times we call work() on plans before comparing them,
 // for small collections.
-extern std::atomic<int> internalQueryPlanEvaluationWorks;
+extern std::atomic<int> internalQueryPlanEvaluationWorks;  // NOLINT
 
 // For large collections, the number times we work() candidate plans is
 // taken as this fraction of the collection size.
-extern AtomicDouble internalQueryPlanEvaluationCollFraction;
+extern AtomicDouble internalQueryPlanEvaluationCollFraction;  // NOLINT
 
 // Stop working plans once a plan returns this many results.
-extern std::atomic<int> internalQueryPlanEvaluationMaxResults;
+extern std::atomic<int> internalQueryPlanEvaluationMaxResults;  // NOLINT
 
 // Do we give a big ranking bonus to intersection plans?
-extern std::atomic<bool> internalQueryForceIntersectionPlans;
+extern std::atomic<bool> internalQueryForceIntersectionPlans;  // NOLINT
 
 // Do we have ixisect on at all?
-extern std::atomic<bool> internalQueryPlannerEnableIndexIntersection;
+extern std::atomic<bool> internalQueryPlannerEnableIndexIntersection;  // NOLINT
 
 // Do we use hash-based intersection for rooted $and queries?
-extern std::atomic<bool> internalQueryPlannerEnableHashIntersection;
+extern std::atomic<bool> internalQueryPlannerEnableHashIntersection;  // NOLINT
 
 //
 // plan cache
 //
 
 // How many entries in the cache?
-extern std::atomic<int> internalQueryCacheSize;
+extern std::atomic<int> internalQueryCacheSize;  // NOLINT
 
 // How many feedback entries do we collect before possibly evicting from the cache based on bad
 // performance?
-extern std::atomic<int> internalQueryCacheFeedbacksStored;
+extern std::atomic<int> internalQueryCacheFeedbacksStored;  // NOLINT
 
 // How many times more works must we perform in order to justify plan cache eviction
 // and replanning?
-extern AtomicDouble internalQueryCacheEvictionRatio;
+extern AtomicDouble internalQueryCacheEvictionRatio;  // NOLINT
 
 //
 // Planning and enumeration.
 //
 
 // How many indexed solutions will QueryPlanner::plan output?
-extern std::atomic<int> internalQueryPlannerMaxIndexedSolutions;
+extern std::atomic<int> internalQueryPlannerMaxIndexedSolutions;  // NOLINT
 
 // How many solutions will the enumerator consider at each OR?
-extern std::atomic<int> internalQueryEnumerationMaxOrSolutions;
+extern std::atomic<int> internalQueryEnumerationMaxOrSolutions;  // NOLINT
 
 // How many intersections will the enumerator consider at each AND?
-extern std::atomic<int> internalQueryEnumerationMaxIntersectPerAnd;
+extern std::atomic<int> internalQueryEnumerationMaxIntersectPerAnd;  // NOLINT
 
 // Do we want to plan each child of the OR independently?
-extern std::atomic<bool> internalQueryPlanOrChildrenIndependently;
+extern std::atomic<bool> internalQueryPlanOrChildrenIndependently;  // NOLINT
 
 // How many index scans are we willing to produce in order to obtain a sort order
 // during explodeForSort?
-extern std::atomic<int> internalQueryMaxScansToExplode;
+extern std::atomic<int> internalQueryMaxScansToExplode;  // NOLINT
 
 //
 // Query execution.
 //
 
-extern std::atomic<int> internalQueryExecMaxBlockingSortBytes;
+extern std::atomic<int> internalQueryExecMaxBlockingSortBytes;  // NOLINT
 
 // Yield after this many "should yield?" checks.
-extern std::atomic<int> internalQueryExecYieldIterations;
+extern std::atomic<int> internalQueryExecYieldIterations;  // NOLINT
 
 // Yield if it's been at least this many milliseconds since we last yielded.
-extern std::atomic<int> internalQueryExecYieldPeriodMS;
+extern std::atomic<int> internalQueryExecYieldPeriodMS;  // NOLINT
 
 // Limit the size that we write without yielding to 16MB / 64 (max expected number of indexes)
 const int64_t insertVectorMaxBytes = 256 * 1024;

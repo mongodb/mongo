@@ -78,7 +78,7 @@ struct ServerGlobalParams {
 
     bool indexBuildRetry;  // --noIndexBuildRetry
 
-    std::atomic<bool> quiet;  // --quiet
+    std::atomic<bool> quiet;  // --quiet NOLINT
 
     bool configsvr;                                  // --configsvr
     CatalogManager::ConfigServerMode configsvrMode;  // -- configsvrMode

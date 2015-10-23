@@ -79,6 +79,6 @@ public:
      * If true, will call printStackTrace on every WriteConflictException created.
      * Can be set via setParameter named traceWriteConflictExceptions.
      */
-    static std::atomic<bool> trace;
+    static std::atomic<bool> trace;  // NOLINT
 };
 }

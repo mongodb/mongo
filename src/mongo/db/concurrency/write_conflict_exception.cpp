@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-std::atomic<bool> WriteConflictException::trace(false);
+std::atomic<bool> WriteConflictException::trace(false);  // NOLINT
 
 WriteConflictException::WriteConflictException()
     : DBException("WriteConflict", ErrorCodes::WriteConflict) {

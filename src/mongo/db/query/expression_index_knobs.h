@@ -39,24 +39,24 @@ namespace mongo {
 /**
  * The maximum number of cells to use for 2D geo query covering for predicate queries
  */
-extern std::atomic<int> internalGeoPredicateQuery2DMaxCoveringCells;
+extern std::atomic<int> internalGeoPredicateQuery2DMaxCoveringCells;  // NOLINT
 
 /**
  * The maximum number of cells to use for 2D geo query covering for predicate queries
  */
-extern std::atomic<int> internalGeoNearQuery2DMaxCoveringCells;
+extern std::atomic<int> internalGeoNearQuery2DMaxCoveringCells;  // NOLINT
 
 //
 // Geo query.
 //
 
 // What is the finest level we will cover a queried region or geoNear annulus?
-extern std::atomic<int> internalQueryS2GeoFinestLevel;
+extern std::atomic<int> internalQueryS2GeoFinestLevel;  // NOLINT
 
 // What is the coarsest level we will cover a queried region or geoNear annulus?
-extern std::atomic<int> internalQueryS2GeoCoarsestLevel;
+extern std::atomic<int> internalQueryS2GeoCoarsestLevel;  // NOLINT
 
 // What is the maximum cell count that we want? (advisory, not a hard threshold)
-extern std::atomic<int> internalQueryS2GeoMaxCells;
+extern std::atomic<int> internalQueryS2GeoMaxCells;  // NOLINT
 
 }  // namespace mongo

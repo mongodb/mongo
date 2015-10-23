@@ -48,8 +48,8 @@ struct SASLGlobalParams {
     std::string hostName;
     std::string serviceName;
     std::string authdPath;
-    std::atomic<int> scramIterationCount;
-    std::atomic<int> authFailedDelay;
+    std::atomic<int> scramIterationCount;  // NOLINT
+    std::atomic<int> authFailedDelay;      // NOLINT
 
     SASLGlobalParams();
 };

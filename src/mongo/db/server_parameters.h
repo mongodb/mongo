@@ -161,7 +161,7 @@ class is_safe_runtime_parameter_type<double> : public std::true_type {};
 template <typename T, ServerParameterType paramType>
 class server_parameter_storage_type {
 public:
-    using value_type = std::atomic<T>;
+    using value_type = std::atomic<T>;  // NOLINT
 };
 
 template <typename T>

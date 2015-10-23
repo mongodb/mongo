@@ -45,7 +45,7 @@ class ServerSelectionMetadata;
 }  // namespace rpc
 
 // A spigot to enable the ClusterClientCursor codepath.
-extern std::atomic<bool> useClusterClientCursor;
+extern std::atomic<bool> useClusterClientCursor;  // NOLINT
 
 /**
  * Legacy interface for processing client read/write/cmd requests.
