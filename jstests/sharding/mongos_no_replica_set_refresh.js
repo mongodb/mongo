@@ -1,11 +1,31 @@
 // Tests whether new sharding is detected on insert by mongos
 load("jstests/replsets/rslib.js");
 (function () {
-var st = new ShardingTest(name = "test", 
-                          shards = 1, 
-                          verbose = 2, 
-                          mongos = 2, 
-                          other = { rs : true });
+var st = new ShardingTest(
+    name = "test",
+    shards = 1,
+    verbose = 2,
+    mongos = 2,
+    other = {
+        rs0: {
+            nodes: [
+                {rsConfig: {priority: 10}},
+                {},
+                {},
+            ],
+        },
+    }
+);
+
+var rsObj = st._rs[0].test;
+assert.commandWorked(
+    rsObj.nodes[0].adminCommand({
+        replSetTest: 1,
+        waitForMemberState: rsObj.PRIMARY,
+        timeoutMillis: 60 * 1000,
+    }),
+    'node 0 ' + rsObj.nodes[0].host + ' failed to become primary'
+);
 
 var mongos = st.s;
 var config = mongos.getDB("config");
@@ -14,19 +34,11 @@ config.settings.update({ _id : "balancer" }, { $set : { stopped : true } }, true
 
 printjson( mongos.getCollection("foo.bar").findOne() );
 
-var rsObj = st._rs[0].test;
 var primary = rsObj.getPrimary();
-var secondaries = rsObj.getSecondaries();
 
 jsTestLog( "Reconfiguring replica set..." );
 
-var rsConfig = primary.getDB("local").system.replset.findOne();
-// First, make sure the last node in the config is not the primary
-rsConfig.members[0].priority = 10;
-rsConfig.version++;
-reconfig(rsObj, rsConfig);
-rsObj.waitForState(rsObj.nodes[0], rsObj.PRIMARY, 60* 1000);
-primary = rsObj.getPrimary();
+var rsConfig = rsObj.getConfigFromPrimary();
 
 // Now remove the last node in the config.
 var removedNode = rsConfig.members.pop();
@@ -34,8 +46,9 @@ rsConfig.version++;
 reconfig(rsObj, rsConfig);
 
 var numRSHosts = function(){
-    var result = primary.getDB("admin").runCommand({ ismaster : 1 });
-    printjson( result );
+    jsTestLog('Checking number of active nodes in ' + rsObj.name);
+    var result = assert.commandWorked(primary.adminCommand({ismaster : 1}));
+    jsTestLog('Active nodes in ' + rsObj.name + ': ' + tojson(result));
     return result.hosts.length;
 };
 
@@ -43,8 +56,10 @@ primary = rsObj.getPrimary();
 assert.soon( function(){ return numRSHosts() < 3; } );
 
 var numMongosHosts = function(){
-    var result = mongos.getDB("admin").runCommand("connPoolStats")["replicaSets"][ rsObj.name ];
-    printjson( result );
+    jsTestLog('Checking number of nodes in ' + rsObj.name + ' connected to mongos...');
+    var commandResult = assert.commandWorked(mongos.adminCommand("connPoolStats"));
+    var result = commandResult.replicaSets[rsObj.name];
+    jsTestLog('Nodes in ' + rsObj.name + ' connected to mongos: ' + tojson(result));
     return result.hosts.length;
 };
 
