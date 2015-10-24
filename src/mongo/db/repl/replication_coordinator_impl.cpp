@@ -3100,7 +3100,7 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationCoordinatorImpl::upda
 
     if (!isV1ElectionProtocol()) {
         // Do not update if not in V1 protocol.
-        return Status::OK();
+        return ReplicationExecutor::CallbackHandle();
     }
 
     auto work =
