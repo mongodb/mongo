@@ -1127,8 +1127,13 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
             if( status.members[i].name == node.host || status.members[i].name == node.name ) {
                 for( var j = 0; j < states.length; j++ ) {
                     if( printStatus ) {
-                        print( "Status " + " : " + status.members[i][ind] +
-                                "  target state : " + states[j] );
+                        print( "Status -- " + " current state: " + status.members[i][ind] +
+                                ",  target state : " + states[j] );
+                    }
+
+                    if (typeof(states[j]) != "number") {
+                        throw new Error("State was not an number -- type:"
+                                        + typeof(states[j]) + ", value:" + states[j]);
                     }
                     if( status.members[i][ind] == states[j] ) {
                         return true;
