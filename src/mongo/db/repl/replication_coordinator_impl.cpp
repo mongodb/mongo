@@ -3127,6 +3127,11 @@ Status ReplicationCoordinatorImpl::updateTerm(long long term) {
 }
 
 bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term) {
+    if (!isV1ElectionProtocol()) {
+        warning() << "Cannot update term in election protocol version 0";
+        return false;
+    }
+
     auto now = _replExecutor.now();
     bool updated = _topCoord->updateTerm(term, now);
     {
