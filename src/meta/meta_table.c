@@ -225,7 +225,12 @@ __wt_metadata_search(
 		return (__wt_turtle_read(session, key, valuep));
 
 	/*
-	 * All metadata reads are at read-uncommitted isolation.
+	 * All metadata reads are at read-uncommitted isolation.  That's
+	 * because once a schema-level operation completes, subsequent
+	 * operations must see the current version of checkpoint metadata, or
+	 * they may try to read blocks that may have been freed from a file.
+	 * Metadata updates use non-transactional techniques (such as the
+	 * schema and metadata locks) to protect access to in-flight updates.
 	 */
 	if ((txn = &session->txn) != NULL) {
 		iso_orig = txn->isolation;
