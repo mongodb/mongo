@@ -524,3 +524,284 @@ sh.getRecentMigrations = function(configDB) {
 
     return result;
 };
+
+function printShardingStatus(configDB, verbose) {
+    // configDB is a DB object that contains the sharding metadata of interest.
+    // Defaults to the db named "config" on the current connection.
+    if (configDB === undefined)
+        configDB = db.getSisterDB('config')
+
+    var version = configDB.getCollection( "version" ).findOne();
+    if ( version == null ){
+        print( "printShardingStatus: this db does not have sharding enabled. be sure you are connecting to a mongos from the shell and not to a mongod." );
+        return;
+    }
+
+    var raw = "";
+    var output = function(s){
+        raw += s + "\n";
+    }
+    output( "--- Sharding Status --- " );
+    output( "  sharding version: " + tojson( configDB.getCollection( "version" ).findOne() ) );
+
+    output( "  shards:" );
+    configDB.shards.find().sort( { _id : 1 } ).forEach( 
+        function(z){
+            output( "\t" + tojsononeline( z ) );
+        }
+    );
+
+    // (most recently) active mongoses
+    var mongosActiveThresholdMs = 60000;
+    var mostRecentMongos = configDB.mongos.find().sort( { ping : -1 } ).limit(1);
+    var mostRecentMongosTime = null;
+    var mongosAdjective = "most recently active";
+    if (mostRecentMongos.hasNext()) {
+        mostRecentMongosTime = mostRecentMongos.next().ping;
+        // Mongoses older than the threshold are the most recent, but cannot be
+        // considered "active" mongoses. (This is more likely to be an old(er)
+        // configdb dump, or all the mongoses have been stopped.)
+        if (mostRecentMongosTime.getTime() >= Date.now() - mongosActiveThresholdMs) {
+            mongosAdjective = "active";
+        }
+    }
+
+    output( "  " + mongosAdjective + " mongoses:" );
+    if (mostRecentMongosTime === null) {
+        output( "\tnone" );
+    } else {
+        var recentMongosQuery = {
+            ping: {
+                $gt: (function () {
+                    var d = mostRecentMongosTime;
+                    d.setTime(d.getTime() - mongosActiveThresholdMs);
+                    return d;
+                } )()
+            }
+        };
+
+        if ( verbose ) {
+            configDB.mongos.find( recentMongosQuery ).sort( { ping : -1 } ).forEach(
+                function (z) {
+                    output( "\t" + tojsononeline( z ) );
+                }
+            );
+        } else {
+            configDB.mongos.aggregate( [
+                        { $match: recentMongosQuery },
+                        { $group: { _id: "$mongoVersion", num: { $sum: 1 } } },
+                        { $sort: { num: -1 } }
+                    ] ).forEach(
+                function (z) {
+                    output( "\t" + tojson( z._id ) + " : " + z.num );
+                }
+            );
+        }
+    }
+
+    output( "  balancer:" );
+
+    //Is the balancer currently enabled
+    output( "\tCurrently enabled:  " + ( sh.getBalancerState(configDB) ? "yes" : "no" ) );
+
+    //Is the balancer currently active
+    output( "\tCurrently running:  " + ( sh.isBalancerRunning(configDB) ? "yes" : "no" ) );
+
+    //Output details of the current balancer round
+    var balLock = sh.getBalancerLockDetails(configDB)
+    if ( balLock ) {
+        output( "\t\tBalancer lock taken at " + balLock.when + " by " + balLock.who );
+    }
+
+    //Output the balancer window
+    var balSettings = sh.getBalancerWindow(configDB)
+    if ( balSettings ) {
+        output( "\t\tBalancer active window is set between " +
+            balSettings.start + " and " + balSettings.stop + " server local time");
+    }
+
+    //Output the list of active migrations
+    var activeMigrations = sh.getActiveMigrations(configDB)
+    if (activeMigrations.length > 0 ){
+        output("\tCollections with active migrations: ");
+        activeMigrations.forEach( function(migration){
+            output("\t\t"+migration._id+ " started at " + migration.when );
+        });
+    }
+
+    // Actionlog and version checking only works on 2.7 and greater
+    var versionHasActionlog = false;
+    var metaDataVersion = configDB.getCollection("version").findOne().currentVersion
+    if ( metaDataVersion > 5 ) {
+        versionHasActionlog = true;
+    }
+    if ( metaDataVersion == 5 ) {
+        var verArray = db.serverBuildInfo().versionArray
+        if (verArray[0] == 2 && verArray[1] > 6){
+            versionHasActionlog = true;
+        }
+    }
+
+    if ( versionHasActionlog ) {
+        //Review config.actionlog for errors
+        var actionReport = sh.getRecentFailedRounds(configDB);
+        //Always print the number of failed rounds
+        output( "\tFailed balancer rounds in last 5 attempts:  " + actionReport.count )
+
+        //Only print the errors if there are any
+        if ( actionReport.count > 0 ){
+            output( "\tLast reported error:  " + actionReport.lastErr )
+            output( "\tTime of Reported error:  " + actionReport.lastTime )
+        }
+
+        output("\tMigration Results for the last 24 hours: ");
+        var migrations = sh.getRecentMigrations(configDB)
+        if(migrations.length > 0) {
+            migrations.forEach( function(x) {
+                if (x._id === "Success"){
+                    output( "\t\t" + x.count + " : " + x._id)
+                } else {
+                    output( "\t\t" + x.count + " : Failed with error '" +  x._id
+                    + "', from " + x.from + " to " + x.to )
+                }
+            });
+        } else {
+                output( "\t\tNo recent migrations");
+        }
+    }
+
+    output( "  databases:" );
+    configDB.databases.find().sort( { name : 1 } ).forEach( 
+        function(db){
+            var truthy = function (value) {
+                return !!value;
+            }
+            var nonBooleanNote = function (name, value) {
+                // If the given value is not a boolean, return a string of the
+                // form " (<name>: <value>)", where <value> is converted to JSON.
+                var t = typeof(value);
+                var s = "";
+                if (t != "boolean" && t != "undefined") {
+                    s = " (" + name + ": " + tojson(value) + ")";
+                }
+                return s;
+            }
+
+            output( "\t" + tojsononeline(db,"",true) );
+        
+            if (db.partitioned){
+                configDB.collections.find( { _id : new RegExp( "^" +
+                    RegExp.escape(db._id) + "\\." ) } ).
+                    sort( { _id : 1 } ).forEach( function( coll ){
+                        if ( ! coll.dropped ){
+                            output( "\t\t" + coll._id );
+                            output( "\t\t\tshard key: " + tojson(coll.key) );
+                            output( "\t\t\tunique: " + truthy(coll.unique)
+                                    + nonBooleanNote("unique", coll.unique) );
+                            output( "\t\t\tbalancing: " + !truthy(coll.noBalance)
+                                    + nonBooleanNote("noBalance", coll.noBalance) );
+                            output( "\t\t\tchunks:" );
+
+                            res = configDB.chunks.aggregate( { $match : { ns : coll._id } } ,
+                                                             { $group : { _id : "$shard" ,
+                                                                          cnt : { $sum : 1 } } } ,
+                                                             { $project : { _id : 0 ,
+                                                                            shard : "$_id" ,
+                                                                            nChunks : "$cnt" } } ,
+                                                             { $sort : { shard : 1 } } ).toArray();
+                            var totalChunks = 0;
+                            res.forEach( function(z){
+                                totalChunks += z.nChunks;
+                                output( "\t\t\t\t" + z.shard + "\t" + z.nChunks );
+                            } )
+                            
+                            if ( totalChunks < 20 || verbose ){
+                                configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
+                                    function(chunk){
+                                        output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
+                                                " on : " + chunk.shard + " " + tojson( chunk.lastmod ) + " " +
+                                                ( chunk.jumbo ? "jumbo " : "" ) );
+                                    }
+                                );
+                            }
+                            else {
+                                output( "\t\t\ttoo many chunks to print, use verbose if you want to force print" );
+                            }
+
+                            configDB.tags.find( { ns : coll._id } ).sort( { min : 1 } ).forEach( 
+                                function( tag ) {
+                                    output( "\t\t\t tag: " + tag.tag + "  " + tojson( tag.min ) + " -->> " + tojson( tag.max ) );
+                                }
+                            )
+                        }
+                    }
+                )
+            }
+        }
+    );
+    
+    print( raw );
+}
+
+function printShardingSizes(configDB) {
+    // configDB is a DB object that contains the sharding metadata of interest.
+    // Defaults to the db named "config" on the current connection.
+    if (configDB === undefined)
+        configDB = db.getSisterDB('config')
+
+    var version = configDB.getCollection( "version" ).findOne();
+    if ( version == null ){
+        print( "printShardingSizes : not a shard db!" );
+        return;
+    }
+
+    var raw = "";
+    var output = function(s){
+        raw += s + "\n";
+    }
+    output( "--- Sharding Status --- " );
+    output( "  sharding version: " + tojson( configDB.getCollection( "version" ).findOne() ) );
+
+    output( "  shards:" );
+    var shards = {};
+    configDB.shards.find().forEach( 
+        function(z){
+            shards[z._id] = new Mongo(z.host);
+            output( "      " + tojson(z) );
+        }
+    );
+
+    var saveDB = db;
+    output( "  databases:" );
+    configDB.databases.find().sort( { name : 1 } ).forEach( 
+        function(db){
+            output( "\t" + tojson(db,"",true) );
+        
+            if (db.partitioned){
+                configDB.collections.find( { _id : new RegExp( "^" +
+                    RegExp.escape(db._id) + "\." ) } ).
+                    sort( { _id : 1 } ).forEach( function( coll ){
+                        output("\t\t" + coll._id + " chunks:");
+                        configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
+                            function(chunk){
+                                var mydb = shards[chunk.shard].getDB(db._id)
+                                var out = mydb.runCommand({dataSize: coll._id,
+                                                           keyPattern: coll.key, 
+                                                           min: chunk.min,
+                                                           max: chunk.max });
+                                delete out.millis;
+                                delete out.ok;
+
+                                output( "\t\t\t" + tojson( chunk.min ) + " -->> " + tojson( chunk.max ) + 
+                                        " on : " + chunk.shard + " " + tojson( out ) );
+
+                            }
+                        );
+                    }
+                )
+            }
+        }
+    );
+    
+    print( raw );
+};
