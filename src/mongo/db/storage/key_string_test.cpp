@@ -152,6 +152,7 @@ TEST(KeyStringTest, AllTypesSimple) {
                                              << "a"))));
     ROUNDTRIP(BSON("" << 5));
     ROUNDTRIP(BSON("" << Timestamp(123123, 123)));
+    ROUNDTRIP(BSON("" << Timestamp(~0U, 3)));
     ROUNDTRIP(BSON("" << 1235123123123LL));
 }
 
@@ -312,6 +313,7 @@ TEST(KeyStringTest, Timestamp) {
     BSONObj b = BSON("" << Timestamp(1234, 1));
     BSONObj c = BSON("" << Timestamp(1234, 2));
     BSONObj d = BSON("" << Timestamp(1235, 1));
+    BSONObj e = BSON("" << Timestamp(~0U, 0));
 
     {
         ROUNDTRIP(a);
@@ -326,10 +328,12 @@ TEST(KeyStringTest, Timestamp) {
         KeyString kb(b, ALL_ASCENDING);
         KeyString kc(c, ALL_ASCENDING);
         KeyString kd(d, ALL_ASCENDING);
+        KeyString ke(e, ALL_ASCENDING);
 
         ASSERT(ka.compare(kb) < 0);
         ASSERT(kb.compare(kc) < 0);
         ASSERT(kc.compare(kd) < 0);
+        ASSERT(kd.compare(ke) < 0);
     }
 
     {

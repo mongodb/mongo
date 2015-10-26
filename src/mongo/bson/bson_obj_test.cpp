@@ -41,6 +41,12 @@ TEST(BSONObjToString, EmptyArray) {
     ASSERT_EQUALS(text, o1_str);
 }
 
+TEST(BSONObjCompare, Timestamp) {
+    ASSERT_LT(BSON("" << Timestamp(0, 3)), BSON("" << Timestamp(~0U, 2)));
+    ASSERT_GT(BSON("" << Timestamp(2, 3)), BSON("" << Timestamp(2, 2)));
+    ASSERT_EQ(BSON("" << Timestamp(3ULL)), BSON("" << Timestamp(0, 3)));
+}
+
 TEST(BSONObjCompare, NumberDouble) {
     ASSERT_LT(BSON("" << 0.0), BSON("" << 1.0));
     ASSERT_LT(BSON("" << -1.0), BSON("" << 0.0));

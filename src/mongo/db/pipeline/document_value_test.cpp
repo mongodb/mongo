@@ -651,6 +651,11 @@ public:
         ASSERT(Timestamp(777) == value.getTimestamp());
         ASSERT_EQUALS(mongo::bsonTimestamp, value.getType());
         assertRoundTrips(value);
+
+        value = Value(Timestamp(~0U, 3));
+        ASSERT(Timestamp(~0U, 3) == value.getTimestamp());
+        ASSERT_EQUALS(mongo::bsonTimestamp, value.getType());
+        assertRoundTrips(value);
     }
 };
 
@@ -1525,6 +1530,8 @@ public:
         // Timestamp.
         assertComparison(0, Timestamp(1234), Timestamp(1234));
         assertComparison(-1, Timestamp(4), Timestamp(1234));
+        // High bit set.
+        assertComparison(1, Timestamp(~0U, 2), Timestamp(0, 3));
 
         // Cross-type comparisons. Listed in order of canonical types.
         assertComparison(-1, Value(mongo::MINKEY), Value());
