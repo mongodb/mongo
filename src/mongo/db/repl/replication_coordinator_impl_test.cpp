@@ -3323,12 +3323,18 @@ TEST_F(ReplCoordTest, WaitForMemberState) {
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    auto replCoord = this->getReplCoord();
+    auto replCoord = getReplCoord();
+    auto initialTerm = replCoord->getTerm();
     replCoord->setMyLastOptime(OpTime(Timestamp(1, 0), 0));
     ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
 
-    // Single node cluster - this node should transition to PRIMARY from SECONDARY immediately.
-    auto timeout = Milliseconds(10);
+    // Successful dry run election increases term.
+    ASSERT_EQUALS(initialTerm + 1, replCoord->getTerm());
+
+    // Single node cluster - this node should start election on setFollowerMode() completion.
+    replCoord->waitForElectionFinish_forTest();
+
+    auto timeout = Milliseconds(1);
     ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, timeout));
     ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
                   replCoord->waitForMemberState(MemberState::RS_REMOVED, timeout));
@@ -3351,12 +3357,18 @@ TEST_F(ReplCoordTest, WaitForDrainFinish) {
                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                      << "test1:1234"))),
                        HostAndPort("test1", 1234));
-    auto replCoord = this->getReplCoord();
+    auto replCoord = getReplCoord();
+    auto initialTerm = replCoord->getTerm();
     replCoord->setMyLastOptime(OpTime(Timestamp(1, 0), 0));
     ASSERT_TRUE(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
 
-    // Single node cluster - this node should transition to PRIMARY from SECONDARY immediately.
-    auto timeout = Milliseconds(10);
+    // Successful dry run election increases term.
+    ASSERT_EQUALS(initialTerm + 1, replCoord->getTerm());
+
+    // Single node cluster - this node should start election on setFollowerMode() completion.
+    replCoord->waitForElectionFinish_forTest();
+
+    auto timeout = Milliseconds(1);
     ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, timeout));
 
     ASSERT_TRUE(replCoord->isWaitingForApplierToDrain());
