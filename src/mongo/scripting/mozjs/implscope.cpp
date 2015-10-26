@@ -38,6 +38,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/platform/stack_locator.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
@@ -227,13 +228,22 @@ MozJSImplScope::MozRuntime::MozRuntime() {
 
         _runtime = JS_NewRuntime(kMaxBytesBeforeGC);
 
-        // TODO: Re-enable this when it can be done in a way that does
-        // not conflict with the performance fix in SERVER-20678. The
-        // jscore/recursion.js tes tshould be re-enabled when this is
-        // uncommented.
-        //
-        // static_assert(kMaxStackBytes > (32 * 1024), "kMaxStackBytes must be larger than 32k");
-        // JS_SetNativeStackQuota(_runtime, kMaxStackBytes - (32 * 1024));
+        const StackLocator locator;
+        const auto available = locator.available();
+        if (available) {
+            // We fudge by 64k for a two reasons. First, it appears
+            // that the internal recursion checks that SM performs can
+            // have stack usage between checks of more than 32k in
+            // some builds. Second, some platforms report the guard
+            // page (in the linux sense) as "part of the stack", even
+            // though accessing that page will fault the process. We
+            // don't have a good way of getting information about the
+            // guard page on those platforms.
+            //
+            // TODO: What if we are running on a platform with very
+            // large pages, like 4MB?
+            JS_SetNativeStackQuota(_runtime, available.get() - (64 * 1024));
+        }
     }
 
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSRuntime", _runtime);
