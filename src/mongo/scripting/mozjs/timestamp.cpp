@@ -30,6 +30,9 @@
 
 #include "mongo/scripting/mozjs/timestamp.h"
 
+#include <limits>
+#include <string>
+
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -42,6 +45,23 @@ namespace mozjs {
 
 const char* const TimestampInfo::className = "Timestamp";
 
+namespace {
+// Checks that argument 'idx' of 'args' is a number in the range of an unsigned 32-bit integer,
+// or uasserts a complaint about an invalid value for 'name'.
+double getTimestampArg(JSContext* cx, JS::CallArgs args, int idx, std::string name) {
+    int64_t maxArgVal = std::numeric_limits<uint32_t>::max();
+    if (!args.get(idx).isNumber())
+        uasserted(ErrorCodes::BadValue, str::stream() << name << " must be a number");
+    int64_t val = ValueWriter(cx, args.get(idx)).toInt64();
+    if (val < 0 || val > maxArgVal) {
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << name << " must be non-negative and not greater than "
+                                << maxArgVal << ", got " << val);
+    }
+    return val;
+}
+}  // namespace
+
 void TimestampInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
@@ -53,20 +73,8 @@ void TimestampInfo::construct(JSContext* cx, JS::CallArgs args) {
         o.setNumber(InternedString::t, 0);
         o.setNumber(InternedString::i, 0);
     } else if (args.length() == 2) {
-        if (!args.get(0).isNumber())
-            uasserted(ErrorCodes::BadValue, "Timestamp time must be a number");
-        if (!args.get(1).isNumber())
-            uasserted(ErrorCodes::BadValue, "Timestamp increment must be a number");
-
-        int64_t t = ValueWriter(cx, args.get(0)).toInt64();
-        int64_t largestVal = int64_t(Timestamp::max().getSecs());
-        if (t > largestVal)
-            uasserted(ErrorCodes::BadValue,
-                      str::stream() << "The first argument must be in seconds; " << t
-                                    << " is too large (max " << largestVal << ")");
-
-        o.setValue(InternedString::t, args.get(0));
-        o.setValue(InternedString::i, args.get(1));
+        o.setNumber(InternedString::t, getTimestampArg(cx, args, 0, "Timestamp time (seconds)"));
+        o.setNumber(InternedString::i, getTimestampArg(cx, args, 1, "Timestamp increment"));
     } else {
         uasserted(ErrorCodes::BadValue, "Timestamp needs 0 or 2 arguments");
     }

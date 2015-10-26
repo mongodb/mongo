@@ -850,12 +850,12 @@ public:
     }
 };
 
-class InvalidTimestamp {
+class MaxTimestamp {
 public:
     void run() {
         unique_ptr<Scope> s(globalScriptEngine->newScope());
 
-        // Timestamp 't' component cannot exceed max for int32_t.
+        // Timestamp 't' component can exceed max for int32_t.
         BSONObj in;
         {
             BSONObjBuilder b;
@@ -867,7 +867,7 @@ public:
         }
         s->setObject("a", in);
 
-        ASSERT_FALSE(s->exec("x = tojson( a ); ", "foo", false, true, false));
+        ASSERT(s->exec("x = tojson( a ); ", "foo", false, true, false));
     }
 };
 
@@ -2386,7 +2386,7 @@ public:
             add<NumberDecimalBigObject>();
         }
 
-        add<InvalidTimestamp>();
+        add<MaxTimestamp>();
         add<RenameTest>();
 
         add<WeirdObjects>();

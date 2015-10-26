@@ -26,6 +26,20 @@ b = Timestamp(a.t, a.i);
 printjson(a);
 assert.eq(tojson(a), tojson(b), "timestamp");
 
+assert.throws(function() { Timestamp(-2, 3); }, null,
+              "Timestamp time must not accept negative time" );
+assert.throws(function() { Timestamp(0, -1); }, null,
+              "Timestamp increment must not accept negative time" );
+assert.throws(function() { Timestamp(0x10000 * 0x10000, 0); }, null,
+              "Timestamp time must not accept values larger than 2**32 - 1");
+assert.throws(function() { Timestamp(0, 0x10000 * 0x10000); }, null,
+              "Timestamp increment must not accept values larger than 2**32 - 1");
+
+a = new Timestamp(0x80008000, 0x80008000 + 0.5);
+b = Timestamp(a.t, Math.round(a.i));
+printjson(a);
+assert.eq(tojson(a), tojson(b), "timestamp");
+
 a = new BinData(3,"VQ6EAOKbQdSnFkRmVUQAAA==");
 b = BinData(a.type, a.base64());
 printjson(a);

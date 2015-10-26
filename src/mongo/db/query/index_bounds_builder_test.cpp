@@ -281,6 +281,25 @@ TEST(IndexBoundsBuilderTest, TranslateLtDate) {
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
+TEST(IndexBoundsBuilderTest, TranslateGtTimestamp) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << GT << Timestamp(2, 3));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  //  Constant below is ~0U, or 2**32 - 1, but cannot be written that way in JS
+                  oil.intervals[0].compare(Interval(
+                      fromjson("{'': Timestamp(2, 3), '': Timestamp(4294967295, 4294967295)}"),
+                      false,
+                      true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+}
+
 TEST(IndexBoundsBuilderTest, TranslateGtNumber) {
     IndexEntry testIndex = IndexEntry(BSONObj());
     BSONObj obj = fromjson("{a: {$gt: 1}}");
