@@ -753,7 +753,8 @@ static void normalizeInserts(const BatchedCommandRequest& request,
 static void insertOne(WriteBatchExecutor::ExecInsertsState* state, WriteOpResult* result);
 
 // Loops over the specified subset of the batch, processes one document at a time.
-void WriteBatchExecutor::insertMany(WriteBatchExecutor::ExecInsertsState* state,
+// Returns a true to discontinue the insert, or false if not.
+bool WriteBatchExecutor::insertMany(WriteBatchExecutor::ExecInsertsState* state,
                                     size_t startIndex,
                                     size_t endIndex,
                                     CurOp* currentOp,
@@ -791,11 +792,12 @@ void WriteBatchExecutor::insertMany(WriteBatchExecutor::ExecInsertsState* state,
             CurOp* const currentOp = CurOp::get(_txn);
             logCurOpError(currentOp, error);
             if (ordered)
-                break;
+                return true;
         } else {
             _le->recordInsert(nInserted);
         }
     }
+    return false;
 }
 
 // Instantiates an ExecInsertsState, which represents all of the state for the batch.
@@ -832,7 +834,8 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
 
         if ((chunkCount >= chunkMaxCount) || (chunkBytes >= insertVectorMaxBytes) ||
             (i == maxIndex)) {
-            insertMany(&state, startIndex, i + 1, currentOp, errors, request.getOrdered());
+            bool stop;
+            stop = insertMany(&state, startIndex, i + 1, currentOp, errors, request.getOrdered());
             startIndex = i + 1;
             chunkCount = 0;
             chunkBytes = 0;
@@ -846,6 +849,8 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
                 // Since the lock manager guarantees FIFO queues waiting on locks,
                 // there is no need to explicitly sleep or give up control of the processor here.
             }
+            if (stop)
+                break;
         }
     }
 }

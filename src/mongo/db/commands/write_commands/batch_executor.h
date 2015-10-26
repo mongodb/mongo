@@ -85,8 +85,9 @@ private:
 
     /**
      * Inserts a subset of an insert batch.
+     * Returns a true to discontinue the insert, or false if not.
      */
-    void insertMany(WriteBatchExecutor::ExecInsertsState* state,
+    bool insertMany(WriteBatchExecutor::ExecInsertsState* state,
                     size_t startIndex,
                     size_t endIndex,
                     CurOp* currentOp,

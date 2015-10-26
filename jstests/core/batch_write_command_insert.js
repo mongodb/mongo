@@ -302,6 +302,22 @@ assert(!result.ok, tojson(result));
 assert.eq(coll.getIndexes().length, 0);
 
 //
+// Ensure we error out correctly in the middle of a batch
+coll.drop();
+coll.insert({_id: 50});  // Create a document to force a duplicate key exception.
+
+var bulk = coll.initializeOrderedBulkOp();
+for (i = 1; i < 100; i++) {
+  bulk.insert( { _id: i } );
+}
+try {
+    bulk.execute();
+    assert(false, "should have failed due to duplicate key");
+} catch(err) {
+    assert(coll.count() == 50, "Unexpected number inserted by bulk write: " + coll.count());
+}
+
+//
 // Background index creation
 // Note: due to SERVER-13304 this test is at the end of this file, and we don't drop
 // the collection afterwards.
