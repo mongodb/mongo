@@ -1315,7 +1315,7 @@ public:
         uassert(13343, "query for sharded findAndModify must have shardkey", !shardKey.isEmpty());
 
         ChunkPtr chunk = cm->findIntersectingChunk(shardKey);
-        ShardConnection conn(chunk->getShard(), fullns);
+        ShardConnection conn(chunk->getShard(), fullns, cm);
         BSONObj res;
         bool ok = conn->runCommand(conf->getName(), cmdObj, res);
         conn.done();

@@ -148,13 +148,14 @@ void Command::execCommandClientBasic(OperationContext* txn,
     c->_commandsExecuted.increment();
 
     std::string errmsg;
-    bool ok;
+    bool ok = false;
     try {
         ok = c->run(txn, dbname, cmdObj, queryOptions, errmsg, result, false);
-    } catch (DBException& e) {
-        ok = false;
+    } catch (const DBException& e) {
         int code = e.getCode();
-        if (code == RecvStaleConfigCode) {  // code for StaleConfigException
+
+        // Codes for StaleConfigException
+        if (code == RecvStaleConfigCode || code == SendStaleConfigCode) {
             throw;
         }
 

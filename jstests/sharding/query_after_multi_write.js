@@ -2,8 +2,8 @@
 "use strict";
 
 /**
- * Test that a targetted findAndModify will be properly routed after executing a write that
- * does not perform any shard version checks.
+ * Test that queries will be properly routed after executing a write that does not
+ * perform any shard version checks.
  */
 var runTest = function(writeFunc) {
     var st = new ShardingTest({ shards: 2, mongos: 2 });
@@ -30,16 +30,8 @@ var runTest = function(writeFunc) {
                                                to: 'shard0000',
                                                _waitForDelete: true }));
 
-    // Issue a targetted findAndModify and check that it was upserted to the right shard.
-    assert.commandWorked(testDB2.runCommand({
-        findAndModify: 'user',
-        query: { x: 100 },
-        update: { $set: { y: 1 }},
-        upsert: true
-    }));
-
-    assert.neq(null, st.d0.getDB('test').user.findOne({ x: 100 }));
-    assert.eq(null, st.d1.getDB('test').user.findOne({ x: 100 }));
+    // Issue a query and make sure it gets routed to the right shard.
+    assert.neq(null, testDB2.user.findOne({ x: 123456 }));
 
     // At this point, s1 thinks the version of 'test.user' is 2, bounce it again so it gets
     // incremented to 3
@@ -48,15 +40,8 @@ var runTest = function(writeFunc) {
                                                to: 'shard0001',
                                                _waitForDelete: true }));
 
-    assert.commandWorked(testDB2.runCommand({
-        findAndModify: 'user',
-        query: { x: 200 },
-        update: { $set: { y: 1 }},
-        upsert: true
-    }));
-
-    assert.eq(null, st.d0.getDB('test').user.findOne({ x: 200 }));
-    assert.neq(null, st.d1.getDB('test').user.findOne({ x: 200 }));
+    // Issue a query and make sure it gets routed to the right shard again.
+    assert.neq(null, testDB2.user.findOne({ x: 123456 }));
 
     // At this point, s0 thinks the version of 'test.user' is 3, bounce it again so it gets
     // incremented to 4
@@ -69,15 +54,7 @@ var runTest = function(writeFunc) {
     // ignored.
     writeFunc(testDB2);
 
-    assert.commandWorked(testDB2.runCommand({
-        findAndModify: 'user',
-        query: { x: 300 },
-        update: { $set: { y: 1 }},
-        upsert: true
-    }));
-
-    assert.neq(null, st.d0.getDB('test').user.findOne({ x: 300 }));
-    assert.eq(null, st.d1.getDB('test').user.findOne({ x: 300 }));
+    assert.neq(null, testDB2.user.findOne({ x: 123456 }));
 
     st.stop();
 };
