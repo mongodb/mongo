@@ -72,6 +72,12 @@ using std::unique_ptr;
 using std::vector;
 
 MONGO_FP_DECLARE(skipBalanceRound);
+MONGO_FP_DECLARE(balancerRoundIntervalSetting);
+
+namespace {
+const Seconds kBalanceRoundDefaultInterval(10);
+const Seconds kShortBalanceRoundInterval(1);
+}
 
 Balancer balancer;
 
@@ -500,7 +506,7 @@ void Balancer::run() {
         break;
     }
 
-    const int sleepTime = 10;
+    Seconds balanceRoundInterval(kBalanceRoundDefaultInterval);
 
     while (!inShutdown()) {
         auto txn = cc().makeOperationContext();
@@ -514,6 +520,11 @@ void Balancer::run() {
         try {
             // ping has to be first so we keep things in the config server in sync
             _ping(txn.get());
+
+            MONGO_FAIL_POINT_BLOCK(balancerRoundIntervalSetting, scopedBalancerRoundInterval) {
+                const BSONObj& data = scopedBalancerRoundInterval.getData();
+                balanceRoundInterval = Seconds(data["sleepSecs"].numberInt());
+            }
 
             BSONObj balancerResult;
 
@@ -542,7 +553,7 @@ void Balancer::run() {
                 // Ping again so scripts can determine if we're active without waiting
                 _ping(txn.get(), true);
 
-                sleepsecs(sleepTime);
+                sleepFor(balanceRoundInterval);
                 continue;
             }
 
@@ -558,7 +569,7 @@ void Balancer::run() {
                     // Ping again so scripts can determine if we're active without waiting
                     _ping(txn.get(), true);
 
-                    sleepsecs(sleepTime);  // no need to wake up soon
+                    sleepFor(balanceRoundInterval);  // no need to wake up soon
                     continue;
                 }
 
@@ -600,7 +611,7 @@ void Balancer::run() {
             // Ping again so scripts can determine if we're active without waiting
             _ping(txn.get(), true);
 
-            sleepsecs(_balancedLastTime ? sleepTime / 10 : sleepTime);
+            sleepFor(_balancedLastTime ? kShortBalanceRoundInterval : balanceRoundInterval);
         } catch (std::exception& e) {
             log() << "caught exception while doing balance: " << e.what();
 
@@ -614,7 +625,7 @@ void Balancer::run() {
             grid.catalogManager(txn.get())->logAction(txn.get(), actionLog);
 
             // Sleep a fair amount before retrying because of the error
-            sleepsecs(sleepTime);
+            sleepFor(balanceRoundInterval);
 
             continue;
         }

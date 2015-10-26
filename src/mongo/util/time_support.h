@@ -324,7 +324,11 @@ bool toPointInTime(const std::string& str, boost::posix_time::ptime* timeOfDay);
 void sleepsecs(int s);
 void sleepmillis(long long ms);
 void sleepmicros(long long micros);
-void sleepFor(const Milliseconds& time);
+
+template <typename DurationType>
+void sleepFor(DurationType time) {
+    sleepmicros(durationCount<Microseconds>(time));
+}
 
 class Backoff {
 public:

@@ -815,10 +815,6 @@ void sleepmillis(long long s) {
 }
 #endif
 
-void sleepFor(const Milliseconds& time) {
-    sleepmillis(time.count());
-}
-
 void Backoff::nextSleepMillis() {
     // Get the current time
     unsigned long long currTimeMillis = curTimeMillis64();
