@@ -279,11 +279,15 @@ PlanStage* buildStages(OperationContext* txn,
         const std::string& language =
             ("" == node->language ? fam->getSpec().defaultLanguage().str() : node->language);
 
-        params.query.parse(node->query,
-                           language,
-                           node->caseSensitive,
-                           node->diacriticSensitive,
-                           fam->getSpec().getTextIndexVersion());
+        Status parseStatus = params.query.parse(node->query,
+                                                language,
+                                                node->caseSensitive,
+                                                node->diacriticSensitive,
+                                                fam->getSpec().getTextIndexVersion());
+        if (!parseStatus.isOK()) {
+            warning() << "Can't parse text search query";
+            return NULL;
+        }
 
         return new TextStage(txn, params, ws, node->filter.get());
     } else if (STAGE_SHARDING_FILTER == root->getType()) {

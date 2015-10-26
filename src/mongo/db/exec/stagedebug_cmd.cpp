@@ -457,11 +457,13 @@ public:
 
             params.spec = fam->getSpec();
 
-            params.query.parse(search,
-                               fam->getSpec().defaultLanguage().str().c_str(),
-                               fts::FTSQuery::caseSensitiveDefault,
-                               fts::FTSQuery::diacriticSensitiveDefault,
-                               fam->getSpec().getTextIndexVersion());
+            if (!params.query.parse(search,
+                                    fam->getSpec().defaultLanguage().str().c_str(),
+                                    fts::FTSQuery::caseSensitiveDefault,
+                                    fts::FTSQuery::diacriticSensitiveDefault,
+                                    fam->getSpec().getTextIndexVersion()).isOK()) {
+                return NULL;
+            }
 
             return new TextStage(txn, params, workingSet, matcher);
         } else if ("delete" == nodeName) {

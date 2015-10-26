@@ -37,7 +37,7 @@ namespace fts {
 
 TEST(FTSQuery, Basic1) {
     FTSQuery q;
-    q.parse("this is fun", "english", false, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q.parse("this is fun", "english", false, false, TEXT_INDEX_VERSION_3).isOK());
 
     ASSERT_EQUALS(false, q.getCaseSensitive());
     ASSERT_EQUALS(1U, q.getPositiveTerms().size());
@@ -50,7 +50,7 @@ TEST(FTSQuery, Basic1) {
 
 TEST(FTSQuery, ParsePunctuation) {
     FTSQuery q;
-    q.parse("hello.world", "english", false, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q.parse("hello.world", "english", false, false, TEXT_INDEX_VERSION_3).isOK());
 
     ASSERT_EQUALS(false, q.getCaseSensitive());
     ASSERT_EQUALS(2U, q.getPositiveTerms().size());
@@ -64,7 +64,7 @@ TEST(FTSQuery, ParsePunctuation) {
 
 TEST(FTSQuery, Neg1) {
     FTSQuery q;
-    q.parse("this is -really fun", "english", false, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q.parse("this is -really fun", "english", false, false, TEXT_INDEX_VERSION_3).isOK());
 
     ASSERT_EQUALS(1U, q.getPositiveTerms().size());
     ASSERT_EQUALS("fun", *q.getPositiveTerms().begin());
@@ -75,7 +75,8 @@ TEST(FTSQuery, Neg1) {
 
 TEST(FTSQuery, Phrase1) {
     FTSQuery q;
-    q.parse("doing a \"phrase test\" for fun", "english", false, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q.parse("doing a \"phrase test\" for fun", "english", false, false, TEXT_INDEX_VERSION_3)
+               .isOK());
 
     ASSERT_EQUALS(3U, q.getPositiveTerms().size());
     ASSERT_EQUALS(0U, q.getNegatedTerms().size());
@@ -89,26 +90,29 @@ TEST(FTSQuery, Phrase1) {
 
 TEST(FTSQuery, Phrase2) {
     FTSQuery q;
-    q.parse("doing a \"phrase-test\" for fun", "english", false, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q.parse("doing a \"phrase-test\" for fun", "english", false, false, TEXT_INDEX_VERSION_3)
+               .isOK());
     ASSERT_EQUALS(1U, q.getPositivePhr().size());
     ASSERT_EQUALS("phrase-test", q.getPositivePhr()[0]);
 }
 
 TEST(FTSQuery, NegPhrase1) {
     FTSQuery q;
-    q.parse("doing a -\"phrase test\" for fun", "english", false, false, TEXT_INDEX_VERSION_3);
+    ASSERT(
+        q.parse("doing a -\"phrase test\" for fun", "english", false, false, TEXT_INDEX_VERSION_3)
+            .isOK());
     ASSERT_EQUALS("fun||||||phrase test", q.debugString());
 }
 
 TEST(FTSQuery, CaseSensitiveOption) {
     FTSQuery q;
-    q.parse("this is fun", "english", true, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q.parse("this is fun", "english", true, false, TEXT_INDEX_VERSION_3).isOK());
     ASSERT_EQUALS(true, q.getCaseSensitive());
 }
 
 TEST(FTSQuery, CaseSensitivePositiveTerms) {
     FTSQuery q;
-    q.parse("This is Positively fun", "english", true, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q.parse("This is Positively fun", "english", true, false, TEXT_INDEX_VERSION_3).isOK());
 
     ASSERT_EQUALS(2U, q.getTermsForBounds().size());
     ASSERT_EQUALS(1,
@@ -124,7 +128,8 @@ TEST(FTSQuery, CaseSensitivePositiveTerms) {
 
 TEST(FTSQuery, CaseSensitiveNegativeTerms) {
     FTSQuery q;
-    q.parse("-This -is -Negatively -miserable", "english", true, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q.parse("-This -is -Negatively -miserable", "english", true, false, TEXT_INDEX_VERSION_3)
+               .isOK());
 
     ASSERT_EQUALS(0U, q.getPositiveTerms().size());
     ASSERT_EQUALS(0U, q.getTermsForBounds().size());
@@ -137,7 +142,8 @@ TEST(FTSQuery, CaseSensitiveNegativeTerms) {
 
 TEST(FTSQuery, CaseSensitivePositivePhrases) {
     FTSQuery q;
-    q.parse("doing a \"Phrase Test\" for fun", "english", true, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q.parse("doing a \"Phrase Test\" for fun", "english", true, false, TEXT_INDEX_VERSION_3)
+               .isOK());
 
     ASSERT_EQUALS(1U, q.getPositivePhr().size());
     ASSERT_EQUALS(0U, q.getNegatedPhr().size());
@@ -146,7 +152,8 @@ TEST(FTSQuery, CaseSensitivePositivePhrases) {
 
 TEST(FTSQuery, CaseSensitiveNegativePhrases) {
     FTSQuery q;
-    q.parse("doing a -\"Phrase Test\" for fun", "english", true, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q.parse("doing a -\"Phrase Test\" for fun", "english", true, false, TEXT_INDEX_VERSION_3)
+               .isOK());
 
     ASSERT_EQUALS(0U, q.getPositivePhr().size());
     ASSERT_EQUALS(1U, q.getNegatedPhr().size());
@@ -155,15 +162,17 @@ TEST(FTSQuery, CaseSensitiveNegativePhrases) {
 
 TEST(FTSQuery, Mix1) {
     FTSQuery q;
-    q.parse("\"industry\" -Melbourne -Physics", "english", false, false, TEXT_INDEX_VERSION_3);
+    ASSERT(
+        q.parse("\"industry\" -Melbourne -Physics", "english", false, false, TEXT_INDEX_VERSION_3)
+            .isOK());
     ASSERT_EQUALS("industri||melbourn|physic||industry||", q.debugString());
 }
 
 TEST(FTSQuery, NegPhrase2) {
     FTSQuery q1, q2, q3;
-    q1.parse("foo \"bar\"", "english", false, false, TEXT_INDEX_VERSION_3);
-    q2.parse("foo \"-bar\"", "english", false, false, TEXT_INDEX_VERSION_3);
-    q3.parse("foo \" -bar\"", "english", false, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q1.parse("foo \"bar\"", "english", false, false, TEXT_INDEX_VERSION_3).isOK());
+    ASSERT(q2.parse("foo \"-bar\"", "english", false, false, TEXT_INDEX_VERSION_3).isOK());
+    ASSERT(q3.parse("foo \" -bar\"", "english", false, false, TEXT_INDEX_VERSION_3).isOK());
 
     ASSERT_EQUALS(2U, q1.getPositiveTerms().size());
     ASSERT_EQUALS(2U, q2.getPositiveTerms().size());
@@ -184,9 +193,9 @@ TEST(FTSQuery, NegPhrase2) {
 
 TEST(FTSQuery, NegPhrase3) {
     FTSQuery q1, q2, q3;
-    q1.parse("foo -\"bar\"", "english", false, false, TEXT_INDEX_VERSION_3);
-    q2.parse("foo -\"-bar\"", "english", false, false, TEXT_INDEX_VERSION_3);
-    q3.parse("foo -\" -bar\"", "english", false, false, TEXT_INDEX_VERSION_3);
+    ASSERT(q1.parse("foo -\"bar\"", "english", false, false, TEXT_INDEX_VERSION_3).isOK());
+    ASSERT(q2.parse("foo -\"-bar\"", "english", false, false, TEXT_INDEX_VERSION_3).isOK());
+    ASSERT(q3.parse("foo -\" -bar\"", "english", false, false, TEXT_INDEX_VERSION_3).isOK());
 
     ASSERT_EQUALS(1U, q1.getPositiveTerms().size());
     ASSERT_EQUALS(1U, q2.getPositiveTerms().size());
@@ -209,7 +218,7 @@ TEST(FTSQuery, NegPhrase3) {
 // stemmer and stopword list.
 TEST(FTSQuery, TextIndexVersion1LanguageEnglish) {
     FTSQuery q;
-    q.parse("the running", "english", false, false, TEXT_INDEX_VERSION_1);
+    ASSERT(q.parse("the running", "english", false, false, TEXT_INDEX_VERSION_1).isOK());
     ASSERT_EQUALS(1U, q.getPositiveTerms().size());
     ASSERT_EQUALS("run", *q.getPositiveTerms().begin());
     ASSERT_EQUALS(0U, q.getNegatedTerms().size());
@@ -221,7 +230,7 @@ TEST(FTSQuery, TextIndexVersion1LanguageEnglish) {
 // no stopword list.
 TEST(FTSQuery, TextIndexVersion1LanguageEng) {
     FTSQuery q;
-    q.parse("the running", "eng", false, false, TEXT_INDEX_VERSION_1);
+    ASSERT(q.parse("the running", "eng", false, false, TEXT_INDEX_VERSION_1).isOK());
     ASSERT_EQUALS(2U, q.getPositiveTerms().size());
     ASSERT_EQUALS(1, std::count(q.getPositiveTerms().begin(), q.getPositiveTerms().end(), "the"));
     ASSERT_EQUALS(1, std::count(q.getPositiveTerms().begin(), q.getPositiveTerms().end(), "run"));
@@ -234,7 +243,7 @@ TEST(FTSQuery, TextIndexVersion1LanguageEng) {
 // and no stopword list will be used.
 TEST(FTSQuery, TextIndexVersion1LanguageInvalid) {
     FTSQuery q;
-    q.parse("the running", "invalid", false, false, TEXT_INDEX_VERSION_1);
+    ASSERT(q.parse("the running", "invalid", false, false, TEXT_INDEX_VERSION_1).isOK());
     ASSERT_EQUALS(2U, q.getPositiveTerms().size());
     ASSERT_EQUALS(1, std::count(q.getPositiveTerms().begin(), q.getPositiveTerms().end(), "the"));
     ASSERT_EQUALS(1,
