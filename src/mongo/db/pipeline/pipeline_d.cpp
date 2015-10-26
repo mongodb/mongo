@@ -26,6 +26,8 @@
  * it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/pipeline_d.h"
@@ -54,6 +56,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -99,19 +102,13 @@ public:
 
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                           const NamespaceString& ns) final {
-        AutoGetDb autoDb(opCtx, ns.db(), MODE_IS);
+        AutoGetCollectionForRead autoColl(opCtx, ns);
 
-        uassert(28804,
-                str::stream() << "Database not found on index stats retrieval: " << ns.db(),
-                autoDb.getDb());
-
-        Lock::CollectionLock colLock(opCtx->lockState(), ns.ns(), MODE_IS);
-
-        Collection* collection = autoDb.getDb()->getCollection(ns);
-
-        uassert(28795,
-                str::stream() << "Collection not found on index stats retrieval: " << ns.ns(),
-                collection);
+        Collection* collection = autoColl.getCollection();
+        if (!collection) {
+            LOG(2) << "Collection not found on index stats retrieval: " << ns.ns();
+            return CollectionIndexUsageMap();
+        }
 
         return collection->infoCache()->getIndexUsageStats();
     }
