@@ -195,8 +195,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 * Metadata updates use non-transactional techniques (such as the
 	 * schema and metadata locks) to protect access to in-flight updates.
 	 */
-	if (txn->isolation == WT_ISO_READ_UNCOMMITTED ||
-	    session->dhandle == session->meta_dhandle)
+	if (txn->isolation == WT_ISO_READ_UNCOMMITTED)
 		return (true);
 
 	/* Transactions see their own changes. */
