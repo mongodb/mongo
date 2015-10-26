@@ -115,7 +115,7 @@ public:
                                   PR_PRIORITY_NORMAL,
                                   PR_LOCAL_THREAD,
                                   PR_JOINABLE_THREAD,
-                                  MozJSImplScope::kMaxStackBytes);
+                                  0);
         _started = true;
     }
 

@@ -79,8 +79,6 @@ class MozJSImplScope final : public Scope {
     MONGO_DISALLOW_COPYING(MozJSImplScope);
 
 public:
-    static const std::size_t kMaxStackBytes = (1024 * 1024);
-
     explicit MozJSImplScope(MozJSScriptEngine* engine);
     ~MozJSImplScope();
 

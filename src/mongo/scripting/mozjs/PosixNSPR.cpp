@@ -22,119 +22,42 @@
 #include <js/Utility.h>
 #include <vm/PosixNSPR.h>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/threadlocal.h"
+
+class nspr::Thread {
+    mongo::stdx::thread thread_;
+    void (*start)(void* arg);
+    void* arg;
+    bool joinable;
+
+public:
+    Thread(void (*start)(void* arg), void* arg, bool joinable)
+        : start(start), arg(arg), joinable(joinable) {}
+
+    static void* ThreadRoutine(void* arg);
+
+    mongo::stdx::thread& thread() {
+        return thread_;
+    }
+};
 
 namespace {
 MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL nspr::Thread* kCurrentThread;
 }  // namespace
 
-/**
- * It's unfortunate, but we have to use platform threads here over std::thread because we need
- * specified stack sizes. In particular, we guard stack overflow in spidermonkey with
- * JS_SetNativeStackQuota(), and it's more difficult to figure out the size of a thread, after
- * creation, than it is to just create one with a known value.
- */
-#ifdef _WIN32
-class nspr::Thread {
-    HANDLE thread_;
-    void (*start)(void* arg);
-    void* arg;
-    bool joinable;
-
-public:
-    Thread(void (*start)(void* arg), void* arg, uint32_t stackSize, bool joinable)
-        : start(start), arg(arg), joinable(joinable) {
-        if (!start)
-            return;
-
-        thread_ = CreateThread(nullptr, stackSize, ThreadRoutine, this, 0, nullptr);
-
-        if (thread_ == nullptr) {
-            mongo::uasserted(mongo::ErrorCodes::InternalError, "Failed in CreateThread");
-        }
-    }
-
-    void detach() {
-        if (CloseHandle(thread_) == 0) {
-            mongo::uasserted(mongo::ErrorCodes::InternalError, "Failed in CloseHandle");
-        }
-    }
-
-    void join() {
-        if (WaitForSingleObject(thread_, INFINITE) == WAIT_FAILED) {
-            mongo::uasserted(mongo::ErrorCodes::InternalError, "Failed in WaitForSingleObject");
-        }
-    }
-
-private:
-    static DWORD WINAPI ThreadRoutine(LPVOID arg) {
-        Thread* self = static_cast<Thread*>(arg);
-        kCurrentThread = self;
-        self->start(self->arg);
-        if (!self->joinable)
-            js_delete(self);
-        return 0;
-    }
-};
-#else
-class nspr::Thread {
-    pthread_t thread_;
-    void (*start)(void* arg);
-    void* arg;
-    bool joinable;
-
-public:
-    Thread(void (*start)(void* arg), void* arg, uint32_t stackSize, bool joinable)
-        : start(start), arg(arg), joinable(joinable) {
-        if (!start)
-            return;
-        pthread_attr_t attrs;
-
-        if (pthread_attr_init(&attrs) != 0) {
-            mongo::uasserted(mongo::ErrorCodes::InternalError, "Failed in pthread_attr_init");
-        }
-
-        if (stackSize) {
-            if (pthread_attr_setstacksize(&attrs, stackSize) != 0) {
-                mongo::uasserted(mongo::ErrorCodes::InternalError,
-                                 "Failed in pthread_attr_setstacksize");
-            }
-        }
-
-        if (pthread_create(&thread_, &attrs, ThreadRoutine, this) != 0) {
-            mongo::uasserted(mongo::ErrorCodes::InternalError, "Failed in pthread_create");
-        }
-    }
-
-    void detach() {
-        if (pthread_detach(thread_) != 0) {
-            mongo::uasserted(mongo::ErrorCodes::InternalError, "Failed in pthread_detach");
-        }
-    }
-
-    void join() {
-        if (pthread_join(thread_, nullptr) != 0) {
-            mongo::uasserted(mongo::ErrorCodes::InternalError, "Failed in pthread_join");
-        }
-    }
-
-private:
-    static void* ThreadRoutine(void* arg) {
-        Thread* self = static_cast<Thread*>(arg);
-        kCurrentThread = self;
-        self->start(self->arg);
-        if (!self->joinable)
-            js_delete(self);
-        return nullptr;
-    }
-};
-#endif
+void* nspr::Thread::ThreadRoutine(void* arg) {
+    Thread* self = static_cast<Thread*>(arg);
+    kCurrentThread = self;
+    self->start(self->arg);
+    if (!self->joinable)
+        js_delete(self);
+    return nullptr;
+}
 
 namespace mongo {
 namespace mozjs {
@@ -144,7 +67,7 @@ void PR_BindThread(PRThread* thread) {
 }
 
 PRThread* PR_CreateFakeThread() {
-    return new PRThread(nullptr, nullptr, 0, true);
+    return new PRThread(nullptr, nullptr, true);
 }
 
 void PR_DestroyFakeThread(PRThread* thread) {
@@ -166,11 +89,13 @@ PRThread* PR_CreateThread(PRThreadType type,
 
     try {
         std::unique_ptr<nspr::Thread, void (*)(nspr::Thread*)> t(
-            js_new<nspr::Thread>(start, arg, stackSize, state != PR_UNJOINABLE_THREAD),
+            js_new<nspr::Thread>(start, arg, state != PR_UNJOINABLE_THREAD),
             js_delete<nspr::Thread>);
 
+        t->thread() = mongo::stdx::thread(&nspr::Thread::ThreadRoutine, t.get());
+
         if (state == PR_UNJOINABLE_THREAD) {
-            t->detach();
+            t->thread().detach();
         }
 
         return t.release();
@@ -181,7 +106,7 @@ PRThread* PR_CreateThread(PRThreadType type,
 
 PRStatus PR_JoinThread(PRThread* thread) {
     try {
-        thread->join();
+        thread->thread().join();
 
         js_delete(thread);
 

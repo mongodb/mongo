@@ -93,10 +93,6 @@ bool gFirstRuntimeCreated = false;
 
 MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL MozJSImplScope* kCurrentScope;
 
-#ifndef _MSC_EXTENSIONS
-const std::size_t MozJSImplScope::kMaxStackBytes;
-#endif  // _MSC_EXTENSIONS
-
 struct MozJSImplScope::MozJSEntry {
     MozJSEntry(MozJSImplScope* scope) : ar(scope->_context), ac(scope->_context, scope->_global) {}
 

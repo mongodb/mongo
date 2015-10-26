@@ -57,7 +57,7 @@ MozJSProxyScope::MozJSProxyScope(MozJSScriptEngine* engine)
                               PR_PRIORITY_NORMAL,
                               PR_LOCAL_THREAD,
                               PR_JOINABLE_THREAD,
-                              MozJSImplScope::kMaxStackBytes)) {
+                              0)) {
     // Test the child on startup to make sure it's awake and that the
     // implementation scope sucessfully constructed.
     try {
