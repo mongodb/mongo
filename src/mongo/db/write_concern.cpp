@@ -142,7 +142,8 @@ Status validateWriteConcern(const WriteConcernOptions& writeConcern, const std::
                     << "w:1 and w:'majority' are the only valid write concerns when writing to "
                        "config servers, got: " << writeConcern.toBSON().toString());
         }
-        if (replMode == repl::ReplicationCoordinator::modeReplSet && !isLocalDb &&
+        if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::CSRS &&
+            replMode == repl::ReplicationCoordinator::modeReplSet && !isLocalDb &&
             writeConcern.wMode.empty()) {
             invariant(writeConcern.wNumNodes == 1);
             return Status(
