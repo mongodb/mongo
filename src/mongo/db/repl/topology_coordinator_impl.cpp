@@ -1965,7 +1965,8 @@ TopologyCoordinatorImpl::UnelectableReasonMask TopologyCoordinatorImpl::_getUnel
     if (hbData.getState() != MemberState::RS_SECONDARY) {
         result |= NotSecondary;
     }
-    if (!_isOpTimeCloseEnoughToLatestToElect(hbData.getOpTime(), lastOpApplied)) {
+    if (_rsConfig.getProtocolVersion() == 0 &&
+        !_isOpTimeCloseEnoughToLatestToElect(hbData.getOpTime(), lastOpApplied)) {
         result |= NotCloseEnoughToLatestOptime;
     }
     if (hbData.up() && hbData.isUnelectable()) {
@@ -1997,17 +1998,22 @@ TopologyCoordinatorImpl::UnelectableReasonMask TopologyCoordinatorImpl::_getMyUn
     if (_stepDownUntil > now) {
         result |= StepDownPeriodActive;
     }
-    if (_voteLease.whoId != -1 && _voteLease.whoId != _rsConfig.getMemberAt(_selfIndex).getId() &&
-        _voteLease.when + VoteLease::leaseTime >= now) {
-        result |= VotedTooRecently;
-    }
 
     // Cannot be electable unless secondary or already primary
     if (!getMemberState().secondary() && !_iAmPrimary()) {
         result |= NotSecondary;
     }
-    if (!_isOpTimeCloseEnoughToLatestToElect(lastApplied, lastApplied)) {
-        result |= NotCloseEnoughToLatestOptime;
+
+    // Election rules only for protocol version 0.
+    if (_rsConfig.getProtocolVersion() == 0) {
+        if (_voteLease.whoId != -1 &&
+            _voteLease.whoId != _rsConfig.getMemberAt(_selfIndex).getId() &&
+            _voteLease.when + VoteLease::leaseTime >= now) {
+            result |= VotedTooRecently;
+        }
+        if (!_isOpTimeCloseEnoughToLatestToElect(lastApplied, lastApplied)) {
+            result |= NotCloseEnoughToLatestOptime;
+        }
     }
     return result;
 }
