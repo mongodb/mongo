@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env use_system_version_of_library usemozjs boostSuffix has_option")
+Import("env use_system_version_of_library usemozjs boostSuffix get_option")
 Import("wiredtiger")
 
 snappySuffix = '-1.1.2'
@@ -330,7 +330,7 @@ asioEnv.Library(
         'shim_asio.cpp'
     ])
 
-if has_option("experimental-decimal-support"):
+if get_option("experimental-decimal-support") == "on":
     if use_system_version_of_library("intel_decimal128"):
         intelDecimal128Env = env.Clone(
             SYSLIBDEPS=[
