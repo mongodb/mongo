@@ -2,8 +2,10 @@
  * Tests upgrading a cluster which has 3.0 mongos.
  */
 
-load( './jstests/multiVersion/libs/multi_rs.js' )
-load( './jstests/multiVersion/libs/multi_cluster.js' )
+load('./jstests/multiVersion/libs/multi_rs.js');
+load('./jstests/multiVersion/libs/multi_cluster.js');
+
+(function() {
 
 /**
  * @param isRSCluster {bool} use replica set shards.
@@ -28,9 +30,6 @@ var options = {
 }
 
 var st = new ShardingTest({ shards : 2, mongos : 2, other : options });
-
-// Just stop balancer, to simulate race conds
-st.setBalancer(false);
 
 var shards = st.s0.getDB("config").shards.find().toArray();
 var configConnStr = st._configDB;
@@ -124,3 +123,5 @@ st.stop();
 
 runTest(false);
 runTest(true);
+
+})();

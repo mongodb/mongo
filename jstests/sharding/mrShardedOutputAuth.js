@@ -4,6 +4,8 @@
  * from a separate input database while authenticated to both.
  */
 
+(function() {
+
 function doMapReduce(connection, outputDb) {
     // clean output db and run m/r
     outputDb.numbers_out.drop();
@@ -43,12 +45,10 @@ function assertFailure(configDb, outputDb) {
 }
 
 
-var st = new ShardingTest( testName = "mrShardedOutputAuth",
-                           numShards = 1,
-                           verboseLevel = 0,
-                           numMongos = 1,
-                           { extraOptions : {"keyFile" : "jstests/libs/key1"} }
-                         );
+var st = new ShardingTest({ name: "mrShardedOutputAuth",
+                            shards: 1,
+                            mongos: 1,
+                            other: { extraOptions : {"keyFile" : "jstests/libs/key1"} } });
 
 // Setup the users to the input, output and admin databases
 var mongos = st.s;
@@ -94,3 +94,5 @@ doMapReduce(outputAuthConn, outputDb);
 assertFailure(configDb, outputDb);
 
 st.stop();
+
+})();

@@ -1,14 +1,15 @@
 // Tests the dropping and re-adding of a collection
+(function() {
 
-var st = new ShardingTest( name = "multidrop", shards = 1, verbose = 0, mongos = 2 )
+var st = new ShardingTest({ name: "multidrop", shards: 1, mongos: 2 });
 
-var mA = st.s0
-var mB = st.s1
+var mA = st.s0;
+var mB = st.s1;
 
-var coll = mA.getCollection( name + ".coll" )
-var collB = mB.getCollection( coll + "" )
+var coll = mA.getCollection('multidrop.coll');
+var collB = mB.getCollection('multidrop.coll');
 
-jsTestLog( "Shard and split collection..." )
+jsTestLog( "Shard and split collection..." );
 
 var admin = mA.getDB( "admin" )
 admin.runCommand({ enableSharding : coll.getDB() + "" })
@@ -40,6 +41,6 @@ collB.find().itcount()
 
 jsTestLog( "Done." )
 
-st.stop()
+st.stop();
 
-
+})();

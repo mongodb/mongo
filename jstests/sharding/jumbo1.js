@@ -11,8 +11,6 @@ s.adminCommand( { shardcollection : "test.foo" , key : { x : 1 } } );
 
 db = s.getDB( "test" );
 
-sh.setBalancerState( false )
-
 big = ""
 while ( big.length < 10000 )
     big += "."

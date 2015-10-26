@@ -1,4 +1,8 @@
-var st = new ShardingTest({numShards: 2, nopreallocj: "", enableBalancer: true});
+(function() {
+
+var st = new ShardingTest({ name: 'migrateBig_balancer',
+                            shards: 2,
+                            other: { enableBalancer: true } });
 var mongos = st.s;
 
 var admin = mongos.getDB("admin");
@@ -34,8 +38,7 @@ admin.runCommand({ shardcollection : "" + coll, key : { _id : 1 } })
 assert.lt( 5 , mongos.getDB( "config" ).chunks.find( { ns : "test.stuff" } ).count() , "not enough chunks" );
 
 assert.soon( 
-    function(){
-        
+    function() {
         // On *extremely* slow or variable systems, we've seen migrations fail in the critical section and
         // kill the server.  Do an explicit check for this. SERVER-8781
         // TODO: Remove once we can better specify what systems to run what tests on.
@@ -61,3 +64,5 @@ assert.soon(
     "never migrated" , 10 * 60 * 1000 , 1000 );
 
 st.stop();
+
+})();

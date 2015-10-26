@@ -1,21 +1,20 @@
 // Tests whether new sharding is detected on insert by mongos
 load("jstests/replsets/rslib.js");
+
 (function () {
-var st = new ShardingTest(
-    name = "test",
-    shards = 1,
-    verbose = 2,
-    mongos = 2,
-    other = {
-        rs0: {
-            nodes: [
-                {rsConfig: {priority: 10}},
-                {},
-                {},
-            ],
-        },
-    }
-);
+
+var st = new ShardingTest({ name: 'mongos_no_replica_set_refresh',
+                            shards: 1,
+                            mongos: 2,
+                            other: {
+                                rs0: {
+                                    nodes: [
+                                        {rsConfig: {priority: 10}},
+                                        {},
+                                        {},
+                                    ],
+                                }
+                            } });
 
 var rsObj = st._rs[0].test;
 assert.commandWorked(
@@ -94,4 +93,5 @@ assert.soon( function(){ return configServerURL().indexOf( removedNode.host ) >=
 jsTestLog( "Done..." );
 
 st.stop();
+
 }());

@@ -38,7 +38,7 @@ coll.save({ _id : 1, b : "b", date : new Date() });
 
 print("2: shard collection");
 
-shardTest.shardGo(coll, /* shardBy */ { _id : 1 }, /* splitAt */ { _id : 0 });
+shardTest.shardColl(coll, /* shardBy */ { _id : 1 }, /* splitAt */ { _id : 0 });
 
 print("3: test normal and slaveOk queries");
 

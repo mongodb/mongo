@@ -20,7 +20,8 @@ for (var i=0; i<N; i+=(N/12)) {
                                    to: "shard000" + Math.floor(Math.random() * numShards)});
 }
 
-s.setBalancer( true )
+s.startBalancer();
+
 var bulk = db.foo.initializeUnorderedBulkOp();
 for ( i=0; i<N; i++ )
     bulk.insert({ _id: i });

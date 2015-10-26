@@ -1,10 +1,10 @@
-// this tests all points using $near
+// This tests all points using $near
+(function() {
+
 load("jstests/libs/geo_near_random.js");
 
 var testName = "geo_near_random1";
-var s = new ShardingTest( testName , 3 );
-
-s.stopBalancer()
+var s = new ShardingTest({ name: testName, shards: 3 });
 
 db = s.getDB("test"); // global db
 
@@ -30,7 +30,7 @@ for (var i = (test.nPts/10); i < test.nPts; i+= (test.nPts/10)){
 }
 
 // Turn balancer back on, for actual tests
-// s.setBalancer( true ) // SERVER-13365
+// s.startBalancer() // SERVER-13365
 
 printShardingSizes()
 
@@ -41,4 +41,6 @@ test.testPt(test.mkPt(), opts);
 test.testPt(test.mkPt(), opts);
 test.testPt(test.mkPt(), opts);
 
-s.stop()
+s.stop();
+
+})();

@@ -1,9 +1,8 @@
 (function() {
 "use strict";
-var otherOptions = { rs: true , numReplicas: 2 , chunkSize: 1 , nopreallocj: true };
-var s = new ShardingTest({ shards: 2, verbose: 1, other: otherOptions });
-assert.writeOK(s.config.settings.update({ _id: "balancer" },
-                         { $set: { stopped: true }}, true ));
+
+var s = new ShardingTest({ shards: 2,
+                           other: { rs: true , numReplicas: 2 , chunkSize: 1 } });
 
 var db = s.getDB( "test" );
 var bulk = db.foo.initializeUnorderedBulkOp();
@@ -42,4 +41,3 @@ for ( i=0; i<20; i++ ) {
 s.stop();
 
 }());
-

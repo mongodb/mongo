@@ -9,12 +9,10 @@
 var s = new ShardingTest({shards: 2,
                           mongos: 1,
                           verbose:1});
+
 var db = s.getDB("test");   // db variable name is required due to startParallelShell()
 var numDocs = 10000;
 db.foo.drop();
-
-// stop the balancer
-s.stopBalancer()
 
 // shard test.foo and add a split point
 s.adminCommand({enablesharding: "test"});
@@ -27,7 +25,7 @@ s.adminCommand({moveChunk: "test.foo", find: {_id: 3},
                 to: s.getNonPrimaries("test")[0], _waitForDelete: true});
 
 // restart balancer
-s.setBalancer(true)
+s.startBalancer();
 
 // insert 10k small documents into the sharded collection
 var bulk = db.foo.initializeUnorderedBulkOp();
@@ -150,4 +148,4 @@ if ( x.all.shard0000 > 0 ) {
 x = db._adminCommand({"fsync" :1, lock:true});
 assert(!x.ok, "lock should fail: " + tojson(x));
 
-s.stop()
+s.stop();

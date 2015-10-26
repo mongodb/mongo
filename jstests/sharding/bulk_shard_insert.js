@@ -1,4 +1,5 @@
 // Test bulk inserts with sharding
+(function() {
 
 // Setup randomized test
 var seed = new Date().getTime()
@@ -7,11 +8,7 @@ var seed = new Date().getTime()
 Random.srand( seed )
 print( "Seeded with " + seed )
 
-
 var st = new ShardingTest({ name : jsTestName(), shards : 4, chunkSize: 1 })
-
-// Turn off balancer initially
-st.setBalancer( false )
 
 // Setup sharded collection
 var mongos = st.s0
@@ -37,8 +34,7 @@ print( "\n\n\nDocument size is " + Object.bsonsize({ x : data }) )
 var docsInserted = 0;
 var balancerOn = false;
 
-while( docsInserted < numDocs ){
-    
+while (docsInserted < numDocs) {
     var currBulkSize = ( numDocs - docsInserted > bulkSize ) ? bulkSize : ( numDocs - docsInserted )
     
     var bulk = []
@@ -57,7 +53,7 @@ while( docsInserted < numDocs ){
     
     if( docsInserted > numDocs / 2 && ! balancerOn ){
         print( "Turning on balancer after half documents inserted." )
-        st.setBalancer( true )
+        st.startBalancer();
         balancerOn = true;
     }
 }
@@ -68,10 +64,9 @@ st.printShardingStatus()
 var count = coll.find().count()
 var itcount = count //coll.find().itcount()
 
-print( "Inserted " + docsInserted + " count : " + count + " itcount : " + itcount )
+print("Inserted " + docsInserted + " count : " + count + " itcount : " + itcount);
 
-st.setBalancer( true )
-sleep( 10000 )
+st.startBalancer();
 
 var count = coll.find().count()
 var itcount = coll.find().itcount()
@@ -81,5 +76,6 @@ print( "Inserted " + docsInserted + " count : " + count + " itcount : " + itcoun
 
 // SERVER-3645
 // assert.eq( docsInserted, count )
-assert.eq( docsInserted, itcount )
+assert.eq(docsInserted, itcount);
 
+})();

@@ -2,7 +2,6 @@
 
 var s = new ShardingTest({ name: "migrateBig",
                            shards: 2,
-                           mongos: 1,
                            other: { chunkSize: 1 } });
 
 s.config.settings.update( { _id: "balancer" }, { $set : { _waitForDelete : true } } , true);
@@ -57,7 +56,6 @@ for ( i=0; i<20; i+= 2 ) {
 }
 
 db.printShardingStatus()
-
 
 s.config.settings.update( { _id: "balancer" }, { $set : { stopped: false } } , true );
 
