@@ -581,6 +581,14 @@ struct __wt_page {
 #define	WT_PAGE_UPDATE_IGNORE	0x40	/* Ignore updates on page discard */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
+	uint8_t unused[2];		/* Unused padding */
+
+	/*
+	 * Used to protect and co-ordinate splits for internal pages and
+	 * reconciliation for all pages.
+	 */
+	WT_FAIR_LOCK page_lock;
+
 	/*
 	 * The page's read generation acts as an LRU value for each page in the
 	 * tree; it is used by the eviction server thread to select pages to be
@@ -601,12 +609,6 @@ struct __wt_page {
 #define	WT_READGEN_OLDEST	1
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
-
-	/*
-	 * Used to protect and co-ordinate splits for internal pages and
-	 * reconciliation for all pages.
-	 */
-	WT_FAIR_LOCK page_lock;
 
 	size_t memory_footprint;	/* Memory attached to the page */
 
