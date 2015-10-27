@@ -282,15 +282,11 @@ void ReplicationCoordinatorImpl::_requestRemotePrimaryStepdown(const HostAndPort
 }
 
 void ReplicationCoordinatorImpl::_stepDownStart() {
-    const StatusWith<ReplicationExecutor::EventHandle> stepDownFinishEvh =
-        _replExecutor.makeEvent();
-    if (!stepDownFinishEvh.isOK()) {
-        if (stepDownFinishEvh.getStatus() != ErrorCodes::ShutdownInProgress) {
-            fassert(28672, stepDownFinishEvh.getStatus());
-        }
+    auto event = _makeEvent();
+    if (!event) {
         return;
     }
-    _stepDownFinishedEvent = stepDownFinishEvh.getValue();
+    _stepDownFinishedEvent = event;
     _replExecutor.scheduleWorkWithGlobalExclusiveLock(
         stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish,
                    this,
@@ -322,10 +318,6 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConf
     }
 
     switch (_rsConfigState) {
-        case kConfigStartingUp:
-            LOG(1) << "Ignoring new configuration with version " << newConfig.getConfigVersion()
-                   << " because still attempting to load local configuration information";
-            return;
         case kConfigUninitialized:
         case kConfigSteady:
             LOG(1) << "Received new config via heartbeat with version "
@@ -337,7 +329,9 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConf
             LOG(1) << "Ignoring new configuration with version " << newConfig.getConfigVersion()
                    << " because already in the midst of a configuration process";
             return;
-        default:
+        case kConfigPreStart:
+        case kConfigStartingUp:
+        case kConfigReplicationDisabled:
             severe() << "Reconfiguration request occurred while _rsConfigState == "
                      << int(_rsConfigState) << "; aborting.";
             fassertFailed(18807);

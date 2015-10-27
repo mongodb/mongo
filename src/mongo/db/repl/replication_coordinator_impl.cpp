@@ -582,7 +582,7 @@ void ReplicationCoordinatorImpl::_setFollowerModeFinish(
     }
 
     if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
-        // We are a candidate, which means _topCoord believs us to be in state RS_SECONDARY, and
+        // We are a candidate, which means _topCoord believes us to be in state RS_SECONDARY, and
         // we know that newState != RS_SECONDARY because we would have returned early, above if
         // the old and new state were equal.  So, cancel the running election and try again to
         // finish setting the follower mode.

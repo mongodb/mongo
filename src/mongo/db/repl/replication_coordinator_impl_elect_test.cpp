@@ -327,6 +327,38 @@ TEST_F(ReplCoordElectTest, VotesWithStringValuesAreNotCountedAsYeas) {
                   countLogLinesContaining("wrong type for vote argument in replSetElect command"));
 }
 
+TEST_F(ReplCoordElectTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version" << 1 << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345")));
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+    OperationContextNoop txn;
+    OpTime time1(Timestamp(100, 1), 0);
+    getReplCoord()->setMyLastOptime(time1);
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    simulateEnoughHeartbeatsForElectability();
+    simulateFreshEnoughForElectability();
+
+    bool success = false;
+    auto event = getReplCoord()->setFollowerMode_nonBlocking(MemberState::RS_ROLLBACK, &success);
+
+    // We do not need to respond to any pending network operations because setFollowerMode() will
+    // cancel the freshness checker and election command runner.
+    getReplCoord()->waitForElectionFinish_forTest();
+    getReplExec()->waitForEvent(event);
+    ASSERT_TRUE(success);
+    ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
+}
+
 TEST_F(ReplCoordElectTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     // start up, receive reconfig via heartbeat while at the same time, become candidate.
     // candidate state should be cleared.
@@ -476,8 +508,19 @@ TEST_F(ReplCoordElectTest, StepsDownRemoteIfNodeHasHigherPriorityThanCurrentPrim
     auto&& request = noi->getRequest();
     log() << request.target << " processing " << request.cmdObj;
     ASSERT_EQUALS("replSetStepDown", request.cmdObj.firstElement().fieldNameStringData());
-    ASSERT_EQUALS(HostAndPort("node2", 12345), request.target);
+    auto target = request.target;
+    ASSERT_EQUALS(HostAndPort("node2", 12345), target);
+    auto response = makeResponseStatus(BSON("ok" << 1));
+    net->scheduleResponse(noi, net->now(), response);
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
+    startCapturingLogMessages();
+    net->runReadyNetworkOperations();
+    stopCapturingLogMessages();
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
     net->exitNetwork();
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining(str::stream() << "stepdown of primary("
+                                                        << target.toString() << ") succeeded"));
 }
 
 }  // namespace

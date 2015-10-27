@@ -809,6 +809,10 @@ TEST_F(ReplCoordElectV1Test, SchedulesPriorityTakeoverIfNodeHasHigherPriorityTha
     ASSERT_NOT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
     ASSERT_EQUALS(now + config.getPriorityTakeoverDelay(0),
                   replCoord->getPriorityTakeover_forTest());
+
+    // Updating term cancels priority takeover callback.
+    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(replCoord->getTerm() + 1));
+    ASSERT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
 }
 
 }  // namespace
