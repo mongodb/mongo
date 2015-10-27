@@ -457,7 +457,20 @@ var runner = (function() {
 
                 // Only drop the collections/databases if all the workloads ran successfully
                 if (!errors.length && !teardownFailed) {
+                    // For sharded clusters, enable a fail point that allows
+                    // dropCollection to wait longer to acquire the distributed lock.
+                    // This prevents tests from failing if the distributed lock is
+                    // already held by the balancer or by a workload operation. The
+                    // increased wait is shorter than the distributed-lock-takeover
+                    // period because otherwise the node would be assumed to be down
+                    // and the lock would be overtaken.
+                    if (cluster.isSharded()) {
+                        cluster.increaseDropDistLockTimeout();
+                    }
                     cleanupWorkloadData(workloads, context, clusterOptions);
+                    if (cluster.isSharded()) {
+                        cluster.resetDropDistLockTimeout();
+                    }
                 }
 
                 throwError(errors);
