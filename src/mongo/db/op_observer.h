@@ -55,10 +55,11 @@ public:
                        const std::string& ns,
                        BSONObj indexDoc,
                        bool fromMigrate = false);
-    void onInsert(OperationContext* txn,
-                  const NamespaceString& ns,
-                  BSONObj doc,
-                  bool fromMigrate = false);
+    void onInserts(OperationContext* txn,
+                   const NamespaceString& ns,
+                   std::vector<BSONObj>::iterator begin,
+                   std::vector<BSONObj>::iterator end,
+                   bool fromMigrate = false);
     void onUpdate(OperationContext* txn, oplogUpdateEntryArgs args);
     void onDelete(OperationContext* txn,
                   const std::string& ns,

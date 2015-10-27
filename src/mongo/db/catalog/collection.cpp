@@ -360,11 +360,7 @@ Status Collection::insertDocuments(OperationContext* txn,
         return status;
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
 
-    int inserted = 0;
-    for (vector<BSONObj>::iterator it = begin; it != end; it++) {  // TODO: vectorize
-        getGlobalServiceContext()->getOpObserver()->onInsert(txn, ns(), *it, fromMigrate);
-        inserted++;
-    }
+    getGlobalServiceContext()->getOpObserver()->onInserts(txn, ns(), begin, end, fromMigrate);
 
     txn->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
@@ -405,7 +401,9 @@ Status Collection::insertDocument(OperationContext* txn,
     if (!status.isOK())
         return status;
 
-    getGlobalServiceContext()->getOpObserver()->onInsert(txn, ns(), doc);
+    vector<BSONObj> docs;
+    docs.push_back(doc);
+    getGlobalServiceContext()->getOpObserver()->onInserts(txn, ns(), docs.begin(), docs.end());
 
     txn->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
