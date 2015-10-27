@@ -236,14 +236,15 @@ restart:	page = current->page;
 		 */
 		base = 1;
 		limit = pindex->entries - 1;
-		if (btree->qsearch)
+		if (collator == NULL &&
+		    srch_key->size <= WT_COMPARE_SHORT_MAXLEN)
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
 				descent = pindex->index[indx];
 				__wt_ref_key(
 				    page, descent, &item->data, &item->size);
 
-				cmp = __wt_lex_qcompare(srch_key, item);
+				cmp = __wt_lex_compare_short(srch_key, item);
 				if (cmp > 0) {
 					base = indx + 1;
 					--limit;
@@ -377,14 +378,14 @@ leaf_only:
 	 */
 	base = 0;
 	limit = page->pg_row_entries;
-	if (btree->qsearch)
+	if (collator == NULL && srch_key->size <= WT_COMPARE_SHORT_MAXLEN)
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;
 			WT_ERR(
 			    __wt_row_leaf_key(session, page, rip, item, true));
 
-			cmp = __wt_lex_qcompare(srch_key, item);
+			cmp = __wt_lex_compare_short(srch_key, item);
 			if (cmp > 0) {
 				base = indx + 1;
 				--limit;

@@ -74,7 +74,6 @@ struct __wt_btree {
 	const char *key_format;		/* Key format */
 	const char *value_format;	/* Value format */
 	uint8_t bitcnt;			/* Fixed-length field size in bits */
-	bool	qsearch;		/* Key is a packed uint64_t */
 
 	WT_COLLATOR *collator;		/* Row-store comparator */
 	int collator_owned;		/* The collator needs to be freed */
