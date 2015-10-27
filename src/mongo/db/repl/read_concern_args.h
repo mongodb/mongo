@@ -78,7 +78,7 @@ public:
     /**
      * Appends level and afterOpTime.
      */
-    void appendInfo(BSONObjBuilder* builder);
+    void appendInfo(BSONObjBuilder* builder) const;
 
     ReadConcernLevel getLevel() const;
     OpTime getOpTime() const;

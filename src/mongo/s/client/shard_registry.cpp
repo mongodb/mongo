@@ -389,14 +389,13 @@ OpTime ShardRegistry::getConfigOpTime() {
     return _configOpTime;
 }
 
-StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
+StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
     OperationContext* txn,
     const ReadPreferenceSetting& readPref,
     const NamespaceString& nss,
     const BSONObj& query,
     const BSONObj& sort,
-    boost::optional<long long> limit,
-    boost::optional<repl::ReadConcernArgs> readConcern) {
+    boost::optional<long long> limit) {
     const auto targeter = getConfigShard()->getTargeter();
     const auto host = targeter->findHost(readPref);
     if (!host.isOK()) {
@@ -439,9 +438,11 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
     };
 
     BSONObj readConcernObj;
-    if (readConcern) {
+    {
+        const repl::ReadConcernArgs readConcern{getConfigOpTime(),
+                                                repl::ReadConcernLevel::kMajorityReadConcern};
         BSONObjBuilder bob;
-        readConcern->appendInfo(&bob);
+        readConcern.appendInfo(&bob);
         readConcernObj =
             bob.done().getObjectField(repl::ReadConcernArgs::kReadConcernFieldName).getOwned();
     }
@@ -490,6 +491,34 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
     advanceConfigOpTime(response.opTime);
 
     return response;
+}
+
+StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
+    OperationContext* txn,
+    const ReadPreferenceSetting& readPref,
+    const NamespaceString& nss,
+    const BSONObj& query,
+    const BSONObj& sort,
+    boost::optional<long long> limit) {
+    Status lastStatus = Status(ErrorCodes::InternalError, "Uninitialized");
+
+    for (int retry = 0; retry < kNotMasterNumRetries; retry++) {
+        auto result = _exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
+
+        if (ErrorCodes::isNetworkError(result.getStatus().code()) ||
+            ErrorCodes::isNotMasterError(result.getStatus().code())) {
+            lastStatus = std::move(result.getStatus());
+            continue;
+        }
+
+        if (!result.isOK()) {
+            return result.getStatus();
+        }
+
+        return {std::move(result.getValue())};
+    }
+
+    return lastStatus;
 }
 
 StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,

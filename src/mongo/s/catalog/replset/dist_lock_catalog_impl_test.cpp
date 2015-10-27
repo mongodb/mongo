@@ -148,9 +148,9 @@ private:
 };
 
 void checkReadConcern(const BSONObj& findCmd) {
-    auto readConcernElem = findCmd[ReadConcernArgs::kReadConcernFieldName];
-    ASSERT_EQ(Object, readConcernElem.type());
-    ASSERT_EQ(BSON(ReadConcernArgs::kLevelFieldName << "majority"), readConcernElem.Obj());
+    ReadConcernArgs readConcernArgs;
+    ASSERT_OK(readConcernArgs.initialize(findCmd[ReadConcernArgs::kReadConcernFieldName]));
+    ASSERT(repl::ReadConcernLevel::kMajorityReadConcern == readConcernArgs.getLevel());
 }
 
 TEST_F(DistLockCatalogFixture, BasicPing) {

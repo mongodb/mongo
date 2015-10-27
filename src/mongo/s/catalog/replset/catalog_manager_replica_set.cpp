@@ -351,13 +351,15 @@ StatusWith<OpTimePair<DatabaseType>> CatalogManagerReplicaSet::getDatabase(
         // against the primary, in case the database was recently created.
         result =
             _fetchDatabaseMetadata(txn, dbName, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
-        if (ErrorCodes::isNotMasterError(result.getStatus().code())) {
-            return Status(ErrorCodes::NoConfigMaster,
+        if (!result.isOK() && (result != ErrorCodes::NamespaceNotFound)) {
+            return Status(result.getStatus().code(),
                           str::stream() << "Could not confirm non-existence of database \""
                                         << dbName
-                                        << "\" because there is no config server primary");
+                                        << "\" due to inability to query the config server primary"
+                                        << causedBy(result.getStatus()));
         }
     }
+
     return result;
 }
 
@@ -1218,29 +1220,14 @@ StatusWith<OpTimePair<vector<BSONObj>>> CatalogManagerReplicaSet::_exhaustiveFin
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    Status lastStatus = Status::OK();
-
-    for (int retry = 0; retry < kMaxReadRetry; retry++) {
-        repl::ReadConcernArgs readConcern{grid.shardRegistry()->getConfigOpTime(),
-                                          repl::ReadConcernLevel::kMajorityReadConcern};
-
-        auto result = grid.shardRegistry()->exhaustiveFindOnConfig(
-            txn, readPref, nss, query, sort, limit, readConcern);
-
-        if (ErrorCodes::isNetworkError(result.getStatus().code())) {
-            lastStatus = result.getStatus();
-            continue;
-        }
-
-        if (!result.isOK()) {
-            return result.getStatus();
-        }
-
-        auto response = std::move(result.getValue());
-        return OpTimePair<vector<BSONObj>>(std::move(response.docs), response.opTime);
+    auto response =
+        grid.shardRegistry()->exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
+    if (!response.isOK()) {
+        return response.getStatus();
     }
 
-    return lastStatus;
+    return OpTimePair<vector<BSONObj>>(std::move(response.getValue().docs),
+                                       response.getValue().opTime);
 }
 
 void CatalogManagerReplicaSet::_appendReadConcern(BSONObjBuilder* builder) {
@@ -1254,12 +1241,14 @@ bool CatalogManagerReplicaSet::_runReadCommand(OperationContext* txn,
                                                const BSONObj& cmdObj,
                                                const ReadPreferenceSetting& settings,
                                                BSONObjBuilder* result) {
-    Status lastStatus = Status::OK();
+    Status lastStatus = Status(ErrorCodes::InternalError, "Uninitialized");
+
     for (int retry = 0; retry < kMaxReadRetry; retry++) {
         auto resultStatus = grid.shardRegistry()->runCommandOnConfig(txn, settings, dbname, cmdObj);
 
-        if (ErrorCodes::isNetworkError(resultStatus.getStatus().code())) {
-            lastStatus = resultStatus.getStatus();
+        if (ErrorCodes::isNetworkError(resultStatus.getStatus().code()) ||
+            ErrorCodes::isNotMasterError(resultStatus.getStatus().code())) {
+            lastStatus = std::move(resultStatus.getStatus());
             continue;
         }
 

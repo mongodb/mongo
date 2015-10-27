@@ -438,10 +438,7 @@ StatusWith<vector<BSONObj>> DistLockCatalogImpl::_findOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    repl::ReadConcernArgs readConcern(boost::none, repl::ReadConcernLevel::kMajorityReadConcern);
-    auto result =
-        _client->exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit, readConcern);
-
+    auto result = _client->exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
     if (!result.isOK()) {
         return result.getStatus();
     }

@@ -110,7 +110,7 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
     return Status::OK();
 }
 
-void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) {
+void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
     BSONObjBuilder rcBuilder(builder->subobjStart(kReadConcernFieldName));
 
     if (_level) {

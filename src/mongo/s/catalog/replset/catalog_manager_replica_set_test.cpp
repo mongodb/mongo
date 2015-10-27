@@ -227,14 +227,9 @@ TEST_F(CatalogManagerReplSetTest, GetDatabaseStaleSecondaryRetryNoPrimary) {
     HostAndPort testHost{"TestHost1"};
     configTargeter()->setFindHostReturnValue(testHost);
 
-    DatabaseType expectedDb;
-    expectedDb.setName("bigdata");
-    expectedDb.setPrimary("shard0000");
-    expectedDb.setSharded(true);
-
-    auto future = launchAsync([this, &expectedDb] {
+    auto future = launchAsync([this] {
         auto dbResult = catalogManager()->getDatabase(operationContext(), "NonExistent");
-        ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NoConfigMaster);
+        ASSERT_EQ(dbResult.getStatus(), ErrorCodes::NotMaster);
     });
 
     // Return empty result set as if the database wasn't found

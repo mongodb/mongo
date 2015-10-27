@@ -201,14 +201,12 @@ public:
      *
      * Note: should never be used outside of CatalogManagerReplicaSet or DistLockCatalogImpl.
      */
-    StatusWith<QueryResponse> exhaustiveFindOnConfig(
-        OperationContext* txn,
-        const ReadPreferenceSetting& readPref,
-        const NamespaceString& nss,
-        const BSONObj& query,
-        const BSONObj& sort,
-        boost::optional<long long> limit,
-        boost::optional<repl::ReadConcernArgs> readConcern);
+    StatusWith<QueryResponse> exhaustiveFindOnConfig(OperationContext* txn,
+                                                     const ReadPreferenceSetting& readPref,
+                                                     const NamespaceString& nss,
+                                                     const BSONObj& query,
+                                                     const BSONObj& sort,
+                                                     boost::optional<long long> limit);
 
     /**
      * Runs a command against a host belonging to the specified shard and matching the given
@@ -315,6 +313,13 @@ private:
                                                                 const std::string& dbname,
                                                                 const BSONObj& cmdObj,
                                                                 const BSONObj& metadata);
+
+    StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
+                                                      const ReadPreferenceSetting& readPref,
+                                                      const NamespaceString& nss,
+                                                      const BSONObj& query,
+                                                      const BSONObj& sort,
+                                                      boost::optional<long long> limit);
 
     // Factory to obtain remote command targeters for shards
     const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;
