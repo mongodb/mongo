@@ -239,10 +239,6 @@ __wt_metadata_search(
 	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	WT_ERR(cursor->search(cursor));
-	if (txn != NULL) {
-		txn->isolation = iso_orig;
-		txn = NULL;
-	}
 	WT_ERR(cursor->get_value(cursor, &value));
 	WT_ERR(__wt_strdup(session, value, valuep));
 
