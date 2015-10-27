@@ -809,7 +809,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	r->flags = flags;
 
 	/* Track if the page can be marked clean. */
-	r->leave_dirty = 0;
+	r->leave_dirty = false;
 
 	/* Raw compression. */
 	r->raw_compression =
