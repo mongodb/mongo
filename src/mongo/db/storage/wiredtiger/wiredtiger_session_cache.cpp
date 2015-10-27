@@ -133,6 +133,7 @@ WiredTigerSessionCache::~WiredTigerSessionCache() {
 void WiredTigerSessionCache::shuttingDown() {
     uint32_t actual = _shuttingDown.load();
     uint32_t expected;
+    int count = 0;
 
     // Try to atomically set _shuttingDown flag, but just return if another thread was first.
     do {
@@ -141,6 +142,21 @@ void WiredTigerSessionCache::shuttingDown() {
         if (actual & kShuttingDownMask)
             return;
     } while (actual != expected);
+
+    // Spin while there are still sessions and warn after 1 second
+    while (_sessionsOut.load() != 0) {
+        sleepmillis(10);
+        if (count == 100) {
+            warning() << "Waiting for WiredTiger operations to complete";
+        }
+        if (count == 6000) {
+            warning() << "Unable to confirm all WiredTiger operations were complete";
+            break;
+        }
+        count++;
+    }
+    if (count >= 100 && count < 6000)
+        log() << "All WiredTiger operations are now complete, continuing with shutdown";
 
     // Spin as long as there are threads in releaseSession
     while (_shuttingDown.load() != kShuttingDownMask) {
@@ -200,6 +216,7 @@ WiredTigerSession* WiredTigerSessionCache::getSession() {
     // operations should be allowed to start.
     invariant(!(_shuttingDown.loadRelaxed() & kShuttingDownMask));
 
+    _sessionsOut.fetchAndAdd(1);
     {
         stdx::lock_guard<stdx::mutex> lock(_cacheLock);
         if (!_sessions.empty()) {
@@ -222,6 +239,8 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     const int shuttingDown = _shuttingDown.fetchAndAdd(1);
     ON_BLOCK_EXIT([this] { _shuttingDown.fetchAndSubtract(1); });
 
+    // The session is "done" at this point, even if we are to leak it below
+    _sessionsOut.fetchAndSubtract(1);
     if (shuttingDown & kShuttingDownMask) {
         // Leak the session in order to avoid race condition with clean shutdown, where the
         // storage engine is ripped from underneath transactions, which are not "active"
