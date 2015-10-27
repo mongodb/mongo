@@ -284,6 +284,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 
 	cursor = NULL;
 	idx = NULL;
+	txn = NULL;
 	match = false;
 
 	/* Build a search key. */
@@ -426,6 +427,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	cursor = NULL;
 	table = NULL;
 	tablename = NULL;
+	txn = NULL;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
 
