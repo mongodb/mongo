@@ -236,14 +236,18 @@ __wt_metadata_search(
 		iso_orig = txn->isolation;
 		txn->isolation = WT_ISO_READ_UNCOMMITTED;
 	}
-	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	WT_ERR(cursor->search(cursor));
-	if (txn != NULL)
+	if (txn != NULL) {
 		txn->isolation = iso_orig;
+		txn = NULL;
+	}
 	WT_ERR(cursor->get_value(cursor, &value));
 	WT_ERR(__wt_strdup(session, value, valuep));
 
 err:	WT_TRET(cursor->close(cursor));
+	if (txn != NULL)
+		txn->isolation = iso_orig;
 	return (ret);
 }
