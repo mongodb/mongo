@@ -42,10 +42,6 @@ const char* DocumentSourceMock::getSourceName() const {
     return "mock";
 }
 
-void DocumentSourceMock::setSource(DocumentSource* pSource) {
-    invariant(false);
-}
-
 Value DocumentSourceMock::serialize(bool explain) const {
     return Value(DOC(getSourceName() << Document()));
 }

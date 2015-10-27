@@ -135,11 +135,6 @@ void DocumentSourceCursor::loadBatch() {
             state == PlanExecutor::IS_EOF || state == PlanExecutor::ADVANCED);
 }
 
-void DocumentSourceCursor::setSource(DocumentSource* pSource) {
-    /* this doesn't take a source */
-    verify(false);
-}
-
 long long DocumentSourceCursor::getLimit() const {
     return _limit ? _limit->getLimit() : -1;
 }

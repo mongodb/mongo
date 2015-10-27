@@ -322,7 +322,6 @@ public:
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
     Value serialize(bool explain = false) const final;
-    void setSource(DocumentSource* pSource) final;
     bool coalesce(const boost::intrusive_ptr<DocumentSource>& nextSource) final;
     bool isValidInitialSource() const final {
         return true;
@@ -611,7 +610,6 @@ public:
 
     // virtuals from DocumentSource
     boost::optional<Document> getNext();
-    void setSource(DocumentSource* pSource) final;
     const char* getSourceName() const final;
     void dispose() final;
     Value serialize(bool explain = false) const final;
@@ -674,7 +672,6 @@ public:
     boost::optional<Document> getNext() override;
     const char* getSourceName() const override;
     Value serialize(bool explain = false) const override;
-    void setSource(DocumentSource* pSource) override;
     void dispose() override;
     bool isValidInitialSource() const override {
         return true;
@@ -1199,7 +1196,6 @@ public:
     // virtuals from DocumentSource
     boost::optional<Document> getNext() final;
     const char* getSourceName() const final;
-    void setSource(DocumentSource* pSource) final;
     bool coalesce(const boost::intrusive_ptr<DocumentSource>& pNextSource) final;
     bool isValidInitialSource() const final {
         return true;

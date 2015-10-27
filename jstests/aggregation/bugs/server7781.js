@@ -12,7 +12,7 @@ db[coll].insert({loc:[0,0]});
 // $geoNear is only allowed as the first stage in a pipeline, nowhere else.
 assertErrorCode(db[coll],
                 [{$match: {x:1}}, {$geoNear:{near: [1,1], spherical: true, distanceField: 'dis'}}],
-                16602);
+                28837);
 
 function checkOutput(cmdOut, aggOut, expectedNum) {
     assert.commandWorked(cmdOut, "geoNear command");

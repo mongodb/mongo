@@ -104,4 +104,7 @@
     // Confirm index stats object exists with count 0 once index is recreated.
     assert.commandWorked(col.createIndex({b: 1, c: 1}, {name: "b_1_c_1"}));
     assert.eq(countB, getUsageCount("b_1_c_1"));
+
+    // Confirm that retrieval fails if $indexStats is not in the first pipeline position.
+    assert.throws(function() { col.aggregate([{$match: {}}, {$indexStats: {}}]) });
 })();

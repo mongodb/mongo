@@ -48,11 +48,6 @@ const char* DocumentSourceMergeCursors::getSourceName() const {
     return "$mergeCursors";
 }
 
-void DocumentSourceMergeCursors::setSource(DocumentSource* pSource) {
-    /* this doesn't take a source */
-    verify(false);
-}
-
 intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
     const CursorIds& cursorIds, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     return new DocumentSourceMergeCursors(cursorIds, pExpCtx);

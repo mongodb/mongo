@@ -157,8 +157,12 @@ intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
                 pipeElement.type() == Object);
 
         sources.push_back(DocumentSource::parse(pCtx, pipeElement.Obj()));
-
-        // TODO find a good general way to check stages that must be first syntactically
+        if (sources.back()->isValidInitialSource()) {
+            uassert(28837,
+                    str::stream() << sources.back()->getSourceName()
+                                  << " is only valid as the first stage in a pipeline.",
+                    iStep == 0);
+        }
 
         if (dynamic_cast<DocumentSourceOut*>(sources.back().get())) {
             uassert(16991, "$out can only be the final stage in the pipeline", iStep == nSteps - 1);
