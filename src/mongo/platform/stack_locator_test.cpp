@@ -28,9 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include <thread>
-
 #include "mongo/platform/stack_locator.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -75,7 +74,7 @@ TEST(StackLocator, StacksGrowsDown) {
 TEST(StackLocator, StackLocatorFindsStackOfStdThread) {
     bool foundBounds = false;
 
-    std::thread thr([&] {
+    stdx::thread thr([&] {
         const StackLocator locator;
         auto avail = locator.available();
         foundBounds = static_cast<bool>(avail);
