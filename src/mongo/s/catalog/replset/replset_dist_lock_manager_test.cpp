@@ -618,21 +618,16 @@ TEST_F(ReplSetDistLockManagerFixture, MustUnlockOnLockError) {
  * 1. Ping thread started during setUp of fixture.
  * 2. Wait until ping was called at least 3 times.
  * 3. Check that correct process is being pinged.
- * 4. Check that ping values are unique (based on the assumption that the system
- *    clock supports 2ms granularity).
  */
 TEST_F(ReplSetDistLockManagerFixture, LockPinging) {
     stdx::mutex testMutex;
     stdx::condition_variable ping3TimesCV;
-    vector<Date_t> pingValues;
     vector<string> processIDList;
 
     getMockCatalog()->expectPing(
-        [&testMutex, &ping3TimesCV, &processIDList, &pingValues](StringData processIDArg,
-                                                                 Date_t ping) {
+        [&testMutex, &ping3TimesCV, &processIDList](StringData processIDArg, Date_t ping) {
             stdx::lock_guard<stdx::mutex> lk(testMutex);
             processIDList.push_back(processIDArg.toString());
-            pingValues.push_back(ping);
 
             if (processIDList.size() >= 3) {
                 ping3TimesCV.notify_all();
@@ -660,12 +655,7 @@ TEST_F(ReplSetDistLockManagerFixture, LockPinging) {
 
     ASSERT_FALSE(didTimeout);
 
-    Date_t lastPing;
-    for (const auto& ping : pingValues) {
-        ASSERT_NOT_EQUALS(lastPing, ping);
-        lastPing = ping;
-    }
-
+    ASSERT_FALSE(processIDList.empty());
     for (const auto& processIDArg : processIDList) {
         ASSERT_EQUALS(getProcessID(), processIDArg);
     }
