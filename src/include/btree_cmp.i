@@ -84,8 +84,8 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 }
 
 /*
- * __wt_lex_qcompare --
- *	Lexicographic comparison routine for record number keys.
+ * __wt_lex_compare_short --
+ *	Lexicographic comparison routine for short keys.
  *
  * Returns:
  *	< 0 if user_item is lexicographically < tree_item
@@ -96,7 +96,7 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
  * the application is looking at when we call its comparison function.
  */
 static inline int
-__wt_lex_qcompare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
+__wt_lex_compare_short(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
 	size_t len, usz, tsz;
 	const uint8_t *userp, *treep;
@@ -112,6 +112,7 @@ __wt_lex_qcompare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	 * The maximum packed uint64_t is 9B, catch row-store objects using
 	 * packed record numbers as keys.
 	 */
+#define	WT_COMPARE_SHORT_MAXLEN 9
 #undef	WT_COMPARE_SHORT
 #define	WT_COMPARE_SHORT(n)						\
 	case n:								\
