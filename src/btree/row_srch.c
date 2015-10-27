@@ -218,10 +218,11 @@ restart:	page = current->page;
 		}
 
 		/*
-		 * Binary search of the internal page. Three versions (record
-		 * numbers, no application-specified collation order and
-		 * application-specified collation order), because moving those
-		 * tests and the error handling inside the loop costs about 5%.
+		 * Binary search of an internal page. There are three versions
+		 * (keys with no application-specified collation order, in long
+		 * and short versions, and keys with an application-specified
+		 * collation order), because doing the tests and error handling
+		 * inside the loop costs about 5%.
 		 *
 		 * The 0th key on an internal page is a problem for a couple of
 		 * reasons.  First, we have to force the 0th key to sort less
@@ -371,10 +372,10 @@ leaf_only:
 	}
 
 	/*
-	 * Binary search of the leaf page. Three versions (record numbers, no
-	 * application-specified collation order and application-specified
-	 * collation order), because moving those tests and the error handling
-	 * inside the loop costs about 5%.
+	 * Binary search of an leaf page. There are three versions (keys with
+	 * no application-specified collation order, in long and short versions,
+	 * and keys with an application-specified collation order), because
+	 * doing the tests and error handling inside the loop costs about 5%.
 	 */
 	base = 0;
 	limit = page->pg_row_entries;
