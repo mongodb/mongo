@@ -26,10 +26,12 @@
  *    delete this exception statement from all source files in the program,
  *    then also delete it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
 
 #include "mongo/platform/random.h"
 
-#include <stdio.h>
 #include <string.h>
 
 #ifndef _WIN32
@@ -38,10 +40,10 @@
 
 #define _CRT_RAND_S
 #include <cstdlib>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
-#include "mongo/platform/basic.h"
+#include <mongo/util/log.h>
 
 namespace mongo {
 
@@ -113,8 +115,8 @@ public:
     InputStreamSecureRandom(const char* fn) {
         _in = new std::ifstream(fn, std::ios::binary | std::ios::in);
         if (!_in->is_open()) {
-            std::cerr << "can't open " << fn << " " << strerror(errno) << std::endl;
-            abort();
+            error() << "cannot open " << fn << " " << strerror(errno);
+            fassertFailed(28839);
         }
     }
 
@@ -126,7 +128,8 @@ public:
         int64_t r;
         _in->read(reinterpret_cast<char*>(&r), sizeof(r));
         if (_in->fail()) {
-            abort();
+            error() << "InputStreamSecureRandom failed to generate random bytes";
+            fassertFailed(28840);
         }
         return r;
     }
