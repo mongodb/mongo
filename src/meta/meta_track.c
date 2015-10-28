@@ -231,8 +231,6 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 {
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
-	WT_TXN *txn;
-	WT_TXN_ISOLATION iso_orig;
 
 	WT_ASSERT(session,
 	    WT_META_TRACKING(session) && session->meta_track_nest > 0);
@@ -276,14 +274,8 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 			session, false, WT_TXN_LOG_CKPT_SYNC, NULL));
 		WT_RET(ret);
 	} else {
-		if ((txn = &session->txn) != NULL) {
-			iso_orig = txn->isolation;
-			txn->isolation = WT_ISO_READ_UNCOMMITTED;
-		}
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_checkpoint(session, NULL));
-		if (txn != NULL)
-			txn->isolation = iso_orig;
 		WT_RET(ret);
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_checkpoint_sync(session, NULL));
