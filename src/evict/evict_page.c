@@ -106,7 +106,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		conn->cache->evict_max_page_size = page->memory_footprint;
 
 	/* Update the reference and discard the page. */
-	if (mod == NULL || mod->rec_result == 0) {
+	if ((mod == NULL || mod->rec_result == 0) &&
+	    !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
 		if (__wt_ref_is_root(ref))
 			__wt_ref_out(session, ref);
 		else

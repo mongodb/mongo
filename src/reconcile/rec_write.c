@@ -535,7 +535,7 @@ __rec_write_status(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/*
 	 * Set the page's status based on whether or not we cleaned the page.
 	 */
-	if (r->leave_dirty || F_ISSET(r, WT_EVICT_IN_MEMORY)) {
+	if (r->leave_dirty) {
 		/*
 		 * The page remains dirty.
 		 *
