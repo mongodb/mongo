@@ -644,12 +644,12 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMast
         }
 
         Status commandStatus = getStatusFromCommandResult(response.getValue().response);
-        if (ErrorCodes::NotMaster == commandStatus ||
-            ErrorCodes::NotMasterNoSlaveOk == commandStatus) {
+        if (ErrorCodes::isNotMasterError(commandStatus.code())) {
             if (i == kNotMasterNumRetries - 1) {
                 // If we're out of retries don't bother sleeping, just return.
                 return commandStatus;
             }
+
             sleepmillis(durationCount<Milliseconds>(kNotMasterRetryInterval));
             continue;
         }

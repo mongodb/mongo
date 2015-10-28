@@ -150,11 +150,7 @@ void splitIfNeeded(OperationContext* txn, const NamespaceString& nss, const Targ
 
 }  // namespace
 
-Status clusterCreateIndex(OperationContext* txn,
-                          const string& ns,
-                          BSONObj keys,
-                          bool unique,
-                          BatchedCommandResponse* response) {
+Status clusterCreateIndex(OperationContext* txn, const string& ns, BSONObj keys, bool unique) {
     const NamespaceString nss(ns);
     const std::string dbName = nss.db().toString();
 
@@ -168,34 +164,12 @@ Status clusterCreateIndex(OperationContext* txn,
     request.setNS(NamespaceString(nss.getSystemIndexesCollection()));
     request.setWriteConcern(WriteConcernOptions::Acknowledged);
 
-    BatchedCommandResponse dummyResponse;
-    if (response == NULL) {
-        response = &dummyResponse;
-    }
+    BatchedCommandResponse response;
 
     ClusterWriter writer(false, 0);
-    writer.write(txn, request, response);
+    writer.write(txn, request, &response);
 
-    if (response->getOk() != 1) {
-        return Status(static_cast<ErrorCodes::Error>(response->getErrCode()),
-                      response->getErrMessage());
-    }
-
-    if (response->isErrDetailsSet()) {
-        const WriteErrorDetail* errDetail = response->getErrDetails().front();
-
-        return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
-                      errDetail->getErrMessage());
-    }
-
-    if (response->isWriteConcernErrorSet()) {
-        const WCErrorDetail* errDetail = response->getWriteConcernError();
-
-        return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
-                      errDetail->getErrMessage());
-    }
-
-    return Status::OK();
+    return response.toStatus();
 }
 
 

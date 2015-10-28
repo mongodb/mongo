@@ -74,6 +74,9 @@ typedef SetState::Nodes Nodes;
 
 const double socketTimeoutSecs = 5;
 
+// Intentionally chosen to compare worse than all known latencies.
+const int64_t unknownLatency = numeric_limits<int64_t>::max();
+
 // TODO: Move to ReplicaSetMonitorManager
 ReplicaSetMonitor::ConfigChangeHook asyncConfigChangeHook;
 ReplicaSetMonitor::ConfigChangeHook syncConfigChangeHook;
@@ -196,6 +199,7 @@ StaticObserver staticObserver;
 bool isMaster(const Node& node) {
     return node.isMaster;
 }
+
 bool compareLatencies(const Node* lhs, const Node* rhs) {
     // NOTE: this automatically compares Node::unknownLatency worse than all others.
     return lhs->latencyMicros < rhs->latencyMicros;
@@ -249,6 +253,7 @@ struct HostNotIn {
     }
     const std::set<HostAndPort>& _hosts;
 };
+
 }  // namespace
 
 // At 1 check every 10 seconds, 30 checks takes 5 minutes
@@ -795,7 +800,12 @@ void IsMasterReply::parse(const BSONObj& obj) {
     }
 }
 
-const int64_t Node::unknownLatency = numeric_limits<int64_t>::max();
+Node::Node(const HostAndPort& host) : host(host), latencyMicros(unknownLatency) {}
+
+void Node::markFailed() {
+    isUp = false;
+    isMaster = false;
+}
 
 bool Node::matches(const ReadPreference pref) const {
     if (!isUp)

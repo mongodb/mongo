@@ -81,16 +81,13 @@ struct ReplicaSetMonitor::SetState {
     MONGO_DISALLOW_COPYING(SetState);
 
 public:
-    // A single node in the replicaSet
+    /**
+     * Holds the state of a single node in the replicaSet
+     */
     struct Node {
-        explicit Node(const HostAndPort& host) : host(host), latencyMicros(unknownLatency) {
-            markFailed();
-        }
+        explicit Node(const HostAndPort& host);
 
-        void markFailed() {
-            isUp = false;
-            isMaster = false;
-        }
+        void markFailed();
 
         bool matches(const ReadPreference pref) const;
 
@@ -114,12 +111,9 @@ public:
          */
         void update(const IsMasterReply& reply);
 
-        // Intentionally chosen to compare worse than all known latencies.
-        static const int64_t unknownLatency;  // = numeric_limits<int64_t>::max()
-
         HostAndPort host;
-        bool isUp;
-        bool isMaster;          // implies isUp
+        bool isUp{false};
+        bool isMaster{false};   // implies isUp
         int64_t latencyMicros;  // unknownLatency if unknown
         BSONObj tags;           // owned
     };

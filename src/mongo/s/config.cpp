@@ -689,12 +689,11 @@ void ConfigServer::reloadSettings(OperationContext* txn) {
         }
     } else if (chunkSizeResult.getStatus() == ErrorCodes::NoMatchingDocument) {
         const int chunkSize = Chunk::MaxChunkSize / (1024 * 1024);
-        Status result =
-            grid.catalogManager(txn)->insert(txn,
-                                             SettingsType::ConfigNS,
-                                             BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)
-                                                  << SettingsType::chunkSizeMB(chunkSize)),
-                                             NULL);
+        Status result = grid.catalogManager(txn)->insertConfigDocument(
+            txn,
+            SettingsType::ConfigNS,
+            BSON(SettingsType::key(SettingsType::ChunkSizeDocKey)
+                 << SettingsType::chunkSizeMB(chunkSize)));
         if (!result.isOK()) {
             warning() << "couldn't set chunkSize on config db" << causedBy(result);
         }
@@ -703,12 +702,10 @@ void ConfigServer::reloadSettings(OperationContext* txn) {
     }
 
     // indexes
-    Status result = clusterCreateIndex(txn,
-                                       ChunkType::ConfigNS,
-                                       BSON(ChunkType::ns() << 1 << ChunkType::min() << 1),
-                                       true,  // unique
-                                       NULL);
+    const bool unique = true;
 
+    Status result = clusterCreateIndex(
+        txn, ChunkType::ConfigNS, BSON(ChunkType::ns() << 1 << ChunkType::min() << 1), unique);
     if (!result.isOK()) {
         warning() << "couldn't create ns_1_min_1 index on config db" << causedBy(result);
     }
@@ -717,9 +714,7 @@ void ConfigServer::reloadSettings(OperationContext* txn) {
         txn,
         ChunkType::ConfigNS,
         BSON(ChunkType::ns() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
-        true,  // unique
-        NULL);
-
+        unique);
     if (!result.isOK()) {
         warning() << "couldn't create ns_1_shard_1_min_1 index on config db" << causedBy(result);
     }
@@ -727,29 +722,17 @@ void ConfigServer::reloadSettings(OperationContext* txn) {
     result = clusterCreateIndex(txn,
                                 ChunkType::ConfigNS,
                                 BSON(ChunkType::ns() << 1 << ChunkType::DEPRECATED_lastmod() << 1),
-                                true,  // unique
-                                NULL);
-
+                                unique);
     if (!result.isOK()) {
         warning() << "couldn't create ns_1_lastmod_1 index on config db" << causedBy(result);
     }
 
-    result = clusterCreateIndex(txn,
-                                ShardType::ConfigNS,
-                                BSON(ShardType::host() << 1),
-                                true,  // unique
-                                NULL);
-
+    result = clusterCreateIndex(txn, ShardType::ConfigNS, BSON(ShardType::host() << 1), unique);
     if (!result.isOK()) {
         warning() << "couldn't create host_1 index on config db" << causedBy(result);
     }
 
-    result = clusterCreateIndex(txn,
-                                LocksType::ConfigNS,
-                                BSON(LocksType::lockID() << 1),
-                                false,  // unique
-                                NULL);
-
+    result = clusterCreateIndex(txn, LocksType::ConfigNS, BSON(LocksType::lockID() << 1), !unique);
     if (!result.isOK()) {
         warning() << "couldn't create lock id index on config db" << causedBy(result);
     }
@@ -757,29 +740,19 @@ void ConfigServer::reloadSettings(OperationContext* txn) {
     result = clusterCreateIndex(txn,
                                 LocksType::ConfigNS,
                                 BSON(LocksType::state() << 1 << LocksType::process() << 1),
-                                false,  // unique
-                                NULL);
-
+                                !unique);
     if (!result.isOK()) {
         warning() << "couldn't create state and process id index on config db" << causedBy(result);
     }
 
-    result = clusterCreateIndex(txn,
-                                LockpingsType::ConfigNS,
-                                BSON(LockpingsType::ping() << 1),
-                                false,  // unique
-                                NULL);
-
+    result =
+        clusterCreateIndex(txn, LockpingsType::ConfigNS, BSON(LockpingsType::ping() << 1), !unique);
     if (!result.isOK()) {
         warning() << "couldn't create lockping ping time index on config db" << causedBy(result);
     }
 
-    result = clusterCreateIndex(txn,
-                                TagsType::ConfigNS,
-                                BSON(TagsType::ns() << 1 << TagsType::min() << 1),
-                                true,  // unique
-                                NULL);
-
+    result = clusterCreateIndex(
+        txn, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::min() << 1), unique);
     if (!result.isOK()) {
         warning() << "could not create index ns_1_min_1: " << causedBy(result);
     }

@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/write_ops/batched_command_response.h"
 
 #include "mongo/bson/util/bson_extract.h"
@@ -581,6 +583,28 @@ bool BatchedCommandResponse::isWriteConcernErrorSet() const {
 
 const WCErrorDetail* BatchedCommandResponse::getWriteConcernError() const {
     return _wcErrDetails.get();
+}
+
+Status BatchedCommandResponse::toStatus() const {
+    if (!getOk()) {
+        return Status(static_cast<ErrorCodes::Error>(getErrCode()), getErrMessage());
+    }
+
+    if (isErrDetailsSet()) {
+        const WriteErrorDetail* errDetail = getErrDetails().front();
+
+        return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
+                      errDetail->getErrMessage());
+    }
+
+    if (isWriteConcernErrorSet()) {
+        const WCErrorDetail* errDetail = getWriteConcernError();
+
+        return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
+                      errDetail->getErrMessage());
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo

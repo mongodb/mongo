@@ -428,8 +428,8 @@ void ChunkManager::createFirstChunks(OperationContext* txn,
         chunk.setShard(shardIds[i % shardIds.size()]);
         chunk.setVersion(version);
 
-        Status result =
-            grid.catalogManager(txn)->insert(txn, ChunkType::ConfigNS, chunk.toBSON(), NULL);
+        Status result = grid.catalogManager(txn)
+                            ->insertConfigDocument(txn, ChunkType::ConfigNS, chunk.toBSON());
         if (!result.isOK()) {
             string ss = str::stream()
                 << "creating first chunks failed. result: " << result.reason();

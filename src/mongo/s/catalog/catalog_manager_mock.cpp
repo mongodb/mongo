@@ -36,6 +36,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_settings.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -45,6 +46,7 @@ using std::vector;
 CatalogManagerMock::CatalogManagerMock() {
     _mockDistLockMgr = stdx::make_unique<DistLockManagerMock>();
 }
+
 CatalogManagerMock::~CatalogManagerMock() = default;
 
 Status CatalogManagerMock::startup(OperationContext* txn, bool allowNetworking) {
@@ -193,6 +195,12 @@ StatusWith<SettingsType> CatalogManagerMock::getGlobalSettings(OperationContext*
 void CatalogManagerMock::writeConfigServerDirect(OperationContext* txn,
                                                  const BatchedCommandRequest& request,
                                                  BatchedCommandResponse* response) {}
+
+Status CatalogManagerMock::insertConfigDocument(OperationContext* txn,
+                                                const std::string& ns,
+                                                const BSONObj& doc) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
 
 Status CatalogManagerMock::createDatabase(OperationContext* txn, const std::string& dbName) {
     return {ErrorCodes::InternalError, "Method not implemented"};

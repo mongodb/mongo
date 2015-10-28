@@ -1043,6 +1043,25 @@ void CatalogManagerLegacy::writeConfigServerDirect(OperationContext* txn,
     exec.executeBatch(request, response);
 }
 
+Status CatalogManagerLegacy::insertConfigDocument(OperationContext* txn,
+                                                  const std::string& ns,
+                                                  const BSONObj& doc) {
+    const NamespaceString nss(ns);
+    invariant(nss.db() == "config");
+    invariant(doc.hasField("_id"));
+
+    auto insert(stdx::make_unique<BatchedInsertRequest>());
+    insert->addToDocuments(doc);
+
+    BatchedCommandRequest request(insert.release());
+    request.setNS(nss);
+
+    BatchedCommandResponse response;
+    writeConfigServerDirect(txn, request, &response);
+
+    return response.toStatus();
+}
+
 Status CatalogManagerLegacy::_checkDbDoesNotExist(OperationContext* txn,
                                                   const std::string& dbName,
                                                   DatabaseType* db) {

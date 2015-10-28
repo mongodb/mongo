@@ -135,6 +135,10 @@ public:
                                  const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;
 
+    Status insertConfigDocument(OperationContext* txn,
+                                const std::string& ns,
+                                const BSONObj& doc) override;
+
     DistLockManager* getDistLockManager() override;
 
     Status initConfigVersion(OperationContext* txn) override;

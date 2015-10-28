@@ -215,6 +215,10 @@ private:
                                  const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;
 
+    Status insertConfigDocument(OperationContext* txn,
+                                const std::string& ns,
+                                const BSONObj& doc) override;
+
     Status createDatabase(OperationContext* txn, const std::string& dbName) override;
 
     Status initConfigVersion(OperationContext* txn) override;

@@ -36,7 +36,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/optime_pair.h"
-#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -389,19 +388,14 @@ public:
     virtual Status createDatabase(OperationContext* txn, const std::string& dbName) = 0;
 
     /**
-     * Directly inserts a document in the specified namespace on the config server (only the
-     * config or admin databases). If the document does not have _id field, the field will be
-     * added.
+     * Directly inserts a document in the specified namespace on the config server. The document
+     * must have an _id index. Must only be used for insertions in the 'config' database.
      *
-     * This is a thin wrapper around writeConfigServerDirect.
-     *
-     * NOTE: Should not be used in new code. Instead add a new metadata operation to the
-     *       interface.
+     * NOTE: Should not be used in new code. Instead add a new metadata operation to the interface.
      */
-    Status insert(OperationContext* txn,
-                  const std::string& ns,
-                  const BSONObj& doc,
-                  BatchedCommandResponse* response);
+    virtual Status insertConfigDocument(OperationContext* txn,
+                                        const std::string& ns,
+                                        const BSONObj& doc) = 0;
 
     /**
      * Updates a document in the specified namespace on the config server (only the config or

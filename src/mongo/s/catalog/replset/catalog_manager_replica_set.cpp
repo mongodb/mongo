@@ -897,6 +897,26 @@ void CatalogManagerReplicaSet::writeConfigServerDirect(OperationContext* txn,
     }
 }
 
+Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
+                                                      const std::string& ns,
+                                                      const BSONObj& doc) {
+    const NamespaceString nss(ns);
+    invariant(nss.db() == "config");
+    invariant(doc.hasField("_id"));
+
+    auto insert(stdx::make_unique<BatchedInsertRequest>());
+    insert->addToDocuments(doc);
+
+    BatchedCommandRequest request(insert.release());
+    request.setNS(nss);
+    request.setWriteConcern(WriteConcernOptions::Majority);
+
+    BatchedCommandResponse response;
+    writeConfigServerDirect(txn, request, &response);
+
+    return response.toStatus();
+}
+
 Status CatalogManagerReplicaSet::_checkDbDoesNotExist(OperationContext* txn,
                                                       const string& dbName,
                                                       DatabaseType* db) {

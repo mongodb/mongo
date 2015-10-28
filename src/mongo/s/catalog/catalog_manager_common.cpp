@@ -346,7 +346,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
 
     log() << "going to add shard: " << shardType.toString();
 
-    Status result = insert(txn, ShardType::ConfigNS, shardType.toBSON(), NULL);
+    Status result = insertConfigDocument(txn, ShardType::ConfigNS, shardType.toBSON());
     if (!result.isOK()) {
         log() << "error adding shard: " << shardType.toBSON() << " err: " << result.reason();
         return result;
@@ -459,9 +459,7 @@ Status CatalogManagerCommon::createDatabase(OperationContext* txn, const std::st
     db.setPrimary(newShardId);
     db.setSharded(false);
 
-    BatchedCommandResponse response;
-    status = insert(txn, DatabaseType::ConfigNS, db.toBSON(), &response);
-
+    status = insertConfigDocument(txn, DatabaseType::ConfigNS, db.toBSON());
     if (status.code() == ErrorCodes::DuplicateKey) {
         return Status(ErrorCodes::NamespaceExists, "database " + dbName + " already exists");
     }
@@ -608,7 +606,7 @@ Status CatalogManagerCommon::_log(OperationContext* txn,
     log() << "about to log metadata event into " << logCollName << ": " << changeLogBSON;
 
     const NamespaceString nss("config", logCollName);
-    Status result = insert(txn, nss.ns(), changeLogBSON, NULL);
+    Status result = insertConfigDocument(txn, nss.ns(), changeLogBSON);
     if (!result.isOK()) {
         warning() << "Error encountered while logging config change with ID [" << changeId
                   << "] into collection " << logCollName << ": " << result;

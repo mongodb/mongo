@@ -558,6 +558,12 @@ void ForwardingCatalogManager::writeConfigServerDirect(OperationContext* txn,
           });
 }
 
+Status ForwardingCatalogManager::insertConfigDocument(OperationContext* txn,
+                                                      const std::string& ns,
+                                                      const BSONObj& doc) {
+    return retry(txn, [&] { return _actual->insertConfigDocument(txn, ns, doc); });
+}
+
 Status ForwardingCatalogManager::createDatabase(OperationContext* txn, const std::string& dbName) {
     return retry(txn, [&] { return _actual->createDatabase(txn, dbName); });
 }

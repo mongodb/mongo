@@ -38,7 +38,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
 #include "mongo/s/write_ops/batched_delete_request.h"
-#include "mongo/s/write_ops/batched_insert_request.h"
 #include "mongo/s/write_ops/batched_update_document.h"
 
 namespace mongo {
@@ -46,57 +45,6 @@ namespace mongo {
 using std::string;
 using std::unique_ptr;
 using std::vector;
-
-namespace {
-
-Status getStatus(const BatchedCommandResponse& response) {
-    if (response.getOk() == 0) {
-        return Status(static_cast<ErrorCodes::Error>(response.getErrCode()),
-                      response.getErrMessage());
-    }
-
-    if (response.isErrDetailsSet()) {
-        const WriteErrorDetail* errDetail = response.getErrDetails().front();
-
-        return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
-                      errDetail->getErrMessage());
-    }
-
-    if (response.isWriteConcernErrorSet()) {
-        const WCErrorDetail* errDetail = response.getWriteConcernError();
-
-        return Status(static_cast<ErrorCodes::Error>(errDetail->getErrCode()),
-                      errDetail->getErrMessage());
-    }
-
-    return Status::OK();
-}
-
-}  // namespace
-
-Status CatalogManager::insert(OperationContext* txn,
-                              const string& ns,
-                              const BSONObj& doc,
-                              BatchedCommandResponse* response) {
-    unique_ptr<BatchedInsertRequest> insert(new BatchedInsertRequest());
-    insert->addToDocuments(doc);
-
-    BatchedCommandRequest request(insert.release());
-    request.setNS(NamespaceString(ns));
-    request.setWriteConcern(WriteConcernOptions::Majority);
-
-    BatchedCommandResponse dummyResponse;
-    if (response == NULL) {
-        response = &dummyResponse;
-    }
-
-    // Make sure to add ids to the request, since this is an insert operation
-    unique_ptr<BatchedCommandRequest> requestWithIds(BatchedCommandRequest::cloneWithIds(request));
-    const BatchedCommandRequest& requestToSend = requestWithIds.get() ? *requestWithIds : request;
-
-    writeConfigServerDirect(txn, requestToSend, response);
-    return getStatus(*response);
-}
 
 Status CatalogManager::update(OperationContext* txn,
                               const string& ns,
@@ -124,7 +72,7 @@ Status CatalogManager::update(OperationContext* txn,
     }
 
     writeConfigServerDirect(txn, request, response);
-    return getStatus(*response);
+    return response->toStatus();
 }
 
 Status CatalogManager::remove(OperationContext* txn,
@@ -149,7 +97,7 @@ Status CatalogManager::remove(OperationContext* txn,
     }
 
     writeConfigServerDirect(txn, request, response);
-    return getStatus(*response);
+    return response->toStatus();
 }
 
 }  // namespace mongo

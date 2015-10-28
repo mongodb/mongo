@@ -144,6 +144,11 @@ public:
     bool isWriteConcernErrorSet() const;
     const WCErrorDetail* getWriteConcernError() const;
 
+    /**
+     * Converts the specified command response into a status, based on its contents.
+     */
+    Status toStatus() const;
+
 private:
     // Convention: (M)andatory, (O)ptional
 
