@@ -186,12 +186,15 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 		return (false);
 
 	/*
-	 * If we don't have a snapshot or we are running at read-uncommitted
-	 * isolation, all other changes are visible.
+	 * Read-uncommitted transactions see all other changes.
 	 */
 	if (txn->isolation == WT_ISO_READ_UNCOMMITTED)
 		return (true);
 
+        /*
+         * A visibility check that is not read-uncommitted must have an
+         * active snapshot.
+         */
 	WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT));
 
 	/* Transactions see their own changes. */
