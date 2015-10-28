@@ -1732,7 +1732,7 @@ TEST_F(TopoCoordTest, ReconfigKeepSecondary) {
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
 }
 
-TEST_F(TopoCoordTest, CheckShouldStandForElectionWithPrimary) {
+TEST_F(TopoCoordTest, ShouldNotStandForElectionWithPrimary) {
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version" << 1 << "members"
@@ -1749,7 +1749,7 @@ TEST_F(TopoCoordTest, CheckShouldStandForElectionWithPrimary) {
     ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, OpTime()));
 }
 
-TEST_F(TopoCoordTest, CheckShouldStandForElectionNotCloseEnoughToLastOptime) {
+TEST_F(TopoCoordTest, ShouldStandForElectionDespiteNotCloseEnoughToLastOptime) {
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version" << 1 << "members"
@@ -1763,7 +1763,7 @@ TEST_F(TopoCoordTest, CheckShouldStandForElectionNotCloseEnoughToLastOptime) {
 
     heartbeatFromMember(
         HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(10000, 0), 0));
-    ASSERT_FALSE(getTopoCoord().checkShouldStandForElection(now()++, OpTime(Timestamp(100, 0), 0)));
+    ASSERT_TRUE(getTopoCoord().checkShouldStandForElection(now()++, OpTime(Timestamp(100, 0), 0)));
 }
 
 TEST_F(TopoCoordTest, VoteForMyselfFailsWhileNotCandidate) {
