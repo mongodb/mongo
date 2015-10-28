@@ -54,7 +54,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".find(...).limit(n)");
     print("\tdb." + shortName + ".find(...).skip(n)");
     print("\tdb." + shortName + ".find(...).sort(...)");
-    print("\tdb." + shortName + ".findOne([query])");
+    print("\tdb." + shortName + ".findOne([query], [fields], [options], [readConcern])");
     print("\tdb." + shortName + ".findOneAndDelete( filter, <optional params> ) - delete first matching document, optional parameters are: projection, sort, maxTimeMS");
     print("\tdb." + shortName + ".findOneAndReplace( filter, replacement, <optional params> ) - replace first matching document, optional parameters are: projection, sort, maxTimeMS, upsert, returnNewDocument");
     print("\tdb." + shortName + ".findOneAndUpdate( filter, update, <optional params> ) - update first matching document, optional parameters are: projection, sort, maxTimeMS, upsert, returnNewDocument");
@@ -204,9 +204,13 @@ DBCollection.prototype.find = function( query , fields , limit , skip, batchSize
     return cursor;
 }
 
-DBCollection.prototype.findOne = function( query , fields, options ){
+DBCollection.prototype.findOne = function( query , fields, options, readConcern ){
     var cursor = this.find(query, fields, -1 /* limit */, 0 /* skip*/,
         0 /* batchSize */, options);
+
+    if ( readConcern ) {
+        cursor = cursor.readConcern(readConcern);
+    }
 
     if ( ! cursor.hasNext() )
         return null;

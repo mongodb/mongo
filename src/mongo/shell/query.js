@@ -30,6 +30,7 @@ DBQuery.prototype.help = function () {
     print("\t.skip(<n>)")
     print("\t.batchSize(<n>) - sets the number of docs to return per getMore")
     print("\t.hint({...})")
+    print("\t.readConcern(<level>)")
     print("\t.readPref(<mode>, <tagset>)")
     print("\t.count(<applySkipLimit>) - total # of objects matching query. by default ignores skip,limit")
     print("\t.size() - total # of objects cursor would return, honors skip,limit")
@@ -197,6 +198,10 @@ DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
 
     if ("$snapshot" in this._query) {
         cmd["snapshot"] = this._query.$snapshot;
+    }
+
+    if ("readConcern" in this._query) {
+        cmd["readConcern"] = this._query.readConcern;
     }
 
     if ((this._options & DBQuery.Option.tailable) != 0) {
@@ -429,6 +434,14 @@ DBQuery.prototype.showRecordId = function() {
 
 DBQuery.prototype.maxTimeMS = function( maxTimeMS ) {
     return this._addSpecial( "$maxTimeMS" , maxTimeMS );
+}
+
+DBQuery.prototype.readConcern = function( level ) {
+    var readConcernObj = {
+        level: level
+    };
+
+    return this._addSpecial( "readConcern", readConcernObj );
 }
 
 /**
