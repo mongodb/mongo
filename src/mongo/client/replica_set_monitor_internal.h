@@ -151,7 +151,17 @@ public:
 
     void updateNodeIfInNodes(const IsMasterReply& reply);
 
-    std::string getServerAddress() const;
+    /**
+     * Returns the connection string of the nodes that are known the be in the set because we've
+     * seen them in the isMaster reply of a PRIMARY.
+     */
+    std::string getConfirmedServerAddress() const;
+
+    /**
+     * Returns the connection string of the nodes that are believed to be in the set because we've
+     * seen them in the isMaster reply of non-PRIMARY nodes in our seed list.
+     */
+    std::string getUnconfirmedServerAddress() const;
 
     /**
      * Before unlocking, do DEV checkInvariants();

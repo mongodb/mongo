@@ -331,7 +331,7 @@ std::string ReplicaSetMonitor::getName() const {
 
 std::string ReplicaSetMonitor::getServerAddress() const {
     stdx::lock_guard<stdx::mutex> lk(_state->mutex);
-    return _state->getServerAddress();
+    return _state->getConfirmedServerAddress();
 }
 
 bool ReplicaSetMonitor::contains(const HostAndPort& host) const {
@@ -450,10 +450,18 @@ Refresher::NextStep Refresher::getNextStep() {
 
             // NOTE: we don't modify seedNodes or notify about set membership change in this
             // case since it hasn't been confirmed by a master.
+            const string oldAddr = _set->getUnconfirmedServerAddress();
             for (UnconfirmedReplies::iterator it = _scan->unconfirmedReplies.begin();
                  it != _scan->unconfirmedReplies.end();
                  ++it) {
                 _set->findOrCreateNode(it->host)->update(*it);
+            }
+            const string newAddr = _set->getUnconfirmedServerAddress();
+            if (oldAddr != newAddr && syncConfigChangeHook) {
+                // Run the syncConfigChangeHook because the ShardRegistry needs to know about any
+                // node we might talk to.  Don't run the asyncConfigChangeHook because we don't
+                // want to update the seed list stored on the config servers with unconfirmed hosts.
+                syncConfigChangeHook(_set->name, _set->getUnconfirmedServerAddress());
             }
         }
 
@@ -642,21 +650,21 @@ bool Refresher::receivedIsMasterFromMaster(const IsMasterReply& reply) {
     }
 
     if (reply.normalHosts != _set->seedNodes) {
-        const string oldAddr = _set->getServerAddress();
+        const string oldAddr = _set->getConfirmedServerAddress();
         _set->seedNodes = reply.normalHosts;
 
         // LogLevel can be pretty low, since replica set reconfiguration should be pretty rare
         // and we want to record our changes
-        log() << "changing hosts to " << _set->getServerAddress() << " from " << oldAddr;
+        log() << "changing hosts to " << _set->getConfirmedServerAddress() << " from " << oldAddr;
 
         if (syncConfigChangeHook) {
-            syncConfigChangeHook(_set->name, _set->getServerAddress());
+            syncConfigChangeHook(_set->name, _set->getConfirmedServerAddress());
         }
 
         if (asyncConfigChangeHook) {
             // call from a separate thread to avoid blocking and holding lock while potentially
             // going over the network
-            stdx::thread bg(asyncConfigChangeHook, _set->name, _set->getServerAddress());
+            stdx::thread bg(asyncConfigChangeHook, _set->name, _set->getConfirmedServerAddress());
             bg.detach();
         }
     }
@@ -977,7 +985,7 @@ void SetState::updateNodeIfInNodes(const IsMasterReply& reply) {
     node->update(reply);
 }
 
-std::string SetState::getServerAddress() const {
+std::string SetState::getConfirmedServerAddress() const {
     StringBuilder ss;
     if (!name.empty())
         ss << name << "/";
@@ -987,6 +995,20 @@ std::string SetState::getServerAddress() const {
         if (it != seedNodes.begin())
             ss << ",";
         it->append(ss);
+    }
+
+    return ss.str();
+}
+
+std::string SetState::getUnconfirmedServerAddress() const {
+    StringBuilder ss;
+    if (!name.empty())
+        ss << name << "/";
+
+    for (std::vector<Node>::const_iterator it = nodes.begin(); it != nodes.end(); ++it) {
+        if (it != nodes.begin())
+            ss << ",";
+        it->host.append(ss);
     }
 
     return ss.str();

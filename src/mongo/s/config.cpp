@@ -810,7 +810,8 @@ void ConfigServer::replicaSetChangeConfigServerUpdateHook(const string& setName,
     try {
         std::shared_ptr<Shard> s = grid.shardRegistry()->lookupRSName(setName);
         if (!s) {
-            LOG(1) << "shard not found for set: " << newConnectionString;
+            LOG(1) << "shard not found for set: " << newConnectionString
+                   << " when attempting to inform config servers of updated set membership";
             return;
         }
 
