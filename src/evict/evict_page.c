@@ -143,17 +143,16 @@ done:	if (((inmem_split && ret == 0) || (forced_eviction && ret == EBUSY)) &&
 	return (ret);
 }
 /*
- * __evict_ref_delete --
- *	Mark a reference deleted.
+ * __evict_reverse_split_check --
+ *	Check if an internal page needs a reverse split.
  */
 static int
-__evict_ref_delete(WT_SESSION_IMPL *session, WT_REF *ref)
+__evict_reverse_split_check(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *pindex;
 	uint32_t deleted_entries;
 
-	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	if (__wt_ref_is_root(ref))
 		return (0);
 
@@ -190,8 +189,9 @@ __wt_evict_page_clean_update(
 	 */
 	__wt_ref_out(session, ref);
 	if (ref->addr == NULL) {
+		WT_PUBLISH(ref->state, WT_REF_DELETED);
 		WT_WITH_PAGE_INDEX(session,
-		    ret = __evict_ref_delete(session, ref));
+		    ret = __evict_reverse_split_check(session, ref));
 		WT_RET_BUSY_OK(ret);
 	} else
 		WT_PUBLISH(ref->state, WT_REF_DISK);
@@ -236,9 +236,10 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 */
 		__wt_ref_out(session, ref);
 		ref->addr = NULL;
+		WT_PUBLISH(ref->state, WT_REF_DELETED);
 		WT_WITH_PAGE_INDEX(session,
-		    ret = __evict_ref_delete(session, ref));
-		WT_RET(ret);
+		    ret = __evict_reverse_split_check(session, ref));
+		WT_RET_BUSY_OK(ret);
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
 		/*
