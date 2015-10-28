@@ -49,27 +49,30 @@ class test_inmem01(wttest.WiredTigerTestCase):
     """
     scenarios = check_scenarios([
         ('col', dict(tablekind='col')),
-#        ('fix', dict(tablekind='fix')),
+        # Fixed length is very slow, disable it for now
+        #('fix', dict(tablekind='fix')),
         ('row', dict(tablekind='row'))
     ])
 
     # Override WiredTigerTestCase to create an in-memory database
     def setUpConnectionOpen(self, dir):
         conn = wiredtiger.wiredtiger_open(dir,
-            'create,file_manager=(close_idle_time=0),in_memory=true,cache_size=2MB')
+            'cache_size=5MB,create,' +
+            'file_manager=(close_idle_time=0),in_memory=true,cache_size=5MB')
         return conn
 
     def get_table_config(self):
-        kf = vf = ''
+        kf = 'key_format='
+        vf = 'value_format='
         if self.tablekind == 'row':
-            kf = 'S'
+            kf = kf + 'S'
         else:
-            kf = 'r'  # record format
+            kf = kf + 'r'  # record format
         if self.tablekind == 'fix':
-            vf = '8t'
+            vf = vf + '8t'
         else:
-            vf = 'S'
-        return 'memory_page_max=32k,leaf_page_max=4k,key_format=' + kf + ',value_format=' + vf
+            vf = vf + 'S'
+        return 'memory_page_max=32k,leaf_page_max=4k,' + kf + ',' + vf
 
     def test_insert(self):
         table_config = self.get_table_config()
@@ -83,7 +86,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
         msg = '/WT_CACHE_FULL.*/'
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda:simple_populate(self,
-                "table:" + self.name, table_config, 3000000), msg)
+                "table:" + self.name, table_config, 10000000), msg)
 
         # Figure out the last key we inserted.
         cursor = self.session.open_cursor('table:' + self.name, None)
@@ -96,7 +99,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
         msg = '/WT_CACHE_FULL.*/'
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda:simple_populate(self,
-                "table:" + self.name, table_config, 3000000), msg)
+                "table:" + self.name, table_config, 10000000), msg)
 
         # Now that the database contains as much data as will fit into
         # the configured cache, verify removes succeed.
@@ -110,12 +113,16 @@ class test_inmem01(wttest.WiredTigerTestCase):
         msg = '/WT_CACHE_FULL.*/'
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             lambda:simple_populate(self,
-                "table:" + self.name, table_config, 3000000), msg)
+                "table:" + self.name, table_config, 10000000), msg)
+
+        cursor = self.session.open_cursor('table:' + self.name, None)
+        cursor.prev()
+        last_key = int(cursor.get_key())
 
         # Now that the database contains as much data as will fit into
         # the configured cache, verify removes succeed.
         cursor = self.session.open_cursor('table:' + self.name, None)
-        for i in range(1, 1000):
+        for i in range(1, last_key / 4, 1):
             cursor.set_key(key_populate(cursor, i))
             cursor.remove()
 
@@ -127,6 +134,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
                 cursor[key_populate(cursor, 1)] = value_populate(cursor, 1)
             except wiredtiger.WiredTigerError:
                 cursor.reset()
+                sleep(1)
                 continue
             inserted = True
             break
