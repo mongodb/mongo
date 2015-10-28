@@ -33,7 +33,6 @@
 
 #include "mongo/platform/random.h"
 
-#include <stdio.h>
 #include <string.h>
 
 #ifdef _WIN32
@@ -48,6 +47,7 @@
 #include <fstream>
 #include <limits>
 
+#include <mongo/stdx/memory.h>
 #include <mongo/util/log.h>
 #include <mongo/util/assert_util.h>
 
@@ -150,28 +150,25 @@ SecureRandom* SecureRandom::create() {
 class InputStreamSecureRandom : public SecureRandom {
 public:
     InputStreamSecureRandom(const char* fn) {
-        _in = new std::ifstream(fn, std::ios::binary | std::ios::in);
+        _in = stdx::make_unique<std::ifstream>(fn, std::ios::binary | std::ios::in);
         if (!_in->is_open()) {
-            std::cerr << "can't open " << fn << " " << strerror(errno) << std::endl;
-            abort();
+            error() << "cannot open " << fn << " " << strerror(errno);
+            fassertFailed(28839);
         }
-    }
-
-    ~InputStreamSecureRandom() {
-        delete _in;
     }
 
     int64_t nextInt64() {
         int64_t r;
         _in->read(reinterpret_cast<char*>(&r), sizeof(r));
         if (_in->fail()) {
-            abort();
+            error() << "InputStreamSecureRandom failed to generate random bytes";
+            fassertFailed(28840);
         }
         return r;
     }
 
 private:
-    std::ifstream* _in;
+    std::unique_ptr<std::ifstream> _in;
 };
 
 SecureRandom* SecureRandom::create() {
