@@ -184,6 +184,11 @@ WiredTigerSession* WiredTigerRecoveryUnit::getSession(OperationContext* opCtx) {
     return _session;
 }
 
+WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn(OperationContext* opCtx) {
+    _ensureSession();
+    return _session;
+}
+
 void WiredTigerRecoveryUnit::abandonSnapshot() {
     invariant(!_inUnitOfWork);
     if (_active) {

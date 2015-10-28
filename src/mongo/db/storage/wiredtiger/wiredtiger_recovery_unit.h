@@ -86,6 +86,14 @@ public:
     // ---- WT STUFF
 
     WiredTigerSession* getSession(OperationContext* opCtx);
+
+    /**
+     * Returns a session without starting a new WT txn on the session. Will not close any already
+     * running session.
+     */
+
+    WiredTigerSession* getSessionNoTxn(OperationContext* opCtx);
+
     WiredTigerSessionCache* getSessionCache() {
         return _sessionCache;
     }

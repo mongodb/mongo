@@ -56,8 +56,10 @@ bool WiredTigerServerStatusSection::includeByDefault() const {
 
 BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* txn,
                                                        const BSONElement& configElement) const {
-    WiredTigerSession* session =
-        checked_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit())->getSession(txn);
+     // The session does not open a transaction here as one is not needed and opening one would
+     // mean that execution could become blocked when a new transaction cannot be allocated
+     // immediately.
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSessionNoTxn(txn);
     invariant(session);
 
     WT_SESSION* s = session->getSession();
