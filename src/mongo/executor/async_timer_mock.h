@@ -119,7 +119,7 @@ public:
     /**
      * Create and return a new AsyncTimerMock object.
      */
-    std::unique_ptr<AsyncTimerInterface> make(asio::io_service* io_service,
+    std::unique_ptr<AsyncTimerInterface> make(asio::io_service::strand* strand,
                                               Milliseconds expiration) override;
 
     /**

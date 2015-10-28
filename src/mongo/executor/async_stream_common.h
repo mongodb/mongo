@@ -51,17 +51,27 @@ void destroyStream(ASIOStream* stream, bool connected) {
 }
 
 template <typename ASIOStream, typename Buffer, typename Handler>
-void writeStream(ASIOStream* stream, bool connected, Buffer&& buffer, Handler&& handler) {
+void writeStream(ASIOStream* stream,
+                 asio::io_service::strand* strand,
+                 bool connected,
+                 Buffer&& buffer,
+                 Handler&& handler) {
     invariant(connected);
-    asio::async_write(
-        *stream, asio::buffer(std::forward<Buffer>(buffer)), std::forward<Handler>(handler));
+    asio::async_write(*stream,
+                      asio::buffer(std::forward<Buffer>(buffer)),
+                      strand->wrap(std::forward<Handler>(handler)));
 }
 
 template <typename ASIOStream, typename Buffer, typename Handler>
-void readStream(ASIOStream* stream, bool connected, Buffer&& buffer, Handler&& handler) {
+void readStream(ASIOStream* stream,
+                asio::io_service::strand* strand,
+                bool connected,
+                Buffer&& buffer,
+                Handler&& handler) {
     invariant(connected);
-    asio::async_read(
-        *stream, asio::buffer(std::forward<Buffer>(buffer)), std::forward<Handler>(handler));
+    asio::async_read(*stream,
+                     asio::buffer(std::forward<Buffer>(buffer)),
+                     strand->wrap(std::forward<Handler>(handler)));
 }
 
 template <typename ASIOStream>

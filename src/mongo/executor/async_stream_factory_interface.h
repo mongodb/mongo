@@ -48,7 +48,7 @@ class AsyncStreamFactoryInterface {
 public:
     virtual ~AsyncStreamFactoryInterface() = default;
 
-    virtual std::unique_ptr<AsyncStreamInterface> makeStream(asio::io_service* io_service,
+    virtual std::unique_ptr<AsyncStreamInterface> makeStream(asio::io_service::strand* strand,
                                                              const HostAndPort& target) = 0;
 
 protected:

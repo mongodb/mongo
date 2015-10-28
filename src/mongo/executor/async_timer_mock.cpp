@@ -94,7 +94,7 @@ std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryMock::make(Milliseconds ex
     return make(nullptr, expiration);
 }
 
-std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryMock::make(asio::io_service* io_service,
+std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryMock::make(asio::io_service::strand* strand,
                                                                  Milliseconds expiration) {
     stdx::lock_guard<stdx::mutex> lk(_timersMutex);
     auto elem = _timers.emplace(std::make_shared<AsyncTimerMockImpl>(expiration));

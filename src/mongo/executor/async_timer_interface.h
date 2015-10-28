@@ -81,7 +81,7 @@ class AsyncTimerFactoryInterface {
 public:
     virtual ~AsyncTimerFactoryInterface() = default;
 
-    virtual std::unique_ptr<AsyncTimerInterface> make(asio::io_service* io_service,
+    virtual std::unique_ptr<AsyncTimerInterface> make(asio::io_service::strand* strand,
                                                       Milliseconds expiration) = 0;
 
 protected:

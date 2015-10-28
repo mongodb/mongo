@@ -43,8 +43,9 @@
 namespace mongo {
 namespace executor {
 
-AsyncSecureStream::AsyncSecureStream(asio::io_service* io_service, asio::ssl::context* sslContext)
-    : _stream(*io_service, *sslContext) {}
+AsyncSecureStream::AsyncSecureStream(asio::io_service::strand* strand,
+                                     asio::ssl::context* sslContext)
+    : _strand(strand), _stream(_strand->get_io_service(), *sslContext) {}
 
 AsyncSecureStream::~AsyncSecureStream() {
     destroyStream(&_stream.lowest_layer(), _connected);
@@ -55,33 +56,34 @@ void AsyncSecureStream::connect(const asio::ip::tcp::resolver::iterator endpoint
     // Stash the connectHandler as we won't be able to call it until we re-enter the state
     // machine.
     _userHandler = std::move(connectHandler);
-    asio::async_connect(_stream.lowest_layer(),
-                        std::move(endpoints),
-                        [this](std::error_code ec, asio::ip::tcp::resolver::iterator iter) {
-                            if (ec) {
-                                return _userHandler(ec);
-                            }
-                            _connected = true;
-                            return _handleConnect(std::move(iter));
-                        });
+    asio::async_connect(
+        _stream.lowest_layer(),
+        std::move(endpoints),
+        _strand->wrap([this](std::error_code ec, asio::ip::tcp::resolver::iterator iter) {
+            if (ec) {
+                return _userHandler(ec);
+            }
+            _connected = true;
+            return _handleConnect(std::move(iter));
+        }));
 }
 
 void AsyncSecureStream::write(asio::const_buffer buffer, StreamHandler&& streamHandler) {
-    writeStream(&_stream, _connected, buffer, std::move(streamHandler));
+    writeStream(&_stream, _strand, _connected, buffer, std::move(streamHandler));
 }
 
 void AsyncSecureStream::read(asio::mutable_buffer buffer, StreamHandler&& streamHandler) {
-    readStream(&_stream, _connected, buffer, std::move(streamHandler));
+    readStream(&_stream, _strand, _connected, buffer, std::move(streamHandler));
 }
 
 void AsyncSecureStream::_handleConnect(asio::ip::tcp::resolver::iterator iter) {
     _stream.async_handshake(decltype(_stream)::client,
-                            [this, iter](std::error_code ec) {
+                            _strand->wrap([this, iter](std::error_code ec) {
                                 if (ec) {
                                     return _userHandler(ec);
                                 }
                                 return _handleHandshake(ec, iter->host_name());
-                            });
+                            }));
 }
 
 void AsyncSecureStream::_handleHandshake(std::error_code ec, const std::string& hostName) {

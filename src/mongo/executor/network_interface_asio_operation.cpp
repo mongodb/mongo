@@ -99,42 +99,39 @@ NetworkInterfaceASIO::AsyncOp::AsyncOp(NetworkInterfaceASIO* const owner,
       _request(request),
       _onFinish(onFinish),
       _start(now),
+      _resolver(owner->_io_service),
       _canceled(0),
       _timedOut(0),
       _access(std::make_shared<AsyncOp::AccessControl>()),
-      _inSetup(true) {}
+      _inSetup(true),
+      _strand(owner->_io_service) {}
 
 void NetworkInterfaceASIO::AsyncOp::cancel() {
     LOG(2) << "Canceling operation; original request was: " << request().toString();
-    std::shared_ptr<AsyncOp::AccessControl> access;
-    std::size_t generation;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_access->mutex);
-        access = _access;
-        generation = access->id;
-    }
+    stdx::lock_guard<stdx::mutex> lk(_access->mutex);
+    auto access = _access;
+    auto generation = access->id;
 
     // An operation may be in mid-flight when it is canceled, so we cancel any
     // in-progress async ops but do not complete the operation now.
-    asio::post(_owner->_io_service,
-               [this, access, generation] {
-                   // Ensure 'this' pointer is still valid.
-                   stdx::lock_guard<stdx::mutex> lk(access->mutex);
-                   if (generation == access->id) {
-                       _canceled.store(1);
-                       if (_connection) {
-                           _connection->cancel();
-                       }
-                   }
-               });
+
+    _strand.post([this, access, generation] {
+        stdx::lock_guard<stdx::mutex> lk(access->mutex);
+        if (generation == access->id) {
+            _canceled = true;
+            if (_connection) {
+                _connection->cancel();
+            }
+        }
+    });
 }
 
 bool NetworkInterfaceASIO::AsyncOp::canceled() const {
-    return (_canceled.load() == 1);
+    return _canceled;
 }
 
 bool NetworkInterfaceASIO::AsyncOp::timedOut() const {
-    return (_timedOut.load() == 1);
+    return _timedOut;
 }
 
 const TaskExecutor::CallbackHandle& NetworkInterfaceASIO::AsyncOp::cbHandle() const {
@@ -237,8 +234,8 @@ void NetworkInterfaceASIO::AsyncOp::reset() {
     // Ditto for _operationProtocol.
     _start = {};
     _timeoutAlarm.reset();
-    _canceled.store(0u);
-    _timedOut.store(0u);
+    _canceled = false;
+    _timedOut = false;
     _command = boost::none;
     // _inSetup should always be false at this point.
 }

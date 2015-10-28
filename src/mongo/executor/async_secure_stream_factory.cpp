@@ -52,12 +52,12 @@ AsyncSecureStreamFactory::AsyncSecureStreamFactory(SSLManagerInterface* sslManag
 }
 
 std::unique_ptr<AsyncStreamInterface> AsyncSecureStreamFactory::makeStream(
-    asio::io_service* io_service, const HostAndPort&) {
+    asio::io_service::strand* strand, const HostAndPort&) {
     int sslModeVal = getSSLGlobalParams().sslMode.load();
     if (sslModeVal == SSLParams::SSLMode_preferSSL || sslModeVal == SSLParams::SSLMode_requireSSL) {
-        return stdx::make_unique<AsyncSecureStream>(io_service, &_sslContext);
+        return stdx::make_unique<AsyncSecureStream>(strand, &_sslContext);
     }
-    return stdx::make_unique<AsyncStream>(io_service);
+    return stdx::make_unique<AsyncStream>(strand);
 }
 
 }  // namespace executor

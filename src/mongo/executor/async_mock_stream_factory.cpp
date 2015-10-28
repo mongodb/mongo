@@ -67,25 +67,23 @@ StringData stateToString(AsyncMockStreamFactory::MockStream::StreamState state) 
 }
 
 template <typename Handler>
-void checkCanceled(asio::io_service* io_service,
+void checkCanceled(asio::io_service::strand* strand,
                    AsyncMockStreamFactory::MockStream::StreamState* state,
                    Handler&& handler,
                    std::size_t bytes,
                    std::error_code ec = std::error_code()) {
     auto wasCancelled = (*state == AsyncMockStreamFactory::MockStream::StreamState::kCanceled);
     *state = AsyncMockStreamFactory::MockStream::StreamState::kRunning;
-    asio::post(*io_service,
-               [handler, wasCancelled, bytes, ec] {
-                   handler(wasCancelled ? make_error_code(asio::error::operation_aborted) : ec,
-                           bytes);
-               });
+    strand->post([handler, wasCancelled, bytes, ec] {
+        handler(wasCancelled ? make_error_code(asio::error::operation_aborted) : ec, bytes);
+    });
 }
 
 }  // namespace
 
 std::unique_ptr<AsyncStreamInterface> AsyncMockStreamFactory::makeStream(
-    asio::io_service* io_service, const HostAndPort& target) {
-    return stdx::make_unique<MockStream>(io_service, this, target);
+    asio::io_service::strand* strand, const HostAndPort& target) {
+    return stdx::make_unique<MockStream>(strand, this, target);
 }
 
 void AsyncMockStreamFactory::_createStream(const HostAndPort& host, MockStream* stream) {
@@ -112,10 +110,10 @@ AsyncMockStreamFactory::MockStream* AsyncMockStreamFactory::blockUntilStreamExis
     return iter->second;
 }
 
-AsyncMockStreamFactory::MockStream::MockStream(asio::io_service* io_service,
+AsyncMockStreamFactory::MockStream::MockStream(asio::io_service::strand* strand,
                                                AsyncMockStreamFactory* factory,
                                                const HostAndPort& target)
-    : _io_service(io_service), _factory(factory), _target(target) {
+    : _strand(strand), _factory(factory), _target(target) {
     _factory->_createStream(_target, this);
 }
 
@@ -133,7 +131,7 @@ void AsyncMockStreamFactory::MockStream::connect(asio::ip::tcp::resolver::iterat
                // We shim a lambda to give connectHandler the right signature since it doesn't take
                // a size_t param.
                checkCanceled(
-                   _io_service,
+                   _strand,
                    &_state,
                    [connectHandler](std::error_code ec, std::size_t) { return connectHandler(ec); },
                    0);
@@ -152,7 +150,7 @@ void AsyncMockStreamFactory::MockStream::write(asio::const_buffer buf,
     _defer_inlock(kBlockedAfterWrite,
                   [this, writeHandler, size]() {
                       stdx::unique_lock<stdx::mutex> lk(_mutex);
-                      checkCanceled(_io_service, &_state, std::move(writeHandler), size);
+                      checkCanceled(_strand, &_state, std::move(writeHandler), size);
                   });
 }
 
@@ -207,7 +205,7 @@ void AsyncMockStreamFactory::MockStream::read(asio::mutable_buffer buf,
                    };
                }
 
-               checkCanceled(_io_service, &_state, std::move(handler), nToCopy, _error);
+               checkCanceled(_strand, &_state, std::move(handler), nToCopy, _error);
                _error.clear();
            });
 }
@@ -259,7 +257,7 @@ void AsyncMockStreamFactory::MockStream::_unblock_inlock() {
     }
     // Post our deferred action to resume state machine execution
     invariant(_deferredAction);
-    _io_service->post(std::move(_deferredAction));
+    _strand->post(std::move(_deferredAction));
     _deferredAction = nullptr;
 }
 

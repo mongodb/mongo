@@ -37,13 +37,14 @@ namespace executor {
 
 class AsyncTimerASIO final : public AsyncTimerInterface {
 public:
-    AsyncTimerASIO(asio::io_service* service, Milliseconds expiration);
+    AsyncTimerASIO(asio::io_service::strand* strand, Milliseconds expiration);
 
     void cancel() override;
 
     void asyncWait(AsyncTimerInterface::Handler handler) override;
 
 private:
+    asio::io_service::strand* const _strand;
     asio::steady_timer _timer;
 };
 
@@ -51,7 +52,7 @@ class AsyncTimerFactoryASIO final : public AsyncTimerFactoryInterface {
 public:
     AsyncTimerFactoryASIO() = default;
 
-    std::unique_ptr<AsyncTimerInterface> make(asio::io_service* service,
+    std::unique_ptr<AsyncTimerInterface> make(asio::io_service::strand* strand,
                                               Milliseconds expiration) override;
 };
 

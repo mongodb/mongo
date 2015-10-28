@@ -44,7 +44,7 @@ namespace connection_pool_asio {
  */
 class ASIOTimer final : public ConnectionPool::TimerInterface {
 public:
-    ASIOTimer(asio::io_service* service);
+    ASIOTimer(asio::io_service::strand* strand);
     ~ASIOTimer();
 
     void setTimeout(Milliseconds timeout, TimeoutCallback cb) override;
@@ -57,7 +57,7 @@ private:
     };
 
     TimeoutCallback _cb;
-    asio::io_service* const _io_service;
+    asio::io_service::strand* const _strand;
     asio::steady_timer _impl;
     std::shared_ptr<CallbackSharedState> _callbackSharedState;
 };
@@ -99,12 +99,12 @@ private:
     SetupCallback _setupCallback;
     RefreshCallback _refreshCallback;
     ASIOImpl* const _global;
-    ASIOTimer _timer;
     Date_t _lastUsed;
     Status _status = ConnectionPool::kConnectionStateUnknown;
     HostAndPort _hostAndPort;
     size_t _generation;
     std::unique_ptr<NetworkInterfaceASIO::AsyncOp> _impl;
+    ASIOTimer _timer;
 };
 
 /**

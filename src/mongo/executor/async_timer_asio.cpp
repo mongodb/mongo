@@ -33,20 +33,20 @@
 namespace mongo {
 namespace executor {
 
-AsyncTimerASIO::AsyncTimerASIO(asio::io_service* service, Milliseconds expiration)
-    : _timer(*service, expiration) {}
+AsyncTimerASIO::AsyncTimerASIO(asio::io_service::strand* strand, Milliseconds expiration)
+    : _strand(strand), _timer(_strand->get_io_service(), expiration) {}
 
 void AsyncTimerASIO::cancel() {
     _timer.cancel();
 }
 
 void AsyncTimerASIO::asyncWait(AsyncTimerInterface::Handler handler) {
-    _timer.async_wait(std::move(handler));
+    _timer.async_wait(_strand->wrap(std::move(handler)));
 }
 
-std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryASIO::make(asio::io_service* service,
+std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryASIO::make(asio::io_service::strand* strand,
                                                                  Milliseconds expiration) {
-    return stdx::make_unique<AsyncTimerASIO>(service, expiration);
+    return stdx::make_unique<AsyncTimerASIO>(strand, expiration);
 }
 
 }  // namespace executor

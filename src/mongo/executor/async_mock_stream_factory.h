@@ -54,12 +54,12 @@ class AsyncMockStreamFactory final : public AsyncStreamFactoryInterface {
 public:
     AsyncMockStreamFactory() = default;
 
-    std::unique_ptr<AsyncStreamInterface> makeStream(asio::io_service* io_service,
+    std::unique_ptr<AsyncStreamInterface> makeStream(asio::io_service::strand* strand,
                                                      const HostAndPort& host) override;
 
     class MockStream final : public AsyncStreamInterface {
     public:
-        MockStream(asio::io_service* io_service,
+        MockStream(asio::io_service::strand* strand,
                    AsyncMockStreamFactory* factory,
                    const HostAndPort& target);
 
@@ -103,7 +103,7 @@ public:
         void _defer_inlock(StreamState state, Action&& handler);
         void _unblock_inlock();
 
-        asio::io_service* _io_service;
+        asio::io_service::strand* _strand;
 
         AsyncMockStreamFactory* _factory;
         HostAndPort _target;
