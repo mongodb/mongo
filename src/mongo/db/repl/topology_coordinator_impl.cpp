@@ -1043,107 +1043,56 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBDataV1(
     const MemberState& originalState,
     Date_t now,
     const OpTime& lastOpApplied) {
-    // This method has two interrelated responsibilities, performed in two phases.
     //
-    // First, it updates the local notion of which remote node, if any is primary.
+    // Updates the local notion of which remote node, if any is primary.
+    // Start the priority takeover process if we are eligible.
     //
-    // Second, if there is no remote primary, and the local node is not primary, it considers
-    // whether or not to stand for election.
+
     invariant(updatedConfigIndex != _selfIndex);
 
-    // We are missing from the config, so do not participate in primary maintenance or election.
+    // If we are missing from the config, do not participate in primary maintenance or election.
     if (_selfIndex == -1) {
         return HeartbeatResponseAction::makeNoAction();
     }
-
-    ////////////////////
-    // Phase 1
-    ////////////////////
-
-    // If we believe the node whose data was just updated is primary, confirm that
-    // the updated data supports that notion.  If not, erase our notion of who is primary.
-    if (updatedConfigIndex == _currentPrimaryIndex) {
-        const MemberHeartbeatData& updatedHBData = _hbdata[updatedConfigIndex];
-        if (!updatedHBData.up() || !updatedHBData.getState().primary()) {
-            _currentPrimaryIndex = -1;
-        }
+    // If we are the primary, there must be no other primary, otherwise its higher term would
+    // have already made us step down.
+    if (_currentPrimaryIndex == _selfIndex) {
+        return HeartbeatResponseAction::makeNoAction();
     }
 
     // Scan the member list's heartbeat data for who is primary, and update _currentPrimaryIndex.
-    if (_currentPrimaryIndex != _selfIndex) {
-        int remotePrimaryIndex = -1;
-        for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin();
-             it != _hbdata.end();
-             ++it) {
-            const int itIndex = indexOfIterator(_hbdata, it);
-            if (itIndex == _selfIndex) {
-                continue;
-            }
-
-            if (it->getState().primary() && it->up()) {
-                if (remotePrimaryIndex == -1 ||
-                    _hbdata[remotePrimaryIndex].getTerm() < it->getTerm()) {
-                    remotePrimaryIndex = itIndex;
-                }
+    int primaryIndex = -1;
+    for (size_t i = 0; i < _hbdata.size(); i++) {
+        const MemberHeartbeatData& member = _hbdata[i];
+        if (member.getState().primary() && member.up()) {
+            if (primaryIndex == -1 || _hbdata[primaryIndex].getTerm() < member.getTerm()) {
+                primaryIndex = i;
             }
         }
-
-        if (remotePrimaryIndex != -1) {
-            // Clear last heartbeat message on ourselves.
-            setMyHeartbeatMessage(now, "");
-
-            _currentPrimaryIndex = remotePrimaryIndex;
-
-            // Priority takeover when the replset is stable.
-            //
-            // Take over the primary only if the remote primary is in the latest term I know.
-            // Otherwise, there must be an outstanding election, which may succeed or not, but
-            // the remote primary will become aware of that election eventually and step down.
-            if (_hbdata[remotePrimaryIndex].getTerm() == _term &&
-                _rsConfig.getMemberAt(remotePrimaryIndex).getPriority() <
-                    _rsConfig.getMemberAt(_selfIndex).getPriority()) {
-                LOG(4) << "I can take over the primary due to higher priority."
-                       << " Current primary index: " << remotePrimaryIndex << " in term "
-                       << _hbdata[remotePrimaryIndex].getTerm();
-
-                return HeartbeatResponseAction::makePriorityTakeoverAction();
-            }
-            return HeartbeatResponseAction::makeNoAction();
-        }
     }
-
-    ////////////////////
-    // Phase 2
-    ////////////////////
-
-    // We do not believe any remote to be primary.
-
-    // Return if we are primary. The stepdown decision is based on liveness rather than
-    // heartbeats in pv 1.
-    if (_iAmPrimary()) {
+    _currentPrimaryIndex = primaryIndex;
+    if (_currentPrimaryIndex == -1) {
         return HeartbeatResponseAction::makeNoAction();
     }
 
-    fassert(28798, _currentPrimaryIndex == -1);
+    // Clear last heartbeat message on ourselves.
+    setMyHeartbeatMessage(now, "");
 
-    const MemberState currentState = getMemberState();
-    if (originalState.recovering() && currentState.secondary()) {
-        // We just transitioned from RECOVERING to SECONDARY, this can only happen if we
-        // received a heartbeat with an auth error when previously all the heartbeats we'd
-        // received had auth errors.  In this case, don't return makeElectAction() because
-        // that could cause the election to start before the ReplicationCoordinator has updated
-        // its notion of the member state to SECONDARY.  Instead return noAction so that the
-        // ReplicationCoordinator knows to update its tracking of the member state off of the
-        // TopologyCoordinator, and leave starting the election until the next heartbeat comes
-        // back.
-        return HeartbeatResponseAction::makeNoAction();
-    }
+    // Priority takeover when the replset is stable.
+    //
+    // Take over the primary only if the remote primary is in the latest term I know.
+    // Otherwise, there must be an outstanding election, which may succeed or not, but
+    // the remote primary will become aware of that election eventually and step down.
+    if (_hbdata[primaryIndex].getTerm() == _term &&
+        _rsConfig.getMemberAt(primaryIndex).getPriority() <
+            _rsConfig.getMemberAt(_selfIndex).getPriority()) {
+        LOG(4) << "I can take over the primary due to higher priority."
+               << " Current primary index: " << primaryIndex << " in term "
+               << _hbdata[primaryIndex].getTerm();
 
-    // At this point, there is no primary anywhere.  Check to see if we should become a candidate.
-    if (!checkShouldStandForElection(now, lastOpApplied)) {
-        return HeartbeatResponseAction::makeNoAction();
+        return HeartbeatResponseAction::makePriorityTakeoverAction();
     }
-    return HeartbeatResponseAction::makeScheduleElectionAction();
+    return HeartbeatResponseAction::makeNoAction();
 }
 
 HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(

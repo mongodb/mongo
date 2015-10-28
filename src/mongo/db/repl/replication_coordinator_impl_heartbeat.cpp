@@ -215,13 +215,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
             invariant(responseStatus.isOK());
             _scheduleHeartbeatReconfig(responseStatus.getValue().getConfig());
             break;
-        case HeartbeatResponseAction::ScheduleElection:
-            DEV {
-                // Election timer should already be periodically scheduled at this point.
-                stdx::unique_lock<stdx::mutex> lk(_mutex);
-                fassert(28813, _handleElectionTimeoutCbh.isValid());
-            }
-            break;
         case HeartbeatResponseAction::StartElection:
             _startElectSelf();
             break;
@@ -250,9 +243,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
             }
             break;
         }
-        default:
-            severe() << "Illegal heartbeat response action code " << int(action.getAction());
-            invariant(false);
     }
 }
 

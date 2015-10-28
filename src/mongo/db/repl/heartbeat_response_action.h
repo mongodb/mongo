@@ -47,7 +47,6 @@ public:
     enum Action {
         NoAction,
         Reconfig,
-        ScheduleElection,
         StartElection,
         StepDownSelf,
         StepDownRemotePrimary,
@@ -63,13 +62,6 @@ public:
      * Makes a new action representing the instruction to reconfigure the current node.
      */
     static HeartbeatResponseAction makeReconfigAction();
-
-    /**
-     * Makes a new action telling the current node to schedule an election due to election timeout
-     * expiry. If an election timeout is already scheduled, the current node should not reschedule
-     * the timeout. Valid under protocol version 1 only.
-     */
-    static HeartbeatResponseAction makeScheduleElectionAction();
 
     /**
      * Makes a new action telling the current node to attempt to elect itself primary.

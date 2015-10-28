@@ -2793,9 +2793,7 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPrimaryDownMajorityOfVotersUp
                                                   << "votes" << 0 << "priority" << 0)
                                     << BSON("_id" << 6 << "host"
                                                   << "host7:27017")) << "protocolVersion" << 1
-                      << "settings"
-
-                      << BSON("heartbeatTimeoutSecs" << 5)),
+                      << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
                  0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -2833,8 +2831,11 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPrimaryDownMajorityOfVotersUp
 
     nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0", lastOpTimeApplied);
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    ASSERT_EQUALS(HeartbeatResponseAction::ScheduleElection, nextAction.getAction());
+    ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+    // We are electable now.
+    ASSERT_TRUE(getTopoCoord().becomeCandidateIfElectable(now(), lastOpTimeApplied));
+    ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 }
 
 TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPrimaryDownMajority) {
@@ -2863,8 +2864,10 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPrimaryDownMajority) {
 
     nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0", lastOpTimeApplied);
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    ASSERT_EQUALS(HeartbeatResponseAction::ScheduleElection, nextAction.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+    // We are electable now.
+    ASSERT_TRUE(getTopoCoord().becomeCandidateIfElectable(now(), lastOpTimeApplied));
+    ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 }
 
 TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPrimaryDownMajorityButIAmArbiter) {
@@ -3486,9 +3489,8 @@ private:
     HostAndPort _target;
 };
 
-TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStepDownSelf) {
-    // Confirm that action responses can come back from retries; in this, expect a StepDownSelf
-    // action.
+TEST_F(HeartbeatResponseTestOneRetryV1, HeartbeatDoesNotStepDownSelf) {
+    // Confirm that action responses can come back from retries..
 
     // acknowledge the other member so that we see a majority
     HeartbeatResponseAction action =
@@ -3536,9 +3538,8 @@ TEST_F(HeartbeatResponseTestOneRetryV1, HeartbeatTimeoutSuppressesSecondRetry) {
                   action.getNextHeartbeatStartDate());
 }
 
-TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStartElection) {
-    // Confirm that action responses can come back from retries; in this, expect a StartElection
-    // action.
+TEST_F(HeartbeatResponseTestOneRetryV1, HeartbeatDoesNotStartElection) {
+    // Confirm that action responses can come back from retries.
 
     // acknowledge the other member so that we see a majority
     OpTime election = OpTime(Timestamp(400, 0), 0);
@@ -3566,37 +3567,11 @@ TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStartElection) {
         target(),
         StatusWith<ReplSetHeartbeatResponse>(startElectionResponse),
         election);
-    ASSERT_EQUALS(HeartbeatResponseAction::ScheduleElection, action.getAction());
+    ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     ASSERT_EQUALS(firstRequestDate() + Milliseconds(4500) +
                       ReplicaSetConfig::kDefaultElectionTimeoutPeriod / 2,
                   action.getNextHeartbeatStartDate());
-}
-
-TEST_F(HeartbeatResponseTestOneRetryV1, DecideToStepDownRemotePrimary) {
-    // Confirm that action responses can come back from retries; in this, expect a
-    // StepDownRemotePrimary action.
-
-    // make self primary
-    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    makeSelfPrimary(Timestamp(5, 0));
-    ASSERT_EQUALS(0, getCurrentPrimaryIndex());
-
-    ReplSetHeartbeatResponse electedMoreRecentlyResponse;
-    electedMoreRecentlyResponse.noteReplSet();
-    electedMoreRecentlyResponse.setSetName("rs0");
-    electedMoreRecentlyResponse.setState(MemberState::RS_PRIMARY);
-    electedMoreRecentlyResponse.setElectable(true);
-    electedMoreRecentlyResponse.setElectionTime(Timestamp(3, 0));
-    electedMoreRecentlyResponse.setConfigVersion(5);
-    HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
-        firstRequestDate() + Milliseconds(4500),  // Time is left.
-        Milliseconds(400),                        // Spent 0.4 of the 0.5 second in the network.
-        target(),
-        StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
-        OpTime());  // We've never applied anything.
-    ASSERT_NO_ACTION(action.getAction());
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(6500), action.getNextHeartbeatStartDate());
 }
 
 TEST_F(HeartbeatResponseTestOneRetryV1, DecideToReconfig) {
@@ -3681,9 +3656,8 @@ public:
     }
 };
 
-TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStartElection) {
-    // Confirm that action responses can come back from retries; in this, expect a StartElection
-    // action.
+TEST_F(HeartbeatResponseTestTwoRetriesV1, HeatbeatDoesNotStartElection) {
+    // Confirm that action responses can come back from retries.
 
     // acknowledge the other member so that we see a majority
     OpTime election = OpTime(Timestamp(400, 0), 0);
@@ -3711,16 +3685,16 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStartElection) {
         target(),
         StatusWith<ReplSetHeartbeatResponse>(startElectionResponse),
         election);
-    ASSERT_EQUALS(HeartbeatResponseAction::ScheduleElection, action.getAction());
+    ASSERT_NO_ACTION(action.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     ASSERT_EQUALS(firstRequestDate() + Milliseconds(5000) +
                       ReplicaSetConfig::kDefaultElectionTimeoutPeriod / 2,
                   action.getNextHeartbeatStartDate());
+    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
 }
 
-TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStepDownSelf) {
-    // Confirm that action responses can come back from retries; in this, expect a StepDownSelf
-    // action.
+TEST_F(HeartbeatResponseTestTwoRetriesV1, HeatbeatDoesNotStepDownSelf) {
+    // Confirm that action responses can come back from retries.
 
     // acknowledge the other member so that we see a majority
     HeartbeatResponseAction action =
@@ -3744,38 +3718,10 @@ TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStepDownSelf) {
         StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
         OpTime(Timestamp(0, 0), 0));  // We've never applied anything.
     ASSERT_NO_ACTION(action.getAction());
-    ASSERT_EQUALS(-1, action.getPrimaryConfigIndex());
     ASSERT_EQUALS(firstRequestDate() + Milliseconds(7000), action.getNextHeartbeatStartDate());
     // Doesn't actually do the stepdown until stepDownIfPending is called
     ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
-}
-
-TEST_F(HeartbeatResponseTestTwoRetriesV1, DecideToStepDownRemotePrimary) {
-    // Confirm that action responses can come back from retries; in this, expect a
-    // StepDownRemotePrimary action.
-
-    // make self primary
-    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    makeSelfPrimary(Timestamp(5, 0));
-    ASSERT_EQUALS(0, getCurrentPrimaryIndex());
-
-    ReplSetHeartbeatResponse electedMoreRecentlyResponse;
-    electedMoreRecentlyResponse.noteReplSet();
-    electedMoreRecentlyResponse.setSetName("rs0");
-    electedMoreRecentlyResponse.setState(MemberState::RS_PRIMARY);
-    electedMoreRecentlyResponse.setElectable(true);
-    electedMoreRecentlyResponse.setElectionTime(Timestamp(3, 0));
-    electedMoreRecentlyResponse.setConfigVersion(5);
-    HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
-        firstRequestDate() + Milliseconds(5000),  // Time is left.
-        Milliseconds(400),                        // Spent 0.4 of the 0.5 second in the network.
-        target(),
-        StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
-        OpTime());  // We've never applied anything.
-    ASSERT_NO_ACTION(action.getAction());
-    ASSERT_EQUALS(-1, action.getPrimaryConfigIndex());
-    ASSERT_EQUALS(firstRequestDate() + Milliseconds(7000), action.getNextHeartbeatStartDate());
 }
 
 TEST_F(HeartbeatResponseTestTwoRetriesV1, HeartbeatRetriesAtMostTwice) {
