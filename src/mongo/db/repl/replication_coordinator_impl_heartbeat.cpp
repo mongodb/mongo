@@ -224,6 +224,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
         case HeartbeatResponseAction::StepDownSelf:
             invariant(action.getPrimaryConfigIndex() == _selfIndex);
             log() << "Stepping down from primary in response to heartbeat";
+            _topCoord->prepareForStepDown();
             _stepDownStart();
             break;
         case HeartbeatResponseAction::StepDownRemotePrimary: {

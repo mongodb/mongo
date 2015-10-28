@@ -2665,7 +2665,7 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataRemoteDoesNotExist) {
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
 }
 
-TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataRelinquishPrimaryDueToNodeDisappearing) {
+TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataDoesNotRelinquishPrimary) {
     // Become PRIMARY.
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
     makeSelfPrimary(Timestamp(2, 0));
@@ -2679,20 +2679,15 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataRelinquishPrimaryDueToNodeDis
     heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime());
     heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime());
 
-    // Lose that awareness and be sure we are going to stepdown.
+    // Lose that awareness, but we are not going to step down, because stepdown only
+    // depends on liveness.
     HeartbeatResponseAction nextAction =
         receiveDownHeartbeat(HostAndPort("host2"), "rs0", OpTime(Timestamp(100, 0), 0));
     ASSERT_NO_ACTION(nextAction.getAction());
     nextAction = receiveDownHeartbeat(HostAndPort("host3"), "rs0", OpTime(Timestamp(100, 0), 0));
-    ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, nextAction.getAction());
-    ASSERT_EQUALS(0, nextAction.getPrimaryConfigIndex());
+    ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
-    // Doesn't actually do the stepdown until stepDownIfPending is called.
-
-    ASSERT_TRUE(getTopoCoord().stepDownIfPending());
-    ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
 }
 
 TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataPriorTakeoverDueToHigherPriority) {

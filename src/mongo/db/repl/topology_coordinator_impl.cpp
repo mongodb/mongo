@@ -1118,18 +1118,9 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBDataV1(
 
     // We do not believe any remote to be primary.
 
-    // If we are primary, check if we can still see majority of the set; stepdown if we can't.
+    // Return if we are primary. The stepdown decision is based on liveness rather than
+    // heartbeats in pv 1.
     if (_iAmPrimary()) {
-        if (CannotSeeMajority & _getMyUnelectableReason(now, lastOpApplied)) {
-            if (_stepDownPending) {
-                return HeartbeatResponseAction::makeNoAction();
-            }
-            _stepDownPending = true;
-            log() << "can't see a majority of the set, relinquishing primary";
-            return HeartbeatResponseAction::makeStepDownSelfAction(_selfIndex);
-        }
-
-        LOG(2) << "Choosing to remain primary";
         return HeartbeatResponseAction::makeNoAction();
     }
 
