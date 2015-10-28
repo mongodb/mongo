@@ -797,6 +797,12 @@ __checkpoint_worker(WT_SESSION_IMPL *session,
 	name_alloc = NULL;
 
 	/*
+	 * Only referenced in diagnostic builds and gcc 5.1 isn't satisfied
+	 * with wrapping the entire assert condition in the unused macro.
+	 */
+	WT_UNUSED(need_tracking);
+
+	/*
 	 * Most callers need meta tracking to be on here, otherwise it is
 	 * possible for this checkpoint to cleanup handles that are still in
 	 * use. The exceptions are:
