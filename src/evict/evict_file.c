@@ -18,7 +18,10 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
+	WT_TXN *txn;
 	bool evict_reset;
+
+	txn = &session->txn;
 
 	/*
 	 * We need exclusive access to the file -- disable ordinary eviction
@@ -56,8 +59,11 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 		 * and the write will fail with EBUSY.  Our caller handles that
 		 * error, retrying later.
 		 */
-		if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page))
+		if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page)) {
+			if (txn->isolation == WT_ISO_READ_COMMITTED)
+				__wt_txn_get_snapshot(session);
 			WT_ERR(__wt_reconcile(session, ref, NULL, WT_EVICTING));
+		}
 
 		/*
 		 * We can't evict the page just returned to us (it marks our
@@ -106,6 +112,9 @@ err:		/* On error, clear any left-over tree walk. */
 
 	if (evict_reset)
 		__wt_evict_file_exclusive_off(session);
+
+	if (txn->isolation == WT_ISO_READ_COMMITTED && session->ncursors == 0)
+		__wt_txn_release_snapshot(session);
 
 	return (ret);
 }

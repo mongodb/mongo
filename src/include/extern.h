@@ -565,9 +565,9 @@ extern int __wt_schema_colgroup_name(WT_SESSION_IMPL *session, WT_TABLE *table, 
 extern int __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table);
 extern int __wt_schema_open_index(WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, size_t len, WT_INDEX **indexp);
 extern int __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table);
-extern int __wt_schema_open_table(WT_SESSION_IMPL *session, const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep);
 extern int __wt_schema_get_colgroup(WT_SESSION_IMPL *session, const char *uri, bool quiet, WT_TABLE **tablep, WT_COLGROUP **colgroupp);
 extern int __wt_schema_get_index(WT_SESSION_IMPL *session, const char *uri, bool quiet, WT_TABLE **tablep, WT_INDEX **indexp);
+extern int __wt_schema_open_table(WT_SESSION_IMPL *session, const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep);
 extern int __wt_schema_colcheck(WT_SESSION_IMPL *session, const char *key_format, const char *value_format, WT_CONFIG_ITEM *colconf, u_int *kcolsp, u_int *vcolsp);
 extern int __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table);
 extern int __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table, const char *columns, size_t len, bool value_only, WT_ITEM *plan);

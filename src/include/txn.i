@@ -186,10 +186,13 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 		return (false);
 
 	/*
-	 * Read-uncommitted transactions see all other changes.
+	 * If we don't have a snapshot or we are running at read-uncommitted
+	 * isolation, all other changes are visible.
 	 */
 	if (txn->isolation == WT_ISO_READ_UNCOMMITTED)
 		return (true);
+
+	WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT));
 
 	/* Transactions see their own changes. */
 	if (id == txn->id)
@@ -421,9 +424,15 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 
-	/* Release the snap_min ID we put in the global table. */
-	if (!F_ISSET(txn, WT_TXN_RUNNING) ||
-	    txn->isolation != WT_ISO_SNAPSHOT)
+	/*
+	 * Release the snap_min ID we put in the global table.
+	 *
+	 * If the isolation has been temporarily forced, don't touch the
+	 * snapshot here: it will be restored by WT_WITH_TXN_ISOLATION.
+	 */
+	if ((!F_ISSET(txn, WT_TXN_RUNNING) ||
+	    txn->isolation != WT_ISO_SNAPSHOT) &&
+	    txn->forced_iso == 0)
 		__wt_txn_release_snapshot(session);
 }
 
