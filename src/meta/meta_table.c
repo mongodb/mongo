@@ -210,8 +210,6 @@ __wt_metadata_search(
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	WT_TXN *txn;
-	WT_TXN_ISOLATION iso_orig;
 	const char *value;
 
 	*valuep = NULL;
@@ -224,6 +222,9 @@ __wt_metadata_search(
 	if (__metadata_turtle(key))
 		return (__wt_turtle_read(session, key, valuep));
 
+	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
+	cursor->set_key(cursor, key);
+
 	/*
 	 * All metadata reads are at read-uncommitted isolation.  That's
 	 * because once a schema-level operation completes, subsequent
@@ -232,18 +233,13 @@ __wt_metadata_search(
 	 * Metadata updates use non-transactional techniques (such as the
 	 * schema and metadata locks) to protect access to in-flight updates.
 	 */
-	if ((txn = &session->txn) != NULL) {
-		iso_orig = txn->isolation;
-		txn->isolation = WT_ISO_READ_UNCOMMITTED;
-	}
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
-	cursor->set_key(cursor, key);
-	WT_ERR(cursor->search(cursor));
+	WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+	    ret = cursor->search(cursor));
+	WT_ERR(ret);
+
 	WT_ERR(cursor->get_value(cursor, &value));
 	WT_ERR(__wt_strdup(session, value, valuep));
 
 err:	WT_TRET(cursor->close(cursor));
-	if (txn != NULL)
-		txn->isolation = iso_orig;
 	return (ret);
 }
