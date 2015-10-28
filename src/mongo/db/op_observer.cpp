@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+using std::vector;
+
 void OpObserver::onCreateIndex(OperationContext* txn,
                                const std::string& ns,
                                BSONObj indexDoc,
@@ -54,16 +56,21 @@ void OpObserver::onCreateIndex(OperationContext* txn,
     logOpForDbHash(txn, ns.c_str());
 }
 
-void OpObserver::onInsert(OperationContext* txn,
-                          const NamespaceString& ns,
-                          BSONObj doc,
-                          bool fromMigrate) {
-    repl::logOp(txn, "i", ns.ns().c_str(), doc, nullptr, fromMigrate);
+void OpObserver::onInserts(OperationContext* txn,
+                           const NamespaceString& nss,
+                           vector<BSONObj>::iterator begin,
+                           vector<BSONObj>::iterator end,
+                           bool fromMigrate) {
+    repl::logOps(txn, "i", nss, begin, end, fromMigrate);
 
-    getGlobalAuthorizationManager()->logOp(txn, "i", ns.ns().c_str(), doc, nullptr);
-    logOpForSharding(txn, "i", ns.ns().c_str(), doc, nullptr, fromMigrate);
-    logOpForDbHash(txn, ns.ns().c_str());
-    if (strstr(ns.ns().c_str(), ".system.js")) {
+    const char* ns = nss.ns().c_str();
+    for (auto it = begin; it != end; it++) {
+        getGlobalAuthorizationManager()->logOp(txn, "i", ns, *it, nullptr);
+        logOpForSharding(txn, "i", ns, *it, nullptr, fromMigrate);
+    }
+
+    logOpForDbHash(txn, ns);
+    if (strstr(ns, ".system.js")) {
         Scope::storedFuncMod(txn);
     }
 }

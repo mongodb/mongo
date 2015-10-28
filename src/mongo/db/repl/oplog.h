@@ -81,7 +81,7 @@ extern std::string masterSlaveOplogName;
 
 extern int OPLOG_VERSION;
 
-/** Log an operation to the local oplog
+/* Log operation(s) to the local oplog
  *
  * @param opstr
  *  "i" insert
@@ -90,8 +90,16 @@ extern int OPLOG_VERSION;
  *  "c" db cmd
  *  "n" no-op
  *  "db" declares presence of a database (ns is set to the db name + '.')
- *
- * For 'u' records, 'obj' captures the mutation made to the object but not
+ */
+
+void logOps(OperationContext* txn,
+            const char* opstr,
+            const NamespaceString& nss,
+            std::vector<BSONObj>::iterator begin,
+            std::vector<BSONObj>::iterator end,
+            bool fromMigrate);
+
+/* For 'u' records, 'obj' captures the mutation made to the object but not
  * the object itself. 'o2' captures the the criteria for the object that will be modified.
  *
  * Sets replCoord last optime if 'updateReplOpTime' is true.
