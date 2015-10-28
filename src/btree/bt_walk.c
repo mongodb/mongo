@@ -178,8 +178,7 @@ ascend:	/*
 			/*
 			 * If we got all the way through an internal page and
 			 * all of the child pages were deleted, mark it for
-			 * eviction.  If we see enough deleted refs at either
-			 * end, try a reverse split immediately.
+			 * eviction.
 			 */
 			if (empty_internal && pindex->entries > 1) {
 				__wt_page_evict_soon(ref->page);
