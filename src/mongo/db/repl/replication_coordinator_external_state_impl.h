@@ -52,7 +52,9 @@ public:
     virtual void startThreads(const ReplSettings& settings) override;
     virtual void startMasterSlave(OperationContext* txn);
     virtual void shutdown();
-    virtual void initiateOplog(OperationContext* txn, bool updateReplOpTime);
+    virtual Status initializeReplSetStorage(OperationContext* txn,
+                                            const BSONObj& config,
+                                            bool updateReplOpTime);
     virtual void logTransitionToPrimaryToOplog(OperationContext* txn);
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext* txn);

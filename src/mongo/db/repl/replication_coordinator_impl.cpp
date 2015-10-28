@@ -2161,9 +2161,10 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         }
     }
 
-    status = _externalState->storeLocalConfigDocument(txn, newConfig.toBSON());
+    status = _externalState->initializeReplSetStorage(txn, newConfig.toBSON(), replEnabled);
     if (!status.isOK()) {
-        error() << "replSetInitiate failed to store config document; " << status;
+        error() << "replSetInitiate failed to store config document or create the oplog; "
+                << status;
         return status;
     }
 
@@ -2180,15 +2181,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
         configStateGuard.Dismiss();
         fassert(18654, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
-    }
 
-    // Create the oplog with the first entry, and start repl threads.
-    // If the node is running with replication enabled, we
-    // want initiateOplog() to eventually update the replication coordinator's
-    // last op time.
-    const auto updateReplOpTime = replEnabled;
-    _externalState->initiateOplog(txn, updateReplOpTime);
-    if (replEnabled) {
         // A configuration passed to replSetInitiate() with the current node as an arbiter
         // will fail validation with a "replSet initiate got ... while validating" reason.
         invariant(!newConfig.getMemberAt(myIndex.getValue()).isArbiter());

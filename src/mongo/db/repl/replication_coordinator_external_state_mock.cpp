@@ -63,8 +63,12 @@ void ReplicationCoordinatorExternalStateMock::startThreads(const ReplSettings& s
 }
 
 void ReplicationCoordinatorExternalStateMock::startMasterSlave(OperationContext*) {}
-void ReplicationCoordinatorExternalStateMock::initiateOplog(OperationContext* txn,
-                                                            bool updateReplOpTime) {}
+Status ReplicationCoordinatorExternalStateMock::initializeReplSetStorage(OperationContext* txn,
+                                                                         const BSONObj& config,
+                                                                         bool updateReplOpTime) {
+    return storeLocalConfigDocument(txn, config);
+}
+
 void ReplicationCoordinatorExternalStateMock::shutdown() {}
 void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
 
