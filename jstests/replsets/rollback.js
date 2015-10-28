@@ -129,6 +129,7 @@ load("jstests/replsets/rslib.js");
     replTest.unPartition(1, 2);
 
     awaitOpTime(b.getMongo(), getLatestOp(a_conn).ts);
+    replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
     checkFinalResults(a);
     checkFinalResults(b);

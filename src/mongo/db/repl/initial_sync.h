@@ -49,12 +49,6 @@ public:
      */
     void oplogApplication(OperationContext* txn, const OpTime& endOpTime);
 
-    // Initial sync will ignore all journal requirement flags and doesn't wait until
-    // operations are durable before updating the last OpTime.
-    virtual bool shouldEnsureDurability() {
-        return false;
-    }
-
 private:
     /**
      * Applies oplog entries until reaching "endOpTime".

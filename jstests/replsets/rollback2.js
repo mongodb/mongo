@@ -111,6 +111,7 @@ load("jstests/replsets/rslib.js");
     awaitOpTime(b.getMongo(), getLatestOp(a_conn).ts);
 
     // await steady state and ensure the two nodes have the same contents
+    replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
     checkFinalResults(a);
     checkFinalResults(b);

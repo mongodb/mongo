@@ -33,8 +33,12 @@
 #include "mongo/db/repl/initial_sync.h"
 
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/repl_client_info.h"
+
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
@@ -68,7 +72,8 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
     while (true) {
         OpQueue ops;
 
-        while (!tryPopAndWaitForMore(txn, &ops, getGlobalReplicationCoordinator())) {
+        auto replCoord = repl::ReplicationCoordinator::get(txn);
+        while (!tryPopAndWaitForMore(txn, &ops, replCoord)) {
             // nothing came back last time, so go again
             if (ops.empty())
                 continue;
@@ -106,6 +111,10 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
         entriesApplied += ops.getDeque().size();
 
         const OpTime lastOpTime = multiApply(txn, ops);
+
+        replCoord->setMyLastOptime(lastOpTime);
+        setNewTimestamp(lastOpTime.getTimestamp());
+
         if (inShutdown()) {
             return;
         }

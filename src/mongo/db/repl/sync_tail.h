@@ -153,12 +153,6 @@ protected:
     static const int replBatchLimitSeconds = 1;
     static const unsigned int replBatchLimitOperations = 5000;
 
-    // SyncTail base class always supports awaiting commit if any op has j:true flag
-    // that indicates awaiting commit before updating last OpTime.
-    virtual bool shouldEnsureDurability() {
-        return true;
-    }
-
     // Apply a batch of operations, using multiple threads.
     // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
     OpTime multiApply(OperationContext* txn, const OpQueue& ops);

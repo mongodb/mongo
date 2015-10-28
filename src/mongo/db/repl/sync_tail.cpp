@@ -131,6 +131,99 @@ bool isCrudOpType(const char* field) {
 }
 }
 
+namespace {
+
+class ApplyBatchFinalizer {
+public:
+    ApplyBatchFinalizer(ReplicationCoordinator* replCoord);
+    ~ApplyBatchFinalizer();
+
+    /**
+     * In PV0, calls ReplicationCoordinator::setMyLastOptime with "newOp".
+     * In PV1, sets _latestOpTime to be "newOp" and signals the _waiterThread.
+     */
+    void record(OpTime newOp);
+
+private:
+    /**
+     * Loops continuously, waiting for writes to be flushed to disk and then calls
+     * ReplicationCoordinator::setMyLastOptime with _latestOpTime.
+     * Terminates once _shutdownSignaled is set true.
+     */
+    void _run();
+
+    // Used to update the replication system's progress.
+    ReplicationCoordinator* _replCoord;
+    // Protects _cond, _shutdownSignaled, and _latestOpTime.
+    stdx::mutex _mutex;
+    // Used to alert our thread of a new OpTime.
+    stdx::condition_variable _cond;
+    // The next OpTime to set as the ReplicationCoordinator's lastOpTime after flushing.
+    OpTime _latestOpTime;
+    // Once this is set to true the _run method will terminate.
+    bool _shutdownSignaled;
+    // Thread that will _run(). Must be initialized last as it depends on the other variables.
+    stdx::thread _waiterThread;
+};
+
+ApplyBatchFinalizer::ApplyBatchFinalizer(ReplicationCoordinator* replCoord)
+    : _replCoord(replCoord),
+      _shutdownSignaled(false),
+      _waiterThread(&ApplyBatchFinalizer::_run, this) {}
+
+ApplyBatchFinalizer::~ApplyBatchFinalizer() {
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    _shutdownSignaled = true;
+    _cond.notify_all();
+    lock.unlock();
+
+    _waiterThread.join();
+}
+
+void ApplyBatchFinalizer::record(OpTime newOp) {
+    const bool mustWaitUntilDurable = _replCoord->isV1ElectionProtocol();
+    if (!mustWaitUntilDurable) {
+        // We have to use setMyLastOptimeForward since this thread races with
+        // logTransitionToPrimaryToOplog.
+        _replCoord->setMyLastOptimeForward(newOp);
+        return;
+    }
+
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
+    _latestOpTime = newOp;
+    _cond.notify_all();
+}
+
+void ApplyBatchFinalizer::_run() {
+    Client::initThread("ApplyBatchFinalizer");
+
+    while (true) {
+        OpTime latestOpTime;
+
+        {
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            while (_latestOpTime.isNull() && !_shutdownSignaled) {
+                _cond.wait(lock);
+            }
+
+            if (_shutdownSignaled) {
+                return;
+            }
+
+            latestOpTime = _latestOpTime;
+            _latestOpTime = OpTime();
+        }
+
+        auto txn = cc().makeOperationContext();
+        txn->recoveryUnit()->goingToWaitUntilDurable();
+        txn->recoveryUnit()->waitUntilDurable();
+        // We have to use setMyLastOptimeForward since this thread races with
+        // logTransitionToPrimaryToOplog.
+        _replCoord->setMyLastOptimeForward(latestOpTime);
+    }
+}
+}  // anonymous namespace containing ApplyBatchFinalizer definitions.
+
 SyncTail::SyncTail(BackgroundSyncInterface* q, MultiSyncApplyFunc func)
     : _networkQueue(q),
       _applyFunc(func),
@@ -352,7 +445,7 @@ void fillWriterVectors(const std::deque<BSONObj>& ops,
 }  // namespace
 
 // Applies a batch of oplog entries, by using a set of threads to apply the operations and then
-// writes the oplog entries to the local oplog. At the end we update the lastOpTime.
+// writes the oplog entries to the local oplog.
 OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
     invariant(_applyFunc);
 
@@ -387,13 +480,6 @@ OpTime SyncTail::multiApply(OperationContext* txn, const OpQueue& ops) {
     }
     _writerPool.join();
     // We have now written all database writes and updated the oplog to match.
-
-    ReplClientInfo::forClient(txn->getClient()).setLastOp(lastOpTime);
-    replCoord->setMyLastOptime(lastOpTime);
-    setNewTimestamp(lastOpTime.getTimestamp());
-
-    BackgroundSync::get()->notify(txn);
-
     return lastOpTime;
 }
 
@@ -433,6 +519,7 @@ void tryToGoLiveAsASecondary(OperationContext* txn, ReplicationCoordinator* repl
 /* tail an oplog.  ok to return, will be re-called. */
 void SyncTail::oplogApplication() {
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+    ApplyBatchFinalizer finalizer(replCoord);
 
     OperationContextImpl txn;
     OpTime originalEndOpTime(getMinValid(&txn).end);
@@ -533,18 +620,11 @@ void SyncTail::oplogApplication() {
         // This write will not journal/checkpoint.
         setMinValid(&txn, {start, end});
 
-        const bool mustWaitUntilDurable =
-            shouldEnsureDurability() && replCoord->isV1ElectionProtocol();
-        if (mustWaitUntilDurable) {
-            txn.recoveryUnit()->goingToWaitUntilDurable();
-        }
+        OpTime finalOpTime = multiApply(&txn, ops);
+        setNewTimestamp(finalOpTime.getTimestamp());
 
-        multiApply(&txn, ops);
-
-        // This write will journal/checkpoint, and finish the batch.
-        setMinValid(&txn,
-                    end,
-                    mustWaitUntilDurable ? DurableRequirement::Strong : DurableRequirement::None);
+        setMinValid(&txn, end, DurableRequirement::None);
+        finalizer.record(finalOpTime);
     }
 }
 
