@@ -924,6 +924,7 @@ suiteGlobalConfig = {   "files": ("files/*.js", False),
                         "oplog": ("oplog/*.js", False),
                         "import": ("import/*.js", False),
                         "ssl": ("ssl/*.js", False),
+                        "unstable": ("unstable/*.js", False),
                     }
 
 def get_module_suites():
