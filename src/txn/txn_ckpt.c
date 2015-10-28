@@ -344,11 +344,11 @@ __checkpoint_verbose_track(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_txn_checkpoint --
+ * __txn_checkpoint --
  *	Checkpoint a database or a list of objects in the database.
  */
-int
-__wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+static int
+__txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	struct timespec start, stop, verb_timer;
 	WT_CONNECTION_IMPL *conn;
@@ -631,6 +631,50 @@ err:	/*
 }
 
 /*
+ * __wt_txn_checkpoint --
+ *	Checkpoint a database or a list of objects in the database.
+ */
+int
+__wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_DECL_RET;
+
+	/*
+	 * Reset open cursors.  Do this explicitly, even though it will happen
+	 * implicitly in the call to begin_transaction for the checkpoint, the
+	 * checkpoint code will acquire the schema lock before we do that, and
+	 * some implementation of WT_CURSOR::reset might need the schema lock.
+	 */
+	WT_RET(__wt_session_reset_cursors(session, false));
+
+	/*
+	 * Don't highjack the session checkpoint thread for eviction.
+	 *
+	 * Application threads are not generally available for potentially slow
+	 * operations, but checkpoint does enough I/O it may be called upon to
+	 * perform slow operations for the block manager.
+	 */
+	F_SET(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
+
+	/*
+	 * Only one checkpoint can be active at a time, and checkpoints must run
+	 * in the same order as they update the metadata. It's probably a bad
+	 * idea to run checkpoints out of multiple threads, but as compaction
+	 * calls checkpoint directly, it can be tough to avoid. Serialize here
+	 * to ensure we don't get into trouble.
+	 */
+	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 1);
+
+	WT_WITH_CHECKPOINT_LOCK(session, ret = __txn_checkpoint(session, cfg));
+
+	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
+
+	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
+
+	return (ret);
+}
+
+/*
  * __drop --
  *	Drop all checkpoints with a specific name.
  */
@@ -726,8 +770,8 @@ __drop_to(WT_CKPT *ckptbase, const char *name, size_t len)
  *	Checkpoint a tree.
  */
 static int
-__checkpoint_worker(
-    WT_SESSION_IMPL *session, const char *cfg[], bool is_checkpoint)
+__checkpoint_worker(WT_SESSION_IMPL *session,
+    const char *cfg[], bool is_checkpoint, bool need_tracking)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -751,6 +795,22 @@ __checkpoint_worker(
 	was_modified = btree->modified;
 	fake_ckpt = hot_backup_locked = false;
 	name_alloc = NULL;
+
+	/*
+	 * Only referenced in diagnostic builds and gcc 5.1 isn't satisfied
+	 * with wrapping the entire assert condition in the unused macro.
+	 */
+	WT_UNUSED(need_tracking);
+
+	/*
+	 * Most callers need meta tracking to be on here, otherwise it is
+	 * possible for this checkpoint to cleanup handles that are still in
+	 * use. The exceptions are:
+	 *  - Checkpointing the metadata handle itself.
+	 *  - On connection close when we know there can't be any races.
+	 */
+	WT_ASSERT(session, !need_tracking ||
+	    WT_IS_METADATA(dhandle) || WT_META_TRACKING(session));
 
 	/*
 	 * Set the checkpoint LSN to the maximum LSN so that if logging is
@@ -1128,7 +1188,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Should be holding the schema lock. */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
 
-	return (__checkpoint_worker(session, cfg, true));
+	return (__checkpoint_worker(session, cfg, true, true));
 }
 
 /*
@@ -1208,7 +1268,7 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	if (need_tracking)
 		WT_RET(__wt_meta_track_on(session));
 
-	WT_TRET(__checkpoint_worker(session, NULL, false));
+	WT_TRET(__checkpoint_worker(session, NULL, false, need_tracking));
 
 	if (need_tracking)
 		WT_RET(__wt_meta_track_off(session, true, ret != 0));
