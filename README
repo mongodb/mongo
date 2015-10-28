@@ -38,13 +38,13 @@ RUNNING
 
 DRIVERS
 
-  Client drivers for most programming languages are available at mongodb.org.  Use the 
-  shell ("mongo") for administrative tasks.
+  Client drivers for most programming languages are available at
+  mongodb.org.  Use the shell ("mongo") for administrative tasks.
 
 PACKAGING
 
-  Packages are created dynamically by the package.py script located in the buildscripts directory. This will 
-  generate RPM and Debian packages.
+  Packages are created dynamically by the package.py script located in the
+  buildscripts directory. This will generate RPM and Debian packages.
 
 DOCUMENTATION
 
@@ -70,9 +70,9 @@ LEARN MONGODB
 
 LICENSE
 
-  Most MongoDB source files (src/mongo folder and below) are made available under the terms of the
-  GNU Affero General Public License (AGPL).  See individual files for
-  details.
+  Most MongoDB source files (src/mongo folder and below) are made available
+  under the terms of the GNU Affero General Public License (AGPL).  See
+  individual files for details.
 
   As an exception, the files in the client/, debian/, rpm/,
   utils/mongoutils, and all subdirectories thereof are made available under
