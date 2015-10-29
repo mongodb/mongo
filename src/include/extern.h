@@ -116,7 +116,7 @@ extern int __wt_debug_tree( WT_SESSION_IMPL *session, WT_BTREE *btree, WT_PAGE *
 extern int __wt_debug_page(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile);
 extern int __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp);
 extern void __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref);
-extern bool __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref);
+extern bool __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all);
 extern int __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref);
 extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
@@ -155,6 +155,7 @@ extern void __wt_split_stash_discard(WT_SESSION_IMPL *session);
 extern void __wt_split_stash_discard_all( WT_SESSION_IMPL *session_safe, WT_SESSION_IMPL *session);
 extern int __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_REF **refp, size_t *incrp);
 extern int __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref);
+extern int __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref);
 extern int __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst);
