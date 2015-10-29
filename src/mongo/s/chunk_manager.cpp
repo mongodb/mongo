@@ -477,7 +477,7 @@ ChunkPtr ChunkManager::findIntersectingChunk(OperationContext* txn, const BSONOb
 
 void ChunkManager::getShardIdsForQuery(set<ShardId>& shardIds, const BSONObj& query) const {
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(NamespaceString(_ns), query, WhereCallbackNoop());
+        CanonicalQuery::canonicalize(NamespaceString(_ns), query, ExtensionsCallbackNoop());
 
     uassertStatusOK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());

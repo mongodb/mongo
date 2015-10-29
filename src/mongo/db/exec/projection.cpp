@@ -62,7 +62,7 @@ ProjectionStage::ProjectionStage(OperationContext* opCtx,
 
     if (ProjectionStageParams::NO_FAST_PATH == _projImpl) {
         _exec.reset(
-            new ProjectionExec(params.projObj, params.fullExpression, *params.whereCallback));
+            new ProjectionExec(params.projObj, params.fullExpression, *params.extensionsCallback));
     } else {
         // We shouldn't need the full expression if we're fast-pathing.
         invariant(NULL == params.fullExpression);

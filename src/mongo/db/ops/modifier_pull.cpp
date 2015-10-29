@@ -118,7 +118,7 @@ Status ModifierPull::init(const BSONElement& modExpr, const Options& opts, bool*
         // Build the matcher around the object we built above. Currently, we do not allow
         // $pull operations to contain $where clauses, so preserving this behaviour.
         StatusWithMatchExpression parseResult =
-            MatchExpressionParser::parse(_exprObj, MatchExpressionParser::WhereCallback());
+            MatchExpressionParser::parse(_exprObj, MatchExpressionParser::ExtensionsCallback());
         if (!parseResult.isOK()) {
             return parseResult.getStatus();
         }

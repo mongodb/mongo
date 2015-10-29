@@ -142,9 +142,9 @@ public:
 
         // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
 
-        WhereCallbackReal whereCallback(txn, nss.db());
+        ExtensionsCallbackReal extensionsCallback(txn, nss.db());
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(lpqStatus.getValue().release(), whereCallback);
+            CanonicalQuery::canonicalize(lpqStatus.getValue().release(), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -229,8 +229,8 @@ public:
         beginQueryOp(txn, nss, cmdObj, ntoreturn, ntoskip);
 
         // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
-        WhereCallbackReal whereCallback(txn, nss.db());
-        auto statusWithCQ = CanonicalQuery::canonicalize(lpq.release(), whereCallback);
+        ExtensionsCallbackReal extensionsCallback(txn, nss.db());
+        auto statusWithCQ = CanonicalQuery::canonicalize(lpq.release(), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             return appendCommandStatus(result, statusWithCQ.getStatus());
         }

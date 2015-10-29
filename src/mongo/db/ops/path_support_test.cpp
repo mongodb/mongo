@@ -490,7 +490,7 @@ TEST_F(ArrayDoc, NonNumericPathInArray) {
 //
 
 static MatchExpression* makeExpr(const BSONObj& exprBSON) {
-    static const WhereCallbackNoop callbackNoop;
+    static const ExtensionsCallbackNoop callbackNoop;
     return MatchExpressionParser::parse(exprBSON, callbackNoop).getValue().release();
 }
 

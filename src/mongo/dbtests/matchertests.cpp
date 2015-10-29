@@ -56,7 +56,7 @@ class Basic {
 public:
     void run() {
         BSONObj query = fromjson("{\"a\":\"b\"}");
-        M m(query, MatchExpressionParser::WhereCallback());
+        M m(query, MatchExpressionParser::ExtensionsCallback());
         ASSERT(m.matches(fromjson("{\"a\":\"b\"}")));
     }
 };
@@ -66,7 +66,7 @@ class DoubleEqual {
 public:
     void run() {
         BSONObj query = fromjson("{\"a\":5}");
-        M m(query, MatchExpressionParser::WhereCallback());
+        M m(query, MatchExpressionParser::ExtensionsCallback());
         ASSERT(m.matches(fromjson("{\"a\":5}")));
     }
 };
@@ -77,7 +77,7 @@ public:
     void run() {
         BSONObjBuilder query;
         query.append("a", 5);
-        M m(query.done(), MatchExpressionParser::WhereCallback());
+        M m(query.done(), MatchExpressionParser::ExtensionsCallback());
         ASSERT(m.matches(fromjson("{\"a\":5}")));
     }
 };
@@ -87,7 +87,7 @@ class MixedNumericGt {
 public:
     void run() {
         BSONObj query = fromjson("{\"a\":{\"$gt\":4}}");
-        M m(query, MatchExpressionParser::WhereCallback());
+        M m(query, MatchExpressionParser::ExtensionsCallback());
         BSONObjBuilder b;
         b.append("a", 5);
         ASSERT(m.matches(b.done()));
@@ -102,7 +102,7 @@ public:
         ASSERT_EQUALS(4, query["a"].embeddedObject()["$in"].embeddedObject()["0"].number());
         ASSERT_EQUALS(NumberInt, query["a"].embeddedObject()["$in"].embeddedObject()["0"].type());
 
-        M m(query, MatchExpressionParser::WhereCallback());
+        M m(query, MatchExpressionParser::ExtensionsCallback());
 
         {
             BSONObjBuilder b;
@@ -129,7 +129,7 @@ template <typename M>
 class MixedNumericEmbedded {
 public:
     void run() {
-        M m(BSON("a" << BSON("x" << 1)), MatchExpressionParser::WhereCallback());
+        M m(BSON("a" << BSON("x" << 1)), MatchExpressionParser::ExtensionsCallback());
         ASSERT(m.matches(BSON("a" << BSON("x" << 1))));
         ASSERT(m.matches(BSON("a" << BSON("x" << 1.0))));
     }
@@ -139,7 +139,7 @@ template <typename M>
 class Size {
 public:
     void run() {
-        M m(fromjson("{a:{$size:4}}"), MatchExpressionParser::WhereCallback());
+        M m(fromjson("{a:{$size:4}}"), MatchExpressionParser::ExtensionsCallback());
         ASSERT(m.matches(fromjson("{a:[1,2,3,4]}")));
         ASSERT(!m.matches(fromjson("{a:[1,2,3]}")));
         ASSERT(!m.matches(fromjson("{a:[1,2,3,'a','b']}")));
@@ -152,7 +152,7 @@ class WithinBox {
 public:
     void run() {
         M m(fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}"),
-            MatchExpressionParser::WhereCallback());
+            MatchExpressionParser::ExtensionsCallback());
         ASSERT(!m.matches(fromjson("{loc: [3,4]}")));
         ASSERT(m.matches(fromjson("{loc: [4,4]}")));
         ASSERT(m.matches(fromjson("{loc: [5,5]}")));
@@ -166,7 +166,7 @@ class WithinPolygon {
 public:
     void run() {
         M m(fromjson("{loc:{$within:{$polygon:[{x:0,y:0},[0,5],[5,5],[5,0]]}}}"),
-            MatchExpressionParser::WhereCallback());
+            MatchExpressionParser::ExtensionsCallback());
         ASSERT(m.matches(fromjson("{loc: [3,4]}")));
         ASSERT(m.matches(fromjson("{loc: [4,4]}")));
         ASSERT(m.matches(fromjson("{loc: {x:5,y:5}}")));
@@ -180,7 +180,7 @@ class WithinCenter {
 public:
     void run() {
         M m(fromjson("{loc:{$within:{$center:[{x:30,y:30},10]}}}"),
-            MatchExpressionParser::WhereCallback());
+            MatchExpressionParser::ExtensionsCallback());
         ASSERT(!m.matches(fromjson("{loc: [3,4]}")));
         ASSERT(m.matches(fromjson("{loc: {x:30,y:30}}")));
         ASSERT(m.matches(fromjson("{loc: [20,30]}")));
@@ -196,7 +196,7 @@ template <typename M>
 class ElemMatchKey {
 public:
     void run() {
-        M matcher(BSON("a.b" << 1), MatchExpressionParser::WhereCallback());
+        M matcher(BSON("a.b" << 1), MatchExpressionParser::ExtensionsCallback());
         MatchDetails details;
         details.requestElemMatchKey();
         ASSERT(!details.hasElemMatchKey());
@@ -216,7 +216,7 @@ public:
 
         M m(BSON("$where"
                  << "function(){ return this.a == 1; }"),
-            WhereCallbackReal(&txn, StringData("unittests")));
+            ExtensionsCallbackReal(&txn, StringData("unittests")));
         ASSERT(m.matches(BSON("a" << 1)));
         ASSERT(!m.matches(BSON("a" << 2)));
     }
@@ -226,7 +226,7 @@ template <typename M>
 class TimingBase {
 public:
     long dotime(const BSONObj& patt, const BSONObj& obj) {
-        M m(patt, MatchExpressionParser::WhereCallback());
+        M m(patt, MatchExpressionParser::ExtensionsCallback());
         Timer t;
         for (int i = 0; i < 900000; i++) {
             if (!m.matches(obj)) {

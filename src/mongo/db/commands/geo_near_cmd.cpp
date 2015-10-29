@@ -185,9 +185,9 @@ public:
         BSONObj projObj = BSON("$pt" << BSON("$meta" << LiteParsedQuery::metaGeoNearPoint) << "$dis"
                                      << BSON("$meta" << LiteParsedQuery::metaGeoNearDistance));
 
-        const WhereCallbackReal whereCallback(txn, nss.db());
+        const ExtensionsCallbackReal extensionsCallback(txn, nss.db());
         auto statusWithCQ = CanonicalQuery::canonicalize(
-            nss, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), whereCallback);
+            nss, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             errmsg = "Can't parse filter / create query";
             return false;

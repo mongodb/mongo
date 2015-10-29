@@ -96,7 +96,7 @@ bool DocumentSourceMatch::coalesce(const intrusive_ptr<DocumentSource>& nextSour
 
     // Replace our matcher with the $and of ours and theirs.
     matcher.reset(new Matcher(BSON("$and" << BSON_ARRAY(getQuery() << otherMatch->getQuery())),
-                              MatchExpressionParser::WhereCallback()));
+                              MatchExpressionParser::ExtensionsCallback()));
 
     return true;
 }
@@ -359,6 +359,6 @@ BSONObj DocumentSourceMatch::getQuery() const {
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
                                          const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx),
-      matcher(new Matcher(query.getOwned(), MatchExpressionParser::WhereCallback())),
+      matcher(new Matcher(query.getOwned(), MatchExpressionParser::ExtensionsCallback())),
       _isTextQuery(isTextQuery(query)) {}
 }

@@ -74,7 +74,7 @@ ProjectionExec::ProjectionExec()
 
 ProjectionExec::ProjectionExec(const BSONObj& spec,
                                const MatchExpression* queryExpression,
-                               const MatchExpressionParser::WhereCallback& whereCallback)
+                               const MatchExpressionParser::ExtensionsCallback& extensionsCallback)
     : _include(true),
       _special(false),
       _source(spec),
@@ -126,7 +126,7 @@ ProjectionExec::ProjectionExec(const BSONObj& spec,
                 verify(elemMatchObj.isOwned());
                 _elemMatchObjs.push_back(elemMatchObj);
                 StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(elemMatchObj, whereCallback);
+                    MatchExpressionParser::parse(elemMatchObj, extensionsCallback);
                 verify(statusWithMatcher.isOK());
                 // And store it in _matchers.
                 _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()] =

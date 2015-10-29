@@ -98,8 +98,8 @@ public:
             filter = b.obj();
         }
 
-        const WhereCallbackReal whereCallback(txn, db);
-        const Matcher matcher(filter, whereCallback);
+        const ExtensionsCallbackReal extensionsCallback(txn, db);
+        const Matcher matcher(filter, extensionsCallback);
 
         BSONArrayBuilder inprogBuilder(result.subarrayStart("inprog"));
 

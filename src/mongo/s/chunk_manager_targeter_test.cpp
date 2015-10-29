@@ -56,7 +56,7 @@ using std::make_pair;
 unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
     BSONObj queryObj = fromjson(queryStr);
     const NamespaceString nss("test.foo");
-    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj, WhereCallbackNoop());
+    auto statusWithCQ = CanonicalQuery::canonicalize(nss, queryObj, ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
     return std::move(statusWithCQ.getValue());
 }

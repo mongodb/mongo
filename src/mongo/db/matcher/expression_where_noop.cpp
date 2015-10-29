@@ -115,9 +115,9 @@ bool WhereNoOpMatchExpression::equivalent(const MatchExpression* other) const {
 
 // -----------------
 
-WhereCallbackNoop::WhereCallbackNoop() {}
+ExtensionsCallbackNoop::ExtensionsCallbackNoop() {}
 
-StatusWithMatchExpression WhereCallbackNoop::parseWhere(const BSONElement& where) const {
+StatusWithMatchExpression ExtensionsCallbackNoop::parseWhere(const BSONElement& where) const {
     unique_ptr<WhereNoOpMatchExpression> exp(new WhereNoOpMatchExpression());
     if (where.type() == String || where.type() == Code) {
         Status s = exp->init(where.valuestr());

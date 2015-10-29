@@ -191,10 +191,10 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     BSONObj projectionObj,
     BSONObj sortObj,
     const size_t plannerOpts) {
-    const WhereCallbackReal whereCallback(pExpCtx->opCtx, pExpCtx->ns.db());
+    const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, pExpCtx->ns.db());
 
-    auto cq =
-        CanonicalQuery::canonicalize(pExpCtx->ns, queryObj, sortObj, projectionObj, whereCallback);
+    auto cq = CanonicalQuery::canonicalize(
+        pExpCtx->ns, queryObj, sortObj, projectionObj, extensionsCallback);
 
     if (!cq.isOK()) {
         // Return an error instead of uasserting, since there are cases where the combination of

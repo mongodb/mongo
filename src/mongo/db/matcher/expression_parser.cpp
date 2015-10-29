@@ -326,7 +326,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj, int 
                 if (e.trueValue())
                     root->add(new AtomicMatchExpression());
             } else if (mongoutils::str::equals("where", rest)) {
-                StatusWithMatchExpression s = _whereCallback->parseWhere(e);
+                StatusWithMatchExpression s = _extensionsCallback->parseWhere(e);
                 if (!s.isOK())
                     return s;
                 root->add(s.getValue().release());
@@ -954,7 +954,7 @@ StatusWith<std::vector<uint32_t>> MatchExpressionParser::_parseBitPositionsArray
     return bitPositions;
 }
 
-StatusWithMatchExpression MatchExpressionParser::WhereCallback::parseWhere(
+StatusWithMatchExpression MatchExpressionParser::ExtensionsCallback::parseWhere(
     const BSONElement& where) const {
     return {Status(ErrorCodes::NoWhereParseContext, "no context for parsing $where")};
 }

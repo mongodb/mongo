@@ -49,8 +49,8 @@ struct ProjectionStageParams {
         SIMPLE_DOC
     };
 
-    ProjectionStageParams(const MatchExpressionParser::WhereCallback& wc)
-        : projImpl(NO_FAST_PATH), fullExpression(NULL), whereCallback(&wc) {}
+    ProjectionStageParams(const MatchExpressionParser::ExtensionsCallback& wc)
+        : projImpl(NO_FAST_PATH), fullExpression(NULL), extensionsCallback(&wc) {}
 
     ProjectionImplementation projImpl;
 
@@ -67,7 +67,7 @@ struct ProjectionStageParams {
     BSONObj coveredKeyObj;
 
     // Used for creating context for the $where clause processing. Not owned.
-    const MatchExpressionParser::WhereCallback* whereCallback;
+    const MatchExpressionParser::ExtensionsCallback* extensionsCallback;
 };
 
 /**

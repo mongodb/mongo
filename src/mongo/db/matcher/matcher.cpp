@@ -41,10 +41,11 @@
 
 namespace mongo {
 
-Matcher::Matcher(const BSONObj& pattern, const MatchExpressionParser::WhereCallback& whereCallback)
+Matcher::Matcher(const BSONObj& pattern,
+                 const MatchExpressionParser::ExtensionsCallback& extensionsCallback)
     : _pattern(pattern) {
     StatusWithMatchExpression statusWithMatcher =
-        MatchExpressionParser::parse(pattern, whereCallback);
+        MatchExpressionParser::parse(pattern, extensionsCallback);
     uassert(16810,
             mongoutils::str::stream() << "bad query: " << statusWithMatcher.getStatus().toString(),
             statusWithMatcher.isOK());

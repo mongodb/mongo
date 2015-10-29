@@ -94,7 +94,7 @@ private:
     unique_ptr<Scope> _scope;
     ScriptingFunction _func;
 
-    // Not owned. See comments insde WhereCallbackReal for the lifetime of this pointer.
+    // Not owned. See comments insde ExtensionsCallbackReal for the lifetime of this pointer.
     OperationContext* _txn;
 };
 
@@ -177,10 +177,10 @@ bool WhereMatchExpression::equivalent(const MatchExpression* other) const {
         _userScope == realOther->_userScope;
 }
 
-WhereCallbackReal::WhereCallbackReal(OperationContext* txn, StringData dbName)
+ExtensionsCallbackReal::ExtensionsCallbackReal(OperationContext* txn, StringData dbName)
     : _txn(txn), _dbName(dbName) {}
 
-StatusWithMatchExpression WhereCallbackReal::parseWhere(const BSONElement& where) const {
+StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(const BSONElement& where) const {
     if (!globalScriptEngine)
         return StatusWithMatchExpression(ErrorCodes::BadValue,
                                          "no globalScriptEngine in $where parsing");

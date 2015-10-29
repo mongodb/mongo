@@ -48,8 +48,8 @@ public:
     static Status make(const BSONObj& spec,
                        const MatchExpression* const query,
                        ParsedProjection** out,
-                       const MatchExpressionParser::WhereCallback& whereCallback =
-                           MatchExpressionParser::WhereCallback());
+                       const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
+                           MatchExpressionParser::ExtensionsCallback());
 
     /**
      * Returns true if the projection requires match details from the query,

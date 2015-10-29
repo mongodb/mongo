@@ -492,7 +492,7 @@ std::string runQuery(OperationContext* txn,
 
     // Parse the qm into a CanonicalQuery.
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(q, WhereCallbackReal(txn, nss.db()));
+    auto statusWithCQ = CanonicalQuery::canonicalize(q, ExtensionsCallbackReal(txn, nss.db()));
     if (!statusWithCQ.isOK()) {
         uasserted(
             17287,

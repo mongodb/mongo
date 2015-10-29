@@ -256,8 +256,8 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     std::unique_ptr<LiteParsedQuery> lpq(
         assertGet(LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain)));
 
-    WhereCallbackNoop whereCallback;
-    auto statusWithCQ = CanonicalQuery::canonicalize(lpq.release(), whereCallback);
+    ExtensionsCallbackNoop extensionsCallback;
+    auto statusWithCQ = CanonicalQuery::canonicalize(lpq.release(), extensionsCallback);
     ASSERT_OK(statusWithCQ.getStatus());
 
     Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns.mutableVector());

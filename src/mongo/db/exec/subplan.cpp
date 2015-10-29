@@ -178,7 +178,7 @@ Status SubplanStage::planSubqueries() {
         LOG(5) << "Subplanner: index " << i << " is " << ie.toString();
     }
 
-    const WhereCallbackReal whereCallback(getOpCtx(), _collection->ns().db());
+    const ExtensionsCallbackReal extensionsCallback(getOpCtx(), _collection->ns().db());
 
     for (size_t i = 0; i < _orExpression->numChildren(); ++i) {
         // We need a place to shove the results from planning this branch.
@@ -188,7 +188,7 @@ Status SubplanStage::planSubqueries() {
         MatchExpression* orChild = _orExpression->getChild(i);
 
         // Turn the i-th child into its own query.
-        auto statusWithCQ = CanonicalQuery::canonicalize(*_query, orChild, whereCallback);
+        auto statusWithCQ = CanonicalQuery::canonicalize(*_query, orChild, extensionsCallback);
         if (!statusWithCQ.isOK()) {
             mongoutils::str::stream ss;
             ss << "Can't canonicalize subchild " << orChild->toString() << " "

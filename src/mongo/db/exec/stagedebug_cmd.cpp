@@ -244,7 +244,7 @@ public:
             BSONObj argObj = e.Obj();
             if (filterTag == e.fieldName()) {
                 StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
-                    argObj, WhereCallbackReal(txn, collection->ns().db()));
+                    argObj, ExtensionsCallbackReal(txn, collection->ns().db()));
                 if (!statusWithMatcher.isOK()) {
                     return NULL;
                 }

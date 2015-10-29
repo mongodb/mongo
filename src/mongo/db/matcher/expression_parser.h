@@ -53,26 +53,26 @@ public:
      *
      * Do not use this class to pass-in generic context as it should only be used for $where.
      */
-    class WhereCallback {
+    class ExtensionsCallback {
     public:
         virtual StatusWithMatchExpression parseWhere(const BSONElement& where) const;
 
-        virtual ~WhereCallback() {}
+        virtual ~ExtensionsCallback() {}
     };
 
     /**
      * caller has to maintain ownership obj
      * the tree has views (BSONElement) into obj
      */
-    static StatusWithMatchExpression parse(const BSONObj& obj,
-                                           const WhereCallback& whereCallback = WhereCallback()) {
+    static StatusWithMatchExpression parse(
+        const BSONObj& obj, const ExtensionsCallback& extensionsCallback = ExtensionsCallback()) {
         // The 0 initializes the match expression tree depth.
-        return MatchExpressionParser(&whereCallback)._parse(obj, 0);
+        return MatchExpressionParser(&extensionsCallback)._parse(obj, 0);
     }
 
 private:
-    explicit MatchExpressionParser(const WhereCallback* whereCallback)
-        : _whereCallback(whereCallback) {}
+    explicit MatchExpressionParser(const ExtensionsCallback* extensionsCallback)
+        : _extensionsCallback(extensionsCallback) {}
 
     /**
      * 5 = false
@@ -164,20 +164,20 @@ private:
 
     // Performs parsing for the $where clause. We do not own this pointer - it has to live
     // as long as the parser is active.
-    const WhereCallback* _whereCallback;
+    const ExtensionsCallback* _extensionsCallback;
 };
 
 /**
  * This implementation is used for the server-side code.
  */
-class WhereCallbackReal : public MatchExpressionParser::WhereCallback {
+class ExtensionsCallbackReal : public MatchExpressionParser::ExtensionsCallback {
 public:
     /**
      * The OperationContext passed here is not owned, but just referenced. It gets assigned to
      * any $where parsers, which this callback generates. Therefore, the op context must only
      * be destroyed after these parsers and their clones (shallowClone) have been destroyed.
      */
-    WhereCallbackReal(OperationContext* txn, StringData dbName);
+    ExtensionsCallbackReal(OperationContext* txn, StringData dbName);
 
     virtual StatusWithMatchExpression parseWhere(const BSONElement& where) const;
 
@@ -190,9 +190,9 @@ private:
 /**
  * This is just a pass-through implementation, used by sharding only.
  */
-class WhereCallbackNoop : public MatchExpressionParser::WhereCallback {
+class ExtensionsCallbackNoop : public MatchExpressionParser::ExtensionsCallback {
 public:
-    WhereCallbackNoop();
+    ExtensionsCallbackNoop();
 
     virtual StatusWithMatchExpression parseWhere(const BSONElement& where) const;
 };

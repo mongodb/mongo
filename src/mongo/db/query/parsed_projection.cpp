@@ -48,7 +48,7 @@ using std::string;
 Status ParsedProjection::make(const BSONObj& spec,
                               const MatchExpression* const query,
                               ParsedProjection** out,
-                              const MatchExpressionParser::WhereCallback& whereCallback) {
+                              const MatchExpressionParser::ExtensionsCallback& extensionsCallback) {
     // Whether we're including or excluding fields.
     enum class IncludeExclude { kUninitialized, kInclude, kExclude };
     IncludeExclude includeExclude = IncludeExclude::kUninitialized;
@@ -125,7 +125,7 @@ Status ParsedProjection::make(const BSONObj& spec,
 
                 // TODO: Is there a faster way of validating the elemMatchObj?
                 StatusWithMatchExpression statusWithMatcher =
-                    MatchExpressionParser::parse(elemMatchObj, whereCallback);
+                    MatchExpressionParser::parse(elemMatchObj, extensionsCallback);
                 if (!statusWithMatcher.isOK()) {
                     return statusWithMatcher.getStatus();
                 }

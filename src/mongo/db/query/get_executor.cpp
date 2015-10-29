@@ -265,7 +265,7 @@ Status prepareExecution(OperationContext* opCtx,
         // document, so we don't support covered projections. However, we might use the
         // simple inclusion fast path.
         if (NULL != canonicalQuery->getProj()) {
-            ProjectionStageParams params(WhereCallbackReal(opCtx, collection->ns().db()));
+            ProjectionStageParams params(ExtensionsCallbackReal(opCtx, collection->ns().db()));
             params.projObj = canonicalQuery->getProj()->getProjObj();
 
             // Add a SortKeyGeneratorStage if there is a $meta sortKey projection.
@@ -614,7 +614,7 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* txn,
                 "Cannot use a $meta sortKey projection in findAndModify commands."};
     }
 
-    ProjectionStageParams params(WhereCallbackReal(txn, nsString.db()));
+    ProjectionStageParams params(ExtensionsCallbackReal(txn, nsString.db()));
     params.projObj = proj;
     params.fullExpression = cq->root();
     return {make_unique<ProjectionStage>(txn, params, ws, root.release())};
@@ -921,10 +921,10 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
     }
 
     const NamespaceString nss(request.ns);
-    const WhereCallbackReal whereCallback(txn, nss.db());
+    const ExtensionsCallbackReal extensionsCallback(txn, nss.db());
 
     auto statusWithCQ =
-        CanonicalQuery::canonicalize(nss, request.query, request.explain, whereCallback);
+        CanonicalQuery::canonicalize(nss, request.query, request.explain, extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -1157,7 +1157,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
     unique_ptr<CanonicalQuery> cq;
     if (!request.getQuery().isEmpty() || !request.getHint().isEmpty()) {
         // If query or hint is not empty, canonicalize the query before working with collection.
-        typedef MatchExpressionParser::WhereCallback WhereCallback;
+        typedef MatchExpressionParser::ExtensionsCallback ExtensionsCallback;
         auto statusWithCQ = CanonicalQuery::canonicalize(
             request.getNs(),
             request.getQuery(),
@@ -1170,9 +1170,9 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
             BSONObj(),  // max
             false,      // snapshot
             explain,
-            collection
-                ? static_cast<const WhereCallback&>(WhereCallbackReal(txn, collection->ns().db()))
-                : static_cast<const WhereCallback&>(WhereCallbackNoop()));
+            collection ? static_cast<const ExtensionsCallback&>(
+                             ExtensionsCallbackReal(txn, collection->ns().db()))
+                       : static_cast<const ExtensionsCallback&>(ExtensionsCallbackNoop()));
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -1313,13 +1313,13 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
         }
     }
 
-    const WhereCallbackReal whereCallback(txn, collection->ns().db());
+    const ExtensionsCallbackReal extensionsCallback(txn, collection->ns().db());
 
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.
     if (plannerParams.indices.empty()) {
         auto statusWithCQ =
-            CanonicalQuery::canonicalize(collection->ns(), query, isExplain, whereCallback);
+            CanonicalQuery::canonicalize(collection->ns(), query, isExplain, extensionsCallback);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -1348,7 +1348,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
                                                      BSONObj(),  // max
                                                      false,      // snapshot
                                                      isExplain,
-                                                     whereCallback);
+                                                     extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -1434,7 +1434,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     }
 
     // We drop the projection from the 'cq'.  Unfortunately this is not trivial.
-    statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, isExplain, whereCallback);
+    statusWithCQ =
+        CanonicalQuery::canonicalize(collection->ns(), query, isExplain, extensionsCallback);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
