@@ -187,17 +187,15 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 
 	/*
 	 * Read-uncommitted transactions see all other changes.
-	 *
-	 * All metadata reads are at read-uncommitted isolation.  That's
-	 * because once a schema-level operation completes, subsequent
-	 * operations must see the current version of checkpoint metadata, or
-	 * they may try to read blocks that may have been freed from a file.
-	 * Metadata updates use non-transactional techniques (such as the
-	 * schema and metadata locks) to protect access to in-flight updates.
 	 */
-	if (txn->isolation == WT_ISO_READ_UNCOMMITTED ||
-	    session->dhandle == session->meta_dhandle)
+	if (txn->isolation == WT_ISO_READ_UNCOMMITTED)
 		return (true);
+
+	/*
+	 * A visibility check that is not read-uncommitted must have an
+	 * active snapshot.
+	 */
+	WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT));
 
 	/* Transactions see their own changes. */
 	if (id == txn->id)
@@ -429,9 +427,15 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 
-	/* Release the snap_min ID we put in the global table. */
-	if (!F_ISSET(txn, WT_TXN_RUNNING) ||
-	    txn->isolation != WT_ISO_SNAPSHOT)
+	/*
+	 * Release the snap_min ID we put in the global table.
+	 *
+	 * If the isolation has been temporarily forced, don't touch the
+	 * snapshot here: it will be restored by WT_WITH_TXN_ISOLATION.
+	 */
+	if ((!F_ISSET(txn, WT_TXN_RUNNING) ||
+	    txn->isolation != WT_ISO_SNAPSHOT) &&
+	    txn->forced_iso == 0)
 		__wt_txn_release_snapshot(session);
 }
 

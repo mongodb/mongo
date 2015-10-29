@@ -275,7 +275,8 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 		WT_RET(ret);
 	} else {
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
-		    ret = __wt_checkpoint(session, NULL));
+		    WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_COMMITTED,
+			ret = __wt_checkpoint(session, NULL)));
 		WT_RET(ret);
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_checkpoint_sync(session, NULL));

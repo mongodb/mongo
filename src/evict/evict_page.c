@@ -142,6 +142,50 @@ done:	if (((inmem_split && ret == 0) || (forced_eviction && ret == EBUSY)) &&
 
 	return (ret);
 }
+/*
+ * __evict_delete_ref --
+ *	Mark a page reference deleted and check if the parent can reverse
+ *	split.
+ */
+static int
+__evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
+{
+	WT_DECL_RET;
+	WT_PAGE *parent;
+	WT_PAGE_INDEX *pindex;
+	uint32_t ndeleted;
+
+	if (__wt_ref_is_root(ref))
+		return (0);
+
+	/*
+	 * Avoid doing reverse splits when closing the file, it is
+	 * wasted work and some structure may already have been freed.
+	 */
+	if (!closing) {
+		parent = ref->home;
+		WT_INTL_INDEX_GET(session, parent, pindex);
+		ndeleted = __wt_atomic_addv32(&pindex->deleted_entries, 1);
+
+		/*
+		 * If more than 10% of the parent references are deleted, try a
+		 * reverse split.  Don't bother if there is a single deleted
+		 * reference: the internal page is empty and we have to wait
+		 * for eviction to notice.
+		 *
+		 * This will consume the deleted ref (and eventually free it).
+		 * If the reverse split can't get the access it needs because
+		 * something is busy, be sure that the page still ends up
+		 * marked deleted.
+		 */
+		if (ndeleted > pindex->entries / 10 && pindex->entries > 1 &&
+		    (ret = __wt_split_reverse(session, ref)) != EBUSY)
+			return (ret);
+	}
+
+	WT_PUBLISH(ref->state, WT_REF_DELETED);
+	return (0);
+}
 
 /*
  * __wt_evict_page_clean_update --
@@ -151,6 +195,8 @@ int
 __wt_evict_page_clean_update(
     WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
+	WT_DECL_RET;
+
 	/*
 	 * If doing normal system eviction, but only in the service of reducing
 	 * the number of dirty pages, leave the clean page in cache.
@@ -164,8 +210,12 @@ __wt_evict_page_clean_update(
 	 * page re-instantiated (for example, by searching) and never written.
 	 */
 	__wt_ref_out(session, ref);
-	WT_PUBLISH(ref->state,
-	    ref->addr == NULL ? WT_REF_DELETED : WT_REF_DISK);
+	if (ref->addr == NULL) {
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __evict_delete_ref(session, ref, closing));
+		WT_RET_BUSY_OK(ret);
+	} else
+		WT_PUBLISH(ref->state, WT_REF_DISK);
 
 	return (0);
 }
@@ -178,6 +228,7 @@ static int
 __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_ADDR *addr;
+	WT_DECL_RET;
 	WT_PAGE *parent;
 	WT_PAGE_MODIFY *mod;
 
@@ -206,7 +257,9 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 */
 		__wt_ref_out(session, ref);
 		ref->addr = NULL;
-		WT_PUBLISH(ref->state, WT_REF_DELETED);
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __evict_delete_ref(session, ref, closing));
+		WT_RET_BUSY_OK(ret);
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
 		/*
