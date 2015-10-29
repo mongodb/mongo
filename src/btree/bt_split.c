@@ -14,6 +14,12 @@
 	to_incr += __len;						\
 } while (0)
 
+static int __split_parent(
+    WT_SESSION_IMPL *, WT_REF *, WT_REF **, uint32_t, size_t, bool);
+static int __split_internal_lock(
+    WT_SESSION_IMPL *, WT_REF *, WT_PAGE **, bool *);
+static int __split_internal_unlock(WT_SESSION_IMPL *, WT_PAGE *, bool);
+
 /*
  * __split_oldest_gen --
  *	Calculate the oldest active split generation.
@@ -170,18 +176,16 @@ __split_safe_free(WT_SESSION_IMPL *session,
 }
 
 /*
- * __split_should_deepen --
- *	Return if we should deepen the tree.
+ * __split_internal_should_split --
+ *	Return if we should split an internal page.
  */
 static bool
-__split_should_deepen(WT_SESSION_IMPL *session, WT_REF *ref)
+__split_internal_should_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 
 	btree = S2BT(session);
-	page = ref->page;
 
 	/*
 	 * Our caller is holding the parent page locked to single-thread splits,
@@ -400,7 +404,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	WT_PAGE *child;
 	WT_PAGE_INDEX *alloc_index, *child_pindex, *pindex;
 	WT_REF **alloc_refp;
-	WT_REF *child_ref, **child_refp, *parent_ref, **parent_refp, *ref;
+	WT_REF *child_ref, **child_refp, **parent_refp, *ref;
 	size_t child_incr, parent_decr, parent_incr, size;
 	uint64_t split_gen;
 	uint32_t children, chunk, i, j, moved_entries, new_entries, remain;
@@ -410,6 +414,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_deepen);
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_internal);
+	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_internal);
 
 	btree = S2BT(session);
 	alloc_index = NULL;
@@ -463,6 +469,10 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		    pindex->entries - (skip_leading + skip_trailing);
 	}
 
+	/* Calculate the standard chunk, and whatever remains. */
+	chunk = moved_entries / children;
+	remain = moved_entries - chunk * (children - 1);
+
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
 	    parent, pindex->entries, children));
@@ -470,8 +480,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	/*
 	 * Allocate a new WT_PAGE_INDEX and set of WT_REF objects. Initialize
 	 * the slots of the allocated WT_PAGE_INDEX to point to the pages we're
-	 * keeping at the current level, and the rest of the slots to point to
-	 * new WT_REF objects.
+	 * keeping at the current level (both leading and trailing), and the
+	 * rest of the slots to point to newly allocated WT_REF objects.
 	 */
 	size = sizeof(WT_PAGE_INDEX) +
 	    (children + skip_leading + skip_trailing) * sizeof(WT_REF *);
@@ -479,18 +489,15 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	parent_incr += size;
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = children + skip_leading + skip_trailing;
-	for (alloc_refp = alloc_index->index,
+	for (alloc_refp = alloc_index->index,			/* leading */
 	    i = 0; i < skip_leading; ++alloc_refp, ++i)
-		alloc_index->index[i] = pindex->index[i];
-	for (i = 0; i < children; ++alloc_refp, ++i)
+		*alloc_refp = pindex->index[i];
+	for (i = 0; i < children; ++alloc_refp, ++i)		/* new */
 		WT_ERR(__wt_calloc_one(session, alloc_refp));
+	*alloc_refp = pindex->index[pindex->entries - 1];	/* trailing */
 	parent_incr += children * sizeof(WT_REF);
-	alloc_index->index[alloc_index->entries - 1] =
-	    pindex->index[pindex->entries - 1];
 
 	/* Allocate child pages, and connect them into the new page index. */
-	chunk = moved_entries / children;
-	remain = moved_entries - chunk * (children - 1);
 	for (parent_refp = pindex->index + skip_leading,
 	    alloc_refp = alloc_index->index + skip_leading,
 	    i = 0; i < children; ++i) {
@@ -557,6 +564,13 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	    parent_refp - pindex->index == pindex->entries - skip_trailing);
 
 	/*
+	 * Save the number of entries created by deepening the tree and reset
+	 * the count of splits into this page after that point.
+	 */
+	parent->pg_intl_deepen_split_append = 0;
+	parent->pg_intl_deepen_split_last = alloc_index->entries;
+
+	/*
 	 * Confirm the parent page's index hasn't moved, then update it, which
 	 * makes the split visible to threads descending the tree. From this
 	 * point on, we're committed to the split.
@@ -572,19 +586,12 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 */
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(parent) == pindex);
 	WT_INTL_INDEX_SET(parent, alloc_index);
-	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
 	complete = true;
 
 #ifdef HAVE_DIAGNOSTIC
 	WT_WITH_PAGE_INDEX(session,
 	    __split_verify_intl_key_order(session, parent));
 #endif
-	/*
-	 * Save the number of entries created by deepening the tree and reset
-	 * the count of splits into this page after that point.
-	 */
-	parent->pg_intl_deepen_split_append = 0;
-	parent->pg_intl_deepen_split_last = alloc_index->entries;
 
 	/*
 	 * The moved reference structures now reference the wrong parent page,
@@ -598,11 +605,11 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * We're not acquiring hazard pointers on these pages, they cannot be
 	 * evicted because of the eviction transaction value set above.
 	 */
-	for (parent_refp = alloc_index->index,
-	    i = alloc_index->entries; i > 0; ++parent_refp, --i) {
-		parent_ref = *parent_refp;
-		WT_ASSERT(session, parent_ref->home == parent);
-		if (parent_ref->state != WT_REF_MEM)
+	for (alloc_refp = alloc_index->index,
+	    i = alloc_index->entries; i > 0; ++alloc_refp, --i) {
+		ref = *alloc_refp;
+		WT_ASSERT(session, ref->home == parent);
+		if (ref->state != WT_REF_MEM)
 			continue;
 
 		/*
@@ -610,7 +617,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * level to avoid bad split patterns, they might be leaf pages;
 		 * check the page type before we continue.
 		 */
-		child = parent_ref->page;
+		child = ref->page;
 		if (!WT_PAGE_IS_INTERNAL(child))
 			continue;
 #ifdef HAVE_DIAGNOSTIC
@@ -625,7 +632,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		WT_ENTER_PAGE_INDEX(session);
 		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
 			/*
-			 * The page's parent reference may not be wrong, as we
+			 * The page's home reference may not be wrong, as we
 			 * opened up access from the top of the tree already,
 			 * pages may have been read in since then.  Check and
 			 * only update pages that reference the original page,
@@ -638,13 +645,13 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		} WT_INTL_FOREACH_END;
 		WT_LEAVE_PAGE_INDEX(session);
 	}
+	alloc_index = NULL;
 
 	/*
 	 * Push out the changes: not required for correctness, but don't let
 	 * threads spin on incorrect page references longer than necessary.
 	 */
 	WT_FULL_BARRIER();
-	alloc_index = NULL;
 
 	/*
 	 * We can't free the previous parent's index, there may be threads using
@@ -656,13 +663,12 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * fails, we don't roll back that change, because threads may already
 	 * be using the new index.
 	 */
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
-	WT_TRET(__split_safe_free(session, split_gen, 0, pindex, size));
+	WT_TRET(__split_safe_free(session, split_gen, false, pindex, size));
 	parent_decr += size;
 
-	/*
-	 * Adjust the parent's memory footprint.
-	 */
+	/* Adjust the parent's memory footprint. */
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
 
@@ -684,6 +690,350 @@ err:	/*
 		    "ignoring not-fatal error during parent page split to "
 		    "deepen the tree");
 	return (ret == WT_PANIC || !complete ? ret : 0);
+}
+
+/*
+ * __split_internal --
+ *	Split an internal page into its parent.
+ */
+static int
+__split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_PAGE *child;
+	WT_PAGE_INDEX *alloc_index, *child_pindex, *pindex, *replace_index;
+	WT_REF **alloc_refp;
+	WT_REF *child_ref, **child_refp, *page_ref, **page_refp, *ref;
+	size_t child_incr, page_decr, page_incr, parent_incr, size;
+	uint64_t split_gen;
+	uint32_t children, chunk, i, j, moved_entries, remain;
+	uint32_t slots;
+	bool complete;
+	void *p;
+
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_internal);
+	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_internal);
+
+	btree = S2BT(session);
+	alloc_index = replace_index = NULL;
+	page_ref = page->pg_intl_parent_ref;
+	page_decr = page_incr = parent_incr = 0;
+	complete = false;
+
+	/*
+	 * Our caller is holding the page locked to single-thread splits, which
+	 * means we can safely look at the page's index without setting a split
+	 * generation.
+	 */
+	pindex = WT_INTL_INDEX_GET_SAFE(page);
+
+	/* Figure out how many child pages we're creating. */
+	moved_entries = pindex->entries;
+	children = moved_entries / btree->split_deepen_per_child;
+
+	/* Calculate the standard chunk, and whatever remains. */
+	chunk = moved_entries / children;
+	remain = moved_entries - chunk * (children - 1);
+
+	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
+	    page, pindex->entries, children));
+
+	/*
+	 * Ideally, we'd discard the original page, but that's hard since other
+	 * threads of control are using it (for example, if eviction is walking
+	 * the tree and looking at the page.) Instead, perform a right-split,
+	 * moving all except the first chunk of the page's WT_REF objects to new
+	 * pages.
+	 *
+	 * Create and initialize a replacement WT_PAGE_INDEX for the original
+	 * page.
+	 */
+	size = sizeof(WT_PAGE_INDEX) + chunk * sizeof(WT_REF *);
+	WT_ERR(__wt_calloc(session, 1, size, &replace_index));
+	page_incr += size;
+	replace_index->index = (WT_REF **)(replace_index + 1);
+	replace_index->entries = chunk;
+	for (page_refp = pindex->index, i = 0; i < chunk; ++i)
+		replace_index->index[i] = *page_refp++;
+
+	/*
+	 * Allocate a new WT_PAGE_INDEX and set of WT_REF objects to be inserted
+	 * into the page's parent, replacing the page's WT_REF.
+	 *
+	 * The first slot of the new WT_PAGE_INDEX is a copy of the original
+	 * page's WT_REF. (Make a copy because the original WT_REF will be set
+	 * to split status and eventually freed; doing a WT_REF set/free in this
+	 * path isn't required, but it's simpler than changing the underlying
+	 * split-page code to do the set/free in some cases but not in others).
+	 * The remainder of the slots are allocated WT_REFs.
+	 */
+	size = sizeof(WT_PAGE_INDEX) + children * sizeof(WT_REF *);
+	WT_ERR(__wt_calloc(session, 1, size, &alloc_index));
+	parent_incr += size;
+	alloc_index->index = (WT_REF **)(alloc_index + 1);
+	alloc_index->entries = children;
+	for (alloc_refp = alloc_index->index,
+	    i = 0; i < children; ++alloc_refp, ++i)
+		WT_ERR(__wt_calloc_one(session, alloc_refp));
+	alloc_refp = alloc_index->index;		/* original page */
+	**alloc_refp++ = *page_ref;
+	parent_incr += children * sizeof(WT_REF);
+
+	/* Allocate child pages, and connect them into the new page index. */
+	WT_ASSERT(session, page_refp = pindex->index + chunk);
+	WT_ASSERT(session, alloc_refp = alloc_index->index + 1);
+	for (i = 1; i < children; ++i) {
+		slots = i == children - 1 ? remain : chunk;
+		WT_ERR(__wt_page_alloc(
+		    session, page->type, 0, slots, false, &child));
+
+		/*
+		 * Initialize the page's child reference; we need a copy of the
+		 * page's key.
+		 */
+		ref = *alloc_refp++;
+		ref->home = parent;
+		ref->page = child;
+		ref->addr = NULL;
+		if (page->type == WT_PAGE_ROW_INT) {
+			__wt_ref_key(page, *page_refp, &p, &size);
+			WT_ERR(__wt_row_ikey(session, 0, p, size, ref));
+			parent_incr += sizeof(WT_IKEY) + size;
+		} else
+			ref->key.recno = (*page_refp)->key.recno;
+		ref->state = WT_REF_MEM;
+
+		/* Initialize the child page. */
+		if (page->type == WT_PAGE_COL_INT)
+			child->pg_intl_recno = (*page_refp)->key.recno;
+		child->pg_intl_parent_ref = ref;
+
+		/* Mark it dirty. */
+		WT_ERR(__wt_page_modify_init(session, child));
+		__wt_page_modify_set(session, child);
+
+		/*
+		 * Once the split goes live, the newly created internal pages
+		 * might be evicted and their WT_REF structures freed.  If those
+		 * pages are evicted before threads exit the previous page index
+		 * array, a thread might see a freed WT_REF.  Set the eviction
+		 * transaction requirement for the newly created internal pages.
+		 */
+		child->modify->mod_split_txn = __wt_txn_new_id(session);
+
+		/*
+		 * The newly allocated child's page index references the same
+		 * structures as the page. (We cannot move WT_REF structures,
+		 * threads may be underneath us right now changing the structure
+		 * state.)  However, if the WT_REF structures reference on-page
+		 * information, we have to fix that, because the disk image for
+		 * the page that has an page index entry for the WT_REF is about
+		 * to be discarded.
+		 */
+		child_incr = 0;
+		child_pindex = WT_INTL_INDEX_GET_SAFE(child);
+		for (child_refp = child_pindex->index, j = 0; j < slots; ++j) {
+			WT_ERR(__split_ref_deepen_move(session,
+			    page, *page_refp, &page_decr, &child_incr));
+			*child_refp++ = *page_refp++;
+		}
+		__wt_cache_page_inmem_incr(session, child, child_incr);
+	}
+	WT_ASSERT(session,
+	    alloc_refp - alloc_index->index == alloc_index->entries);
+	WT_ASSERT(session, page_refp - pindex->index == pindex->entries);
+
+	/* Split into the parent. */
+	WT_ERR(__split_parent(session, page_ref,
+	    alloc_index->index, alloc_index->entries, parent_incr, false));
+
+	/* Confirm the page's index hasn't moved, then update it. */
+	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(page) == pindex);
+	WT_INTL_INDEX_SET(page, replace_index);
+
+	/*
+	 * A note on error handling: until this point, there's no problem with
+	 * unwinding on error.  We allocated a new page index, a new set of
+	 * WT_REFs and a new set of child pages -- if an error occurred, the
+	 * page remained unchanged, although it may have an incorrect memory
+	 * footprint.  From now on we've modified the page, attention needs to
+	 * be paid. However, subsequent failures are relatively benign, the
+	 * split is OK and complete. For that reason, we ignore errors past
+	 * this point unless there's a panic.
+	 */
+	complete = true;
+
+#ifdef HAVE_DIAGNOSTIC
+	WT_WITH_PAGE_INDEX(session,
+	    __split_verify_intl_key_order(session, parent));
+	WT_WITH_PAGE_INDEX(session,
+	    __split_verify_intl_key_order(session, page));
+#endif
+	/*
+	 * The moved reference structures now reference the wrong parent page,
+	 * and we have to fix that up.  The problem is revealed when a thread
+	 * of control searches for a page's reference structure slot, and fails
+	 * to find it because the page it's searching no longer references it.
+	 * When that failure happens, the thread waits for the reference's home
+	 * page to be updated, which we do here: walk the children and fix them
+	 * up.
+	 *
+	 * We're not acquiring hazard pointers on these pages, they cannot be
+	 * evicted because of the eviction transaction value set above.
+	 */
+	for (alloc_refp = alloc_index->index,
+	    i = alloc_index->entries; i > 0; ++alloc_refp, --i) {
+		ref = *alloc_refp;
+		WT_ASSERT(session, ref->home == parent);
+		if (ref->state != WT_REF_MEM)
+			continue;
+
+		child = ref->page;
+#ifdef HAVE_DIAGNOSTIC
+		WT_WITH_PAGE_INDEX(session,
+		    __split_verify_intl_key_order(session, child));
+#endif
+		/*
+		 * We have the parent locked, but there's nothing to prevent
+		 * this child from splitting beneath us; ensure that reading
+		 * the child's page index structure is safe.
+		 */
+		WT_ENTER_PAGE_INDEX(session);
+		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
+			/*
+			 * The page's home reference may not be wrong, as we
+			 * opened up access from the top of the tree already,
+			 * pages may have been read in since then.  Check and
+			 * only update pages that reference the original page,
+			 * they must be wrong.
+			 */
+			if (child_ref->home == page) {
+				child_ref->home = child;
+				child_ref->pindex_hint = 0;
+			}
+		} WT_INTL_FOREACH_END;
+		WT_LEAVE_PAGE_INDEX(session);
+	}
+
+	/*
+	 * We don't care about the page-index we allocated, all we needed was
+	 * the array of WT_REF structures, which has now been split into the
+	 * parent page.
+	 */
+	__wt_free(session, alloc_index);
+
+	/*
+	 * Push out the changes: not required for correctness, but don't let
+	 * threads spin on incorrect page references longer than necessary.
+	 */
+	WT_FULL_BARRIER();
+
+	/*
+	 * We can't free the previous page's index, there may be threads using
+	 * it. Add to the session's discard list, to be freed once we know no
+	 * threads can still be using it.
+	 *
+	 * This change requires care with error handling, we've already updated
+	 * the parent page. Even if stashing the old value fails, we don't roll
+	 * back that change, because threads may already be using the new parent
+	 * page.
+	 */
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
+	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
+	WT_TRET(__split_safe_free(session, split_gen, false, pindex, size));
+	page_decr += size;
+
+	/* Adjust the page's memory footprint. */
+	__wt_cache_page_inmem_incr(session, page, page_incr);
+	__wt_cache_page_inmem_decr(session, page, page_decr);
+
+err:	/*
+	 * If complete is true, we saw an error after opening up the tree to
+	 * descent through the page's new index. There is nothing we can do,
+	 * there are threads potentially active in both versions of the tree.
+	 *
+	 * A note on error handling: if we completed the split, return success,
+	 * nothing really bad can have happened, and our caller has to proceed
+	 * with the split.
+	 */
+	if (!complete) {
+		__wt_free_ref_index(session, page, alloc_index, true);
+		__wt_free_ref_index(session, page, replace_index, false);
+	}
+
+	if (ret != 0 && ret != WT_PANIC)
+		__wt_err(session, ret,
+		    "ignoring not-fatal error during internal page split");
+	return (ret == WT_PANIC || !complete ? ret : 0);
+}
+
+/*
+ * __split_parent_climb --
+ *	Check if we should split up the tree.
+ */
+static int
+__split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page, bool page_hazard)
+{
+	WT_DECL_RET;
+	WT_PAGE *parent;
+	WT_REF *ref;
+	bool parent_hazard;
+
+	/*
+	 * Page splits trickle up the tree, that is, as leaf pages grow large
+	 * enough and are evicted, they'll split into their parent.  And, as
+	 * that parent page grows large enough and is evicted, it splits into
+	 * its parent and so on.  When the page split wave reaches the root,
+	 * the tree will permanently deepen as multiple root pages are written.
+	 *
+	 * However, this only helps if internal pages are evicted (and we resist
+	 * evicting internal pages for obvious reasons), or if the tree were to
+	 * be closed and re-opened from a disk image, which may be a rare event.
+	 *
+	 * To avoid internal pages becoming too large absent eviction, check
+	 * parent pages each time pages are split into them. If the page is big
+	 * enough, either split the page into its parent or, in the case of the
+	 * root, deepen the tree.
+	 *
+	 * Split up the tree.
+	 */
+	for (;;) {
+		parent = NULL;
+		parent_hazard = false;
+
+		/* If we don't need to split the page, we're done. */
+		if (!__split_internal_should_split(session, page))
+			break;
+
+		/*
+		 * If we've reached the root page, there are no subsequent pages
+		 * to review, deepen the tree and quit.
+		 */
+		ref = page->pg_intl_parent_ref;
+		if (__wt_ref_is_root(ref)) {
+			ret = __split_deepen(session, page);
+			break;
+		}
+
+		WT_ERR(__split_internal_lock(
+		    session, ref, &parent, &parent_hazard));
+		ret = __split_internal(session, parent, page);
+		WT_TRET(__split_internal_unlock(session, page, page_hazard));
+		page = parent;
+		page_hazard = parent_hazard;
+		WT_ERR(ret);
+	}
+
+err:	if (parent != NULL)
+		WT_TRET(
+		    __split_internal_unlock(session, parent, parent_hazard));
+	WT_TRET(__split_internal_unlock(session, page, page_hazard));
+
+	/* A page may have been busy, in which case return without error. */
+	WT_RET_BUSY_OK(ret);
+	return (0);
 }
 
 /*
@@ -879,11 +1229,11 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 }
 
 /*
- * __split_parent_lock --
- *	Lock the parent page.
+ * __split_internal_lock --
+ *	Lock an internal page.
  */
 static int
-__split_parent_lock(
+__split_internal_lock(
     WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE **parentp, bool *hazardp)
 {
 	WT_DECL_RET;
@@ -925,14 +1275,13 @@ __split_parent_lock(
 		WT_RET(__wt_fair_lock(session, &parent->page_lock));
 		if (parent == ref->home)
 			break;
-		/* Try again if the page deepened while we were waiting */
 		WT_RET(__wt_fair_unlock(session, &parent->page_lock));
 	}
 
 	/*
 	 * We have exclusive access to split the parent, and at this point, the
 	 * child prevents the parent from being evicted.  However, once we
-	 * update the parent's index, it will no longer refer to the child, and
+	 * update the parent's index, it may no longer refer to the child, and
 	 * could conceivably be evicted.  Get a hazard pointer on the parent
 	 * now, so that we can safely access it after updating the index.
 	 *
@@ -954,11 +1303,11 @@ err:	WT_TRET(__wt_fair_unlock(session, &parent->page_lock));
 }
 
 /*
- * __split_parent_unlock --
+ * __split_internal_unlock --
  *	Unlock the parent page.
  */
 static int
-__split_parent_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
+__split_internal_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
 {
 	WT_DECL_RET;
 
@@ -975,13 +1324,13 @@ __split_parent_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
  */
 static int
 __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
-    WT_REF **ref_new, uint32_t new_entries, size_t parent_incr, int exclusive)
+    WT_REF **ref_new, uint32_t new_entries, size_t parent_incr, bool exclusive)
 {
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *alloc_index, *pindex;
-	WT_REF **alloc_refp, *next_ref, *parent_ref;
+	WT_REF **alloc_refp, *next_ref;
 	size_t parent_decr, size;
 	uint64_t split_gen;
 	uint32_t i, j;
@@ -989,7 +1338,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	bool complete;
 
 	parent = ref->home;
-	parent_ref = parent->pg_intl_parent_ref;
 
 	alloc_index = pindex = NULL;
 	parent_decr = 0;
@@ -1042,6 +1390,17 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			for (j = 0; j < new_entries; ++j) {
 				ref_new[j]->home = parent;
 				*alloc_refp++ = ref_new[j];
+#if THIS_IS_A_PROBLEM
+				The idea is to clear the list of inserted WT_REF
+				objects so our callers don't have to worry about
+				dealing with this on error. However, the
+				internal-page split code needs it so it can
+				clean up after the split succeeds, it's the only
+				list we have of the pages that are being moved.
+				We could keep another copy, but that's slow. We
+				can't fail after this point without doing a full
+				panic, so it may be OK to not clear this knowing
+				we won't return an error to the caller.
 
 				/*
 				 * Clear the split reference as it moves to the
@@ -1049,6 +1408,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 				 * both after an error.
 				 */
 				ref_new[j] = NULL;
+#endif
 			}
 
 			/*
@@ -1142,7 +1502,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			if (ikey != NULL) {
 				size = sizeof(WT_IKEY) + ikey->size;
 				WT_TRET(__split_safe_free(
-				    session, split_gen, 0, ikey, size));
+				    session, split_gen, exclusive, ikey, size));
 				parent_decr += size;
 			}
 			/*
@@ -1159,7 +1519,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 		}
 
 		WT_TRET(__split_safe_free(
-		    session, split_gen, 0, next_ref, sizeof(WT_REF)));
+		    session, split_gen, exclusive, next_ref, sizeof(WT_REF)));
 		parent_decr += sizeof(WT_REF);
 	}
 
@@ -1174,31 +1534,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	WT_TRET(__split_safe_free(session, split_gen, exclusive, pindex, size));
 	parent_decr += size;
 
-	/*
-	 * Adjust the parent's memory footprint.
-	 */
+	/* Adjust the parent's memory footprint. */
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
-
-	/*
-	 * Simple page splits trickle up the tree, that is, as leaf pages grow
-	 * large enough and are evicted, they'll split into their parent.  And,
-	 * as that parent grows large enough and is evicted, it will split into
-	 * its parent and so on.  When the page split wave reaches the root,
-	 * the tree will permanently deepen as multiple root pages are written.
-	 *	However, this only helps if first, the pages are evicted (and
-	 * we resist evicting internal pages for obvious reasons), and second,
-	 * if the tree is closed and re-opened from a disk image, which may be
-	 * a rare event.
-	 *	To avoid the case of internal pages becoming too large when they
-	 * aren't being evicted, check internal pages each time a leaf page is
-	 * split into them.  If it's big enough, deepen the tree at that point.
-	 *	Do the check here because we've just grown the parent page and
-	 * are holding it locked.
-	 */
-	if (ret == 0 && !exclusive &&
-	    __split_should_deepen(session, parent_ref))
-		ret = __split_deepen(session, parent);
 
 err:	/*
 	 * A note on error handling: if we completed the split, return success,
@@ -1501,10 +1839,18 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PAGE *parent;
 	bool hazard;
 
-	WT_RET(__split_parent_lock(session, ref, &parent, &hazard));
-	ret = __split_insert(session, ref);
-	WT_TRET(__split_parent_unlock(session, parent, hazard));
-	return (ret);
+	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
+	if ((ret = __split_insert(session, ref)) != 0) {
+		WT_TRET(__split_internal_unlock(session, parent, hazard));
+		return (ret);
+	}
+
+	/*
+	 * Split up through the tree as necessary; we're holding the original
+	 * parent page locked, note the functions we call are responsible for
+	 * releasing that lock.
+	 */
+	return (__split_parent_climb(session, parent, hazard));
 }
 
 /*
@@ -1594,8 +1940,8 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_ERR(__split_parent(
 	    session, ref, ref_new, new_entries, parent_incr, closing));
 
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split);
-	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split);
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_leaf);
+	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_leaf);
 
 	/*
 	 * The split succeeded, we can no longer fail.
@@ -1649,8 +1995,16 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 	WT_PAGE *parent;
 	bool hazard;
 
-	WT_RET(__split_parent_lock(session, ref, &parent, &hazard));
-	ret = __split_multi(session, ref, closing);
-	WT_TRET(__split_parent_unlock(session, parent, hazard));
-	return (ret);
+	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
+	if ((ret = __split_multi(session, ref, closing)) != 0 || closing) {
+		WT_TRET(__split_internal_unlock(session, parent, hazard));
+		return (ret);
+	}
+
+	/*
+	 * Split up through the tree as necessary; we're holding the original
+	 * parent page locked, note the functions we call are responsible for
+	 * releasing that lock.
+	 */
+	return (__split_parent_climb(session, parent, hazard));
 }
