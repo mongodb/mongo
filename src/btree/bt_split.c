@@ -1017,6 +1017,10 @@ __split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page, bool page_hazard)
 			break;
 		}
 
+		/*
+		 * Lock the parent and split into it, then swap the parent/page
+		 * locks, lock-coupling up the tree.
+		 */
 		WT_ERR(__split_internal_lock(
 		    session, ref, &parent, &parent_hazard));
 		ret = __split_internal(session, parent, page);
