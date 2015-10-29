@@ -480,7 +480,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
 
         ASSERT_OK(catalogManager()->getChunks(operationContext(),
                                               chunksQuery,
-                                              BSON(ChunkType::version() << -1),
+                                              BSON(ChunkType::DEPRECATED_lastmod() << -1),
                                               1,
                                               &chunks,
                                               &opTime));
@@ -501,7 +501,7 @@ TEST_F(CatalogManagerReplSetTest, GetChunksForNSWithSortAndLimit) {
 
         ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
         ASSERT_EQ(query->getFilter(), chunksQuery);
-        ASSERT_EQ(query->getSort(), BSON(ChunkType::version() << -1));
+        ASSERT_EQ(query->getSort(), BSON(ChunkType::DEPRECATED_lastmod() << -1));
         ASSERT_EQ(query->getLimit().get(), 1);
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);

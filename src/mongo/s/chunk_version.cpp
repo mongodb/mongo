@@ -104,4 +104,11 @@ void ChunkVersion::appendForCommands(BSONObjBuilder* builder) const {
     builder->appendArray(kShardVersion, toBSON());
 }
 
+BSONObj ChunkVersion::toBSON() const {
+    BSONArrayBuilder b;
+    b.appendTimestamp(_combined);
+    b.append(_epoch);
+    return b.arr();
+}
+
 }  // namespace mongo

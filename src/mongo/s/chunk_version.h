@@ -111,13 +111,6 @@ public:
         _minor++;
     }
 
-    // Incrementing an epoch creates a new, randomly generated identifier
-    void incEpoch() {
-        _epoch = OID::gen();
-        _major = 0;
-        _minor = 0;
-    }
-
     // Note: this shouldn't be used as a substitute for version except in specific cases -
     // epochs make versions more complex
     unsigned long long toLong() const {
@@ -128,24 +121,14 @@ public:
         return _combined > 0;
     }
 
-    bool isEpochSet() const {
-        return _epoch.isSet();
-    }
-
-    std::string toString() const {
-        std::stringstream ss;
-        // Similar to month/day/year.  For the most part when debugging, we care about major
-        // so it's first
-        ss << _major << "|" << _minor << "||" << _epoch;
-        return ss.str();
-    }
-
     int majorVersion() const {
         return _major;
     }
+
     int minorVersion() const {
         return _minor;
     }
+
     OID epoch() const {
         return _epoch;
     }
@@ -237,17 +220,6 @@ public:
     // { version : <TS> } and { version : [<TS>,<OID>] } format
     //
 
-    static bool canParseBSON(const BSONElement& el, const std::string& prefix = "") {
-        bool canParse;
-        fromBSON(el, prefix, &canParse);
-        return canParse;
-    }
-
-    static ChunkVersion fromBSON(const BSONElement& el, const std::string& prefix = "") {
-        bool canParse;
-        return fromBSON(el, prefix, &canParse);
-    }
-
     static ChunkVersion fromBSON(const BSONElement& el, const std::string& prefix, bool* canParse) {
         *canParse = true;
 
@@ -314,17 +286,6 @@ public:
     // { version : [<TS>, <OID>] } format
     //
 
-    static bool canParseBSON(const BSONArray& arr) {
-        bool canParse;
-        fromBSON(arr, &canParse);
-        return canParse;
-    }
-
-    static ChunkVersion fromBSON(const BSONArray& arr) {
-        bool canParse;
-        return fromBSON(arr, &canParse);
-    }
-
     static ChunkVersion fromBSON(const BSONArray& arr, bool* canParse) {
         *canParse = false;
 
@@ -356,19 +317,16 @@ public:
     // versions that know nothing about epochs.
     //
 
-    BSONObj toBSONWithPrefix(const std::string& prefixIn) const {
+    BSONObj toBSONWithPrefix(const std::string& prefix) const {
+        invariant(!prefix.empty());
+
         BSONObjBuilder b;
-
-        std::string prefix = prefixIn;
-        if (prefix == "")
-            prefix = "version";
-
         b.appendTimestamp(prefix, _combined);
         b.append(prefix + "Epoch", _epoch);
         return b.obj();
     }
 
-    void addToBSON(BSONObjBuilder& b, const std::string& prefix = "") const {
+    void addToBSON(BSONObjBuilder& b, const std::string& prefix) const {
         b.appendElements(toBSONWithPrefix(prefix));
     }
 
@@ -383,19 +341,13 @@ public:
      */
     void appendForCommands(BSONObjBuilder* builder) const;
 
-    BSONObj toBSON() const {
-        // ChunkVersion wants to be an array.
-        BSONArrayBuilder b;
-        b.appendTimestamp(_combined);
-        b.append(_epoch);
-        return b.arr();
+    std::string toString() const {
+        StringBuilder sb;
+        sb << _major << "|" << _minor << "||" << _epoch;
+        return sb.str();
     }
 
-    void clear() {
-        _minor = 0;
-        _major = 0;
-        _epoch = OID();
-    }
+    BSONObj toBSON() const;
 
 private:
     union {

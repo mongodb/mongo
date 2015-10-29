@@ -364,12 +364,7 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     expectedChunk.setMin(keyPattern.getKeyPattern().globalMin());
     expectedChunk.setMax(keyPattern.getKeyPattern().globalMax());
     expectedChunk.setShard(shard.getName());
-    {
-        ChunkVersion expectedVersion;
-        expectedVersion.incEpoch();
-        expectedVersion.incMajor();
-        expectedChunk.setVersion(expectedVersion);
-    }
+    expectedChunk.setVersion(ChunkVersion(1, 0, OID::gen()));
 
     distLock()->expectLock(
         [&](StringData name,
@@ -498,9 +493,7 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
     BSONObj splitPoint2 = BSON("_id" << 200);
     BSONObj splitPoint3 = BSON("_id" << 300);
 
-    ChunkVersion expectedVersion;
-    expectedVersion.incEpoch();
-    expectedVersion.incMajor();
+    ChunkVersion expectedVersion(1, 0, OID::gen());
 
     ChunkType expectedChunk0;
     expectedChunk0.setNS(ns);
@@ -665,9 +658,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
     BSONObj splitPoint2 = BSON("_id" << 200);
     BSONObj splitPoint3 = BSON("_id" << 300);
 
-    ChunkVersion expectedVersion;
-    expectedVersion.incEpoch();
-    expectedVersion.incMajor();
+    ChunkVersion expectedVersion(1, 0, OID::gen());
 
     ChunkType expectedChunk0;
     expectedChunk0.setNS(ns);

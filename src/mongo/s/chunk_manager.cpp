@@ -410,9 +410,7 @@ void ChunkManager::createFirstChunks(OperationContext* txn,
 
 
     // this is the first chunk; start the versioning from scratch
-    ChunkVersion version;
-    version.incEpoch();
-    version.incMajor();
+    ChunkVersion version(1, 0, OID::gen());
 
     log() << "going to create " << splitPoints.size() + 1 << " chunk(s) for: " << _ns
           << " using new epoch " << version.epoch();

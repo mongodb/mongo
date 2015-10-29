@@ -47,7 +47,6 @@ const BSONField<std::string> ChunkType::name("_id");
 const BSONField<std::string> ChunkType::ns("ns");
 const BSONField<BSONObj> ChunkType::min("min");
 const BSONField<BSONObj> ChunkType::max("max");
-const BSONField<BSONArray> ChunkType::version("version");
 const BSONField<std::string> ChunkType::shard("shard");
 const BSONField<bool> ChunkType::jumbo("jumbo");
 const BSONField<Date_t> ChunkType::DEPRECATED_lastmod("lastmod");
@@ -109,17 +108,12 @@ StatusWith<ChunkType> ChunkType::fromBSON(const BSONObj& source) {
         }
     }
 
-    //
-    // ChunkVersion backward compatibility logic contained in ChunkVersion
-    //
-
-    // ChunkVersion is currently encoded as { 'version': [<TS>,<OID>] }
-
-    if (ChunkVersion::canParseBSON(source, version())) {
-        chunk._version = ChunkVersion::fromBSON(source, version());
-    } else if (ChunkVersion::canParseBSON(source, DEPRECATED_lastmod())) {
-        chunk._version = ChunkVersion::fromBSON(source, DEPRECATED_lastmod());
+    // The format of chunk version encoding is { lastmod: <Major|Minor>, lastmodEpoch: OID }
+    if (!ChunkVersion::canParseBSON(source, DEPRECATED_lastmod())) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Unable to parse chunk version from " << source);
     }
+    chunk._version = ChunkVersion::fromBSON(source, DEPRECATED_lastmod());
 
     return chunk;
 }
@@ -143,8 +137,7 @@ Status ChunkType::validate() const {
     }
 
     if (!_version.is_initialized() || !_version->isSet()) {
-        return Status(ErrorCodes::NoSuchKey,
-                      str::stream() << "missing " << version.name() << " field");
+        return Status(ErrorCodes::NoSuchKey, str::stream() << "missing version field");
     }
 
     if (!_shard.is_initialized() || _shard->empty()) {
@@ -192,7 +185,6 @@ BSONObj ChunkType::toBSON() const {
         builder.append(shard.name(), getShard());
     if (_version) {
         // For now, write both the deprecated *and* the new fields
-        _version->addToBSON(builder, version());
         _version->addToBSON(builder, DEPRECATED_lastmod());
     }
     if (_jumbo)

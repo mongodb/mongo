@@ -97,7 +97,7 @@ void OperationShardVersion::setShardVersion(NamespaceString ns, ChunkVersion new
 
 void OperationShardVersion::_clear() {
     _hasVersion = false;
-    _shardVersion.clear();
+    _shardVersion = ChunkVersion();
     _ns = NamespaceString();
 }
 

@@ -144,10 +144,12 @@ TEST_F(ChunkManagerTests, FullTest) {
         ChunkVersion version = ChunkVersion::fromBSON(chunk, ChunkType::DEPRECATED_lastmod());
 
         ASSERT(version.majorVersion() == 1);
-        ASSERT(version.isEpochSet());
+        ASSERT(version.epoch().isSet());
 
-        if (!epoch.isSet())
+        if (!epoch.isSet()) {
             epoch = version.epoch();
+        }
+
         ASSERT(version.epoch() == epoch);
 
         ASSERT(minorVersions.find(version.minorVersion()) == minorVersions.end());
