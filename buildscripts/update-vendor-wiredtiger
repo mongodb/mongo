@@ -1,12 +1,12 @@
 #!/bin/sh
 #
 # Updates src/third_party/wiredtiger contents
-# from github.com/wiredtiger/wiredtiger branch "develop"
+# from github.com/wiredtiger/wiredtiger branch "mongodb-3.2" or the first argument passed
 #
 
 set -o errexit
 
-REMOTEBRANCH="mongodb-3.2"
+REMOTEBRANCH="${1:-mongodb-3.2}"
 LOCALBRANCH=$(git symbolic-ref HEAD)
 
 # Ensure working directory is TOPLEVEL/src/third_party
