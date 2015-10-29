@@ -636,6 +636,11 @@ void BackgroundSync::cancelFetcher() {
 void BackgroundSync::stop() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
+    if (_replCoord->isWaitingForApplierToDrain()) {
+        // Signal to consumers that we have entered the paused state.
+        _buffer.pushEvenIfFull(BSONObj());
+    }
+
     _pause = true;
     _syncSourceHost = HostAndPort();
     _lastOpTimeFetched = OpTime();

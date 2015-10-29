@@ -73,13 +73,13 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
         OpQueue ops;
 
         auto replCoord = repl::ReplicationCoordinator::get(txn);
-        while (!tryPopAndWaitForMore(txn, &ops, replCoord)) {
+        while (!tryPopAndWaitForMore(txn, &ops)) {
             // nothing came back last time, so go again
             if (ops.empty())
                 continue;
 
             // Check if we reached the end
-            const BSONObj currentOp = ops.back();
+            const BSONObj currentOp = ops.back().raw;
             const OpTime currentOpTime =
                 fassertStatusOK(28772, OpTime::parseFromOplogEntry(currentOp));
 
@@ -104,7 +104,7 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
             fassertFailedNoTrace(18692);
         }
 
-        const BSONObj lastOp = ops.back().getOwned();
+        const BSONObj lastOp = ops.back().raw.getOwned();
 
         // Tally operation information
         bytesApplied += ops.getSize();
