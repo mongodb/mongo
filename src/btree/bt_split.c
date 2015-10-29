@@ -1884,9 +1884,9 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PAGE *parent;
 	bool hazard;
 
-	WT_RET(__split_parent_lock(session, ref, &parent, &hazard));
+	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
 	ret = __split_parent(session, ref, NULL, 0, 0, 0);
-	WT_TRET(__split_parent_unlock(session, parent, hazard));
+	WT_TRET(__split_internal_unlock(session, parent, hazard));
 	return (ret);
 }
 
