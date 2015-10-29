@@ -32,6 +32,7 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/structure/collection_iterator.h"
 #include "mongo/util/fail_point_service.h"
@@ -64,7 +65,7 @@ namespace mongo {
         : _workingSet(workingSet),
           _filter(filter),
           _params(params),
-          _nsDropped(false) {
+          _isDead(false) {
 
         // We pre-allocate a WSID and use it to pass up fetch requests.  It is only
         // used to pass up fetch requests and we should never use it for anything else.
@@ -77,13 +78,21 @@ namespace mongo {
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;
-        if (_nsDropped) { return PlanStage::DEAD; }
+        if (_isDead) {
+            Status status(ErrorCodes::CappedPositionLost, str::stream()
+                << "CollectionScan died due to position in capped collection being deleted.");
+            *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
+            return PlanStage::DEAD;
+        }
 
         // Do some init if we haven't already.
         if (NULL == _iter) {
             Collection* collection = cc().database()->getCollection( _params.ns );
             if ( collection == NULL ) {
-                _nsDropped = true;
+                _isDead = true;
+                Status status(ErrorCodes::InternalError,
+                    str::stream() << "CollectionScan died due to NULL collection.");
+                *out = WorkingSetCommon::allocateStatusMember(_workingSet, status);
                 return PlanStage::DEAD;
             }
 
@@ -152,7 +161,7 @@ namespace mongo {
         if ((0 != _params.maxScan) && (_specificStats.docsTested >= _params.maxScan)) {
             return true;
         }
-        if (_nsDropped) { return true; }
+        if (_isDead) { return true; }
         if (NULL == _iter) { return false; }
         return _iter->isEOF();
     }
@@ -190,8 +199,7 @@ namespace mongo {
         ++_commonStats.unyields;
         if (NULL != _iter) {
             if (!_iter->recoverFromYield()) {
-                warning() << "Collection dropped or state deleted during yield of CollectionScan";
-                _nsDropped = true;
+                _isDead = true;
             }
         }
     }

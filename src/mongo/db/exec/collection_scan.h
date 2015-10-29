@@ -75,8 +75,7 @@ namespace mongo {
 
         CollectionScanParams _params;
 
-        // True if nsdetails(_ns) == NULL on our first call to work.
-        bool _nsDropped;
+        bool _isDead;
 
         // If we want to return a DiskLoc and it points at something that's not in memory, we return
         // a a "please page this in" result.  We allocate one WSM for this purpose at construction
