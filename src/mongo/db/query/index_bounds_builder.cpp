@@ -878,7 +878,7 @@ void IndexBoundsBuilder::alignBounds(IndexBounds* bounds, const BSONObj& kp, int
         log() << "INVALID BOUNDS: " << bounds->toString() << endl
               << "kp = " << kp.toString() << endl
               << "scanDir = " << scanDir << endl;
-        verify(0);
+        invariant(0);
     }
 }
 

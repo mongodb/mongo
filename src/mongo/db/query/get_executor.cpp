@@ -1360,7 +1360,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
     // getDistinctNodeIndex().
     size_t distinctNodeIndex = 0;
     if (query.isEmpty() && getDistinctNodeIndex(plannerParams.indices, field, &distinctNodeIndex)) {
-        DistinctNode* dn = new DistinctNode();
+        auto dn = stdx::make_unique<DistinctNode>();
         dn->indexKeyPattern = plannerParams.indices[distinctNodeIndex].keyPattern;
         dn->direction = 1;
         IndexBoundsBuilder::allValuesBounds(dn->indexKeyPattern, &dn->bounds);
@@ -1368,8 +1368,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
 
         QueryPlannerParams params;
 
-        // Takes ownership of 'dn'.
-        unique_ptr<QuerySolution> soln(QueryPlannerAnalysis::analyzeDataAccess(*cq, params, dn));
+        unique_ptr<QuerySolution> soln(
+            QueryPlannerAnalysis::analyzeDataAccess(*cq, params, dn.release()));
         invariant(soln);
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
