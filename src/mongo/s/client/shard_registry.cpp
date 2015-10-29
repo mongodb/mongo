@@ -276,15 +276,22 @@ void ShardRegistry::getAllShardIds(vector<ShardId>* all) const {
 }
 
 void ShardRegistry::toBSON(BSONObjBuilder* result) {
-    BSONObjBuilder b(_lookup.size() + 50);
-
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    for (ShardMap::const_iterator i = _lookup.begin(); i != _lookup.end(); ++i) {
-        b.append(i->first, i->second->getConnString().toString());
+    // Need to copy, then sort by shardId.
+    std::vector<std::pair<ShardId, std::string>> shards;
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        shards.reserve(_lookup.size());
+        for (auto&& shard : _lookup) {
+            shards.emplace_back(shard.first, shard.second->getConnString().toString());
+        }
     }
 
-    result->append("map", b.obj());
+    std::sort(std::begin(shards), std::end(shards));
+
+    BSONObjBuilder mapBob(result->subobjStart("map"));
+    for (auto&& shard : shards) {
+        mapBob.append(shard.first, shard.second);
+    }
 }
 
 void ShardRegistry::_addConfigShard_inlock() {

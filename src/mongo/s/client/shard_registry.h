@@ -31,6 +31,7 @@
 #include <boost/optional.hpp>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -275,7 +276,7 @@ public:
                                      const Status& remoteCommandStatus);
 
 private:
-    typedef std::map<ShardId, std::shared_ptr<Shard>> ShardMap;
+    using ShardMap = std::unordered_map<ShardId, std::shared_ptr<Shard>>;
 
     struct CommandResponse {
         BSONObj response;
