@@ -268,6 +268,7 @@ private:
     const int64_t _cappedMaxSize;
     const int64_t _cappedMaxSizeSlack;  // when to start applying backpressure
     const int64_t _cappedMaxDocs;
+    RecordId _cappedFirstRecord;
     AtomicInt64 _cappedSleep;
     AtomicInt64 _cappedSleepMS;
     CappedCallback* _cappedCallback;
