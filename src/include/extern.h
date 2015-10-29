@@ -316,7 +316,7 @@ extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, bool is_server);
 extern int __wt_cache_wait(WT_SESSION_IMPL *session, int full);
 extern void __wt_cache_dump(WT_SESSION_IMPL *session);
 extern int __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing);
-extern int __wt_evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref);
+extern int __wt_evict_page_clean_update( WT_SESSION_IMPL *session, WT_REF *ref, bool closing);
 extern int __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn);
 extern int __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn);
 extern int __wt_log_needs_recovery(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn, bool *recp);

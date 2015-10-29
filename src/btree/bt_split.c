@@ -943,8 +943,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * reading thread will restart.  Include the ref we are splitting in
 	 * the count to be deleted.
 	 */
-	deleted_entries = ref_new != NULL ? 1 : 0;
-	for (i = 0; i < parent_entries; ++i) {
+	for (deleted_entries = 1, i = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
 		if (next_ref->state == WT_REF_DELETED &&
@@ -966,7 +965,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	if (result_entries == 0) {
 		next_ref = pindex->index[0];
-		WT_ASSERT(session, next_ref->state == WT_REF_SPLIT);
+		WT_ASSERT(session, next_ref->state == WT_REF_SPLIT ||
+		    (next_ref == ref && ref->state == WT_REF_LOCKED));
 		next_ref->state = WT_REF_DELETED;
 		--deleted_entries;
 		result_entries = 1;
@@ -1051,9 +1051,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
 	    "%s split into parent %" PRIu32 " -> %" PRIu32
-	    " (%" PRIu32 ")",
-	    __wt_page_type_string(ref->page->type), parent_entries,
-	    result_entries, result_entries - parent_entries));
+	    " (%" PRIu32 ")", ref->page == NULL ?
+	    "reverse" : __wt_page_type_string(ref->page->type),
+	    parent_entries, result_entries, result_entries - parent_entries));
 
 	/*
 	 * The new page index is in place, free the WT_REF we were splitting
@@ -1454,23 +1454,18 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 
 /*
  * __wt_split_reverse --
- *	Lock, then reverse split an internal page (remove deleted refs).
+ *	We have a locked ref that is empty and we want to rewrite the index in
+ *	its parent.
  */
 int
 __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_DECL_RET;
 	WT_PAGE *parent;
-	WT_REF dummy_child;
 	bool hazard;
 
-	WT_CLEAR(dummy_child);
-	dummy_child.home = dummy_child.page = ref->page;
-	dummy_child.state = WT_REF_MEM;
-
-	WT_RET(__split_parent_lock(session, &dummy_child, &parent, &hazard));
-	WT_ASSERT(session, parent == ref->page);
-	ret = __split_parent(session, &dummy_child, NULL, 0, 0, 0);
+	WT_RET(__split_parent_lock(session, ref, &parent, &hazard));
+	ret = __split_parent(session, ref, NULL, 0, 0, 0);
 	WT_TRET(__split_parent_unlock(session, parent, hazard));
 	return (ret);
 }
