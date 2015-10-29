@@ -14,6 +14,8 @@ var coll = testServer.getDB("test").readMajority;
 assert.writeOK(coll.insert({_id: "foo"}));
 assert.throws(function() { coll.find({_id: "foo"}).readConcern("majority").itcount(); });
 assert.throws(function() { coll.findOne({_id: "foo"}, {}, {}, "majority"); });
+assert.throws(function() { coll.count({_id: "foo"}, {readConcern: "majority"}); });
+assert.throws(function() { coll.find({_id: "foo"}).readConcern("majority").count(); });
 
 MongoRunner.stopMongod(testServer);
 testServer = MongoRunner.runMongod({
@@ -25,6 +27,8 @@ coll = testServer.getDB("test").readMajority;
 
 assert.doesNotThrow(function() { coll.find({_id: "foo"}).readConcern("majority").itcount(); });
 assert.doesNotThrow(function() { coll.findOne({_id: "foo"}, {}, {}, "majority"); });
+assert.doesNotThrow(function() { coll.count({_id: "foo"}, {readConcern: "majority"}); });
+assert.doesNotThrow(function() { coll.find({_id: "foo"}).readConcern("majority").count(); });
 
 MongoRunner.stopMongod(testServer);
 }());

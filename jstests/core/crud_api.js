@@ -642,7 +642,7 @@
         // Simple count no arguments, applying hint
         countExecutor({
           insert: [{ _id: 1, x:11 }, { _id: 2, x:22 }, { _id: 3, x:33 }],
-          params: [{}, {hint: "_id"}],
+          params: [{}, {hint: { "_id": 1}}],
           result: 3,
           expected: [{ _id: 1, x:11 }, { _id: 2, x:22 }, { _id: 3, x:33 }]
         });

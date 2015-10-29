@@ -331,6 +331,9 @@ DBQuery.prototype._convertToCountCmd = function( applySkipLimit ) {
             if ( this._query.$hint ) {
                 cmd.hint = this._query.$hint;
             }
+            if ( this._query.readConcern ) {
+                cmd.readConcern = this._query.readConcern;
+            }
         }
         else {
             cmd.query = this._query;
