@@ -643,27 +643,6 @@ bool Chunk::operator==(const Chunk& s) const {
     return _min.woCompare(s._min) == 0 && _max.woCompare(s._max) == 0;
 }
 
-void Chunk::serialize(BSONObjBuilder& to, ChunkVersion myLastMod) {
-    to.append("_id", genID(_manager->getns(), _min));
-
-    if (myLastMod.isSet()) {
-        myLastMod.addToBSON(to, ChunkType::DEPRECATED_lastmod());
-    } else if (_lastmod.isSet()) {
-        _lastmod.addToBSON(to, ChunkType::DEPRECATED_lastmod());
-    } else {
-        verify(0);
-    }
-
-    to << ChunkType::ns(_manager->getns());
-    to << ChunkType::min(_min);
-    to << ChunkType::max(_max);
-    to << ChunkType::shard(_shardId);
-}
-
-string Chunk::genID() const {
-    return genID(_manager->getns(), _min);
-}
-
 string Chunk::genID(const string& ns, const BSONObj& o) {
     StringBuilder buf;
     buf << ns << "-";
@@ -691,15 +670,17 @@ void Chunk::markAsJumbo(OperationContext* txn) const {
     // at least this mongos won't try and keep moving
     _jumbo = true;
 
+    const string chunkName = genID(_manager->getns(), _min);
+
     Status result = grid.catalogManager(txn)->update(txn,
                                                      ChunkType::ConfigNS,
-                                                     BSON(ChunkType::name(genID())),
+                                                     BSON(ChunkType::name(chunkName)),
                                                      BSON("$set" << BSON(ChunkType::jumbo(true))),
                                                      false,  // upsert
                                                      false,  // multi
                                                      NULL);
     if (!result.isOK()) {
-        warning() << "couldn't set jumbo for chunk: " << genID() << result.reason();
+        warning() << "couldn't set jumbo for chunk: " << chunkName << result.reason();
     }
 }
 

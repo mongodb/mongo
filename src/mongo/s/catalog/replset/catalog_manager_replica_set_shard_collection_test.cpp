@@ -124,19 +124,14 @@ public:
 
             ASSERT_EQUALS(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
 
-            BatchedUpdateRequest actualBatchedUpdate;
+            BatchedInsertRequest actualBatchedInsert;
             std::string errmsg;
-            ASSERT_TRUE(actualBatchedUpdate.parseBSON(request.dbname, request.cmdObj, &errmsg));
-            ASSERT_EQUALS(ChunkType::ConfigNS, actualBatchedUpdate.getNS().ns());
-            auto updates = actualBatchedUpdate.getUpdates();
-            ASSERT_EQUALS(1U, updates.size());
-            auto update = updates.front();
+            ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
+            ASSERT_EQUALS(ChunkType::ConfigNS, actualBatchedInsert.getNS().ns());
+            auto inserts = actualBatchedInsert.getDocuments();
+            ASSERT_EQUALS(1U, inserts.size());
 
-            ASSERT_TRUE(update->getUpsert());
-            ASSERT_FALSE(update->getMulti());
-            ASSERT_EQUALS(BSON(ChunkType::name(expectedChunk.getName())), update->getQuery());
-
-            BSONObj chunkObj = update->getUpdateExpr();
+            BSONObj chunkObj = inserts.front();
             ASSERT_EQUALS(expectedChunk.getName(), chunkObj["_id"].String());
             ASSERT_EQUALS(Timestamp(expectedChunk.getVersion().toLong()),
                           chunkObj[ChunkType::DEPRECATED_lastmod()].timestamp());

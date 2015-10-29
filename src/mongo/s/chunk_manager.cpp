@@ -420,29 +420,24 @@ void ChunkManager::createFirstChunks(OperationContext* txn,
         BSONObj max =
             i < splitPoints.size() ? splitPoints[i] : _keyPattern.getKeyPattern().globalMax();
 
-        Chunk temp(this, min, max, shardIds[i % shardIds.size()], version);
+        ChunkType chunk;
+        chunk.setName(Chunk::genID(_ns, min));
+        chunk.setNS(_ns);
+        chunk.setMin(min);
+        chunk.setMax(max);
+        chunk.setShard(shardIds[i % shardIds.size()]);
+        chunk.setVersion(version);
 
-        BSONObjBuilder chunkBuilder;
-        temp.serialize(chunkBuilder);
-
-        BSONObj chunkObj = chunkBuilder.obj();
-
-        Status result = grid.catalogManager(txn)->update(txn,
-                                                         ChunkType::ConfigNS,
-                                                         BSON(ChunkType::name(temp.genID())),
-                                                         chunkObj,
-                                                         true,
-                                                         false,
-                                                         NULL);
-
-        version.incMinor();
-
+        Status result =
+            grid.catalogManager(txn)->insert(txn, ChunkType::ConfigNS, chunk.toBSON(), NULL);
         if (!result.isOK()) {
             string ss = str::stream()
                 << "creating first chunks failed. result: " << result.reason();
             error() << ss;
             msgasserted(15903, ss);
         }
+
+        version.incMinor();
     }
 
     _version = ChunkVersion(0, 0, version.epoch());

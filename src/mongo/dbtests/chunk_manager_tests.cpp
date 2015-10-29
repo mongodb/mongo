@@ -122,6 +122,51 @@ const string ChunkManagerFixture::_collName{"foo.bar"};
 typedef ChunkManagerFixture ChunkManagerTests;
 
 /**
+ * Tests that chunks are loaded correctly from the db with no a-priori info and also that they can
+ * be reloaded on top of an old chunk manager with changes.
+ */
+TEST_F(ChunkManagerTests, Basic) {
+    string keyName = "_id";
+    createChunks(keyName);
+    int numChunks =
+        static_cast<int>(_client.count(ChunkType::ConfigNS, BSON(ChunkType::ns(_collName))));
+
+    BSONObj firstChunk = _client.findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
+
+    ChunkVersion version = ChunkVersion::fromBSON(firstChunk, ChunkType::DEPRECATED_lastmod());
+
+    // Make manager load existing chunks
+    CollectionType collType;
+    collType.setNs(NamespaceString{_collName});
+    collType.setEpoch(version.epoch());
+    collType.setUpdatedAt(jsTime());
+    collType.setKeyPattern(BSON("_id" << 1));
+    collType.setUnique(false);
+    collType.setDropped(false);
+
+    ChunkManager manager(collType);
+    manager.loadExistingRanges(&_txn, nullptr);
+
+    ASSERT_EQ(version.epoch(), manager.getVersion().epoch());
+    ASSERT_EQ(numChunks - 1, manager.getVersion().minorVersion());
+    ASSERT_EQ(numChunks, static_cast<int>(manager.getChunkMap().size()));
+
+    // Modify chunks collection
+    BSONObjBuilder b;
+    ChunkVersion laterVersion = ChunkVersion(2, 1, version.epoch());
+    laterVersion.addToBSON(b, ChunkType::DEPRECATED_lastmod());
+
+    _client.update(ChunkType::ConfigNS, BSONObj(), BSON("$set" << b.obj()));
+
+    // Make new manager load chunk diff
+    ChunkManager newManager(manager.getns(), manager.getShardKeyPattern(), manager.isUnique());
+    newManager.loadExistingRanges(&_txn, &manager);
+
+    ASSERT_EQ(numChunks, static_cast<int>(manager.getChunkMap().size()));
+    ASSERT_EQ(laterVersion.toString(), newManager.getVersion().toString());
+}
+
+/**
  * Tests creating a new chunk manager with random split points.  Creating chunks on multiple shards
  * is not tested here since there are unresolved race conditions there and probably should be
  * avoided if at all possible.
@@ -157,52 +202,6 @@ TEST_F(ChunkManagerTests, FullTest) {
 
         ASSERT(chunk[ChunkType::shard()].String() == _shardId);
     }
-}
-
-/**
- * Tests that chunks are loaded correctly from the db with no a-priori info and also that they can
- * be reloaded on top of an old chunk manager with changes.
- */
-TEST_F(ChunkManagerTests, Basic) {
-    string keyName = "_id";
-    createChunks(keyName);
-    int numChunks =
-        static_cast<int>(_client.count(ChunkType::ConfigNS, BSON(ChunkType::ns(_collName))));
-
-    BSONObj firstChunk = _client.findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
-
-    ChunkVersion version = ChunkVersion::fromBSON(firstChunk, ChunkType::DEPRECATED_lastmod());
-
-    // Make manager load existing chunks
-    CollectionType collType;
-    collType.setNs(NamespaceString{_collName});
-    collType.setEpoch(version.epoch());
-    collType.setUpdatedAt(jsTime());
-    collType.setKeyPattern(BSON("_id" << 1));
-    collType.setUnique(false);
-    collType.setDropped(false);
-
-    ChunkManager manager(collType);
-    manager.loadExistingRanges(&_txn, nullptr);
-
-    ASSERT(manager.getVersion().epoch() == version.epoch());
-    ASSERT(manager.getVersion().minorVersion() == (numChunks - 1));
-    ASSERT(static_cast<int>(manager.getChunkMap().size()) == numChunks);
-
-    // Modify chunks collection
-    BSONObjBuilder b;
-    ChunkVersion laterVersion = ChunkVersion(2, 1, version.epoch());
-    laterVersion.addToBSON(b, ChunkType::DEPRECATED_lastmod());
-
-    _client.update(ChunkType::ConfigNS, BSONObj(), BSON("$set" << b.obj()));
-
-    // Make new manager load chunk diff
-    ChunkManager newManager(manager.getns(), manager.getShardKeyPattern(), manager.isUnique());
-    newManager.loadExistingRanges(&_txn, &manager);
-
-    ASSERT(newManager.getVersion().toLong() == laterVersion.toLong());
-    ASSERT(newManager.getVersion().epoch() == laterVersion.epoch());
-    ASSERT(static_cast<int>(newManager.getChunkMap().size()) == numChunks);
 }
 
 }  // namespace

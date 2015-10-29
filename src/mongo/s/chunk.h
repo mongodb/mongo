@@ -71,12 +71,6 @@ public:
           ChunkVersion lastmod = ChunkVersion());
 
     //
-    // serialization support
-    //
-
-    void serialize(BSONObjBuilder& to, ChunkVersion myLastMod = ChunkVersion(0, 0, OID()));
-
-    //
     // chunk boundary support
     //
 
@@ -94,7 +88,6 @@ public:
     //  to a subset of fields).
     bool containsKey(const BSONObj& shardKey) const;
 
-    std::string genID() const;
     static std::string genID(const std::string& ns, const BSONObj& min);
 
     //
