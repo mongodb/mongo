@@ -960,16 +960,19 @@ bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* resu
             return _lockAndCheckImpl(result, false);
         }
 
-        WriteUnitOfWork wunit(txn);
-        // Implicitly create if it doesn't exist
-        _collection = _database->createCollection(txn, request->getTargetingNS());
-        if (!_collection) {
-            result->setError(
-                toWriteError(Status(ErrorCodes::InternalError,
-                                    "could not create collection " + request->getTargetingNS())));
-            return false;
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            WriteUnitOfWork wunit(txn);
+            // Implicitly create if it doesn't exist
+            _collection = _database->createCollection(txn, request->getTargetingNS());
+            if (!_collection) {
+                result->setError(toWriteError(
+                    Status(ErrorCodes::InternalError,
+                           "could not create collection " + request->getTargetingNS())));
+                return false;
+            }
+            wunit.commit();
         }
-        wunit.commit();
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "createCollection", request->getTargetingNS());
     }
     return true;
 }
