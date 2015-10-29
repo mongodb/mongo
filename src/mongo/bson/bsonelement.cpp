@@ -867,9 +867,9 @@ int compareElementValues(const BSONElement& l, const BSONElement& r) {
         case bsonTimestamp:
             // unsigned compare for timestamps - note they are not really dates but (ordinal +
             // time_t)
-            if (l.timestamp() < r.timestamp())
+            if (l.date() < r.date())
                 return -1;
-            return l.timestamp() == r.timestamp() ? 0 : 1;
+            return l.date() == r.date() ? 0 : 1;
         case Date:
             // Signed comparisons for Dates.
             {
