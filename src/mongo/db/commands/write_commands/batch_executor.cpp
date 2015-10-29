@@ -789,8 +789,7 @@ bool WriteBatchExecutor::insertMany(WriteBatchExecutor::ExecInsertsState* state,
             error = result.releaseError();
             errors->push_back(error);
             error->setIndex(state->currIndex);
-            CurOp* const currentOp = CurOp::get(_txn);
-            logCurOpError(currentOp, error);
+            logCurOpError(CurOp::get(_txn), error);
             if (ordered)
                 return true;
         } else {
