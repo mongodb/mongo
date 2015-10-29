@@ -1394,7 +1394,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			for (j = 0; j < new_entries; ++j) {
 				ref_new[j]->home = parent;
 				*alloc_refp++ = ref_new[j];
-#if THIS_IS_A_PROBLEM
+#if 0
 				The idea is to clear the list of inserted WT_REF
 				objects so our callers don't have to worry about
 				dealing with this on error. However, the
