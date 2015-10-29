@@ -98,14 +98,12 @@ StatusWith<BSONObj> storePossibleCursor(const HostAndPort& server,
     ClusterClientCursorParams params(incomingCursorResponse.getValue().getNSS());
     params.remotes.emplace_back(server, incomingCursorResponse.getValue().getCursorId());
 
-    auto ccc = stdx::make_unique<ClusterClientCursorImpl>(executor, std::move(params));
-    auto pinnedCursor =
-        cursorManager->registerCursor(std::move(ccc),
+    auto ccc = ClusterClientCursorImpl::make(executor, std::move(params));
+    auto clusterCursorId =
+        cursorManager->registerCursor(ccc.releaseCursor(),
                                       incomingCursorResponse.getValue().getNSS(),
                                       ClusterCursorManager::CursorType::NamespaceNotSharded,
                                       ClusterCursorManager::CursorLifetime::Mortal);
-    CursorId clusterCursorId = pinnedCursor.getCursorId();
-    pinnedCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
 
     CursorResponse outgoingCursorResponse(incomingCursorResponse.getValue().getNSS(),
                                           clusterCursorId,

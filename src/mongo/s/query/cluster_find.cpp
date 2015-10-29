@@ -266,23 +266,12 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         params.remotes.emplace_back(shard->getId(), cmdBuilder.obj());
     }
 
-    auto ccc =
-        stdx::make_unique<ClusterClientCursorImpl>(shardRegistry->getExecutor(), std::move(params));
-
-    // Register the cursor with the cursor manager.
-    auto cursorManager = grid.getCursorManager();
-    const auto cursorType = chunkManager ? ClusterCursorManager::CursorType::NamespaceSharded
-                                         : ClusterCursorManager::CursorType::NamespaceNotSharded;
-    const auto cursorLifetime = query.getParsed().isNoCursorTimeout()
-        ? ClusterCursorManager::CursorLifetime::Immortal
-        : ClusterCursorManager::CursorLifetime::Mortal;
-    auto pinnedCursor =
-        cursorManager->registerCursor(std::move(ccc), query.nss(), cursorType, cursorLifetime);
+    auto ccc = ClusterClientCursorImpl::make(shardRegistry->getExecutor(), std::move(params));
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     int bytesBuffered = 0;
     while (!FindCommon::enoughForFirstBatch(query.getParsed(), results->size(), bytesBuffered)) {
-        auto next = pinnedCursor.next();
+        auto next = ccc->next();
         if (!next.isOK()) {
             return next.getStatus();
         }
@@ -292,7 +281,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
             // exhausted. If it is tailable, usually we keep it open (i.e. "NotExhausted") even
             // when we reach end-of-stream. However, if all the remote cursors are exhausted, there
             // is no hope of returning data and thus we need to close the mongos cursor as well.
-            if (!pinnedCursor.isTailable() || pinnedCursor.remotesExhausted()) {
+            if (!ccc->isTailable() || ccc->remotesExhausted()) {
                 cursorState = ClusterCursorManager::CursorState::Exhausted;
             }
             break;
@@ -305,7 +294,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         int sizeEstimate = bytesBuffered + next.getValue()->objsize() +
             ((results->size() + 1U) * kPerDocumentOverheadBytesUpperBound);
         if (sizeEstimate > BSONObjMaxUserSize && !results->empty()) {
-            pinnedCursor.queueResult(*next.getValue());
+            ccc->queueResult(*next.getValue());
             break;
         }
 
@@ -314,18 +303,25 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         results->push_back(std::move(*next.getValue()));
     }
 
-    if (!query.getParsed().wantMore() && !pinnedCursor.isTailable()) {
+    if (!query.getParsed().wantMore() && !ccc->isTailable()) {
         cursorState = ClusterCursorManager::CursorState::Exhausted;
     }
 
-    CursorId idToReturn = (cursorState == ClusterCursorManager::CursorState::Exhausted)
-        ? CursorId(0)
-        : pinnedCursor.getCursorId();
+    // If the cursor is exhausted, then there are no more results to return and we don't need to
+    // allocate a cursor id.
+    if (cursorState == ClusterCursorManager::CursorState::Exhausted) {
+        return CursorId(0);
+    }
 
-    // Transfer ownership of the cursor back to the cursor manager.
-    pinnedCursor.returnCursor(cursorState);
-
-    return idToReturn;
+    // Register the cursor with the cursor manager.
+    auto cursorManager = grid.getCursorManager();
+    const auto cursorType = chunkManager ? ClusterCursorManager::CursorType::NamespaceSharded
+                                         : ClusterCursorManager::CursorType::NamespaceNotSharded;
+    const auto cursorLifetime = query.getParsed().isNoCursorTimeout()
+        ? ClusterCursorManager::CursorLifetime::Immortal
+        : ClusterCursorManager::CursorLifetime::Mortal;
+    return cursorManager->registerCursor(
+        ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime);
 }
 
 }  // namespace

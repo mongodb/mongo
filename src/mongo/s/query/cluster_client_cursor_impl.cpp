@@ -41,6 +41,40 @@
 
 namespace mongo {
 
+ClusterClientCursorGuard::ClusterClientCursorGuard(std::unique_ptr<ClusterClientCursor> ccc)
+    : _ccc(std::move(ccc)) {}
+
+ClusterClientCursorGuard::~ClusterClientCursorGuard() {
+    if (_ccc && !_ccc->remotesExhausted()) {
+        _ccc->kill();
+    }
+}
+
+#if defined(_MSC_VER) && _MSC_VER < 1900
+ClusterClientCursorGuard::ClusterClientCursorGuard(ClusterClientCursorGuard&& other)
+    : _ccc(std::move(other._ccc)) {}
+
+ClusterClientCursorGuard& ClusterClientCursorGuard::operator=(ClusterClientCursorGuard&& other) {
+    _ccc = std::move(other._ccc);
+    return *this;
+}
+#endif
+
+ClusterClientCursor* ClusterClientCursorGuard::operator->() {
+    return _ccc.get();
+}
+
+std::unique_ptr<ClusterClientCursor> ClusterClientCursorGuard::releaseCursor() {
+    return std::move(_ccc);
+}
+
+ClusterClientCursorGuard ClusterClientCursorImpl::make(executor::TaskExecutor* executor,
+                                                       ClusterClientCursorParams&& params) {
+    std::unique_ptr<ClusterClientCursor> cursor(
+        new ClusterClientCursorImpl(executor, std::move(params)));
+    return ClusterClientCursorGuard(std::move(cursor));
+}
+
 ClusterClientCursorImpl::ClusterClientCursorImpl(executor::TaskExecutor* executor,
                                                  ClusterClientCursorParams&& params)
     : _isTailable(params.isTailable), _root(buildMergerPlan(executor, std::move(params))) {}

@@ -230,9 +230,7 @@ public:
     ~ClusterCursorManager();
 
     /**
-     * Registers the given cursor with this manager, and returns a PinnedCursor owning the
-     * (now-pinned) cursor.  The PinnedCursor must later be returned with
-     * PinnedCursor::returnCursor().
+     * Registers the given cursor with this manager, and returns the registered cursor's id.
      *
      * 'cursor' must be non-null.  'cursorType' should reflect whether or not the cursor is
      * operating on a sharded namespace (this will be used for reporting purposes).
@@ -241,10 +239,10 @@ public:
      *
      * Does not block.
      */
-    PinnedCursor registerCursor(std::unique_ptr<ClusterClientCursor> cursor,
-                                const NamespaceString& nss,
-                                CursorType cursorType,
-                                CursorLifetime cursorLifetime);
+    CursorId registerCursor(std::unique_ptr<ClusterClientCursor> cursor,
+                            const NamespaceString& nss,
+                            CursorType cursorType,
+                            CursorLifetime cursorLifetime);
 
     /**
      * Moves the given cursor to the 'pinned' state, and transfers ownership of the cursor to the

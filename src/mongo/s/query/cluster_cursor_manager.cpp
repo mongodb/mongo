@@ -173,11 +173,10 @@ ClusterCursorManager::~ClusterCursorManager() {
     invariant(_namespaceToContainerMap.empty());
 }
 
-ClusterCursorManager::PinnedCursor ClusterCursorManager::registerCursor(
-    std::unique_ptr<ClusterClientCursor> cursor,
-    const NamespaceString& nss,
-    CursorType cursorType,
-    CursorLifetime cursorLifetime) {
+CursorId ClusterCursorManager::registerCursor(std::unique_ptr<ClusterClientCursor> cursor,
+                                              const NamespaceString& nss,
+                                              CursorType cursorType,
+                                              CursorLifetime cursorLifetime) {
     // Read the clock out of the lock.
     const auto now = _clockSource->now();
 
@@ -221,11 +220,7 @@ ClusterCursorManager::PinnedCursor ClusterCursorManager::registerCursor(
         entryMap.emplace(cursorId, CursorEntry(std::move(cursor), cursorType, cursorLifetime, now));
     invariant(emplaceResult.second);
 
-    // Pin and return the cursor.  Note that pinning a cursor transfers ownership of the underlying
-    // ClusterClientCursor object to the pin; the CursorEntry is left with a null
-    // ClusterClientCursor.
-    CursorEntry& entry = emplaceResult.first->second;
-    return PinnedCursor(this, entry.releaseCursor(), nss, cursorId);
+    return cursorId;
 }
 
 StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursor(
