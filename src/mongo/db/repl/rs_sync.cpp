@@ -131,12 +131,8 @@ void runSyncThread() {
             /* we have some data.  continue tailing. */
             SyncTail tail(BackgroundSync::get(), multiSyncApply);
             tail.oplogApplication();
-        } catch (const DBException& e) {
-            log() << "Received exception while syncing: " << e.toString();
-            sleepsecs(10);
-        } catch (const std::exception& e) {
-            log() << "Received exception while syncing: " << e.what();
-            sleepsecs(10);
+        } catch (...) {
+            std::terminate();
         }
     }
 }

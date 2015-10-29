@@ -229,9 +229,13 @@ void BackgroundSync::_producerThread() {
         if (!isPaused()) {
             stop();
         }
-        if (_replCoord->isWaitingForApplierToDrain() && _buffer.empty()) {
-            // This will wake up the applier if it is sitting in blockingPeek().
-            _buffer.clear();
+        if (_replCoord->isWaitingForApplierToDrain()) {
+            // Signal to consumers that we have entered the paused state if the signal isn't already
+            // in the queue.
+            const boost::optional<BSONObj> lastObjectPushed = _buffer.lastObjectPushed();
+            if (!lastObjectPushed || !lastObjectPushed->isEmpty()) {
+                _buffer.pushEvenIfFull(BSONObj());
+            }
         }
         sleepsecs(1);
         return;

@@ -29,12 +29,14 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <limits>
 #include <queue>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/base/disallow_copying.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
@@ -62,6 +64,11 @@ public:
     BlockingQueue(size_t size) : _maxSize(size), _getSize(&_getSizeDefault) {}
     BlockingQueue(size_t size, getSizeFunc f) : _maxSize(size), _getSize(f) {}
 
+    void pushEvenIfFull(T const& t) {
+        stdx::unique_lock<stdx::mutex> l(_lock);
+        pushImpl_inlock(t, _getSize(t));
+    }
+
     void push(T const& t) {
         stdx::unique_lock<stdx::mutex> l(_lock);
         _clearing = false;
@@ -69,9 +76,7 @@ public:
         while (_currentSize + tSize > _maxSize) {
             _cvNoLongerFull.wait(l);
         }
-        _queue.push(t);
-        _currentSize += tSize;
-        _cvNoLongerEmpty.notify_one();
+        pushImpl_inlock(t, tSize);
     }
 
     bool empty() const {
@@ -197,7 +202,27 @@ public:
         return true;
     }
 
+    /**
+     * Returns the item most recently added to the queue or nothing if the queue is empty.
+     */
+    boost::optional<T> lastObjectPushed() const {
+        stdx::unique_lock<stdx::mutex> l(_lock);
+        if (_queue.empty()) {
+            return {};
+        }
+
+        return {_queue.back()};
+    }
+
 private:
+    void pushImpl_inlock(const T& obj, size_t objSize) {
+        _clearing = false;
+        _queue.push(obj);
+        _currentSize += objSize;
+        if (_queue.size() == 1)  // We were empty.
+            _cvNoLongerEmpty.notify_one();
+    }
+
     mutable stdx::mutex _lock;
     std::queue<T> _queue;
     const size_t _maxSize;
