@@ -109,7 +109,7 @@ bool Grid::getConfigShouldBalance(OperationContext* txn) const {
         grid.catalogManager(txn)->getGlobalSettings(txn, SettingsType::BalancerDocKey);
     if (!balSettingsResult.isOK()) {
         if (balSettingsResult == ErrorCodes::NoMatchingDocument) {
-            // Settings document for balancer does not exists, default to balancing allowed.
+            // Settings document for balancer does not exist, default to balancing allowed.
             return true;
         }
 
