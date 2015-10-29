@@ -152,6 +152,8 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
 			}
+			if (txn->isolation == WT_ISO_READ_COMMITTED)
+				__wt_txn_get_snapshot(session);
 			WT_ERR(__wt_reconcile(session, walk, NULL, 0));
 		}
 		break;

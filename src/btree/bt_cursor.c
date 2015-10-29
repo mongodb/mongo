@@ -443,6 +443,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	} else if ((ret = __wt_btcur_next(cbt, false)) != WT_NOTFOUND)
 		exact = 1;
 	else {
+		WT_ERR(__cursor_func_init(cbt, true));
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, true) :
 		    __cursor_col_search(session, cbt, NULL));
