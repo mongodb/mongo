@@ -379,9 +379,16 @@ __log_file_server(void *arg)
 				 * to move the sync_lsn into the next file for
 				 * later syncs.
 				 */
+				WT_ERR(__wt_fsync(session, close_fh));
+				/*
+				 * We want to make sure the file size reflects
+				 * actual data and has minimal pre-allocated
+				 * zero'ed space.
+				 */
+				WT_ERR(__wt_ftruncate(
+				    session, close_fh, close_end_lsn.offset));
 				close_end_lsn.file++;
 				close_end_lsn.offset = 0;
-				WT_ERR(__wt_fsync(session, close_fh));
 				__wt_spin_lock(session, &log->log_sync_lock);
 				locked = true;
 				WT_ERR(__wt_close(session, &close_fh));
