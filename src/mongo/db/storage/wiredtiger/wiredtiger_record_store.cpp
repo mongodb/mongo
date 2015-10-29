@@ -737,7 +737,6 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
       _cappedMaxSize(cappedMaxSize),
       _cappedMaxSizeSlack(std::min(cappedMaxSize / 10, int64_t(16 * 1024 * 1024))),
       _cappedMaxDocs(cappedMaxDocs),
-      _cappedFirstRecord(),
       _cappedSleep(0),
       _cappedSleepMS(0),
       _cappedCallback(cappedCallback),
@@ -1012,46 +1011,25 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* txn
         WriteUnitOfWork wuow(txn);
 
         WiredTigerCursor curwrap(_uri, _tableId, true, txn);
-        WT_CURSOR* truncateEnd = curwrap.get();
-        RecordId newestIdToDelete;
-        int64_t firstKey = 0;
+        WT_CURSOR* c = curwrap.get();
+        RecordId newestOld;
         int ret = 0;
-        bool positioned = false;
-
-        // If we know where the first record is, go to it
-        if (_cappedFirstRecord != RecordId()) {
-            truncateEnd->set_key(truncateEnd, _makeKey(_cappedFirstRecord));
-            if ((ret = WT_OP_CHECK(truncateEnd->search(truncateEnd))) != WT_NOTFOUND) {
-                invariantWTOK(ret);
-                invariantWTOK(truncateEnd->get_key(truncateEnd, &firstKey));
-                positioned = true;
-            }
-        }
-
-        // Advance the cursor truncateEnd until we find a suitable end point for our truncate
-        while ((sizeSaved < sizeOverCap || docsRemoved < docsOverCap) && (docsRemoved < 20000)) {
-            if (positioned)
-                positioned = false;
-            else if ((ret = WT_OP_CHECK(truncateEnd->next(truncateEnd))) == WT_NOTFOUND)
-                break;
+        while ((sizeSaved < sizeOverCap || docsRemoved < docsOverCap) && (docsRemoved < 20000) &&
+               (ret = WT_OP_CHECK(c->next(c))) == 0) {
+            int64_t key;
+            ret = c->get_key(c, &key);
             invariantWTOK(ret);
 
-            int64_t key;
-            invariantWTOK(truncateEnd->get_key(truncateEnd, &key));
+            // don't go past the record we just inserted
+            newestOld = _fromKey(key);
+            if (newestOld >= justInserted)  // TODO: use oldest uncommitted instead
+                break;
 
             if (_shuttingDown)
                 break;
 
-            // don't go past the record we just inserted
-            RecordId nextId = _fromKey(key);
-            // TODO: use oldest uncommitted instead
-            if (newestIdToDelete >= justInserted)
-                break;
-            else
-                newestIdToDelete = nextId;
-
             WT_ITEM old_value;
-            invariantWTOK(truncateEnd->get_value(truncateEnd, &old_value));
+            invariantWTOK(c->get_value(c, &old_value));
 
             ++docsRemoved;
             sizeSaved += old_value.size;
@@ -1059,38 +1037,28 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* txn
             if (_cappedCallback) {
                 uassertStatusOK(_cappedCallback->aboutToDeleteCapped(
                     txn,
-                    newestIdToDelete,
+                    newestOld,
                     RecordData(static_cast<const char*>(old_value.data), old_value.size)));
             }
         }
 
+        if (ret != WT_NOTFOUND) {
+            invariantWTOK(ret);
+        }
+
         if (docsRemoved > 0) {
             // if we scanned to the end of the collection or past our insert, go back one
-            if (ret == WT_NOTFOUND || newestIdToDelete >= justInserted) {
-                ret = WT_OP_CHECK(truncateEnd->prev(truncateEnd));
-                invariantWTOK(ret);
-            } else
-                invariantWTOK(ret);
-
-            RecordId firstRemainingId;
-            ret = truncateEnd->next(truncateEnd);
-            if (ret != WT_NOTFOUND) {
-                invariantWTOK(ret);
-                int64_t key;
-                invariantWTOK(truncateEnd->get_key(truncateEnd, &key));
-                firstRemainingId = _fromKey(key);
+            if (ret == WT_NOTFOUND || newestOld >= justInserted) {
+                ret = WT_OP_CHECK(c->prev(c));
             }
-            invariantWTOK(truncateEnd->prev(truncateEnd));  // put the cursor back where it was
+            invariantWTOK(ret);
 
             WiredTigerCursor startWrap(_uri, _tableId, true, txn);
+            WT_CURSOR* start = startWrap.get();
+            ret = WT_OP_CHECK(start->next(start));
+            invariantWTOK(ret);
 
-            WT_CURSOR* truncateStart = NULL;
-            if (firstKey != 0) {
-                truncateStart = startWrap.get();
-                truncateStart->set_key(truncateStart, firstKey);
-            }
-
-            ret = session->truncate(session, NULL, truncateStart, truncateEnd, NULL);
+            ret = session->truncate(session, NULL, start, c, NULL);
             if (ret == ENOENT || ret == WT_NOTFOUND) {
                 // TODO we should remove this case once SERVER-17141 is resolved
                 log() << "Soft failure truncating capped collection. Will try again later.";
@@ -1100,9 +1068,6 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* txn
                 _changeNumRecords(txn, -docsRemoved);
                 _increaseDataSize(txn, -sizeSaved);
                 wuow.commit();
-
-                // Update the starting key
-                _cappedFirstRecord = firstRemainingId;
             }
         }
     } catch (const WriteConflictException& wce) {
