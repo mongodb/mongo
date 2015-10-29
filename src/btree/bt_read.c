@@ -448,8 +448,12 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	for (oldgen = stalled = false,
 	    force_attempts = 0, sleep_cnt = wait_cnt = 0;;) {
 		switch (ref->state) {
-		case WT_REF_DISK:
 		case WT_REF_DELETED:
+			if (LF_ISSET(WT_READ_NO_EMPTY) &&
+			    __wt_delete_page_skip(session, ref, false))
+				return (WT_NOTFOUND);
+			/* FALLTHROUGH */
+		case WT_REF_DISK:
 			if (LF_ISSET(WT_READ_CACHE))
 				return (WT_NOTFOUND);
 
