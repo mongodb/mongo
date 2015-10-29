@@ -264,6 +264,7 @@ public:
 
     virtual void cancel() = 0;
     virtual void waitForCompletion() = 0;
+    virtual bool isCanceled() const = 0;
 
 protected:
     CallbackState();
@@ -302,6 +303,10 @@ public:
 
     std::size_t hash() const {
         return std::hash<decltype(_callback)>()(_callback);
+    }
+
+    bool isCanceled() const {
+        return getCallback()->isCanceled();
     }
 
 private:

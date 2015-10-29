@@ -1451,7 +1451,7 @@ void ReplicationCoordinatorImpl::_stepDownContinue(
         return;
     }
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _cancelHeartbeats();
+    _cancelHeartbeats_inlock();
     _startHeartbeats_inlock(cbData);
 }
 
@@ -2432,7 +2432,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
     const ReplicaSetConfig& newConfig,
     int myIndex) {
     invariant(_settings.usingReplSets());
-    _cancelHeartbeats();
+    _cancelHeartbeats_inlock();
     _setConfigState_inlock(kConfigSteady);
 
     // Must get this before changing our config.
@@ -2641,7 +2641,7 @@ void ReplicationCoordinatorImpl::_chooseNewSyncSource(
     // allowing us to make informed sync source decisions.
     if (newSyncSource->empty() && _justLostSyncSource && _selfIndex >= 0 &&
         !_getMemberState_inlock().primary()) {
-        _cancelHeartbeats();
+        _cancelHeartbeats_inlock();
         _startHeartbeats_inlock(cbData);
         _justLostSyncSource = false;
     } else {
@@ -3344,7 +3344,7 @@ void ReplicationCoordinatorImpl::_scheduleElectionWinNotification() {
             return;
         }
 
-        _cancelHeartbeats();
+        _cancelHeartbeats_inlock();
         _startHeartbeats_inlock(cbData);
     };
 

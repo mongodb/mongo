@@ -340,6 +340,9 @@ public:
 
     void cancel() override;
     void waitForCompletion() override;
+    bool isCanceled() const override {
+        return _isCanceled;
+    }
 
 private:
     ReplicationExecutor* _executor;

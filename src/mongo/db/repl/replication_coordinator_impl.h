@@ -775,7 +775,7 @@ private:
     /**
      * Cancels all heartbeats.  Called within executor context.
      */
-    void _cancelHeartbeats();
+    void _cancelHeartbeats_inlock();
 
     /**
      * Asynchronously sends a heartbeat to "target". "targetIndex" is the index

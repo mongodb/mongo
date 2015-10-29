@@ -526,12 +526,16 @@ void ReplicationCoordinatorImpl::_untrackHeartbeatHandle(const CBHandle& handle)
     _heartbeatHandles.erase(newEnd, _heartbeatHandles.end());
 }
 
-void ReplicationCoordinatorImpl::_cancelHeartbeats() {
+void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
     std::for_each(_heartbeatHandles.begin(),
                   _heartbeatHandles.end(),
                   stdx::bind(&ReplicationExecutor::cancel, &_replExecutor, stdx::placeholders::_1));
     // Heartbeat callbacks will remove themselves from _heartbeatHandles when they execute with
     // CallbackCanceled status, so it's better to leave the handles in the list, for now.
+
+    if (_handleLivenessTimeoutCbh.isValid()) {
+        _replExecutor.cancel(_handleLivenessTimeoutCbh);
+    }
 }
 
 void ReplicationCoordinatorImpl::_startHeartbeats_inlock(
@@ -555,13 +559,15 @@ void ReplicationCoordinatorImpl::_startHeartbeats_inlock(
 
 void ReplicationCoordinatorImpl::_handleLivenessTimeout(
     const ReplicationExecutor::CallbackArgs& cbData) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _handleLivenessTimeoutCbh = CallbackHandle();
     if (!cbData.status.isOK()) {
         return;
     }
     if (!isV1ElectionProtocol()) {
         return;
     }
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+
     // Scan liveness table for problems and mark nodes as down by calling into topocoord.
     auto now(_replExecutor.now());
     for (auto&& slaveInfo : _slaveInfo) {
@@ -629,6 +635,11 @@ void ReplicationCoordinatorImpl::_scheduleNextLivenessUpdate_inlock(
     if (earliestMemberId == -1 || earliestDate == Date_t::max()) {
         _earliestMemberId = -1;
         // Nobody here but us.
+        return;
+    }
+
+    if (_handleLivenessTimeoutCbh.isValid() && !_handleLivenessTimeoutCbh.isCanceled()) {
+        // don't bother to schedule; one is already scheduled and pending.
         return;
     }
 

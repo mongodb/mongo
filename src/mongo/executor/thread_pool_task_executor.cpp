@@ -65,6 +65,10 @@ public:
 
     virtual ~CallbackState() = default;
 
+    bool isCanceled() const override {
+        return canceled.load() > 0;
+    }
+
     void cancel() override {
         MONGO_UNREACHABLE;
     }

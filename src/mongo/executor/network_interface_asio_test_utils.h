@@ -49,6 +49,9 @@ public:
     MockCallbackState() = default;
     void cancel() override {}
     void waitForCompletion() override {}
+    bool isCanceled() const override {
+        return false;
+    }
 };
 
 TaskExecutor::CallbackHandle makeCallbackHandle() {
