@@ -383,7 +383,7 @@ __log_file_server(void *arg)
 				/*
 				 * We want to make sure the file size reflects
 				 * actual data and has minimal pre-allocated
-				 * zero'ed space.
+				 * zeroed space.
 				 */
 				WT_ERR(__wt_ftruncate(
 				    session, close_fh, close_end_lsn.offset));

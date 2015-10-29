@@ -1564,10 +1564,10 @@ advance:
 		reclen = *(uint32_t *)buf->mem;
 		/*
 		 * Log files are pre-allocated.  We need to detect the
-		 * difference betweeen a hole in the file (where this location
+		 * difference between a hole in the file (where this location
 		 * would be considered the end of log) and the last record
-		 * in the log and we're at the zero'ed part of the file.
-		 * If we find a zero'ed record, scan forward in the log looking
+		 * in the log and we're at the zeroed part of the file.
+		 * If we find a zeroed record, scan forward in the log looking
 		 * for any data.  If we detect any we have a hole and stop.
 		 * Otherwise if the rest is all zeroes advance to the next file.
 		 * When recovery finds the end of the log, truncate the file
