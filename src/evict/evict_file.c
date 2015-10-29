@@ -32,6 +32,9 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	/* Make sure the oldest transaction ID is up-to-date. */
 	__wt_txn_update_oldest(session, true);
 
+	if (txn->isolation == WT_ISO_READ_COMMITTED)
+		__wt_txn_get_snapshot(session);
+
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;
 	WT_ERR(__wt_tree_walk(session, &next_ref, NULL,
@@ -59,11 +62,12 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 		 * and the write will fail with EBUSY.  Our caller handles that
 		 * error, retrying later.
 		 */
-		if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page)) {
-			if (txn->isolation == WT_ISO_READ_COMMITTED)
-				__wt_txn_get_snapshot(session);
+		if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page))
 			WT_ERR(__wt_reconcile(session, ref, NULL, WT_EVICTING));
-		}
+
+		/* Update our snapshot for each new page. */
+		if (txn->isolation == WT_ISO_READ_COMMITTED)
+			__wt_txn_get_snapshot(session);
 
 		/*
 		 * We can't evict the page just returned to us (it marks our

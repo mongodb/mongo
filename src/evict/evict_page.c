@@ -143,25 +143,47 @@ done:	if (((inmem_split && ret == 0) || (forced_eviction && ret == EBUSY)) &&
 	return (ret);
 }
 /*
- * __evict_reverse_split_check --
- *	Check if an internal page needs a reverse split.
+ * __evict_delete_ref --
+ *	Mark a page reference deleted and check if the parent can reverse
+ *	split.
  */
 static int
-__evict_reverse_split_check(WT_SESSION_IMPL *session, WT_REF *ref)
+__evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
+	WT_DECL_RET;
 	WT_PAGE *parent;
 	WT_PAGE_INDEX *pindex;
-	uint32_t deleted_entries;
+	uint32_t ndeleted;
 
 	if (__wt_ref_is_root(ref))
 		return (0);
 
-	parent = ref->home;
-	WT_INTL_INDEX_GET(session, parent, pindex);
-	deleted_entries = __wt_atomic_addv32(&pindex->deleted_entries, 1);
-	if (deleted_entries > pindex->entries / 10)
-		WT_RET(__wt_split_reverse(session, parent->pg_intl_parent_ref));
+	/*
+	 * Avoid doing reverse splits when closing the file, it is
+	 * wasted work and some structure may already have been freed.
+	 */
+	if (!closing) {
+		parent = ref->home;
+		WT_INTL_INDEX_GET(session, parent, pindex);
+		ndeleted = __wt_atomic_addv32(&pindex->deleted_entries, 1);
 
+		/*
+		 * If more than 10% of the parent references are deleted, try a
+		 * reverse split.  Don't bother if there is a single deleted
+		 * reference: the internal page is empty and we have to wait
+		 * for eviction to notice.
+		 *
+		 * This will consume the deleted ref (and eventually free it).
+		 * If the reverse split can't get the access it needs because
+		 * something is busy, be sure that the page still ends up
+		 * marked deleted.
+		 */
+		if (ndeleted > pindex->entries / 10 && pindex->entries > 1 &&
+		    (ret = __wt_split_reverse(session, ref)) != EBUSY)
+			return (ret);
+	}
+
+	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	return (0);
 }
 
@@ -189,16 +211,9 @@ __wt_evict_page_clean_update(
 	 */
 	__wt_ref_out(session, ref);
 	if (ref->addr == NULL) {
-		WT_PUBLISH(ref->state, WT_REF_DELETED);
-		/*
-		 * Avoid doing reverse splits when closing the file, it is
-		 * wasted work and some structure may already have been freed.
-		 */
-		if (!closing) {
-			WT_WITH_PAGE_INDEX(session,
-			    ret = __evict_reverse_split_check(session, ref));
-			WT_RET_BUSY_OK(ret);
-		}
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __evict_delete_ref(session, ref, closing));
+		WT_RET_BUSY_OK(ret);
 	} else
 		WT_PUBLISH(ref->state, WT_REF_DISK);
 
@@ -242,9 +257,8 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 */
 		__wt_ref_out(session, ref);
 		ref->addr = NULL;
-		WT_PUBLISH(ref->state, WT_REF_DELETED);
 		WT_WITH_PAGE_INDEX(session,
-		    ret = __evict_reverse_split_check(session, ref));
+		    ret = __evict_delete_ref(session, ref, closing));
 		WT_RET_BUSY_OK(ret);
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
