@@ -190,9 +190,15 @@ __wt_evict_page_clean_update(
 	__wt_ref_out(session, ref);
 	if (ref->addr == NULL) {
 		WT_PUBLISH(ref->state, WT_REF_DELETED);
-		WT_WITH_PAGE_INDEX(session,
-		    ret = __evict_reverse_split_check(session, ref));
-		WT_RET_BUSY_OK(ret);
+		/*
+		 * Avoid doing reverse splits when closing the file, it is
+		 * wasted work and some structure may already have been freed.
+		 */
+		if (!closing) {
+			WT_WITH_PAGE_INDEX(session,
+			    ret = __evict_reverse_split_check(session, ref));
+			WT_RET_BUSY_OK(ret);
+		}
 	} else
 		WT_PUBLISH(ref->state, WT_REF_DISK);
 
