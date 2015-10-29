@@ -688,8 +688,7 @@ err:	/*
 
 /*
  * __split_multi_inmem --
- *	Instantiate a page in a multi-block set, when an update couldn't be
- * written.
+ *	Instantiate a page in a multi-block set.
  */
 static int
 __split_multi_inmem(
@@ -705,9 +704,11 @@ __split_multi_inmem(
 	uint32_t i, slot;
 
 	/*
-	 * We can find unresolved updates when attempting to evict a page, which
-	 * can't be written. This code re-creates the in-memory page and adds
-	 * references to the unresolved update chains to that page.
+	 * This code re-creates an in-memory page that is part of a set created
+	 * while evicting a large page, and adds references to any unresolved
+	 * update chains to the new page. We get here due to choosing to keep
+	 * the results of a split in memory or because and update could not be
+	 * written when attempting to evict a page.
 	 *
 	 * Clear the disk image and link the page into the passed-in WT_REF to
 	 * simplify error handling: our caller will not discard the disk image
@@ -767,7 +768,7 @@ __split_multi_inmem(
 		}
 
 	/*
-	 * We modified the page above, which will have set the first dirty
+	 * If we modified the page above, it will have set the first dirty
 	 * transaction to the last transaction currently running.  However, the
 	 * updates we installed may be older than that.  Set the first dirty
 	 * transaction to an impossibly old value so this page is never skipped

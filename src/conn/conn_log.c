@@ -47,8 +47,12 @@ __logmgr_config(
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
+	bool enabled;
 
 	conn = S2C(session);
+
+	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
+	enabled = cval.val != 0;
 
 	/*
 	 * If we're reconfiguring, enabled must match the already
@@ -57,14 +61,21 @@ __logmgr_config(
 	 * If it is off and the user it turning it on, or it is on
 	 * and the user is turning it off, return an error.
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
 	if (reconfig &&
-	    ((cval.val != 0 &&
-	    !FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) ||
-	    (cval.val == 0 &&
-	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))))
+	    ((enabled && !FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) ||
+	    (!enabled && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))))
 		return (EINVAL);
-	*runp = cval.val != 0;
+
+	/* Logging is incompatible with in-memory */
+	if (enabled) {
+		WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
+		if (cval.val != 0)
+			WT_RET_MSG(session, EINVAL,
+			    "In memory configuration incompatible with "
+			    "log=(enabled=true)");
+	}
+
+	*runp = enabled;
 
 	/*
 	 * Setup a log path and compression even if logging is disabled in case

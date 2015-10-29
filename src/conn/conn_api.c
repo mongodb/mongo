@@ -1643,45 +1643,6 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __conn_confchk --
- *	Check for valid configure option combinations. Individual options
- *	are checked as they are parsed. This function is a place to check
- *	combinations of options across subsystems.
- */
-static int
-__conn_confchk(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-
-#define	WT_CONN_CONFCHK_PREFIX	"In memory configuration incompatible with "
-
-	conn = S2C(session);
-
-	/*
-	 * In memory configuration requires specific settings for a number
-	 * of other configuration values. Check those now.
-	 */
-	if (F_ISSET(conn, WT_CONN_IN_MEMORY)) {
-		if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
-			WT_RET_MSG(session, EINVAL,
-			    WT_CONN_CONFCHK_PREFIX "log=(enabled=true)");
-		else if (conn->sweep_idle_time != 0)
-			WT_RET_MSG(session, EINVAL,
-			    WT_CONN_CONFCHK_PREFIX
-			    "non zero file_manager=(close_idle_time)");
-		else if (conn->ckpt_usecs != 0)
-			/*
-			 * It is not necessary to check for log based
-			 * automatic checkpoints since logging must be
-			 * disabled.
-			 */
-			WT_RET_MSG(session, EINVAL,
-			    WT_CONN_CONFCHK_PREFIX "checkpoints");
-	}
-	return (0);
-}
-
-/*
  * __conn_write_base_config --
  *	Save the base configuration used to create a database.
  */
@@ -2029,12 +1990,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Now that we know if verbose is configured, output the version. */
 	WT_ERR(__wt_verbose(
 	    session, WT_VERB_VERSION, "%s", WIREDTIGER_VERSION_STRING));
-
-	/*
-	 * Ensure there were no conflicts now that all configuration options
-	 * have been parsed.
-	 */
-	WT_ERR(__conn_confchk(session));
 
 	/*
 	 * Open the connection, then reset the local session as the real one

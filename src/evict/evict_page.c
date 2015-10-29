@@ -107,7 +107,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 
 	/* Update the reference and discard the page. */
 	if ((mod == NULL || mod->rec_result == 0) &&
-	    !F_ISSET(S2C(session), WT_CONN_IN_MEMORY)) {
+	    !F_ISSET(conn, WT_CONN_IN_MEMORY)) {
 		if (__wt_ref_is_root(ref))
 			__wt_ref_out(session, ref);
 		else
@@ -371,7 +371,7 @@ __evict_review(
 	}
 
 	/* If the page is clean, we're done and we can evict. */
-	if (!__wt_page_is_modified(page))
+	if (!modified)
 		return (0);
 
 	/*

@@ -1216,10 +1216,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		page = ref->page;
 		modified = __wt_page_is_modified(page);
 
-		/* Don't add clean pages if we are running in-memory */
-		if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !modified)
-			continue;
-
 		/*
 		 * Use the EVICT_LRU flag to avoid putting pages onto the list
 		 * multiple times.
@@ -1231,8 +1227,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		if (__wt_page_is_empty(page))
 			goto fast;
 
-		/* Optionally ignore clean pages. */
-		if (!modified && FLD_ISSET(cache->state, WT_EVICT_PASS_DIRTY))
+		/* Skip clean pages if appropriate. */
+		if (!modified && (F_ISSET(conn, WT_CONN_IN_MEMORY) ||
+		    FLD_ISSET(cache->state, WT_EVICT_PASS_DIRTY)))
 			continue;
 
 		/*
