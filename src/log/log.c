@@ -1514,7 +1514,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	}
 	WT_ERR(__log_openfile(
 	    session, false, &log_fh, WT_LOG_FILENAME, start_lsn.file));
-	log_size = log_fh->size;
+	WT_ERR(__wt_filesize(session, log_fh, &log_size));
 	rd_lsn = start_lsn;
 
 	WT_ERR(__wt_scr_alloc(session, WT_LOG_ALIGN, &buf));
@@ -1545,7 +1545,7 @@ advance:
 				break;
 			WT_ERR(__log_openfile(session,
 			    false, &log_fh, WT_LOG_FILENAME, rd_lsn.file));
-			log_size = log_fh->size;
+			WT_ERR(__wt_filesize(session, log_fh, &log_size));
 			eol = false;
 			continue;
 		}
