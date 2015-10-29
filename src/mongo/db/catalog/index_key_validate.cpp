@@ -26,7 +26,11 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/catalog/index_key_validate.h"
+
+#include <limits>
 
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
@@ -62,6 +66,17 @@ Status validateKeyPattern(const BSONObj& key) {
 
         if (keyElement.type() == String && pluginName != keyElement.str()) {
             return Status(code, "Can't use more than one index plugin for a single index.");
+        }
+
+        // We convert the element value to an int in order to determine whether the index is
+        // ascending or descending on a particular field. Therefore, the element value cannot
+        // overflow an int.
+        long long asLong = keyElement.safeNumberLong();
+        if (asLong > std::numeric_limits<int>::max() || asLong < std::numeric_limits<int>::min()) {
+            return Status(code,
+                          str::stream()
+                              << "Key pattern element cannot be represented as a 32-bit int: "
+                              << keyElement);
         }
 
         // Ensure that the fields on which we are building the index are valid: a field must not
