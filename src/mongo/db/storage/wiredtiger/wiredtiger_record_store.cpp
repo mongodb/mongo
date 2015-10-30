@@ -1078,8 +1078,6 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* txn
             }
             invariantWTOK(truncateEnd->prev(truncateEnd));  // put the cursor back where it was
 
-            int64_t currentRangeEndKey;
-            invariantWTOK(truncateEnd->get_key(truncateEnd, &currentRangeEndKey));
             WiredTigerCursor startWrap(_uri, _tableId, true, txn);
             WT_CURSOR* truncateStart = startWrap.get();
 
@@ -1101,7 +1099,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* txn
                 _increaseDataSize(txn, -sizeSaved);
                 wuow.commit();
                 // Save the key for the next round
-                _cappedFirstRecord = _fromKey(currentRangeEndKey);
+                _cappedFirstRecord = firstRemainingId;
             }
         }
     } catch (const WriteConflictException& wce) {
