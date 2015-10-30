@@ -6,7 +6,7 @@ var getToolTest;
   getToolTest = function(name) {
     var toolTest = new ToolTest(name, null);
 
-    var shardingTest = new ShardingTest(name, 2, 0, 3, { chunksize: 1, enableBalancer: 0 });
+    var shardingTest = new ShardingTest({name:name, shards:2, verbose:0, mongos:3, other:{ chunksize: 1, enableBalancer: 0 }});
     shardingTest.adminCommand({ enablesharding: name });
 
     toolTest.m = shardingTest.s0;

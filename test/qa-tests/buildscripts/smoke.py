@@ -155,7 +155,7 @@ def buildlogger(cmd, is_global=False):
 
 def clean_dbroot(dbroot="", nokill=False):
     # Clean entire /data/db dir if --with-cleanbb, else clean specific database path.
-    if clean_whole_dbroot and not small_oplog:
+    if clean_whole_dbroot and not (small_oplog or small_oplog_rs):
         dbroot = os.path.normpath(smoke_db_prefix + "/data/db")
     if os.path.exists(dbroot):
         print("clean_dbroot: %s" % dbroot)
@@ -224,22 +224,23 @@ class mongod(NullMongod):
         # SERVER-9137 Added httpinterface parameter to keep previous behavior
         argv += ['--setParameter', 'enableTestCommands=1', '--httpinterface']
         if self.kwargs.get('small_oplog'):
-            argv += ["--master", "--oplogSize", "511"]
+            if self.slave:
+                argv += ['--slave', '--source', 'localhost:' + str(srcport)]
+            else:
+                argv += ["--master", "--oplogSize", "511"]
         if self.kwargs.get('storage_engine'):
             argv += ["--storageEngine", self.kwargs.get('storage_engine')]
-        if self.kwargs.get('wiredtiger_engine_config'):
-            argv += ["--wiredTigerEngineConfig", self.kwargs.get('wiredtiger_engine_config')]
-        if self.kwargs.get('wiredtiger_collection_config'):
-            argv += ["--wiredTigerCollectionConfig", self.kwargs.get('wiredtiger_collection_config')]
-        if self.kwargs.get('wiredtiger_index_config'):
-            argv += ["--wiredTigerIndexConfig", self.kwargs.get('wiredtiger_index_config')]
+        if self.kwargs.get('wiredtiger_engine_config_string'):
+            argv += ["--wiredTigerEngineConfigString", self.kwargs.get('wiredtiger_engine_config_string')]
+        if self.kwargs.get('wiredtiger_collection_config_string'):
+            argv += ["--wiredTigerCollectionConfigString", self.kwargs.get('wiredtiger_collection_config_string')]
+        if self.kwargs.get('wiredtiger_index_config_string'):
+            argv += ["--wiredTigerIndexConfigString", self.kwargs.get('wiredtiger_index_config_string')]
         params = self.kwargs.get('set_parameters', None)
         if params:
             for p in params.split(','): argv += ['--setParameter', p]
         if self.kwargs.get('small_oplog_rs'):
             argv += ["--replSet", "foo", "--oplogSize", "511"]
-        if self.slave:
-            argv += ['--slave', '--source', 'localhost:' + str(srcport)]
         if self.kwargs.get('no_journal'):
             argv += ['--nojournal']
         if self.kwargs.get('no_preallocj'):
@@ -272,7 +273,7 @@ class mongod(NullMongod):
             synced = False
             while not synced:
                 synced = True
-                for source in local.sources.find(fields=["syncedTo"]):
+                for source in local.sources.find({}, ["syncedTo"]):
                     synced = synced and "syncedTo" in source and source["syncedTo"]
 
     def _start(self, argv):
@@ -376,9 +377,7 @@ def check_db_hashes(master, slave):
     if not slave.slave:
         raise(Bug("slave instance doesn't have slave attribute set"))
 
-    print "waiting for slave (%s) to catch up to master (%s)" % (slave.port, master.port)
     master.wait_for_repl()
-    print "caught up!"
 
     # FIXME: maybe make this run dbhash on all databases?
     for mongod in [master, slave]:
@@ -442,7 +441,7 @@ def skipTest(path):
     basename = os.path.basename(path)
     parentPath = os.path.dirname(path)
     parentDir = os.path.basename(parentPath)
-    if small_oplog: # For tests running in parallel
+    if small_oplog or small_oplog_rs: # For tests running in parallel
         if basename in ["cursor8.js", "indexh.js", "dropdb.js", "dropdb_race.js", 
                         "connections_opened.js", "opcounters_write_cmd.js", "dbadmin.js"]:
             return True
@@ -478,9 +477,11 @@ def skipTest(path):
                            ("jstests", "bench_test1.js"),
                            ("jstests", "bench_test2.js"),
                            ("jstests", "bench_test3.js"),
+                           ("jstests", "bench_test_insert.js"),
                            ("core", "bench_test1.js"),
                            ("core", "bench_test2.js"),
                            ("core", "bench_test3.js"),
+                           ("core", "bench_test_insert.js"),
                            ]
 
         if os.path.join(parentDir,basename) in [ os.path.join(*test) for test in authTestsToSkip ]:
@@ -520,7 +521,7 @@ def runTest(test, result):
         if os.path.basename(path) in ('python', 'python.exe'):
             path = argv[1]
     elif ext == ".js":
-        argv = [shell_executable, "--port", mongod_port, '--authenticationMechanism', authMechanism]
+        argv = [shell_executable, "--port", mongod_port]
         
         setShellWriteModeForTest(path, argv)
         
@@ -545,12 +546,12 @@ def runTest(test, result):
 
             if storage_engine:
                 argv.extend(["--storageEngine", storage_engine])
-            if wiredtiger_engine_config:
-                argv.extend(["--wiredTigerEngineConfig", wiredtiger_engine_config])
-            if wiredtiger_collection_config:
-                argv.extend(["--wiredTigerCollectionConfig", wiredtiger_collection_config])
-            if wiredtiger_index_config:
-                argv.extend(["--wiredTigerIndexConfig", wiredtiger_index_config])
+            if wiredtiger_engine_config_string:
+                argv.extend(["--wiredTigerEngineConfigString", wiredtiger_engine_config_string])
+            if wiredtiger_collection_config_string:
+                argv.extend(["--wiredTigerCollectionConfigString", wiredtiger_collection_config_string])
+            if wiredtiger_index_config_string:
+                argv.extend(["--wiredTigerIndexConfigString", wiredtiger_index_config_string])
 
         # more blech
         elif os.path.basename(path) in ['mongos', 'mongos.exe']:
@@ -575,9 +576,9 @@ def runTest(test, result):
         evalString = 'load("jstests/libs/servers.js");load("jstests/libs/servers_misc.js");' +\
                      'TestData = new Object();' + \
                      'TestData.storageEngine = "' + ternary( storage_engine, storage_engine, "" ) + '";' + \
-                     'TestData.wiredTigerEngineConfig = "' + ternary( wiredtiger_engine_config, wiredtiger_engine_config, "" ) + '";' + \
-                     'TestData.wiredTigerCollectionConfig = "' + ternary( wiredtiger_collection_config, wiredtiger_collection_config, "" ) + '";' + \
-                     'TestData.wiredTigerIndexConfig = "' + ternary( wiredtiger_index_config, wiredtiger_index_config, "" ) + '";' + \
+                     'TestData.wiredTigerEngineConfigString = "' + ternary( wiredtiger_engine_config_string, wiredtiger_engine_config_string, "" ) + '";' + \
+                     'TestData.wiredTigerCollectionConfigString = "' + ternary( wiredtiger_collection_config_string, wiredtiger_collection_config_string, "" ) + '";' + \
+                     'TestData.wiredTigerIndexConfigString = "' + ternary( wiredtiger_index_config_string, wiredtiger_index_config_string, "" ) + '";' + \
                      'TestData.testPath = "' + path + '";' + \
                      'TestData.testFile = "' + os.path.basename( path ) + '";' + \
                      'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + \
@@ -605,9 +606,6 @@ def runTest(test, result):
 
         if auth and usedb:
             evalString += 'jsTest.authenticate(db.getMongo());'
-
-        if os.getenv('SMOKE_EVAL') is not None:
-            evalString += os.getenv('SMOKE_EVAL')
 
         argv = argv + [ '--eval', evalString]
 
@@ -698,9 +696,9 @@ def run_tests(tests):
                             small_oplog=small_oplog,
                             no_journal=no_journal,
                             storage_engine=storage_engine,
-                            wiredtiger_engine_config=wiredtiger_engine_config,
-                            wiredtiger_collection_config=wiredtiger_collection_config,
-                            wiredtiger_index_config=wiredtiger_index_config,
+                            wiredtiger_engine_config_string=wiredtiger_engine_config_string,
+                            wiredtiger_collection_config_string=wiredtiger_collection_config_string,
+                            wiredtiger_index_config_string=wiredtiger_index_config_string,
                             set_parameters=set_parameters,
                             no_preallocj=no_preallocj,
                             auth=auth,
@@ -712,21 +710,23 @@ def run_tests(tests):
 
         if small_oplog:
             slave = mongod(slave=True,
+                           small_oplog=True,
+                           small_oplog_rs=False,
                            storage_engine=storage_engine,
-                           wiredtiger_engine_config=wiredtiger_engine_config,
-                           wiredtiger_collection_config=wiredtiger_collection_config,
-                           wiredtiger_index_config=wiredtiger_index_config,
+                           wiredtiger_engine_config_string=wiredtiger_engine_config_string,
+                           wiredtiger_collection_config_string=wiredtiger_collection_config_string,
+                           wiredtiger_index_config_string=wiredtiger_index_config_string,
                            set_parameters=set_parameters)
             slave.start()
         elif small_oplog_rs:
             slave = mongod(slave=True,
-                           small_oplog_rs=small_oplog_rs,
-                           small_oplog=small_oplog,
+                           small_oplog_rs=True,
+                           small_oplog=False,
                            no_journal=no_journal,
                            storage_engine=storage_engine,
-                           wiredtiger_engine_config=wiredtiger_engine_config,
-                           wiredtiger_collection_config=wiredtiger_collection_config,
-                           wiredtiger_index_config=wiredtiger_index_config,
+                           wiredtiger_engine_config_string=wiredtiger_engine_config_string,
+                           wiredtiger_collection_config_string=wiredtiger_collection_config_string,
+                           wiredtiger_index_config_string=wiredtiger_index_config_string,
                            set_parameters=set_parameters,
                            no_preallocj=no_preallocj,
                            auth=auth,
@@ -741,12 +741,23 @@ def run_tests(tests):
                             {'_id': 0, 'host':'localhost:%s' % master.port},
                             {'_id': 1, 'host':'localhost:%s' % slave.port,'priority':0}]}})
 
+            # Wait for primary and secondary to finish initial sync and election
             ismaster = False
             while not ismaster:
                 result = primary.admin.command("ismaster");
                 ismaster = result["ismaster"]
                 if not ismaster:
                     print "waiting for primary to be available ..."
+                    time.sleep(.2)
+            
+            secondaryUp = False
+            sConn = MongoClient(port=slave.port,
+                read_preference=ReadPreference.SECONDARY_PREFERRED);
+            while not secondaryUp:
+                result = sConn.admin.command("ismaster");
+                secondaryUp = result["secondary"]
+                if not secondaryUp:
+                    print "waiting for secondary to be available ..."
                     time.sleep(.2)
 
         if small_oplog or small_oplog_rs:
@@ -796,9 +807,9 @@ def run_tests(tests):
                                         small_oplog=small_oplog,
                                         no_journal=no_journal,
                                         storage_engine=storage_engine,
-                                        wiredtiger_engine_config=wiredtiger_engine_config,
-                                        wiredtiger_collection_config=wiredtiger_collection_config,
-                                        wiredtiger_index_config=wiredtiger_index_config,
+                                        wiredtiger_engine_config_string=wiredtiger_engine_config_string,
+                                        wiredtiger_collection_config_string=wiredtiger_collection_config_string,
+                                        wiredtiger_index_config_string=wiredtiger_index_config_string,
                                         set_parameters=set_parameters,
                                         no_preallocj=no_preallocj,
                                         auth=auth,
@@ -902,6 +913,7 @@ def report():
 
 # Keys are the suite names (passed on the command line to smoke.py)
 # Values are pairs: (filenames, <start mongod before running tests>)
+
 suiteGlobalConfig = {   "files": ("files/*.js", False),
                         "restore": ("restore/*.js", False),
                         "stat": ("stat/*.js", False),
@@ -981,6 +993,7 @@ def expand_suites(suites,expandUseDB=True):
                                   'noPassthrough', 
                                   'clone', 
                                   'parallel', 
+                                  'concurrency',
                                   'repl', 
                                   'auth', 
                                   'sharding', 
@@ -1069,7 +1082,7 @@ def add_exe(e):
 def set_globals(options, tests):
     global mongod_executable, mongod_port, shell_executable, continue_on_failure
     global small_oplog, small_oplog_rs
-    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, storage_engine, wiredtiger_engine_config, wiredtiger_collection_config, wiredtiger_index_config
+    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, storage_engine, wiredtiger_engine_config_string, wiredtiger_collection_config_string, wiredtiger_index_config_string
     global auth, authMechanism, keyFile, keyFileData, smoke_db_prefix, test_path, start_mongod
     global use_ssl, use_x509
     global file_of_commands_mode
@@ -1104,9 +1117,9 @@ def set_globals(options, tests):
         small_oplog_rs = options.small_oplog_rs
     no_journal = options.no_journal
     storage_engine = options.storage_engine
-    wiredtiger_engine_config = options.wiredtiger_engine_config
-    wiredtiger_collection_config = options.wiredtiger_collection_config
-    wiredtiger_index_config = options.wiredtiger_index_config
+    wiredtiger_engine_config_string = options.wiredtiger_engine_config_string
+    wiredtiger_collection_config_string = options.wiredtiger_collection_config_string
+    wiredtiger_index_config_string = options.wiredtiger_index_config_string
     set_parameters = options.set_parameters
     set_parameters_mongos = options.set_parameters_mongos
     no_preallocj = options.no_preallocj
@@ -1221,7 +1234,7 @@ def add_to_failfile(tests, options):
 
 def main():
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog
-    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, storage_engine, wiredtiger_engine_config, wiredtiger_collection_config, wiredtiger_index_config
+    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, storage_engine, wiredtiger_engine_config_string, wiredtiger_collection_config_string, wiredtiger_index_config_string
     global keyFile, smoke_db_prefix, test_path, use_write_commands
 
     try:
@@ -1259,11 +1272,11 @@ def main():
                       help='Run tests with replica set replication & use a small oplog')
     parser.add_option('--storageEngine', dest='storage_engine', default=None,
                       help='What storage engine to start mongod with')
-    parser.add_option('--wiredTigerEngineConfig', dest='wiredtiger_engine_config', default=None,
+    parser.add_option('--wiredTigerEngineConfig', dest='wiredtiger_engine_config_string', default=None,
                       help='Wired Tiger configuration to pass through to mongod')
-    parser.add_option('--wiredTigerCollectionConfig', dest='wiredtiger_collection_config', default=None,
+    parser.add_option('--wiredTigerCollectionConfig', dest='wiredtiger_collection_config_string', default=None,
                       help='Wired Tiger collection configuration to pass through to mongod')
-    parser.add_option('--wiredTigerIndexConfig', dest='wiredtiger_index_config', default=None,
+    parser.add_option('--wiredTigerIndexConfig', dest='wiredtiger_index_config_string', default=None,
                       help='Wired Tiger index configuration to pass through to mongod')
     parser.add_option('--nojournal', dest='no_journal', default=False,
                       action="store_true",

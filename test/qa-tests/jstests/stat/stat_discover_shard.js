@@ -4,7 +4,7 @@ load("jstests/libs/mongostat.js");
 
 baseName = "tool_discover_shard";
 
-st = new ShardingTest("shard1", 2);
+st = new ShardingTest({name:"shard1", shards:2});
 
 stdb = st.getDB("test");
 

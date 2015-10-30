@@ -1,5 +1,55 @@
 // Wrap whole file in a function to avoid polluting the global namespace
 (function() {
+	jsTestOptions = function (){
+		if( TestData ) {
+			return Object.merge(_jsTestOptions,
+								{ setParameters : TestData.setParameters,
+								  setParametersMongos : TestData.setParametersMongos,
+								  storageEngine: TestData.storageEngine,
+								  wiredTigerEngineConfigString: TestData.wiredTigerEngineConfigString,
+								  wiredTigerCollectionConfigString: TestData.wiredTigerCollectionConfigString,
+								  wiredTigerIndexConfigString: TestData.wiredTigerIndexConfigString,
+								  noJournal : TestData.noJournal,
+								  noJournalPrealloc : TestData.noJournalPrealloc,
+								  auth : TestData.auth,
+								  keyFile : TestData.keyFile,
+								  authUser : "__system",
+								  authPassword : TestData.keyFileData,
+								  authMechanism : TestData.authMechanism,
+								  adminUser : TestData.adminUser || "admin",
+								  adminPassword : TestData.adminPassword || "password",
+								  useLegacyConfigServers: TestData.useLegacyConfigServers || false,
+								  useLegacyReplicationProtocol:
+										TestData.useLegacyReplicationProtocol || false,
+								  enableEncryption: TestData.enableEncryption,
+								  encryptionKeyFile: TestData.encryptionKeyFile,
+								  auditDestination: TestData.auditDestination,
+								  useSSL : TestData.useSSL,
+								  minPort: TestData.minPort,
+								  maxPort: TestData.maxPort,
+								}
+							);
+		}
+		return _jsTestOptions;
+	}
+
+	// Shim to allow compatibility with newer shells.
+	if(typeof stopMongod == 'undefined'){
+		stopMongod = _stopMongoProgram
+	}
+	if(typeof startMongod == 'undefined'){
+		startMongod = function(){
+			argArray = arguments
+			if ( jsTestOptions().useSSL ) {
+				if ( argArray.indexOf('--sslMode') < 0 ) {
+					argArray.push.apply(argArray, [ '--sslMode', 'requireSSL', '--sslPEMKeyFile', 'jstests/libs/server.pem', '--sslCAFile', 'jstests/libs/ca.pem', '--sslWeakCertificateValidation' ] );
+				}
+			}
+			_startMongod.apply(null, argArray)
+		}
+	}
+
+
 
 _parsePath = function() {
     var dbpath = "";
@@ -112,12 +162,14 @@ MongoRunner.VersionSub = function(regex, version) {
 // version string to support the dev/stable MongoDB release cycle.
 MongoRunner.binVersionSubs = [ new MongoRunner.VersionSub(/^latest$/, ""),
                                new MongoRunner.VersionSub(/^oldest-supported$/, "1.8"),
-                               // To-be-updated when 2.8 becomes available
+                               // To-be-updated when 3.0 becomes available
                                new MongoRunner.VersionSub(/^last-stable$/, "2.6"),
                                // Latest unstable and next stable are effectively the
                                // same release
                                new MongoRunner.VersionSub(/^2\.7(\..*){0,1}/, ""),
-                               new MongoRunner.VersionSub(/^2\.8(\..*){0,1}/, "") ];
+                               new MongoRunner.VersionSub(/^2\.8(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^3\.0(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^3\.1(\..*){0,1}/, "") ];
 
 MongoRunner.getBinVersionFor = function(version) {
  
@@ -217,6 +269,9 @@ MongoRunner.toRealDir = function( path, pathOpts ){
 MongoRunner.toRealFile = MongoRunner.toRealDir
 
 MongoRunner.nextOpenPort = function(){
+	if(typeof allocatePort == "function"){
+		return allocatePort()
+	}
 
     var i = 0;
     while( MongoRunner.usedPortMap[ "" + ( 27000 + i ) ] ) i++;
@@ -492,6 +547,7 @@ MongoRunner.mongodOptions = function( opts ){
     }
 
     if( jsTestOptions().useSSL ) {
+		
         if (!opts.sslMode) opts.sslMode = "requireSSL";
         if (!opts.sslPEMKeyFile) opts.sslPEMKeyFile = "jstests/libs/server.pem";
         if (!opts.sslCAFile) opts.sslCAFile = "jstests/libs/ca.pem";
@@ -783,7 +839,6 @@ function appendSetParameterArgs(argArray) {
         if (jsTest.options().auth) {
             argArray.push.apply(argArray, ['--setParameter', "enableLocalhostAuthBypass=false"]);
         }
-
         if ( jsTestOptions().useSSL ) {
             if ( argArray.indexOf('--sslMode') < 0 ) {
                 argArray.push.apply(argArray, [ '--sslMode', 'requireSSL', '--sslPEMKeyFile', 'jstests/libs/server.pem', '--sslCAFile', 'jstests/libs/ca.pem', '--sslWeakCertificateValidation' ] );
@@ -806,7 +861,18 @@ function appendSetParameterArgs(argArray) {
         else if (programName.endsWith('mongod')) {
             // set storageEngine for mongod
             if (jsTest.options().storageEngine) {
-                argArray.push.apply(argArray, ['--storageEngine', jsTest.options().storageEngine]);
+                if ( argArray.indexOf( "--storageEngine" ) < 0 ) {
+                    argArray.push.apply(argArray, ['--storageEngine', jsTest.options().storageEngine]);
+                }
+            }
+            if (jsTest.options().wiredTigerEngineConfigString) {
+                argArray.push.apply(argArray, ['--wiredTigerEngineConfigString', jsTest.options().wiredTigerEngineConfigString]);
+            }
+            if (jsTest.options().wiredTigerCollectionConfigString) {
+                argArray.push.apply(argArray, ['--wiredTigerCollectionConfigString', jsTest.options().wiredTigerCollectionConfigString]);
+            }
+            if (jsTest.options().wiredTigerIndexConfigString) {
+                argArray.push.apply(argArray, ['--wiredTigerIndexConfigString', jsTest.options().wiredTigerIndexConfigString]);
             }
             // apply setParameters for mongod
             if (jsTest.options().setParameters) {
@@ -904,7 +970,6 @@ runMongoProgram = function() {
         args.unshift( progName,
                       '-u', jsTestOptions().authUser,
                       '-p', jsTestOptions().authPassword,
-                      '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                       '--authenticationDatabase=admin'
                     );
     }
@@ -934,12 +999,11 @@ startMongoProgramNoConnect = function() {
         args.unshift(progName,
                      '-u', jsTestOptions().authUser,
                      '-p', jsTestOptions().authPassword,
-                     '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                      '--authenticationDatabase=admin');
     }
 
     if ( jsTestOptions().useSSL ) {
-        args.push("--ssl", "--sslPEMKeyFile", "jstests/libs/server.pem", "--sslCAFile", "jstests/libs/ca.pem", "--sslAllowInvalidHostnames");
+        args.push("--ssl", "--sslPEMKeyFile", "jstests/libs/client.pem", "--sslCAFile", "jstests/libs/ca.pem", "--sslAllowInvalidHostnames");
     }
 
     if (progName == 'mongo' && !_useWriteCommandsDefault()) {
