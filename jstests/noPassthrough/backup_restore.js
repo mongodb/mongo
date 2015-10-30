@@ -264,8 +264,8 @@
         // Note the dbhash can only run when the DB is inactive to get a result
         // that can be compared, which is only in the fsyncLock/fsynUnlock case
         if (dbHash !== undefined) {
-            assert(dbHash, rst.nodes[numNodes].getDB(crudDb).runCommand({dbhash: 1}).md5,
-                   testName + ' dbHash');
+            assert.eq(dbHash, rst.nodes[numNodes].getDB(crudDb).runCommand({dbhash: 1}).md5,
+                      testName + ' dbHash');
         }
 
         // Add new hidden secondary to replica set

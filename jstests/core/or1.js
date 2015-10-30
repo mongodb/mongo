@@ -1,14 +1,14 @@
 t = db.jstests_or1;
 t.drop();
 
-checkArrs = function( a, b, m ) {
-    assert.eq( a.length, b.length, m );
+checkArrs = function( a, b ) {
+    assert.eq( a.length, b.length );
     aStr = [];
     bStr = [];
     a.forEach( function( x ) { aStr.push( tojson( x ) ); } );
     b.forEach( function( x ) { bStr.push( tojson( x ) ); } );
     for ( i = 0; i < aStr.length; ++i ) {
-        assert( -1 != bStr.indexOf( aStr[ i ] ), m );
+        assert.neq( -1, bStr.indexOf( aStr[ i ] ) );
     }
 }
 

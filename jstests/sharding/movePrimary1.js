@@ -8,7 +8,7 @@ initDB = function( name ){
     c.save( { a : 1 } );
     c.save( { a : 2 } );
     c.save( { a : 3 } );
-    assert( 3 , c.count() );
+    assert.eq( 3 , c.count() );
     
     return s.getServer( name );
 }

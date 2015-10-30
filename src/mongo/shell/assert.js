@@ -19,6 +19,12 @@ doassert = function(msg, obj) {
 }
 
 assert = function(b, msg){
+    if (arguments.length > 2) {
+        doassert("Too many parameters to assert().");
+    }
+    if (arguments.length > 1 && typeof(msg) !== "string") {
+        doassert("Non-string 'msg' parameters are invalid for assert().");
+    }
     if (assert._debug && msg) print("in assert for: " + msg);
     if (b)
         return;
@@ -234,13 +240,14 @@ assert.doesNotThrow = function(func, params, msg) {
     if (params && typeof(params) == "string") {
         throw ("2nd argument to assert.throws has to be an array, not " + params);
     }
+    var res;
     try {
-        func.apply(null, params);
+        res = func.apply(null, params);
     }
     catch (e) {
         doassert("threw unexpected exception: " + e + " : " + msg);
     }
-    return;
+    return res;
 };
 
 assert.throws.automsg = function(func, params) {

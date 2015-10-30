@@ -10,7 +10,7 @@ test1 = s.getDB( "test1" ).foo;
 test1.save( { a : 1 } );
 test1.save( { a : 2 } );
 test1.save( { a : 3 } );
-assert( 3 , test1.count() );
+assert.eq( 3 , test1.count() );
 
 assert( ! s.admin.runCommand( { addshard: "sdd$%" } ).ok , "bad hostname" );
 
