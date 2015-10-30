@@ -171,7 +171,15 @@ __curmetadata_next(WT_CURSOR *cursor)
 	if (!F_ISSET(mdc, WT_MDC_POSITIONED))
 		WT_ERR(__curmetadata_metadata_search(session, cursor));
 	else {
-		WT_ERR(file_cursor->next(mdc->file_cursor));
+		/*
+		 * When applications open metadata cursors, they expect to see
+		 * all schema-level operations reflected in the results.  Query
+		 * at read-uncommitted to avoid confusion caused by the current
+		 * transaction state.
+		 */
+		WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+		    ret = file_cursor->next(mdc->file_cursor));
+		WT_ERR(ret);
 		WT_ERR(__curmetadata_setkv(mdc, file_cursor));
 	}
 
@@ -204,7 +212,8 @@ __curmetadata_prev(WT_CURSOR *cursor)
 		goto err;
 	}
 
-	ret = file_cursor->prev(file_cursor);
+	WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+	    ret = file_cursor->prev(file_cursor));
 	if (ret == 0)
 		WT_ERR(__curmetadata_setkv(mdc, file_cursor));
 	else if (ret == WT_NOTFOUND)
@@ -264,7 +273,9 @@ __curmetadata_search(WT_CURSOR *cursor)
 	if (WT_KEY_IS_METADATA(&cursor->key))
 		WT_ERR(__curmetadata_metadata_search(session, cursor));
 	else {
-		WT_ERR(file_cursor->search(file_cursor));
+		WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+		    ret = file_cursor->search(file_cursor));
+		WT_ERR(ret);
 		WT_ERR(__curmetadata_setkv(mdc, file_cursor));
 	}
 
@@ -298,7 +309,9 @@ __curmetadata_search_near(WT_CURSOR *cursor, int *exact)
 		WT_ERR(__curmetadata_metadata_search(session, cursor));
 		*exact = 1;
 	} else {
-		WT_ERR(file_cursor->search_near(file_cursor, exact));
+		WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+		    ret = file_cursor->search_near(file_cursor, exact));
+		WT_ERR(ret);
 		WT_ERR(__curmetadata_setkv(mdc, file_cursor));
 	}
 
