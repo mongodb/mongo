@@ -25,7 +25,7 @@ typedef struct {
 	WT_PAGE *page;
 	uint32_t flags;			/* Caller's configuration */
 
-	WT_ITEM	 dsk;			/* Temporary disk-image buffer */
+	WT_ITEM	 disk_image;		/* Temporary disk-image buffer */
 
 	/*
 	 * Track start/stop write generation to decide if all changes to the
@@ -161,7 +161,7 @@ typedef struct {
 		WT_ADDR addr;		/* Split's written location */
 		uint32_t size;		/* Split's size */
 		uint32_t cksum;		/* Split's checksum */
-		void    *dsk;		/* Split's disk image */
+		void    *disk_image;	/* Split's disk image */
 
 		/*
 		 * Saved update list, supporting the WT_EVICT_UPDATE_RESTORE and
@@ -760,7 +760,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 		r->last = &r->_last;
 
 		/* Disk buffers need to be aligned for writing. */
-		F_SET(&r->dsk, WT_ITEM_ALIGNED);
+		F_SET(&r->disk_image, WT_ITEM_ALIGNED);
 	}
 
 	/* Reconciliation is not re-entrant, make sure that doesn't happen. */
@@ -899,7 +899,7 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
 		return;
 	*(WT_RECONCILE **)reconcilep = NULL;
 
-	__wt_buf_free(session, &r->dsk);
+	__wt_buf_free(session, &r->disk_image);
 
 	__wt_free(session, r->raw_entries);
 	__wt_free(session, r->raw_offsets);
@@ -962,7 +962,7 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, bool destroy)
 	if (destroy || r->bnd_entries > 10 * 1000) {
 		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
 			__wt_free(session, bnd->addr.addr);
-			__wt_free(session, bnd->dsk);
+			__wt_free(session, bnd->disk_image);
 			__wt_free(session, bnd->supd);
 			__wt_buf_free(session, &bnd->key);
 		}
@@ -983,7 +983,7 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, bool destroy)
 			++last_used;
 		for (bnd = r->bnd, i = 0; i < last_used; ++bnd, ++i) {
 			__wt_free(session, bnd->addr.addr);
-			__wt_free(session, bnd->dsk);
+			__wt_free(session, bnd->disk_image);
 			__wt_free(session, bnd->supd);
 		}
 	}
@@ -1641,8 +1641,8 @@ __rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size)
 	 * for overflow in diagnostic mode.
 	 */
 	WT_ASSERT(session, r->space_avail >= size);
-	WT_ASSERT(session,
-	    WT_BLOCK_FITS(r->first_free, size, r->dsk.mem, r->dsk.memsize));
+	WT_ASSERT(session, WT_BLOCK_FITS(
+	    r->first_free, size, r->disk_image.mem, r->disk_image.memsize));
 
 	r->entries += v;
 	r->space_avail -= size;
@@ -1864,7 +1864,7 @@ __rec_split_bnd_init(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd)
 	WT_CLEAR(bnd->addr);
 	bnd->size = 0;
 	bnd->cksum = 0;
-	__wt_free(session, bnd->dsk);
+	__wt_free(session, bnd->disk_image);
 
 	__wt_free(session, bnd->supd);
 	bnd->supd_next = 0;
@@ -1977,14 +1977,14 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 */
 	corrected_page_size = r->page_size;
 	WT_RET(bm->write_size(bm, session, &corrected_page_size));
-	WT_RET(__wt_buf_init(session, &r->dsk, corrected_page_size));
+	WT_RET(__wt_buf_init(session, &r->disk_image, corrected_page_size));
 
 	/*
 	 * Clear the disk page's header and block-manager space, set the page
 	 * type (the type doesn't change, and setting it later would require
 	 * additional code in a few different places).
 	 */
-	dsk = r->dsk.mem;
+	dsk = r->disk_image.mem;
 	memset(dsk, 0, WT_PAGE_HEADER_BYTE_SIZE(btree));
 	dsk->type = page->type;
 
@@ -2263,11 +2263,11 @@ __rec_split_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t add_len)
 	btree = S2BT(session);
 	bm = btree->bm;
 
-	len = WT_PTRDIFF(r->first_free, r->dsk.mem);
+	len = WT_PTRDIFF(r->first_free, r->disk_image.mem);
 	corrected_page_size = len + add_len;
 	WT_RET(bm->write_size(bm, session, &corrected_page_size));
-	WT_RET(__wt_buf_grow(session, &r->dsk, corrected_page_size));
-	r->first_free = (uint8_t *)r->dsk.mem + len;
+	WT_RET(__wt_buf_grow(session, &r->disk_image, corrected_page_size));
+	r->first_free = (uint8_t *)r->disk_image.mem + len;
 	WT_ASSERT(session, corrected_page_size >= len);
 	r->space_avail = corrected_page_size - len;
 	WT_ASSERT(session, r->space_avail >= add_len);
@@ -2288,7 +2288,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 	size_t inuse;
 
 	btree = S2BT(session);
-	dsk = r->dsk.mem;
+	dsk = r->disk_image.mem;
 
 	/*
 	 * We should never split during salvage, and we're about to drop core
@@ -2420,8 +2420,10 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
 		/* Finalize the header information and write the page. */
 		dsk->recno = last->recno;
 		dsk->u.entries = r->entries;
-		dsk->mem_size = r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
-		WT_RET(__rec_split_write(session, r, last, &r->dsk, false));
+		dsk->mem_size =
+		    r->disk_image.size = WT_PTRDIFF32(r->first_free, dsk);
+		WT_RET(
+		    __rec_split_write(session, r, last, &r->disk_image, false));
 
 		/*
 		 * Set the caller's entry count and buffer information for the
@@ -2485,7 +2487,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session,
 	unpack = &_unpack;
 	compressor = btree->compressor;
 	dst = &r->raw_destination;
-	dsk = r->dsk.mem;
+	dsk = r->disk_image.mem;
 
 	WT_RET(__rec_split_bnd_grow(session, r));
 	last = &r->bnd[r->bnd_next];
@@ -2761,7 +2763,7 @@ no_slots:
 		r->first_free = dsk_start + len;
 		r->space_avail += r->raw_offsets[result_slots];
 		WT_ASSERT(session, r->first_free + r->space_avail <=
-		    (uint8_t *)r->dsk.mem + r->dsk.memsize);
+		    (uint8_t *)r->disk_image.mem + r->disk_image.memsize);
 
 		/*
 		 * Set the key for the next block (before writing the block, a
@@ -2798,14 +2800,15 @@ no_slots:
 		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail);
 
 		dsk->recno = last->recno;
-		dsk->mem_size = r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
+		dsk->mem_size =
+		    r->disk_image.size = WT_PTRDIFF32(r->first_free, dsk);
 		dsk->u.entries = r->entries;
 
 		r->entries = 0;
 		r->first_free = WT_PAGE_HEADER_BYTE(btree, dsk);
 		r->space_avail = r->page_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 
-		write_ref = &r->dsk;
+		write_ref = &r->disk_image;
 		last->already_compressed = false;
 	} else {
 		/*
@@ -2833,7 +2836,7 @@ no_slots:
 	    last_block && __rec_is_checkpoint(session, r, last)) {
 		if (write_ref == dst)
 			WT_RET(__wt_buf_set(
-			    session, &r->dsk, dst->mem, dst->size));
+			    session, &r->disk_image, dst->mem, dst->size));
 	} else
 		WT_RET(
 		    __rec_split_write(session, r, last, write_ref, last_block));
@@ -2976,14 +2979,14 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	bnd->entries = r->entries;
 
 	/* Finalize the header information. */
-	dsk = r->dsk.mem;
+	dsk = r->disk_image.mem;
 	dsk->recno = bnd->recno;
 	dsk->u.entries = r->entries;
-	dsk->mem_size = r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
+	dsk->mem_size = r->disk_image.size = WT_PTRDIFF32(r->first_free, dsk);
 
 	/* If this is a checkpoint, we're done, otherwise write the page. */
 	return (__rec_is_checkpoint(session, r, bnd) ?
-	    0 : __rec_split_write(session, r, bnd, &r->dsk, true));
+	    0 : __rec_split_write(session, r, bnd, &r->disk_image, true));
 }
 
 /*
@@ -3033,9 +3036,9 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * WT_PAGE_HEADER header onto the scratch buffer, most of the header
 	 * information remains unchanged between the pages.
 	 */
-	WT_RET(__wt_scr_alloc(session, r->dsk.memsize, &tmp));
+	WT_RET(__wt_scr_alloc(session, r->disk_image.memsize, &tmp));
 	dsk = tmp->mem;
-	memcpy(dsk, r->dsk.mem, WT_PAGE_HEADER_SIZE);
+	memcpy(dsk, r->disk_image.mem, WT_PAGE_HEADER_SIZE);
 
 	/*
 	 * For each split chunk we've created, update the disk image and copy
@@ -3045,7 +3048,8 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	for (i = 0, bnd = r->bnd; i < r->bnd_next; ++i, ++bnd) {
 		/* Copy the page contents to the temporary buffer. */
 		len = (bnd + 1)->offset - bnd->offset;
-		memcpy(dsk_start, (uint8_t *)r->dsk.mem + bnd->offset, len);
+		memcpy(dsk_start,
+		    (uint8_t *)r->disk_image.mem + bnd->offset, len);
 
 		/* Finalize the header information and write the page. */
 		dsk->recno = bnd->recno;
@@ -3070,12 +3074,12 @@ __rec_split_fixup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 * chunk, including header, because if there was room for that large a
 	 * remnant, we wouldn't have switched from accumulating to a page end.
 	 */
-	p = (uint8_t *)r->dsk.mem + bnd->offset;
+	p = (uint8_t *)r->disk_image.mem + bnd->offset;
 	len = WT_PTRDIFF(r->first_free, p);
 	if (len >= r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree))
 		WT_PANIC_ERR(session, EINVAL,
 		    "Reconciliation remnant too large for the split buffer");
-	dsk = r->dsk.mem;
+	dsk = r->disk_image.mem;
 	dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
 	(void)memmove(dsk_start, p, len);
 
@@ -3241,10 +3245,10 @@ supd_check_complete:
 		 */
 		if (bnd->already_compressed)
 			WT_ERR(__rec_raw_decompress(
-			    session, buf->data, buf->size, &bnd->dsk));
+			    session, buf->data, buf->size, &bnd->disk_image));
 		else {
 			WT_ERR(__wt_strndup(
-			    session, buf->data, buf->size, &bnd->dsk));
+			    session, buf->data, buf->size, &bnd->disk_image));
 			WT_ASSERT(session, __wt_verify_dsk_image(session,
 			    "[evict split]", buf->data, buf->size, true) == 0);
 		}
@@ -5292,7 +5296,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_free(session, multi->key.ikey);
 			break;
 		}
-		if (multi->supd_dsk == NULL) {
+		if (multi->disk_image == NULL) {
 			if (multi->addr.reuse)
 				multi->addr.addr = NULL;
 			else {
@@ -5302,7 +5306,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			}
 		} else {
 			__wt_free(session, multi->supd);
-			__wt_free(session, multi->supd_dsk);
+			__wt_free(session, multi->disk_image);
 		}
 	}
 	__wt_free(session, mod->mod_multi);
@@ -5503,7 +5507,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * we were about to write the buffer so we know what to do here.
 		 */
 		if (bnd->addr.addr == NULL)
-			WT_RET(__wt_bt_write(session, &r->dsk,
+			WT_RET(__wt_bt_write(session, &r->disk_image,
 			    NULL, NULL, true, bnd->already_compressed));
 		else {
 			mod->mod_replace = bnd->addr;
@@ -5642,12 +5646,12 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_RET(__wt_row_ikey_alloc(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
 
-		if (bnd->dsk != NULL) {
+		if (bnd->disk_image != NULL) {
 			multi->supd = bnd->supd;
 			multi->supd_entries = bnd->supd_next;
 			bnd->supd = NULL;
-			multi->supd_dsk = bnd->dsk;
-			bnd->dsk = NULL;
+			multi->disk_image = bnd->disk_image;
+			bnd->disk_image = NULL;
 		} else {
 			multi->addr = bnd->addr;
 			multi->addr.reuse = 0;
@@ -5682,12 +5686,12 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
 		multi->key.recno = bnd->recno;
 
-		if (bnd->dsk != NULL) {
+		if (bnd->disk_image != NULL) {
 			multi->supd = bnd->supd;
 			multi->supd_entries = bnd->supd_next;
 			bnd->supd = NULL;
-			multi->supd_dsk = bnd->dsk;
-			bnd->dsk = NULL;
+			multi->disk_image = bnd->disk_image;
+			bnd->disk_image = NULL;
 		} else {
 			multi->addr = bnd->addr;
 			multi->addr.reuse = 0;
