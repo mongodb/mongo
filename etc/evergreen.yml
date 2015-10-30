@@ -4651,9 +4651,47 @@ buildvariants:
     distros:
     - rhel55-test
 
-##############################################
-# mongo-partner storage engine buildvariants #
-##############################################
+################################
+# storage engine buildvariants #
+################################
+
+- name: linux-64-ephemeralForTest
+  display_name: Linux (ephemeralForTest)
+  modules: ~
+  run_on:
+  - rhel55
+  - rhel55-test
+  batchtime: 1440 # 1 day
+  expansions:
+    gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    test_flags: --continueOnFailure --storageEngine=ephemeralForTest
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+  tasks:
+  - name: compile
+    distros:
+    - rhel55
+  - name: aggregation
+  - name: dbtest
+  - name: failpoints
+  - name: failpoints_auth
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_small_oplog
+  - name: jsCore_small_oplog_rs
+  - name: jstestfuzz
+  - name: bulk_gle_passthrough
+  - name: parallel
+  - name: parallel_compatibility
+#  - name: concurrency
+#  - name: concurrency_replication
+#  - name: concurrency_sharded
+  - name: slow1
+#  - name: slow2
+  - name: sharding_jscore_passthrough
+  - name: unittests
 
 - name: ubuntu1404-rocksdb
   display_name: Ubuntu 14.04 (RocksDB)
