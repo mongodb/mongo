@@ -653,6 +653,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	r->flags = flags;
 
 	/* Track if the page can be marked clean. */
+	r->max_txn = WT_TXN_NONE;
 	r->leave_dirty = false;
 
 	/* Raw compression. */
