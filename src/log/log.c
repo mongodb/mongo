@@ -1173,87 +1173,60 @@ __wt_log_close(WT_SESSION_IMPL *session)
 }
 
 /*
- * __log_filesize --
- *	Returns an estimate of the real end of log file.
+ * __log_has_hole --
+ *	Determine if the current offset represents a hole in the log
+ *	file (i.e. there is valid data somewhere after the hole), or
+ *	if this is the end of this log file and the remainder of the
+ *	file is zeroes.
  */
 static int
-__log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *eof)
+__log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, bool *hole)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	wt_off_t log_size, off, off1;
-	uint32_t allocsize, bufsz;
+	wt_off_t log_size, off, remainder;
+	uint32_t bufsz, rdlen;
 	char *buf, *zerobuf;
 
 	conn = S2C(session);
 	log = conn->log;
-	if (eof == NULL)
-		return (0);
-	*eof = 0;
-	WT_RET(__wt_filesize(session, fh, &log_size));
-	if (log == NULL)
-		allocsize = WT_LOG_ALIGN;
-	else
-		allocsize = log->allocsize;
+	log_size = fh->size;
+	remainder = log_size - offset;
+	*hole = false;
 
 	/*
 	 * It can be very slow looking for the last real record in the log
-	 * in very small chunks.  Walk backward by a megabyte at a time.  When
-	 * we find a part of the log that is not just zeroes, walk to find
-	 * the last record.
+	 * in very small chunks.  Walk a megabyte at a time.  If we find a
+	 * part of the log that is not just zeroes we know this log file
+	 * has a hole in it.
 	 */
 	buf = zerobuf = NULL;
-	if (allocsize < WT_MEGABYTE && log_size > WT_MEGABYTE)
+	if (log == NULL || log->allocsize < WT_MEGABYTE)
 		bufsz = WT_MEGABYTE;
 	else
-		bufsz = allocsize;
+		bufsz = log->allocsize;
+
+	if (remainder < bufsz)
+		bufsz = remainder;
 	WT_RET(__wt_calloc_def(session, bufsz, &buf));
 	WT_ERR(__wt_calloc_def(session, bufsz, &zerobuf));
 
 	/*
-	 * Read in a chunk starting at the end of the file.  Keep going until
-	 * we reach the beginning or we find a chunk that contains any non-zero
-	 * bytes.  Compare against a known zero byte chunk.
+	 * Read in a chunk starting at the given offset.
+	 * Compare against a known zero byte chunk.
 	 */
-	for (off = log_size - (wt_off_t)bufsz;
-	    off >= 0;
-	    off -= (wt_off_t)bufsz) {
-		WT_ERR(__wt_read(session, fh, off, bufsz, buf));
-		if (memcmp(buf, zerobuf, bufsz) != 0)
+	for (off = offset; remainder > 0;
+	    remainder -= bufsz, off += (wt_off_t)bufsz) {
+		rdlen = WT_MIN(bufsz, remainder);
+		WT_ERR(__wt_read(session, fh, off, rdlen, buf));
+		if (memcmp(buf, zerobuf, rdlen) != 0) {
+			*hole = true;
 			break;
+		}
 	}
 
-	/*
-	 * If we're walking by large amounts, now walk by the real allocsize
-	 * to find the real end, if we found something.  Otherwise we reached
-	 * the beginning of the file.  Offset can go negative if the log file
-	 * size is not a multiple of a megabyte.  The first chunk of the log
-	 * file will always be non-zero.
-	 */
-	if (off < 0)
-		off = 0;
-
-	/*
-	 * We know all log records are aligned at log->allocsize.  The first
-	 * item in a log record is always a 32-bit length.  Look for any
-	 * non-zero length at the allocsize boundary.  This may not be a true
-	 * log record since it could be the middle of a large record.  But we
-	 * know no log record starts after it.  Return an estimate of the log
-	 * file size.
-	 */
-	for (off1 = bufsz - allocsize;
-	    off1 > 0; off1 -= (wt_off_t)allocsize)
-		if (memcmp(buf + off1, zerobuf, sizeof(uint32_t)) != 0)
-			break;
-	off = off + off1;
-
-	/*
-	 * Set EOF to the last zero-filled record we saw.
-	 */
-	*eof = off + (wt_off_t)allocsize;
-err:
-	if (buf != NULL)
+err:	if (buf != NULL)
 		__wt_free(session, buf);
 	if (zerobuf != NULL)
 		__wt_free(session, zerobuf);
@@ -1543,7 +1516,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	}
 	WT_ERR(__log_openfile(
 	    session, false, &log_fh, WT_LOG_FILENAME, start_lsn.file));
-	WT_ERR(__log_filesize(session, log_fh, &log_size));
+	WT_ERR(__wt_filesize(session, log_fh, &log_size));
 	rd_lsn = start_lsn;
 
 	WT_ERR(__wt_scr_alloc(session, WT_LOG_ALIGN, &buf));
@@ -1574,7 +1547,7 @@ advance:
 				break;
 			WT_ERR(__log_openfile(session,
 			    false, &log_fh, WT_LOG_FILENAME, rd_lsn.file));
-			WT_ERR(__log_filesize(session, log_fh, &log_size));
+			WT_ERR(__wt_filesize(session, log_fh, &log_size));
 			eol = false;
 			continue;
 		}
@@ -1592,16 +1565,25 @@ advance:
 		 */
 		reclen = *(uint32_t *)buf->mem;
 		/*
-		 * Log files are pre-allocated.  We never expect a zero length
-		 * unless we've reached the end of the log.  The log can be
-		 * written out of order, so when recovery finds the end of
-		 * the log, truncate the file and remove any later log files
-		 * that may exist.
+		 * Log files are pre-allocated.  We need to detect the
+		 * difference between a hole in the file (where this location
+		 * would be considered the end of log) and the last record
+		 * in the log and we're at the zeroed part of the file.
+		 * If we find a zeroed record, scan forward in the log looking
+		 * for any data.  If we detect any we have a hole and stop.
+		 * Otherwise if the rest is all zeroes advance to the next file.
+		 * When recovery finds the end of the log, truncate the file
+		 * and remove any later log files that may exist.
 		 */
 		if (reclen == 0) {
-			/* This LSN is the end. */
-			eol = true;
-			break;
+			WT_ERR(__log_has_hole(
+			    session, log_fh, rd_lsn.offset, &eol));
+			if (eol)
+				/* Found a hole. This LSN is the end. */
+				break;
+			else
+				/* Last record in log.  Look for more. */
+				goto advance;
 		}
 		rdup_len = __wt_rduppo2(reclen, allocsize);
 		if (reclen > allocsize) {

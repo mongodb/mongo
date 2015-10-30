@@ -194,7 +194,8 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 		if (force && (btree->bm == NULL || btree->bm->map == NULL))  {
 			WT_ERR(__conn_dhandle_mark_dead(session));
 			marked_dead = true;
-		} else
+		}
+		if (!marked_dead || final)
 			WT_ERR(__wt_checkpoint_close(session, final));
 	}
 
@@ -695,7 +696,7 @@ restart:
 
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_conn_dhandle_discard_single(
-		    session, true, false)));
+		    session, true, F_ISSET(conn, WT_CONN_IN_MEMORY))));
 		goto restart;
 	}
 
@@ -712,7 +713,7 @@ restart:
 	while ((dhandle = TAILQ_FIRST(&conn->dhqh)) != NULL)
 		WT_WITH_DHANDLE(session, dhandle,
 		    WT_TRET(__wt_conn_dhandle_discard_single(
-		    session, true, false)));
+		    session, true, F_ISSET(conn, WT_CONN_IN_MEMORY))));
 
 	return (ret);
 }

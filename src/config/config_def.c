@@ -519,6 +519,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_file_manager_subconfigs, 3 },
 	{ "hazard_max", "int", NULL, "min=15", NULL, 0 },
+	{ "in_memory", "boolean", NULL, NULL, NULL, 0 },
 	{ "log", "category",
 	    NULL, NULL,
 	    confchk_wiredtiger_open_log_subconfigs, 8 },
@@ -594,6 +595,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_file_manager_subconfigs, 3 },
 	{ "hazard_max", "int", NULL, "min=15", NULL, 0 },
+	{ "in_memory", "boolean", NULL, NULL, NULL, 0 },
 	{ "log", "category",
 	    NULL, NULL,
 	    confchk_wiredtiger_open_log_subconfigs, 8 },
@@ -974,8 +976,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "eviction_target=80,eviction_trigger=95,exclusive=0,extensions=,"
 	  "file_extend=,file_manager=(close_handle_minimum=250,"
 	  "close_idle_time=30,close_scan_interval=10),hazard_max=1000,"
-	  "log=(archive=,compressor=,enabled=0,file_max=100MB,path=,"
-	  "prealloc=,recover=on,zero_fill=0),lsm_manager=(merge=,"
+	  "in_memory=0,log=(archive=,compressor=,enabled=0,file_max=100MB,"
+	  "path=,prealloc=,recover=on,zero_fill=0),lsm_manager=(merge=,"
 	  "worker_thread_max=4),lsm_merge=,mmap=,multiprocess=0,"
 	  "session_max=100,session_scratch_max=2MB,shared_cache=(chunk=10MB"
 	  ",name=,quota=0,reserve=0,size=500MB),statistics=none,"
@@ -983,7 +985,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),"
 	  "transaction_sync=(enabled=0,method=fsync),use_environment_priv=0"
 	  ",verbose=",
-	  confchk_wiredtiger_open, 34
+	  confchk_wiredtiger_open, 35
 	},
 	{ "wiredtiger_open_all",
 	  "async=(enabled=0,ops_max=1024,threads=2),buffer_alignment=-1,"
@@ -995,8 +997,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "eviction_target=80,eviction_trigger=95,exclusive=0,extensions=,"
 	  "file_extend=,file_manager=(close_handle_minimum=250,"
 	  "close_idle_time=30,close_scan_interval=10),hazard_max=1000,"
-	  "log=(archive=,compressor=,enabled=0,file_max=100MB,path=,"
-	  "prealloc=,recover=on,zero_fill=0),lsm_manager=(merge=,"
+	  "in_memory=0,log=(archive=,compressor=,enabled=0,file_max=100MB,"
+	  "path=,prealloc=,recover=on,zero_fill=0),lsm_manager=(merge=,"
 	  "worker_thread_max=4),lsm_merge=,mmap=,multiprocess=0,"
 	  "session_max=100,session_scratch_max=2MB,shared_cache=(chunk=10MB"
 	  ",name=,quota=0,reserve=0,size=500MB),statistics=none,"
@@ -1004,7 +1006,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),"
 	  "transaction_sync=(enabled=0,method=fsync),use_environment_priv=0"
 	  ",verbose=,version=(major=0,minor=0)",
-	  confchk_wiredtiger_open_all, 35
+	  confchk_wiredtiger_open_all, 36
 	},
 	{ "wiredtiger_open_basecfg",
 	  "async=(enabled=0,ops_max=1024,threads=2),buffer_alignment=-1,"

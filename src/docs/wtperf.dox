@@ -200,6 +200,8 @@ if non zero choose a value from within this range as the key for
 insert operations
 @par random_value (boolean, default=false)
 generate random content for the value
+@par reopen_connection (boolean, default=true)
+close and reopen the connection between populate and workload phases
 @par report_interval (unsigned int, default=2)
 output throughput information every interval seconds, 0 to disable
 @par run_ops (unsigned int, default=0)
