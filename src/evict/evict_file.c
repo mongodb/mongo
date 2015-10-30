@@ -18,10 +18,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
-	WT_TXN *txn;
 	bool evict_reset;
-
-	txn = &session->txn;
 
 	/*
 	 * We need exclusive access to the file -- disable ordinary eviction
@@ -109,9 +106,6 @@ err:		/* On error, clear any left-over tree walk. */
 
 	if (evict_reset)
 		__wt_evict_file_exclusive_off(session);
-
-	if (txn->isolation == WT_ISO_READ_COMMITTED && session->ncursors == 0)
-		__wt_txn_release_snapshot(session);
 
 	return (ret);
 }
