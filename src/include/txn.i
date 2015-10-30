@@ -192,10 +192,11 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 		return (true);
 
 	/*
-	 * A visibility check that is not read-uncommitted must have an
-	 * active snapshot.
+	 * If we don't have a transactional snapshot, only make stable updates
+	 * visible.
 	 */
-	WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT));
+	if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
+		return (__wt_txn_visible_all(session, id));
 
 	/* Transactions see their own changes. */
 	if (id == txn->id)
