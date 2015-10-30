@@ -180,12 +180,14 @@ __split_safe_free(WT_SESSION_IMPL *session,
  *	Return if we should split an internal page.
  */
 static bool
-__split_internal_should_split(WT_SESSION_IMPL *session, WT_PAGE *page)
+__split_internal_should_split(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_BTREE *btree;
+	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 
 	btree = S2BT(session);
+	page = ref->page;
 
 	/*
 	 * Our caller is holding the parent page locked to single-thread splits,
@@ -560,9 +562,10 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	}
 	WT_ASSERT(session,
 	    alloc_refp - alloc_index->index ==
-	    alloc_index->entries - skip_trailing);
+	    (ptrdiff_t)(alloc_index->entries - skip_trailing));
 	WT_ASSERT(session,
-	    parent_refp - pindex->index == pindex->entries - skip_trailing);
+	    parent_refp - pindex->index ==
+	    (ptrdiff_t)(pindex->entries - skip_trailing));
 
 	/*
 	 * Save the number of entries created by deepening the tree and reset
@@ -783,8 +786,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	parent_incr += children * sizeof(WT_REF);
 
 	/* Allocate child pages, and connect them into the new page index. */
-	WT_ASSERT(session, page_refp = pindex->index + chunk);
-	WT_ASSERT(session, alloc_refp = alloc_index->index + 1);
+	WT_ASSERT(session, page_refp == pindex->index + chunk);
+	WT_ASSERT(session, alloc_refp == alloc_index->index + 1);
 	for (i = 1; i < children; ++i) {
 		slots = i == children - 1 ? remain : chunk;
 		WT_ERR(__wt_page_alloc(
@@ -842,9 +845,10 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 		}
 		__wt_cache_page_inmem_incr(session, child, child_incr);
 	}
+	WT_ASSERT(session, alloc_refp -
+	    alloc_index->index == (ptrdiff_t)alloc_index->entries);
 	WT_ASSERT(session,
-	    alloc_refp - alloc_index->index == alloc_index->entries);
-	WT_ASSERT(session, page_refp - pindex->index == pindex->entries);
+	    page_refp - pindex->index == (ptrdiff_t)pindex->entries);
 
 	/* Split into the parent. */
 	WT_ERR(__split_parent(session, page_ref,
@@ -1003,16 +1007,16 @@ __split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page, bool page_hazard)
 	for (;;) {
 		parent = NULL;
 		parent_hazard = false;
+		ref = page->pg_intl_parent_ref;
 
 		/* If we don't need to split the page, we're done. */
-		if (!__split_internal_should_split(session, page))
+		if (!__split_internal_should_split(session, ref))
 			break;
 
 		/*
 		 * If we've reached the root page, there are no subsequent pages
 		 * to review, deepen the tree and quit.
 		 */
-		ref = page->pg_intl_parent_ref;
 		if (__wt_ref_is_root(ref)) {
 			ret = __split_deepen(session, page);
 			break;
