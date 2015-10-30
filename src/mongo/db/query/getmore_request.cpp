@@ -45,7 +45,7 @@ namespace {
 
 const char kCollectionField[] = "collection";
 const char kBatchSizeField[] = "batchSize";
-const char kMaxTimeMSField[] = "maxTimeMS";
+const char kAwaitDataTimeoutField[] = "maxTimeMS";
 const char kTermField[] = "term";
 const char kLastKnownCommittedOpTimeField[] = "lastKnownCommittedOpTime";
 
@@ -58,11 +58,13 @@ GetMoreRequest::GetMoreRequest() : cursorid(0), batchSize(0) {}
 GetMoreRequest::GetMoreRequest(NamespaceString namespaceString,
                                CursorId id,
                                boost::optional<long long> sizeOfBatch,
+                               boost::optional<Milliseconds> awaitDataTimeout,
                                boost::optional<long long> term,
                                boost::optional<repl::OpTime> lastKnownCommittedOpTime)
     : nss(std::move(namespaceString)),
       cursorid(id),
       batchSize(sizeOfBatch),
+      awaitDataTimeout(awaitDataTimeout),
       term(term),
       lastKnownCommittedOpTime(lastKnownCommittedOpTime) {}
 
@@ -104,6 +106,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
 
     // Optional fields.
     boost::optional<long long> batchSize;
+    boost::optional<Milliseconds> awaitDataTimeout;
     boost::optional<long long> term;
     boost::optional<repl::OpTime> lastKnownCommittedOpTime;
 
@@ -131,10 +134,15 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
             }
 
             batchSize = el.numberLong();
-        } else if (str::equals(fieldName, kMaxTimeMSField)) {
-            // maxTimeMS is parsed by the command handling code, so we don't repeat the parsing
-            // here.
-            continue;
+        } else if (str::equals(fieldName, kAwaitDataTimeoutField)) {
+            auto maxAwaitDataTime = LiteParsedQuery::parseMaxTimeMS(el);
+            if (!maxAwaitDataTime.isOK()) {
+                return maxAwaitDataTime.getStatus();
+            }
+
+            if (maxAwaitDataTime.getValue()) {
+                awaitDataTimeout = Milliseconds(maxAwaitDataTime.getValue());
+            }
         } else if (str::equals(fieldName, kTermField)) {
             if (el.type() != BSONType::NumberLong) {
                 return {ErrorCodes::TypeMismatch,
@@ -165,8 +173,12 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                 str::stream() << "Field 'collection' missing in: " << cmdObj};
     }
 
-    GetMoreRequest request(
-        NamespaceString(*fullns), *cursorid, batchSize, term, lastKnownCommittedOpTime);
+    GetMoreRequest request(NamespaceString(*fullns),
+                           *cursorid,
+                           batchSize,
+                           awaitDataTimeout,
+                           term,
+                           lastKnownCommittedOpTime);
     Status validStatus = request.isValid();
     if (!validStatus.isOK()) {
         return validStatus;
@@ -183,6 +195,10 @@ BSONObj GetMoreRequest::toBSON() const {
 
     if (batchSize) {
         builder.append(kBatchSizeField, *batchSize);
+    }
+
+    if (awaitDataTimeout) {
+        builder.append(kAwaitDataTimeoutField, durationCount<Milliseconds>(*awaitDataTimeout));
     }
 
     if (term) {

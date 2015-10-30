@@ -65,4 +65,8 @@ bool RouterStageRemoveSortKey::remotesExhausted() {
     return getChildStage()->remotesExhausted();
 }
 
+Status RouterStageRemoveSortKey::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    return getChildStage()->setAwaitDataTimeout(awaitDataTimeout);
+}
+
 }  // namespace mongo

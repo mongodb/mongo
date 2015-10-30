@@ -125,6 +125,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/rpc/command_status',
+        'lite_parsed_query',
     ]
 )
 

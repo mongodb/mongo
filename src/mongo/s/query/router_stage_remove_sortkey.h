@@ -46,6 +46,8 @@ public:
     void kill() final;
 
     bool remotesExhausted() final;
+
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 };
 
 }  // namespace mongo

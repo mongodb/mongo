@@ -1216,5 +1216,39 @@ TEST(LiteParsedQueryTest, ParseFromCommandForbidExtraOption) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+TEST(LiteParsedQueryTest, ParseMaxTimeMSStringValueFails) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << "foo");
+    ASSERT_NOT_OK(LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]));
+}
+
+TEST(LiteParsedQueryTest, ParseMaxTimeMSNonIntegralValueFails) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << 100.3);
+    ASSERT_NOT_OK(LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]));
+}
+
+TEST(LiteParsedQueryTest, ParseMaxTimeMSOutOfRangeDoubleFails) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << 1e200);
+    ASSERT_NOT_OK(LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]));
+}
+
+TEST(LiteParsedQueryTest, ParseMaxTimeMSNegativeValueFails) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << -400);
+    ASSERT_NOT_OK(LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]));
+}
+
+TEST(LiteParsedQueryTest, ParseMaxTimeMSZeroSucceeds) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << 0);
+    auto maxTime = LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
+    ASSERT_OK(maxTime);
+    ASSERT_EQ(maxTime.getValue(), 0);
+}
+
+TEST(LiteParsedQueryTest, ParseMaxTimeMSPositiveInRangeSucceeds) {
+    BSONObj maxTimeObj = BSON(LiteParsedQuery::cmdOptionMaxTimeMS << 300);
+    auto maxTime = LiteParsedQuery::parseMaxTimeMS(maxTimeObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
+    ASSERT_OK(maxTime);
+    ASSERT_EQ(maxTime.getValue(), 300);
+}
+
 }  // namespace mongo
 }  // namespace

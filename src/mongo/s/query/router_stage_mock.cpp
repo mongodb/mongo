@@ -68,4 +68,17 @@ bool RouterStageMock::remotesExhausted() {
     return _remotesExhausted;
 }
 
+Status RouterStageMock::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    _awaitDataTimeout = awaitDataTimeout;
+    return Status::OK();
+}
+
+StatusWith<Milliseconds> RouterStageMock::getAwaitDataTimeout() {
+    if (!_awaitDataTimeout) {
+        return Status(ErrorCodes::BadValue, "no awaitData timeout set");
+    }
+
+    return *_awaitDataTimeout;
+}
+
 }  // namespace mongo

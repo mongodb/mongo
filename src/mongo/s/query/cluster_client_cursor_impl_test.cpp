@@ -129,6 +129,19 @@ TEST(ClusterClientCursorImpl, RemotesExhausted) {
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 2LL);
 }
 
+TEST(ClusterClientCursorImpl, ForwardsAwaitDataTimeout) {
+    auto mockStage = stdx::make_unique<RouterStageMock>();
+    auto mockStagePtr = mockStage.get();
+    ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
+
+    ClusterClientCursorImpl cursor(std::move(mockStage));
+    ASSERT_OK(cursor.setAwaitDataTimeout(Milliseconds(789)));
+
+    auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();
+    ASSERT_OK(awaitDataTimeout.getStatus());
+    ASSERT_EQ(789, durationCount<Milliseconds>(awaitDataTimeout.getValue()));
+}
+
 }  // namespace
 
 }  // namespace mongo

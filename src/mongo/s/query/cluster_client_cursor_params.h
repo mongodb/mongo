@@ -132,6 +132,9 @@ struct ClusterClientCursorParams {
     // Whether this cursor is tailing a capped collection.
     bool isTailable = false;
 
+    // Whether this cursor has the awaitData option set.
+    bool isAwaitData = false;
+
     // Read preference for where to target the query. This value is only set if initial shard host
     // targeting is necessary and not used if using externally prepared cursor ids.
     boost::optional<ReadPreferenceSetting> readPreference;

@@ -119,6 +119,10 @@ bool ClusterClientCursorImpl::remotesExhausted() {
     return _root->remotesExhausted();
 }
 
+Status ClusterClientCursorImpl::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    return _root->setAwaitDataTimeout(awaitDataTimeout);
+}
+
 std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
     executor::TaskExecutor* executor, ClusterClientCursorParams&& params) {
     const auto skip = params.skip;

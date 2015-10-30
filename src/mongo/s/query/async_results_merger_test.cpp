@@ -117,6 +117,7 @@ protected:
         params.batchSize = getMoreBatchSize ? getMoreBatchSize : lpq->getBatchSize();
         params.skip = lpq->getSkip();
         params.isTailable = lpq->isTailable();
+        params.isAwaitData = lpq->isAwaitData();
         params.isAllowPartialResults = lpq->isAllowPartialResults();
 
         for (const auto& shardId : shardIds) {
@@ -1307,6 +1308,65 @@ TEST_F(AsyncResultsMergerTest, RetryOnHostUnreachableAllowPartialResults) {
     ASSERT_TRUE(arm->ready());
 }
 
+TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true, awaitData: true}");
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}")};
+    responses.emplace_back(_nss, CursorId(123), batch1);
+    scheduleNetworkResponses(std::move(responses), CursorResponse::ResponseType::InitialResponse);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT(!unittest::assertGet(arm->nextReady()));
+
+    ASSERT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
+
+    ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    // Pending getMore request should include maxTimeMS.
+    BSONObj expectedCmdObj = BSON("getMore" << CursorId(123) << "collection"
+                                            << "testcoll"
+                                            << "maxTimeMS" << 789);
+    ASSERT_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
+
+    responses.clear();
+    std::vector<BSONObj> batch2 = {fromjson("{_id: 2}")};
+    responses.emplace_back(_nss, CursorId(0), batch2);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+    executor->waitForEvent(readyEvent);
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()));
+    ASSERT_TRUE(arm->ready());
+    ASSERT(!unittest::assertGet(arm->nextReady()));
+}
+
+TEST_F(AsyncResultsMergerTest, GetMoreRequestWithoutTailableCantHaveMaxTime) {
+    BSONObj findCmd = fromjson("{find: 'testcoll'}");
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
+    ASSERT_NOT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
+    auto killEvent = arm->kill();
+    executor->waitForEvent(killEvent);
+}
+
+TEST_F(AsyncResultsMergerTest, GetMoreRequestWithoutAwaitDataCantHaveMaxTime) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', tailable: true}");
+    makeCursorFromFindCmd(findCmd, {kTestShardIds[0]});
+    ASSERT_NOT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
+    auto killEvent = arm->kill();
+    executor->waitForEvent(killEvent);
+}
 
 }  // namespace
 

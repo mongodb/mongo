@@ -220,6 +220,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     params.batchSize = query.getParsed().getEffectiveBatchSize();
     params.skip = query.getParsed().getSkip();
     params.isTailable = query.getParsed().isTailable();
+    params.isAwaitData = query.getParsed().isAwaitData();
     params.isAllowPartialResults = query.getParsed().isAllowPartialResults();
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
@@ -405,6 +406,13 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
         return pinnedCursor.getStatus();
     }
     invariant(request.cursorid == pinnedCursor.getValue().getCursorId());
+
+    if (request.awaitDataTimeout) {
+        auto status = pinnedCursor.getValue().setAwaitDataTimeout(*request.awaitDataTimeout);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
 
     std::vector<BSONObj> batch;
     int bytesBuffered = 0;

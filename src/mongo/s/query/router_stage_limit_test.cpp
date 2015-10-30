@@ -164,6 +164,19 @@ TEST(RouterStageLimitTest, LimitStageRemotesExhausted) {
     ASSERT_TRUE(limitStage->remotesExhausted());
 }
 
+TEST(RouterStageLimitTest, ForwardsAwaitDataTimeout) {
+    auto mockStage = stdx::make_unique<RouterStageMock>();
+    auto mockStagePtr = mockStage.get();
+    ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
+
+    auto limitStage = stdx::make_unique<RouterStageLimit>(std::move(mockStage), 100);
+    ASSERT_OK(limitStage->setAwaitDataTimeout(Milliseconds(789)));
+
+    auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();
+    ASSERT_OK(awaitDataTimeout.getStatus());
+    ASSERT_EQ(789, durationCount<Milliseconds>(awaitDataTimeout.getValue()));
+}
+
 }  // namespace
 
 }  // namespace mongo

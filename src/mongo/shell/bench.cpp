@@ -398,6 +398,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
         GetMoreRequest getMoreRequest(lpq->nss(),
                                       cursorResponse.getCursorId(),
                                       lpq->getBatchSize(),
+                                      boost::none,   // maxTimeMS
                                       boost::none,   // term
                                       boost::none);  // lastKnownCommittedOpTime
         BSONObj getMoreCommandResult;

@@ -32,6 +32,8 @@
 
 #include "mongo/s/query/cluster_client_cursor_mock.h"
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
 ClusterClientCursorMock::ClusterClientCursorMock(stdx::function<void(void)> killCallback)
@@ -89,6 +91,10 @@ void ClusterClientCursorMock::markRemotesNotExhausted() {
 
 void ClusterClientCursorMock::queueError(Status status) {
     _resultsQueue.push({status});
+}
+
+Status ClusterClientCursorMock::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo

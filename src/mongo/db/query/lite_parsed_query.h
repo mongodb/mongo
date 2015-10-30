@@ -119,16 +119,9 @@ public:
     void asFindCommand(BSONObjBuilder* cmdBuilder) const;
 
     /**
-     * Helper functions to parse maxTimeMS from a command object.  Returns the contained value,
-     * or an error on parsing fail.  When passed an EOO-type element, returns 0 (special value
-     * for "allow to run indefinitely").
+     * Parses maxTimeMS from the BSONElement containing its value.
      */
-    static StatusWith<int> parseMaxTimeMSCommand(const BSONObj& cmdObj);
-
-    /**
-     * Same as parseMaxTimeMSCommand, but for a query object.
-     */
-    static StatusWith<int> parseMaxTimeMSQuery(const BSONObj& queryObj);
+    static StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt);
 
     /**
      * Helper function to identify text search sort key
@@ -297,8 +290,6 @@ public:
      */
     static StatusWith<std::unique_ptr<LiteParsedQuery>> fromLegacyQueryMessage(
         const QueryMessage& qm);
-
-    static StatusWith<int> parseMaxTimeMS(const BSONElement& maxTimeMSElt);
 
 private:
     LiteParsedQuery(NamespaceString nss);

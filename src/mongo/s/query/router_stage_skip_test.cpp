@@ -200,6 +200,19 @@ TEST(RouterStageSkipTest, SkipStageRemotesExhausted) {
     ASSERT_TRUE(skipStage->remotesExhausted());
 }
 
+TEST(RouterStageSkipTest, ForwardsAwaitDataTimeout) {
+    auto mockStage = stdx::make_unique<RouterStageMock>();
+    auto mockStagePtr = mockStage.get();
+    ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
+
+    auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 3);
+    ASSERT_OK(skipStage->setAwaitDataTimeout(Milliseconds(789)));
+
+    auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();
+    ASSERT_OK(awaitDataTimeout.getStatus());
+    ASSERT_EQ(789, durationCount<Milliseconds>(awaitDataTimeout.getValue()));
+}
+
 }  // namespace
 
 }  // namespace mongo

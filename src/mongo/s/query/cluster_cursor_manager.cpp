@@ -148,6 +148,11 @@ bool ClusterCursorManager::PinnedCursor::remotesExhausted() {
     return _cursor->remotesExhausted();
 }
 
+Status ClusterCursorManager::PinnedCursor::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    invariant(_cursor);
+    return _cursor->setAwaitDataTimeout(awaitDataTimeout);
+}
+
 void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
     invariant(_cursor);
 

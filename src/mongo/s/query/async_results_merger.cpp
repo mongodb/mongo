@@ -111,6 +111,18 @@ bool AsyncResultsMerger::remotesExhausted_inlock() {
     return true;
 }
 
+Status AsyncResultsMerger::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (!_params.isTailable || !_params.isAwaitData) {
+        return Status(ErrorCodes::BadValue,
+                      "maxTimeMS can only be used with getMore for tailable, awaitData cursors");
+    }
+
+    _awaitDataTimeout = awaitDataTimeout;
+    return Status::OK();
+}
+
 bool AsyncResultsMerger::ready() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return ready_inlock();
@@ -268,10 +280,12 @@ Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
             adjustedBatchSize = *_params.batchSize - remote.fetchedCount;
         }
 
-        cmdObj =
-            GetMoreRequest(
-                _params.nsString, *remote.cursorId, adjustedBatchSize, boost::none, boost::none)
-                .toBSON();
+        cmdObj = GetMoreRequest(_params.nsString,
+                                *remote.cursorId,
+                                adjustedBatchSize,
+                                _awaitDataTimeout,
+                                boost::none,
+                                boost::none).toBSON();
     } else {
         // Do the first time shard host resolution.
         invariant(_params.readPreference);

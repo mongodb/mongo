@@ -149,6 +149,19 @@ TEST(RouterStageRemoveSortKeyTest, RemotesExhausted) {
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 }
 
+TEST(RouterStageRemoveSortKeyTest, ForwardsAwaitDataTimeout) {
+    auto mockStage = stdx::make_unique<RouterStageMock>();
+    auto mockStagePtr = mockStage.get();
+    ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
+
+    auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(std::move(mockStage));
+    ASSERT_OK(sortKeyStage->setAwaitDataTimeout(Milliseconds(789)));
+
+    auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();
+    ASSERT_OK(awaitDataTimeout.getStatus());
+    ASSERT_EQ(789, durationCount<Milliseconds>(awaitDataTimeout.getValue()));
+}
+
 }  // namespace
 
 }  // namespace mongo

@@ -53,6 +53,8 @@ public:
 
     void queueResult(const BSONObj& obj) final;
 
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
+
     /**
      * Returns true unless marked as having non-exhausted remote cursors via
      * markRemotesNotExhausted().

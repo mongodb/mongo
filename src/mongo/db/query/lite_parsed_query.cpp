@@ -666,17 +666,7 @@ Status LiteParsedQuery::validate() const {
 }
 
 // static
-StatusWith<int> LiteParsedQuery::parseMaxTimeMSCommand(const BSONObj& cmdObj) {
-    return parseMaxTimeMS(cmdObj[cmdOptionMaxTimeMS]);
-}
-
-// static
-StatusWith<int> LiteParsedQuery::parseMaxTimeMSQuery(const BSONObj& queryObj) {
-    return parseMaxTimeMS(queryObj[queryOptionMaxTimeMS]);
-}
-
-// static
-StatusWith<int> LiteParsedQuery::parseMaxTimeMS(const BSONElement& maxTimeMSElt) {
+StatusWith<int> LiteParsedQuery::parseMaxTimeMS(BSONElement maxTimeMSElt) {
     if (!maxTimeMSElt.eoo() && !maxTimeMSElt.isNumber()) {
         return StatusWith<int>(
             ErrorCodes::BadValue,

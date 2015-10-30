@@ -40,6 +40,7 @@
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -89,6 +90,15 @@ public:
      * Returns true if all of the remote cursors are exhausted.
      */
     bool remotesExhausted();
+
+    /**
+     * Sets the maxTimeMS value that the ARM should forward with any internally issued getMore
+     * requests.
+     *
+     * Returns a non-OK status if this cursor type does not support maxTimeMS on getMore (i.e. if
+     * the cursor is not tailable + awaitData).
+     */
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
 
     /**
      * Returns true if there is no need to schedule remote work in order to take the next action.
@@ -351,6 +361,8 @@ private:
     // For tailable cursors, set to true if the next result returned from nextReady() should be
     // boost::none.
     bool _eofNext = false;
+
+    boost::optional<Milliseconds> _awaitDataTimeout;
 
     //
     // Killing

@@ -264,7 +264,8 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
     QuerySpec qSpec((string)q.ns, q.query, q.fields, q.ntoskip, q.ntoreturn, q.queryOptions);
 
     // Parse "$maxTimeMS".
-    StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSQuery(q.query);
+    StatusWith<int> maxTimeMS =
+        LiteParsedQuery::parseMaxTimeMS(q.query[LiteParsedQuery::queryOptionMaxTimeMS]);
     uassert(17233, maxTimeMS.getStatus().reason(), maxTimeMS.isOK());
 
     if (_isSystemIndexes(q.ns) && doShardedIndexQuery(txn, request, qSpec)) {
@@ -576,7 +577,8 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
         if (ntoreturn) {
             batchSize = abs(ntoreturn);
         }
-        GetMoreRequest getMoreRequest(NamespaceString(ns), id, batchSize, boost::none, boost::none);
+        GetMoreRequest getMoreRequest(
+            NamespaceString(ns), id, batchSize, boost::none, boost::none, boost::none);
 
         auto cursorResponse = ClusterFind::runGetMore(txn, getMoreRequest);
         if (cursorResponse == ErrorCodes::CursorNotFound) {

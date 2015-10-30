@@ -51,6 +51,8 @@ public:
 
     bool remotesExhausted() final;
 
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
+
 private:
     // Not owned here.
     executor::TaskExecutor* _executor;

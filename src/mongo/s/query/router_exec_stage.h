@@ -33,6 +33,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -70,6 +71,15 @@ public:
      * Returns whether or not all the remote cursors are exhausted.
      */
     virtual bool remotesExhausted() = 0;
+
+    /**
+     * Sets the maxTimeMS value that the cursor should forward with any internally issued getMore
+     * requests.
+     *
+     * Returns a non-OK status if this cursor type does not support maxTimeMS on getMore (i.e. if
+     * the cursor is not tailable + awaitData).
+     */
+    virtual Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) = 0;
 
 protected:
     /**

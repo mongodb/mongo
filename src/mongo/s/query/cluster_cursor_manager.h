@@ -189,6 +189,15 @@ public:
          */
         bool remotesExhausted();
 
+        /**
+         * Sets the maxTimeMS value that the cursor should forward with any internally issued
+         * getMore requests. A cursor must be owned.
+         *
+         * Returns a non-OK status if this cursor type does not support maxTimeMS on getMore (i.e.
+         * if the cursor is not tailable + awaitData).
+         */
+        Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
+
     private:
         // ClusterCursorManager is a friend so that its methods can call the PinnedCursor
         // constructor declared below, which is private to prevent clients from calling it directly.

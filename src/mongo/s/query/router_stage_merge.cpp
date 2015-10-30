@@ -64,4 +64,8 @@ bool RouterStageMerge::remotesExhausted() {
     return _arm.remotesExhausted();
 }
 
+Status RouterStageMerge::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    return _arm.setAwaitDataTimeout(awaitDataTimeout);
+}
+
 }  // namespace mongo

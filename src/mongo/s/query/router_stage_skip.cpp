@@ -64,4 +64,8 @@ bool RouterStageSkip::remotesExhausted() {
     return getChildStage()->remotesExhausted();
 }
 
+Status RouterStageSkip::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    return getChildStage()->setAwaitDataTimeout(awaitDataTimeout);
+}
+
 }  // namespace mongo

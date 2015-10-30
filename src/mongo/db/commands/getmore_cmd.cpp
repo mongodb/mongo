@@ -228,6 +228,12 @@ public:
             }
         }
 
+        if (request.awaitDataTimeout && !isCursorAwaitData(cursor)) {
+            Status status(ErrorCodes::BadValue,
+                          "cannot set maxTimeMS on getMore command for a non-awaitData cursor");
+            return appendCommandStatus(result, status);
+        }
+
         // Validate term, if provided.
         if (request.term) {
             auto replCoord = repl::ReplicationCoordinator::get(txn);

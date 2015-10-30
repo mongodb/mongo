@@ -108,6 +108,8 @@ public:
 
     bool remotesExhausted() final;
 
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
+
 private:
     /**
      * Constructs a cluster client cursor.

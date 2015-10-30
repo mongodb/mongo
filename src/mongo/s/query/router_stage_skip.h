@@ -45,6 +45,8 @@ public:
 
     bool remotesExhausted() final;
 
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
+
 private:
     long long _skip;
 

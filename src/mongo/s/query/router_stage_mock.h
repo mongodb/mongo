@@ -49,6 +49,8 @@ public:
 
     bool remotesExhausted() final;
 
+    Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
+
     /**
      * Queues a BSONObj to be returned.
      */
@@ -70,9 +72,15 @@ public:
      */
     void markRemotesExhausted();
 
+    /**
+     * Gets the timeout for awaitData, or an error if none was set.
+     */
+    StatusWith<Milliseconds> getAwaitDataTimeout();
+
 private:
     std::queue<StatusWith<boost::optional<BSONObj>>> _resultsQueue;
     bool _remotesExhausted = false;
+    boost::optional<Milliseconds> _awaitDataTimeout;
 };
 
 }  // namespace mongo

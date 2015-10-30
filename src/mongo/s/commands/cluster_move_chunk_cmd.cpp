@@ -216,7 +216,8 @@ public:
 
         LOG(0) << "CMD: movechunk: " << cmdObj;
 
-        StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSCommand(cmdObj);
+        StatusWith<int> maxTimeMS =
+            LiteParsedQuery::parseMaxTimeMS(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
 
         if (!maxTimeMS.isOK()) {
             errmsg = maxTimeMS.getStatus().reason();

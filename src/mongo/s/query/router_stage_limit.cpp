@@ -63,4 +63,8 @@ bool RouterStageLimit::remotesExhausted() {
     return getChildStage()->remotesExhausted();
 }
 
+Status RouterStageLimit::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
+    return getChildStage()->setAwaitDataTimeout(awaitDataTimeout);
+}
+
 }  // namespace mongo
