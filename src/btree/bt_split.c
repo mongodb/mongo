@@ -841,7 +841,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	/* Any parent reference is filled in by our caller. */
 	ref->home = NULL;
 
-	if (multi->supd == NULL && multi->supd_dsk == NULL) {
+	if (multi->supd_dsk == NULL) {
 		/*
 		 * Copy the address: we could simply take the buffer, but that
 		 * would complicate error handling, freeing the reference array

@@ -5292,7 +5292,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_free(session, multi->key.ikey);
 			break;
 		}
-		if (multi->supd == NULL && multi->supd_dsk == NULL) {
+		if (multi->supd_dsk == NULL) {
 			if (multi->addr.reuse)
 				multi->addr.addr = NULL;
 			else {
@@ -5642,7 +5642,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_RET(__wt_row_ikey_alloc(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
 
-		if (bnd->supd != NULL || F_ISSET(r, WT_EVICT_IN_MEMORY)) {
+		if (bnd->dsk != NULL) {
 			multi->supd = bnd->supd;
 			multi->supd_entries = bnd->supd_next;
 			bnd->supd = NULL;
@@ -5682,7 +5682,7 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
 		multi->key.recno = bnd->recno;
 
-		if (bnd->supd != NULL || F_ISSET(r, WT_EVICT_IN_MEMORY)) {
+		if (bnd->dsk != NULL) {
 			multi->supd = bnd->supd;
 			multi->supd_entries = bnd->supd_next;
 			bnd->supd = NULL;
