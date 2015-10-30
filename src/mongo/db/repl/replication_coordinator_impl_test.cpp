@@ -1284,7 +1284,6 @@ TEST_F(ReplCoordTest, UpdateTerm) {
     Handle cbHandle;
     ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(2).code());
     ASSERT_EQUALS(2, getReplCoord()->getTerm());
-    getReplCoord()->waitForStepDownFinish_forTest();
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
 
@@ -1322,33 +1321,25 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
     replExec->scheduleWorkWithGlobalExclusiveLock(stepDownFinishBlocker);
 
     bool termUpdated2 = false;
-    auto updateTermResult2 = getReplCoord()->updateTerm_nonBlocking(2, &termUpdated2);
-    ASSERT_OK(updateTermResult2.getStatus());
+    auto updateTermEvh2 = getReplCoord()->updateTerm_forTest(2, &termUpdated2);
+    ASSERT(updateTermEvh2.isValid());
 
     bool termUpdated3 = false;
-    auto updateTermResult3 = getReplCoord()->updateTerm_nonBlocking(3, &termUpdated3);
-    ASSERT_OK(updateTermResult3.getStatus());
+    auto updateTermEvh3 = getReplCoord()->updateTerm_forTest(3, &termUpdated3);
+    ASSERT(updateTermEvh3.isValid());
 
     // Unblock 'stepDownFinishBlocker'. Tasks for updateTerm and _stepDownFinish should proceed.
     barrier.countDownAndWait();
 
     // Both _updateTerm_incallback tasks should be scheduled.
-    auto handle2 = updateTermResult2.getValue();
-    ASSERT_TRUE(handle2.isValid());
-    replExec->wait(handle2);
+    replExec->waitForEvent(updateTermEvh2);
     ASSERT_TRUE(termUpdated2);
-
-    auto handle3 = updateTermResult3.getValue();
-    ASSERT_TRUE(handle3.isValid());
-    replExec->wait(handle3);
+    replExec->waitForEvent(updateTermEvh3);
     ASSERT_TRUE(termUpdated3);
 
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
 
-    // Ensure all global exclusive lock tasks (eg. _stepDownFinish) run to completion.
-    auto work = [](const executor::TaskExecutor::CallbackArgs&) {};
-    replExec->wait(unittest::assertGet(replExec->scheduleWorkWithGlobalExclusiveLock(work)));
-    getReplCoord()->waitForStepDownFinish_forTest();
+    // Update term event handles will wait for potential stepdown.
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
 
@@ -3310,7 +3301,11 @@ TEST_F(ReplCoordTest, LivenessElectionTimeout) {
         }
     }
     getNet()->exitNetwork();
-    getReplCoord()->waitForStepDownFinish_forTest();
+
+    // Ensure all global exclusive lock tasks (eg. _stepDownFinish) run to completion.
+    auto exec = getReplExec();
+    auto work = [](const executor::TaskExecutor::CallbackArgs&) {};
+    exec->wait(unittest::assertGet(exec->scheduleWorkWithGlobalExclusiveLock(work)));
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getReplCoord()->getMemberState().s);
 }
 

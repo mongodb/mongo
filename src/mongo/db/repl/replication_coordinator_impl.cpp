@@ -405,6 +405,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         _setCurrentRSConfig_inlock(cbData, localConfig, myIndex.getValue());
     _setMyLastOptimeAndReport_inlock(&lk, lastOpTime, false);
     _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
+    // Step down is impossible, so we don't need to wait for the returned event.
     _updateTerm_incallback(term);
     LOG(1) << "Current term is now " << term;
     if (lk.owns_lock()) {
@@ -1724,8 +1725,13 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result)
 }
 
 void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {
-    _scheduleWorkAndWaitForCompletion(stdx::bind(
-        &ReplicationCoordinatorImpl::_processReplSetMetadata_incallback, this, replMetadata));
+    EventHandle evh;
+    _scheduleWorkAndWaitForCompletion([this, &evh, &replMetadata](const CallbackArgs& args) {
+        evh = _processReplSetMetadata_incallback(replMetadata);
+    });
+    if (evh.isValid()) {
+        _replExecutor.waitForEvent(evh);
+    }
 }
 
 void ReplicationCoordinatorImpl::cancelAndRescheduleElectionTimeout() {
@@ -1733,13 +1739,13 @@ void ReplicationCoordinatorImpl::cancelAndRescheduleElectionTimeout() {
     _cancelAndRescheduleElectionTimeout_inlock();
 }
 
-void ReplicationCoordinatorImpl::_processReplSetMetadata_incallback(
+EventHandle ReplicationCoordinatorImpl::_processReplSetMetadata_incallback(
     const rpc::ReplSetMetadata& replMetadata) {
     if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
-        return;
+        return EventHandle();
     }
     _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
-    _updateTerm_incallback(replMetadata.getTerm());
+    return _updateTerm_incallback(replMetadata.getTerm());
 }
 
 bool ReplicationCoordinatorImpl::getMaintenanceMode() {
@@ -1908,11 +1914,6 @@ Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& 
     }
     fassert(18508, cbh.getStatus());
     _replExecutor.wait(cbh.getValue());
-
-    // Wait if heartbeat causes stepdown.
-    if (_stepDownFinishedEvent.isValid()) {
-        _replExecutor.waitForEvent(_stepDownFinishedEvent);
-    }
     return result;
 }
 
@@ -2849,12 +2850,6 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
     if (!termStatus.isOK() && termStatus.code() != ErrorCodes::StaleTerm)
         return termStatus;
 
-    // Term update may cause current primary step down, we need to wait until it
-    // finishes so that it won't close our connection.
-    if (_stepDownFinishedEvent.isValid()) {
-        _replExecutor.waitForEvent(_stepDownFinishedEvent);
-    }
-
     Status result{ErrorCodes::InternalError, "didn't set status in processReplSetRequestVotes"};
     CBHStatus cbh = _replExecutor.scheduleWork(
         stdx::bind(&ReplicationCoordinatorImpl::_processReplSetRequestVotes_finish,
@@ -2993,10 +2988,6 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
     fassert(28645, cbh.getStatus());
     _replExecutor.wait(cbh.getValue());
 
-    // Wait if heartbeat causes stepdown.
-    if (_stepDownFinishedEvent.isValid()) {
-        _replExecutor.waitForEvent(_stepDownFinishedEvent);
-    }
     return result;
 }
 
@@ -3084,8 +3075,25 @@ void ReplicationCoordinatorImpl::_getTerm_helper(const ReplicationExecutor::Call
     *term = _topCoord->getTerm();
 }
 
-StatusWith<ReplicationExecutor::CallbackHandle> ReplicationCoordinatorImpl::updateTerm_nonBlocking(
-    long long term, bool* updated) {
+EventHandle ReplicationCoordinatorImpl::updateTerm_forTest(long long term, bool* updated) {
+    auto finishEvhStatus = _replExecutor.makeEvent();
+    invariantOK(finishEvhStatus.getStatus());
+    EventHandle finishEvh = finishEvhStatus.getValue();
+    auto signalFinishEvent =
+        [this, finishEvh](const CallbackArgs&) { this->_replExecutor.signalEvent(finishEvh); };
+    auto work = [this, term, updated, signalFinishEvent](const CallbackArgs& args) {
+        auto evh = _updateTerm_incallback(term, updated);
+        if (evh.isValid()) {
+            _replExecutor.onEvent(evh, signalFinishEvent);
+        } else {
+            signalFinishEvent(args);
+        }
+    };
+    _scheduleWork(work);
+    return finishEvh;
+}
+
+Status ReplicationCoordinatorImpl::updateTerm(long long term) {
     // Term is only valid if we are replicating.
     if (getReplicationMode() != modeReplSet) {
         return {ErrorCodes::BadValue, "cannot supply 'term' without active replication"};
@@ -3093,25 +3101,19 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationCoordinatorImpl::upda
 
     if (!isV1ElectionProtocol()) {
         // Do not update if not in V1 protocol.
-        return ReplicationExecutor::CallbackHandle();
+        return Status::OK();
     }
 
-    auto work =
-        [this, term, updated](const CallbackArgs&) { *updated = _updateTerm_incallback(term); };
-    return _scheduleWork(work);
-}
-
-Status ReplicationCoordinatorImpl::updateTerm(long long term) {
     bool updated = false;
-    auto result = updateTerm_nonBlocking(term, &updated);
-    if (!result.isOK()) {
-        return result.getStatus();
+    EventHandle finishEvh;
+    auto work = [this, term, &updated, &finishEvh](const CallbackArgs&) {
+        finishEvh = _updateTerm_incallback(term, &updated);
+    };
+    _scheduleWorkAndWaitForCompletion(work);
+    // Wait for potential stepdown to finish.
+    if (finishEvh.isValid()) {
+        _replExecutor.waitForEvent(finishEvh);
     }
-    auto handle = result.getValue();
-    if (handle.isValid()) {
-        _replExecutor.wait(handle);
-    }
-
     if (updated) {
         return {ErrorCodes::StaleTerm, "Replication term of this node was stale; retry query"};
     }
@@ -3119,30 +3121,34 @@ Status ReplicationCoordinatorImpl::updateTerm(long long term) {
     return Status::OK();
 }
 
-bool ReplicationCoordinatorImpl::_updateTerm_incallback(long long term) {
+EventHandle ReplicationCoordinatorImpl::_updateTerm_incallback(long long term, bool* updated) {
     if (!isV1ElectionProtocol()) {
         LOG(3) << "Cannot update term in election protocol version 0";
-        return false;
+        return EventHandle();
     }
 
     auto now = _replExecutor.now();
-    bool updated = _topCoord->updateTerm(term, now);
+    bool termUpdated = _topCoord->updateTerm(term, now);
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _cachedTerm = _topCoord->getTerm();
 
-        if (updated) {
+        if (termUpdated) {
             _cancelPriorityTakeover_inlock();
             _cancelAndRescheduleElectionTimeout_inlock();
         }
     }
 
-    if (updated && getMemberState().primary()) {
+    if (updated) {
+        *updated = termUpdated;
+    }
+
+    if (termUpdated && getMemberState().primary()) {
         log() << "stepping down from primary, because a new term has begun: " << term;
         _topCoord->prepareForStepDown();
-        _stepDownStart();
+        return _stepDownStart();
     }
-    return updated;
+    return EventHandle();
 }
 
 SnapshotName ReplicationCoordinatorImpl::reserveSnapshotName(OperationContext* txn) {
@@ -3243,12 +3249,6 @@ void ReplicationCoordinatorImpl::waitForElectionFinish_forTest() {
 void ReplicationCoordinatorImpl::waitForElectionDryRunFinish_forTest() {
     if (_electionDryRunFinishedEvent.isValid()) {
         _replExecutor.waitForEvent(_electionDryRunFinishedEvent);
-    }
-}
-
-void ReplicationCoordinatorImpl::waitForStepDownFinish_forTest() {
-    if (_stepDownFinishedEvent.isValid()) {
-        _replExecutor.waitForEvent(_stepDownFinishedEvent);
     }
 }
 
