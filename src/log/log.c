@@ -1217,7 +1217,7 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, bool *hole)
 	 * Compare against a known zero byte chunk.
 	 */
 	for (off = offset; remainder > 0;
-	    remainder -= rdlen, off += (wt_off_t)rdlen) {
+	    remainder -= (wt_off_t)rdlen, off += (wt_off_t)rdlen) {
 		rdlen = WT_MIN(bufsz, (size_t)remainder);
 		WT_ERR(__wt_read(session, fh, off, rdlen, buf));
 		if (memcmp(buf, zerobuf, rdlen) != 0) {
