@@ -3222,16 +3222,17 @@ supd_check_complete:
 	}
 
 	/*
-	 * If using the save/restore eviction path and we had to skip updates in
-	 * order to build this disk image, we can't actually write it. Instead,
-	 * we will re-instantiate the page using the disk image and the list of
-	 * updates we skipped.
-	 *
-	 * With an in-memory database, we always take this path.
+	 * If configured for an in-memory database, or using the save/restore
+	 * eviction path and we had to skip updates in order to build this disk
+	 * image, we can't actually write it. Instead, we will re-instantiate
+	 * the page using the disk image and any list of updates we skipped.
 	 */
-	if ((F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) ||
-	    F_ISSET(r, WT_EVICT_IN_MEMORY)) {
-		r->cache_write_restore = true;
+	if (F_ISSET(r, WT_EVICT_IN_MEMORY) ||
+	    (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL)) {
+
+		/* Statistics tracking that we used update/restore. */
+		if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL)
+			r->cache_write_restore = true;
 
 		/*
 		 * If the buffer is compressed (raw compression was configured),
