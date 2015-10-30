@@ -1030,17 +1030,11 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	result_entries = (parent_entries + new_entries) - deleted_entries;
 
 	/*
-	 * If the entire (sub)tree is empty, leave the first ref in place,
-	 * deleted.
+	 * If the entire (sub)tree is empty, give up: we can't leave an empty
+	 * internal page.
 	 */
-	if (result_entries == 0) {
-		next_ref = pindex->index[0];
-		WT_ASSERT(session, next_ref->state == WT_REF_SPLIT ||
-		    (next_ref == ref && ref->state == WT_REF_LOCKED));
-		next_ref->state = WT_REF_DELETED;
-		--deleted_entries;
-		result_entries = 1;
-	}
+	if (result_entries == 0)
+		return (0);
 
 	/*
 	 * Allocate and initialize a new page index array for the parent, then
@@ -1085,6 +1079,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			/* Skip refs we have marked for deletion. */
 			*alloc_refp++ = next_ref;
 	}
+
+	/* Check that we filled in all the entries. */
+	WT_ASSERT(session, alloc_refp - alloc_index->index == result_entries);
 
 	/*
 	 * Confirm the parent page's index hasn't moved then update it, which

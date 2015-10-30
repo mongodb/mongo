@@ -18,10 +18,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *next_ref, *ref;
-	WT_TXN *txn;
 	bool evict_reset;
-
-	txn = &session->txn;
 
 	/*
 	 * We need exclusive access to the file -- disable ordinary eviction
@@ -31,9 +28,6 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 
 	/* Make sure the oldest transaction ID is up-to-date. */
 	__wt_txn_update_oldest(session, true);
-
-	if (txn->isolation == WT_ISO_READ_COMMITTED)
-		__wt_txn_get_snapshot(session);
 
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;
@@ -64,10 +58,6 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 		 */
 		if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page))
 			WT_ERR(__wt_reconcile(session, ref, NULL, WT_EVICTING));
-
-		/* Update our snapshot for each new page. */
-		if (txn->isolation == WT_ISO_READ_COMMITTED)
-			__wt_txn_get_snapshot(session);
 
 		/*
 		 * We can't evict the page just returned to us (it marks our
@@ -116,9 +106,6 @@ err:		/* On error, clear any left-over tree walk. */
 
 	if (evict_reset)
 		__wt_evict_file_exclusive_off(session);
-
-	if (txn->isolation == WT_ISO_READ_COMMITTED && session->ncursors == 0)
-		__wt_txn_release_snapshot(session);
 
 	return (ret);
 }

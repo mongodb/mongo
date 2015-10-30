@@ -385,7 +385,7 @@ __evict_review(
 	 * Clean pages can't be evicted when running in memory only. This
 	 * should be uncommon - we don't add clean pages to the queue.
 	 */
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !modified)
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !modified && !closing)
 		return (EBUSY);
 
 	/*
