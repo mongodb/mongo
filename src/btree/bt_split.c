@@ -211,7 +211,8 @@ __split_should_deepen(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * splitting into parent pages can become large enough to result
 	 * in slow operations.
 	 */
-	if (pindex->entries > btree->split_deepen_min_child)
+	if (!__wt_ref_is_root(ref) &&
+	    pindex->entries > btree->split_deepen_min_child)
 		return (true);
 
 	return (false);
