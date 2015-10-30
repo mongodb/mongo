@@ -1220,11 +1220,13 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, bool *hole)
 	    remainder -= bufsz, off += (wt_off_t)bufsz) {
 		rdlen = WT_MIN(bufsz, remainder);
 		WT_ERR(__wt_read(session, fh, off, rdlen, buf));
-		if (memcmp(buf, zerobuf, rdlen) != 0)
+		if (memcmp(buf, zerobuf, rdlen) != 0) {
 			*hole = true;
+			break;
+		}
 	}
-err:
-	if (buf != NULL)
+
+err:	if (buf != NULL)
 		__wt_free(session, buf);
 	if (zerobuf != NULL)
 		__wt_free(session, zerobuf);
@@ -1576,7 +1578,7 @@ advance:
 		if (reclen == 0) {
 			WT_ERR(__log_has_hole(
 			    session, log_fh, rd_lsn.offset, &eol));
-			if (eol == true)
+			if (eol)
 				/* Found a hole. This LSN is the end. */
 				break;
 			else
