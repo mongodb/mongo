@@ -1227,8 +1227,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		if (__wt_page_is_empty(page))
 			goto fast;
 
-		/* Optionally ignore clean pages. */
-		if (!modified && FLD_ISSET(cache->state, WT_EVICT_PASS_DIRTY))
+		/* Skip clean pages if appropriate. */
+		if (!modified && (F_ISSET(conn, WT_CONN_IN_MEMORY) ||
+		    FLD_ISSET(cache->state, WT_EVICT_PASS_DIRTY)))
 			continue;
 
 		/*

@@ -106,7 +106,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		conn->cache->evict_max_page_size = page->memory_footprint;
 
 	/* Update the reference and discard the page. */
-	if (mod == NULL || mod->rec_result == 0) {
+	if ((mod == NULL || mod->rec_result == 0) &&
+	    !F_ISSET(conn, WT_CONN_IN_MEMORY)) {
 		if (__wt_ref_is_root(ref))
 			__wt_ref_out(session, ref);
 		else
@@ -356,6 +357,7 @@ __evict_review(
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t flags;
+	bool modified;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -377,6 +379,15 @@ __evict_review(
 	/* Now that we have exclusive access, review the page. */
 	page = ref->page;
 
+	modified = __wt_page_is_modified(ref->page);
+
+	/*
+	 * Clean pages can't be evicted when running in memory only. This
+	 * should be uncommon - we don't add clean pages to the queue.
+	 */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !modified)
+		return (EBUSY);
+
 	/*
 	 * Fail if an internal has active children, the children must be evicted
 	 * first. The test is necessary but shouldn't fire much: the eviction
@@ -395,7 +406,7 @@ __evict_review(
 		 * Update the oldest ID to avoid wasted effort should it have
 		 * fallen behind current.
 		 */
-		if (__wt_page_is_modified(page))
+		if (modified)
 			__wt_txn_update_oldest(session, true);
 
 		if (!__wt_page_can_evict(session, ref, false, inmem_splitp))
@@ -413,7 +424,7 @@ __evict_review(
 	}
 
 	/* If the page is clean, we're done and we can evict. */
-	if (!__wt_page_is_modified(page))
+	if (!modified)
 		return (0);
 
 	/*
@@ -443,7 +454,9 @@ __evict_review(
 	if (closing)
 		LF_SET(WT_VISIBILITY_ERR);
 	else if (!WT_PAGE_IS_INTERNAL(page)) {
-		if (page->read_gen == WT_READGEN_OLDEST)
+		if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+			LF_SET(WT_EVICT_IN_MEMORY | WT_EVICT_UPDATE_RESTORE);
+		else if (page->read_gen == WT_READGEN_OLDEST)
 			LF_SET(WT_EVICT_UPDATE_RESTORE);
 		else if (__wt_eviction_aggressive(session))
 			LF_SET(WT_EVICT_LOOKASIDE);

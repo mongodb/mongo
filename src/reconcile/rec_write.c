@@ -1446,7 +1446,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * If there are deleted child pages we can't discard immediately, keep
 	 * the page dirty so they are eventually freed.
 	 */
-	r->leave_dirty = 1;
+	r->leave_dirty = true;
 
 	/*
 	 * If the original page cannot be freed, we need to keep a slot on the
@@ -3222,8 +3222,11 @@ supd_check_complete:
 	 * order to build this disk image, we can't actually write it. Instead,
 	 * we will re-instantiate the page using the disk image and the list of
 	 * updates we skipped.
+	 *
+	 * With an in-memory database, we always take this path.
 	 */
-	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) {
+	if ((F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) ||
+	    F_ISSET(r, WT_EVICT_IN_MEMORY)) {
 		r->cache_write_restore = true;
 
 		/*
@@ -5289,7 +5292,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_free(session, multi->key.ikey);
 			break;
 		}
-		if (multi->supd == NULL) {
+		if (multi->supd == NULL && multi->supd_dsk == NULL) {
 			if (multi->addr.reuse)
 				multi->addr.addr = NULL;
 			else {
@@ -5491,7 +5494,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * of forced eviction: set up a single block as if to split,
 		 * then use that block to rewrite the page in memory.
 		 */
-		if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL)
+		if (bnd->supd != NULL || F_ISSET(r, WT_EVICT_IN_MEMORY))
 			goto split;
 
 		/*
@@ -5639,7 +5642,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_RET(__wt_row_ikey_alloc(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
 
-		if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) {
+		if (bnd->supd != NULL || F_ISSET(r, WT_EVICT_IN_MEMORY)) {
 			multi->supd = bnd->supd;
 			multi->supd_entries = bnd->supd_next;
 			bnd->supd = NULL;
@@ -5679,7 +5682,7 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
 		multi->key.recno = bnd->recno;
 
-		if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && bnd->supd != NULL) {
+		if (bnd->supd != NULL || F_ISSET(r, WT_EVICT_IN_MEMORY)) {
 			multi->supd = bnd->supd;
 			multi->supd_entries = bnd->supd_next;
 			bnd->supd = NULL;

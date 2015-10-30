@@ -689,8 +689,7 @@ err:	/*
 
 /*
  * __split_multi_inmem --
- *	Instantiate a page in a multi-block set, when an update couldn't be
- * written.
+ *	Instantiate a page in a multi-block set.
  */
 static int
 __split_multi_inmem(
@@ -706,9 +705,11 @@ __split_multi_inmem(
 	uint32_t i, slot;
 
 	/*
-	 * We can find unresolved updates when attempting to evict a page, which
-	 * can't be written. This code re-creates the in-memory page and adds
-	 * references to the unresolved update chains to that page.
+	 * This code re-creates an in-memory page that is part of a set created
+	 * while evicting a large page, and adds references to any unresolved
+	 * update chains to the new page. We get here due to choosing to keep
+	 * the results of a split in memory or because and update could not be
+	 * written when attempting to evict a page.
 	 *
 	 * Clear the disk image and link the page into the passed-in WT_REF to
 	 * simplify error handling: our caller will not discard the disk image
@@ -768,13 +769,14 @@ __split_multi_inmem(
 		}
 
 	/*
-	 * We modified the page above, which will have set the first dirty
+	 * If we modified the page above, it will have set the first dirty
 	 * transaction to the last transaction currently running.  However, the
 	 * updates we installed may be older than that.  Set the first dirty
 	 * transaction to an impossibly old value so this page is never skipped
 	 * in a checkpoint.
 	 */
-	page->modify->first_dirty_txn = WT_TXN_FIRST;
+	if (page->modify != NULL)
+		page->modify->first_dirty_txn = WT_TXN_FIRST;
 
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt, true));
@@ -839,7 +841,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	/* Any parent reference is filled in by our caller. */
 	ref->home = NULL;
 
-	if (multi->supd == NULL) {
+	if (multi->supd == NULL && multi->supd_dsk == NULL) {
 		/*
 		 * Copy the address: we could simply take the buffer, but that
 		 * would complicate error handling, freeing the reference array
@@ -868,7 +870,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 		break;
 	}
 
-	ref->state = multi->supd == NULL ? WT_REF_DISK : WT_REF_MEM;
+	ref->state = addr != NULL ? WT_REF_DISK : WT_REF_MEM;
 
 	/*
 	 * If our caller wants to track the memory allocations, we have a return

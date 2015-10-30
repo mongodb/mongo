@@ -1455,6 +1455,8 @@ close_reopen(CONFIG *cfg)
 {
 	int ret;
 
+	if (!cfg->reopen_connection)
+		return (0);
 	/*
 	 * Reopen the connection.  We do this so that the workload phase always
 	 * starts with the on-disk files, and so that read-only workloads can
