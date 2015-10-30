@@ -119,7 +119,7 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
 
     // (ok == 1) implies that it is a mongos
     if (getStatusFromCommandResult(cmdStatus.getValue()).isOK()) {
-        return {ErrorCodes::BadValue, "can't add a mongos process as a shard"};
+        return {ErrorCodes::OperationFailed, "can't add a mongos process as a shard"};
     }
 
     // Is it a replica set?
@@ -136,7 +136,7 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
 
     // Make sure the specified replica set name (if any) matches the actual shard's replica set
     if (providedSetName.empty() && !foundSetName.empty()) {
-        return {ErrorCodes::BadValue,
+        return {ErrorCodes::OperationFailed,
                 str::stream() << "host is part of set " << foundSetName << "; "
                               << "use replica set url format "
                               << "<setname>/<server1>,<server2>, ..."};
@@ -178,12 +178,12 @@ StatusWith<ShardType> validateHostAsShard(OperationContext* txn,
         }
 
         if (isConfigServer) {
-            return {ErrorCodes::BadValue,
+            return {ErrorCodes::OperationFailed,
                     str::stream() << "Cannot add " << connectionString.toString()
                                   << " as a shard since it is part of a config server replica set"};
         }
     } else if ((res["info"].type() == String) && (res["info"].String() == "configsvr")) {
-        return {ErrorCodes::BadValue,
+        return {ErrorCodes::OperationFailed,
                 "the specified mongod is a legacy-style config "
                 "server and cannot be used as a shard server"};
     }
