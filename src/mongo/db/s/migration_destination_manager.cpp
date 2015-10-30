@@ -825,7 +825,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* txn,
             BSONObj fullObj;
             if (Helpers::findById(txn, ctx.db(), ns.c_str(), id, fullObj)) {
                 if (!isInRange(fullObj, min, max, shardKeyPattern)) {
-                    LOG(2) << "not applying out of range deletion: " << fullObj << migrateLog;
                     continue;
                 }
             }
