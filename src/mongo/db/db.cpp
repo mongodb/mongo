@@ -462,6 +462,30 @@ static void repairDatabasesAndCheckVersion() {
 static void _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
+    const repl::ReplSettings& replSettings = repl::getGlobalReplicationCoordinator()->getSettings();
+
+    {
+        ProcessId pid = ProcessId::getCurrent();
+        LogstreamBuilder l = log(LogComponent::kControl);
+        l << "MongoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
+          << " dbpath=" << storageGlobalParams.dbpath;
+        if (replSettings.master)
+            l << " master=" << replSettings.master;
+        if (replSettings.slave)
+            l << " slave=" << (int)replSettings.slave;
+
+        const bool is32bit = sizeof(int*) == 4;
+        l << (is32bit ? " 32" : " 64") << "-bit host=" << getHostNameCached() << endl;
+    }
+
+    DEV log(LogComponent::kControl) << "_DEBUG build (which is slower)" << endl;
+
+#if defined(_WIN32)
+    printTargetMinOS();
+#endif
+
+    logProcessDetails();
+
     // Due to SERVER-15389, we must setupSockets first thing at startup in order to avoid
     // obtaining too high a file descriptor for our calls to select().
     MessageServer::Options options;
@@ -507,30 +531,7 @@ static void _initAndListen(int listenPort) {
 
     getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
 
-    const repl::ReplSettings& replSettings = repl::getGlobalReplicationCoordinator()->getSettings();
-
-    {
-        ProcessId pid = ProcessId::getCurrent();
-        LogstreamBuilder l = log(LogComponent::kControl);
-        l << "MongoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
-          << " dbpath=" << storageGlobalParams.dbpath;
-        if (replSettings.master)
-            l << " master=" << replSettings.master;
-        if (replSettings.slave)
-            l << " slave=" << (int)replSettings.slave;
-
-        const bool is32bit = sizeof(int*) == 4;
-        l << (is32bit ? " 32" : " 64") << "-bit host=" << getHostNameCached() << endl;
-    }
-
-    DEV log(LogComponent::kControl) << "_DEBUG build (which is slower)" << endl;
     logMongodStartupWarnings(storageGlobalParams);
-
-#if defined(_WIN32)
-    printTargetMinOS();
-#endif
-
-    logProcessDetails();
 
     {
         stringstream ss;
