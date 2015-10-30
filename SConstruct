@@ -1494,12 +1494,6 @@ if env.TargetOSIs('posix'):
     else:
         env.Append( CCFLAGS=["-O0"] )
 
-    if debugBuild:
-        if not optBuild:
-            env.Append( CCFLAGS=["-fstack-protector"] )
-            env.Append( LINKFLAGS=["-fstack-protector"] )
-            env.Append( SHLINKFLAGS=["-fstack-protector"] )
-
 mmapv1 = False
 if get_option('mmapv1') == 'auto':
     # The mmapv1 storage engine is only supported on x86
@@ -1803,6 +1797,49 @@ def doConfigure(myenv):
         # TODO: re-evaluate when we move to GCC 5.3
         # see: http://stackoverflow.com/questions/21755206/how-to-get-around-gcc-void-b-4-may-be-used-uninitialized-in-this-funct
         AddToCXXFLAGSIfSupported(myenv, "-Wno-maybe-uninitialized")
+
+    if get_option('runtime-hardening') == "on":
+        # Clang honors these flags, but doesn't actually do anything with them for compatibility, so we
+        # need to only do this for GCC. On clang, we do things differently. Note that we need to add
+        # these to the LINKFLAGS as well, since otherwise we might not link libssp when we need to (see
+        # SERVER-12456).
+        if myenv.ToolchainIs('gcc'):
+            if AddToCCFLAGSIfSupported(myenv, '-fstack-protector-strong'):
+                myenv.Append(
+                    LINKFLAGS=[
+                        '-fstack-protector-strong',
+                    ]
+                )
+            elif AddToCCFLAGSIfSupported(myenv, '-fstack-protector-all'):
+                myenv.Append(
+                    LINKFLAGS=[
+                        '-fstack-protector-all',
+                    ]
+                )
+        elif myenv.ToolchainIs('clang'):
+            # TODO: Clang stack hardening. There are several interesting
+            # things to try here, but they each have consequences we need
+            # to investigate.
+            #
+            # - fsanitize=bounds: This does static bounds checking. We can
+            #   probably turn this on along with fsanitize-trap so that we
+            #   don't depend on the ASAN runtime.
+            #
+            # - fsanitize=safestack: This looks very interesting, and is
+            #   probably what we want. However there are a few problems:
+            #
+            #   - It relies on having the RT library available, and it is
+            #     unclear whether we can ship binaries that depend on
+            #     that.
+            #
+            #   - It is incompatible with a shared object build.
+            #
+            #   - It may not work with SpiderMonkey due to needing to
+            #     inform the GC about the stacks so that mark-sweep
+            #
+            # - fsanitize=cfi: Again, very interesting, however it
+            #   requires LTO builds.
+            pass
 
     # Check if we need to disable null-conversion warnings
     if myenv.ToolchainIs('clang'):
