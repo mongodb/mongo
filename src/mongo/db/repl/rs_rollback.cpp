@@ -523,7 +523,7 @@ void syncFixUp(OperationContext* txn,
                 auto status = removeSaver.goingToDelete(curObj);
                 if (!status.isOK()) {
                     severe() << "rolling back createCollection on " << *it
-                             << " failed to write document to remove saver file:" << status;
+                             << " failed to write document to remove saver file: " << status;
                     throw RSFatalException();
                 }
             }
@@ -831,7 +831,7 @@ Status _syncRollback(OperationContext* txn,
             return Status(ErrorCodes::UnrecoverableRollbackError,
                           str::stream()
                               << "need to rollback, but unable to determine common point between"
-                                 "local and remote oplog: " << e.what(),
+                                 " local and remote oplog: " << e.what(),
                           18752);
         } catch (const DBException& e) {
             warning() << "rollback 2 exception " << e.toString() << "; sleeping 1 min";
@@ -857,7 +857,7 @@ Status _syncRollback(OperationContext* txn,
         if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
             warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
                       << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                      << "but found self in " << replCoord->getMemberState();
+                      << " but found self in " << replCoord->getMemberState();
         }
 
         throw;
@@ -869,7 +869,7 @@ Status _syncRollback(OperationContext* txn,
     if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
         warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
                   << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                  << "but found self in " << replCoord->getMemberState();
+                  << " but found self in " << replCoord->getMemberState();
     }
 
     return Status::OK();
