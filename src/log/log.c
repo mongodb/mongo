@@ -1185,14 +1185,14 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, bool *hole)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	wt_off_t log_size, off, remainder;
-	uint32_t bufsz, rdlen;
+	wt_off_t log_size, off;
+	uint32_t bufsz, rdlen, remainder;
 	char *buf, *zerobuf;
 
 	conn = S2C(session);
 	log = conn->log;
 	log_size = fh->size;
-	remainder = log_size - offset;
+	remainder = (uint32_t)(log_size - offset);
 	*hole = false;
 
 	/*
