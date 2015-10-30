@@ -74,9 +74,7 @@ Status validateKeyPattern(const BSONObj& key) {
         long long asLong = keyElement.safeNumberLong();
         if (asLong > std::numeric_limits<int>::max() || asLong < std::numeric_limits<int>::min()) {
             return Status(code,
-                          str::stream()
-                              << "Key pattern element cannot be represented as a 32-bit int: "
-                              << keyElement);
+                          str::stream() << "Key pattern element overflows an int: " << keyElement);
         }
 
         // Ensure that the fields on which we are building the index are valid: a field must not
