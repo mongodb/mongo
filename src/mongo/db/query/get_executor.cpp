@@ -53,6 +53,8 @@
 #include "mongo/db/exec/update.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain.h"

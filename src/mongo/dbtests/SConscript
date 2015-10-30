@@ -69,6 +69,7 @@ dbtest = env.Program(
         'directclienttests.cpp',
         'documentsourcetests.cpp',
         'executor_registry.cpp',
+        'expression_where_test.cpp',
         'gle_test.cpp',
         'indexcatalogtests.cpp',
         'indexupdatetests.cpp',

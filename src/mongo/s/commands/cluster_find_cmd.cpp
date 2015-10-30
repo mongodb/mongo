@@ -33,6 +33,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/query/cluster_find.h"

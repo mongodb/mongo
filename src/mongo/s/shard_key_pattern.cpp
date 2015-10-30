@@ -34,6 +34,7 @@
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/ops/path_support.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/util/mongoutils/str.h"

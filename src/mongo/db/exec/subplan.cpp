@@ -35,6 +35,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/planner_analysis.h"

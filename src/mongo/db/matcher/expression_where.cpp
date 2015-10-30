@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/matcher/expression_where.h"
+
 #include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/namespace_string.h"
@@ -44,79 +46,34 @@
 namespace mongo {
 
 using std::unique_ptr;
-using std::endl;
 using std::string;
 using std::stringstream;
 using stdx::make_unique;
 
-class WhereMatchExpression : public MatchExpression {
-public:
-    WhereMatchExpression(OperationContext* txn) : MatchExpression(WHERE), _txn(txn) {
-        invariant(_txn != NULL);
+WhereMatchExpression::WhereMatchExpression(OperationContext* txn, WhereParams params)
+    : WhereMatchExpressionBase(std::move(params)), _txn(txn) {
+    invariant(_txn != NULL);
 
-        _func = 0;
+    _func = 0;
+}
+
+Status WhereMatchExpression::init(StringData dbName) {
+    if (!globalScriptEngine) {
+        return Status(ErrorCodes::BadValue, "no globalScriptEngine in $where parsing");
     }
 
-    virtual ~WhereMatchExpression() {}
-
-    Status init(StringData dbName, StringData theCode, const BSONObj& scope);
-
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const;
-
-    virtual bool matchesSingleElement(const BSONElement& e) const {
-        return false;
-    }
-
-    virtual unique_ptr<MatchExpression> shallowClone() const {
-        unique_ptr<WhereMatchExpression> e = make_unique<WhereMatchExpression>(_txn);
-        e->init(_dbName, _code, _userScope);
-        if (getTag()) {
-            e->setTag(getTag()->clone());
-        }
-        return std::move(e);
-    }
-
-    virtual void debugString(StringBuilder& debug, int level = 0) const;
-
-    virtual void toBSON(BSONObjBuilder* out) const;
-
-    virtual bool equivalent(const MatchExpression* other) const;
-
-    virtual void resetTag() {
-        setTag(NULL);
-    }
-
-private:
-    string _dbName;
-    string _code;
-    BSONObj _userScope;
-
-    unique_ptr<Scope> _scope;
-    ScriptingFunction _func;
-
-    // Not owned. See comments insde ExtensionsCallbackReal for the lifetime of this pointer.
-    OperationContext* _txn;
-};
-
-Status WhereMatchExpression::init(StringData dbName, StringData theCode, const BSONObj& scope) {
     if (dbName.size() == 0) {
         return Status(ErrorCodes::BadValue, "ns for $where cannot be empty");
     }
 
-    if (theCode.size() == 0) {
-        return Status(ErrorCodes::BadValue, "code for $where cannot be empty");
-    }
-
     _dbName = dbName.toString();
-    _code = theCode.toString();
-    _userScope = scope.getOwned();
 
     const string userToken =
         AuthorizationSession::get(ClientBasic::getCurrent())->getAuthenticatedUserNamesToken();
 
     try {
         _scope = globalScriptEngine->getPooledScope(_txn, _dbName, "where" + userToken);
-        _func = _scope->createFunction(_code.c_str());
+        _func = _scope->createFunction(getCode().c_str());
     } catch (...) {
         return exceptionToStatus();
     }
@@ -131,8 +88,8 @@ bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* d
     uassert(28692, "$where compile error", _func);
     BSONObj obj = doc->toBSON();
 
-    if (!_userScope.isEmpty()) {
-        _scope->init(&_userScope);
+    if (!getScope().isEmpty()) {
+        _scope->init(&getScope());
     }
 
     _scope->advanceGeneration();
@@ -151,56 +108,15 @@ bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* d
     return _scope->getBoolean("__returnValue") != 0;
 }
 
-void WhereMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
-    debug << "$where\n";
-
-    _debugAddSpace(debug, level + 1);
-    debug << "dbName: " << _dbName << "\n";
-
-    _debugAddSpace(debug, level + 1);
-    debug << "code: " << _code << "\n";
-
-    _debugAddSpace(debug, level + 1);
-    debug << "scope: " << _userScope << "\n";
-}
-
-void WhereMatchExpression::toBSON(BSONObjBuilder* out) const {
-    out->append("$where", _code);
-}
-
-bool WhereMatchExpression::equivalent(const MatchExpression* other) const {
-    if (matchType() != other->matchType())
-        return false;
-    const WhereMatchExpression* realOther = static_cast<const WhereMatchExpression*>(other);
-    return _dbName == realOther->_dbName && _code == realOther->_code &&
-        _userScope == realOther->_userScope;
-}
-
-ExtensionsCallbackReal::ExtensionsCallbackReal(OperationContext* txn, const NamespaceString* nss)
-    : _txn(txn), _nss(nss) {}
-
-StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(const BSONElement& where) const {
-    if (!globalScriptEngine)
-        return StatusWithMatchExpression(ErrorCodes::BadValue,
-                                         "no globalScriptEngine in $where parsing");
-
-    unique_ptr<WhereMatchExpression> exp(new WhereMatchExpression(_txn));
-    if (where.type() == String || where.type() == Code) {
-        Status s = exp->init(_nss->db(), where.valuestr(), BSONObj());
-        if (!s.isOK())
-            return StatusWithMatchExpression(s);
-        return {std::move(exp)};
+unique_ptr<MatchExpression> WhereMatchExpression::shallowClone() const {
+    WhereParams params;
+    params.code = getCode();
+    params.scope = getScope();
+    unique_ptr<WhereMatchExpression> e = make_unique<WhereMatchExpression>(_txn, std::move(params));
+    e->init(_dbName);
+    if (getTag()) {
+        e->setTag(getTag()->clone());
     }
-
-    if (where.type() == CodeWScope) {
-        Status s = exp->init(
-            _nss->db(), where.codeWScopeCode(), BSONObj(where.codeWScopeScopeDataUnsafe()));
-        if (!s.isOK())
-            return StatusWithMatchExpression(s);
-        return {std::move(exp)};
-    }
-
-    return StatusWithMatchExpression(ErrorCodes::BadValue, "$where got bad type");
+    return std::move(e);
 }
 }

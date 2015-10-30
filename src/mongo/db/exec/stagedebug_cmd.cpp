@@ -54,6 +54,7 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"

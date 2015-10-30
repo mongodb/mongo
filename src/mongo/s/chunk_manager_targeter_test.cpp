@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/s/chunk_manager.h"

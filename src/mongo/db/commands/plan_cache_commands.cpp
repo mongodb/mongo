@@ -42,6 +42,7 @@
 #include "mongo/db/commands/plan_cache_commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/util/log.h"

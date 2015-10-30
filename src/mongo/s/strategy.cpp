@@ -45,6 +45,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/max_time.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/getmore_request.h"

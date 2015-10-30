@@ -1,7 +1,5 @@
-// expression_where_noop.cpp
-
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -30,28 +28,19 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/matcher/expression_where_noop.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 
-#include "mongo/stdx/memory.h"
+#include "mongo/db/matcher/expression_where_noop.h"
 
 namespace mongo {
 
-WhereNoOpMatchExpression::WhereNoOpMatchExpression(WhereParams params)
-    : WhereMatchExpressionBase(std::move(params)) {}
-
-bool WhereNoOpMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    return false;
-}
-
-std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::shallowClone() const {
-    WhereParams params;
-    params.code = getCode();
-    params.scope = getScope();
-    std::unique_ptr<WhereNoOpMatchExpression> e =
-        stdx::make_unique<WhereNoOpMatchExpression>(std::move(params));
-    if (getTag()) {
-        e->setTag(getTag()->clone());
+StatusWithMatchExpression ExtensionsCallbackNoop::parseWhere(BSONElement where) const {
+    auto whereParams = extractWhereMatchExpressionParams(where);
+    if (!whereParams.isOK()) {
+        return whereParams.getStatus();
     }
-    return std::move(e);
+
+    return {stdx::make_unique<WhereNoOpMatchExpression>(std::move(whereParams.getValue()))};
 }
-}
+
+}  // namespace mongo

@@ -39,6 +39,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_planner.h"

@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -955,8 +956,33 @@ StatusWith<std::vector<uint32_t>> MatchExpressionParser::_parseBitPositionsArray
 }
 
 StatusWithMatchExpression MatchExpressionParser::ExtensionsCallback::parseWhere(
-    const BSONElement& where) const {
+    BSONElement where) const {
     return {Status(ErrorCodes::NoWhereParseContext, "no context for parsing $where")};
+}
+
+StatusWith<WhereMatchExpressionBase::WhereParams>
+MatchExpressionParser::ExtensionsCallback::extractWhereMatchExpressionParams(BSONElement where) {
+    WhereMatchExpressionBase::WhereParams params;
+
+    switch (where.type()) {
+        case mongo::String:
+        case mongo::Code:
+            params.code = where._asCode();
+            params.scope = BSONObj();
+            break;
+        case mongo::CodeWScope:
+            params.code = where._asCode();
+            params.scope = where.codeWScopeObject().getOwned();
+            break;
+        default:
+            return {ErrorCodes::BadValue, "$where got bad type"};
+    }
+
+    if (params.code.empty()) {
+        return {ErrorCodes::BadValue, "code for $where cannot be empty"};
+    }
+
+    return params;
 }
 
 // Geo

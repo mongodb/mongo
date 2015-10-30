@@ -33,6 +33,7 @@
 
 #include "mongo/db/db_raii.h"
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"

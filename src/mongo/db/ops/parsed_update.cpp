@@ -29,6 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ops/parsed_update.h"
+
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_planner_common.h"

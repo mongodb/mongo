@@ -44,6 +44,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"

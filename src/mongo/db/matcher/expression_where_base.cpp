@@ -1,7 +1,5 @@
-// expression_where_noop.cpp
-
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -30,28 +28,34 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/matcher/expression_where_noop.h"
-
-#include "mongo/stdx/memory.h"
+#include "mongo/db/matcher/expression_where_base.h"
 
 namespace mongo {
 
-WhereNoOpMatchExpression::WhereNoOpMatchExpression(WhereParams params)
-    : WhereMatchExpressionBase(std::move(params)) {}
+WhereMatchExpressionBase::WhereMatchExpressionBase(WhereParams params)
+    : MatchExpression(WHERE), _code(std::move(params.code)), _scope(std::move(params.scope)) {}
 
-bool WhereNoOpMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    return false;
+void WhereMatchExpressionBase::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << "$where\n";
+
+    _debugAddSpace(debug, level + 1);
+    debug << "code: " << getCode() << "\n";
+
+    _debugAddSpace(debug, level + 1);
+    debug << "scope: " << getScope() << "\n";
 }
 
-std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::shallowClone() const {
-    WhereParams params;
-    params.code = getCode();
-    params.scope = getScope();
-    std::unique_ptr<WhereNoOpMatchExpression> e =
-        stdx::make_unique<WhereNoOpMatchExpression>(std::move(params));
-    if (getTag()) {
-        e->setTag(getTag()->clone());
+void WhereMatchExpressionBase::toBSON(BSONObjBuilder* out) const {
+    out->appendCodeWScope("$where", getCode(), getScope());
+}
+
+bool WhereMatchExpressionBase::equivalent(const MatchExpression* other) const {
+    if (matchType() != other->matchType()) {
+        return false;
     }
-    return std::move(e);
+    const WhereMatchExpressionBase* realOther = static_cast<const WhereMatchExpressionBase*>(other);
+    return getCode() == realOther->getCode() && getScope() == realOther->getScope();
 }
-}
+
+}  // namespace mongo

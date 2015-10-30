@@ -1,7 +1,5 @@
-// expression_where_noop.cpp
-
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,30 +26,50 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/matcher/expression_where_noop.h"
-
-#include "mongo/stdx/memory.h"
+#include "mongo/db/matcher/expression.h"
 
 namespace mongo {
 
-WhereNoOpMatchExpression::WhereNoOpMatchExpression(WhereParams params)
-    : WhereMatchExpressionBase(std::move(params)) {}
+/**
+ * Common base class for $where match expression implementations.
+ */
+class WhereMatchExpressionBase : public MatchExpression {
+public:
+    struct WhereParams {
+        std::string code;
+        BSONObj scope;  // Owned.
+    };
 
-bool WhereNoOpMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    return false;
-}
+    WhereMatchExpressionBase(WhereParams params);
 
-std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::shallowClone() const {
-    WhereParams params;
-    params.code = getCode();
-    params.scope = getScope();
-    std::unique_ptr<WhereNoOpMatchExpression> e =
-        stdx::make_unique<WhereNoOpMatchExpression>(std::move(params));
-    if (getTag()) {
-        e->setTag(getTag()->clone());
+    //
+    // Methods inherited from MatchExpression.
+    //
+
+    bool matchesSingleElement(const BSONElement& e) const final {
+        return false;
     }
-    return std::move(e);
-}
-}
+
+    void debugString(StringBuilder& debug, int level = 0) const final;
+
+    void toBSON(BSONObjBuilder* out) const final;
+
+    bool equivalent(const MatchExpression* other) const final;
+
+protected:
+    const std::string& getCode() const {
+        return _code;
+    }
+
+    const BSONObj& getScope() const {
+        return _scope;
+    }
+
+private:
+    const std::string _code;
+    const BSONObj _scope;  // Owned.
+};
+
+}  // namespace mongo

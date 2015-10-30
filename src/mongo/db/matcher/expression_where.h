@@ -1,7 +1,5 @@
-// expression_where_noop.cpp
-
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,30 +26,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/matcher/expression_where_noop.h"
-
-#include "mongo/stdx/memory.h"
+#include "mongo/db/matcher/expression_where_base.h"
+#include "mongo/scripting/engine.h"
 
 namespace mongo {
 
-WhereNoOpMatchExpression::WhereNoOpMatchExpression(WhereParams params)
-    : WhereMatchExpressionBase(std::move(params)) {}
+class OperationContext;
 
-bool WhereNoOpMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    return false;
-}
+class WhereMatchExpression final : public WhereMatchExpressionBase {
+public:
+    WhereMatchExpression(OperationContext* txn, WhereParams params);
 
-std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::shallowClone() const {
-    WhereParams params;
-    params.code = getCode();
-    params.scope = getScope();
-    std::unique_ptr<WhereNoOpMatchExpression> e =
-        stdx::make_unique<WhereNoOpMatchExpression>(std::move(params));
-    if (getTag()) {
-        e->setTag(getTag()->clone());
-    }
-    return std::move(e);
-}
-}
+    Status init(StringData dbName);
+
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
+
+    std::unique_ptr<MatchExpression> shallowClone() const final;
+
+private:
+    std::string _dbName;
+
+    std::unique_ptr<Scope> _scope;
+    ScriptingFunction _func;
+
+    OperationContext* const _txn;
+};
+
+}  // namespace mongo
