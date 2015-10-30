@@ -527,20 +527,18 @@ Status ForwardingCatalogManager::applyChunkOpsDeprecated(OperationContext* txn,
                  [&] { return _actual->applyChunkOpsDeprecated(txn, updateOps, preCondition); });
 }
 
-void ForwardingCatalogManager::logAction(OperationContext* txn, const ActionLogType& actionLog) {
-    retry(txn,
-          [&] {
-              _actual->logAction(txn, actionLog);
-              return 1;
-          });
-}
-
-Status ForwardingCatalogManager::logChange(OperationContext* txn,
-                                           const std::string& clientAddress,
+Status ForwardingCatalogManager::logAction(OperationContext* txn,
                                            const std::string& what,
                                            const std::string& ns,
                                            const BSONObj& detail) {
-    return retry(txn, [&] { return _actual->logChange(txn, clientAddress, what, ns, detail); });
+    return retry(txn, [&] { return _actual->logAction(txn, what, ns, detail); });
+}
+
+Status ForwardingCatalogManager::logChange(OperationContext* txn,
+                                           const std::string& what,
+                                           const std::string& ns,
+                                           const BSONObj& detail) {
+    return retry(txn, [&] { return _actual->logChange(txn, what, ns, detail); });
 }
 
 StatusWith<SettingsType> ForwardingCatalogManager::getGlobalSettings(OperationContext* txn,

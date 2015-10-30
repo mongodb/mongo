@@ -12,7 +12,6 @@ env.SConscript(
 env.Library(
     target='catalog_types',
     source=[
-        'type_actionlog.cpp',
         'type_changelog.cpp',
         'type_chunk.cpp',
         'type_collection.cpp',

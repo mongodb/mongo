@@ -45,7 +45,6 @@
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/catalog_manager.h"
-#include "mongo/s/catalog/type_actionlog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_mongos.h"
@@ -70,6 +69,53 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 using std::vector;
+
+namespace {
+
+/**
+ * Utility class to generate timing and statistics for a single balancer round.
+ */
+class BalanceRoundDetails {
+public:
+    BalanceRoundDetails() : _executionTimer() {}
+
+    void setSucceeded(int candidateChunks, int chunksMoved) {
+        invariant(!_errMsg);
+        _candidateChunks = candidateChunks;
+        _chunksMoved = chunksMoved;
+    }
+
+    void setFailed(const string& errMsg) {
+        _errMsg = errMsg;
+    }
+
+    BSONObj toBSON() const {
+        BSONObjBuilder builder;
+        builder.append("executionTimeMillis", _executionTimer.millis());
+        builder.append("errorOccured", _errMsg.is_initialized());
+
+        if (_errMsg) {
+            builder.append("errmsg", *_errMsg);
+        } else {
+            builder.append("candidateChunks", _candidateChunks);
+            builder.append("chunksMoved", _chunksMoved);
+        }
+
+        return builder.obj();
+    }
+
+private:
+    const Timer _executionTimer;
+
+    // Set only on success
+    int _candidateChunks{0};
+    int _chunksMoved{0};
+
+    // Set only on failure
+    boost::optional<std::string> _errMsg;
+};
+
+}  // namespace
 
 MONGO_FP_DECLARE(skipBalanceRound);
 MONGO_FP_DECLARE(balancerRoundIntervalSetting);
@@ -511,11 +557,7 @@ void Balancer::run() {
     while (!inShutdown()) {
         auto txn = cc().makeOperationContext();
 
-        Timer balanceRoundTimer;
-        ActionLogType actionLog;
-
-        actionLog.setServer(getHostNameCached());
-        actionLog.setWhat("balancer.round");
+        BalanceRoundDetails roundDetails;
 
         try {
             // ping has to be first so we keep things in the config server in sync
@@ -597,37 +639,33 @@ void Balancer::run() {
                         _moveChunks(txn.get(), candidateChunks, writeConcern.get(), waitForDelete);
                 }
 
-                actionLog.setDetails(boost::none,
-                                     balanceRoundTimer.millis(),
-                                     static_cast<int>(candidateChunks.size()),
-                                     _balancedLastTime);
-                actionLog.setTime(jsTime());
+                roundDetails.setSucceeded(static_cast<int>(candidateChunks.size()),
+                                          _balancedLastTime);
 
-                grid.catalogManager(txn.get())->logAction(txn.get(), actionLog);
+                grid.catalogManager(txn.get())
+                    ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
 
-                LOG(1) << "*** end of balancing round";
+                LOG(1) << "*** End of balancing round";
             }
 
             // Ping again so scripts can determine if we're active without waiting
             _ping(txn.get(), true);
 
             sleepFor(_balancedLastTime ? kShortBalanceRoundInterval : balanceRoundInterval);
-        } catch (std::exception& e) {
+        } catch (const std::exception& e) {
             log() << "caught exception while doing balance: " << e.what();
 
             // Just to match the opening statement if in log level 1
             LOG(1) << "*** End of balancing round";
 
             // This round failed, tell the world!
-            actionLog.setDetails(string(e.what()), balanceRoundTimer.millis(), 0, 0);
-            actionLog.setTime(jsTime());
+            roundDetails.setFailed(e.what());
 
-            grid.catalogManager(txn.get())->logAction(txn.get(), actionLog);
+            grid.catalogManager(txn.get())
+                ->logAction(txn.get(), "balancer.round", "", roundDetails.toBSON());
 
             // Sleep a fair amount before retrying because of the error
             sleepFor(balanceRoundInterval);
-
-            continue;
         }
     }
 }

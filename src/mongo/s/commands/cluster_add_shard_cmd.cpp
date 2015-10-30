@@ -135,6 +135,5 @@ public:
 
 } addShard;
 
-
 }  // namespace
 }  // namespace mongo

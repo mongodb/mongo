@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/client/connection_string.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/catalog_manager_common.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -129,14 +128,6 @@ public:
                                    const BSONArray& updateOps,
                                    const BSONArray& preCondition) override;
 
-    void logAction(OperationContext* txn, const ActionLogType& actionLog);
-
-    Status logChange(OperationContext* txn,
-                     const std::string& clientAddress,
-                     const std::string& what,
-                     const std::string& ns,
-                     const BSONObj& detail) override;
-
     StatusWith<SettingsType> getGlobalSettings(OperationContext* txn,
                                                const std::string& key) override;
 
@@ -154,6 +145,10 @@ private:
                                 DatabaseType* db) override;
 
     StatusWith<std::string> _generateNewShardName(OperationContext* txn) override;
+
+    Status _createCappedConfigCollection(OperationContext* txn,
+                                         StringData collName,
+                                         int cappedSize) override;
 
     /**
      * Starts the thread that periodically checks data consistency amongst the config servers.
@@ -191,12 +186,6 @@ private:
 
     // Distribted lock manager singleton.
     std::unique_ptr<DistLockManager> _distLockManager;
-
-    // Whether the logChange call should attempt to create the changelog collection
-    AtomicInt32 _changeLogCollectionCreated;
-
-    // Whether the logAction call should attempt to create the actionlog collection
-    AtomicInt32 _actionLogCollectionCreated;
 
     // protects _inShutdown, _consistentFromLastCheck; used by _consistencyCheckerCV
     stdx::mutex _mutex;

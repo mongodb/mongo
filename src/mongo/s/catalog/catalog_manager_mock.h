@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/s/catalog/catalog_manager_common.h"
+#include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 
 namespace mongo {
@@ -36,7 +36,7 @@ namespace mongo {
 /**
  * A dummy implementation of CatalogManager for testing purposes.
  */
-class CatalogManagerMock : public CatalogManagerCommon {
+class CatalogManagerMock : public CatalogManager {
 public:
     CatalogManagerMock();
     ~CatalogManagerMock();
@@ -48,6 +48,8 @@ public:
     Status startup(OperationContext* txn, bool allowNetworking) override;
 
     void shutDown(OperationContext* txn, bool allowNetworking) override;
+
+    Status enableSharding(OperationContext* txn, const std::string& dbName);
 
     Status shardCollection(OperationContext* txn,
                            const std::string& ns,
@@ -126,10 +128,12 @@ public:
                                    const BSONArray& updateOps,
                                    const BSONArray& preCondition) override;
 
-    void logAction(OperationContext* txn, const ActionLogType& actionLog) override;
+    Status logAction(OperationContext* txn,
+                     const std::string& what,
+                     const std::string& ns,
+                     const BSONObj& detail) override;
 
     Status logChange(OperationContext* txn,
-                     const std::string& clientAddress,
                      const std::string& what,
                      const std::string& ns,
                      const BSONObj& detail) override;
@@ -141,17 +145,13 @@ public:
                                  const BatchedCommandRequest& request,
                                  BatchedCommandResponse* response) override;
 
+    Status createDatabase(OperationContext* txn, const std::string& dbName);
+
     DistLockManager* getDistLockManager() override;
 
     Status initConfigVersion(OperationContext* txn) override;
 
 private:
-    Status _checkDbDoesNotExist(OperationContext* txn,
-                                const std::string& dbName,
-                                DatabaseType* db) override;
-
-    StatusWith<std::string> _generateNewShardName(OperationContext* txn) override;
-
     std::unique_ptr<DistLockManagerMock> _mockDistLockMgr;
 };
 

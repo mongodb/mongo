@@ -953,11 +953,7 @@ MoveTimingHelper::~MoveTimingHelper() {
             _b.append("errmsg", *_cmdErrmsg);
         }
 
-        grid.catalogManager(_txn)->logChange(_txn,
-                                             _txn->getClient()->clientAddress(true),
-                                             (string) "moveChunk." + _where,
-                                             _ns,
-                                             _b.obj());
+        grid.catalogManager(_txn)->logChange(_txn, (string) "moveChunk." + _where, _ns, _b.obj());
     } catch (const std::exception& e) {
         warning() << "couldn't record timing for moveChunk '" << _where << "': " << e.what()
                   << migrateLog;

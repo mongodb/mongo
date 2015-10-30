@@ -229,8 +229,7 @@ public:
             "min" << chunkMoveState.getMinKey() << "max" << chunkMoveState.getMaxKey() << "from"
                   << chunkMoveState.getFromShard() << "to" << chunkMoveState.getToShard());
 
-        grid.catalogManager(txn)->logChange(
-            txn, txn->getClient()->clientAddress(true), "moveChunk.start", ns, chunkInfo);
+        grid.catalogManager(txn)->logChange(txn, "moveChunk.start", ns, chunkInfo);
 
         const auto origCollMetadata = chunkMoveState.getCollMetadata();
         BSONObj shardKeyPattern = origCollMetadata->getKeyPattern();

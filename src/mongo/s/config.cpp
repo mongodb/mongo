@@ -539,8 +539,7 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
      */
 
     log() << "DBConfig::dropDatabase: " << _name;
-    grid.catalogManager(txn)->logChange(
-        txn, txn->getClient()->clientAddress(true), "dropDatabase.start", _name, BSONObj());
+    grid.catalogManager(txn)->logChange(txn, "dropDatabase.start", _name, BSONObj());
 
     // 1
     grid.catalogCache()->invalidate(_name);
@@ -601,8 +600,7 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
 
     LOG(1) << "\t dropped primary db for: " << _name;
 
-    grid.catalogManager(txn)
-        ->logChange(txn, txn->getClient()->clientAddress(true), "dropDatabase", _name, BSONObj());
+    grid.catalogManager(txn)->logChange(txn, "dropDatabase", _name, BSONObj());
 
     return true;
 }

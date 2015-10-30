@@ -275,27 +275,28 @@ void ShardingTestFixture::expectInserts(const NamespaceString& nss,
     });
 }
 
-void ShardingTestFixture::expectChangeLogCreate(const HostAndPort& configHost,
-                                                const BSONObj& response) {
+void ShardingTestFixture::expectConfigCollectionCreate(const HostAndPort& configHost,
+                                                       StringData collName,
+                                                       int cappedSize,
+                                                       const BSONObj& response) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
 
-        BSONObj expectedCreateCmd =
-            BSON("create" << ChangeLogType::ConfigNS << "capped" << true << "size"
-                          << 1024 * 1024 * 10 << "maxTimeMS" << 30000);
+        BSONObj expectedCreateCmd = BSON("create" << collName << "capped" << true << "size"
+                                                  << cappedSize << "maxTimeMS" << 30000);
         ASSERT_EQUALS(expectedCreateCmd, request.cmdObj);
 
         return response;
     });
 }
 
-void ShardingTestFixture::expectChangeLogInsert(const HostAndPort& configHost,
-                                                const std::string& clientAddress,
-                                                Date_t timestamp,
-                                                const std::string& what,
-                                                const std::string& ns,
-                                                const BSONObj& detail) {
+void ShardingTestFixture::expectConfigCollectionInsert(const HostAndPort& configHost,
+                                                       StringData collName,
+                                                       Date_t timestamp,
+                                                       const std::string& what,
+                                                       const std::string& ns,
+                                                       const BSONObj& detail) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
@@ -303,17 +304,20 @@ void ShardingTestFixture::expectChangeLogInsert(const HostAndPort& configHost,
         BatchedInsertRequest actualBatchedInsert;
         std::string errmsg;
         ASSERT_TRUE(actualBatchedInsert.parseBSON(request.dbname, request.cmdObj, &errmsg));
-        ASSERT_EQUALS(ChangeLogType::ConfigNS, actualBatchedInsert.getNS().ns());
+
+        ASSERT_EQ("config", actualBatchedInsert.getNS().db());
+        ASSERT_EQ(collName, actualBatchedInsert.getNS().coll());
 
         auto inserts = actualBatchedInsert.getDocuments();
         ASSERT_EQUALS(1U, inserts.size());
 
         const ChangeLogType& actualChangeLog = assertGet(ChangeLogType::fromBSON(inserts.front()));
 
-        ASSERT_EQUALS(clientAddress, actualChangeLog.getClientAddr());
+        ASSERT_EQUALS(operationContext()->getClient()->clientAddress(true),
+                      actualChangeLog.getClientAddr());
         ASSERT_EQUALS(detail, actualChangeLog.getDetails());
         ASSERT_EQUALS(ns, actualChangeLog.getNS());
-        ASSERT_EQUALS(shardRegistry()->getNetwork()->getHostName(), actualChangeLog.getServer());
+        ASSERT_EQUALS(network()->getHostName(), actualChangeLog.getServer());
         ASSERT_EQUALS(timestamp, actualChangeLog.getTime());
         ASSERT_EQUALS(what, actualChangeLog.getWhat());
 
@@ -338,6 +342,19 @@ void ShardingTestFixture::expectChangeLogInsert(const HostAndPort& configHost,
 
         return response.toBSON();
     });
+}
+
+void ShardingTestFixture::expectChangeLogCreate(const HostAndPort& configHost,
+                                                const BSONObj& response) {
+    expectConfigCollectionCreate(configHost, "changelog", 10 * 1024 * 1024, response);
+}
+
+void ShardingTestFixture::expectChangeLogInsert(const HostAndPort& configHost,
+                                                Date_t timestamp,
+                                                const std::string& what,
+                                                const std::string& ns,
+                                                const BSONObj& detail) {
+    expectConfigCollectionInsert(configHost, "changelog", timestamp, what, ns, detail);
 }
 
 void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost,

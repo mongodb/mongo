@@ -253,8 +253,7 @@ bool mergeChunks(OperationContext* txn,
 
     BSONObj mergeLogEntry = buildMergeLogEntry(chunksToMerge, shardVersion, mergeVersion);
 
-    grid.catalogManager(txn)
-        ->logChange(txn, txn->getClient()->clientAddress(true), "merge", nss.ns(), mergeLogEntry);
+    grid.catalogManager(txn)->logChange(txn, "merge", nss.ns(), mergeLogEntry);
 
     return true;
 }

@@ -306,12 +306,12 @@ void Chunk::pickSplitVector(OperationContext* txn,
     cmd.append("maxChunkSizeBytes", chunkSize);
     cmd.append("maxSplitPoints", maxPoints);
     cmd.append("maxChunkObjects", maxObjs);
+
     BSONObj cmdObj = cmd.obj();
 
-    const auto primaryShard = grid.shardRegistry()->getShard(txn, getShardId());
     auto result = grid.shardRegistry()->runCommandOnShard(
         txn,
-        primaryShard,
+        getShardId(),
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
         "admin",
         cmdObj);

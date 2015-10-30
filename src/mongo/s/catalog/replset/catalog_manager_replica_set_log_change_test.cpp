@@ -55,138 +55,161 @@ using executor::TaskExecutor;
 using stdx::async;
 using unittest::assertGet;
 
-static const stdx::chrono::seconds kFutureTimeout{5};
+const stdx::chrono::seconds kFutureTimeout{5};
+const HostAndPort configHost{"TestHost1"};
 
-using LogChangeTest = CatalogManagerReplSetTestFixture;
+class InfoLoggingTest : public CatalogManagerReplSetTestFixture {
+public:
+    enum CollType { ActionLog, ChangeLog };
 
-TEST_F(LogChangeTest, NoRetryAfterSuccessfulCreate) {
-    const HostAndPort configHost{"TestHost1"};
-    configTargeter()->setFindHostReturnValue(configHost);
+    InfoLoggingTest(CollType configCollType, int cappedSize)
+        : _configCollType(configCollType), _cappedSize(cappedSize) {}
 
-    auto future = launchAsync([this] {
-        catalogManager()->logChange(operationContext(),
-                                    "client",
-                                    "moved a chunk",
-                                    "foo.bar",
-                                    BSON("min" << 3 << "max" << 4));
-    });
+    void setUp() override {
+        CatalogManagerReplSetTestFixture::setUp();
 
-    expectChangeLogCreate(configHost, BSON("ok" << 1));
-    expectChangeLogInsert(configHost,
-                          "client",
-                          network()->now(),
-                          "moved a chunk",
-                          "foo.bar",
-                          BSON("min" << 3 << "max" << 4));
+        configTargeter()->setFindHostReturnValue(configHost);
+    }
 
-    // Now wait for the logChange call to return
-    future.timed_get(kFutureTimeout);
+protected:
+    void noRetryAfterSuccessfulCreate() {
+        auto future = launchAsync(
+            [this] { log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)); });
 
-    // Now log another change and confirm that we don't re-attempt to create the collection
-    future = launchAsync([this] {
-        catalogManager()->logChange(operationContext(),
-                                    "client",
-                                    "moved a second chunk",
-                                    "foo.bar",
-                                    BSON("min" << 4 << "max" << 5));
-    });
+        expectConfigCollectionCreate(configHost, getConfigCollName(), _cappedSize, BSON("ok" << 1));
+        expectConfigCollectionInsert(configHost,
+                                     getConfigCollName(),
+                                     network()->now(),
+                                     "moved a chunk",
+                                     "foo.bar",
+                                     BSON("min" << 3 << "max" << 4));
 
-    expectChangeLogInsert(configHost,
-                          "client",
-                          network()->now(),
-                          "moved a second chunk",
-                          "foo.bar",
-                          BSON("min" << 4 << "max" << 5));
+        // Now wait for the logChange call to return
+        future.timed_get(kFutureTimeout);
 
-    // Now wait for the logChange call to return
-    future.timed_get(kFutureTimeout);
+        // Now log another change and confirm that we don't re-attempt to create the collection
+        future = launchAsync(
+            [this] { log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5)); });
+
+        expectConfigCollectionInsert(configHost,
+                                     getConfigCollName(),
+                                     network()->now(),
+                                     "moved a second chunk",
+                                     "foo.bar",
+                                     BSON("min" << 4 << "max" << 5));
+
+        // Now wait for the logChange call to return
+        future.timed_get(kFutureTimeout);
+    }
+
+    void noRetryCreateIfAlreadyExists() {
+        auto future = launchAsync(
+            [this] { log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)); });
+
+        BSONObjBuilder createResponseBuilder;
+        Command::appendCommandStatus(createResponseBuilder,
+                                     Status(ErrorCodes::NamespaceExists, "coll already exists"));
+        expectConfigCollectionCreate(
+            configHost, getConfigCollName(), _cappedSize, createResponseBuilder.obj());
+        expectConfigCollectionInsert(configHost,
+                                     getConfigCollName(),
+                                     network()->now(),
+                                     "moved a chunk",
+                                     "foo.bar",
+                                     BSON("min" << 3 << "max" << 4));
+
+        // Now wait for the logAction call to return
+        future.timed_get(kFutureTimeout);
+
+        // Now log another change and confirm that we don't re-attempt to create the collection
+        future = launchAsync(
+            [this] { log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5)); });
+
+        expectConfigCollectionInsert(configHost,
+                                     getConfigCollName(),
+                                     network()->now(),
+                                     "moved a second chunk",
+                                     "foo.bar",
+                                     BSON("min" << 4 << "max" << 5));
+
+        // Now wait for the logChange call to return
+        future.timed_get(kFutureTimeout);
+    }
+
+    void createFailure() {
+        auto future = launchAsync(
+            [this] { log("moved a chunk", "foo.bar", BSON("min" << 3 << "max" << 4)); });
+
+        BSONObjBuilder createResponseBuilder;
+        Command::appendCommandStatus(createResponseBuilder,
+                                     Status(ErrorCodes::HostUnreachable, "socket error"));
+        expectConfigCollectionCreate(
+            configHost, getConfigCollName(), _cappedSize, createResponseBuilder.obj());
+
+        // Now wait for the logAction call to return
+        future.timed_get(kFutureTimeout);
+
+        // Now log another change and confirm that we *do* attempt to create the collection
+        future = launchAsync(
+            [this] { log("moved a second chunk", "foo.bar", BSON("min" << 4 << "max" << 5)); });
+
+        expectConfigCollectionCreate(configHost, getConfigCollName(), _cappedSize, BSON("ok" << 1));
+        expectConfigCollectionInsert(configHost,
+                                     getConfigCollName(),
+                                     network()->now(),
+                                     "moved a second chunk",
+                                     "foo.bar",
+                                     BSON("min" << 4 << "max" << 5));
+
+        // Now wait for the logChange call to return
+        future.timed_get(kFutureTimeout);
+    }
+
+    std::string getConfigCollName() const {
+        return (_configCollType == ChangeLog ? "changelog" : "actionlog");
+    }
+
+    Status log(const std::string& what, const std::string& ns, const BSONObj& detail) {
+        if (_configCollType == ChangeLog) {
+            return catalogManager()->logChange(operationContext(), what, ns, detail);
+        } else {
+            return catalogManager()->logAction(operationContext(), what, ns, detail);
+        }
+    }
+
+    const CollType _configCollType;
+    const int _cappedSize;
+};
+
+class ActionLogTest : public InfoLoggingTest {
+public:
+    ActionLogTest() : InfoLoggingTest(ActionLog, 2 * 1024 * 1024) {}
+};
+
+class ChangeLogTest : public InfoLoggingTest {
+public:
+    ChangeLogTest() : InfoLoggingTest(ChangeLog, 10 * 1024 * 1024) {}
+};
+
+TEST_F(ActionLogTest, NoRetryAfterSuccessfulCreate) {
+    noRetryAfterSuccessfulCreate();
+}
+TEST_F(ChangeLogTest, NoRetryAfterSuccessfulCreate) {
+    noRetryAfterSuccessfulCreate();
 }
 
-TEST_F(LogChangeTest, NoRetryCreateIfAlreadyExists) {
-    const HostAndPort configHost{"TestHost1"};
-    configTargeter()->setFindHostReturnValue(configHost);
-
-    auto future = launchAsync([this] {
-        catalogManager()->logChange(operationContext(),
-                                    "client",
-                                    "moved a chunk",
-                                    "foo.bar",
-                                    BSON("min" << 3 << "max" << 4));
-    });
-
-    BSONObjBuilder createResponseBuilder;
-    Command::appendCommandStatus(createResponseBuilder,
-                                 Status(ErrorCodes::NamespaceExists, "coll already exists"));
-    expectChangeLogCreate(configHost, createResponseBuilder.obj());
-    expectChangeLogInsert(configHost,
-                          "client",
-                          network()->now(),
-                          "moved a chunk",
-                          "foo.bar",
-                          BSON("min" << 3 << "max" << 4));
-
-    // Now wait for the logAction call to return
-    future.timed_get(kFutureTimeout);
-
-    // Now log another change and confirm that we don't re-attempt to create the collection
-    future = launchAsync([this] {
-        catalogManager()->logChange(operationContext(),
-                                    "client",
-                                    "moved a second chunk",
-                                    "foo.bar",
-                                    BSON("min" << 4 << "max" << 5));
-    });
-
-    expectChangeLogInsert(configHost,
-                          "client",
-                          network()->now(),
-                          "moved a second chunk",
-                          "foo.bar",
-                          BSON("min" << 4 << "max" << 5));
-
-    // Now wait for the logChange call to return
-    future.timed_get(kFutureTimeout);
+TEST_F(ActionLogTest, NoRetryCreateIfAlreadyExists) {
+    noRetryCreateIfAlreadyExists();
+}
+TEST_F(ChangeLogTest, NoRetryCreateIfAlreadyExists) {
+    noRetryCreateIfAlreadyExists();
 }
 
-TEST_F(LogChangeTest, CreateFailure) {
-    const HostAndPort configHost{"TestHost1"};
-    configTargeter()->setFindHostReturnValue(configHost);
-
-    auto future = launchAsync([this] {
-        catalogManager()->logChange(operationContext(),
-                                    "client",
-                                    "moved a chunk",
-                                    "foo.bar",
-                                    BSON("min" << 3 << "max" << 4));
-    });
-
-    BSONObjBuilder createResponseBuilder;
-    Command::appendCommandStatus(createResponseBuilder,
-                                 Status(ErrorCodes::HostUnreachable, "socket error"));
-    expectChangeLogCreate(configHost, createResponseBuilder.obj());
-
-    // Now wait for the logAction call to return
-    future.timed_get(kFutureTimeout);
-
-    // Now log another change and confirm that we *do* attempt to create the collection
-    future = launchAsync([this] {
-        catalogManager()->logChange(operationContext(),
-                                    "client",
-                                    "moved a second chunk",
-                                    "foo.bar",
-                                    BSON("min" << 4 << "max" << 5));
-    });
-
-    expectChangeLogCreate(configHost, BSON("ok" << 1));
-    expectChangeLogInsert(configHost,
-                          "client",
-                          network()->now(),
-                          "moved a second chunk",
-                          "foo.bar",
-                          BSON("min" << 4 << "max" << 5));
-
-    // Now wait for the logChange call to return
-    future.timed_get(kFutureTimeout);
+TEST_F(ActionLogTest, CreateFailure) {
+    createFailure();
+}
+TEST_F(ChangeLogTest, CreateFailure) {
+    createFailure();
 }
 
 }  // namespace

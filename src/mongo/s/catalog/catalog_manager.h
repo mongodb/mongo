@@ -333,25 +333,17 @@ public:
                                            const BSONArray& preCondition) = 0;
 
     /**
-     * Logs to the actionlog.
-     * Used by the balancer to report the result of a balancing round.
-     *
-     * NOTE: This method is best effort so it should never throw.
+     * Writes a diagnostic event to the action log.
      */
-    virtual void logAction(OperationContext* txn, const ActionLogType& actionLog) = 0;
+    virtual Status logAction(OperationContext* txn,
+                             const std::string& what,
+                             const std::string& ns,
+                             const BSONObj& detail) = 0;
 
     /**
-     * Logs a diagnostic event locally and on the config server. If the config server write fails
-     * for any reason a warning will be written to the local service log and the method will return
-     * a failed status.
-     *
-     * @param clientAddress Address of the client that initiated the op that caused this change
-     * @param what E.g. "split", "migrate"
-     * @param ns To which collection the metadata change is being applied
-     * @param detail Additional info about the metadata change (not interpreted)
+     * Writes a diagnostic event to the change log.
      */
     virtual Status logChange(OperationContext* txn,
-                             const std::string& clientAddress,
                              const std::string& what,
                              const std::string& ns,
                              const BSONObj& detail) = 0;

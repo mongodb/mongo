@@ -390,12 +390,8 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
                             << shard.getName() + ":" + shard.getHost() << "initShards"
                             << BSONArray() << "numChunks" << 1);
         expectChangeLogCreate(configHost, BSON("ok" << 1));
-        expectChangeLogInsert(configHost,
-                              clientHost.toString(),
-                              network()->now(),
-                              "shardCollection.start",
-                              ns,
-                              logChangeDetail);
+        expectChangeLogInsert(
+            configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);
     }
 
     // Report that no documents exist for the given collection on the primary shard
@@ -435,7 +431,6 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
 
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
-                          clientHost.toString(),
                           network()->now(),
                           "shardCollection.end",
                           ns,
@@ -573,12 +568,8 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
                             << BSON_ARRAY(shard0.getName() << shard1.getName() << shard2.getName())
                             << "numChunks" << (int)expectedChunks.size());
         expectChangeLogCreate(configHost, BSON("ok" << 1));
-        expectChangeLogInsert(configHost,
-                              clientHost.toString(),
-                              network()->now(),
-                              "shardCollection.start",
-                              ns,
-                              logChangeDetail);
+        expectChangeLogInsert(
+            configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);
     }
 
     for (auto& expectedChunk : expectedChunks) {
@@ -617,7 +608,6 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
 
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
-                          clientHost.toString(),
                           network()->now(),
                           "shardCollection.end",
                           ns,
@@ -731,12 +721,8 @@ TEST_F(ShardCollectionTest, withInitialData) {
                             << shard.getName() + ":" + shard.getHost() << "initShards"
                             << BSONArray() << "numChunks" << 1);
         expectChangeLogCreate(configHost, BSON("ok" << 1));
-        expectChangeLogInsert(configHost,
-                              clientHost.toString(),
-                              network()->now(),
-                              "shardCollection.start",
-                              ns,
-                              logChangeDetail);
+        expectChangeLogInsert(
+            configHost, network()->now(), "shardCollection.start", ns, logChangeDetail);
     }
 
     // Report that documents exist for the given collection on the primary shard, so that calling
@@ -799,7 +785,6 @@ TEST_F(ShardCollectionTest, withInitialData) {
 
     // Respond to request to write final changelog entry indicating success.
     expectChangeLogInsert(configHost,
-                          clientHost.toString(),
                           network()->now(),
                           "shardCollection.end",
                           ns,

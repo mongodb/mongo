@@ -52,8 +52,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/s/catalog/type_actionlog.h"
-#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -95,8 +93,6 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
 const int kInitialSSVRetries = 3;
-const int kActionLogCollectionSize = 1024 * 1024 * 2;
-const int kChangeLogCollectionSize = 1024 * 1024 * 10;
 const int kMaxConfigVersionInitRetry = 3;
 const int kMaxReadRetry = 3;
 
@@ -187,11 +183,7 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
 
         collectionDetail.append("numChunks", static_cast<int>(initPoints.size() + 1));
 
-        logChange(txn,
-                  txn->getClient()->clientAddress(true),
-                  "shardCollection.start",
-                  ns,
-                  collectionDetail.obj());
+        logChange(txn, "shardCollection.start", ns, collectionDetail.obj());
     }
 
     shared_ptr<ChunkManager> manager(new ChunkManager(ns, fieldsAndOrder, unique));
@@ -221,11 +213,7 @@ Status CatalogManagerReplicaSet::shardCollection(OperationContext* txn,
                   << dbPrimaryShardId << ssvStatus.getStatus();
     }
 
-    logChange(txn,
-              txn->getClient()->clientAddress(true),
-              "shardCollection.end",
-              ns,
-              BSON("version" << manager->getVersion().toString()));
+    logChange(txn, "shardCollection.end", ns, BSON("version" << manager->getVersion().toString()));
 
     return Status::OK();
 }
@@ -280,11 +268,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationC
         grid.shardRegistry()->reload(txn);
 
         // Record start in changelog
-        logChange(txn,
-                  txn->getClient()->clientAddress(true),
-                  "removeShard.start",
-                  "",
-                  BSON("shard" << name));
+        logChange(txn, "removeShard.start", "", BSON("shard" << name));
         return ShardDrainingStatus::STARTED;
     }
 
@@ -324,7 +308,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationC
     grid.shardRegistry()->reload(txn);
 
     // Record finish in changelog
-    logChange(txn, txn->getClient()->clientAddress(true), "removeShard", "", BSON("shard" << name));
+    logChange(txn, "removeShard", "", BSON("shard" << name));
 
     return ShardDrainingStatus::COMPLETED;
 }
@@ -467,8 +451,7 @@ Status CatalogManagerReplicaSet::getCollections(OperationContext* txn,
 }
 
 Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const NamespaceString& ns) {
-    logChange(
-        txn, txn->getClient()->clientAddress(true), "dropCollection.start", ns.ns(), BSONObj());
+    logChange(txn, "dropCollection.start", ns.ns(), BSONObj());
 
     auto shardsStatus = getAllShards(txn);
     if (!shardsStatus.isOK()) {
@@ -589,84 +572,9 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
 
     LOG(1) << "dropCollection " << ns << " completed";
 
-    logChange(txn, txn->getClient()->clientAddress(true), "dropCollection", ns.ns(), BSONObj());
+    logChange(txn, "dropCollection", ns.ns(), BSONObj());
 
     return Status::OK();
-}
-
-void CatalogManagerReplicaSet::logAction(OperationContext* txn, const ActionLogType& actionLog) {
-    if (_actionLogCollectionCreated.load() == 0) {
-        BSONObj createCmd = BSON("create" << ActionLogType::ConfigNS << "capped" << true << "size"
-                                          << kActionLogCollectionSize);
-        auto result =
-            grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, "config", createCmd);
-        if (!result.isOK()) {
-            LOG(1) << "couldn't create actionlog collection: " << causedBy(result.getStatus());
-            return;
-        }
-
-        Status commandStatus = Command::getStatusFromCommandResult(result.getValue());
-        if (commandStatus.isOK() || commandStatus == ErrorCodes::NamespaceExists) {
-            _actionLogCollectionCreated.store(1);
-        } else {
-            LOG(1) << "couldn't create actionlog collection: " << causedBy(commandStatus);
-            return;
-        }
-    }
-
-    Status result = insert(txn, ActionLogType::ConfigNS, actionLog.toBSON(), NULL);
-    if (!result.isOK()) {
-        log() << "error encountered while logging action: " << result;
-    }
-}
-
-Status CatalogManagerReplicaSet::logChange(OperationContext* txn,
-                                           const string& clientAddress,
-                                           const string& what,
-                                           const string& ns,
-                                           const BSONObj& detail) {
-    if (_changeLogCollectionCreated.load() == 0) {
-        BSONObj createCmd = BSON("create" << ChangeLogType::ConfigNS << "capped" << true << "size"
-                                          << kChangeLogCollectionSize);
-        auto result =
-            grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, "config", createCmd);
-        if (!result.isOK()) {
-            LOG(1) << "couldn't create changelog collection: " << causedBy(result.getStatus());
-            return result.getStatus();
-        }
-
-        Status commandStatus = Command::getStatusFromCommandResult(result.getValue());
-        if (commandStatus.isOK() || commandStatus == ErrorCodes::NamespaceExists) {
-            _changeLogCollectionCreated.store(1);
-        } else {
-            LOG(1) << "couldn't create changelog collection: " << causedBy(commandStatus);
-            return commandStatus;
-        }
-    }
-
-    Date_t now = grid.shardRegistry()->getExecutor()->now();
-    const std::string hostName = grid.shardRegistry()->getNetwork()->getHostName();
-    const string changeId = str::stream() << hostName << "-" << now.toString() << "-" << OID::gen();
-
-    ChangeLogType changeLog;
-    changeLog.setChangeId(changeId);
-    changeLog.setServer(hostName);
-    changeLog.setClientAddr(clientAddress);
-    changeLog.setTime(now);
-    changeLog.setNS(ns);
-    changeLog.setWhat(what);
-    changeLog.setDetails(detail);
-
-    BSONObj changeLogBSON = changeLog.toBSON();
-    log() << "about to log metadata event: " << changeLogBSON;
-
-    Status result = insert(txn, ChangeLogType::ConfigNS, changeLogBSON, NULL);
-    if (!result.isOK()) {
-        warning() << "Error encountered while logging config change with ID " << changeId << ": "
-                  << result;
-    }
-
-    return result;
 }
 
 StatusWith<SettingsType> CatalogManagerReplicaSet::getGlobalSettings(OperationContext* txn,
@@ -1068,6 +976,19 @@ StatusWith<std::string> CatalogManagerReplicaSet::_generateNewShardName(Operatio
     }
 
     return Status(ErrorCodes::OperationFailed, "unable to generate new shard name");
+}
+
+Status CatalogManagerReplicaSet::_createCappedConfigCollection(OperationContext* txn,
+                                                               StringData collName,
+                                                               int cappedSize) {
+    BSONObj createCmd = BSON("create" << collName << "capped" << true << "size" << cappedSize);
+    auto result =
+        grid.shardRegistry()->runCommandOnConfigWithNotMasterRetries(txn, "config", createCmd);
+    if (!result.isOK()) {
+        return result.getStatus();
+    }
+
+    return Command::getStatusFromCommandResult(result.getValue());
 }
 
 StatusWith<long long> CatalogManagerReplicaSet::_runCountCommandOnConfig(OperationContext* txn,

@@ -164,7 +164,6 @@ protected:
 
         // Expect the change log operation
         expectChangeLogInsert(configHost,
-                              "FakeRemoteClient:34567",
                               shardRegistry()->getNetwork()->now(),
                               "addShard",
                               "",

@@ -43,8 +43,10 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
+#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
@@ -65,6 +67,12 @@ using std::unique_ptr;
 using std::vector;
 
 namespace {
+
+const std::string kActionLogCollectionName("actionlog");
+const int kActionLogCollectionSizeMB = 2 * 1024 * 1024;
+
+const std::string kChangeLogCollectionName("changelog");
+const int kChangeLogCollectionSizeMB = 10 * 1024 * 1024;
 
 /**
  * Validates that the specified connection string can serve as a shard server. In particular,
@@ -366,7 +374,7 @@ StatusWith<string> CatalogManagerCommon::addShard(OperationContext* txn,
     shardDetails.append("name", shardType.getName());
     shardDetails.append("host", shardConnectionString.toString());
 
-    logChange(txn, txn->getClient()->clientAddress(true), "addShard", "", shardDetails.obj());
+    logChange(txn, "addShard", "", shardDetails.obj());
 
     return shardType.getName();
 }
@@ -461,6 +469,42 @@ Status CatalogManagerCommon::createDatabase(OperationContext* txn, const std::st
     return status;
 }
 
+Status CatalogManagerCommon::logAction(OperationContext* txn,
+                                       const std::string& what,
+                                       const std::string& ns,
+                                       const BSONObj& detail) {
+    if (_actionLogCollectionCreated.load() == 0) {
+        Status result = _createCappedConfigCollection(
+            txn, kActionLogCollectionName, kActionLogCollectionSizeMB);
+        if (result.isOK() || result == ErrorCodes::NamespaceExists) {
+            _actionLogCollectionCreated.store(1);
+        } else {
+            log() << "couldn't create config.actionlog collection:" << causedBy(result);
+            return result;
+        }
+    }
+
+    return _log(txn, kActionLogCollectionName, what, ns, detail);
+}
+
+Status CatalogManagerCommon::logChange(OperationContext* txn,
+                                       const std::string& what,
+                                       const std::string& ns,
+                                       const BSONObj& detail) {
+    if (_changeLogCollectionCreated.load() == 0) {
+        Status result = _createCappedConfigCollection(
+            txn, kChangeLogCollectionName, kChangeLogCollectionSizeMB);
+        if (result.isOK() || result == ErrorCodes::NamespaceExists) {
+            _changeLogCollectionCreated.store(1);
+        } else {
+            log() << "couldn't create config.changelog collection:" << causedBy(result);
+            return result;
+        }
+    }
+
+    return _log(txn, kChangeLogCollectionName, what, ns, detail);
+}
+
 // static
 StatusWith<ShardId> CatalogManagerCommon::selectShardForNewDatabase(OperationContext* txn,
                                                                     ShardRegistry* shardRegistry) {
@@ -540,6 +584,37 @@ Status CatalogManagerCommon::enableSharding(OperationContext* txn, const std::st
     log() << "Enabling sharding for database [" << dbName << "] in config db";
 
     return updateDatabase(txn, dbName, db);
+}
+
+Status CatalogManagerCommon::_log(OperationContext* txn,
+                                  const StringData& logCollName,
+                                  const std::string& what,
+                                  const std::string& operationNS,
+                                  const BSONObj& detail) {
+    Date_t now = grid.shardRegistry()->getExecutor()->now();
+    const std::string hostName = grid.shardRegistry()->getNetwork()->getHostName();
+    const string changeId = str::stream() << hostName << "-" << now.toString() << "-" << OID::gen();
+
+    ChangeLogType changeLog;
+    changeLog.setChangeId(changeId);
+    changeLog.setServer(hostName);
+    changeLog.setClientAddr(txn->getClient()->clientAddress(true));
+    changeLog.setTime(now);
+    changeLog.setNS(operationNS);
+    changeLog.setWhat(what);
+    changeLog.setDetails(detail);
+
+    BSONObj changeLogBSON = changeLog.toBSON();
+    log() << "about to log metadata event into " << logCollName << ": " << changeLogBSON;
+
+    const NamespaceString nss("config", logCollName);
+    Status result = insert(txn, nss.ns(), changeLogBSON, NULL);
+    if (!result.isOK()) {
+        warning() << "Error encountered while logging config change with ID [" << changeId
+                  << "] into collection " << logCollName << ": " << result;
+    }
+
+    return result;
 }
 
 }  // namespace mongo

@@ -30,7 +30,6 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/catalog_manager_common.h"
 #include "mongo/stdx/mutex.h"
 
@@ -123,14 +122,6 @@ public:
                                    const BSONArray& updateOps,
                                    const BSONArray& preCondition) override;
 
-    void logAction(OperationContext* txn, const ActionLogType& actionLog) override;
-
-    Status logChange(OperationContext* txn,
-                     const std::string& clientAddress,
-                     const std::string& what,
-                     const std::string& ns,
-                     const BSONObj& detail) override;
-
     StatusWith<SettingsType> getGlobalSettings(OperationContext* txn,
                                                const std::string& key) override;
 
@@ -148,6 +139,10 @@ private:
                                 DatabaseType* db) override;
 
     StatusWith<std::string> _generateNewShardName(OperationContext* txn) override;
+
+    Status _createCappedConfigCollection(OperationContext* txn,
+                                         StringData collName,
+                                         int cappedSize) override;
 
     /**
      * Helper method for running a read command against the config server.
@@ -195,7 +190,6 @@ private:
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //
-    // (F) Self synchronizing.
     // (M) Must hold _mutex for access.
     // (R) Read only, can only be written during initialization.
     //
@@ -204,12 +198,6 @@ private:
 
     // Distribted lock manager singleton.
     std::unique_ptr<DistLockManager> _distLockManager;  // (R)
-
-    // Whether the logAction call should attempt to create the actionlog collection
-    AtomicInt32 _actionLogCollectionCreated;  // (F)
-
-    // Whether the logChange call should attempt to create the changelog collection
-    AtomicInt32 _changeLogCollectionCreated;  // (F)
 
     // True if shutDown() has been called. False, otherwise.
     bool _inShutdown = false;  // (M)

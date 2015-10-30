@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/catalog_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/optime_pair.h"
@@ -48,22 +49,32 @@ class CatalogManagerCommon : public CatalogManager {
 public:
     virtual ~CatalogManagerCommon() = default;
 
-    Status enableSharding(OperationContext* txn, const std::string& dbName) override;
+    Status enableSharding(OperationContext* txn, const std::string& dbName) final;
 
     StatusWith<std::string> addShard(OperationContext* txn,
                                      const std::string* shardProposedName,
                                      const ConnectionString& shardConnectionString,
-                                     const long long maxSize) override;
+                                     const long long maxSize) final;
 
     Status updateDatabase(OperationContext* txn,
                           const std::string& dbName,
-                          const DatabaseType& db) override;
+                          const DatabaseType& db) final;
 
     Status updateCollection(OperationContext* txn,
                             const std::string& collNs,
-                            const CollectionType& coll) override;
+                            const CollectionType& coll) final;
 
-    Status createDatabase(OperationContext* txn, const std::string& dbName) override;
+    Status createDatabase(OperationContext* txn, const std::string& dbName) final;
+
+    Status logAction(OperationContext* txn,
+                     const std::string& what,
+                     const std::string& ns,
+                     const BSONObj& detail) final;
+
+    Status logChange(OperationContext* txn,
+                     const std::string& what,
+                     const std::string& ns,
+                     const BSONObj& detail) final;
 
 protected:
     /**
@@ -94,6 +105,36 @@ private:
      * Generates a unique name to be given to a newly added shard.
      */
     virtual StatusWith<std::string> _generateNewShardName(OperationContext* txn) = 0;
+
+    /**
+     * Creates the specified collection name in the config database.
+     */
+    virtual Status _createCappedConfigCollection(OperationContext* txn,
+                                                 StringData collName,
+                                                 int cappedSize) = 0;
+
+    /**
+     * Best effort method, which logs diagnostic events on the config server. If the config server
+     * write fails for any reason a warning will be written to the local service log and the method
+     * will return a failed status.
+     *
+     * @param txn Operation context in which the call is running
+     * @param logCollName Which config collection to write to (excluding the database name)
+     * @param what E.g. "split", "migrate" (not interpreted)
+     * @param operationNS To which collection the metadata change is being applied (not interpreted)
+     * @param detail Additional info about the metadata change (not interpreted)
+     */
+    Status _log(OperationContext* txn,
+                const StringData& logCollName,
+                const std::string& what,
+                const std::string& operationNS,
+                const BSONObj& detail);
+
+    // Whether the logAction call should attempt to create the actionlog collection
+    AtomicInt32 _actionLogCollectionCreated{0};
+
+    // Whether the logChange call should attempt to create the changelog collection
+    AtomicInt32 _changeLogCollectionCreated{0};
 };
 
 }  // namespace mongo

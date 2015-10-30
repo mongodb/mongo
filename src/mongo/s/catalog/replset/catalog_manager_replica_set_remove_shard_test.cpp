@@ -199,12 +199,8 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     });
 
     expectChangeLogCreate(configHost, BSON("ok" << 1));
-    expectChangeLogInsert(configHost,
-                          clientHost.toString(),
-                          network()->now(),
-                          "removeShard.start",
-                          "",
-                          BSON("shard" << shardName));
+    expectChangeLogInsert(
+        configHost, network()->now(), "removeShard.start", "", BSON("shard" << shardName));
 
     future.timed_get(kFutureTimeout);
 }
@@ -375,12 +371,8 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     });
 
     expectChangeLogCreate(configHost, BSON("ok" << 1));
-    expectChangeLogInsert(configHost,
-                          clientHost.toString(),
-                          network()->now(),
-                          "removeShard",
-                          "",
-                          BSON("shard" << shardName));
+    expectChangeLogInsert(
+        configHost, network()->now(), "removeShard", "", BSON("shard" << shardName));
 
     future.timed_get(kFutureTimeout);
 }

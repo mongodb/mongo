@@ -39,8 +39,6 @@
 
 namespace mongo {
 
-const std::string ChangeLogType::ConfigNS = "config.changelog";
-
 const BSONField<std::string> ChangeLogType::changeId("_id");
 const BSONField<std::string> ChangeLogType::server("server");
 const BSONField<std::string> ChangeLogType::clientAddr("clientAddr");
@@ -94,7 +92,7 @@ StatusWith<ChangeLogType> ChangeLogType::fromBSON(const BSONObj& source) {
 
     {
         std::string changeLogNs;
-        Status status = bsonExtractStringField(source, ns.name(), &changeLogNs);
+        Status status = bsonExtractStringFieldWithDefault(source, ns.name(), "", &changeLogNs);
         if (!status.isOK())
             return status;
         changeLog._ns = changeLogNs;
@@ -128,9 +126,6 @@ Status ChangeLogType::validate() const {
 
     if (!_what.is_initialized() || _what->empty())
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << what.name() << " field"};
-
-    if (!_ns.is_initialized() || _ns->empty())
-        return {ErrorCodes::NoSuchKey, str::stream() << "missing " << ns.name() << " field"};
 
     if (!_details.is_initialized() || _details->isEmpty())
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << details.name() << " field"};

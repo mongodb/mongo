@@ -556,11 +556,7 @@ Status ChunkMoveOperationState::commitMigration() {
         commitInfo.appendElements(res["counts"].Obj());
     }
 
-    grid.catalogManager(_txn)->logChange(_txn,
-                                         _txn->getClient()->clientAddress(true),
-                                         "moveChunk.commit",
-                                         _nss.ns(),
-                                         commitInfo.obj());
+    grid.catalogManager(_txn)->logChange(_txn, "moveChunk.commit", _nss.ns(), commitInfo.obj());
 
     shardingState->migrationSourceManager()->done(_txn);
     _isRunning = false;

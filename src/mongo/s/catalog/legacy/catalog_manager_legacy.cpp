@@ -47,13 +47,10 @@
 #include "mongo/db/server_options.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/legacy/cluster_client_internal.h"
 #include "mongo/s/catalog/legacy/config_coordinator.h"
 #include "mongo/s/catalog/legacy/config_upgrade.h"
-#include "mongo/s/catalog/type_actionlog.h"
-#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -324,11 +321,7 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
 
     collectionDetail.append("numChunks", static_cast<int>(initPoints.size() + 1));
 
-    logChange(txn,
-              txn->getClient()->clientAddress(true),
-              "shardCollection.start",
-              ns,
-              collectionDetail.obj());
+    logChange(txn, "shardCollection.start", ns, collectionDetail.obj());
 
     shared_ptr<ChunkManager> manager(new ChunkManager(ns, fieldsAndOrder, unique));
     manager->createFirstChunks(txn, dbPrimaryShardId, &initPoints, &initShardIds);
@@ -374,8 +367,7 @@ Status CatalogManagerLegacy::shardCollection(OperationContext* txn,
 
     finishDetail.append("version", manager->getVersion().toString());
 
-    logChange(
-        txn, txn->getClient()->clientAddress(true), "shardCollection.end", ns, finishDetail.obj());
+    logChange(txn, "shardCollection.end", ns, finishDetail.obj());
 
     return Status::OK();
 }
@@ -415,11 +407,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
         conn.done();
 
         // Record start in changelog
-        logChange(txn,
-                  txn->getClient()->clientAddress(true),
-                  "removeShard.start",
-                  "",
-                  BSON("shard" << name));
+        logChange(txn, "removeShard.start", "", BSON("shard" << name));
         return ShardDrainingStatus::STARTED;
     }
 
@@ -445,8 +433,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
         conn.done();
 
         // Record finish in changelog
-        logChange(
-            txn, txn->getClient()->clientAddress(true), "removeShard", "", BSON("shard" << name));
+        logChange(txn, "removeShard", "", BSON("shard" << name));
         return ShardDrainingStatus::COMPLETED;
     }
 
@@ -546,8 +533,7 @@ Status CatalogManagerLegacy::getCollections(OperationContext* txn,
 }
 
 Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const NamespaceString& ns) {
-    logChange(
-        txn, txn->getClient()->clientAddress(true), "dropCollection.start", ns.ns(), BSONObj());
+    logChange(txn, "dropCollection.start", ns.ns(), BSONObj());
 
     auto shardsStatus = getAllShards(txn);
     if (!shardsStatus.isOK()) {
@@ -668,92 +654,9 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
 
     LOG(1) << "dropCollection " << ns << " completed";
 
-    logChange(txn, txn->getClient()->clientAddress(true), "dropCollection", ns.ns(), BSONObj());
+    logChange(txn, "dropCollection", ns.ns(), BSONObj());
 
     return Status::OK();
-}
-
-void CatalogManagerLegacy::logAction(OperationContext* txn, const ActionLogType& actionLog) {
-    // Create the action log collection and ensure that it is capped. Wrap in try/catch,
-    // because creating an existing collection throws.
-    if (_actionLogCollectionCreated.load() == 0) {
-        try {
-            ScopedDbConnection conn(_configServerConnectionString, 30.0);
-            conn->createCollection(ActionLogType::ConfigNS, 1024 * 1024 * 2, true);
-            conn.done();
-
-            _actionLogCollectionCreated.store(1);
-        } catch (const DBException& ex) {
-            if (ex.toStatus() == ErrorCodes::NamespaceExists) {
-                _actionLogCollectionCreated.store(1);
-            } else {
-                LOG(1) << "couldn't create actionlog collection: " << ex;
-                // If we couldn't create the collection don't attempt the insert otherwise we might
-                // implicitly create the collection without it being capped.
-                return;
-            }
-        }
-    }
-
-    Status result = insert(txn, ActionLogType::ConfigNS, actionLog.toBSON(), NULL);
-    if (!result.isOK()) {
-        log() << "error encountered while logging action: " << result;
-    }
-}
-
-Status CatalogManagerLegacy::logChange(OperationContext* txn,
-                                       const string& clientAddress,
-                                       const string& what,
-                                       const string& ns,
-                                       const BSONObj& detail) {
-    // Create the change log collection and ensure that it is capped. Wrap in try/catch,
-    // because creating an existing collection throws.
-    if (_changeLogCollectionCreated.load() == 0) {
-        try {
-            ScopedDbConnection conn(_configServerConnectionString, 30.0);
-            conn->createCollection(ChangeLogType::ConfigNS, 1024 * 1024 * 10, true);
-            conn.done();
-
-            _changeLogCollectionCreated.store(1);
-        } catch (const DBException& ex) {
-            if (ex.toStatus() == ErrorCodes::NamespaceExists) {
-                _changeLogCollectionCreated.store(1);
-            } else {
-                LOG(1) << "couldn't create changelog collection: " << ex;
-                // If we couldn't create the collection don't attempt the insert otherwise we might
-                // implicitly create the collection without it being capped.
-                return ex.toStatus();
-            }
-        }
-    }
-
-    ChangeLogType changeLog;
-    {
-        // Store this entry's ID so we can use on the exception code path too
-        StringBuilder changeIdBuilder;
-        changeIdBuilder << getHostNameCached() << "-" << Date_t::now().toString() << "-"
-                        << OID::gen();
-        changeLog.setChangeId(changeIdBuilder.str());
-    }
-    changeLog.setServer(getHostNameCached());
-    changeLog.setClientAddr(clientAddress);
-    changeLog.setTime(Date_t::now());
-    changeLog.setWhat(what);
-    changeLog.setNS(ns);
-    changeLog.setDetails(detail);
-
-    BSONObj changeLogBSON = changeLog.toBSON();
-    // Send a copy of the message to the local log in case it doesn't manage to reach
-    // config.changelog
-    log() << "about to log metadata event: " << changeLogBSON;
-
-    Status result = insert(txn, ChangeLogType::ConfigNS, changeLogBSON, NULL);
-    if (!result.isOK()) {
-        warning() << "Error encountered while logging config change with ID "
-                  << changeLog.getChangeId() << ": " << result;
-    }
-
-    return result;
 }
 
 StatusWith<SettingsType> CatalogManagerLegacy::getGlobalSettings(OperationContext* txn,
@@ -1203,6 +1106,26 @@ StatusWith<string> CatalogManagerLegacy::_generateNewShardName(OperationContext*
     }
 
     return Status(ErrorCodes::OperationFailed, "unable to generate new shard name");
+}
+
+Status CatalogManagerLegacy::_createCappedConfigCollection(OperationContext* txn,
+                                                           StringData collName,
+                                                           int cappedSize) {
+    try {
+        const NamespaceString nss("config", collName);
+        ScopedDbConnection conn(_configServerConnectionString, 30.0);
+
+        BSONObj result;
+        const int maxNumDocuments = 0;
+        conn->createCollection(nss.ns(), cappedSize, true, maxNumDocuments, &result);
+        conn.done();
+
+        return getStatusFromCommandResult(result);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
+    return Status::OK();
 }
 
 size_t CatalogManagerLegacy::_getShardCount(const BSONObj& query) const {
