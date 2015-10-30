@@ -1185,14 +1185,14 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, bool *hole)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
-	wt_off_t log_size, off;
-	uint32_t bufsz, rdlen, remainder;
+	wt_off_t log_size, off, remainder;
+	size_t bufsz, rdlen;
 	char *buf, *zerobuf;
 
 	conn = S2C(session);
 	log = conn->log;
 	log_size = fh->size;
-	remainder = (uint32_t)(log_size - offset);
+	remainder = log_size - offset;
 	*hole = false;
 
 	/*
@@ -1207,8 +1207,8 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, bool *hole)
 	else
 		bufsz = log->allocsize;
 
-	if (remainder < bufsz)
-		bufsz = remainder;
+	if ((size_t)remainder < bufsz)
+		bufsz = (size_t)remainder;
 	WT_RET(__wt_calloc_def(session, bufsz, &buf));
 	WT_ERR(__wt_calloc_def(session, bufsz, &zerobuf));
 
@@ -1218,7 +1218,7 @@ __log_has_hole(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, bool *hole)
 	 */
 	for (off = offset; remainder > 0;
 	    remainder -= rdlen, off += (wt_off_t)rdlen) {
-		rdlen = WT_MIN(bufsz, remainder);
+		rdlen = WT_MIN(bufsz, (size_t)remainder);
 		WT_ERR(__wt_read(session, fh, off, rdlen, buf));
 		if (memcmp(buf, zerobuf, rdlen) != 0) {
 			*hole = true;
