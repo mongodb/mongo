@@ -460,7 +460,7 @@ __evict_review(
 	WT_ASSERT(session,
 	    LF_ISSET(WT_EVICT_UPDATE_RESTORE) || !__wt_page_is_modified(page));
 	WT_ASSERT(session,
-	    LF_SET(WT_EVICT_LOOKASIDE) ||
+	    LF_ISSET(WT_EVICT_LOOKASIDE) ||
 	    __wt_page_is_modified(page) ||
 	    __wt_txn_visible_all(session, page->modify->rec_max_txn));
 
