@@ -717,9 +717,9 @@ __split_multi_inmem(
 	 * allocated page on error, when discarding the allocated WT_REF.
 	 */
 	WT_RET(__wt_page_inmem(session, ref,
-	    multi->supd_dsk, ((WT_PAGE_HEADER *)multi->supd_dsk)->mem_size,
+	    multi->disk_image, ((WT_PAGE_HEADER *)multi->disk_image)->mem_size,
 	    WT_PAGE_DISK_ALLOC, &page));
-	multi->supd_dsk = NULL;
+	multi->disk_image = NULL;
 
 	if (orig->type == WT_PAGE_ROW_LEAF)
 		WT_RET(__wt_scr_alloc(session, 0, &key));
@@ -841,7 +841,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	/* Any parent reference is filled in by our caller. */
 	ref->home = NULL;
 
-	if (multi->supd == NULL && multi->supd_dsk == NULL) {
+	if (multi->disk_image == NULL) {
 		/*
 		 * Copy the address: we could simply take the buffer, but that
 		 * would complicate error handling, freeing the reference array

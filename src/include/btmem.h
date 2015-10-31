@@ -261,7 +261,9 @@ struct __wt_page_modify {
 		} key;
 
 		/*
-		 * Eviction, but block wasn't written: unresolved updates and
+		 * Eviction, but the block wasn't written: either an in-memory
+		 * configuration or unresolved updates prevented the write.
+		 * There may be a list of unresolved updates, there's always an
 		 * associated disk image.
 		 *
 		 * Saved updates are either a WT_INSERT, or a row-store leaf
@@ -274,7 +276,7 @@ struct __wt_page_modify {
 			uint64_t   onpage_txn;
 		} *supd;
 		uint32_t supd_entries;
-		void	*supd_dsk;
+		void	*disk_image;
 
 		/*
 		 * Block was written: address, size and checksum.

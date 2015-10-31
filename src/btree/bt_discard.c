@@ -164,7 +164,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 				break;
 			}
 			__wt_free(session, multi->supd);
-			__wt_free(session, multi->supd_dsk);
+			__wt_free(session, multi->disk_image);
 			__wt_free(session, multi->addr.addr);
 		}
 		__wt_free(session, mod->mod_multi);
