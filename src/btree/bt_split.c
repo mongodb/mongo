@@ -553,9 +553,9 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	}
 	WT_ASSERT(session,
 	    alloc_refp - alloc_index->index ==
-	    alloc_index->entries - skip_trailing);
-	WT_ASSERT(session,
-	    parent_refp - pindex->index == pindex->entries - skip_trailing);
+	    (ptrdiff_t)(alloc_index->entries - skip_trailing));
+	WT_ASSERT(session, parent_refp - pindex->index ==
+	    (ptrdiff_t)(pindex->entries - skip_trailing));
 
 	/*
 	 * Confirm the parent page's index hasn't moved, then update it, which
@@ -1081,7 +1081,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	}
 
 	/* Check that we filled in all the entries. */
-	WT_ASSERT(session, alloc_refp - alloc_index->index == result_entries);
+	WT_ASSERT(session,
+	    alloc_refp - alloc_index->index == (ptrdiff_t)result_entries);
 
 	/*
 	 * Confirm the parent page's index hasn't moved then update it, which
