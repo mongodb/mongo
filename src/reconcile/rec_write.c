@@ -5496,11 +5496,12 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/*
 		 * If saving/restoring changes for this page and there's only
-		 * one block, there's nothing to write. This is a special case
-		 * of forced eviction: set up a single block as if to split,
-		 * then use that block to rewrite the page in memory.
+		 * one block, there's nothing to write. This is an in-memory
+		 * configuration or a special case of forced eviction: set up
+		 * a single block as if to split, then use that disk image to
+		 * rewrite the page in memory.
 		 */
-		if (bnd->supd != NULL || F_ISSET(r, WT_EVICT_IN_MEMORY))
+		if (bnd->disk_image != NULL)
 			goto split;
 
 		/*
