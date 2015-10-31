@@ -5649,18 +5649,18 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_RET(__wt_row_ikey_alloc(session, 0,
 		    bnd->key.data, bnd->key.size, &multi->key.ikey));
 
-		if (bnd->disk_image != NULL) {
-			multi->supd = bnd->supd;
-			multi->supd_entries = bnd->supd_next;
-			bnd->supd = NULL;
-			multi->disk_image = bnd->disk_image;
-			bnd->disk_image = NULL;
-		} else {
+		if (bnd->disk_image == NULL) {
 			multi->addr = bnd->addr;
 			multi->addr.reuse = 0;
 			multi->size = bnd->size;
 			multi->cksum = bnd->cksum;
 			bnd->addr.addr = NULL;
+		} else {
+			multi->supd = bnd->supd;
+			multi->supd_entries = bnd->supd_next;
+			bnd->supd = NULL;
+			multi->disk_image = bnd->disk_image;
+			bnd->disk_image = NULL;
 		}
 	}
 	mod->mod_multi_entries = r->bnd_next;
@@ -5689,18 +5689,18 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++multi, ++bnd, ++i) {
 		multi->key.recno = bnd->recno;
 
-		if (bnd->disk_image != NULL) {
-			multi->supd = bnd->supd;
-			multi->supd_entries = bnd->supd_next;
-			bnd->supd = NULL;
-			multi->disk_image = bnd->disk_image;
-			bnd->disk_image = NULL;
-		} else {
+		if (bnd->disk_image == NULL) {
 			multi->addr = bnd->addr;
 			multi->addr.reuse = 0;
 			multi->size = bnd->size;
 			multi->cksum = bnd->cksum;
 			bnd->addr.addr = NULL;
+		} else {
+			multi->supd = bnd->supd;
+			multi->supd_entries = bnd->supd_next;
+			bnd->supd = NULL;
+			multi->disk_image = bnd->disk_image;
+			bnd->disk_image = NULL;
 		}
 	}
 	mod->mod_multi_entries = r->bnd_next;
