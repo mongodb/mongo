@@ -475,7 +475,7 @@ __evict_review(
 	WT_ASSERT(session,
 	    __wt_page_is_modified(page) ||
 	    LF_ISSET(WT_EVICT_LOOKASIDE) ||
-	    F_ISSET(S2BT(session), WT_BTREE_LOOKASIDE) |
+	    F_ISSET(S2BT(session), WT_BTREE_LOOKASIDE) ||
 	    __wt_txn_visible_all(session, page->modify->rec_max_txn));
 
 	return (0);
