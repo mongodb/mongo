@@ -40,9 +40,7 @@ typedef struct {
 	uint64_t orig_btree_checkpoint_gen;
 	uint64_t orig_txn_checkpoint_gen;
 
-	/*
-	 * Track maximum transaction ID seen and first unwritten transaction ID.
-	 */
+	/* Track the page's maximum transaction ID. */
 	uint64_t max_txn;
 
 	/*
@@ -818,8 +816,10 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	}
 	r->flags = flags;
 
-	/* Track if the page can be marked clean. */
+	/* Track the page's maximum transaction ID. */
 	r->max_txn = WT_TXN_NONE;
+
+	/* Track if the page can be marked clean. */
 	r->leave_dirty = false;
 
 	/* Raw compression. */
