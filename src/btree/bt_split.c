@@ -563,8 +563,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	WT_ASSERT(session,
 	    alloc_refp - alloc_index->index ==
 	    (ptrdiff_t)(alloc_index->entries - skip_trailing));
-	WT_ASSERT(session,
-	    parent_refp - pindex->index ==
+	WT_ASSERT(session, parent_refp - pindex->index ==
 	    (ptrdiff_t)(pindex->entries - skip_trailing));
 
 	/*
@@ -1078,9 +1077,9 @@ __split_multi_inmem(
 	 * allocated page on error, when discarding the allocated WT_REF.
 	 */
 	WT_RET(__wt_page_inmem(session, ref,
-	    multi->supd_dsk, ((WT_PAGE_HEADER *)multi->supd_dsk)->mem_size,
+	    multi->disk_image, ((WT_PAGE_HEADER *)multi->disk_image)->mem_size,
 	    WT_PAGE_DISK_ALLOC, &page));
-	multi->supd_dsk = NULL;
+	multi->disk_image = NULL;
 
 	if (orig->type == WT_PAGE_ROW_LEAF)
 		WT_RET(__wt_scr_alloc(session, 0, &key));
@@ -1202,7 +1201,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 	/* Any parent reference is filled in by our caller. */
 	ref->home = NULL;
 
-	if (multi->supd == NULL && multi->supd_dsk == NULL) {
+	if (multi->disk_image == NULL) {
 		/*
 		 * Copy the address: we could simply take the buffer, but that
 		 * would complicate error handling, freeing the reference array
@@ -1389,17 +1388,11 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	result_entries = (parent_entries + new_entries) - deleted_entries;
 
 	/*
-	 * If the entire (sub)tree is empty, leave the first ref in place,
-	 * deleted.
+	 * If the entire (sub)tree is empty, give up: we can't leave an empty
+	 * internal page.
 	 */
-	if (result_entries == 0) {
-		next_ref = pindex->index[0];
-		WT_ASSERT(session, next_ref->state == WT_REF_SPLIT ||
-		    (next_ref == ref && ref->state == WT_REF_LOCKED));
-		next_ref->state = WT_REF_DELETED;
-		--deleted_entries;
-		result_entries = 1;
-	}
+	if (result_entries == 0)
+		return (0);
 
 	/*
 	 * Allocate and initialize a new page index array for the parent, then
@@ -1458,6 +1451,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 			/* Skip refs we have marked for deletion. */
 			*alloc_refp++ = next_ref;
 	}
+
+	/* Check that we filled in all the entries. */
+	WT_ASSERT(session,
+	    alloc_refp - alloc_index->index == (ptrdiff_t)result_entries);
 
 	/*
 	 * Confirm the parent page's index hasn't moved then update it, which
