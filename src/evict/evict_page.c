@@ -378,8 +378,7 @@ __evict_review(
 
 	/* Now that we have exclusive access, review the page. */
 	page = ref->page;
-
-	modified = __wt_page_is_modified(ref->page);
+	modified = __wt_page_is_modified(page);
 
 	/*
 	 * Clean pages can't be evicted when running in memory only. This
