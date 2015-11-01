@@ -465,15 +465,17 @@ __evict_review(
 
 	/*
 	 * Success: assert the page is clean or reconciliation was configured
-	 * for an update/restore split, and if the page is clean, reconciliation
-	 * was configured for a lookaside table or all updates on the page are
-	 * globally visible.
+	 * for an update/restore split.  If the page is clean, assert that
+	 * reconciliation was configured for a lookaside table, or it's not a
+	 * durable object (currently the lookaside table), or all page updates
+	 * were globally visible.
 	 */
 	WT_ASSERT(session,
 	    LF_ISSET(WT_EVICT_UPDATE_RESTORE) || !__wt_page_is_modified(page));
 	WT_ASSERT(session,
-	    LF_ISSET(WT_EVICT_LOOKASIDE) ||
 	    __wt_page_is_modified(page) ||
+	    LF_ISSET(WT_EVICT_LOOKASIDE) ||
+	    F_ISSET(S2BT(session), WT_BTREE_LOOKASIDE) |
 	    __wt_txn_visible_all(session, page->modify->rec_max_txn));
 
 	return (0);
