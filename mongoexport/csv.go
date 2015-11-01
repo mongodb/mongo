@@ -25,23 +25,30 @@ type CSVExportOutput struct {
 	// NumExported maintains a running total of the number of documents written.
 	NumExported int64
 
+	// NoHeaderLine, if set, will export CSV data without a list of field names at the first line
+	NoHeaderLine bool
+
 	csvWriter *csv.Writer
 }
 
 // NewCSVExportOutput returns a CSVExportOutput configured to write output to the
 // given io.Writer, extracting the specified fields only.
-func NewCSVExportOutput(fields []string, out io.Writer) *CSVExportOutput {
+func NewCSVExportOutput(fields []string, noHeaderLine bool, out io.Writer) *CSVExportOutput {
 	return &CSVExportOutput{
 		fields,
 		0,
+		noHeaderLine,
 		csv.NewWriter(out),
 	}
 }
 
 // WriteHeader writes a comma-delimited list of fields as the output header row.
 func (csvExporter *CSVExportOutput) WriteHeader() error {
-	csvExporter.csvWriter.Write(csvExporter.Fields)
-	return csvExporter.csvWriter.Error()
+	if !csvExporter.NoHeaderLine {
+		csvExporter.csvWriter.Write(csvExporter.Fields)
+		return csvExporter.csvWriter.Error()
+	}
+	return nil
 }
 
 // WriteFooter is a no-op for CSV export formats.

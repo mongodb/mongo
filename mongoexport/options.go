@@ -30,6 +30,9 @@ type OutputFormatOptions struct {
 
 	// Pretty displays JSON data in a human-readable form.
 	Pretty bool `long:"pretty" description:"output JSON formatted to be human-readable"`
+
+	// NoHeaderLine, if set, will export CSV data without a list of field names at the first line.
+	NoHeaderLine bool `long:"noHeaderLine" description:"export CSV data without a list of field names at the first line"`
 }
 
 // Name returns a human-readable group name for output format options.

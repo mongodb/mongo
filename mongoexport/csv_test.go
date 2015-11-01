@@ -19,14 +19,31 @@ func TestWriteCSV(t *testing.T) {
 		out := &bytes.Buffer{}
 
 		Convey("Headers should be written correctly", func() {
-			csvExporter := NewCSVExportOutput(fields, out)
+			csvExporter := NewCSVExportOutput(fields, false, out)
 			err := csvExporter.WriteHeader()
 			So(err, ShouldBeNil)
+			csvExporter.ExportDocument(bson.D{{"_id", "12345"}})
 			csvExporter.WriteFooter()
+			csvExporter.Flush()
+			rec, err := csv.NewReader(strings.NewReader(out.String())).Read()
+			So(err, ShouldBeNil)
+			So(rec, ShouldResemble, []string{"_id", "x", " y", "z.1.a"})
+		})
+
+		Convey("Headers should not be written", func() {
+			csvExporter := NewCSVExportOutput(fields, true, out)
+			err := csvExporter.WriteHeader()
+			So(err, ShouldBeNil)
+			csvExporter.ExportDocument(bson.D{{"_id", "12345"}})
+			csvExporter.WriteFooter()
+			csvExporter.Flush()
+			rec, err := csv.NewReader(strings.NewReader(out.String())).Read()
+			So(err, ShouldBeNil)
+			So(rec, ShouldResemble, []string{"12345", "", "", ""})
 		})
 
 		Convey("Exported document with missing fields should print as blank", func() {
-			csvExporter := NewCSVExportOutput(fields, out)
+			csvExporter := NewCSVExportOutput(fields, true, out)
 			csvExporter.ExportDocument(bson.D{{"_id", "12345"}})
 			csvExporter.WriteFooter()
 			csvExporter.Flush()
@@ -36,7 +53,7 @@ func TestWriteCSV(t *testing.T) {
 		})
 
 		Convey("Exported document with index into nested objects should print correctly", func() {
-			csvExporter := NewCSVExportOutput(fields, out)
+			csvExporter := NewCSVExportOutput(fields, true, out)
 			csvExporter.ExportDocument(bson.D{{"z", []interface{}{"x", bson.D{{"a", "T"}, {"B", 1}}}}})
 			csvExporter.WriteFooter()
 			csvExporter.Flush()
