@@ -159,7 +159,7 @@ __evict_server(void *arg)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 #ifdef HAVE_DIAGNOSTIC
-	struct timespec now, stuck_ts;
+	struct timespec now, stuck_ts = { 0, 0 };
 #endif
 	u_int spins;
 
