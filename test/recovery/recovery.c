@@ -41,7 +41,7 @@
 
 static char home[512];			/* Program working dir */
 static const char *progname;		/* Program name */
-static char *uri = "table:main";
+static const char *uri = "table:main";
 
 #define	RECORDS_FILE "records"
 
