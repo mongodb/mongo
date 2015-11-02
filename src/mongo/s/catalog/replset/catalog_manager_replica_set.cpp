@@ -95,6 +95,7 @@ const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::Prim
 
 const int kMaxConfigVersionInitRetry = 3;
 const int kMaxReadRetry = 3;
+const int kMaxWriteRetry = 3;
 
 void _toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
@@ -914,7 +915,9 @@ Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
                                                       const BSONObj& doc) {
     const NamespaceString nss(ns);
     invariant(nss.db() == "config");
-    invariant(doc.hasField("_id"));
+
+    const BSONElement idField = doc.getField("_id");
+    invariant(!idField.eoo());
 
     auto insert(stdx::make_unique<BatchedInsertRequest>());
     insert->addToDocuments(doc);
@@ -923,10 +926,49 @@ Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
     request.setNS(nss);
     request.setWriteConcern(WriteConcernOptions::Majority);
 
-    BatchedCommandResponse response;
-    writeConfigServerDirect(txn, request, &response);
+    for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
+        BatchedCommandResponse response;
+        writeConfigServerDirect(txn, request, &response);
 
-    return response.toStatus();
+        Status status = response.toStatus();
+
+        // If we get DuplicateKey error on the first attempt to insert, this definitively means that
+        // we are trying to insert the same entry a second time, so error out. If it happens on a
+        // retry attempt though, it is not clear whether we are actually inserting a duplicate key
+        // or it is because we failed to wait for write concern on the first attempt. In order to
+        // differentiate, fetch the entry and check.
+        if (retry > 1 && status == ErrorCodes::DuplicateKey) {
+            LOG(1) << "Insert retry failed because of duplicate key error, rechecking.";
+
+            auto fetchDuplicate =
+                _exhaustiveFindOnConfig(txn,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        nss,
+                                        idField.wrap(),
+                                        BSONObj(),
+                                        boost::none);
+            if (!fetchDuplicate.isOK()) {
+                return fetchDuplicate.getStatus();
+            }
+
+            auto existingDocs = fetchDuplicate.getValue().value;
+            invariant(existingDocs.size() == 1);
+
+            BSONObj existing = std::move(existingDocs.front());
+            if (existing.woCompare(doc) == 0) {
+                // Documents match, so treat the operation as success
+                status = Status::OK();
+            }
+        }
+
+        if (ErrorCodes::isNetworkError(status.code()) && (retry < kMaxWriteRetry)) {
+            continue;
+        }
+
+        return status;
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 Status CatalogManagerReplicaSet::_checkDbDoesNotExist(OperationContext* txn,
