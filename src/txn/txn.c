@@ -180,7 +180,8 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	 */
 	WT_ASSERT(session, WT_TXNID_LE(prev_oldest_id, snap_min));
 	WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
-	txn_state->snap_min = snap_min;
+	if (txn->forced_iso == 0 || txn_state->snap_min == WT_TXN_NONE)
+		txn_state->snap_min = snap_min;
 
 	WT_ASSERT(session, txn_global->scan_count > 0);
 	(void)__wt_atomic_subiv32(&txn_global->scan_count, 1);

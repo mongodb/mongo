@@ -22,16 +22,17 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_PAGE_MODIFY *mod;
 	WT_REF *walk;
 	WT_TXN *txn;
-	uint64_t internal_bytes, leaf_bytes;
-	uint64_t internal_pages, leaf_pages;
+	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
+	uint64_t saved_snap_min;
 	uint32_t flags;
 	bool evict_reset;
 
 	btree = S2BT(session);
 
-	flags = WT_READ_CACHE | WT_READ_NO_GEN;
 	walk = NULL;
 	txn = &session->txn;
+	saved_snap_min = WT_SESSION_TXN_STATE(session)->snap_min;
+	flags = WT_READ_CACHE | WT_READ_NO_GEN;
 
 	internal_bytes = leaf_bytes = 0;
 	internal_pages = leaf_pages = 0;
@@ -110,6 +111,8 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		/* Write all dirty in-cache pages. */
 		flags |= WT_READ_NO_EVICT;
 		for (walk = NULL;;) {
+			if (txn->isolation == WT_ISO_READ_COMMITTED)
+				__wt_txn_get_snapshot(session);
 			WT_ERR(__wt_tree_walk(session, &walk, NULL, flags));
 			if (walk == NULL)
 				break;
@@ -174,7 +177,12 @@ err:	/* On error, clear any left-over tree walk. */
 	if (walk != NULL)
 		WT_TRET(__wt_page_release(session, walk, flags));
 
-	if (txn->isolation == WT_ISO_READ_COMMITTED && session->ncursors == 0)
+	/*
+	 * If we got a snapshot in order to write pages, and there was no
+	 * snapshot active when we started, release it.
+	 */
+	if (txn->isolation == WT_ISO_READ_COMMITTED &&
+	    saved_snap_min == WT_TXN_NONE)
 		__wt_txn_release_snapshot(session);
 
 	if (btree->checkpointing != WT_CKPT_OFF) {
