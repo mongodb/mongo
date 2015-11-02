@@ -135,7 +135,7 @@ main(int argc, char *argv[])
 	uint64_t key;
 	uint32_t absent, count, sleep_cnt;
 	size_t rd;
-	int ch, fd, status, rc, ret;
+	int ch, fd, status, ret;
 	pid_t pid;
 	char *working_dir;
 
