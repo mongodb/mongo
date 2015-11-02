@@ -378,14 +378,6 @@ __evict_review(
 
 	/* Now that we have exclusive access, review the page. */
 	page = ref->page;
-	modified = __wt_page_is_modified(page);
-
-	/*
-	 * Clean pages can't be evicted when running in memory only. This
-	 * should be uncommon - we don't add clean pages to the queue.
-	 */
-	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !modified && !closing)
-		return (EBUSY);
 
 	/*
 	 * Fail if an internal has active children, the children must be evicted
@@ -398,6 +390,20 @@ __evict_review(
 		    ret = __evict_child_check(session, ref));
 		WT_RET(ret);
 	}
+
+	/*
+	 * Retrieve the modified state of the page. This must happen after the
+	 * check for evictable internal pages otherwise there is a race where a
+	 * page could be marked modified whilst performing the check.
+	 */
+	modified = __wt_page_is_modified(page);
+
+	/*
+	 * Clean pages can't be evicted when running in memory only. This
+	 * should be uncommon - we don't add clean pages to the queue.
+	 */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !modified && !closing)
+		return (EBUSY);
 
 	/* Check if the page can be evicted. */
 	if (!closing) {
