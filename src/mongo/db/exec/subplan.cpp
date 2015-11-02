@@ -178,7 +178,7 @@ Status SubplanStage::planSubqueries() {
         LOG(5) << "Subplanner: index " << i << " is " << ie.toString();
     }
 
-    const ExtensionsCallbackReal extensionsCallback(getOpCtx(), _collection->ns().db());
+    const ExtensionsCallbackReal extensionsCallback(getOpCtx(), &_collection->ns());
 
     for (size_t i = 0; i < _orExpression->numChildren(); ++i) {
         // We need a place to shove the results from planning this branch.

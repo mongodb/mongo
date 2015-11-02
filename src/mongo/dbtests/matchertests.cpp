@@ -212,11 +212,12 @@ class WhereSimple1 {
 public:
     void run() {
         OperationContextImpl txn;
-        AutoGetCollectionForRead ctx(&txn, "unittests.matchertests");
+        const NamespaceString nss("unittests.matchertests");
+        AutoGetCollectionForRead ctx(&txn, nss);
 
         M m(BSON("$where"
                  << "function(){ return this.a == 1; }"),
-            ExtensionsCallbackReal(&txn, StringData("unittests")));
+            ExtensionsCallbackReal(&txn, &nss));
         ASSERT(m.matches(BSON("a" << 1)));
         ASSERT(!m.matches(BSON("a" << 2)));
     }

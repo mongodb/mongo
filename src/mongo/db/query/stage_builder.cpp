@@ -133,7 +133,7 @@ PlanStage* buildStages(OperationContext* txn,
             return NULL;
         }
 
-        ProjectionStageParams params(ExtensionsCallbackReal(txn, collection->ns().db()));
+        ProjectionStageParams params(ExtensionsCallbackReal(txn, &collection->ns()));
         params.projObj = pn->projection;
 
         // Stuff the right data into the params depending on what proj impl we use.

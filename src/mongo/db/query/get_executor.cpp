@@ -265,7 +265,7 @@ Status prepareExecution(OperationContext* opCtx,
         // document, so we don't support covered projections. However, we might use the
         // simple inclusion fast path.
         if (NULL != canonicalQuery->getProj()) {
-            ProjectionStageParams params(ExtensionsCallbackReal(opCtx, collection->ns().db()));
+            ProjectionStageParams params(ExtensionsCallbackReal(opCtx, &collection->ns()));
             params.projObj = canonicalQuery->getProj()->getProjObj();
 
             // Add a SortKeyGeneratorStage if there is a $meta sortKey projection.
@@ -614,7 +614,7 @@ StatusWith<unique_ptr<PlanStage>> applyProjection(OperationContext* txn,
                 "Cannot use a $meta sortKey projection in findAndModify commands."};
     }
 
-    ProjectionStageParams params(ExtensionsCallbackReal(txn, nsString.db()));
+    ProjectionStageParams params(ExtensionsCallbackReal(txn, &nsString));
     params.projObj = proj;
     params.fullExpression = cq->root();
     return {make_unique<ProjectionStage>(txn, params, ws, root.release())};
@@ -921,7 +921,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
     }
 
     const NamespaceString nss(request.ns);
-    const ExtensionsCallbackReal extensionsCallback(txn, nss.db());
+    const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
     auto statusWithCQ =
         CanonicalQuery::canonicalize(nss, request.query, request.explain, extensionsCallback);
@@ -1171,7 +1171,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
             false,      // snapshot
             explain,
             collection ? static_cast<const ExtensionsCallback&>(
-                             ExtensionsCallbackReal(txn, collection->ns().db()))
+                             ExtensionsCallbackReal(txn, &collection->ns()))
                        : static_cast<const ExtensionsCallback&>(ExtensionsCallbackNoop()));
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
@@ -1313,7 +1313,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDistinct(OperationContext* txn,
         }
     }
 
-    const ExtensionsCallbackReal extensionsCallback(txn, collection->ns().db());
+    const ExtensionsCallbackReal extensionsCallback(txn, &collection->ns());
 
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.

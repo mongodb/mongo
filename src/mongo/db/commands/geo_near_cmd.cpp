@@ -185,7 +185,7 @@ public:
         BSONObj projObj = BSON("$pt" << BSON("$meta" << LiteParsedQuery::metaGeoNearPoint) << "$dis"
                                      << BSON("$meta" << LiteParsedQuery::metaGeoNearDistance));
 
-        const ExtensionsCallbackReal extensionsCallback(txn, nss.db());
+        const ExtensionsCallbackReal extensionsCallback(txn, &nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(
             nss, rewritten, BSONObj(), projObj, 0, numWanted, BSONObj(), extensionsCallback);
         if (!statusWithCQ.isOK()) {

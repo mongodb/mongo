@@ -1016,7 +1016,7 @@ void State::finalReduce(CurOp* op, ProgressMeterHolder& pm) {
     }
 
     const NamespaceString nss(_config.incLong);
-    const ExtensionsCallbackReal extensionsCallback(_txn, nss.db());
+    const ExtensionsCallbackReal extensionsCallback(_txn, &nss);
 
     auto statusWithCQ =
         CanonicalQuery::canonicalize(nss, BSONObj(), sortKey, BSONObj(), extensionsCallback);
@@ -1371,7 +1371,7 @@ public:
                 unique_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(txn, MODE_IS));
                 unique_ptr<AutoGetDb> scopedAutoDb(new AutoGetDb(txn, nss.db(), MODE_S));
 
-                const ExtensionsCallbackReal extensionsCallback(txn, nss.db());
+                const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
                 auto statusWithCQ = CanonicalQuery::canonicalize(
                     nss, config.filter, config.sort, BSONObj(), extensionsCallback);

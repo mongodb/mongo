@@ -297,7 +297,7 @@ Status ClearFilters::clear(OperationContext* txn,
     querySettings->clearAllowedIndices();
 
     const NamespaceString nss(ns);
-    const ExtensionsCallbackReal extensionsCallback(txn, nss.db());
+    const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
     // Remove corresponding entries from plan cache.
     // Admin hints affect the planning process directly. If there were

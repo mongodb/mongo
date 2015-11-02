@@ -69,7 +69,7 @@ Status ParsedDelete::parseRequest() {
 Status ParsedDelete::parseQueryToCQ() {
     dassert(!_canonicalQuery.get());
 
-    const ExtensionsCallbackReal extensionsCallback(_txn, _request->getNamespaceString().db());
+    const ExtensionsCallbackReal extensionsCallback(_txn, &_request->getNamespaceString());
 
     // Limit should only used for the findAndModify command when a sort is specified. If a sort
     // is requested, we want to use a top-k sort for efficiency reasons, so should pass the

@@ -207,7 +207,7 @@ StatusWith<unique_ptr<CanonicalQuery>> PlanCacheCommand::canonicalize(OperationC
 
     // Create canonical query
     const NamespaceString nss(ns);
-    const ExtensionsCallbackReal extensionsCallback(txn, nss.db());
+    const ExtensionsCallbackReal extensionsCallback(txn, &nss);
 
     auto statusWithCQ = CanonicalQuery::canonicalize(
         std::move(nss), queryObj, sortObj, projObj, extensionsCallback);

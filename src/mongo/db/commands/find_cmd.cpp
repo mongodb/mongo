@@ -142,7 +142,7 @@ public:
 
         // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
 
-        ExtensionsCallbackReal extensionsCallback(txn, nss.db());
+        ExtensionsCallbackReal extensionsCallback(txn, &nss);
         auto statusWithCQ =
             CanonicalQuery::canonicalize(lpqStatus.getValue().release(), extensionsCallback);
         if (!statusWithCQ.isOK()) {
@@ -229,7 +229,7 @@ public:
         beginQueryOp(txn, nss, cmdObj, ntoreturn, ntoskip);
 
         // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
-        ExtensionsCallbackReal extensionsCallback(txn, nss.db());
+        ExtensionsCallbackReal extensionsCallback(txn, &nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(lpq.release(), extensionsCallback);
         if (!statusWithCQ.isOK()) {
             return appendCommandStatus(result, statusWithCQ.getStatus());

@@ -177,8 +177,8 @@ bool WhereMatchExpression::equivalent(const MatchExpression* other) const {
         _userScope == realOther->_userScope;
 }
 
-ExtensionsCallbackReal::ExtensionsCallbackReal(OperationContext* txn, StringData dbName)
-    : _txn(txn), _dbName(dbName) {}
+ExtensionsCallbackReal::ExtensionsCallbackReal(OperationContext* txn, const NamespaceString* nss)
+    : _txn(txn), _nss(nss) {}
 
 StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(const BSONElement& where) const {
     if (!globalScriptEngine)
@@ -187,15 +187,15 @@ StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(const BSONElement& 
 
     unique_ptr<WhereMatchExpression> exp(new WhereMatchExpression(_txn));
     if (where.type() == String || where.type() == Code) {
-        Status s = exp->init(_dbName, where.valuestr(), BSONObj());
+        Status s = exp->init(_nss->db(), where.valuestr(), BSONObj());
         if (!s.isOK())
             return StatusWithMatchExpression(s);
         return {std::move(exp)};
     }
 
     if (where.type() == CodeWScope) {
-        Status s =
-            exp->init(_dbName, where.codeWScopeCode(), BSONObj(where.codeWScopeScopeDataUnsafe()));
+        Status s = exp->init(
+            _nss->db(), where.codeWScopeCode(), BSONObj(where.codeWScopeScopeDataUnsafe()));
         if (!s.isOK())
             return StatusWithMatchExpression(s);
         return {std::move(exp)};

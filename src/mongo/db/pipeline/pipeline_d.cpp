@@ -191,7 +191,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     BSONObj projectionObj,
     BSONObj sortObj,
     const size_t plannerOpts) {
-    const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, pExpCtx->ns.db());
+    const ExtensionsCallbackReal extensionsCallback(pExpCtx->opCtx, &pExpCtx->ns);
 
     auto cq = CanonicalQuery::canonicalize(
         pExpCtx->ns, queryObj, sortObj, projectionObj, extensionsCallback);

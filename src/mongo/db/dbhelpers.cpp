@@ -129,7 +129,7 @@ RecordId Helpers::findOne(OperationContext* txn,
     if (!collection)
         return RecordId();
 
-    const ExtensionsCallbackReal extensionsCallback(txn, collection->ns().db());
+    const ExtensionsCallbackReal extensionsCallback(txn, &collection->ns());
 
     auto statusWithCQ = CanonicalQuery::canonicalize(collection->ns(), query, extensionsCallback);
     massert(17244, "Could not canonicalize " + query.toString(), statusWithCQ.isOK());

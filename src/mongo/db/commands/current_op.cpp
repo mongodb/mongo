@@ -98,8 +98,12 @@ public:
             filter = b.obj();
         }
 
-        const ExtensionsCallbackReal extensionsCallback(txn, db);
-        const Matcher matcher(filter, extensionsCallback);
+        // We use ExtensionsCallbackReal here instead of ExtensionsCallbackNoop in order to support
+        // the use case of having a $where filter with currentOp. However, since we don't have a
+        // collection, we pass in a fake collection name (and this is okay, because $where parsing
+        // only relies on the database part of the namespace).
+        const NamespaceString fakeNS(db, "$cmd");
+        const Matcher matcher(filter, ExtensionsCallbackReal(txn, &fakeNS));
 
         BSONArrayBuilder inprogBuilder(result.subarrayStart("inprog"));
 
