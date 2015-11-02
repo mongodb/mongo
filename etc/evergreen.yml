@@ -4655,6 +4655,47 @@ buildvariants:
 # storage engine buildvariants #
 ################################
 
+- name: enterprise-rhel-62-64-bit-inmem
+  display_name: Enterprise RHEL 6.2 (inMemory)
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-test
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    test_flags: --continueOnFailure --storageEngine=inMemory
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_distro: rhel62
+  batchtime: 1440 # 1 day
+  tasks:
+  - name: compile
+    distros:
+    - rhel62-build
+  - name: aggregation
+  - name: dbtest
+  - name: failpoints
+  - name: failpoints_auth
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_small_oplog
+  - name: jsCore_small_oplog_rs
+  - name: jstestfuzz
+  - name: bulk_gle_passthrough
+  - name: parallel
+  - name: parallel_compatibility
+#  - name: concurrency
+#  - name: concurrency_replication
+#  - name: concurrency_sharded
+  - name: slow1
+#  - name: slow2
+  - name: sharding_jscore_passthrough
+
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
   modules: ~
@@ -4691,7 +4732,6 @@ buildvariants:
   - name: slow1
 #  - name: slow2
   - name: sharding_jscore_passthrough
-  - name: unittests
 
 - name: ubuntu1404-rocksdb
   display_name: Ubuntu 14.04 (RocksDB)
