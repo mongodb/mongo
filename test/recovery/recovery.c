@@ -26,19 +26,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#if 0
-#include <sys/stat.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <assert.h>
-#else
 #include <sys/wait.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#endif
 #ifndef _WIN32
 #include <unistd.h>
 #endif
