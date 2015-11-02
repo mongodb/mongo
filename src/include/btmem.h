@@ -261,7 +261,9 @@ struct __wt_page_modify {
 		} key;
 
 		/*
-		 * Eviction, but block wasn't written: unresolved updates and
+		 * Eviction, but the block wasn't written: either an in-memory
+		 * configuration or unresolved updates prevented the write.
+		 * There may be a list of unresolved updates, there's always an
 		 * associated disk image.
 		 *
 		 * Saved updates are either a WT_INSERT, or a row-store leaf
@@ -274,7 +276,7 @@ struct __wt_page_modify {
 			uint64_t   onpage_txn;
 		} *supd;
 		uint32_t supd_entries;
-		void	*supd_dsk;
+		void	*disk_image;
 
 		/*
 		 * Block was written: address, size and checksum.
@@ -386,7 +388,6 @@ struct __wt_page_modify {
 #define	WT_PM_REC_EMPTY		1	/* Reconciliation: no replacement */
 #define	WT_PM_REC_MULTIBLOCK	2	/* Reconciliation: multiple blocks */
 #define	WT_PM_REC_REPLACE	3	/* Reconciliation: single block */
-#define	WT_PM_REC_REWRITE	4	/* Reconciliation: rewrite in place */
 	uint8_t rec_result;		/* Reconciliation state */
 };
 
@@ -433,6 +434,7 @@ struct __wt_page {
 
 			struct __wt_page_index {
 				uint32_t entries;
+				uint32_t deleted_entries;
 				WT_REF	**index;
 			} * volatile __index;	/* Collated children */
 
@@ -579,7 +581,16 @@ struct __wt_page {
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
 #define	WT_PAGE_OVERFLOW_KEYS	0x10	/* Page has overflow keys */
 #define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
+#define	WT_PAGE_UPDATE_IGNORE	0x40	/* Ignore updates on page discard */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
+
+	uint8_t unused[2];		/* Unused padding */
+
+	/*
+	 * Used to protect and co-ordinate splits for internal pages and
+	 * reconciliation for all pages.
+	 */
+	WT_FAIR_LOCK page_lock;
 
 	/*
 	 * The page's read generation acts as an LRU value for each page in the
@@ -601,12 +612,6 @@ struct __wt_page {
 #define	WT_READGEN_OLDEST	1
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
-
-	/*
-	 * Used to protect and co-ordinate splits for internal pages and
-	 * reconciliation for all pages.
-	 */
-	WT_FAIR_LOCK page_lock;
 
 	size_t memory_footprint;	/* Memory attached to the page */
 

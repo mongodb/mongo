@@ -53,6 +53,63 @@ err:	__wt_scr_free(session, &buf);
 }
 
 /*
+ * __curstat_size_only --
+ *	 For very simple tables we can avoid getting table handles if
+ *	 configured to only retrieve the size. It's worthwhile because
+ *	 workloads that create and drop a lot of tables can put a lot of
+ *	 pressure on the table list lock.
+ */
+static int
+__curstat_size_only(WT_SESSION_IMPL *session,
+    const char *uri, bool *was_fast,WT_CURSOR_STAT *cst)
+{
+	WT_CONFIG cparser;
+	WT_CONFIG_ITEM ckey, colconf, cval;
+	WT_DECL_RET;
+	WT_ITEM namebuf;
+	wt_off_t filesize;
+	char *tableconf;
+
+	WT_CLEAR(namebuf);
+	*was_fast = false;
+
+	/* Retrieve the metadata for this table. */
+	WT_RET(__wt_metadata_search(session, uri, &tableconf));
+
+	/*
+	 * The fast path only works if the table consists of a single file
+	 * and does not have any indexes. The absence of named columns is how
+	 * we determine that neither of those conditions can be satisfied.
+	 */
+	WT_ERR(__wt_config_getones(session, tableconf, "columns", &colconf));
+	WT_ERR(__wt_config_subinit(session, &cparser, &colconf));
+	if ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
+		goto err;
+
+	/* Build up the file name from the table URI. */
+	WT_ERR(__wt_buf_fmt(
+	    session, &namebuf, "%s.wt", uri + strlen("table:")));
+	/*
+	 * Get the size of the underlying file.  There is nothing stopping a
+	 * race with schema level table operations (for example drop) if there
+	 * is a race there will be an error message generated.
+	 */
+	WT_ERR(__wt_filesize_name(session, namebuf.data, &filesize));
+
+	/* Setup and populate the statistics structure */
+	__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
+	cst->u.dsrc_stats.block_size = filesize;
+	__wt_curstat_dsrc_final(cst);
+
+	*was_fast = true;
+
+err:	__wt_free(session, tableconf);
+	__wt_buf_free(session, &namebuf);
+
+	return (ret);
+}
+
+/*
  * __wt_curstat_table_init --
  *	Initialize the statistics for a table.
  */
@@ -67,6 +124,17 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 	WT_TABLE *table;
 	u_int i;
 	const char *name;
+	bool was_fast;
+
+	/*
+	 * If only gathering table size statistics, try a fast path that
+	 * avoids the schema and table list locks.
+	 */
+	if (F_ISSET(cst, WT_CONN_STAT_SIZE)) {
+		WT_RET(__curstat_size_only(session, uri, &was_fast, cst));
+		if (was_fast)
+			return (0);
+	}
 
 	name = uri + strlen("table:");
 	WT_RET(__wt_schema_get_table(

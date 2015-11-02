@@ -1434,7 +1434,7 @@ __clsm_remove(WT_CURSOR *cursor)
 
 	clsm = (WT_CURSOR_LSM *)cursor;
 
-	CURSOR_UPDATE_API_CALL(cursor, session, remove, NULL);
+	CURSOR_REMOVE_API_CALL(cursor, session, NULL);
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NOVALUE(cursor);
 	WT_ERR(__clsm_enter(clsm, false, true));

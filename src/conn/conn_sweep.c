@@ -334,6 +334,15 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    cfg, "file_manager.close_idle_time", &cval));
 	conn->sweep_idle_time = (time_t)cval.val;
 
+	/* Non-zero sweep idle time is incompatible with in-memory */
+	if (conn->sweep_idle_time != 0) {
+		WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
+		if (cval.val != 0)
+			WT_RET_MSG(session, EINVAL,
+			    "In memory configuration incompatible with "
+			    "non zero file_manager=(close_idle_time)");
+	}
+
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_scan_interval", &cval));
 	conn->sweep_interval = (time_t)cval.val;

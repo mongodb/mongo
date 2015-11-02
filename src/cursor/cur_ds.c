@@ -384,7 +384,7 @@ __curds_remove(WT_CURSOR *cursor)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
-	CURSOR_UPDATE_API_CALL(cursor, session, remove, NULL);
+	CURSOR_REMOVE_API_CALL(cursor, session, NULL);
 
 	WT_STAT_FAST_CONN_INCR(session, cursor_remove);     
 	WT_STAT_FAST_DATA_INCR(session, cursor_remove);

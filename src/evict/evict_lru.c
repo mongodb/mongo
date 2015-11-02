@@ -158,6 +158,9 @@ __evict_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+#ifdef HAVE_DIAGNOSTIC
+	struct timespec now, stuck_ts;
+#endif
 	u_int spins;
 
 	session = arg;
@@ -200,6 +203,20 @@ __evict_server(void *arg)
 
 			/* Next time we wake up, reverse the sweep direction. */
 			cache->flags ^= WT_CACHE_WALK_REVERSE;
+#ifdef HAVE_DIAGNOSTIC
+			stuck_ts.tv_sec = 0;
+		} else if (stuck_ts.tv_sec == 0)
+			WT_ERR(__wt_epoch(session, &stuck_ts));
+		else {
+			/* After being stuck for 5 minutes, give up. */
+			WT_ERR(__wt_epoch(session, &now));
+			if (WT_TIMEDIFF(now, stuck_ts) / WT_BILLION > 300) {
+				__wt_errx(session,
+				    "Cache stuck for too long, giving up");
+				(void)__wt_cache_dump(session, NULL);
+				WT_ERR(ETIMEDOUT);
+			}
+#endif
 		}
 
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping"));
@@ -1210,8 +1227,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		if (__wt_page_is_empty(page))
 			goto fast;
 
-		/* Optionally ignore clean pages. */
-		if (!modified && FLD_ISSET(cache->state, WT_EVICT_PASS_DIRTY))
+		/* Skip clean pages if appropriate. */
+		if (!modified && (F_ISSET(conn, WT_CONN_IN_MEMORY) ||
+		    FLD_ISSET(cache->state, WT_EVICT_PASS_DIRTY)))
 			continue;
 
 		/*
@@ -1560,11 +1578,8 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_cache_dump --
- *	Dump debugging information to stdout about the size of the files in the
- *	cache.
- *
- *	NOTE: this function is not called anywhere, it is intended to be called
- *	from a debugger.
+ *	Dump debugging information to a file (default stderr) about the size of
+ *	the files in the cache.
  */
 int
 __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
@@ -1574,16 +1589,21 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_PAGE *page;
 	WT_REF *next_walk;
-	uint64_t file_intl_pages, file_leaf_pages;
-	uint64_t file_bytes, file_dirty, total_bytes;
+	uint64_t dirty_bytes, dirty_pages, intl_bytes, intl_pages;
+	uint64_t leaf_bytes, leaf_pages;
+	uint64_t max_dirty_bytes, max_intl_bytes, max_leaf_bytes, total_bytes;
+	size_t size;
 
 	conn = S2C(session);
 	total_bytes = 0;
 
 	if (ofile == NULL)
-		fp = stdout;
+		fp = stderr;
 	else
 		WT_RET(__wt_fopen(session, ofile, WT_FHANDLE_WRITE, 0, &fp));
+
+	/* Note: odd string concatenation avoids spelling errors. */
+	(void)__wt_fprintf(fp, "==========\n" "cache dump\n");
 
 	saved_dhandle = session->dhandle;
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
@@ -1591,43 +1611,73 @@ __wt_cache_dump(WT_SESSION_IMPL *session, const char *ofile)
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
 
-		file_bytes = file_dirty = file_intl_pages = file_leaf_pages = 0;
+		dirty_bytes = dirty_pages = intl_bytes = intl_pages = 0;
+		leaf_bytes = leaf_pages = 0;
+		max_dirty_bytes = max_intl_bytes = max_leaf_bytes = 0;
+
 		next_walk = NULL;
 		session->dhandle = dhandle;
 		while (__wt_tree_walk(session,
 		    &next_walk, NULL, WT_READ_CACHE | WT_READ_NO_WAIT) == 0 &&
 		    next_walk != NULL) {
 			page = next_walk->page;
-			if (WT_PAGE_IS_INTERNAL(page))
-				++file_intl_pages;
-			else
-				++file_leaf_pages;
-			file_bytes += page->memory_footprint;
-			if (__wt_page_is_modified(page))
-				file_dirty += page->memory_footprint;
-			(void)__wt_fprintf(fp,
-			    "%" WT_SIZET_FMT ", ", page->memory_footprint);
+			size = page->memory_footprint;
+
+			if (WT_PAGE_IS_INTERNAL(page)) {
+				++intl_pages;
+				intl_bytes += size;
+				max_intl_bytes = WT_MAX(max_intl_bytes, size);
+			} else {
+				++leaf_pages;
+				leaf_bytes += size;
+				max_leaf_bytes = WT_MAX(max_leaf_bytes, size);
+			}
+			if (__wt_page_is_modified(page)) {
+				++dirty_pages;
+				dirty_bytes += size;
+				max_dirty_bytes =
+				    WT_MAX(max_dirty_bytes, size);
+			}
 		}
 		session->dhandle = NULL;
 
-		(void)__wt_fprintf(fp, "\n" "cache dump: %s%s%s%s\n\t"
-		    " %" PRIu64 " internal pages, %" PRIu64 " leaf pages,"
-		    " %" PRIu64 "MB, %" PRIu64 "MB dirty\n==============\n",
-		    dhandle->name,
-		    dhandle->checkpoint == NULL ? "" : " [",
-		    dhandle->checkpoint == NULL ? "" : dhandle->checkpoint,
-		    dhandle->checkpoint == NULL ? "" : "]",
-		    file_intl_pages, file_leaf_pages,
-		    file_bytes >> 20, file_dirty >> 20);
+		if (dhandle->checkpoint == NULL)
+			(void)__wt_fprintf(fp, "%s(<live>): \n", dhandle->name);
+		else
+			(void)__wt_fprintf(fp, "%s(checkpoint=%s): \n",
+			    dhandle->name, dhandle->checkpoint);
+		if (intl_pages != 0)
+			(void)__wt_fprintf(fp, "\t" "internal pages: "
+			    "%" PRIu64 " pages, %" PRIu64
+			    " max, %" PRIu64 "MB total\n",
+			    intl_pages, max_intl_bytes, intl_bytes >> 20);
+		if (leaf_pages != 0)
+			(void)__wt_fprintf(fp, "\t" "leaf pages: "
+			    "%" PRIu64 " pages, %" PRIu64
+			    " max, %" PRIu64 "MB total\n",
+			    leaf_pages, max_leaf_bytes, leaf_bytes >> 20);
+		if (dirty_pages != 0)
+			(void)__wt_fprintf(fp, "\t" "dirty pages: "
+			    "%" PRIu64 " pages, %" PRIu64
+			    " max, %" PRIu64 "MB total\n",
+			    dirty_pages, max_dirty_bytes, dirty_bytes >> 20);
 
-		total_bytes += file_bytes;
+		total_bytes += intl_bytes + leaf_bytes;
 	}
 	session->dhandle = saved_dhandle;
 
+	/*
+	 * Apply the overhead percentage so our total bytes are comparable with
+	 * the tracked value.
+	 */
+	if (conn->cache->overhead_pct != 0)
+		total_bytes +=
+		    (total_bytes * (uint64_t)conn->cache->overhead_pct) / 100;
 	(void)__wt_fprintf(fp, "cache dump: total found = %" PRIu64 "MB"
 	    " vs tracked inuse %" PRIu64 "MB\n",
 	    total_bytes >> 20, __wt_cache_bytes_inuse(conn->cache) >> 20);
-	if (fp != stdout)
+	(void)__wt_fprintf(fp, "==========\n");
+	if (fp != stderr)
 		WT_RET(__wt_fclose(&fp, WT_FHANDLE_WRITE));
 	return (0);
 }
