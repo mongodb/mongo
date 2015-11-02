@@ -2069,6 +2069,7 @@ buildvariants:
   run_on:
   - rhel55
   - rhel55-test
+  batchtime: 1440 # 1 day
   expansions:
     gitvars: LD_LIBRARY_PATH=/opt/openssl/lib64 #needed to workaround the old openSSL on rhel55 builders.
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
@@ -2553,6 +2554,7 @@ buildvariants:
   - enterprise
   run_on:
   - linux-64-amzn-test
+  batchtime: 1440 # 1 day
   expansions:
     tooltags: "-tags 'ssl sasl'"
     push_path: linux
