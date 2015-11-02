@@ -187,17 +187,16 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 
 	/*
 	 * Read-uncommitted transactions see all other changes.
-	 *
-	 * All metadata reads are at read-uncommitted isolation.  That's
-	 * because once a schema-level operation completes, subsequent
-	 * operations must see the current version of checkpoint metadata, or
-	 * they may try to read blocks that may have been freed from a file.
-	 * Metadata updates use non-transactional techniques (such as the
-	 * schema and metadata locks) to protect access to in-flight updates.
 	 */
-	if (txn->isolation == WT_ISO_READ_UNCOMMITTED ||
-	    session->dhandle == session->meta_dhandle)
+	if (txn->isolation == WT_ISO_READ_UNCOMMITTED)
 		return (true);
+
+	/*
+	 * If we don't have a transactional snapshot, only make stable updates
+	 * visible.
+	 */
+	if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
+		return (__wt_txn_visible_all(session, id));
 
 	/* Transactions see their own changes. */
 	if (id == txn->id)
@@ -429,9 +428,15 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 
-	/* Release the snap_min ID we put in the global table. */
-	if (!F_ISSET(txn, WT_TXN_RUNNING) ||
-	    txn->isolation != WT_ISO_SNAPSHOT)
+	/*
+	 * Release the snap_min ID we put in the global table.
+	 *
+	 * If the isolation has been temporarily forced, don't touch the
+	 * snapshot here: it will be restored by WT_WITH_TXN_ISOLATION.
+	 */
+	if ((!F_ISSET(txn, WT_TXN_RUNNING) ||
+	    txn->isolation != WT_ISO_SNAPSHOT) &&
+	    txn->forced_iso == 0)
 		__wt_txn_release_snapshot(session);
 }
 
@@ -451,28 +456,26 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	txn_state = WT_SESSION_TXN_STATE(session);
 
 	/*
-	 * If there is no transaction running (so we don't have an ID), and no
-	 * snapshot allocated, put an ID in the global table to prevent any
-	 * update that we are reading from being trimmed to save memory.  Do a
-	 * read before the write because this shared data is accessed a lot.
+	 * We are about to read data, which means we need to protect against
+	 * updates being freed from underneath this cursor. Read-uncommitted
+	 * isolation protects values by putting a transaction ID in the global
+	 * table to prevent any update that we are reading from being freed.
+	 * Other isolation levels get a snapshot to protect their reads.
 	 *
 	 * !!!
-	 * Note:  We are updating the global table unprotected, so the
-	 * oldest_id may move past this ID if a scan races with this
-	 * value being published.  That said, read-uncommitted operations
-	 * always take the most recent version of a value, so for that version
-	 * to be freed, two newer versions would have to be committed.	Putting
-	 * this snap_min ID in the table prevents the oldest ID from moving
+	 * Note:  We are updating the global table unprotected, so the global
+	 * oldest_id may move past our snap_min if a scan races with this value
+	 * being published. That said, read-uncommitted operations always see
+	 * the most recent update for each record that has not been aborted
+	 * regardless of the snap_min value published here.  Even if there is a
+	 * race while publishing this ID, it prevents the oldest ID from moving
 	 * further forward, so that once a read-uncommitted cursor is
 	 * positioned on a value, it can't be freed.
 	 */
-	if (txn->isolation == WT_ISO_READ_UNCOMMITTED &&
-	    !F_ISSET(txn, WT_TXN_HAS_ID) &&
-	    WT_TXNID_LT(txn_state->snap_min, txn_global->last_running))
-		txn_state->snap_min = txn_global->last_running;
-
-	if (txn->isolation != WT_ISO_READ_UNCOMMITTED &&
-	    !F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
+	if (txn->isolation == WT_ISO_READ_UNCOMMITTED) {
+		if (txn_state->snap_min == WT_TXN_NONE)
+			txn_state->snap_min = txn_global->last_running;
+	} else if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
 		__wt_txn_get_snapshot(session);
 }
 

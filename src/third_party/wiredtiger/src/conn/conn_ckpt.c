@@ -32,8 +32,19 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, bool *startp)
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.wait", &cval));
 	conn->ckpt_usecs = (uint64_t)cval.val * 1000000;
+
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.log_size", &cval));
 	conn->ckpt_logsize = (wt_off_t)cval.val;
+
+	/* Checkpoints are incompatible with in-memory configuration */
+	if (conn->ckpt_usecs != 0 || conn->ckpt_logsize != 0) {
+		WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
+		if (cval.val != 0)
+			WT_RET_MSG(session, EINVAL,
+			    "In memory configuration incompatible with "
+			    "checkpoints");
+	}
+
 	__wt_log_written_reset(session);
 	if ((conn->ckpt_usecs == 0 && conn->ckpt_logsize == 0) ||
 	    (conn->ckpt_logsize && conn->ckpt_usecs == 0 &&

@@ -33,6 +33,8 @@ __wt_session_reset_cursors(WT_SESSION_IMPL *session, bool free_buffers)
 			__wt_buf_free(session, &cursor->value);
 		}
 	}
+
+	WT_ASSERT(session, session->ncursors == 0);
 	return (ret);
 }
 
@@ -54,6 +56,33 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
 			    cursor->value.data, cursor->value.size));
 			F_SET(cursor, WT_CURSTD_VALUE_EXT);
 		}
+
+	return (ret);
+}
+
+/*
+ * __wt_session_release_resources --
+ *	Release common session resources.
+ */
+int
+__wt_session_release_resources(WT_SESSION_IMPL *session)
+{
+	WT_DECL_RET;
+
+	/* Block manager cleanup */
+	if (session->block_manager_cleanup != NULL)
+		WT_TRET(session->block_manager_cleanup(session));
+
+	/* Reconciliation cleanup */
+	if (session->reconcile_cleanup != NULL)
+		WT_TRET(session->reconcile_cleanup(session));
+
+	/*
+	 * Discard scratch buffers, error memory; last, just in case a cleanup
+	 * routine uses scratch buffers.
+	 */
+	__wt_scr_discard(session);
+	__wt_buf_free(session, &session->err);
 
 	return (ret);
 }
@@ -132,24 +161,17 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Close all tables. */
 	WT_TRET(__wt_schema_close_tables(session));
 
+	/* Confirm we're not holding any hazard pointers. */
+	__wt_hazard_close(session);
+
 	/* Discard metadata tracking. */
 	__wt_meta_track_discard(session);
-
-	/* Discard scratch buffers, error memory. */
-	__wt_scr_discard(session);
-	__wt_buf_free(session, &session->err);
 
 	/* Free transaction information. */
 	__wt_txn_destroy(session);
 
-	/* Confirm we're not holding any hazard pointers. */
-	__wt_hazard_close(session);
-
-	/* Cleanup */
-	if (session->block_manager_cleanup != NULL)
-		WT_TRET(session->block_manager_cleanup(session));
-	if (session->reconcile_cleanup != NULL)
-		WT_TRET(session->reconcile_cleanup(session));
+	/* Release common session resources. */
+	WT_TRET(__wt_session_release_resources(session));
 
 	/* Destroy the thread's mutex. */
 	WT_TRET(__wt_cond_destroy(session, &session->cond));
@@ -547,36 +569,10 @@ __session_reset(WT_SESSION *wt_session)
 
 	WT_TRET(__wt_session_reset_cursors(session, true));
 
-	WT_ASSERT(session, session->ncursors == 0);
-
-	__wt_scr_discard(session);
-	__wt_buf_free(session, &session->err);
+	/* Release common session resources. */
+	WT_TRET(__wt_session_release_resources(session));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
-}
-
-/*
- * __session_compact --
- *	WT_SESSION->compact method.
- */
-static int
-__session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)wt_session;
-
-	/* Disallow objects in the WiredTiger name space. */
-	WT_RET(__wt_str_name_check(session, uri));
-
-	if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
-	    !WT_PREFIX_MATCH(uri, "file:") &&
-	    !WT_PREFIX_MATCH(uri, "index:") &&
-	    !WT_PREFIX_MATCH(uri, "lsm:") &&
-	    !WT_PREFIX_MATCH(uri, "table:"))
-		return (__wt_bad_object_type(session, uri));
-
-	return (__wt_session_compact(wt_session, uri, config));
 }
 
 /*
@@ -629,6 +625,9 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, salvage, config, cfg);
+
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		WT_ERR(ENOTSUP);
 
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session,
@@ -818,6 +817,10 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, verify, config, cfg);
+
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		WT_ERR(ENOTSUP);
+
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    WT_WITH_SCHEMA_LOCK(session,
@@ -1036,10 +1039,11 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	txn = &session->txn;
-
 	WT_STAT_FAST_CONN_INCR(session, txn_checkpoint);
 	SESSION_API_CALL(session, checkpoint, config, cfg);
+
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+		WT_ERR(ENOTSUP);
 
 	/*
 	 * Checkpoints require a snapshot to write a transactionally consistent
@@ -1054,43 +1058,20 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * from evicting anything newer than this because we track the oldest
 	 * transaction ID in the system that is not visible to all readers.
 	 */
+	txn = &session->txn;
 	if (F_ISSET(txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL,
 		    "Checkpoint not permitted in a transaction");
 
-	/*
-	 * Reset open cursors.  Do this explicitly, even though it will happen
-	 * implicitly in the call to begin_transaction for the checkpoint, the
-	 * checkpoint code will acquire the schema lock before we do that, and
-	 * some implementation of WT_CURSOR::reset might need the schema lock.
-	 */
-	WT_ERR(__wt_session_reset_cursors(session, false));
+	ret = __wt_txn_checkpoint(session, cfg);
 
 	/*
-	 * Don't highjack the session checkpoint thread for eviction.
-	 *
-	 * Application threads are not generally available for potentially slow
-	 * operations, but checkpoint does enough I/O it may be called upon to
-	 * perform slow operations for the block manager.
+	 * Release common session resources (for example, checkpoint may acquire
+	 * significant reconciliation structures/memory).
 	 */
-	F_SET(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
+	WT_TRET(__wt_session_release_resources(session));
 
-	/*
-	 * Only one checkpoint can be active at a time, and checkpoints must run
-	 * in the same order as they update the metadata.  It's probably a bad
-	 * idea to run checkpoints out of multiple threads, but serialize them
-	 * here to ensure we don't get into trouble.
-	 */
-	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 1);
-
-	WT_WITH_CHECKPOINT_LOCK(session,
-	    ret = __wt_txn_checkpoint(session, cfg));
-
-	WT_STAT_FAST_CONN_SET(session, txn_checkpoint_running, 0);
-
-err:	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
-
-	API_END_RET_NOTFOUND_MAP(session, ret);
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -1160,7 +1141,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_strerror,
 		__session_open_cursor,
 		__session_create,
-		__session_compact,
+		__wt_session_compact,
 		__session_drop,
 		__session_log_flush,
 		__session_log_printf,

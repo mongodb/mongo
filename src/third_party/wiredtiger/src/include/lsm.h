@@ -96,6 +96,7 @@ struct __wt_lsm_chunk {
 
 	int8_t empty;			/* 1/0: checkpoint missing */
 	int8_t evicted;			/* 1/0: in-memory chunk was evicted */
+	uint8_t flushing;		/* 1/0: chunk flush in progress */
 
 #define	WT_LSM_CHUNK_BLOOM	0x01
 #define	WT_LSM_CHUNK_MERGING	0x02

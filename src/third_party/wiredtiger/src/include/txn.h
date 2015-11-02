@@ -28,6 +28,32 @@
 #define	WT_SESSION_IS_CHECKPOINT(s)					\
 	((s)->id != 0 && (s)->id == S2C(s)->txn_global.checkpoint_id)
 
+/*
+ * Perform an operation at the specified isolation level.
+ *
+ * This is fiddly: we can't cope with operations that begin transactions
+ * (leaving an ID allocated), and operations must not move our published
+ * snap_min forwards (or updates we need could be freed while this operation is
+ * in progress).  Check for those cases: the bugs they cause are hard to debug.
+ */
+#define	WT_WITH_TXN_ISOLATION(s, iso, op) do {				\
+	WT_TXN_ISOLATION saved_iso = (s)->isolation;		        \
+	WT_TXN_ISOLATION saved_txn_iso = (s)->txn.isolation;		\
+	WT_TXN_STATE *txn_state = WT_SESSION_TXN_STATE(s);		\
+	WT_TXN_STATE saved_state = *txn_state;				\
+	(s)->txn.forced_iso++;						\
+	(s)->isolation = (s)->txn.isolation = (iso);			\
+	op;								\
+	(s)->isolation = saved_iso;					\
+	(s)->txn.isolation = saved_txn_iso;				\
+	WT_ASSERT((s), (s)->txn.forced_iso > 0);                        \
+	(s)->txn.forced_iso--;						\
+	WT_ASSERT((s), txn_state->id == saved_state.id &&		\
+	    (txn_state->snap_min == saved_state.snap_min ||		\
+	    saved_state.snap_min == WT_TXN_NONE));			\
+	txn_state->snap_min = saved_state.snap_min;			\
+} while (0)
+
 struct __wt_named_snapshot {
 	const char *name;
 
@@ -129,6 +155,8 @@ struct __wt_txn {
 
 	WT_TXN_ISOLATION isolation;
 
+	uint32_t forced_iso;	/* Isolation is currently forced. */
+
 	/*
 	 * Snapshot data:
 	 *	ids < snap_min are visible,
@@ -153,13 +181,13 @@ struct __wt_txn {
 
 	/* Checkpoint status. */
 	WT_LSN		ckpt_lsn;
-	bool		full_ckpt;
 	uint32_t	ckpt_nsnapshot;
 	WT_ITEM		*ckpt_snapshot;
+	bool		full_ckpt;
 
 #define	WT_TXN_AUTOCOMMIT	0x01
 #define	WT_TXN_ERROR		0x02
-#define	WT_TXN_HAS_ID	        0x04
+#define	WT_TXN_HAS_ID		0x04
 #define	WT_TXN_HAS_SNAPSHOT	0x08
 #define	WT_TXN_NAMED_SNAPSHOT	0x10
 #define	WT_TXN_READONLY		0x20

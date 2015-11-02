@@ -1726,6 +1726,7 @@ __conn_write_base_config(WT_SESSION_IMPL *session, const char *cfg[])
 	    "create=,"
 	    "encryption=(secretkey=),"
 	    "exclusive=,"
+	    "in_memory=,"
 	    "log=(recover=),"
 	    "use_environment_priv=,"
 	    "verbose=,", &base_config));
@@ -1798,7 +1799,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
-	int64_t config_base_set;
+	bool config_base_set;
 	const char *enc_cfg[] = { NULL, NULL };
 	char version[64];
 
@@ -1842,13 +1843,20 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/* Capture the config_base setting file for later use. */
 	WT_ERR(__wt_config_gets(session, cfg, "config_base", &cval));
-	config_base_set = cval.val;
+	config_base_set = cval.val != 0;
 
 	/* Configure error messages so we get them right early. */
 	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
 	if (cval.len != 0)
 		WT_ERR(__wt_strndup(
 		    session, cval.str, cval.len, &conn->error_prefix));
+
+	/*
+	 * XXX ideally, we would check "in_memory" here, so we could completely
+	 * avoid having a database directory.  However, it can be convenient to
+	 * pass "in_memory" via the WIREDTIGER_CONFIG environment variable, and
+	 * we haven't read it yet.
+	 */
 
 	/* Get the database home. */
 	WT_ERR(__conn_home(session, home, cfg));
@@ -1883,7 +1891,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	__conn_config_append(cfg, version);
 
 	/* Ignore the base_config file if we config_base set to false. */
-	if (config_base_set != 0)
+	if (config_base_set)
 		WT_ERR(
 		    __conn_config_file(session, WT_BASECONFIG, false, cfg, i1));
 	__conn_config_append(cfg, config);
@@ -1920,6 +1928,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__wt_config_gets(session, cfg, "session_scratch_max", &cval));
 	conn->session_scratch_max = (size_t)cval.val;
+
+	WT_ERR(__wt_config_gets(session, cfg, "in_memory", &cval));
+	if (cval.val != 0)
+		F_SET(conn, WT_CONN_IN_MEMORY);
 
 	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
 	if (cval.val)

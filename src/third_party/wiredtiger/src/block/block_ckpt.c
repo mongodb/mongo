@@ -83,11 +83,16 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_ERR(__wt_block_ckpt_init(session, ci, "checkpoint"));
 	} else {
 		/*
-		 * We depend on the btree level for locking: things will go
-		 * bad fast should we open the live system in two handles, or
-		 * if we create, salvage, truncate or verify the live/running
-		 * file, for that matter.
+		 * We depend on the btree level for locking: things will go bad
+		 * fast if we open the live system in two handles, or salvage,
+		 * truncate or verify the live/running file.
 		 */
+#ifdef HAVE_DIAGNOSTIC
+		__wt_spin_lock(session, &block->live_lock);
+		WT_ASSERT(session, block->live_open == false);
+		block->live_open = true;
+		__wt_spin_unlock(session, &block->live_lock);
+#endif
 		ci = &block->live;
 		WT_ERR(__wt_block_ckpt_init(session, ci, "live"));
 	}
@@ -178,8 +183,8 @@ __wt_block_checkpoint_unload(
 	/*
 	 * If it's the live system, truncate to discard any extended blocks and
 	 * discard the active extent lists.  Hold the lock even though we're
-	 * unloading the live checkpoint, there could be readers active in
-	 * other checkpoints.
+	 * unloading the live checkpoint, there could be readers active in other
+	 * checkpoints.
 	 */
 	if (!checkpoint) {
 		/*
@@ -191,6 +196,9 @@ __wt_block_checkpoint_unload(
 
 		__wt_spin_lock(session, &block->live_lock);
 		__wt_block_ckpt_destroy(session, &block->live);
+#ifdef HAVE_DIAGNOSTIC
+		block->live_open = false;
+#endif
 		__wt_spin_unlock(session, &block->live_lock);
 	}
 

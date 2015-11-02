@@ -218,10 +218,11 @@ restart:	page = current->page;
 		}
 
 		/*
-		 * Binary search of the internal page.  There are two versions
-		 * (a default loop and an application-specified collation loop),
-		 * because moving the collation test and error handling inside
-		 * the loop costs about 5%.
+		 * Binary search of an internal page. There are three versions
+		 * (keys with no application-specified collation order, in long
+		 * and short versions, and keys with an application-specified
+		 * collation order), because doing the tests and error handling
+		 * inside the loop costs about 5%.
 		 *
 		 * The 0th key on an internal page is a problem for a couple of
 		 * reasons.  First, we have to force the 0th key to sort less
@@ -236,7 +237,22 @@ restart:	page = current->page;
 		 */
 		base = 1;
 		limit = pindex->entries - 1;
-		if (collator == NULL)
+		if (collator == NULL &&
+		    srch_key->size <= WT_COMPARE_SHORT_MAXLEN)
+			for (; limit != 0; limit >>= 1) {
+				indx = base + (limit >> 1);
+				descent = pindex->index[indx];
+				__wt_ref_key(
+				    page, descent, &item->data, &item->size);
+
+				cmp = __wt_lex_compare_short(srch_key, item);
+				if (cmp > 0) {
+					base = indx + 1;
+					--limit;
+				} else if (cmp == 0)
+					goto descend;
+			}
+		else if (collator == NULL)
 			for (; limit != 0; limit >>= 1) {
 				indx = base + (limit >> 1);
 				descent = pindex->index[indx];
@@ -356,13 +372,28 @@ leaf_only:
 	}
 
 	/*
-	 * Binary search of the leaf page.  There are two versions (a default
-	 * loop and an application-specified collation loop), because moving
-	 * the collation test and error handling inside the loop costs about 5%.
+	 * Binary search of an leaf page. There are three versions (keys with
+	 * no application-specified collation order, in long and short versions,
+	 * and keys with an application-specified collation order), because
+	 * doing the tests and error handling inside the loop costs about 5%.
 	 */
 	base = 0;
 	limit = page->pg_row_entries;
-	if (collator == NULL)
+	if (collator == NULL && srch_key->size <= WT_COMPARE_SHORT_MAXLEN)
+		for (; limit != 0; limit >>= 1) {
+			indx = base + (limit >> 1);
+			rip = page->pg_row_d + indx;
+			WT_ERR(
+			    __wt_row_leaf_key(session, page, rip, item, true));
+
+			cmp = __wt_lex_compare_short(srch_key, item);
+			if (cmp > 0) {
+				base = indx + 1;
+				--limit;
+			} else if (cmp == 0)
+				goto leaf_match;
+		}
+	else if (collator == NULL)
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			rip = page->pg_row_d + indx;

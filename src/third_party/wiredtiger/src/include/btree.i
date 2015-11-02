@@ -1105,7 +1105,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session,
 	 * internal pages not be evicted until all threads are known to have
 	 * exited the original page index array, because evicting an internal
 	 * page discards its WT_REF array, and a thread traversing the original
-	 * page index array might see an freed WT_REF.  During the split we set
+	 * page index array might see a freed WT_REF.  During the split we set
 	 * a transaction value, once that's globally visible, we know we can
 	 * evict the created page.
 	 */
@@ -1263,13 +1263,9 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held,
 #endif
 	    );
 
-	/* An expected failure: WT_NOTFOUND when doing a cache-only read. */
-	if (LF_ISSET(WT_READ_CACHE) && ret == WT_NOTFOUND)
-		return (WT_NOTFOUND);
-
-	/* An expected failure: WT_RESTART */
-	if (ret == WT_RESTART)
-		return (WT_RESTART);
+	/* Expected failures: page not found or restart. */
+	if (ret == WT_NOTFOUND || ret == WT_RESTART)
+		return (ret);
 
 	/* Discard the original held page. */
 	acquired = ret == 0;

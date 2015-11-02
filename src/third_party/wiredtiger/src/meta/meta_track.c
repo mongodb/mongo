@@ -223,35 +223,6 @@ __meta_track_unroll(WT_SESSION_IMPL *session, WT_META_TRACK *trk)
 }
 
 /*
- * __wt_meta_track_find_handle --
- *	Check if we have already seen a handle.
- */
-int
-__wt_meta_track_find_handle(
-    WT_SESSION_IMPL *session, const char *name, const char *checkpoint)
-{
-	WT_META_TRACK *trk, *trk_orig;
-
-	WT_ASSERT(session,
-	    WT_META_TRACKING(session) && session->meta_track_nest > 0);
-
-	trk_orig = session->meta_track;
-	trk = session->meta_track_next;
-
-	while (--trk >= trk_orig) {
-		if (trk->op != WT_ST_LOCK)
-			continue;
-		if (strcmp(trk->dhandle->name, name) == 0 &&
-		    ((trk->dhandle->checkpoint == NULL && checkpoint == NULL) ||
-		    (trk->dhandle->checkpoint != NULL &&
-		    strcmp(trk->dhandle->checkpoint, checkpoint) == 0)))
-			return (0);
-	}
-
-	return (WT_NOTFOUND);
-}
-
-/*
  * __wt_meta_track_off --
  *	Turn off metadata operation tracking, unrolling on error.
  */
@@ -293,7 +264,8 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 	 * If we don't have the metadata handle (e.g, we're in the process of
 	 * creating the metadata), we can't sync it.
 	 */
-	if (!need_sync || session->meta_dhandle == NULL)
+	if (!need_sync || session->meta_dhandle == NULL ||
+	    F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
 		goto done;
 
 	/* If we're logging, make sure the metadata update was flushed. */
@@ -304,7 +276,8 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 		WT_RET(ret);
 	} else {
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
-		    ret = __wt_checkpoint(session, NULL));
+		    WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_COMMITTED,
+			ret = __wt_checkpoint(session, NULL)));
 		WT_RET(ret);
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_checkpoint_sync(session, NULL));

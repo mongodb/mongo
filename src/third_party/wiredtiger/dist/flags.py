@@ -36,6 +36,7 @@ flags = {
     'page_read' : [
         'READ_CACHE',
         'READ_COMPACT',
+        'READ_NO_EMPTY',
         'READ_NO_EVICT',
         'READ_NO_GEN',
         'READ_NO_WAIT',
@@ -45,9 +46,10 @@ flags = {
         'READ_WONT_NEED',
     ],
     'rec_write' : [
+        'EVICT_IN_MEMORY',
         'EVICT_LOOKASIDE',
-        'EVICTING',
         'EVICT_UPDATE_RESTORE',
+        'EVICTING',
         'VISIBILITY_ERR',
     ],
     'txn_log_checkpoint' : [
@@ -92,6 +94,7 @@ flags = {
         'CONN_CKPT_SYNC',
         'CONN_CLOSING',
         'CONN_EVICTION_RUN',
+        'CONN_IN_MEMORY',
         'CONN_LAS_OPEN',
         'CONN_LEAK_MEMORY',
         'CONN_LOG_SERVER_RUN',
@@ -114,6 +117,7 @@ flags = {
         'SESSION_LOCKED_SCHEMA',
         'SESSION_LOCKED_SLOT',
         'SESSION_LOCKED_TABLE',
+        'SESSION_LOCKED_TURTLE',
         'SESSION_LOGGING_INMEM',
         'SESSION_LOOKASIDE_CURSOR',
         'SESSION_NO_CACHE',
