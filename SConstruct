@@ -406,6 +406,10 @@ Default(t)
 t = env.Program("t_huge",
     "test/huge/huge.c",
     LIBS=[wtlib] + wtlibs)
+
+t = env.Program("t_recovery",
+    "test/recovery/recovery.c",
+    LIBS=[wtlib] + wtlibs)
 #env.Alias("check", env.SmokeTest(t))
 Default(t)
 
