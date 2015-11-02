@@ -1032,8 +1032,11 @@ __split_parent_climb(WT_SESSION_IMPL *session, WT_PAGE *page, bool page_hazard)
 		    session, ref, &parent, &parent_hazard));
 		ret = __split_internal(session, parent, page);
 		WT_TRET(__split_internal_unlock(session, page, page_hazard));
+
 		page = parent;
 		page_hazard = parent_hazard;
+		parent = NULL;
+		parent_hazard = false;
 		WT_ERR(ret);
 	}
 
