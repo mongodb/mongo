@@ -53,7 +53,9 @@ static char *uri = "table:main";
 
 #define	RECORDS_FILE "records"
 
-#define	ENV_CONFIG "create,log=(file_max=10M,archive=false,enabled),transaction_sync=(enabled,method=none)"
+#define	ENV_CONFIG						\
+    "create,log=(file_max=10M,archive=false,enabled),"		\
+    "transaction_sync=(enabled,method=none)"
 #define	ENV_CONFIG_REC "log=(recover=on)"
 #define	MAX_VAL	4096
 
