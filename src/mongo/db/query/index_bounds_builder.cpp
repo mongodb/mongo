@@ -860,7 +860,9 @@ void IndexBoundsBuilder::alignBounds(IndexBounds* bounds, const BSONObj& kp, int
     size_t oilIdx = 0;
     while (it.more()) {
         BSONElement elt = it.next();
-        int direction = (elt.numberInt() >= 0) ? 1 : -1;
+        // The canonical check as to whether a key pattern element is "ascending" or "descending" is
+        // (elt.number() >= 0). This is defined by the Ordering class.
+        int direction = (elt.number() >= 0) ? 1 : -1;
         direction *= scanDir;
         if (-1 == direction) {
             vector<Interval>& iv = bounds->fields[oilIdx].intervals;

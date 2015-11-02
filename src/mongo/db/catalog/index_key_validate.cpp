@@ -68,15 +68,6 @@ Status validateKeyPattern(const BSONObj& key) {
             return Status(code, "Can't use more than one index plugin for a single index.");
         }
 
-        // We convert the element value to an int in order to determine whether the index is
-        // ascending or descending on a particular field. Therefore, the element value cannot
-        // overflow an int.
-        long long asLong = keyElement.safeNumberLong();
-        if (asLong > std::numeric_limits<int>::max() || asLong < std::numeric_limits<int>::min()) {
-            return Status(code,
-                          str::stream() << "Key pattern element overflows an int: " << keyElement);
-        }
-
         // Ensure that the fields on which we are building the index are valid: a field must not
         // begin with a '$' unless it is part of a DBRef or text index, and a field path cannot
         // contain an empty field. If a field cannot be created or updated, it should not be

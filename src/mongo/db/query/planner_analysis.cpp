@@ -319,8 +319,9 @@ BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
         if (elt.type() == mongo::String) {
             break;
         }
-        long long val = elt.safeNumberLong();
-        int sortOrder = val >= 0 ? 1 : -1;
+        // The canonical check as to whether a key pattern element is "ascending" or "descending" is
+        // (elt.number() >= 0). This is defined by the Ordering class.
+        int sortOrder = (elt.number() >= 0) ? 1 : -1;
         sortBob.append(elt.fieldName(), sortOrder);
     }
     return sortBob.obj();

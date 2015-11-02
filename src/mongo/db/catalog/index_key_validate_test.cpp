@@ -52,36 +52,12 @@ TEST(IndexKeyValidateTest, KeyElementValueOfZeroSucceeds) {
     ASSERT_OK(validateKeyPattern(BSON("x" << 0)));
 }
 
-TEST(IndexKeyValidateTest, KeyElementValueOfLargestPossibleIntSucceeds) {
-    BSONObj keyPattern = BSON("x" << 2147483647LL);
-    ASSERT_EQ(2147483647, keyPattern["x"].numberInt());
-    ASSERT_OK(validateKeyPattern(keyPattern));
+TEST(IndexKeyValidateTest, KeyElementValuePositiveFloatingPointSucceeds) {
+    ASSERT_OK(validateKeyPattern(BSON("x" << 0.1)));
 }
 
-TEST(IndexKeyValidateTest, KeyElementValueOfSmallestPossibleIntSucceeds) {
-    BSONObj keyPattern = BSON("x" << -2147483648LL);
-    ASSERT_EQ(-2147483648, keyPattern["x"].numberInt());
-    ASSERT_OK(validateKeyPattern(keyPattern));
-}
-
-TEST(IndexKeyValidateTest, KeyElementValueTooLargeForIntFails) {
-    auto status = validateKeyPattern(BSON("x" << 2147483648LL));
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
-
-    status = validateKeyPattern(BSON("x" << 100000000000.5));
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
-}
-
-TEST(IndexKeyValidateTest, KeyElementValueTooSmallForIntFails) {
-    auto status = validateKeyPattern(BSON("x" << -2147483649LL));
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
-
-    status = validateKeyPattern(BSON("x" << -100000000000.5));
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+TEST(IndexKeyValidateTest, KeyElementValueNegativeFloatingPointSucceeds) {
+    ASSERT_OK(validateKeyPattern(BSON("x" << -0.1)));
 }
 
 TEST(IndexKeyValidateTest, KeyElementValueOfBadPluginStringFails) {
