@@ -234,6 +234,9 @@ main(int argc, char *argv[])
 	close(fd);
 	if ((ret = conn->close(conn, NULL)) != 0)
 		testutil_die(ret, "WT_CONNECTION:close");
-	printf("%u record(s) absent from %u\n", absent, count);
+	if (absent) {
+		printf("%u record(s) absent from %u\n", absent, count);
+		return (EXIT_FAILURE);
+	}
 	return (EXIT_SUCCESS);
 }
