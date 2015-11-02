@@ -245,27 +245,15 @@ Mongo.prototype.forceWriteMode = function( mode ) {
 }
 
 Mongo.prototype.hasWriteCommands = function() {
-    if ( !('_hasWriteCommands' in this) ) {
-        var isMaster = this.getDB("admin").runCommand({ isMaster : 1 });
-        this._hasWriteCommands = (isMaster.ok && 
-                                  'minWireVersion' in isMaster &&
-                                  isMaster.minWireVersion <= 2 && 
-                                  2 <= isMaster.maxWireVersion );
-    }
-    
-    return this._hasWriteCommands;
+    var hasWriteCommands = (this.getMinWireVersion() <= 2 &&
+                            2 <= this.getMaxWireVersion());
+    return hasWriteCommands;
 }
 
 Mongo.prototype.hasExplainCommand = function() {
-    if ( !('_hasExplainCommand' in this) ) {
-        var isMaster = this.getDB("admin").runCommand({ isMaster : 1 });
-        this._hasExplainCommand = (isMaster.ok &&
-                                   'minWireVersion' in isMaster &&
-                                   isMaster.minWireVersion <= 3 &&
-                                   3 <= isMaster.maxWireVersion );
-    }
-
-    return this._hasExplainCommand;
+    var hasExplain = (this.getMinWireVersion() <= 3 &&
+                      3 <= this.getMaxWireVersion());
+    return hasExplain;
 }
 
 /**
@@ -338,12 +326,8 @@ Mongo.prototype.readMode = function() {
     // commands. If it does, use commands mode. If not, degrade to legacy mode.
     if (this._readMode === "compatibility") {
         try {
-            var isMaster = this.getDB("admin").runCommand({isMaster: 1});
-            var hasReadCommands = (isMaster.ok && 'minWireVersion' in isMaster &&
-                                                  'maxWireVersion' in isMaster &&
-                                                  isMaster.minWireVersion <= 4 &&
-                                                  4 <= isMaster.maxWireVersion);
-
+            var hasReadCommands = (this.getMinWireVersion() <= 4 &&
+                                   4 <= this.getMaxWireVersion());
             if (hasReadCommands) {
                 this._readMode = "commands";
             }

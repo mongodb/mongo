@@ -71,6 +71,8 @@ struct ReplicaSetMonitor::IsMasterReply {
     HostAndPort primary;                // empty if not present
     std::set<HostAndPort> normalHosts;  // both "hosts" and "passives"
     BSONObj tags;
+    int minWireVersion{0};
+    int maxWireVersion{0};
 
     // remaining fields aren't in isMaster reply, but are known to caller.
     HostAndPort host;
@@ -116,6 +118,8 @@ public:
         bool isMaster{false};   // implies isUp
         int64_t latencyMicros;  // unknownLatency if unknown
         BSONObj tags;           // owned
+        int minWireVersion{0};
+        int maxWireVersion{0};
     };
 
     typedef std::vector<Node> Nodes;

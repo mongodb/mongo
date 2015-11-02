@@ -197,6 +197,14 @@ void DBClientReplicaSet::setReplyMetadataReader(rpc::ReplyMetadataReader reader)
     DBClientWithCommands::setReplyMetadataReader(std::move(reader));
 }
 
+int DBClientReplicaSet::getMinWireVersion() {
+    return _getMonitor()->getMinWireVersion();
+}
+
+int DBClientReplicaSet::getMaxWireVersion() {
+    return _getMonitor()->getMaxWireVersion();
+}
+
 // A replica set connection is never disconnected, since it controls its own reconnection
 // logic.
 //

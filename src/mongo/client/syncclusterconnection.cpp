@@ -647,6 +647,22 @@ bool SyncClusterConnection::isStillConnected() {
     return true;
 }
 
+int SyncClusterConnection::getMinWireVersion() {
+    int minVersion = 0;
+    for (const auto& host : _conns) {
+        minVersion = std::max(minVersion, host->getMinWireVersion());
+    }
+    return minVersion;
+}
+
+int SyncClusterConnection::getMaxWireVersion() {
+    int maxVersion = std::numeric_limits<int>::max();
+    for (const auto& host : _conns) {
+        maxVersion = std::min(maxVersion, host->getMaxWireVersion());
+    }
+    return maxVersion;
+}
+
 void SyncClusterConnection::setAllSoTimeouts(double socketTimeout) {
     _socketTimeout = socketTimeout;
     for (size_t i = 0; i < _conns.size(); i++)

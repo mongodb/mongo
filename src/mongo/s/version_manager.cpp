@@ -238,14 +238,6 @@ bool initShardVersionEmptyNS(OperationContext* txn, DBClientBase* conn_in) {
         return false;
     }
 
-    // Record the connection wire version if sent in the response, initShardVersion is a
-    // handshake for mongos->mongod connections.
-    if (!result["minWireVersion"].eoo()) {
-        int minWireVersion = result["minWireVersion"].numberInt();
-        int maxWireVersion = result["maxWireVersion"].numberInt();
-        conn->setWireVersions(minWireVersion, maxWireVersion);
-    }
-
     LOG(3) << "initial sharding result : " << result;
 
     connectionShardStatus.setSequence(conn, "", 0);

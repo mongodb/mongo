@@ -62,10 +62,10 @@ enum WireVersion {
 
 // Latest version that the server accepts. This should always be at the latest entry in
 // WireVersion.
-static const int maxWireVersion = FIND_COMMAND;
+static const int kMaxWireVersion = FIND_COMMAND;
 
 // Minimum version that the server accepts. We should bump this whenever we don't want
 // to allow communication with too old agents.
-static const int minWireVersion = RELEASE_2_4_AND_BEFORE;
+static const int kMinWireVersion = RELEASE_2_4_AND_BEFORE;
 
 }  // namespace mongo

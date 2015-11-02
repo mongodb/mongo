@@ -97,6 +97,9 @@ public:
 
     virtual QueryOptions _lookupAvailableOptions();
 
+    int getMinWireVersion() final;
+    int getMaxWireVersion() final;
+
 private:
     OperationContext* _txn;
 };

@@ -35,6 +35,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -87,6 +88,13 @@ std::string DBDirectClient::toString() const {
 
 std::string DBDirectClient::getServerAddress() const {
     return "localhost";  // TODO: should this have the port?
+}
+
+int DBDirectClient::getMinWireVersion() {
+    return kMinWireVersion;
+}
+int DBDirectClient::getMaxWireVersion() {
+    return kMaxWireVersion;
 }
 
 bool DBDirectClient::callRead(Message& toSend, Message& response) {

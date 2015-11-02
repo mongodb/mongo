@@ -133,6 +133,10 @@ public:
         return false;
     }
     virtual bool isStillConnected();
+
+    int getMinWireVersion() final;
+    int getMaxWireVersion() final;
+
     virtual std::string toString() const {
         return _toString();
     }

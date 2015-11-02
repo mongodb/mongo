@@ -69,6 +69,10 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
         setClientRPCProtocols, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(update, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        getMinWireVersion, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        getMaxWireVersion, MongoLocalInfo, MongoExternalInfo),
     JS_FS_END,
 };
 
@@ -627,6 +631,18 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     o.setString(InternedString::defaultDB, cs.getDatabase());
 
     args.rval().setObjectOrNull(thisv);
+}
+
+void MongoBase::Functions::getMinWireVersion::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+
+    args.rval().setInt32(conn->getMinWireVersion());
+}
+
+void MongoBase::Functions::getMaxWireVersion::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+
+    args.rval().setInt32(conn->getMaxWireVersion());
 }
 
 void MongoExternalInfo::Functions::load::call(JSContext* cx, JS::CallArgs args) {

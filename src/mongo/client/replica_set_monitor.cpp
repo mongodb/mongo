@@ -324,6 +324,30 @@ bool ReplicaSetMonitor::isHostUp(const HostAndPort& host) const {
     return node ? node->isUp : false;
 }
 
+int ReplicaSetMonitor::getMinWireVersion() const {
+    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    int minVersion = 0;
+    for (const auto& host : _state->nodes) {
+        if (host.isUp) {
+            minVersion = std::max(minVersion, host.minWireVersion);
+        }
+    }
+
+    return minVersion;
+}
+
+int ReplicaSetMonitor::getMaxWireVersion() const {
+    stdx::lock_guard<stdx::mutex> lk(_state->mutex);
+    int maxVersion = std::numeric_limits<int>::max();
+    for (const auto& host : _state->nodes) {
+        if (host.isUp) {
+            maxVersion = std::min(maxVersion, host.maxWireVersion);
+        }
+    }
+
+    return maxVersion;
+}
+
 int ReplicaSetMonitor::getConsecutiveFailedScans() const {
     stdx::lock_guard<stdx::mutex> lk(_state->mutex);
     return _state->consecutiveFailedScans;
@@ -774,6 +798,9 @@ void IsMasterReply::parse(const BSONObj& obj) {
         hidden = raw["hidden"].trueValue();
         secondary = raw["secondary"].trueValue();
 
+        minWireVersion = raw["minWireVersion"].numberInt();
+        maxWireVersion = raw["maxWireVersion"].numberInt();
+
         // hidden nodes can't be master, even if they claim to be.
         isMaster = !hidden && raw["ismaster"].trueValue();
 
@@ -842,6 +869,9 @@ void Node::update(const IsMasterReply& reply) {
     // send any operations to them.
     isUp = !reply.hidden && (reply.isMaster || reply.secondary);
     isMaster = reply.isMaster;
+
+    minWireVersion = reply.minWireVersion;
+    maxWireVersion = reply.maxWireVersion;
 
     // save a copy if unchanged
     if (!tags.binaryEqual(reply.tags))

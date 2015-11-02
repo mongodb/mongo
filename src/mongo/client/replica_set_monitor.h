@@ -109,6 +109,16 @@ public:
     bool isHostUp(const HostAndPort& host) const;
 
     /**
+     * Returns the minimum wire version supported across the replica set.
+     */
+    int getMinWireVersion() const;
+
+    /**
+     * Returns the maximum wire version supported across the replica set.
+     */
+    int getMaxWireVersion() const;
+
+    /**
      * How may times in a row have we tried to refresh without successfully contacting any hosts
      * who claim to be members of this set?
      */

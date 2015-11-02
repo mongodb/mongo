@@ -131,8 +131,8 @@ public:
             result.append("initialized", true);
 
             // Send back wire version to let mongos know what protocol we can speak
-            result.append("minWireVersion", minWireVersion);
-            result.append("maxWireVersion", maxWireVersion);
+            result.append("minWireVersion", kMinWireVersion);
+            result.append("maxWireVersion", kMaxWireVersion);
 
             return true;
         }

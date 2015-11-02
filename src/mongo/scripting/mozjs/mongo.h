@@ -58,9 +58,11 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(runCommandWithMetadata);
         MONGO_DECLARE_JS_FUNCTION(setClientRPCProtocols);
         MONGO_DECLARE_JS_FUNCTION(update);
+        MONGO_DECLARE_JS_FUNCTION(getMinWireVersion);
+        MONGO_DECLARE_JS_FUNCTION(getMaxWireVersion);
     };
 
-    static const JSFunctionSpec methods[15];
+    static const JSFunctionSpec methods[17];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;

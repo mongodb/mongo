@@ -191,6 +191,9 @@ public:
     void setRequestMetadataWriter(rpc::RequestMetadataWriter writer) final;
 
     void setReplyMetadataReader(rpc::ReplyMetadataReader reader) final;
+
+    int getMinWireVersion() final;
+    int getMaxWireVersion() final;
     // ---- low level ------
 
     virtual bool call(Message& toSend,

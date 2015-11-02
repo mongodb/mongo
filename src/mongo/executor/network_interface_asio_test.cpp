@@ -60,8 +60,8 @@ RemoteCommandResponse simulateIsMaster(RemoteCommandRequest request) {
     ASSERT_EQ(request.dbname, "admin");
 
     RemoteCommandResponse response;
-    response.data = BSON("minWireVersion" << mongo::minWireVersion << "maxWireVersion"
-                                          << mongo::maxWireVersion);
+    response.data = BSON("minWireVersion" << mongo::kMinWireVersion << "maxWireVersion"
+                                          << mongo::kMaxWireVersion);
     return response;
 }
 
@@ -561,8 +561,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
                            [](RemoteCommandRequest request) -> RemoteCommandResponse {
                                RemoteCommandResponse response;
                                response.data = BSON("minWireVersion"
-                                                    << mongo::minWireVersion << "maxWireVersion"
-                                                    << mongo::maxWireVersion << "TESTKEY"
+                                                    << mongo::kMinWireVersion << "maxWireVersion"
+                                                    << mongo::kMaxWireVersion << "TESTKEY"
                                                     << "TESTVALUE");
                                return response;
                            });
