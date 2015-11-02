@@ -44,6 +44,7 @@
 #include "mongo/db/ftdc/ftdc_test.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -166,8 +167,8 @@ TEST(FTDCControllerTest, TestFull) {
 
     FTDCController c(dir, config);
 
-    auto c1 = std::unique_ptr<FTDCMetricsCollectorMock2>(new FTDCMetricsCollectorMock2());
-    auto c2 = std::unique_ptr<FTDCMetricsCollectorMockRotate>(new FTDCMetricsCollectorMockRotate());
+    auto c1 = stdx::make_unique<FTDCMetricsCollectorMock2>();
+    auto c2 = stdx::make_unique<FTDCMetricsCollectorMockRotate>();
 
     auto c1Ptr = c1.get();
     auto c2Ptr = c2.get();
@@ -191,9 +192,80 @@ TEST(FTDCControllerTest, TestFull) {
     auto docsRotate = c2Ptr->getDocs();
     ASSERT_EQUALS(docsRotate.size(), 1UL);
 
-    std::vector<BSONObj> allDocs;
-    allDocs.insert(allDocs.end(), docsRotate.begin(), docsRotate.end());
+    std::vector<BSONObj> allDocs(docsRotate.begin(), docsRotate.end());
     allDocs.insert(allDocs.end(), docsPeriodic.begin(), docsPeriodic.end());
+
+    auto files = scanDirectory(dir);
+
+    ASSERT_EQUALS(files.size(), 1UL);
+
+    auto alog = files[0];
+
+    ValidateDocumentList(alog, allDocs);
+}
+
+// Test we can start and stop the controller in quick succession, make sure it succeeds without
+// assert or fault
+TEST(FTDCControllerTest, TestStartStop) {
+    unittest::TempDir tempdir("metrics_testpath");
+    boost::filesystem::path dir(tempdir.path());
+
+    createDirectoryClean(dir);
+
+    FTDCConfig config;
+    config.enabled = false;
+    config.period = Milliseconds(1);
+    config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
+    config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
+
+    FTDCController c(dir, config);
+
+    c.start();
+
+    c.stop();
+}
+
+// Test we can start the controller as disabled, the directory is empty, and then we can succesfully
+// enable it
+TEST(FTDCControllerTest, TestStartAsDisabled) {
+    unittest::TempDir tempdir("metrics_testpath");
+    boost::filesystem::path dir(tempdir.path());
+
+    createDirectoryClean(dir);
+
+    FTDCConfig config;
+    config.enabled = false;
+    config.period = Milliseconds(1);
+    config.maxFileSizeBytes = FTDCConfig::kMaxFileSizeBytesDefault;
+    config.maxDirectorySizeBytes = FTDCConfig::kMaxDirectorySizeBytesDefault;
+
+    auto c1 = stdx::make_unique<FTDCMetricsCollectorMock2>();
+
+    auto c1Ptr = c1.get();
+
+    FTDCController c(dir, config);
+
+    c.addPeriodicCollector(std::move(c1));
+
+    c.start();
+
+    auto files0 = scanDirectory(dir);
+
+    ASSERT_EQUALS(files0.size(), 0UL);
+
+    c.setEnabled(true);
+
+    c1Ptr->setSignalOnCount(50);
+
+    // Wait for 50 samples to have occured
+    c1Ptr->wait();
+
+    c.stop();
+
+    auto docsPeriodic = c1Ptr->getDocs();
+    ASSERT_GREATER_THAN_OR_EQUALS(docsPeriodic.size(), 50UL);
+
+    std::vector<BSONObj> allDocs(docsPeriodic.begin(), docsPeriodic.end());
 
     auto files = scanDirectory(dir);
 

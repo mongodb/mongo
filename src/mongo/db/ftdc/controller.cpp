@@ -100,8 +100,8 @@ void FTDCController::addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface
 }
 
 void FTDCController::start() {
-    log() << "Starting full-time diagnostic data capture with directory '" << _path.generic_string()
-          << "'";
+    log() << "Initializing full-time diagnostic data capture with directory '"
+          << _path.generic_string() << "'";
 
     // Start the thread
     _thread = stdx::thread(stdx::bind(&FTDCController::doLoop, this));
@@ -115,7 +115,7 @@ void FTDCController::start() {
 }
 
 void FTDCController::stop() {
-    log() << "Stopping full-time diagnostic data capture";
+    log() << "Shuting down full-time diagnostic data capture";
 
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -139,10 +139,12 @@ void FTDCController::stop() {
     _thread.join();
 
     _state = State::kDone;
-
-    auto s = _mgr->close();
-    if (!s.isOK()) {
-        log() << "Failed to close full-time diagnostic data capture file manager: " << s;
+    
+    if (_mgr) {
+        auto s = _mgr->close();
+        if (!s.isOK()) {
+            log() << "Failed to close full-time diagnostic data capture file manager: " << s;
+        }
     }
 }
 
@@ -156,10 +158,6 @@ void FTDCController::doLoop() {
 
         Client::initThread("ftdc");
         Client* client = &cc();
-
-        auto swMgr = FTDCFileManager::create(&_config, _path, &_rotateCollectors, client);
-
-        _mgr = uassertStatusOK(std::move(swMgr));
 
         while (true) {
             // Compute the next interval to run regardless of how we were woken up
@@ -181,12 +179,16 @@ void FTDCController::doLoop() {
                     break;
                 }
 
+                // Update the current configuration settings always
+                // In unit tests, we may never get a signal when the timeout is 1ms on Windows since
+                // MSVC 2013 converts wait_until(now() + 1ms) into ~ wait_for(0) which means it will
+                // not wait for the condition variable to be signaled because it uses
+                // GetFileSystemTime for now which has ~10 ms granularity.
+                _config = _configTemp;
+
                 // if we hit a timeout on the condvar, we need to do another collection
                 // if we were signalled, then we have a config update only or were asked to stop
                 if (status == stdx::cv_status::no_timeout) {
-                    // Update the current configuration settings
-                    _config = _configTemp;
-
                     continue;
                 }
             }
@@ -194,6 +196,15 @@ void FTDCController::doLoop() {
             // TODO: consider only running this thread if we are enabled
             // for now, we just keep an idle thread as it is simplier
             if (_config.enabled) {
+                // Delay initialization of FTDCFileManager until we are sure the user has enabled
+                // FTDC
+                if (!_mgr) {
+                    auto swMgr =
+                        FTDCFileManager::create(&_config, _path, &_rotateCollectors, client);
+
+                    _mgr = uassertStatusOK(std::move(swMgr));
+                }
+
                 auto collectSample = _periodicCollectors.collect(client);
 
                 Status s = _mgr->writeSampleAndRotateIfNeeded(
