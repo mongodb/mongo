@@ -144,10 +144,9 @@ main(int argc, char *argv[])
 	WT_RAND_STATE rnd;
 	uint64_t key;
 	uint32_t absent, count;
-	size_t rd;
 	int ch, status, ret, timeout;
 	pid_t pid;
-	char *working_dir, keybuf[16];
+	char *working_dir;
 
 	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		progname = argv[0];
