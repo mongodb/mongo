@@ -659,6 +659,7 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
                  slave.getDB("admin").getMongo().setSlaveOk();
 
                  var ts = self.getLastOpTime(slave);
+                 var log = slave.getDB("local")['oplog.rs'];
                  if (self.latest.t < ts.t ||
                         (self.latest.t == ts.t && self.latest.i < ts.i)) {
                      self.latest = self.getLastOpTime(master);
