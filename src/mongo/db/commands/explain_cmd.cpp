@@ -79,10 +79,6 @@ public:
         return false;
     }
 
-    bool supportsReadConcern() const final {
-        return true;
-    }
-
     virtual void help(std::stringstream& help) const {
         help << "explain database reads and writes";
     }

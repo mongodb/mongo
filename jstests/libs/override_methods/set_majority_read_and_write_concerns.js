@@ -48,7 +48,6 @@
             "count",
             "dbStats",
             "distinct",
-            "explain",
             "find",
             "geoNear",
             "geoSearch",

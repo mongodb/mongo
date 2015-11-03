@@ -28,9 +28,8 @@ function getReadMajorityAggCursor() {
     return new DBCommandCursor(db.getMongo(), res, 2);
 }
 
-function getReadMajorityExplainPlan(query) {
-    var res = db.runCommand({explain: {find: t.getName(), filter: query},
-                             readConcern: {level: "majority"}});
+function getExplainPlan(query) {
+    var res = db.runCommand({explain: {find: t.getName(), filter: query}});
     return assert.commandWorked(res).queryPlanner.winningPlan;
 }
 
@@ -108,30 +107,18 @@ assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot4}));
 assert.eq(cursor.next().version, 4);
 assert.eq(cursor.next().version, 4);
 
-// Adding an index doesn't bump the min snapshot for a collection, but it can't be used for queries
-// yet.
+// Adding an index bumps the min snapshot for a collection as of SERVER-20260. This may change to
+// just filter that index out from query planning as part of SERVER-20439.
 t.ensureIndex({version: 1});
-if (false) {
-    // disabled until SERVER-20439 is implemented.
-    assert.eq(getReadMajorityAggCursor().itcount(), 10);
-    assert.eq(getReadMajorityCursor().itcount(), 10);
-    assert(!isIxscan(getReadMajorityExplainPlan({version: 1})));
-} else {
-    // stopgap solution implemented for SERVER-20260.
-    assertNoReadMajoritySnapshotAvailable();
-}
+assertNoReadMajoritySnapshotAvailable();
 
 // To use the index, a snapshot created after the index was completed must be marked committed.
 var newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
-if (false) {
-    // disabled until SERVER-20439 is implemented.
-    assert(!isIxscan(getReadMajorityExplainPlan({version: 1})));
-} else {
-    // stopgap solution implemented for SERVER-20260.
-    assertNoReadMajoritySnapshotAvailable();
-}
+assertNoReadMajoritySnapshotAvailable();
 assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
-assert(isIxscan(getReadMajorityExplainPlan({version: 1})));
+assert.eq(getReadMajorityCursor().itcount(), 10);
+assert.eq(getReadMajorityAggCursor().itcount(), 10);
+assert(isIxscan(getExplainPlan({version: 1})));
 
 // Dropping an index does bump the min snapshot.
 t.dropIndex({version: 1});
