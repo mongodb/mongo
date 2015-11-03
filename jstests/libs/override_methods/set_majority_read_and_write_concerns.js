@@ -21,28 +21,66 @@
         return originalStartParallelShell(newCode, port, noConnect);
     }
 
-    DB.prototype._runCommandImpl = function(name, obj, options) {
-        if (obj.hasOwnProperty("createIndexes") ||
-            obj.hasOwnProperty("delete") ||
-            obj.hasOwnProperty("findAndModify") ||
-            obj.hasOwnProperty("findandmodify") ||
-            obj.hasOwnProperty("insert") ||
-            obj.hasOwnProperty("update")) {
+    DB.prototype._runCommandImpl = function(dbName, obj, options) {
+        var cmdName = "";
+        for (var fieldName in obj) {
+            cmdName = fieldName;
+            break;
+        }
+
+        // These commands directly support a writeConcern argument.
+        var commandsToForceWriteConcern = [
+            "delete",
+            "findAndModify",
+            "findandmodify",
+            "insert",
+            "update",
+        ];
+
+        // These commands do writes but do not support a writeConcern argument. Emulate it with a
+        // getLastError command.
+        var commandsToEmulateWriteConcern = [
+            "createIndexes",
+        ];
+
+        // These are reading commands that support majority readConcern.
+        var commandsToForceReadConcern = [
+            "count",
+            "dbStats",
+            "distinct",
+            "explain",
+            "find",
+            "geoNear",
+            "geoSearch",
+            "group",
+        ];
+
+        var forceWriteConcern = Array.contains(commandsToForceWriteConcern, cmdName);
+        var emulateWriteConcern = Array.contains(commandsToEmulateWriteConcern, cmdName);
+        var forceReadConcern = Array.contains(commandsToForceReadConcern, cmdName);
+
+        if (cmdName === "aggregate") {
+            // Aggregate can be either a read or a write depending on whether it has a $out stage.
+            // $out is required to be the last stage of the pipeline.
+            var stages = obj.pipeline;
+            var hasOut = stages &&
+                         (stages.length !== 0) &&
+                         ('$out' in stages[stages.length - 1]);
+            if (hasOut) {
+                emulateWriteConcern = true;
+            } else {
+                forceReadConcern = true;
+            }
+        }
+
+        if (forceWriteConcern) {
             if (obj.hasOwnProperty("writeConcern")) {
                 jsTestLog("Warning: overriding existing writeConcern of: " +
                            obj.writeConcern);
             }
             obj.writeConcern = defaultWriteConcern;
 
-        } else if (obj.hasOwnProperty("aggregate") ||
-            obj.hasOwnProperty("count") ||
-            obj.hasOwnProperty("dbStats") ||
-            obj.hasOwnProperty("distinct") ||
-            obj.hasOwnProperty("explain") ||
-            obj.hasOwnProperty("find") ||
-            obj.hasOwnProperty("geoNear") ||
-            obj.hasOwnProperty("geoSearch") ||
-            obj.hasOwnProperty("group")) {
+        } else if (forceReadConcern) {
             if (obj.hasOwnProperty("readConcern")) {
                 jsTestLog("Warning: overriding existing readConcern of: " +
                            obj.readConcern);
@@ -50,7 +88,16 @@
             obj.readConcern = {level: "majority"};
         }
 
-        return this.getMongo().runCommand(name, obj, options);
+        var res = this.getMongo().runCommand(dbName, obj, options);
+
+        if (res.ok && emulateWriteConcern) {
+            // We only emulate WriteConcern if the command succeeded to match the behavior of
+            // commands that support WriteConcern.
+            var gleCmd = Object.extend({getLastError: 1}, defaultWriteConcern);
+            assert.commandWorked(this.getMongo().runCommand(dbName, gleCmd, options));
+        }
+
+        return res;
     };
 
     // Use a majority write concern if the operation does not specify one.
