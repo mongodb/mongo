@@ -87,7 +87,6 @@ void Request::process(OperationContext* txn, int attempt) {
 
     const MSGID msgId = _m.header().getId();
 
-    Timer t;
     LOG(3) << "Request::process begin ns: " << getnsIfPresent() << " msg id: " << msgId
            << " op: " << op << " attempt: " << attempt;
 
@@ -121,7 +120,7 @@ void Request::process(OperationContext* txn, int attempt) {
     }
 
     LOG(3) << "Request::process end ns: " << getnsIfPresent() << " msg id: " << msgId
-           << " op: " << op << " attempt: " << attempt << " " << t.millis() << "ms";
+           << " op: " << op << " attempt: " << attempt;
 }
 
 void Request::reply(Message& response, const string& fromServer) {
