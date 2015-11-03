@@ -114,11 +114,6 @@ public:
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder* result) override;
 
-    bool runReadCommand(OperationContext* txn,
-                        const std::string& dbname,
-                        const BSONObj& cmdObj,
-                        BSONObjBuilder* result) override;
-
     bool runUserManagementReadCommand(OperationContext* txn,
                                       const std::string& dbname,
                                       const BSONObj& cmdObj,
@@ -142,6 +137,9 @@ public:
     DistLockManager* getDistLockManager() override;
 
     Status initConfigVersion(OperationContext* txn) override;
+
+    Status appendInfoForConfigServerDatabases(OperationContext* txn,
+                                              BSONArrayBuilder* builder) override;
 
 private:
     Status _checkDbDoesNotExist(OperationContext* txn,
@@ -183,6 +181,14 @@ private:
      * check was performed.
      */
     bool _isConsistentFromLastCheck();
+
+    /**
+     * Sends a read only command to the config server.
+     */
+    bool _runReadCommand(OperationContext* txn,
+                         const std::string& dbname,
+                         const BSONObj& cmdObj,
+                         BSONObjBuilder* result);
 
     // Parsed config server hosts, as specified on the command line.
     ConnectionString _configServerConnectionString;

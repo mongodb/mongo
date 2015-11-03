@@ -113,6 +113,7 @@ void ShardingTestFixture::setUp() {
     _distLockManager = uniqueDistLockManager.get();
     std::unique_ptr<CatalogManagerReplicaSet> cm(
         stdx::make_unique<CatalogManagerReplicaSet>(std::move(uniqueDistLockManager)));
+    _catalogManagerRS = cm.get();
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
         "CatalogManagerReplSetTest", {HostAndPort{"TestHost1"}, HostAndPort{"TestHost2"}});
@@ -156,6 +157,10 @@ void ShardingTestFixture::shutdownExecutor() {
 
 CatalogManager* ShardingTestFixture::catalogManager() const {
     return grid.catalogManager(_opCtx.get());
+}
+
+CatalogManagerReplicaSet* ShardingTestFixture::getCatalogManagerReplicaSet() const {
+    return _catalogManagerRS;
 }
 
 ShardRegistry* ShardingTestFixture::shardRegistry() const {

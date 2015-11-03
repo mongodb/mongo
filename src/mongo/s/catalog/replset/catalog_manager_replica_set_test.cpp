@@ -624,7 +624,6 @@ TEST_F(CatalogManagerReplSetTest, RunUserManagementReadCommand) {
         return BSON("ok" << 1 << "users" << BSONArrayBuilder().arr());
     });
 
-    // Now wait for the runReadCommand call to return
     future.timed_get(kFutureTimeout);
 }
 
@@ -2256,7 +2255,7 @@ TEST_F(CatalogManagerReplSetTest, BasicReadAfterOpTime) {
     for (int x = 0; x < 3; x++) {
         auto future = launchAsync([this] {
             BSONObjBuilder responseBuilder;
-            ASSERT_TRUE(catalogManager()->runReadCommand(
+            ASSERT_TRUE(getCatalogManagerReplicaSet()->runReadCommandForTest(
                 operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
         });
 
@@ -2290,7 +2289,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
     // Initialize the internal config OpTime
     auto future1 = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        ASSERT_TRUE(catalogManager()->runReadCommand(
+        ASSERT_TRUE(getCatalogManagerReplicaSet()->runReadCommandForTest(
             operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
     });
 
@@ -2319,7 +2318,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
     // Return an older OpTime
     auto future2 = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        ASSERT_TRUE(catalogManager()->runReadCommand(
+        ASSERT_TRUE(getCatalogManagerReplicaSet()->runReadCommandForTest(
             operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
     });
 
@@ -2345,7 +2344,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeShouldNotGoBack) {
     // Check that older OpTime does not override highest OpTime
     auto future3 = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        ASSERT_TRUE(catalogManager()->runReadCommand(
+        ASSERT_TRUE(getCatalogManagerReplicaSet()->runReadCommandForTest(
             operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
     });
 
@@ -2400,7 +2399,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeFindThenCmd) {
     // Return an older OpTime
     auto future2 = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        ASSERT_TRUE(catalogManager()->runReadCommand(
+        ASSERT_TRUE(getCatalogManagerReplicaSet()->runReadCommandForTest(
             operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
     });
 
@@ -2426,7 +2425,7 @@ TEST_F(CatalogManagerReplSetTest, ReadAfterOpTimeCmdThenFind) {
     // Initialize the internal config OpTime
     auto future1 = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        ASSERT_TRUE(catalogManager()->runReadCommand(
+        ASSERT_TRUE(getCatalogManagerReplicaSet()->runReadCommandForTest(
             operationContext(), "test", BSON("dummy" << 1), &responseBuilder));
     });
 
@@ -2480,7 +2479,7 @@ TEST_F(CatalogManagerReplSetTest, RetryOnReadCommandNetworkErrorFailsAtMaxRetry)
 
     auto future1 = launchAsync([this] {
         BSONObjBuilder responseBuilder;
-        auto ok = catalogManager()->runReadCommand(
+        auto ok = getCatalogManagerReplicaSet()->runReadCommandForTest(
             operationContext(), "test", BSON("dummy" << 1), &responseBuilder);
         ASSERT_FALSE(ok);
         auto status = Command::getStatusFromCommandResult(responseBuilder.obj());
@@ -2504,7 +2503,7 @@ TEST_F(CatalogManagerReplSetTest, RetryOnReadCommandNetworkErrorSucceedsAtMaxRet
 
     auto future1 = launchAsync([this, expectedResult] {
         BSONObjBuilder responseBuilder;
-        auto ok = catalogManager()->runReadCommand(
+        auto ok = getCatalogManagerReplicaSet()->runReadCommandForTest(
             operationContext(), "test", BSON("dummy" << 1), &responseBuilder);
         ASSERT_TRUE(ok);
         auto response = responseBuilder.obj();

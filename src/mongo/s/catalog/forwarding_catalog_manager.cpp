@@ -493,19 +493,6 @@ bool ForwardingCatalogManager::runUserManagementWriteCommand(OperationContext* t
                  });
 }
 
-bool ForwardingCatalogManager::runReadCommand(OperationContext* txn,
-                                              const std::string& dbname,
-                                              const BSONObj& cmdObj,
-                                              BSONObjBuilder* result) {
-    return retry(txn,
-                 [&] {
-                     BSONObjBuilder builder;
-                     const bool success = _actual->runReadCommand(txn, dbname, cmdObj, &builder);
-                     result->appendElements(builder.done());
-                     return success;
-                 });
-}
-
 bool ForwardingCatalogManager::runUserManagementReadCommand(OperationContext* txn,
                                                             const std::string& dbname,
                                                             const BSONObj& cmdObj,
@@ -577,6 +564,11 @@ DistLockManager* ForwardingCatalogManager::getDistLockManager() {
 
 Status ForwardingCatalogManager::initConfigVersion(OperationContext* txn) {
     return retry(txn, [&] { return _actual->initConfigVersion(txn); });
+}
+
+Status ForwardingCatalogManager::appendInfoForConfigServerDatabases(OperationContext* txn,
+                                                                    BSONArrayBuilder* builder) {
+    return retry(txn, [&] { return _actual->appendInfoForConfigServerDatabases(txn, builder); });
 }
 
 }  // namespace mongo

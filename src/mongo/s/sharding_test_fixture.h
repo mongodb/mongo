@@ -75,6 +75,11 @@ protected:
 
     CatalogManager* catalogManager() const;
 
+    /**
+     * Prefer catalogManager() method over this as much as possible.
+     */
+    CatalogManagerReplicaSet* getCatalogManagerReplicaSet() const;
+
     ShardRegistry* shardRegistry() const;
 
     RemoteCommandTargeterFactoryMock* targeterFactory() const;
@@ -204,6 +209,7 @@ private:
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
     std::unique_ptr<executor::NetworkTestEnv> _addShardNetworkTestEnv;
     DistLockManagerMock* _distLockManager = nullptr;
+    CatalogManagerReplicaSet* _catalogManagerRS = nullptr;
 };
 
 }  // namespace mongo

@@ -831,10 +831,10 @@ bool CatalogManagerReplicaSet::runUserManagementWriteCommand(OperationContext* t
     return Command::getStatusFromCommandResult(response.getValue()).isOK();
 }
 
-bool CatalogManagerReplicaSet::runReadCommand(OperationContext* txn,
-                                              const std::string& dbname,
-                                              const BSONObj& cmdObj,
-                                              BSONObjBuilder* result) {
+bool CatalogManagerReplicaSet::runReadCommandForTest(OperationContext* txn,
+                                                     const std::string& dbname,
+                                                     const BSONObj& cmdObj,
+                                                     BSONObjBuilder* result) {
     BSONObjBuilder cmdBuilder;
     cmdBuilder.appendElements(cmdObj);
     _appendReadConcern(&cmdBuilder);
@@ -1208,6 +1208,41 @@ StatusWith<BSONObj> CatalogManagerReplicaSet::_runReadCommand(
     }
 
     MONGO_UNREACHABLE;
+}
+
+Status CatalogManagerReplicaSet::appendInfoForConfigServerDatabases(OperationContext* txn,
+                                                                    BSONArrayBuilder* builder) {
+    auto resultStatus =
+        _runReadCommand(txn, "admin", BSON("listDatabases" << 1), kConfigPrimaryPreferredSelector);
+
+    if (!resultStatus.isOK()) {
+        return resultStatus.getStatus();
+    }
+
+    auto listDBResponse = resultStatus.getValue();
+    BSONElement dbListArray;
+    auto dbListStatus = bsonExtractTypedField(listDBResponse, "databases", Array, &dbListArray);
+    if (!dbListStatus.isOK()) {
+        return dbListStatus;
+    }
+
+    BSONObjIterator iter(dbListArray.Obj());
+
+    while (iter.more()) {
+        auto dbEntry = iter.next().Obj();
+        string name;
+        auto parseStatus = bsonExtractStringField(dbEntry, "name", &name);
+
+        if (!parseStatus.isOK()) {
+            return parseStatus;
+        }
+
+        if (name == "config" || name == "admin") {
+            builder->append(dbEntry);
+        }
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo

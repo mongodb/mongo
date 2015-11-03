@@ -12,7 +12,14 @@ var getDBSection = function (dbsArray, dbToFind) {
             return dbsArray[pos];
     }
     return null;
-}
+};
+
+var dbInConfigEntryCheck = function(dbEntry) {
+    assert.neq(null, dbEntry);
+    assert(!dbEntry.shards); // db should not be in shard.
+    assert.neq(null, dbEntry.sizeOnDisk);
+    assert.eq(false, dbEntry.empty);
+};
 
 assert.writeOK(mongos.getDB("blah").foo.insert({ _id: 1 }));
 assert.writeOK(mongos.getDB("foo").foo.insert({ _id: 1 }));
@@ -21,8 +28,18 @@ assert.writeOK(mongos.getDB("raw").foo.insert({ _id: 1 }));
 //verify that the config db is not on a shard
 var res = mongos.adminCommand("listDatabases");
 var dbArray = res.databases;
-assert(getDBSection(dbArray, "config"), "config db not found! 1")
-assert(!getDBSection(dbArray, "config").shards, "config db is on a shard! 1")
+dbInConfigEntryCheck(getDBSection(dbArray, "config"));
+
+// Should not have admin entry if it doesn't exists.
+var adminSection = getDBSection(dbArray, 'admin');
+assert(!adminSection);
+
+// add doc in admin db on the config server.
+mongos.getDB('admin').test.insert({ _id: 1 });
+res = mongos.adminCommand("listDatabases");
+dbArray = res.databases;
+dbInConfigEntryCheck(getDBSection(dbArray, "config"));
+dbInConfigEntryCheck(getDBSection(dbArray, 'admin'));
 
 //add doc in config/admin db on the shard
 mongod.getDB("config").foo.insert({_id:1})
@@ -32,8 +49,8 @@ mongod.getDB("admin").foo.insert({_id:1})
 mongos.getDB("admin").foo.insert({_id:1})
 
 //verify that the config db is not on a shard
-var res = mongos.adminCommand("listDatabases");
-var dbArray = res.databases;
+res = mongos.adminCommand("listDatabases");
+dbArray = res.databases;
 //check config db
 assert(getDBSection(dbArray, "config"), "config db not found! 2")
 assert(!getDBSection(dbArray, "config").shards, "config db is on a shard! 2")

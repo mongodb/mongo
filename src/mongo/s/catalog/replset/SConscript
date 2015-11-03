@@ -89,6 +89,7 @@ env.CppUnitTest(
     target='catalog_manager_replica_set_test',
     source=[
         'catalog_manager_replica_set_add_shard_test.cpp',
+        'catalog_manager_replica_set_append_db_stats_test.cpp',
         'catalog_manager_replica_set_drop_coll_test.cpp',
         'catalog_manager_replica_set_log_change_test.cpp',
         'catalog_manager_replica_set_remove_shard_test.cpp',

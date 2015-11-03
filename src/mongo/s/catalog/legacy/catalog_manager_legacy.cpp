@@ -950,13 +950,13 @@ bool CatalogManagerLegacy::runUserManagementReadCommand(OperationContext* txn,
                                                         const string& dbname,
                                                         const BSONObj& cmdObj,
                                                         BSONObjBuilder* result) {
-    return runReadCommand(txn, dbname, cmdObj, result);
+    return _runReadCommand(txn, dbname, cmdObj, result);
 }
 
-bool CatalogManagerLegacy::runReadCommand(OperationContext* txn,
-                                          const std::string& dbname,
-                                          const BSONObj& cmdObj,
-                                          BSONObjBuilder* result) {
+bool CatalogManagerLegacy::_runReadCommand(OperationContext* txn,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           BSONObjBuilder* result) {
     try {
         // let SyncClusterConnection handle connecting to the first config server
         // that is reachable and returns data
@@ -1293,6 +1293,39 @@ void CatalogManagerLegacy::_consistencyChecker() {
 bool CatalogManagerLegacy::_isConsistentFromLastCheck() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _consistentFromLastCheck;
+}
+
+Status CatalogManagerLegacy::appendInfoForConfigServerDatabases(OperationContext* txn,
+                                                                BSONArrayBuilder* builder) {
+    BSONObjBuilder resultBuilder;
+    if (!_runReadCommand(txn, "admin", BSON("listDatabases" << 1), &resultBuilder)) {
+        return getStatusFromCommandResult(resultBuilder.obj());
+    }
+
+    auto listDBResponse = resultBuilder.done();
+    BSONElement dbListArray;
+    auto dbListStatus = bsonExtractTypedField(listDBResponse, "databases", Array, &dbListArray);
+    if (!dbListStatus.isOK()) {
+        return dbListStatus;
+    }
+
+    BSONObjIterator iter(dbListArray.Obj());
+
+    while (iter.more()) {
+        auto dbEntry = iter.next().Obj();
+        string name;
+        auto parseStatus = bsonExtractStringField(dbEntry, "name", &name);
+
+        if (!parseStatus.isOK()) {
+            return parseStatus;
+        }
+
+        if (name == "config" || name == "admin") {
+            builder->append(dbEntry);
+        }
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo

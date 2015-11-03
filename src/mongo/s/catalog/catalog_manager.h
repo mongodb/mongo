@@ -43,6 +43,7 @@ class ActionLogType;
 class BatchedCommandRequest;
 class BatchedCommandResponse;
 struct BSONArray;
+class BSONArrayBuilder;
 class BSONObj;
 class BSONObjBuilder;
 class ChunkType;
@@ -305,14 +306,6 @@ public:
                                                BSONObjBuilder* result) = 0;
 
     /**
-     * Runs a read-only command on a config server.
-     */
-    virtual bool runReadCommand(OperationContext* txn,
-                                const std::string& dbname,
-                                const BSONObj& cmdObj,
-                                BSONObjBuilder* result) = 0;
-
-    /**
      * Runs a user management related read-only command on a config server.
      */
     virtual bool runUserManagementReadCommand(OperationContext* txn,
@@ -434,6 +427,13 @@ public:
      * if the current cluster config is empty.
      */
     virtual Status initConfigVersion(OperationContext* txn) = 0;
+
+    /**
+     * Appends the information about the config and admin databases in the config server
+     * with the format for listDatabase.
+     */
+    virtual Status appendInfoForConfigServerDatabases(OperationContext* txn,
+                                                      BSONArrayBuilder* builder) = 0;
 
 protected:
     CatalogManager() = default;

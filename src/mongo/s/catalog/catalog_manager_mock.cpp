@@ -153,13 +153,6 @@ bool CatalogManagerMock::runUserManagementWriteCommand(OperationContext* txn,
     return true;
 }
 
-bool CatalogManagerMock::runReadCommand(OperationContext* txn,
-                                        const std::string& dbname,
-                                        const BSONObj& cmdObj,
-                                        BSONObjBuilder* result) {
-    return true;
-}
-
 bool CatalogManagerMock::runUserManagementReadCommand(OperationContext* txn,
                                                       const string& dbname,
                                                       const BSONObj& cmdObj,
@@ -212,6 +205,11 @@ DistLockManager* CatalogManagerMock::getDistLockManager() {
 
 Status CatalogManagerMock::initConfigVersion(OperationContext* txn) {
     return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
+Status CatalogManagerMock::appendInfoForConfigServerDatabases(OperationContext* txn,
+                                                              BSONArrayBuilder* builder) {
+    return Status::OK();
 }
 
 }  // namespace mongo

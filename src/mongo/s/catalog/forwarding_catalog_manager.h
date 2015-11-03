@@ -112,6 +112,9 @@ public:
      */
     CatalogManager* getCatalogManagerToUse(OperationContext* txn);
 
+    Status appendInfoForConfigServerDatabases(OperationContext* txn,
+                                              BSONArrayBuilder* builder) override;
+
 private:
     ConfigServerMode getMode() override;
 
@@ -183,11 +186,6 @@ private:
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder* result) override;
-
-    bool runReadCommand(OperationContext* txn,
-                        const std::string& dbname,
-                        const BSONObj& cmdObj,
-                        BSONObjBuilder* result) override;
 
     bool runUserManagementReadCommand(OperationContext* txn,
                                       const std::string& dbname,

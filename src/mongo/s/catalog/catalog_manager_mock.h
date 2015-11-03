@@ -114,11 +114,6 @@ public:
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder* result) override;
 
-    virtual bool runReadCommand(OperationContext* txn,
-                                const std::string& dbname,
-                                const BSONObj& cmdObj,
-                                BSONObjBuilder* result) override;
-
     bool runUserManagementReadCommand(OperationContext* txn,
                                       const std::string& dbname,
                                       const BSONObj& cmdObj,
@@ -154,6 +149,9 @@ public:
     DistLockManager* getDistLockManager() override;
 
     Status initConfigVersion(OperationContext* txn) override;
+
+    Status appendInfoForConfigServerDatabases(OperationContext* txn,
+                                              BSONArrayBuilder* builder) override;
 
 private:
     std::unique_ptr<DistLockManagerMock> _mockDistLockMgr;

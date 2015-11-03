@@ -108,11 +108,6 @@ public:
                                        const BSONObj& cmdObj,
                                        BSONObjBuilder* result) override;
 
-    bool runReadCommand(OperationContext* txn,
-                        const std::string& dbname,
-                        const BSONObj& cmdObj,
-                        BSONObjBuilder* result) override;
-
     bool runUserManagementReadCommand(OperationContext* txn,
                                       const std::string& dbname,
                                       const BSONObj& cmdObj,
@@ -136,6 +131,17 @@ public:
     DistLockManager* getDistLockManager() override;
 
     Status initConfigVersion(OperationContext* txn) override;
+
+    Status appendInfoForConfigServerDatabases(OperationContext* txn,
+                                              BSONArrayBuilder* builder) override;
+
+    /**
+     * Runs a read command against the config server with majority read concern.
+     */
+    bool runReadCommandForTest(OperationContext* txn,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               BSONObjBuilder* result);
 
 private:
     Status _checkDbDoesNotExist(OperationContext* txn,
