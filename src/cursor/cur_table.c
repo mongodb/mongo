@@ -186,34 +186,16 @@ __wt_curtable_get_key(WT_CURSOR *cursor, ...)
 int
 __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 {
-	WT_CURSOR *primary;
-	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
-	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	va_list ap;
 
-	ctable = (WT_CURSOR_TABLE *)cursor;
-	primary = *ctable->cg_cursors;
-	CURSOR_API_CALL(cursor, session, get_value, NULL);
-	WT_CURSOR_NEEDVALUE(primary);
-
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
-		ret = __wt_schema_project_merge(session,
-		    ctable->cg_cursors, ctable->plan,
-		    cursor->value_format, &cursor->value);
-		if (ret == 0) {
-			item = va_arg(ap, WT_ITEM *);
-			item->data = cursor->value.data;
-			item->size = cursor->value.size;
-		}
-	} else
-		ret = __wt_schema_project_out(session,
-		    ctable->cg_cursors, ctable->plan, ap);
-	va_end(ap);
+	JOINABLE_CURSOR_API_CALL(cursor, session, get_value, NULL);
+	WT_ERR(__wt_curtable_get_value_ap(cursor, ap));
 
-err:	API_END_RET(session, ret);
+err:	va_end(ap);
+	API_END_RET(session, ret);
 }
 
 /*
@@ -264,7 +246,7 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, set_value, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON)) {
@@ -332,7 +314,7 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_API_CALL(a, session, compare, NULL);
+	JOINABLE_CURSOR_API_CALL(a, session, compare, NULL);
 
 	/*
 	 * Confirm both cursors refer to the same source and have keys, then
@@ -362,7 +344,7 @@ __curtable_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, next, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
 	APPLY_CG(ctable, next);
 
 err:	API_END_RET(session, ret);
@@ -383,7 +365,7 @@ __curtable_next_random(WT_CURSOR *cursor)
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, next, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
 	cp = ctable->cg_cursors;
 
 	/* Split out the first next, it retrieves the random record. */
@@ -414,7 +396,7 @@ __curtable_prev(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, prev, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, prev, NULL);
 	APPLY_CG(ctable, prev);
 
 err:	API_END_RET(session, ret);
@@ -432,7 +414,7 @@ __curtable_reset(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, reset, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, reset, NULL);
 	APPLY_CG(ctable, reset);
 
 err:	API_END_RET(session, ret);
@@ -450,7 +432,7 @@ __curtable_search(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, search, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
 	APPLY_CG(ctable, search);
 
 err:	API_END_RET(session, ret);
@@ -470,7 +452,7 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, search_near, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, search_near, NULL);
 	cp = ctable->cg_cursors;
 	primary = *cp;
 	WT_ERR(primary->search_near(primary, exact));
@@ -721,7 +703,7 @@ __curtable_close(WT_CURSOR *cursor)
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, close, NULL);
+	JOINABLE_CURSOR_API_CALL(cursor, session, close, NULL);
 
 	if (ctable->cg_cursors != NULL)
 		for (i = 0, cp = ctable->cg_cursors;
@@ -844,7 +826,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
  */
 int
 __wt_curtable_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
+    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
 	    __wt_curtable_get_key,	/* get-key */
@@ -935,7 +917,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	}
 
 	WT_ERR(__wt_cursor_init(
-	    cursor, cursor->internal_uri, NULL, cfg, cursorp));
+	    cursor, cursor->internal_uri, owner, cfg, cursorp));
 
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
 		WT_ERR(__wt_json_column_init(cursor, table->key_format,

@@ -244,7 +244,8 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	 */
 	case 't':
 		if (WT_PREFIX_MATCH(uri, "table:"))
-			WT_RET(__wt_curtable_open(session, uri, cfg, cursorp));
+			WT_RET(__wt_curtable_open(
+			    session, uri, owner, cfg, cursorp));
 		break;
 	case 'c':
 		if (WT_PREFIX_MATCH(uri, "colgroup:")) {
@@ -263,6 +264,11 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	case 'i':
 		if (WT_PREFIX_MATCH(uri, "index:"))
 			WT_RET(__wt_curindex_open(
+			    session, uri, owner, cfg, cursorp));
+		break;
+	case 'j':
+		if (WT_PREFIX_MATCH(uri, "join:"))
+			WT_RET(__wt_curjoin_open(
 			    session, uri, owner, cfg, cursorp));
 		break;
 	case 'l':
@@ -614,6 +620,123 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
 	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_join --
+ *	WT_SESSION->join method.
+ */
+static int
+__session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
+    WT_CURSOR *ref_cursor, const char *config)
+{
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	WT_CURSOR_INDEX *cindex;
+	WT_CURSOR_JOIN *cjoin;
+	WT_CURSOR_TABLE *ctable;
+	WT_INDEX *index;
+	WT_TABLE *table;
+	uint32_t flags, range;
+	uint64_t count;
+	uint64_t bloom_bit_count, bloom_hash_count;
+
+	count = 0;
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, join, config, cfg);
+	table = NULL;
+
+	if (!WT_PREFIX_MATCH(join_cursor->uri, "join:")) {
+		__wt_errx(session, "not a join cursor");
+		WT_ERR(EINVAL);
+	}
+
+	if (WT_PREFIX_MATCH(ref_cursor->uri, "index:")) {
+		cindex = (WT_CURSOR_INDEX *)ref_cursor;
+		index = cindex->index;
+		table = cindex->table;
+		WT_CURSOR_CHECKKEY(ref_cursor);
+	} else if (WT_PREFIX_MATCH(ref_cursor->uri, "table:")) {
+		index = NULL;
+		ctable = (WT_CURSOR_TABLE *)ref_cursor;
+		table = ctable->table;
+		WT_CURSOR_CHECKKEY(ctable->cg_cursors[0]);
+	} else {
+		__wt_errx(session, "not an index or table cursor");
+		WT_ERR(EINVAL);
+	}
+
+	cjoin = (WT_CURSOR_JOIN *)join_cursor;
+	if (cjoin->table != table) {
+		__wt_errx(session, "table for join cursor does not match "
+		    "table for index");
+		WT_ERR(EINVAL);
+	}
+	if (F_ISSET(ref_cursor, WT_CURSTD_JOINED)) {
+		__wt_errx(session, "index cursor already used in a join");
+		WT_ERR(EINVAL);
+	}
+
+	/* "ge" is the default */
+	range = WT_CJE_ENDPOINT_GT | WT_CJE_ENDPOINT_EQ;
+	flags = 0;
+	WT_ERR(__wt_config_gets(session, cfg, "compare", &cval));
+	if (cval.len != 0) {
+		if (WT_STRING_MATCH("gt", cval.str, cval.len))
+			range = WT_CJE_ENDPOINT_GT;
+		else if (WT_STRING_MATCH("lt", cval.str, cval.len))
+			range = WT_CJE_ENDPOINT_LT;
+		else if (WT_STRING_MATCH("le", cval.str, cval.len))
+			range = WT_CJE_ENDPOINT_LT | WT_CJE_ENDPOINT_EQ;
+		else if (WT_STRING_MATCH("eq", cval.str, cval.len))
+			range = WT_CJE_ENDPOINT_EQ;
+		else if (!WT_STRING_MATCH("ge", cval.str, cval.len))
+			WT_ERR(EINVAL);
+	}
+	WT_ERR(__wt_config_gets(session, cfg, "count", &cval));
+	if (cval.len != 0)
+		count = cval.val;
+
+	WT_ERR(__wt_config_gets(session, cfg, "strategy", &cval));
+	if (cval.len != 0) {
+		if (WT_STRING_MATCH("bloom", cval.str, cval.len))
+			LF_SET(WT_CJE_BLOOM);
+		else if (!WT_STRING_MATCH("default", cval.str, cval.len))
+			WT_ERR(EINVAL);
+	}
+	WT_ERR(__wt_config_gets(session, cfg, "bloom_bit_count", &cval));
+	bloom_bit_count = (uint64_t)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "bloom_hash_count", &cval));
+	bloom_hash_count = (uint64_t)cval.val;
+	if (LF_ISSET(WT_CJE_BLOOM)) {
+	    if (count == 0) {
+		    __wt_errx(session, "count must be nonzero when "
+			"strategy=bloom");
+		    WT_ERR(EINVAL);
+	    }
+	    if (cjoin->entries_next == 0) {
+		    __wt_errx(session, "the first joined cursor cannot "
+			"specify strategy=bloom");
+		    WT_ERR(EINVAL);
+	    }
+	}
+	WT_ERR(__wt_curjoin_join(session, cjoin, index, ref_cursor, flags,
+	    range, count, bloom_bit_count, bloom_hash_count));
+	/*
+	 * There's an implied ownership ordering that isn't
+	 * known when the cursors are created: the join cursor
+	 * must be closed before any of the indices.  Enforce
+	 * that here by reordering.
+	 */
+	if (TAILQ_FIRST(&session->cursors) != join_cursor) {
+		TAILQ_REMOVE(&session->cursors, join_cursor, q);
+		TAILQ_INSERT_HEAD(&session->cursors, join_cursor, q);
+	}
+	/* Disable the reference cursor for regular operations */
+	F_SET(ref_cursor, WT_CURSTD_JOINED);
+
+err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -1162,6 +1285,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_create,
 		__session_compact,
 		__session_drop,
+		__session_join,
 		__session_log_flush,
 		__session_log_printf,
 		__session_rename,

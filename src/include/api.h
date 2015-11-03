@@ -116,6 +116,11 @@
 	API_CALL_NOCONF(s, WT_CURSOR, n, cur,				\
 	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle)
 
+#define	JOINABLE_CURSOR_API_CALL(cur, s, n, bt)				\
+	CURSOR_API_CALL(cur, s, n, bt);					\
+	if (F_ISSET(cur, WT_CURSTD_JOINED))				\
+		WT_ERR(__wt_curindex_joined(cur))
+
 #define	CURSOR_UPDATE_API_CALL(cur, s, n, bt)				\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
 	TXN_API_CALL_NOCONF(s, WT_CURSOR, n, cur,			\

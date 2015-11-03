@@ -264,6 +264,59 @@ struct __wt_cursor_index {
 	uint8_t	*cg_needvalue;
 };
 
+struct __wt_cursor_join_iter {
+	WT_SESSION_IMPL		*session;
+	WT_CURSOR_JOIN		*cjoin;
+	WT_CURSOR_JOIN_ENTRY	*entry;
+	WT_CURSOR		*cursor;
+	WT_ITEM			*curkey;
+	bool			 advance;
+};
+
+struct __wt_cursor_join_endpoint {
+	WT_ITEM			 key;
+	uint8_t			 recno_buf[10];	/* holds packed recno */
+	WT_CURSOR		*cursor;
+
+#define	WT_CJE_ENDPOINT_LT	0x01		/* include values <  cursor */
+#define	WT_CJE_ENDPOINT_EQ	0x02		/* include values == cursor */
+#define	WT_CJE_ENDPOINT_GT	0x04		/* include values >  cursor */
+#define	WT_CJE_ENDPOINT_OWNKEY	0x08		/* must free key's data */
+	uint8_t			 flags;		/* range for this endpoint */
+};
+
+struct __wt_cursor_join_entry {
+	WT_INDEX		*index;
+	WT_CURSOR		*main;		/* raw main table cursor */
+	WT_BLOOM		*bloom;		/* Bloom filter handle */
+	uint64_t		 bloom_bit_count; /* bits per item in bloom */
+	uint64_t		 bloom_hash_count; /* hash functions in bloom */
+	uint64_t		 count;		/* approx number of matches */
+
+#define	WT_CJE_BLOOM		0x01		/* use a bloom filter */
+#define	WT_CJE_OWN_BLOOM	0x02		/* this entry owns the bloom */
+	uint8_t			 flags;
+
+	WT_CURSOR_JOIN_ENDPOINT	 ends[2];	 /* reference endpoints */
+};
+
+struct __wt_cursor_join {
+	WT_CURSOR iface;
+
+	WT_TABLE		*table;
+	const char		*projection;
+	WT_CURSOR_JOIN_ITER	*iter;
+	WT_CURSOR_JOIN_ENTRY	*entries;
+	size_t			 entries_allocated;
+	size_t			 entries_next;
+	uint8_t			 recno_buf[10];	/* holds packed recno */
+
+#define	WT_CJ_ERROR		0x01	/* Error during initialization */
+#define	WT_CJ_INITIALIZED	0x02	/* Successful initialization */
+#define	WT_CJ_SKIP_FIRST_LEFT	0x04
+	uint8_t			 flags;
+};
+
 struct __wt_cursor_json {
 	char	*key_buf;		/* JSON formatted string */
 	char	*value_buf;		/* JSON formatted string */
