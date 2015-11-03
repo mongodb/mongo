@@ -65,13 +65,14 @@ usage(void)
 static void
 fill_db()
 {
+	FILE *fp;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_ITEM data;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
 	uint64_t i;
-	int fd, ret;
+	int ret;
 	uint8_t buf[MAX_VAL];
 
 	__wt_random_init(&rnd);
@@ -101,10 +102,13 @@ fill_db()
 	/*
 	 * Keep a separate file with the records we wrote for checking.
 	 */
-	unlink(RECORDS_FILE);
-
-	if ((fd = open(RECORDS_FILE, O_CREAT | O_WRONLY, 0777)) == -1)
-		testutil_die(errno, "open");
+	(void)unlink(RECORDS_FILE);
+	if ((fp = fopen(RECORDS_FILE, "w")) == NULL)
+		testutil_die(errno, "fopen");
+	/*
+	 * Set to no buffering.
+	 */
+	setvbuf(fp, NULL, _IONBF, 0);
 
 	/*
 	 * Write data into the table until we are killed by the parent.
@@ -117,8 +121,13 @@ fill_db()
 		cursor->set_value(cursor, &data);
 		if ((ret = cursor->insert(cursor)) != 0)
 			testutil_die(ret, "WT_CURSOR.insert");
-		if (write(fd, &i, sizeof(i)) != sizeof(i))
-			testutil_die(errno, "write");
+		/*
+		 * Save the key separately for checking later.
+		 */
+		if (fprintf(fp, "%" PRIu64 "\n", i) == -1)
+			testutil_die(errno, "fprintf");
+		if (i % 5000)
+			__wt_yield();
 	}
 }
 
@@ -128,6 +137,7 @@ extern char *__wt_optarg;
 int
 main(int argc, char *argv[])
 {
+	FILE *fp;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
@@ -135,9 +145,9 @@ main(int argc, char *argv[])
 	uint64_t key;
 	uint32_t absent, count, sleep_cnt;
 	size_t rd;
-	int ch, fd, status, ret;
+	int ch, status, ret;
 	pid_t pid;
-	char *working_dir;
+	char *working_dir, keybuf[16];
 
 	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		progname = argv[0];
@@ -189,7 +199,9 @@ main(int argc, char *argv[])
 	 * !!! It should be plenty long enough to make sure more than one
 	 * log file exists.  If wanted, that check would be added here.
 	 */
-	kill(pid, SIGKILL);
+	printf("Kill child\n");
+	if (kill(pid, SIGKILL) != 0)
+		testutil_die(errno, "kill");
 	waitpid(pid, &status, 0);
 
 	/*
@@ -197,26 +209,29 @@ main(int argc, char *argv[])
 	 * this is the place to do it.
 	 */
 	chdir(home);
+	printf("Open database, run recovery and verify content\n");
 	if ((ret = wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn)) != 0)
 		testutil_die(ret, "wiredtiger_open");
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		testutil_die(ret, "WT_CONNECTION:open_session");
-	if ((ret = session->log_flush(session, "sync=on")) != 0)
-		testutil_die(ret, "WT_SESSION.log_flush");
 	if ((ret =
 	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0)
 		testutil_die(ret, "WT_SESSION.open_cursor: %s", uri);
 
-	if ((fd = open(RECORDS_FILE, O_RDONLY)) == -1)
-		testutil_die(errno, "open");
+	if ((fp = fopen(RECORDS_FILE, "r")) == NULL)
+		testutil_die(errno, "fopen");
 
+	/*
+	 * For every key in the saved file, verify that the key exists
+	 * in the table after recovery.  Since we did write-no-sync, we
+	 * expect every key to have been recovered.
+	 */
 	for (absent = count = 0;; ++count) {
-		rd = read(fd, &key, sizeof(key));
-		if (rd != sizeof(key)) {
-			if (rd == 0)
-				break;
-			testutil_die(errno, "read");
-		}
+		ret = fscanf(fp, "%" SCNu64 "\n", &key);
+		if (ret != EOF && ret != 1)
+			testutil_die(errno, "fscanf");
+		if (ret == EOF)
+			break;
 		cursor->set_key(cursor, key);
 		if ((ret = cursor->search(cursor)) != 0) {
 			if (ret != WT_NOTFOUND)
@@ -225,12 +240,13 @@ main(int argc, char *argv[])
 			++absent;
 		}
 	}
-	close(fd);
+	fclose(fp);
 	if ((ret = conn->close(conn, NULL)) != 0)
 		testutil_die(ret, "WT_CONNECTION:close");
 	if (absent) {
 		printf("%u record(s) absent from %u\n", absent, count);
 		return (EXIT_FAILURE);
 	}
+	printf("%u records verified\n", count);
 	return (EXIT_SUCCESS);
 }
