@@ -49,12 +49,16 @@ typedef struct {
 
 static POP_RECORD pop_data[] = {
 	{ "AU",  1900,	  4000000 },
+	{ "AU",  1950,	  8267337 },
 	{ "AU",  2000,	 19053186 },
 	{ "CAN", 1900,	  5500000 },
+	{ "CAN", 1950,	 14011422 },
 	{ "CAN", 2000,	 31099561 },
 	{ "UK",  1900,	369000000 },
+	{ "UK",  1950,	 50127000 },
 	{ "UK",  2000,	 59522468 },
 	{ "USA", 1900,	 76212168 },
+	{ "USA", 1950,	150697361 },
 	{ "USA", 2000,	301279593 },
 	{ "", 0, 0 }
 };
@@ -65,7 +69,7 @@ main(void)
 {
 	POP_RECORD *p;
 	WT_CONNECTION *conn;
-	WT_CURSOR *cursor;
+	WT_CURSOR *cursor, *cursor2, *join_cursor;
 	WT_SESSION *session;
 	const char *country;
 	uint64_t recno, population;
@@ -319,6 +323,39 @@ main(void)
 		printf("country %s, year %u\n", country, year);
 	}
 	/*! [Access only the index] */
+	ret = cursor->close(cursor);
+
+	/*! [Join cursors] */
+	/* Open cursors needed by the join. */
+	ret = session->open_cursor(session,
+	    "join:table:poptable", NULL, NULL, &join_cursor);
+	ret = session->open_cursor(session,
+	    "index:poptable:country", NULL, NULL, &cursor);
+	ret = session->open_cursor(session,
+	    "index:poptable:immutable_year", NULL, NULL, &cursor2);
+
+	/* select values WHERE country == "AU" AND year > 1900 */
+	cursor->set_key(cursor, "AU\0\0\0");
+	ret = cursor->search(cursor);
+	ret = session->join(session, join_cursor, cursor,
+	    "compare=eq,count=10");
+	cursor2->set_key(cursor2, (uint16_t)1900);
+	ret = cursor2->search(cursor2);
+	ret = session->join(session, join_cursor, cursor2,
+	    "compare=gt,count=10,strategy=bloom");
+
+	/* List the values that are joined */
+	while ((ret = join_cursor->next(join_cursor)) == 0) {
+		ret = join_cursor->get_key(join_cursor, &recno);
+		ret = join_cursor->get_value(join_cursor, &country, &year,
+		    &population);
+		printf("ID %" PRIu64, recno);
+		printf(": country %s, year %u, population %" PRIu64 "\n",
+		    country, year, population);
+	}
+	/*! [Join cursors] */
+	ret = join_cursor->close(join_cursor);
+	ret = cursor2->close(cursor2);
 	ret = cursor->close(cursor);
 
 	ret = conn->close(conn, NULL);

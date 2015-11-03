@@ -57,12 +57,16 @@ public class ex_schema {
         popData = new ArrayList<PopRecord>();
 
         popData.add(new PopRecord("AU",  (short)1900,	  4000000 ));
+        popData.add(new PopRecord("AU",  (short)1950,	  8267337 ));
         popData.add(new PopRecord("AU",  (short)2000,	 19053186 ));
         popData.add(new PopRecord("CAN", (short)1900,	  5500000 ));
+        popData.add(new PopRecord("CAN", (short)1950,	 14011422 ));
         popData.add(new PopRecord("CAN", (short)2000,	 31099561 ));
         popData.add(new PopRecord("UK",  (short)1900,	369000000 ));
+        popData.add(new PopRecord("UK",  (short)1950,	 50127000 ));
         popData.add(new PopRecord("UK",  (short)2000,	 59522468 ));
         popData.add(new PopRecord("USA", (short)1900,	 76212168 ));
+        popData.add(new PopRecord("USA", (short)1950,	150697361 ));
         popData.add(new PopRecord("USA", (short)2000,	301279593 ));
     };
     /*! [schema declaration] */
@@ -72,7 +76,7 @@ public class ex_schema {
         throws WiredTigerException
     {
         Connection conn;
-        Cursor cursor;
+        Cursor cursor, cursor2, join_cursor;
         Session session;
         String country;
         long recno, population;
@@ -206,7 +210,7 @@ public class ex_schema {
          * for a particular country.
          */
         cursor = session.open_cursor("colgroup:poptable:main", null, null);
-        cursor.putKeyLong(2);
+        cursor.putKeyRecord(2);
         if ((ret = cursor.search()) == 0) {
             country = cursor.getValueString();
             year = cursor.getValueShort();
@@ -223,7 +227,7 @@ public class ex_schema {
          * population of a particular country.
          */
         cursor = session.open_cursor("colgroup:poptable:population", null, null);
-        cursor.putKeyLong(2);
+        cursor.putKeyRecord(2);
         if ((ret = cursor.search()) == 0) {
             population = cursor.getValueLong();
             System.out.println("ID 2: population " + population);
@@ -334,6 +338,39 @@ public class ex_schema {
         }
         /*! [Access only the index] */
         ret = cursor.close();
+
+	/*! [Join cursors] */
+	/* Open cursors needed by the join. */
+	join_cursor = session.open_cursor(
+	    "join:table:poptable", null, null);
+	cursor = session.open_cursor(
+            "index:poptable:country", null, null);
+	cursor2 = session.open_cursor(
+	    "index:poptable:immutable_year", null, null);
+
+	/* select values WHERE country == "AU" AND year > 1900 */
+	cursor.putKeyString("AU");
+	ret = cursor.search();
+	session.join(join_cursor, cursor, "compare=eq,count=10");
+	cursor2.putKeyShort((short)1900);
+	ret = cursor2.search();
+	session.join(join_cursor, cursor2,
+	    "compare=gt,count=10,strategy=bloom");
+
+	/* List the values that are joined */
+	while ((ret = join_cursor.next()) == 0) {
+            recno = join_cursor.getKeyRecord();
+            country = join_cursor.getValueString();
+            year = join_cursor.getValueShort();
+            population = join_cursor.getValueLong();
+            System.out.print("ID " + recno);
+            System.out.println( ": country " + country + ", year " + year +
+                ", population " + population);
+	}
+	/*! [Join cursors] */
+	ret = join_cursor.close();
+	ret = cursor2.close();
+	ret = cursor.close();
 
         ret = conn.close(null);
 
