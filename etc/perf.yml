@@ -650,7 +650,7 @@ tasks:
 
 buildvariants:
 - name: linux-wt-standalone
-  display_name: Linux WT Standalone
+  display_name: Standalone Linux WT
   batchtime: 90 # 1.5 hours
   expansions:
     compile_flags: &compile_flags -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
@@ -673,7 +673,7 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-mmap-standalone
-  display_name: Linux MMAPv1 Standalone
+  display_name: Standalone Linux MMAPv1
   batchtime: 90 # 1.5 hours
   expansions:
     compile_flags: *compile_flags
@@ -693,7 +693,7 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-wt-repl
-  display_name: Linux WT 1-Node ReplSet
+  display_name: 1-Node ReplSet Linux WT
   batchtime: 360 # 6 hours
   expansions:
     compile_flags: *compile_flags 
@@ -710,7 +710,7 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-mmap-repl
-  display_name: Linux MMAPv1 1-Node ReplSet
+  display_name: 1-Node ReplSet Linux MMAPv1
   batchtime: 360 # 6 hours
   expansions:
     compile_flags: *compile_flags 
@@ -727,7 +727,7 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-wt-repl-compare
-  display_name: Linux WT 1-Node ReplSet Compare
+  display_name: 1-Node ReplSet Linux WT Comparison Standalone
   batchtime: 360 # 6 hours
   run_on:
   - "centos6-perf"
@@ -739,7 +739,7 @@ buildvariants:
   - name: misc-wt-repl-comp
 
 - name: linux-mmap-repl-compare
-  display_name: Linux MMAP 1-Node ReplSet Compare
+  display_name: 1-Node ReplSet Linux MMAPv1 Comparison Standalone
   batchtime: 360 # 6 hours
   run_on:
   - "centos6-perf"
@@ -751,7 +751,7 @@ buildvariants:
   - name: misc-mmap-repl-comp
 
 - name: linux-wt-mmap-standalone-compare
-  display_name: Linux WT-MMAP Standalone Compare
+  display_name: Standalone Linux WT Comparison MMAPv1
   batchtime: 90 # 1.5 hours
   run_on:
   - "centos6-perf"
@@ -766,7 +766,7 @@ buildvariants:
   - name: geo-wt-mmap-standalone-comp
 
 - name: linux-wt-mmap-repl-compare
-  display_name: Linux WT-MMAP 1-Node ReplSet Compare
+  display_name: 1-Node ReplSet Linux WT Comparison MMAPv1
   batchtime: 360 # 6 hours
   run_on:
   - "centos6-perf"
