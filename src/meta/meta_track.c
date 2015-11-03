@@ -287,6 +287,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 		WT_WITH_DHANDLE(ckpt_session, session->meta_dhandle, ret =
 		    __wt_checkpoint(ckpt_session, NULL));
 		F_CLR(ckpt_session, WT_SESSION_LOCKED_SCHEMA);
+		ckpt_session->txn.id = WT_TXN_NONE;
 		WT_RET(ret);
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_checkpoint_sync(session, NULL));
@@ -478,10 +479,18 @@ __wt_meta_track_init(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
-	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) {
 		WT_RET(__wt_open_internal_session(conn,
 		    "metadata-ckpt", false, WT_SESSION_NO_DATA_HANDLES,
 		    &conn->meta_ckpt_session));
+
+		/*
+		 * Sessions default to read-committed isolation, we rely on
+		 * that for the correctness of metadata checkpoints.
+		 */
+		WT_ASSERT(session, conn->meta_ckpt_session->txn.isolation ==
+		    WT_ISO_READ_COMMITTED);
+	}
 
 	return (0);
 }

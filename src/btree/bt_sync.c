@@ -81,6 +81,19 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		break;
 	case WT_SYNC_CHECKPOINT:
 		/*
+		 * If we are flushing a file at read-committed isolation, which
+		 * is of particular interest for flushing the metadata to make
+		 * schema-changing operation durable, get a transactional
+		 * snapshot now.
+		 *
+		 * All changes committed up to this point should be included.
+		 * We don't update the snapshot in between pages because (a)
+		 * the metadata shouldn't be that big, and (b) if we do ever
+		 */
+		if (txn->isolation == WT_ISO_READ_COMMITTED)
+			__wt_txn_get_snapshot(session);
+
+		/*
 		 * We cannot check the tree modified flag in the case of a
 		 * checkpoint, the checkpoint code has already cleared it.
 		 *
@@ -111,8 +124,6 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		/* Write all dirty in-cache pages. */
 		flags |= WT_READ_NO_EVICT;
 		for (walk = NULL;;) {
-			if (txn->isolation == WT_ISO_READ_COMMITTED)
-				__wt_txn_get_snapshot(session);
 			WT_ERR(__wt_tree_walk(session, &walk, NULL, flags));
 			if (walk == NULL)
 				break;
