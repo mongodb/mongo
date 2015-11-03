@@ -471,7 +471,7 @@ __wt_meta_track_handle_lock(WT_SESSION_IMPL *session, bool created)
 
 /*
  * __wt_meta_track_init --
- *	Intialize metadata tracking.
+ *	Initialize metadata tracking.
  */
 int
 __wt_meta_track_init(WT_SESSION_IMPL *session)
