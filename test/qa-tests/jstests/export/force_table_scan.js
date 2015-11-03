@@ -47,7 +47,7 @@
 
     // there should only be one query so far, and it should have snapshot set
     assert.eq(1, queries.length);
-    assert.eq(true, queries[0].query['$snapshot']); 
+    assert.eq(true, queries[0].query['$snapshot'] || queries[0].query['snapshot']); 
 
     // remove the export file
     removeFile(exportTarget);
