@@ -43,6 +43,7 @@ each of which is ordered by one or more columns.
 - @ref transaction_named_snapshots
 - @subpage shared_cache
 - @subpage statistics
+- @subpage cursor_join
 - @subpage cursor_log
 - @subpage_single upgrade
 
