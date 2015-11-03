@@ -659,7 +659,6 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
                  slave.getDB("admin").getMongo().setSlaveOk();
 
                  var ts = self.getLastOpTime(slave);
-                 var log = slave.getDB("local")['oplog.rs'];
                  if (self.latest.t < ts.t ||
                         (self.latest.t == ts.t && self.latest.i < ts.i)) {
                      self.latest = self.getLastOpTime(master);
@@ -672,9 +671,6 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
                      print("ReplSetTest awaitReplication: timestamp for secondary #" +
                            secondaryCount + ", " + slaveName + ", is " + tojson(ts) +
                            " but latest is " + tojson(self.latest));
-                     print("ReplSetTest awaitReplication: last oplog entry (of " +
-                           log.count() + ") for secondary #" + secondaryCount +
-                           ", " + slaveName + ", is " + tojsononeline(entry));
                      print("ReplSetTest awaitReplication: secondary #" +
                            secondaryCount + ", " + slaveName + ", is NOT synced");
                      return false;
