@@ -97,7 +97,7 @@ bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
                 opCtx->recoveryUnit()->abandonSnapshot();
             } else {
                 // Release and reacquire locks.
-                QueryYield::yieldAllLocks(opCtx, fetcher);
+                QueryYield::yieldAllLocks(opCtx, fetcher, _planYielding->ns());
             }
 
             return _planYielding->restoreStateWithoutRetrying();

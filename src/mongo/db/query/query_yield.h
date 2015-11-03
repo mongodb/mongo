@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <string>
+
 namespace mongo {
 
 class OperationContext;
@@ -46,7 +48,9 @@ public:
      *
      * If in a nested context (eg DBDirectClient), does nothing.
      */
-    static void yieldAllLocks(OperationContext* txn, RecordFetcher* fetcher);
+    static void yieldAllLocks(OperationContext* txn,
+                              RecordFetcher* fetcher,
+                              const std::string& planExecNS);
 };
 
 }  // namespace mongo
