@@ -8,6 +8,7 @@ t_LDFLAGS = -static
 
 # Run this during a "make check" smoke test.
 TESTS = $(noinst_PROGRAMS)
+LOG_COMPILER = $(TEST_WRAPPER)
 
 clean-local:
 	rm -rf WiredTiger* *.core __*
