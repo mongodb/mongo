@@ -143,9 +143,9 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	WT_RAND_STATE rnd;
 	uint64_t key;
-	uint32_t absent, count, sleep_cnt;
+	uint32_t absent, count;
 	size_t rd;
-	int ch, status, ret;
+	int ch, status, ret, timeout;
 	pid_t pid;
 	char *working_dir, keybuf[16];
 
@@ -155,10 +155,14 @@ main(int argc, char *argv[])
 		++progname;
 
 	working_dir = NULL;
-	while ((ch = __wt_getopt(progname, argc, argv, "h:")) != EOF)
+	timeout = 10;
+	while ((ch = __wt_getopt(progname, argc, argv, "h:t:")) != EOF)
 		switch (ch) {
 		case 'h':
 			working_dir = __wt_optarg;
+			break;
+		case 't':
+			timeout = atoi(__wt_optarg);
 			break;
 		default:
 			usage();
@@ -186,14 +190,9 @@ main(int argc, char *argv[])
 
 	/* parent */
 	__wt_random_init(&rnd);
-	/*
-	 * We want to sleep a random amount between 10-25 seconds and then
-	 * kill the child.
-	 */
-	sleep_cnt = 10 + __wt_random(&rnd) % 15;
-	printf("Parent: sleep %" PRIu32 " seconds, then kill child\n",
-	    sleep_cnt);
-	sleep(sleep_cnt);
+	/* Sleep for the configured amount of time before killing the child. */
+	printf("Parent: sleep %" PRIu32 " seconds, then kill child\n", timeout);
+	sleep(timeout);
 
 	/*
 	 * !!! It should be plenty long enough to make sure more than one
