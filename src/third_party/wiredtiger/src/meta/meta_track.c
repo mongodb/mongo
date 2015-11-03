@@ -231,6 +231,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 {
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
+	WT_SESSION_IMPL *ckpt_session;
 
 	WT_ASSERT(session,
 	    WT_META_TRACKING(session) && session->meta_track_nest > 0);
@@ -275,9 +276,18 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 			session, false, WT_TXN_LOG_CKPT_SYNC, NULL));
 		WT_RET(ret);
 	} else {
-		WT_WITH_DHANDLE(session, session->meta_dhandle,
-		    WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_COMMITTED,
-			ret = __wt_checkpoint(session, NULL)));
+		WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
+		ckpt_session = S2C(session)->meta_ckpt_session;
+		/*
+		 * If this operation is part of a running transaction, that
+		 * should be included in the checkpoint.
+		 */
+		ckpt_session->txn.id = session->txn.id;
+		F_SET(ckpt_session, WT_SESSION_LOCKED_SCHEMA);
+		WT_WITH_DHANDLE(ckpt_session, session->meta_dhandle, ret =
+		    __wt_checkpoint(ckpt_session, NULL));
+		F_CLR(ckpt_session, WT_SESSION_LOCKED_SCHEMA);
+		ckpt_session->txn.id = WT_TXN_NONE;
 		WT_RET(ret);
 		WT_WITH_DHANDLE(session, session->meta_dhandle,
 		    ret = __wt_checkpoint_sync(session, NULL));
@@ -457,4 +467,53 @@ __wt_meta_track_handle_lock(WT_SESSION_IMPL *session, bool created)
 	trk->dhandle = session->dhandle;
 	trk->created = created;
 	return (0);
+}
+
+/*
+ * __wt_meta_track_init --
+ *	Intialize metadata tracking.
+ */
+int
+__wt_meta_track_init(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+	if (!FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) {
+		WT_RET(__wt_open_internal_session(conn,
+		    "metadata-ckpt", false, WT_SESSION_NO_DATA_HANDLES,
+		    &conn->meta_ckpt_session));
+
+		/*
+		 * Sessions default to read-committed isolation, we rely on
+		 * that for the correctness of metadata checkpoints.
+		 */
+		WT_ASSERT(session, conn->meta_ckpt_session->txn.isolation ==
+		    WT_ISO_READ_COMMITTED);
+	}
+
+	return (0);
+}
+
+/*
+ * __wt_meta_track_destroy --
+ *	Release resources allocated for metadata tracking.
+ */
+int
+__wt_meta_track_destroy(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION *wt_session;
+
+	conn = S2C(session);
+
+	/* Close the session used for metadata checkpoints. */
+	if (conn->meta_ckpt_session != NULL) {
+		wt_session = &conn->meta_ckpt_session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+		conn->meta_ckpt_session = NULL;
+	}
+
+	return (ret);
 }

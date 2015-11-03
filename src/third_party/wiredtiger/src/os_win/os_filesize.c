@@ -47,11 +47,10 @@ __wt_filesize_name(
 
 	__wt_free(session, path);
 
-	if (ret != 0) {
+	if (ret != 0)
 		*sizep =
 		    ((int64_t)data.nFileSizeHigh << 32) | data.nFileSizeLow;
-		return (0);
-	}
 
-	WT_RET_MSG(session, __wt_errno(), "%s: GetFileAttributesEx", filename);
+	/* Some callers expect failure, so don't log an error message. */
+	return (ret);
 }

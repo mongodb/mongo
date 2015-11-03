@@ -90,18 +90,19 @@ __curstat_size_only(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_fmt(
 	    session, &namebuf, "%s.wt", uri + strlen("table:")));
 	/*
-	 * Get the size of the underlying file.  There is nothing stopping a
-	 * race with schema level table operations (for example drop) if there
-	 * is a race there will be an error message generated.
+	 * Get the size of the underlying file. This will fail for anything
+	 * other than simple tables (LSM for example) and will fail if there
+	 * are concurrent schema level operations (for example drop). That is
+	 * fine - failing here results in falling back to the slow path of
+	 * opening the handle.
 	 */
-	WT_ERR(__wt_filesize_name(session, namebuf.data, &filesize));
-
-	/* Setup and populate the statistics structure */
-	__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
-	cst->u.dsrc_stats.block_size = filesize;
-	__wt_curstat_dsrc_final(cst);
-
-	*was_fast = true;
+	if (__wt_filesize_name(session, namebuf.data, &filesize) == 0) {
+		/* Setup and populate the statistics structure */
+		__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
+		cst->u.dsrc_stats.block_size = filesize;
+		__wt_curstat_dsrc_final(cst);
+		*was_fast = true;
+	}
 
 err:	__wt_free(session, tableconf);
 	__wt_buf_free(session, &namebuf);
