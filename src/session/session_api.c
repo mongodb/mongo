@@ -147,7 +147,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 		 * Notify the user that we are closing the cursor handle
 		 * via the registered close callback.
 		 */
-		if (session->event_handler->handle_close != NULL)
+		if (session->event_handler->handle_close != NULL &&
+		    !WT_STREQ(cursor->uri, WT_LAS_URI))
 			WT_TRET(session->event_handler->handle_close(
 			    session->event_handler, wt_session, cursor));
 		WT_TRET(cursor->close(cursor));
