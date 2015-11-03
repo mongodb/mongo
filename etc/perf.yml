@@ -259,7 +259,7 @@ tasks:
 
 buildvariants:
 - name: linux-wt-standalone
-  display_name: Linux WT Standalone
+  display_name: Standalone Linux WT
   batchtime: 90 # 1.5 hours
   expansions:
     compile_flags: &compile_flags -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --release --variant-dir="linux2/release"
@@ -282,7 +282,7 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-mmap-standalone
-  display_name: Linux MMAPv1 Standalone
+  display_name: Standalone Linux MMAPv1
   batchtime: 90 # 1.5 hours
   expansions:
     compile_flags: *compile_flags
@@ -305,7 +305,7 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-wt-repl
-  display_name: Linux WT 1-Node ReplSet
+  display_name: 1-Node ReplSet Linux WT
   batchtime: 360 # 6 hours
   expansions:
     compile_flags: *compile_flags 
@@ -325,7 +325,7 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-mmap-repl
-  display_name: Linux MMapv1 1-Node ReplSet
+  display_name: 1-Node ReplSet Linux MMAPv1
   batchtime: 360 # 6 hours
   expansions:
     compile_flags: *compile_flags 
