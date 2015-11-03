@@ -47,10 +47,9 @@ __wt_filesize_name(
 
 	__wt_free(session, path);
 
-	if (ret == 0) {
+	if (ret == 0)
 		*sizep = sb.st_size;
-		return (0);
-	}
 
-	WT_RET_MSG(session, ret, "%s: fstat", filename);
+	/* Some callers expect failure, so don't log an error message. */
+	return (ret);
 }
