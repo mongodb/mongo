@@ -1817,7 +1817,7 @@ var authCommandsLib = {
             ]
         },
         {
-            testname: "mergeChunks",
+            testname: "s_mergeChunks",
             command: {mergeChunks: "test.x", bounds: [{i : 0}, {i : 5}]},
             skipStandalone: true,
             testcases: [
@@ -1834,14 +1834,49 @@ var authCommandsLib = {
             ]
         },
         {
-            testname: "moveChunk",
+            testname: "d_mergeChunks",
+            command: {mergeChunks: "test.x", bounds: [{i : 0}, {i : 5}]},
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: { __system: 1 },
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["internal"] }
+                    ],
+                    expectFail: true
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
+            testname: "s_moveChunk",
             command: {moveChunk: "test.x"},
+            skipStandalone: true,
             testcases: [
                 {
                     runOnDb: adminDbName,
                     roles: roles_clusterManager,
                     privileges: [
                         { resource: {db: "test", collection: "x"}, actions: ["moveChunk"] }
+                    ],
+                    expectFail: true
+                },
+                { runOnDb: firstDbName, roles: {} },
+                { runOnDb: secondDbName, roles: {} }
+            ]
+        },
+        {
+            testname: "d_moveChunk",
+            command: {moveChunk: "test.x"},
+            skipSharded: true,
+            testcases: [
+                {
+                    runOnDb: adminDbName,
+                    roles: { __system: 1 },
+                    privileges: [
+                        { resource: {cluster: true}, actions: ["internal"] }
                     ],
                     expectFail: true
                 },
@@ -2555,9 +2590,9 @@ var authCommandsLib = {
             testcases: [
                 {
                     runOnDb: adminDbName,
-                    roles: roles_clusterManager,
+                    roles: { __system: 1 },
                     privileges: [
-                        { resource: {db: "test", collection: "x"}, actions: ["splitChunk"] }
+                        { resource: {cluster: true}, actions: ["internal"] }
                     ],
                     expectFail: true
                 },
