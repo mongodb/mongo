@@ -422,9 +422,13 @@ int
 __wt_block_manager_size(
     WT_SESSION_IMPL *session, const char *filename, WT_DSRC_STATS *stats)
 {
+	WT_DECL_RET;
 	wt_off_t filesize;
 
-	WT_RET(__wt_filesize_name(session, filename, &filesize));
+	ret = __wt_filesize_name(session, filename, &filesize);
+	if (ret != 0)
+		WT_RET_MSG(session, ret, "%s: file size", filename);
+
 	stats->block_size = filesize;
 
 	return (0);

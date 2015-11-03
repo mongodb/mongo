@@ -126,6 +126,9 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	/* Close open data handles. */
 	WT_TRET(__wt_conn_dhandle_discard(session));
 
+	/* Shut down metadata tracking, required before creating tables. */
+	WT_TRET(__wt_meta_track_destroy(session));
+
 	/*
 	 * Now that all data handles are closed, tell logging that a checkpoint
 	 * has completed then shut down the log manager (only after closing
@@ -251,6 +254,9 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	 * block.
 	 */
 	WT_RET(__wt_logmgr_open(session));
+
+	/* Initialize metadata tracking, required before creating tables. */
+	WT_RET(__wt_meta_track_init(session));
 
 	/* Create the lookaside table. */
 	WT_RET(__wt_las_create(session));

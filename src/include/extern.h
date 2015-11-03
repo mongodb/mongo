@@ -456,6 +456,8 @@ extern int __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session, const char *olduri, const char *newuri);
 extern int __wt_meta_track_drop( WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session, bool created);
+extern int __wt_meta_track_init(WT_SESSION_IMPL *session);
+extern int __wt_meta_track_destroy(WT_SESSION_IMPL *session);
 extern int __wt_turtle_init(WT_SESSION_IMPL *session);
 extern int __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep);
 extern int __wt_turtle_update( WT_SESSION_IMPL *session, const char *key, const char *value);

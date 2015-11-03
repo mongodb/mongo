@@ -394,7 +394,9 @@ __evict_review(
 	/*
 	 * Retrieve the modified state of the page. This must happen after the
 	 * check for evictable internal pages otherwise there is a race where a
-	 * page could be marked modified whilst performing the check.
+	 * page could be marked modified due to a child being transitioned to
+	 * WT_REF_DISK after the modified check and before we visited the ref
+	 * while walking the parent index.
 	 */
 	modified = __wt_page_is_modified(page);
 
