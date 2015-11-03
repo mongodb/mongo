@@ -281,14 +281,19 @@
         assert.commandWorked(primary.adminCommand({replSetReconfig : rsConfig}), testName +
                              ' failed to reconfigure replSet ' + tojson(rsConfig));
 
-        // Wait up to 60 seconds until the new hidden node is in state secondary
-        rst.waitForState(rst.nodes[numNodes], rst.SECONDARY, 60 * 1000);
+        // Wait up to 60 seconds until the new hidden node is in state RECOVERING.
+        rst.waitForState(rst.nodes[numNodes], [rst.RECOVERING, rst.SECONDARY], 60 * 1000);
 
-        // Stop CRUD client, FSM client & replica set mongods
+        // Stop CRUD client and FSM client.
         assert(checkProgram(crudPid), testName + ' CRUD client was not running at end of test');
         assert(checkProgram(fsmPid), testName + ' FSM client was not running at end of test');
         stopMongoProgramByPid(crudPid);
         stopMongoProgramByPid(fsmPid);
+
+        // Wait up to 60 seconds until the new hidden node is in state SECONDARY.
+        rst.waitForState(rst.nodes[numNodes], rst.SECONDARY, 60 * 1000);
+
+        // Stop set.
         rst.stopSet();
 
         // Cleanup the files from the test
