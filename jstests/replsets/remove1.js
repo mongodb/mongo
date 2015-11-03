@@ -79,12 +79,18 @@ wait(function() {
     catch(e) {
         print(e);
     }
-    // master will likely step down (and close all connections) sometime after the reconfig if it
-    // thinks the newly re-added secondary is down.  So wait for that then reconnect the connection
-    // we are using.
-    master = replTest.getMaster();
-
-    printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
+    try {
+        master = replTest.getMaster();
+        printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
+    } catch(e) {
+        // In PV0 the primary node may step down, which will cause the above to try block will
+        // throw and we will need to wait for a new master and try again.
+        if (replTest.getConfigFromPrimary().protocolVersion == 1) {
+            throw e;
+        }
+        master = replTest.getMaster();
+        printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
+    }
     master.setSlaveOk();
     var newConfig = master.getDB("local").system.replset.findOne();
     print( "newConfig: " + tojson(newConfig) );
