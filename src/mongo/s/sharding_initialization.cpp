@@ -168,29 +168,31 @@ Status initializeGlobalShardingState(OperationContext* txn,
                                          makeTaskExecutor(executor::makeNetworkInterface()),
                                          configCS));
 
-    std::unique_ptr<ForwardingCatalogManager> catalogManager;
     try {
-        catalogManager = stdx::make_unique<ForwardingCatalogManager>(
-            getGlobalServiceContext(),
-            configCS,
-            shardRegistry.get(),
-            HostAndPort(getHostName(), serverGlobalParams.port));
+        std::unique_ptr<ForwardingCatalogManager> catalogManager =
+            stdx::make_unique<ForwardingCatalogManager>(
+                getGlobalServiceContext(),
+                configCS,
+                shardRegistry.get(),
+                HostAndPort(getHostName(), serverGlobalParams.port));
+
+        shardRegistry->startup();
+        grid.init(
+            std::move(catalogManager),
+            std::move(shardRegistry),
+            stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getClockSource()));
+
+        auto status = grid.catalogManager(txn)->startup(txn, allowNetworking);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // ShardRegistry::reload may throw, in which case we will just fail the initialization
+        if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::NONE) {
+            grid.shardRegistry()->reload(txn);
+        }
     } catch (const DBException& ex) {
         return ex.toStatus();
-    }
-
-    shardRegistry->startup();
-    grid.init(std::move(catalogManager),
-              std::move(shardRegistry),
-              stdx::make_unique<ClusterCursorManager>(getGlobalServiceContext()->getClockSource()));
-
-    auto status = grid.catalogManager(txn)->startup(txn, allowNetworking);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    if (serverGlobalParams.configsvrMode == CatalogManager::ConfigServerMode::NONE) {
-        grid.shardRegistry()->reload(txn);
     }
 
     return Status::OK();

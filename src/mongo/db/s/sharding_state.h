@@ -56,12 +56,6 @@ namespace repl {
 class OpTime;
 }  // namespace repl
 
-enum class InitializationState : uint32_t {
-    kUninitialized,
-    kInitializing,
-    kInitialized,
-};
-
 /**
  * Represents the sharding state for the running instance. One per instance.
  */
@@ -101,8 +95,11 @@ public:
      * Initializes sharding state and begins authenticating outgoing connections and handling shard
      * versions. If this is not run before sharded operations occur auth will not work and versions
      * will not be tracked.
+     *
+     * Throws if initialization fails for any reason and the sharding state object becomes unusable
+     * afterwards. Any sharding state operations afterwards will fail.
      */
-    void initialize(OperationContext* txn, const std::string& server);
+    void initialize(OperationContext* txn, const std::string& configSvr);
 
     /**
      * Shuts down sharding machinery on the shard.
@@ -139,15 +136,12 @@ public:
     /**
      * If the metadata for 'ns' at this shard is at or above the requested version,
      * 'reqShardVersion', returns OK and fills in 'latestShardVersion' with the latest shard
-     * version.  The latter is always greater or equal than 'reqShardVersion' if in the same
-     * epoch.
+     * version. The latter is always greater or equal than 'reqShardVersion' if in the same epoch.
      *
      * Otherwise, falls back to refreshMetadataNow.
      *
-     * This call blocks if there are more than N threads
-     * currently refreshing metadata. (N is the number of
-     * tickets in ShardingState::_configServerTickets,
-     * currently 3.)
+     * This call blocks if there are more than _configServerTickets threads currently refreshing
+     * metadata (currently set to 3).
      *
      * Locking Note:
      *   + Must NOT be called with the write lock because this call may go into the network,
@@ -325,6 +319,64 @@ private:
     // Map from a namespace into the metadata we need for each collection on this shard
     typedef std::map<std::string, std::shared_ptr<CollectionMetadata>> CollectionMetadataMap;
 
+    // Progress of the sharding state initialization
+    enum class InitializationState : uint32_t {
+        // Initial state. The server must be under exclusive lock when this state is entered. No
+        // metadata is available yet and it is not known whether there is any min optime metadata,
+        // which needs to be recovered. From this state, the server may enter INITIALIZING, if a
+        // recovey document is found or stay in it until initialize has been called.
+        kNew,
+
+        // The sharding state has been recovered (or doesn't need to be recovered) and the catalog
+        // manager is currently being initialized by one of the threads.
+        kInitializing,
+
+        // Sharding state is fully usable.
+        kInitialized,
+
+        // Some initialization error occurred. The _initializationStatus variable will contain the
+        // error.
+        kError,
+    };
+
+    /**
+     * Initializes the sharding infrastructure (connection hook, catalog manager, etc) and
+     * optionally recovers its minimum optime. Must not be called while holding the sharding state
+     * mutex.
+     *
+     * Doesn't throw, only updates the initialization state variables.
+     *
+     * @param txn Operation context of the command which requested the initialization.
+     * @param recoveryRecord If nullptr is passed, will do the initialization assuming there is no
+     *  recovery to be done. Otherwise, will schedule a thread to do the recovery based on the
+     *  contents of the recovery record.
+     * @param configSvr Connection string of the config server to use.
+     */
+    void _initializeImpl(OperationContext* txn, ConnectionString configSvr);
+
+    /**
+     * Must be called only when the current state is kInitializing. Sets the current state to
+     * kInitialized if the status is OK or to kError otherwise.
+     */
+    void _signalInitializationComplete(Status status);
+
+    /**
+     * Blocking method, which waits for the initialization state to become kInitialized or kError
+     * and returns the initialization status.
+     */
+    Status _waitForInitialization();
+
+    /**
+     * Simple wrapper to cast the initialization state atomic uint64 to InitializationState value
+     * without doing any locking.
+     */
+    InitializationState _getInitializationState() const;
+
+    /**
+     * Updates the initialization state. Must be called while holding _mutex.
+     */
+    void _setInitializationState_inlock(InitializationState newState);
+
     /**
      * Refreshes collection metadata by asking the config server for the latest information. May or
      * may not be based on a requested version.
@@ -335,12 +387,6 @@ private:
                             bool useRequestedVersion,
                             ChunkVersion* latestShardVersion);
 
-    void _updateConfigServerOpTimeFromMetadata_inlock(OperationContext* txn);
-
-    InitializationState _getInitializationState() const;
-
-    void _setInitializationState_inlock(InitializationState newState);
-
     // Manages the state of the migration donor shard
     MigrationSourceManager _migrationSourceManager;
 
@@ -350,7 +396,11 @@ private:
     // Protects state below
     stdx::mutex _mutex;
 
+    // State of the initialization of the sharding state along with any potential errors
     AtomicUInt32 _initializationState;
+
+    // Only valid if _initializationState is kError. Contains the reason for initialization failure.
+    Status _initializationStatus;
 
     // Signaled when ::initialize finishes.
     stdx::condition_variable _initializationFinishedCondition;
