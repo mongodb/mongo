@@ -64,8 +64,10 @@ class TaskExecutor;
 }  // namespace executor
 
 /**
- * Maintains the set of all shards known to the instance and their connections. Manages polling
- * the respective replica sets for membership changes.
+ * Maintains the set of all shards known to the instance and their connections and exposes
+ * functionality to run commands against shards. All commands which this registry executes are
+ * retried on NotMaster class of errors and in addition all read commands are retried on network
+ * errors automatically as well.
  */
 class ShardRegistry {
     MONGO_DISALLOW_COPYING(ShardRegistry);
@@ -308,11 +310,14 @@ private:
                                                         const BSONObj& cmdObj,
                                                         const BSONObj& metadata);
 
-    StatusWith<CommandResponse> _runCommandWithNotMasterRetries(executor::TaskExecutor* executor,
-                                                                const std::shared_ptr<Shard>& shard,
-                                                                const std::string& dbname,
-                                                                const BSONObj& cmdObj,
-                                                                const BSONObj& metadata);
+    StatusWith<CommandResponse> _runCommandWithNotMasterRetries(
+        OperationContext* txn,
+        executor::TaskExecutor* executor,
+        const std::shared_ptr<Shard>& shard,
+        const ReadPreferenceSetting& readPref,
+        const std::string& dbname,
+        const BSONObj& cmdObj,
+        const BSONObj& metadata);
 
     StatusWith<QueryResponse> _exhaustiveFindOnConfig(OperationContext* txn,
                                                       const ReadPreferenceSetting& readPref,

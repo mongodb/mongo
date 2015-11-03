@@ -1187,8 +1187,7 @@ bool CatalogManagerReplicaSet::_runReadCommand(OperationContext* txn,
     for (int retry = 0; retry < kMaxReadRetry; retry++) {
         auto resultStatus = grid.shardRegistry()->runCommandOnConfig(txn, settings, dbname, cmdObj);
 
-        if (ErrorCodes::isNetworkError(resultStatus.getStatus().code()) ||
-            ErrorCodes::isNotMasterError(resultStatus.getStatus().code())) {
+        if (ErrorCodes::isNetworkError(resultStatus.getStatus().code())) {
             lastStatus = std::move(resultStatus.getStatus());
             continue;
         }
