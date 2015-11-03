@@ -1031,10 +1031,13 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	/*
 	 * If the entire (sub)tree is empty, give up: we can't leave an empty
-	 * internal page.
+	 * internal page.  Mark it to be evicted soon and clean up any
+	 * references that have changed state.
 	 */
-	if (result_entries == 0)
-		return (0);
+	if (result_entries == 0) {
+		__wt_page_evict_soon(parent);
+		goto err;
+	}
 
 	/*
 	 * Allocate and initialize a new page index array for the parent, then
@@ -1224,6 +1227,12 @@ err:	/*
 			next_ref = pindex->index[i];
 			if (next_ref->state == WT_REF_SPLIT)
 				next_ref->state = WT_REF_DELETED;
+		}
+
+		/* If we gave up on a reverse split, unlock the child. */
+		if (ref_new == NULL) {
+			WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+			ref->state = WT_REF_DELETED;
 		}
 
 		__wt_free_ref_index(session, NULL, alloc_index, false);
