@@ -96,15 +96,17 @@ __curstat_size_only(WT_SESSION_IMPL *session,
 	 * are concurrent schema level operations (for example drop). That is
 	 * fine - failing here results in falling back to the slow path of
 	 * opening the handle.
+	 * !!! Deliberately discard the return code from a failed call - the
+	 * error is flagged by not setting fast to true.
 	 */
-	WT_ERR(__wt_filesize_name(session, namebuf.data, true, &filesize));
+	if (__wt_filesize_name(session, namebuf.data, true, &filesize) == 0) {
+		/* Setup and populate the statistics structure */
+		__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
+		cst->u.dsrc_stats.block_size = filesize;
+		__wt_curstat_dsrc_final(cst);
 
-	/* Setup and populate the statistics structure */
-	__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
-	cst->u.dsrc_stats.block_size = filesize;
-	__wt_curstat_dsrc_final(cst);
-
-	*was_fast = true;
+		*was_fast = true;
+	}
 
 err:	__wt_free(session, tableconf);
 	__wt_buf_free(session, &namebuf);
