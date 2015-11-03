@@ -55,6 +55,12 @@ functions:
           set -o verbose
           mkdir -p ./dbdata
           ${mongod_exec_wrapper} ./mongod --dbpath ./dbdata ${mongod_flags}
+    - command : shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -e
+          set -o verbose
           sleep 5
           # if we started a replset, initiate it and wait for it to become primary
           ./mongo --eval "if(db.isMaster().isreplicaset){rs.initiate(); assert.soon(function(){return db.isMaster().ismaster}, 'no primary')}"
