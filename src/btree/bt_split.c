@@ -1580,12 +1580,6 @@ err:	/*
 				next_ref->state = WT_REF_DELETED;
 		}
 
-		/* If we gave up on a reverse split, unlock the child. */
-		if (ref_new == NULL) {
-			WT_ASSERT(session, ref->state == WT_REF_LOCKED);
-			ref->state = WT_REF_DELETED;
-		}
-
 		__wt_free_ref_index(session, NULL, alloc_index, false);
 	}
 
@@ -1902,7 +1896,14 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
 	bool hazard;
 
 	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
-	ret = __split_parent(session, ref, NULL, 0, 0, false, true);
+
+	/* If we give up on a reverse split, unlock the child. */
+	if ((ret =
+	    __split_parent(session, ref, NULL, 0, 0, false, true)) != 0) {
+		WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+		ref->state = WT_REF_DELETED;
+	}
+
 	WT_TRET(__split_internal_unlock(session, parent, hazard));
 	return (ret);
 }
