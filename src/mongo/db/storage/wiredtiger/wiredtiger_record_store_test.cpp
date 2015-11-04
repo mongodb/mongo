@@ -893,7 +893,7 @@ BSONObj makeBSONObjWithSize(const Timestamp& opTime, int size, char fill = 'x') 
     BSONObj obj = BSON("ts" << opTime << "str" << str);
     ASSERT_EQ(size, obj.objsize());
 
-    return std::move(obj);
+    return obj;
 }
 
 StatusWith<RecordId> insertBSONWithSize(OperationContext* opCtx,
