@@ -17,8 +17,8 @@ replSet.initiate(
 
 // Do an initial write
 var master = replSet.getMaster();
-assert.writeOK(master.getDB("foo").bar.insert({x:1}));
 replSet.awaitReplication();
+assert.writeOK(master.getDB("foo").bar.insert({x:1}));
 
 var primary = master.getDB("foo");
 replSet.nodes[1].setSlaveOk();
