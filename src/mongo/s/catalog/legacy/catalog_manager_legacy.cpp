@@ -1143,8 +1143,6 @@ Status CatalogManagerLegacy::_createCappedConfigCollection(OperationContext* txn
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
-
-    return Status::OK();
 }
 
 size_t CatalogManagerLegacy::_getShardCount(const BSONObj& query) const {
