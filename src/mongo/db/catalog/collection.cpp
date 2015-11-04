@@ -331,14 +331,14 @@ Status Collection::insertDocument(OperationContext* txn, const DocWriter* doc, b
 
 
 Status Collection::insertDocuments(OperationContext* txn,
-                                   const vector<BSONObj>::const_iterator begin,
-                                   const vector<BSONObj>::const_iterator end,
+                                   vector<BSONObj>::iterator begin,
+                                   vector<BSONObj>::iterator end,
                                    bool enforceQuota,
                                    bool fromMigrate) {
     // Should really be done in the collection object at creation and updated on index create.
     const bool hasIdIndex = _indexCatalog.findIdIndex(txn);
 
-    for (auto it = begin; it != end; it++) {
+    for (vector<BSONObj>::iterator it = begin; it != end; it++) {
         if (hasIdIndex && (*it)["_id"].eoo()) {
             return Status(ErrorCodes::InternalError,
                           str::stream() << "Collection::insertDocument got "
@@ -411,8 +411,8 @@ Status Collection::insertDocument(OperationContext* txn,
 }
 
 Status Collection::_insertDocuments(OperationContext* txn,
-                                    const vector<BSONObj>::const_iterator begin,
-                                    const vector<BSONObj>::const_iterator end,
+                                    vector<BSONObj>::iterator begin,
+                                    vector<BSONObj>::iterator end,
                                     bool enforceQuota) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
 
@@ -421,7 +421,7 @@ Status Collection::_insertDocuments(OperationContext* txn,
     //       collection access method probably
 
     std::vector<Record> records;
-    for (auto it = begin; it != end; it++) {
+    for (vector<BSONObj>::iterator it = begin; it != end; it++) {
         Record record = {RecordId(), RecordData(it->objdata(), it->objsize())};
         records.push_back(record);
     }
@@ -431,7 +431,7 @@ Status Collection::_insertDocuments(OperationContext* txn,
 
     std::vector<BsonRecord> bsonRecords;
     int recordIndex = 0;
-    for (auto it = begin; it != end; it++) {
+    for (vector<BSONObj>::iterator it = begin; it != end; it++) {
         RecordId loc = records[recordIndex++].id;
         invariant(RecordId::min() < loc);
         invariant(loc < RecordId::max());

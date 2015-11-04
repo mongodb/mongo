@@ -255,8 +255,8 @@ public:
      * If errors occor (including WCE), caller should retry documents individually.
      */
     Status insertDocuments(OperationContext* txn,
-                           std::vector<BSONObj>::const_iterator begin,
-                           std::vector<BSONObj>::const_iterator end,
+                           std::vector<BSONObj>::iterator begin,
+                           std::vector<BSONObj>::iterator end,
                            bool enforceQuota,
                            bool fromMigrate = false);
 
@@ -440,8 +440,8 @@ private:
     Status _insertDocument(OperationContext* txn, const BSONObj& doc, bool enforceQuota);
 
     Status _insertDocuments(OperationContext* txn,
-                            std::vector<BSONObj>::const_iterator begin,
-                            std::vector<BSONObj>::const_iterator end,
+                            std::vector<BSONObj>::iterator begin,
+                            std::vector<BSONObj>::iterator end,
                             bool enforceQuota);
 
     bool _enforceQuota(bool userEnforeQuota) const;

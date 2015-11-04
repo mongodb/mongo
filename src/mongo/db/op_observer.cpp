@@ -58,8 +58,8 @@ void OpObserver::onCreateIndex(OperationContext* txn,
 
 void OpObserver::onInserts(OperationContext* txn,
                            const NamespaceString& nss,
-                           vector<BSONObj>::const_iterator begin,
-                           vector<BSONObj>::const_iterator end,
+                           vector<BSONObj>::iterator begin,
+                           vector<BSONObj>::iterator end,
                            bool fromMigrate) {
     repl::logOps(txn, "i", nss, begin, end, fromMigrate);
 

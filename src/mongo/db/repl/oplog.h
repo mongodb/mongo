@@ -74,7 +74,7 @@ void createOplog(OperationContext* txn);
 // used internally by replication secondaries after they have applied ops.  Updates the global
 // optime.
 // Returns the optime for the last op inserted.
-OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops);
+OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops);
 
 extern std::string rsOplogName;
 extern std::string masterSlaveOplogName;
@@ -95,8 +95,8 @@ extern int OPLOG_VERSION;
 void logOps(OperationContext* txn,
             const char* opstr,
             const NamespaceString& nss,
-            std::vector<BSONObj>::const_iterator begin,
-            std::vector<BSONObj>::const_iterator end,
+            std::vector<BSONObj>::iterator begin,
+            std::vector<BSONObj>::iterator end,
             bool fromMigrate);
 
 /* For 'u' records, 'obj' captures the mutation made to the object but not

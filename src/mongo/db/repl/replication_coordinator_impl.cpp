@@ -529,11 +529,7 @@ Status ReplicationCoordinatorImpl::waitForMemberState(MemberState expectedState,
 Seconds ReplicationCoordinatorImpl::getSlaveDelaySecs() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_rsConfig.isInitialized());
-    if (_selfIndex == -1) {
-        // We aren't currently in the set. Return 0 seconds so we can clear out the applier's
-        // queue of work.
-        return Seconds(0);
-    }
+    uassert(28524, "Node not a member of the current set configuration", _selfIndex != -1);
     return _rsConfig.getMemberAt(_selfIndex).getSlaveDelay();
 }
 

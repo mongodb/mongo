@@ -95,58 +95,38 @@ public:
     void oplogApplication();
     bool peek(BSONObj* obj);
 
-    /**
-     * A parsed oplog entry.
-     *
-     * This only includes the fields used by the code using this object at the time this was
-     * written. As more code uses this, more fields should be added.
-     *
-     * All unowned members (such as StringDatas and BSONElements) point into the raw BSON.
-     * All StringData members are guaranteed to be NUL terminated.
-     */
-    struct OplogEntry {
-        explicit OplogEntry(const BSONObj& raw);
-
-        BSONObj raw;  // Owned.
-
-        StringData ns = "";
-        StringData opType = "";
-
-        BSONElement version;
-        BSONElement o;
-        BSONElement o2;
-    };
-
     class OpQueue {
     public:
         OpQueue() : _size(0) {}
         size_t getSize() const {
             return _size;
         }
-        const std::deque<OplogEntry>& getDeque() const {
+        const std::deque<BSONObj>& getDeque() const {
             return _deque;
         }
-        void push_back(OplogEntry&& op) {
-            _size += op.raw.objsize();
-            _deque.push_back(std::move(op));
+        void push_back(BSONObj& op) {
+            _deque.push_back(op);
+            _size += op.objsize();
         }
         bool empty() const {
             return _deque.empty();
         }
 
-        const OplogEntry& back() const {
+        BSONObj back() const {
             invariant(!_deque.empty());
             return _deque.back();
         }
 
     private:
-        std::deque<OplogEntry> _deque;
+        std::deque<BSONObj> _deque;
         size_t _size;
     };
 
     // returns true if we should continue waiting for BSONObjs, false if we should
     // stop waiting and apply the queue we have.  Only returns false if !ops.empty().
-    bool tryPopAndWaitForMore(OperationContext* txn, OpQueue* ops);
+    bool tryPopAndWaitForMore(OperationContext* txn,
+                              OpQueue* ops,
+                              ReplicationCoordinator* replCoord);
 
     /**
      * Fetch a single document referenced in the operation from the sync source.
@@ -178,8 +158,6 @@ protected:
     OpTime multiApply(OperationContext* txn, const OpQueue& ops);
 
 private:
-    class OpQueueBatcher;
-
     std::string _hostname;
 
     BackgroundSyncInterface* _networkQueue;

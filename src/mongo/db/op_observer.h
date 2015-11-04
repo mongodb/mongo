@@ -57,8 +57,8 @@ public:
                        bool fromMigrate = false);
     void onInserts(OperationContext* txn,
                    const NamespaceString& ns,
-                   std::vector<BSONObj>::const_iterator begin,
-                   std::vector<BSONObj>::const_iterator end,
+                   std::vector<BSONObj>::iterator begin,
+                   std::vector<BSONObj>::iterator end,
                    bool fromMigrate = false);
     void onUpdate(OperationContext* txn, oplogUpdateEntryArgs args);
     void onDelete(OperationContext* txn,

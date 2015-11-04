@@ -423,8 +423,8 @@ void _logOp(OperationContext* txn,
 void logOps(OperationContext* txn,
             const char* opstr,
             const NamespaceString& nss,
-            std::vector<BSONObj>::const_iterator begin,
-            std::vector<BSONObj>::const_iterator end,
+            std::vector<BSONObj>::iterator begin,
+            std::vector<BSONObj>::iterator end,
             bool fromMigrate) {
     ReplicationCoordinator::Mode replMode = ReplicationCoordinator::get(txn)->getReplicationMode();
 
@@ -459,7 +459,7 @@ void logOp(OperationContext* txn,
     _logOp(txn, opstr, ns, obj, o2, fromMigrate, _oplogCollectionName, replMode, true);
 }
 
-OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops) {
+OpTime writeOpsToOplog(OperationContext* txn, const std::deque<BSONObj>& ops) {
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
     OpTime lastOptime;
@@ -483,10 +483,11 @@ OpTime writeOpsToOplog(OperationContext* txn, const std::vector<BSONObj>& ops) {
         OldClientContext ctx(txn, rsOplogName, _localDB);
         WriteUnitOfWork wunit(txn);
 
+        std::vector<BSONObj> opsVect(ops.begin(), ops.end());
         checkOplogInsert(
-            _localOplogCollection->insertDocuments(txn, ops.begin(), ops.end(), false));
+            _localOplogCollection->insertDocuments(txn, opsVect.begin(), opsVect.end(), false));
         lastOptime =
-            fassertStatusOK(ErrorCodes::InvalidBSON, OpTime::parseFromOplogEntry(ops.back()));
+            fassertStatusOK(ErrorCodes::InvalidBSON, OpTime::parseFromOplogEntry(opsVect.back()));
         wunit.commit();
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "writeOps", _localOplogCollection->ns().ns());
