@@ -15,7 +15,7 @@
 } while (0)
 
 static int __split_parent(
-    WT_SESSION_IMPL *, WT_REF *, WT_REF **, uint32_t, size_t, bool);
+    WT_SESSION_IMPL *, WT_REF *, WT_REF **, uint32_t, size_t, bool, bool);
 static int __split_internal_lock(
     WT_SESSION_IMPL *, WT_REF *, WT_PAGE **, bool *);
 static int __split_internal_unlock(WT_SESSION_IMPL *, WT_PAGE *, bool);
@@ -765,11 +765,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 * Allocate a new WT_PAGE_INDEX and set of WT_REF objects to be inserted
 	 * into the page's parent, replacing the page's WT_REF.
 	 *
-	 * The first slot of the new WT_PAGE_INDEX is a copy of the original
-	 * page's WT_REF. (Make a copy because the original WT_REF will be set
-	 * to split status and eventually freed; doing a WT_REF set/free in this
-	 * path isn't required, but it's simpler than changing the underlying
-	 * split-page code to do the set/free in some cases but not in others).
+	 * The first slot of the new WT_PAGE_INDEX is the original page WT_REF.
 	 * The remainder of the slots are allocated WT_REFs.
 	 */
 	size = sizeof(WT_PAGE_INDEX) + children * sizeof(WT_REF *);
@@ -777,17 +773,15 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	parent_incr += size;
 	alloc_index->index = (WT_REF **)(alloc_index + 1);
 	alloc_index->entries = children;
-	for (alloc_refp = alloc_index->index,
-	    i = 0; i < children; ++alloc_refp, ++i)
+	alloc_refp = alloc_index->index;
+	*alloc_refp++ = page_ref;
+	for (i = 1; i < children; ++alloc_refp, ++i)
 		WT_ERR(__wt_calloc_one(session, alloc_refp));
-	alloc_refp = alloc_index->index;		/* original page */
-	**alloc_refp++ = *page_ref;
 	parent_incr += children * sizeof(WT_REF);
 
 	/* Allocate child pages, and connect them into the new page index. */
 	WT_ASSERT(session, page_refp == pindex->index + chunk);
-	WT_ASSERT(session, alloc_refp == alloc_index->index + 1);
-	for (i = 1; i < children; ++i) {
+	for (alloc_refp = alloc_index->index + 1, i = 1; i < children; ++i) {
 		slots = i == children - 1 ? remain : chunk;
 		WT_ERR(__wt_page_alloc(
 		    session, page->type, 0, slots, false, &child));
@@ -850,8 +844,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	    page_refp - pindex->index == (ptrdiff_t)pindex->entries);
 
 	/* Split into the parent. */
-	WT_ERR(__split_parent(session, page_ref,
-	    alloc_index->index, alloc_index->entries, parent_incr, false));
+	WT_ERR(__split_parent(session, page_ref, alloc_index->index,
+	    alloc_index->entries, parent_incr, false, false));
 
 	/* We copied/moved the current page's WT_REF, update our reference. */
 	page->pg_intl_parent_ref = alloc_index->index[0];
@@ -1339,8 +1333,8 @@ __split_internal_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
  *	Resolve a multi-page split, inserting new information into the parent.
  */
 static int
-__split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
-    WT_REF **ref_new, uint32_t new_entries, size_t parent_incr, bool exclusive)
+__split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
+    uint32_t new_entries, size_t parent_incr, bool exclusive, bool discard)
 {
 	WT_DECL_RET;
 	WT_IKEY *ikey;
@@ -1371,10 +1365,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 	 * Remove any refs to deleted pages while we are splitting, we have
 	 * the internal page locked down, and are copying the refs into a new
 	 * array anyway.  Switch them to the special split state, so that any
-	 * reading thread will restart.  Include the ref we are splitting in
-	 * the count to be deleted.
+	 * reading thread will restart.
 	 */
-	for (deleted_entries = 1, i = 0; i < parent_entries; ++i) {
+	for (deleted_entries = 0, i = 0; i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
 		WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
 		if (next_ref->state == WT_REF_DELETED &&
@@ -1386,9 +1379,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 
 	/*
 	 * The final entry count consists of the original count, plus any new
-	 * pages, less any WT_REFs we're removing.
+	 * pages, less any WT_REFs we're removing (deleted entries plus the
+	 * entry we're replacing).
 	 */
-	result_entries = (parent_entries + new_entries) - deleted_entries;
+	result_entries = (parent_entries + new_entries) - (deleted_entries + 1);
 
 	/*
 	 * If the entire (sub)tree is empty, give up: we can't leave an empty
@@ -1477,13 +1471,17 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref,
 #endif
 
 	/*
-	 * Reset the page's original WT_REF field to split.  Threads cursoring
+	 * If discarding the page's original WT_REF field, reset it to split and
+	 * increment the number of entries being discarded. Threads cursoring
 	 * through the tree were blocked because that WT_REF state was set to
-	 * locked.  This update changes the locked state to split, unblocking
-	 * those threads and causing them to re-calculate their position based
-	 * on the updated parent page's index.
+	 * locked. Changing the locked state to split unblocks those threads and
+	 * causes them to re-calculate their position based on the just-updated
+	 * parent page's index.
 	 */
-	WT_PUBLISH(ref->state, WT_REF_SPLIT);
+	if (discard) {
+		++deleted_entries;
+		WT_PUBLISH(ref->state, WT_REF_SPLIT);
+	}
 
 	/*
 	 * A note on error handling: failures before we swapped the new page
@@ -1825,7 +1823,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	page = NULL;
 	if ((ret = __split_parent(
-	    session, ref, split_ref, 2, parent_incr, false)) != 0) {
+	    session, ref, split_ref, 2, parent_incr, false, true)) != 0) {
 		/*
 		 * Move the insert list element back to the original page list.
 		 * For simplicity, the previous skip list pointers originally
@@ -1904,7 +1902,7 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
 	bool hazard;
 
 	WT_RET(__split_internal_lock(session, ref, &parent, &hazard));
-	ret = __split_parent(session, ref, NULL, 0, 0, 0);
+	ret = __split_parent(session, ref, NULL, 0, 0, false, true);
 	WT_TRET(__split_internal_unlock(session, parent, hazard));
 	return (ret);
 }
@@ -1994,7 +1992,7 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	 * exclusively.
 	 */
 	WT_ERR(__split_parent(
-	    session, ref, ref_new, new_entries, parent_incr, closing));
+	    session, ref, ref_new, new_entries, parent_incr, closing, true));
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_leaf);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_leaf);
