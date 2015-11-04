@@ -529,14 +529,15 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
     var configVersion;
     var masterOpTime;
     var masterName;
+    var master;
     try {
-        var master = this.getMaster();
+        master = this.getMaster();
         configVersion = this.conf().version;
         masterOpTime = this.getLastOpTime(master);
         masterName = master.toString().substr(14); // strip "connection to "
     }
     catch (e) {
-        var master = this.getMaster();
+        master = this.getMaster();
         configVersion = this.conf().version;
         masterOpTime = this.getLastOpTime(master);
         masterName = master.toString().substr(14); // strip "connection to "
@@ -565,7 +566,7 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
                            + ", but expected config version #" + configVersion);
 
                     if (slaveConfigVersion > configVersion) {
-                        var master = this.getMaster();
+                        master = this.getMaster();
                         configVersion = master.getDB("local")['system.replset'].findOne().version;
                         masterOpTime = self.getLastOpTime(master);
                         masterName = master.toString().substr(14); // strip "connection to "
