@@ -839,7 +839,7 @@ TEST_F(AddShardTest, ExistingShardName) {
         ASSERT_EQUALS(ShardType::ConfigNS, actualBatchedInsert.getNS().toString());
 
         auto inserted = actualBatchedInsert.getDocuments();
-        ASSERT_EQUALS(1, inserted.size());
+        ASSERT_EQUALS(1U, inserted.size());
 
         ASSERT_EQ(newShard.toBSON(), inserted.front());
 
