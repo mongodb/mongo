@@ -1590,6 +1590,9 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	size_t page_decr, parent_incr, right_incr;
 	int i;
 
+	WT_STAT_FAST_CONN_INCR(session, cache_inmem_split);
+	WT_STAT_FAST_DATA_INCR(session, cache_inmem_split);
+
 	page = ref->page;
 	right = NULL;
 	page_decr = parent_incr = right_incr = 0;
@@ -1824,9 +1827,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 		WT_ERR(ret);
 	}
 
-	WT_STAT_FAST_CONN_INCR(session, cache_inmem_split);
-	WT_STAT_FAST_DATA_INCR(session, cache_inmem_split);
-
 	return (0);
 
 err:	if (split_ref[0] != NULL) {
@@ -1882,6 +1882,9 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	size_t parent_incr;
 	uint32_t i, new_entries;
 
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_leaf);
+	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_leaf);
+
 	page = ref->page;
 	mod = page->modify;
 	new_entries = mod->mod_multi_entries;
@@ -1903,9 +1906,6 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	 */
 	WT_ERR(__split_parent(
 	    session, ref, ref_new, new_entries, parent_incr, closing, true));
-
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_leaf);
-	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_leaf);
 
 	/*
 	 * The split succeeded, we can no longer fail.
