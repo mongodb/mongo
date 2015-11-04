@@ -71,50 +71,19 @@ assert.soon(function() {
 print("Add it back as a secondary");
 config.members.push({_id:2, host : secondary.host});
 config.version = 3;
-printjson(config);
-wait(function() {
-    try {
-        master.getDB("admin").runCommand({replSetReconfig:config});
-    }
-    catch(e) {
-        print(e);
-    }
-    try {
-        master = replTest.getMaster();
-        printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
-    } catch(e) {
-        // In PV0 the primary node may step down, which will cause the above to try block will
-        // throw and we will need to wait for a new master and try again.
-        if (replTest.getConfigFromPrimary().protocolVersion == 1) {
-            throw e;
-        }
-        master = replTest.getMaster();
-        printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
-    }
-    master.setSlaveOk();
-    var newConfig = master.getDB("local").system.replset.findOne();
-    print( "newConfig: " + tojson(newConfig) );
-    return newConfig.version == 3;
-} , "wait1" );
-
-print("Make sure both nodes are either primary or secondary");
-wait(function() {
-    var status = master.getDB("admin").runCommand({replSetGetStatus:1});
-    occasionally(function() {
-        printjson(status);
-      });
-
-    if (!status.members || status.members.length != 2) {
-      return false;
-    }
-
-    for (var i = 0; i<2; i++) {
-      if (status.members[i].state != 1 && status.members[i].state != 2) {
-        return false;
-      }
-    }
+// Need to keep retrying reconfig here, as it will not work at first due to the primary's
+// perception that the secondary is still "down".
+assert.soon(function() { try {
+    reconfig(replTest, config);
     return true;
-} , "wait2" );
+} catch (e) {
+    return false;
+} });
+master = replTest.getMaster();
+printjson(master.getDB("admin").runCommand({replSetGetStatus:1}));
+var newConfig = master.getDB("local").system.replset.findOne();
+print("newConfig: " + tojson(newConfig));
+assert.eq(newConfig.version, 3);
 
 print("reconfig with minority");
 replTest.stop(secondary);
