@@ -116,7 +116,13 @@ BSONObj DocumentSourceLookUp::queryForInput(const Document& input) const {
     if (localFieldVal.missing()) {
         localFieldVal = Value(BSONNULL);
     }
-    return BSON(_foreignFieldFieldName << localFieldVal);
+
+    // { _foreignFieldFiedlName : { "$eq" : localFieldValue } }
+    BSONObjBuilder query;
+    BSONObjBuilder subObj(query.subobjStart(_foreignFieldFieldName));
+    subObj << "$eq" << localFieldVal;
+    subObj.doneFast();
+    return query.obj();
 }
 
 boost::optional<Document> DocumentSourceLookUp::unwindResult() {

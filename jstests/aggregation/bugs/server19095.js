@@ -378,6 +378,31 @@ load("jstests/aggregation/extras/utils.js");
         testPipeline(pipeline, expectedResults, coll);
 
         //
+        // Query-like local fields (SERVER-21287)
+        //
+
+        // This must only do an equality match rather than treating the value as a regex.
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 0, a: /a regex/}));
+
+        from.drop();
+        assert.writeOK(from.insert({_id: 0, b: /a regex/}));
+        assert.writeOK(from.insert({_id: 1, b: "string that matches /a regex/"}));
+
+        pipeline = [
+            {$lookup: {
+                localField: "a",
+                foreignField: "b",
+                from: "from",
+                as: "b",
+            }},
+        ];
+        expectedResults = [
+            {_id: 0, a: /a regex/, b: [{_id: 0, b: /a regex/}]}
+        ];
+        testPipeline(pipeline, expectedResults, coll);
+
+        //
         // Error cases.
         //
 
