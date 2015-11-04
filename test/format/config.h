@@ -158,6 +158,10 @@ static CONFIG c[] = {
 	  "if values are huffman encoded",			/* 20% */
 	  C_BOOL, 20, 0, 0, &g.c_huffman_value, NULL },
 
+	{ "in_memory",
+	  "if in-memory configured",
+	  C_IGNORE, 0, 0, 1, &g.c_in_memory, NULL },
+
 	{ "insert_pct",
 	  "percent operations that are inserts",
 	  0x0, 0, 45, 90, &g.c_insert_pct, NULL },
