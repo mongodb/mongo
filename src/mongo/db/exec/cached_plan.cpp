@@ -359,16 +359,10 @@ void CachedPlanStage::invalidate(OperationContext* txn, const RecordId& dl, Inva
     }
     ++_commonStats.invalidates;
 
-    for (std::list<WorkingSetID>::iterator it = _results.begin(); it != _results.end();) {
+    for (auto it = _results.begin(); it != _results.end(); ++it) {
         WorkingSetMember* member = _ws->get(*it);
         if (member->hasLoc() && member->loc == dl) {
-            std::list<WorkingSetID>::iterator next = it;
-            ++next;
             WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
-            _results.erase(it);
-            it = next;
-        } else {
-            ++it;
         }
     }
 }
