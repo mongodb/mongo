@@ -278,14 +278,14 @@ bool oplogDisabled(OperationContext* txn,
     return false;
 }
 
-OplogDocWriter _logOpWriter(OperationContext* txn,
-                            const char* opstr,
-                            const NamespaceString& nss,
-                            const BSONObj& obj,
-                            BSONObj* o2,
-                            bool fromMigrate,
-                            OpTime optime,
-                            long long hashNew) {
+unique_ptr<OplogDocWriter> _logOpWriter(OperationContext* txn,
+                                        const char* opstr,
+                                        const NamespaceString& nss,
+                                        const BSONObj& obj,
+                                        BSONObj* o2,
+                                        bool fromMigrate,
+                                        OpTime optime,
+                                        long long hashNew) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -300,7 +300,7 @@ OplogDocWriter _logOpWriter(OperationContext* txn,
     if (o2)
         b.append("o2", *o2);
 
-    return OplogDocWriter(b.obj(), obj);
+    return stdx::make_unique<OplogDocWriter>(OplogDocWriter(b.obj(), obj));
 }
 }  // end anon namespace
 
@@ -370,7 +370,7 @@ void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
 void _logOpsInner(OperationContext* txn,
                   const char* opstr,
                   const NamespaceString& nss,
-                  vector<OplogDocWriter> writers,
+                  const vector<unique_ptr<OplogDocWriter>>& writers,
                   bool fromMigrate,
                   Collection* oplogCollection,
                   ReplicationCoordinator::Mode replicationMode,
@@ -387,7 +387,7 @@ void _logOpsInner(OperationContext* txn,
     // we jump through a bunch of hoops here to avoid copying the obj buffer twice --
     // instead we do a single copy to the destination in the record store.
     for (auto it = writers.begin(); it != writers.end(); it++)
-        checkOplogInsert(oplogCollection->insertDocument(txn, &(*it), false));
+        checkOplogInsert(oplogCollection->insertDocument(txn, it->get(), false));
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
     if (updateReplOpTime)
@@ -410,13 +410,13 @@ void _logOp(OperationContext* txn,
         return;
 
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-    vector<OplogDocWriter> writers;
+    vector<unique_ptr<OplogDocWriter>> writers;
     Collection* oplog = getLocalOplogCollection(txn, oplogName);
     Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
     Lock::CollectionLock lock(txn->lockState(), oplogName, MODE_IX);
     auto slot = getNextOpTime(txn, oplog, replCoord, replMode);
     auto writer = _logOpWriter(txn, opstr, nss, obj, o2, fromMigrate, slot.opTime, slot.hash);
-    writers.push_back(writer);
+    writers.emplace_back(std::move(writer));
     _logOpsInner(txn, opstr, nss, writers, fromMigrate, oplog, replMode, updateOpTime, slot.opTime);
 }
 
@@ -432,7 +432,8 @@ void logOps(OperationContext* txn,
     if (oplogDisabled(txn, replMode, nss))
         return;
 
-    vector<OplogDocWriter> writers;
+    vector<unique_ptr<OplogDocWriter>> writers;
+    writers.reserve(end - begin);
     OpTime finalOpTime;
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
     Collection* oplog = getLocalOplogCollection(txn, _oplogCollectionName);
@@ -442,7 +443,7 @@ void logOps(OperationContext* txn,
         auto slot = getNextOpTime(txn, oplog, replCoord, replMode);
         finalOpTime = slot.opTime;
         auto writer = _logOpWriter(txn, opstr, nss, *it, NULL, fromMigrate, slot.opTime, slot.hash);
-        writers.emplace_back(writer);
+        writers.emplace_back(std::move(writer));
     }
     _logOpsInner(txn, opstr, nss, writers, fromMigrate, oplog, replMode, true, finalOpTime);
 }
