@@ -7,6 +7,9 @@ For any particular improvement you want to make, you can begin a discussion on t
 [MongoDB Developers Forum](https://groups.google.com/forum/?fromgroups#!forum/mongodb-dev).  This is the best place to discuss your proposed improvement (and its
 implementation) with the core development team.
 
+If you're interested in contributing, we have a list of some suggested tickets that are easy enough to get started on here:
+https://jira.mongodb.org/issues/?jql=project%20%3D%20TOOLS%20AND%20labels%20%3D%20community%20and%20status%20%3D%20open
+
 Getting Started
 ---------------
 
