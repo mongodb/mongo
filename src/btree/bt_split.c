@@ -276,42 +276,53 @@ __split_ovfl_key_cleanup(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
  * information.
  */
 static int
-__split_ref_move(WT_SESSION_IMPL *session,
-    WT_PAGE *parent, WT_REF *ref, size_t *parent_decrp, size_t *child_incrp)
+__split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home,
+    WT_REF **from_refp, size_t *decrp, WT_REF **to_refp, size_t *incrp)
 {
 	WT_ADDR *addr;
 	WT_CELL_UNPACK unpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
+	WT_REF *ref;
 	size_t size;
 	void *key;
 
+	ref = *from_refp;
+
 	/*
+	 * The from-home argument is the page into which the "from" WT_REF may
+	 * point, for example, if there's an on-page key the "from" WT_REF
+	 * references, it will be on the page "from-home".
+	 *
 	 * Instantiate row-store keys, and column- and row-store addresses in
-	 * the WT_REF structures referenced by a page that's being split (and
-	 * deepening the tree).  The WT_REF structures aren't moving, but the
-	 * index references are moving from the page we're splitting to a set
-	 * of child pages, and so we can no longer reference the block image
-	 * that remains with the page being split.
+	 * the WT_REF structures referenced by a page that's being split. The
+	 * WT_REF structures aren't moving, but the index references are moving
+	 * from the page we're splitting to a set of new pages, and so we can
+	 * no longer reference the block image that remains with the page being
+	 * split.
 	 *
 	 * No locking is required to update the WT_REF structure because we're
-	 * the only thread splitting the parent page, and there's no way for
-	 * readers to race with our updates of single pointers.  The changes
-	 * have to be written before the page goes away, of course, our caller
-	 * owns that problem.
-	 *
-	 * Row-store keys, first.
+	 * the only thread splitting the page, and there's no way for readers
+	 * to race with our updates of single pointers.  The changes have to be
+	 * written before the page goes away, of course, our caller owns that
+	 * problem.
 	 */
-	if (parent->type == WT_PAGE_ROW_INT) {
+	if (from_home->type == WT_PAGE_ROW_INT) {
+		/*
+		 * Row-store keys: if it's not yet instantiated, instantiate it.
+		 * If already instantiated, check for overflow cleanup (overflow
+		 * keys are always instantiated.
+		 */
 		if ((ikey = __wt_ref_key_instantiated(ref)) == NULL) {
-			__wt_ref_key(parent, ref, &key, &size);
+			__wt_ref_key(from_home, ref, &key, &size);
 			WT_RET(__wt_row_ikey(session, 0, key, size, ref));
 			ikey = ref->key.ikey;
 		} else {
-			WT_RET(__split_ovfl_key_cleanup(session, parent, ref));
-			*parent_decrp += sizeof(WT_IKEY) + ikey->size;
+			WT_RET(
+			    __split_ovfl_key_cleanup(session, from_home, ref));
+			*decrp += sizeof(WT_IKEY) + ikey->size;
 		}
-		*child_incrp += sizeof(WT_IKEY) + ikey->size;
+		*incrp += sizeof(WT_IKEY) + ikey->size;
 	}
 
 	/*
@@ -320,7 +331,7 @@ __split_ref_move(WT_SESSION_IMPL *session,
 	 * get the address from the on-page cell.
 	 */
 	addr = ref->addr;
-	if (addr != NULL && !__wt_off_page(parent, addr)) {
+	if (addr != NULL && !__wt_off_page(from_home, addr)) {
 		__wt_cell_unpack((WT_CELL *)ref->addr, &unpack);
 		WT_RET(__wt_calloc_one(session, &addr));
 		if ((ret = __wt_strndup(
@@ -334,8 +345,9 @@ __split_ref_move(WT_SESSION_IMPL *session,
 		ref->addr = addr;
 	}
 
-	/* And finally, the WT_REF itself. */
-	WT_MEM_TRANSFER(*parent_decrp, *child_incrp, sizeof(WT_REF));
+	/* And finally, copy the WT_REF pointer itself. */
+	*to_refp = ref;
+	WT_MEM_TRANSFER(*decrp, *incrp, sizeof(WT_REF));
 
 	return (0);
 }
@@ -496,13 +508,14 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * the page that has an page index entry for the WT_REF is about
 		 * to change.
 		 */
-		child_incr = 0;
 		child_pindex = WT_INTL_INDEX_GET_SAFE(child);
-		for (child_refp = child_pindex->index, j = 0; j < slots; ++j) {
-			WT_ERR(__split_ref_move(session,
-			    parent, *parent_refp, &parent_decr, &child_incr));
-			*child_refp++ = *parent_refp++;
-		}
+		child_incr = 0;
+		for (child_refp = child_pindex->index,
+		    j = 0; j < slots; ++child_refp, ++parent_refp, ++j)
+			WT_ERR(__split_ref_move(session, parent,
+			    parent_refp, &parent_decr,
+			    child_refp, &child_incr));
+
 		__wt_cache_page_inmem_incr(session, child, child_incr);
 	}
 	WT_ASSERT(session,
@@ -1014,13 +1027,13 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 		 * the page that has an page index entry for the WT_REF is about
 		 * to be discarded.
 		 */
-		child_incr = 0;
 		child_pindex = WT_INTL_INDEX_GET_SAFE(child);
-		for (child_refp = child_pindex->index, j = 0; j < slots; ++j) {
-			WT_ERR(__split_ref_move(session,
-			    page, *page_refp, &page_decr, &child_incr));
-			*child_refp++ = *page_refp++;
-		}
+		child_incr = 0;
+		for (child_refp = child_pindex->index,
+		    j = 0; j < slots; ++child_refp, ++page_refp, ++j)
+			WT_ERR(__split_ref_move(session, page,
+			    page_refp, &page_decr, child_refp, &child_incr));
+
 		__wt_cache_page_inmem_incr(session, child, child_incr);
 	}
 	WT_ASSERT(session, alloc_refp -
