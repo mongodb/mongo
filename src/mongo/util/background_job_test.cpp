@@ -27,7 +27,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/server_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
@@ -37,6 +37,7 @@
 
 namespace {
 
+using mongo::AtomicWord;
 using mongo::BackgroundJob;
 using mongo::MsgAssertionException;
 using mongo::stdx::mutex;
@@ -44,69 +45,67 @@ using mongo::Notification;
 
 namespace stdx = mongo::stdx;
 
-// a global variable that can be accessed independent of the IncTester object below
-// IncTester keeps it up-to-date
-int GLOBAL_val;
-
-class IncTester : public mongo::BackgroundJob {
+class TestJob final : public mongo::BackgroundJob {
 public:
-    explicit IncTester(long long millis, bool selfDelete = false)
-        : mongo::BackgroundJob(selfDelete), _val(0), _millis(millis) {
-        GLOBAL_val = 0;
+    TestJob(bool selfDelete,
+            AtomicWord<bool>* flag,
+            Notification* canProceed = nullptr,
+            Notification* destructorInvoked = nullptr)
+        : BackgroundJob(selfDelete),
+          _flag(flag),
+          _canProceed(canProceed),
+          _destructorInvoked(destructorInvoked) {}
+
+    ~TestJob() override {
+        if (_destructorInvoked)
+            _destructorInvoked->notifyOne();
     }
 
-    void waitAndInc(long long millis) {
-        if (millis)
-            mongo::sleepmillis(millis);
-        ++_val;
-        ++GLOBAL_val;
+    std::string name() const override {
+        return "TestJob";
     }
 
-    int getVal() {
-        return _val;
-    }
-
-    /* --- BackgroundJob virtuals --- */
-
-    std::string name() const {
-        return "IncTester";
-    }
-
-    void run() {
-        waitAndInc(_millis);
+    void run() override {
+        if (_canProceed)
+            _canProceed->waitToBeNotified();
+        _flag->store(true);
     }
 
 private:
-    int _val;
-    long long _millis;
+    AtomicWord<bool>* const _flag;
+    Notification* const _canProceed;
+    Notification* const _destructorInvoked;
 };
 
 TEST(BackgroundJobBasic, NormalCase) {
-    IncTester tester(0 /* inc without wait */);
-    tester.go();
-    ASSERT(tester.wait());
-    ASSERT_EQUALS(tester.getVal(), 1);
+    AtomicWord<bool> flag(false);
+    TestJob tj(false, &flag);
+    tj.go();
+    ASSERT(tj.wait());
+    ASSERT_EQUALS(true, flag.load());
 }
 
 TEST(BackgroundJobBasic, TimeOutCase) {
-    IncTester tester(2000 /* wait 2 sec before inc-ing */);
-    tester.go();
-    ASSERT(!tester.wait(100 /* ms */));  // should time out
-    ASSERT_EQUALS(tester.getVal(), 0);
+    AtomicWord<bool> flag(false);
+    Notification canProceed;
+    TestJob tj(false, &flag, &canProceed);
+    tj.go();
 
-    // if we wait longer than the IncTester, we should see the increment
-    ASSERT(tester.wait(4000 /* ms */));  // should not time out
-    ASSERT_EQUALS(tester.getVal(), 1);
+    ASSERT(!tj.wait(1000));
+    ASSERT_EQUALS(false, flag.load());
+
+    canProceed.notifyOne();
+    ASSERT(tj.wait());
+    ASSERT_EQUALS(true, flag.load());
 }
 
 TEST(BackgroundJobBasic, SelfDeletingCase) {
-    mongo::BackgroundJob* j = new IncTester(0 /* inc without wait */, true /* self delete */);
-    j->go();
-
-    // the background thread should have continued running and this test should pass the
-    // heap-checker as well
-    mongo::sleepmillis(1000);
-    ASSERT_EQUALS(GLOBAL_val, 1);
+    AtomicWord<bool> flag(false);
+    Notification destructorInvoked;
+    // Though it looks like one, this is not a leak since the job is self deleting.
+    (new TestJob(true, &flag, nullptr, &destructorInvoked))->go();
+    destructorInvoked.waitToBeNotified();
+    ASSERT_EQUALS(true, flag.load());
 }
 
 TEST(BackgroundJobLifeCycle, Go) {
