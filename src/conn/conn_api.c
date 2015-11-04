@@ -1054,7 +1054,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_logmgr_reconfig(session, cfg));
 	WT_ERR(__wt_lsm_manager_reconfig(session, cfg));
 	WT_ERR(__wt_statlog_create(session, cfg));
-	WT_ERR(__wt_sweep_config(session, cfg));
+	WT_ERR(__wt_sweep_config(session, cfg, NULL));
 	WT_ERR(__wt_verbose_config(session, cfg));
 
 	/* Third, merge everything together, creating a new connection state. */
@@ -1984,7 +1984,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__conn_statistics_config(session, cfg));
 	WT_ERR(__wt_lsm_manager_config(session, cfg));
-	WT_ERR(__wt_sweep_config(session, cfg));
 	WT_ERR(__wt_verbose_config(session, cfg));
 
 	/* Now that we know if verbose is configured, output the version. */

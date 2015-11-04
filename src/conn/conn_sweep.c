@@ -322,26 +322,30 @@ err:		WT_PANIC_MSG(session, ret, "handle sweep server error");
  *	Pull out sweep configuration settings
  */
 int
-__wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[], bool *startp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
 
+	/*
+	 * Sweeping file handles isn't useful if configured in-memory; because
+	 * the default is to configure sweep, turn it off if running in-memory.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
+	if (cval.val != 0) {
+		if (startp != NULL)
+			*startp = false;
+		return (0);
+	}
+	if (startp != NULL)
+		*startp = true;
+
 	/* Pull out the sweep configurations. */
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_idle_time", &cval));
 	conn->sweep_idle_time = (time_t)cval.val;
-
-	/* Non-zero sweep idle time is incompatible with in-memory */
-	if (conn->sweep_idle_time != 0) {
-		WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
-		if (cval.val != 0)
-			WT_RET_MSG(session, EINVAL,
-			    "In memory configuration incompatible with "
-			    "non zero file_manager=(close_idle_time)");
-	}
 
 	WT_RET(__wt_config_gets(session,
 	    cfg, "file_manager.close_scan_interval", &cval));
@@ -359,12 +363,18 @@ __wt_sweep_config(WT_SESSION_IMPL *session, const char *cfg[])
  *	Start the handle sweep thread.
  */
 int
-__wt_sweep_create(WT_SESSION_IMPL *session)
+__wt_sweep_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
 	uint32_t session_flags;
+	bool start;
 
 	conn = S2C(session);
+
+	/* Configure the handle sweep thread. */
+	WT_RET(__wt_sweep_config(session, cfg, &start));
+	if (!start)
+		return (0);
 
 	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_SERVER_SWEEP);
