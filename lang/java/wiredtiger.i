@@ -395,15 +395,20 @@ javaCloseHandler(WT_EVENT_HANDLER *handler, WT_SESSION *session,
 	WT_CURSOR *cursor)
 {
 	int ret;
+	JAVA_CALLBACK *jcb;
 
 	WT_UNUSED(handler);
 
-	if (cursor != NULL)
-		ret = cursorCloseHandler(NULL, session, (JAVA_CALLBACK *)
-		    cursor->lang_private);
-	else
-		ret = closeHandler(NULL, session, (JAVA_CALLBACK *)
-		    ((WT_SESSION_IMPL *)session)->lang_private);
+	ret = 0;
+	if (cursor != NULL) {
+		if ((jcb = (JAVA_CALLBACK *)cursor->lang_private) != NULL) {
+			ret = cursorCloseHandler(NULL, session, jcb);
+			cursor->lang_private = NULL;
+		}
+	} else if ((jcb = ((WT_SESSION_IMPL *)session)->lang_private) != NULL) {
+		ret = closeHandler(NULL, session, jcb);
+		((WT_SESSION_IMPL *)session)->lang_private = NULL;
+	}
 	return (ret);
 }
 

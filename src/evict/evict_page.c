@@ -106,7 +106,8 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		conn->cache->evict_max_page_size = page->memory_footprint;
 
 	/* Update the reference and discard the page. */
-	if (mod == NULL || mod->rec_result == 0) {
+	if ((mod == NULL || mod->rec_result == 0) &&
+	    !F_ISSET(conn, WT_CONN_IN_MEMORY)) {
 		if (__wt_ref_is_root(ref))
 			__wt_ref_out(session, ref);
 		else
@@ -142,6 +143,50 @@ done:	if (((inmem_split && ret == 0) || (forced_eviction && ret == EBUSY)) &&
 
 	return (ret);
 }
+/*
+ * __evict_delete_ref --
+ *	Mark a page reference deleted and check if the parent can reverse
+ *	split.
+ */
+static int
+__evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
+{
+	WT_DECL_RET;
+	WT_PAGE *parent;
+	WT_PAGE_INDEX *pindex;
+	uint32_t ndeleted;
+
+	if (__wt_ref_is_root(ref))
+		return (0);
+
+	/*
+	 * Avoid doing reverse splits when closing the file, it is
+	 * wasted work and some structure may already have been freed.
+	 */
+	if (!closing) {
+		parent = ref->home;
+		WT_INTL_INDEX_GET(session, parent, pindex);
+		ndeleted = __wt_atomic_addv32(&pindex->deleted_entries, 1);
+
+		/*
+		 * If more than 10% of the parent references are deleted, try a
+		 * reverse split.  Don't bother if there is a single deleted
+		 * reference: the internal page is empty and we have to wait
+		 * for eviction to notice.
+		 *
+		 * This will consume the deleted ref (and eventually free it).
+		 * If the reverse split can't get the access it needs because
+		 * something is busy, be sure that the page still ends up
+		 * marked deleted.
+		 */
+		if (ndeleted > pindex->entries / 10 && pindex->entries > 1 &&
+		    (ret = __wt_split_reverse(session, ref)) != EBUSY)
+			return (ret);
+	}
+
+	WT_PUBLISH(ref->state, WT_REF_DELETED);
+	return (0);
+}
 
 /*
  * __wt_evict_page_clean_update --
@@ -151,6 +196,8 @@ int
 __wt_evict_page_clean_update(
     WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
+	WT_DECL_RET;
+
 	/*
 	 * If doing normal system eviction, but only in the service of reducing
 	 * the number of dirty pages, leave the clean page in cache.
@@ -164,8 +211,12 @@ __wt_evict_page_clean_update(
 	 * page re-instantiated (for example, by searching) and never written.
 	 */
 	__wt_ref_out(session, ref);
-	WT_PUBLISH(ref->state,
-	    ref->addr == NULL ? WT_REF_DELETED : WT_REF_DISK);
+	if (ref->addr == NULL) {
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __evict_delete_ref(session, ref, closing));
+		WT_RET_BUSY_OK(ret);
+	} else
+		WT_PUBLISH(ref->state, WT_REF_DISK);
 
 	return (0);
 }
@@ -178,6 +229,7 @@ static int
 __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 {
 	WT_ADDR *addr;
+	WT_DECL_RET;
 	WT_PAGE *parent;
 	WT_PAGE_MODIFY *mod;
 
@@ -206,7 +258,9 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 */
 		__wt_ref_out(session, ref);
 		ref->addr = NULL;
-		WT_PUBLISH(ref->state, WT_REF_DELETED);
+		WT_WITH_PAGE_INDEX(session,
+		    ret = __evict_delete_ref(session, ref, closing));
+		WT_RET_BUSY_OK(ret);
 		break;
 	case WT_PM_REC_MULTIBLOCK:			/* Multiple blocks */
 		/*
@@ -303,6 +357,7 @@ __evict_review(
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t flags;
+	bool modified;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -336,13 +391,29 @@ __evict_review(
 		WT_RET(ret);
 	}
 
+	/*
+	 * Retrieve the modified state of the page. This must happen after the
+	 * check for evictable internal pages otherwise there is a race where a
+	 * page could be marked modified due to a child being transitioned to
+	 * WT_REF_DISK after the modified check and before we visited the ref
+	 * while walking the parent index.
+	 */
+	modified = __wt_page_is_modified(page);
+
+	/*
+	 * Clean pages can't be evicted when running in memory only. This
+	 * should be uncommon - we don't add clean pages to the queue.
+	 */
+	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !modified && !closing)
+		return (EBUSY);
+
 	/* Check if the page can be evicted. */
 	if (!closing) {
 		/*
 		 * Update the oldest ID to avoid wasted effort should it have
 		 * fallen behind current.
 		 */
-		if (__wt_page_is_modified(page))
+		if (modified)
 			__wt_txn_update_oldest(session, true);
 
 		if (!__wt_page_can_evict(session, ref, false, inmem_splitp))
@@ -360,7 +431,7 @@ __evict_review(
 	}
 
 	/* If the page is clean, we're done and we can evict. */
-	if (!__wt_page_is_modified(page))
+	if (!modified)
 		return (0);
 
 	/*
@@ -390,7 +461,9 @@ __evict_review(
 	if (closing)
 		LF_SET(WT_VISIBILITY_ERR);
 	else if (!WT_PAGE_IS_INTERNAL(page)) {
-		if (page->read_gen == WT_READGEN_OLDEST)
+		if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+			LF_SET(WT_EVICT_IN_MEMORY | WT_EVICT_UPDATE_RESTORE);
+		else if (page->read_gen == WT_READGEN_OLDEST)
 			LF_SET(WT_EVICT_UPDATE_RESTORE);
 		else if (__wt_eviction_aggressive(session))
 			LF_SET(WT_EVICT_LOOKASIDE);
@@ -400,15 +473,17 @@ __evict_review(
 
 	/*
 	 * Success: assert the page is clean or reconciliation was configured
-	 * for an update/restore split, and if the page is clean, reconciliation
-	 * was configured for a lookaside table or all updates on the page are
-	 * globally visible.
+	 * for an update/restore split.  If the page is clean, assert that
+	 * reconciliation was configured for a lookaside table, or it's not a
+	 * durable object (currently the lookaside table), or all page updates
+	 * were globally visible.
 	 */
 	WT_ASSERT(session,
 	    LF_ISSET(WT_EVICT_UPDATE_RESTORE) || !__wt_page_is_modified(page));
 	WT_ASSERT(session,
-	    LF_SET(WT_EVICT_LOOKASIDE) ||
 	    __wt_page_is_modified(page) ||
+	    LF_ISSET(WT_EVICT_LOOKASIDE) ||
+	    F_ISSET(S2BT(session), WT_BTREE_LOOKASIDE) ||
 	    __wt_txn_visible_all(session, page->modify->rec_max_txn));
 
 	return (0);

@@ -306,9 +306,6 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	WT_STAT_FAST_CONN_INCR(session, cursor_search);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search);
 
-	if (btree->type == BTREE_ROW)
-		WT_RET(__cursor_size_chk(session, &cursor->key));
-
 	/*
 	 * If we have a page pinned, search it; if we don't have a page pinned,
 	 * or the search of the pinned page doesn't find an exact match, search
@@ -375,9 +372,6 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 
 	WT_STAT_FAST_CONN_INCR(session, cursor_search_near);
 	WT_STAT_FAST_DATA_INCR(session, cursor_search_near);
-
-	if (btree->type == BTREE_ROW)
-		WT_RET(__cursor_size_chk(session, &cursor->key));
 
 	/*
 	 * If we have a row-store page pinned, search it; if we don't have a
@@ -449,6 +443,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	} else if ((ret = __wt_btcur_next(cbt, false)) != WT_NOTFOUND)
 		exact = 1;
 	else {
+		WT_ERR(__cursor_func_init(cbt, true));
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, true) :
 		    __cursor_col_search(session, cbt, NULL));
@@ -658,9 +653,6 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	WT_STAT_FAST_CONN_INCR(session, cursor_remove);
 	WT_STAT_FAST_DATA_INCR(session, cursor_remove);
 	WT_STAT_FAST_DATA_INCRV(session, cursor_remove_bytes, cursor->key.size);
-
-	if (btree->type == BTREE_ROW)
-		WT_RET(__cursor_size_chk(session, &cursor->key));
 
 retry:	WT_RET(__cursor_func_init(cbt, true));
 
