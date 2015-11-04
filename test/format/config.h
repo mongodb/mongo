@@ -70,9 +70,9 @@ static CONFIG c[] = {
 	  "if LSM inserts are throttled",			/* 90% */
 	  C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL },
 
-	{ "firstfit",
-	  "if allocation is firstfit",				/* 10% */
-	  C_BOOL, 10, 0, 0, &g.c_firstfit, NULL },
+	{ "backups",
+	  "if backups are enabled",				/* 5% */
+	  C_BOOL, 5, 0, 0, &g.c_backups, NULL },
 
 	{ "bitcnt",
 	  "number of bits for fixed-length column-store files",
@@ -146,9 +146,9 @@ static CONFIG c[] = {
 	  "type of store to create (fix | var | row)",
 	  C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_file_type },
 
-	{ "backups",
-	  "if backups are enabled",				/* 5% */
-	  C_BOOL, 5, 0, 0, &g.c_backups, NULL },
+	{ "firstfit",
+	  "if allocation is firstfit",				/* 10% */
+	  C_BOOL, 10, 0, 0, &g.c_firstfit, NULL },
 
 	{ "huffman_key",
 	  "if keys are huffman encoded",			/* 20% */
@@ -187,25 +187,25 @@ static CONFIG c[] = {
 	  "minimum size of keys",
 	  0x0, 10, 32, 256, &g.c_key_min, NULL },
 
-	{ "leak_memory",
-	  "if memory should be leaked on close",
-	  C_BOOL, 0, 0, 0, &g.c_leak_memory, NULL },
-
 	{ "leaf_page_max",
 	  "maximum size of Btree leaf nodes",
 	  0x0, 9, 17, 27, &g.c_leaf_page_max, NULL },
+
+	{ "leak_memory",
+	  "if memory should be leaked on close",
+	  C_BOOL, 0, 0, 0, &g.c_leak_memory, NULL },
 
 	{ "logging",
 	  "if logging configured",				/* 30% */
 	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
 
-	{ "logging_compression",
-	  "type of logging compression " COMPRESSION_LIST,
-	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_logging_compression },
-
 	{ "logging_archive",
 	  "if log file archival configured",			/* 50% */
 	  C_BOOL, 50, 0, 0, &g.c_logging_archive, NULL },
+
+	{ "logging_compression",
+	  "type of logging compression " COMPRESSION_LIST,
+	  C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_logging_compression },
 
 	{ "logging_prealloc",
 	  "if log file pre-allocation configured",		/* 50% */
