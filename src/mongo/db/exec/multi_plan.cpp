@@ -422,22 +422,15 @@ void invalidateHelper(OperationContext* txn,
                       const RecordId& dl,
                       list<WorkingSetID>* idsToInvalidate,
                       const Collection* collection) {
-    for (list<WorkingSetID>::iterator it = idsToInvalidate->begin();
-         it != idsToInvalidate->end();) {
+    for (auto it = idsToInvalidate->begin(); it != idsToInvalidate->end(); ++it) {
         WorkingSetMember* member = ws->get(*it);
         if (member->hasLoc() && member->loc == dl) {
-            list<WorkingSetID>::iterator next = it;
-            next++;
             WorkingSetCommon::fetchAndInvalidateLoc(txn, member, collection);
-            ws->flagForReview(*it);
-            idsToInvalidate->erase(it);
-            it = next;
-        } else {
-            it++;
         }
     }
 }
-}
+
+}  // namespace
 
 void MultiPlanStage::doInvalidate(OperationContext* txn,
                                   const RecordId& dl,
