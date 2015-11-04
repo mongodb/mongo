@@ -67,6 +67,7 @@ replTest.restart(BID);
 
 awaitOpTime(b_conn, getLatestOp(a_conn).ts);
 replTest.awaitReplication();
+replTest.awaitSecondaryNodes();
 
 // Perform a write that should succeed if there's no unique index on B.
 options = {writeConcern: {w: 'majority', wtimeout: 5000}};
