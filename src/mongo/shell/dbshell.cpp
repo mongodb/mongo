@@ -584,7 +584,7 @@ static void edit(const string& whatToEdit) {
 }
 
 int _main(int argc, char* argv[], char** envp) {
-    setupSignalHandlers(true);
+    setupSignalHandlers();
     setupSignals();
 
     mongo::shell_utils::RecordMyLocation(argv[0]);

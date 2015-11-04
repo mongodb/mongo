@@ -374,7 +374,7 @@ int mongoSMain(int argc, char* argv[], char** envp) {
     if (argc < 1)
         return EXIT_FAILURE;
 
-    setupSignalHandlers(false);
+    setupSignalHandlers();
 
     Status status = mongo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
