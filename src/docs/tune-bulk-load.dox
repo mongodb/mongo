@@ -16,7 +16,8 @@ cannot be rolled back and ignore the transactional state of the WT_SESSION
 in which they are opened.
 
 When bulk-loading row-store objects, keys must be loaded in sorted
-order.
+order. When bulk-loading column-store objects, the key is ignored and
+need not be set at all.
 
 When using the \c sort utility on a Linux or other POSIX-like system to
 pre-sort keys, the locale specified by the environment affects the sort
