@@ -847,24 +847,24 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_ERR(__split_parent(session, page_ref, alloc_index->index,
 	    alloc_index->entries, parent_incr, false, false));
 
+	/*
+	 * A note on error handling: until this point, there's no problem with
+	 * unwinding on error.  We allocated a new page index, a new set of
+	 * WT_REFs and a new set of child pages -- if an error occurred, the
+	 * page remained unchanged, although it may have an incorrect memory
+	 * footprint.  From now on we've modified the parent page, attention
+	 * needs to be paid. However, subsequent failures are relatively benign,
+	 * the split is OK and complete. For that reason, we ignore errors past
+	 * this point unless there's a panic.
+	 */
+	complete = true;
+
 	/* We copied/moved the current page's WT_REF, update our reference. */
 	page->pg_intl_parent_ref = alloc_index->index[0];
 
 	/* Confirm the page's index hasn't moved, then update it. */
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(page) == pindex);
 	WT_INTL_INDEX_SET(page, replace_index);
-
-	/*
-	 * A note on error handling: until this point, there's no problem with
-	 * unwinding on error.  We allocated a new page index, a new set of
-	 * WT_REFs and a new set of child pages -- if an error occurred, the
-	 * page remained unchanged, although it may have an incorrect memory
-	 * footprint.  From now on we've modified the page, attention needs to
-	 * be paid. However, subsequent failures are relatively benign, the
-	 * split is OK and complete. For that reason, we ignore errors past
-	 * this point unless there's a panic.
-	 */
-	complete = true;
 
 #ifdef HAVE_DIAGNOSTIC
 	WT_WITH_PAGE_INDEX(session,
@@ -1410,27 +1410,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 			for (j = 0; j < new_entries; ++j) {
 				ref_new[j]->home = parent;
 				*alloc_refp++ = ref_new[j];
-#if 0
-				/*
-				The idea is to clear the list of inserted WT_REF
-				objects so our callers don't have to worry about
-				dealing with this on error. However, the
-				internal-page split code needs it so it can
-				clean up after the split succeeds, it's the only
-				list we have of the pages that are being moved.
-				We could keep another copy, but that's slow. We
-				can't fail after this point without doing a full
-				panic, so it may be OK to not clear this knowing
-				we won't return an error to the caller.
-				*/
-
-				/*
-				 * Clear the split reference as it moves to the
-				 * allocated page index, so it never appears on
-				 * both after an error.
-				 */
-				ref_new[j] = NULL;
-#endif
 			}
 
 			/*
