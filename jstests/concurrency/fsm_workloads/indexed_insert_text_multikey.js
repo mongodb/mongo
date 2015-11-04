@@ -23,6 +23,9 @@ var $config = extendWorkload($config, function($config, $super) {
         return textArr;
     };
 
+    // SERVER-21291: Reduce the thread count to alleviate PV1 failovers on Windows DEBUG hosts.
+    $config.threadCount = 5;
+
     // Remove the shard key, since it cannot be a multikey index
     delete $config.data.shardKey;
 
