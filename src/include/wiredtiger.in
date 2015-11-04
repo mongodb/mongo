@@ -1247,7 +1247,7 @@ struct __wt_session {
 	 * other than other join calls.
 	 * @param ref_cursor either an index cursor having the same base table
 	 * as the join_cursor, or a table cursor open on the same base table.
-         * The ref_cursor must be positioned.
+	 * The ref_cursor must be positioned.
 	 *
 	 * The ref_cursor limits the results seen by iterating the
 	 * join_cursor to table items referred to by the key in this
