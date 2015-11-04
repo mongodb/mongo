@@ -95,11 +95,14 @@ public:
      *
      * Sample schema:
      * {
+     *    "start" : Date_t,    <- Time at which all collecting started
      *    "name" : {           <- name is from name() in FTDCCollectorInterface
-     *       "start" : Date_t,
+     *       "start" : Date_t, <- Time at which name() collection started
      *       "data" : { ... }  <- data comes from collect() in FTDCCollectorInterface
-     *       "end" : Date_t,
-     *    }
+     *       "end" : Date_t,   <- Time at which name() collection ended
+     *    },
+     *    ...
+     *    "end" : Date_t,      <- Time at which all collecting ended
      * }
      */
     std::tuple<BSONObj, Date_t> collect(Client* client);

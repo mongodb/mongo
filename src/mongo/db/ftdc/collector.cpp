@@ -47,10 +47,19 @@ void FTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collec
 }
 
 std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
+    // If there are no collectors, just return an empty BSONObj so that that are caller knows we did
+    // not collect anything
+    if (_collectors.empty()) {
+        return std::tuple<BSONObj, Date_t>(BSONObj(), Date_t());
+    }
+
     BSONObjBuilder builder;
 
     Date_t start = client->getServiceContext()->getClockSource()->now();
+    Date_t end;
     bool firstLoop = true;
+
+    builder.appendDate(kFTDCCollectStartField, start);
 
     for (auto& collector : _collectors) {
         BSONObjBuilder subObjBuilder(builder.subobjStart(collector->name()));
@@ -75,9 +84,11 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
             collector->collect(txn.get(), subObjBuilder);
         }
 
-        subObjBuilder.appendDate(kFTDCCollectEndField,
-                                 client->getServiceContext()->getClockSource()->now());
+        end = client->getServiceContext()->getClockSource()->now();
+        subObjBuilder.appendDate(kFTDCCollectEndField, end);
     }
+
+    builder.appendDate(kFTDCCollectEndField, end);
 
     return std::tuple<BSONObj, Date_t>(builder.obj(), start);
 }

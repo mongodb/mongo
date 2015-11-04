@@ -59,21 +59,29 @@ public:
         _state = State::kStarted;
         ++_counter;
 
+        // Generate document to return for collector
         generateDocument(builder, _counter);
 
+        // Generate an entire document as if the FTDCCollector generates it
         {
             BSONObjBuilder b2;
-            BSONObjBuilder subObjBuilder(b2.subobjStart(name()));
 
-            subObjBuilder.appendDate(kFTDCCollectStartField,
-                                     getGlobalServiceContext()->getClockSource()->now());
+            b2.appendDate(kFTDCCollectStartField,
+                          getGlobalServiceContext()->getClockSource()->now());
 
-            generateDocument(subObjBuilder, _counter);
+            {
+                BSONObjBuilder subObjBuilder(b2.subobjStart(name()));
 
-            subObjBuilder.appendDate(kFTDCCollectEndField,
-                                     getGlobalServiceContext()->getClockSource()->now());
+                subObjBuilder.appendDate(kFTDCCollectStartField,
+                                         getGlobalServiceContext()->getClockSource()->now());
 
-            subObjBuilder.done();
+                generateDocument(subObjBuilder, _counter);
+
+                subObjBuilder.appendDate(kFTDCCollectEndField,
+                                         getGlobalServiceContext()->getClockSource()->now());
+            }
+
+            b2.appendDate(kFTDCCollectEndField, getGlobalServiceContext()->getClockSource()->now());
 
             _docs.emplace_back(b2.obj());
         }
