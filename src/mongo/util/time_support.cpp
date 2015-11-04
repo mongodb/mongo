@@ -779,7 +779,6 @@ bool toPointInTime(const string& str, boost::posix_time::ptime* timeOfDay) {
     return true;
 }
 
-#if defined(_WIN32)
 void sleepsecs(int s) {
     stdx::this_thread::sleep_for(Seconds(s));
 }
@@ -790,30 +789,6 @@ void sleepmillis(long long s) {
 void sleepmicros(long long s) {
     stdx::this_thread::sleep_for(Microseconds(s));
 }
-#else
-void sleepsecs(int s) {
-    struct timespec t;
-    t.tv_sec = s;
-    t.tv_nsec = 0;
-    if (nanosleep(&t, 0)) {
-        std::cout << "nanosleep failed" << std::endl;
-    }
-}
-void sleepmicros(long long s) {
-    if (s <= 0)
-        return;
-    struct timespec t;
-    t.tv_sec = (int)(s / 1000000);
-    t.tv_nsec = 1000 * (s % 1000000);
-    struct timespec out;
-    if (nanosleep(&t, &out)) {
-        std::cout << "nanosleep failed" << std::endl;
-    }
-}
-void sleepmillis(long long s) {
-    sleepmicros(s * 1000);
-}
-#endif
 
 void Backoff::nextSleepMillis() {
     // Get the current time
