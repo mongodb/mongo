@@ -24,8 +24,7 @@ __curjoin_entry_iter_init(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	    session, WT_SESSION_open_cursor), "raw", NULL };
 	const char *def_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), NULL };
-	const char *uri;
-	const char **config;
+	const char *uri, **config;
 	char *uribuf;
 	WT_CURSOR_JOIN_ITER *iter;
 	size_t size;
@@ -265,14 +264,12 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	const char *raw_cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_open_cursor), "raw", NULL };
 	const char *mainkey_str, *p;
-	const void *buf;
 	int cmp, mainkey_len;
 	size_t size;
 	u_int i;
 	void *allocbuf;
 
 	c = NULL;
-	buf = NULL;
 	allocbuf = NULL;
 
 	if (entry->index != NULL) {
@@ -421,7 +418,6 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 {
 	WT_BLOOM *bloom;
 	WT_DECL_RET;
-	WT_CURSOR *to_dup;
 	WT_CURSOR_JOIN_ENTRY *je, *jeend, *je2;
 	uint64_t k, m;
 
@@ -433,17 +429,11 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 
 	je = &cjoin->entries[0];
 	WT_ERR(__curjoin_entry_iter_init(session, cjoin, je, &cjoin->iter));
-	if (je->ends[0].cursor != NULL)
-		to_dup = je->ends[0].cursor;
-	else
-		to_dup = je->ends[1].cursor;
 
 	jeend = &cjoin->entries[cjoin->entries_next];
 	for (je = cjoin->entries; je < jeend; je++) {
-		WT_ERR(__curjoin_endpoint_init_key(session, je,
-		    &je->ends[0]));
-		WT_ERR(__curjoin_endpoint_init_key(session, je,
-		    &je->ends[1]));
+		WT_ERR(__curjoin_endpoint_init_key(session, je, &je->ends[0]));
+		WT_ERR(__curjoin_endpoint_init_key(session, je, &je->ends[1]));
 
 		/*
 		 * The first entry is iterated as the 'outermost' cursor.
@@ -515,16 +505,10 @@ err:
 	return (ret);
 }
 
-typedef struct {
-	WT_CURSOR iface;
-	WT_CURSOR_JOIN_ENTRY *entry;
-	int ismember;
-} WT_CURJOIN_EXTRACTOR;
-
 /*
  * __curjoin_entry_in_range --
- *	Check if a key is in the range specified by the entry.
- *	Return WT_NOTFOUND if not.
+ *	Check if a key is in the range specified by the entry, returning
+ *	WT_NOTFOUND if not.
  */
 static int
 __curjoin_entry_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
@@ -557,6 +541,12 @@ __curjoin_entry_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 err:	return (ret);
 }
 
+typedef struct {
+	WT_CURSOR iface;
+	WT_CURSOR_JOIN_ENTRY *entry;
+	int ismember;
+} WT_CURJOIN_EXTRACTOR;
+
 /*
  * __curjoin_extract_insert --
  *	Handle a key produced by a custom extractor.
@@ -588,10 +578,9 @@ __curjoin_extract_insert(WT_CURSOR *cursor) {
 	--ikey.size;
 
 	ret = __curjoin_entry_in_range(session, cextract->entry, &ikey, 0);
-	if (ret == WT_NOTFOUND) {
-		cextract->ismember = 0;
+	if (ret == WT_NOTFOUND)
 		ret = 0;
-	} else
+	else
 		cextract->ismember = 1;
 
 	return (ret);
@@ -627,10 +616,8 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	    __wt_cursor_notsup);	/* close */
 	WT_DECL_RET;
 	WT_INDEX *index;
-	WT_SESSION *wtsession;
 	WT_ITEM *key, v;
 
-	wtsession = (WT_SESSION *)session;
 	key = cjoin->iter->curkey;
 
 	if (entry->bloom != NULL) {
@@ -649,7 +636,6 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		 */
 		WT_ERR(__wt_bloom_inmem_get(entry->bloom, key));
 	}
-
 	if (entry->index != NULL) {
 		c = entry->main;
 		c->set_key(c, key);
