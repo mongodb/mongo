@@ -123,6 +123,7 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	CSV_EXTRACTOR *csv_extractor;
 	WT_CONFIG_ITEM field, format;
 	WT_CONFIG_PARSER *parser;
+	WT_EXTENSION_API *wtapi;
 	int ret;
 	long field_num;
 
@@ -130,7 +131,8 @@ csv_customize(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	(void)uri;				/* Unused parameters */
 
 	orig = (const CSV_EXTRACTOR *)extractor;
-	if ((ret = wiredtiger_config_parser_open(session, appcfg->str,
+	wtapi = orig->wt_api;
+	if ((ret = wtapi->config_parser_open(wtapi, session, appcfg->str,
 	    appcfg->len, &parser)) != 0)
 		return (ret);
 	if ((ret = parser->get(parser, "field", &field)) != 0 ||
