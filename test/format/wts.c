@@ -459,7 +459,12 @@ wts_dump(const char *tag, int dump_bdb)
 	int ret;
 	char *cmd;
 
-	/* Some data-sources don't support dump through the wt utility. */
+	/*
+	 * In-memory configurations and data-sources don't support dump through
+	 * the wt utility.
+	 */
+	if (g.c_in_memory != 0)
+		return;
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return;
 
