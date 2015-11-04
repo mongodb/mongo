@@ -364,7 +364,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_PAGE *child;
 	WT_PAGE_INDEX *alloc_index, *child_pindex, *pindex;
 	WT_REF **alloc_refp;
-	WT_REF *child_ref, **child_refp, **parent_refp, *ref;
+	WT_REF *child_ref, **child_refp, *ref, **root_refp;
 	size_t child_incr, root_decr, root_incr, size;
 	uint64_t split_gen;
 	uint32_t children, chunk, i, j, moved_entries, new_entries, remain;
@@ -458,7 +458,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	root_incr += children * sizeof(WT_REF);
 
 	/* Allocate child pages, and connect them into the new page index. */
-	for (parent_refp = pindex->index + skip_leading,
+	for (root_refp = pindex->index + skip_leading,
 	    alloc_refp = alloc_index->index + skip_leading,
 	    i = 0; i < children; ++i) {
 		slots = i == children - 1 ? remain : chunk;
@@ -474,16 +474,16 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 		ref->page = child;
 		ref->addr = NULL;
 		if (root->type == WT_PAGE_ROW_INT) {
-			__wt_ref_key(root, *parent_refp, &p, &size);
+			__wt_ref_key(root, *root_refp, &p, &size);
 			WT_ERR(__wt_row_ikey(session, 0, p, size, ref));
 			root_incr += sizeof(WT_IKEY) + size;
 		} else
-			ref->key.recno = (*parent_refp)->key.recno;
+			ref->key.recno = (*root_refp)->key.recno;
 		ref->state = WT_REF_MEM;
 
 		/* Initialize the child page. */
 		if (root->type == WT_PAGE_COL_INT)
-			child->pg_intl_recno = (*parent_refp)->key.recno;
+			child->pg_intl_recno = (*root_refp)->key.recno;
 		child->pg_intl_parent_ref = ref;
 
 		/* Mark it dirty. */
@@ -511,16 +511,16 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 		child_pindex = WT_INTL_INDEX_GET_SAFE(child);
 		child_incr = 0;
 		for (child_refp = child_pindex->index,
-		    j = 0; j < slots; ++child_refp, ++parent_refp, ++j)
+		    j = 0; j < slots; ++child_refp, ++root_refp, ++j)
 			WT_ERR(__split_ref_move(session, root,
-			    parent_refp, &root_decr, child_refp, &child_incr));
+			    root_refp, &root_decr, child_refp, &child_incr));
 
 		__wt_cache_page_inmem_incr(session, child, child_incr);
 	}
 	WT_ASSERT(session,
 	    alloc_refp - alloc_index->index ==
 	    (ptrdiff_t)(alloc_index->entries - skip_trailing));
-	WT_ASSERT(session, parent_refp - pindex->index ==
+	WT_ASSERT(session, root_refp - pindex->index ==
 	    (ptrdiff_t)(pindex->entries - skip_trailing));
 
 	/*
@@ -1019,7 +1019,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 
 		/*
 		 * The newly allocated child's page index references the same
-		 * structures as the page. (We cannot move WT_REF structures,
+		 * structures as the parent. (We cannot move WT_REF structures,
 		 * threads may be underneath us right now changing the structure
 		 * state.)  However, if the WT_REF structures reference on-page
 		 * information, we have to fix that, because the disk image for
