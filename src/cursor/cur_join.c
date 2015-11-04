@@ -607,7 +607,7 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
     WT_CURSOR_JOIN_ENTRY *entry, bool skip_left)
 {
 	WT_CURJOIN_EXTRACTOR extract_cursor;
-	WT_CURSOR *main;
+	WT_CURSOR *c;
 	WT_CURSOR_STATIC_INIT(iface,
 	    __wt_cursor_get_key,	/* get-key */
 	    __wt_cursor_get_value,	/* get-value */
@@ -651,14 +651,14 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 	}
 
 	if (entry->index != NULL) {
-		main = entry->main;
-		main->set_key(main, key);
-		if ((ret  = main->search(main)) == 0)
-			ret = main->get_value(main, &v);
+		c = entry->main;
+		c->set_key(c, key);
+		if ((ret  = c->search(c)) == 0)
+			ret = c->get_value(c, &v);
 		else if (ret == WT_NOTFOUND)
 			WT_ERR_MSG(session, WT_ERROR,
 			    "main table for join is missing entry.");
-		main->reset(main);
+		c->reset(c);
 		WT_ERR(ret);
 	} else
 		v = *key;
