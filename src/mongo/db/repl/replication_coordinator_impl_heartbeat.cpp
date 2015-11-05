@@ -281,8 +281,11 @@ ReplicationExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart() {
     if (!finishEvent) {
         return finishEvent;
     }
-    _replExecutor.scheduleWorkWithGlobalExclusiveLock(stdx::bind(
-        &ReplicationCoordinatorImpl::_stepDownFinish, this, stdx::placeholders::_1, finishEvent));
+    _replExecutor.scheduleWorkWithGlobalExclusiveLock(
+        stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish,
+                   this,
+                   stdx::placeholders::_1,
+                   finishEvent));
     return finishEvent;
 }
 
