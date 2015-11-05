@@ -250,10 +250,7 @@ void CondVarLockGrantNotification::notify(ResourceId resId, LockResult result) {
 
 template <bool IsForMMAPV1>
 LockerImpl<IsForMMAPV1>::LockerImpl()
-    : _id(idCounter.addAndFetch(1)),
-      _requestStartTime(0),
-      _wuowNestingLevel(0),
-      _batchWriter(false) {}
+    : _id(idCounter.addAndFetch(1)), _wuowNestingLevel(0), _batchWriter(false) {}
 
 template <bool IsForMMAPV1>
 LockerImpl<IsForMMAPV1>::~LockerImpl() {
@@ -648,8 +645,6 @@ LockResult LockerImpl<IsForMMAPV1>::lockBegin(ResourceId resId, LockMode mode) {
                               : globalLockManager.convert(resId, request, mode);
 
     if (result == LOCK_WAITING) {
-        // Start counting the wait time so that lockComplete can update that metric
-        _requestStartTime = curTimeMicros64();
         globalStats.recordWait(_id, resId, mode);
         _stats.recordWait(resId, mode);
     }
@@ -676,13 +671,19 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
     // Don't go sleeping without bound in order to be able to report long waits or wake up for
     // deadlock detection.
     unsigned waitTimeMs = std::min(timeoutMs, DeadlockTimeoutMs);
+    const uint64_t startOfTotalWaitTime = curTimeMicros64();
+    uint64_t startOfCurrentWaitTime = startOfTotalWaitTime;
+
     while (true) {
         // It is OK if this call wakes up spuriously, because we re-evaluate the remaining
         // wait time anyways.
         result = _notify.wait(waitTimeMs);
 
         // Account for the time spent waiting on the notification object
-        const uint64_t elapsedTimeMicros = curTimeMicros64() - _requestStartTime;
+        const uint64_t curTimeMicros = curTimeMicros64();
+        const uint64_t elapsedTimeMicros = curTimeMicros - startOfCurrentWaitTime;
+        startOfCurrentWaitTime = curTimeMicros;
+
         globalStats.recordWaitTime(_id, resId, mode, elapsedTimeMicros);
         _stats.recordWaitTime(resId, mode, elapsedTimeMicros);
 
@@ -707,9 +708,9 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
             continue;
         }
 
-        const unsigned elapsedTimeMs = elapsedTimeMicros / 1000;
-        waitTimeMs = (elapsedTimeMs < timeoutMs)
-            ? std::min(timeoutMs - elapsedTimeMs, DeadlockTimeoutMs)
+        const unsigned totalBlockTimeMs = (curTimeMicros - startOfTotalWaitTime) / 1000;
+        waitTimeMs = (totalBlockTimeMs < timeoutMs)
+            ? std::min(timeoutMs - totalBlockTimeMs, DeadlockTimeoutMs)
             : 0;
 
         if (waitTimeMs == 0) {
