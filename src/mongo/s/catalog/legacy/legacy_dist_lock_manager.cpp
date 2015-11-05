@@ -102,13 +102,19 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
     while (waitFor <= milliseconds::zero() || milliseconds(timer.millis()) < waitFor) {
         bool acquired = false;
         BSONObj lockDoc;
+        OID lockID(OID::gen());
+
         try {
-            acquired = distLock->lock_try(
-                whyMessage.toString(), &lockDoc, durationCount<Seconds>(kDefaultSocketTimeout));
+            acquired = distLock->lock_try(lockID,
+                                          whyMessage.toString(),
+                                          &lockDoc,
+                                          durationCount<Seconds>(kDefaultSocketTimeout));
 
             if (!acquired) {
                 lastStatus = Status(ErrorCodes::LockBusy,
                                     str::stream() << "Lock for " << whyMessage << " is taken.");
+                // cleanup failed attempt to acquire lock.
+                _pinger->addUnlockOID(lockID);
             }
         } catch (const LockException& lockExcep) {
             OID needUnlockID(lockExcep.getMustUnlockID());
@@ -119,6 +125,7 @@ StatusWith<DistLockManager::ScopedDistLock> LegacyDistLockManager::lock(
             lastStatus = lockExcep.toStatus();
         } catch (...) {
             lastStatus = exceptionToStatus();
+            _pinger->addUnlockOID(lockID);
         }
 
         if (acquired) {

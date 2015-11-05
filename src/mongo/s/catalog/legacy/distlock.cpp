@@ -329,7 +329,10 @@ static void logErrMsgOrWarn(StringData messagePrefix,
 // Semantics of this method are basically that if the lock cannot be acquired, returns false,
 // can be retried. If the lock should not be tried again (some unexpected error),
 // a LockException is thrown.
-bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout) {
+bool DistributedLock::lock_try(const OID& lockID,
+                               const string& why,
+                               BSONObj* other,
+                               double timeout) {
     // This should always be true, if not, we are using the lock incorrectly.
     verify(_name != "");
 
@@ -574,7 +577,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
     BSONObj lockDetails =
         BSON(LocksType::state(LocksType::LOCK_PREP)
              << LocksType::who(getDistLockId()) << LocksType::process(_processId)
-             << LocksType::when(jsTime()) << LocksType::why(why) << LocksType::lockID(OID::gen()));
+             << LocksType::when(jsTime()) << LocksType::why(why) << LocksType::lockID(lockID));
     BSONObj whatIWant = BSON("$set" << lockDetails);
 
     BSONObj query = queryBuilder.obj();
@@ -620,23 +623,21 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
 
             try {
                 indUpdate = indDB->findOne(LocksType::ConfigNS, BSON(LocksType::name(_name)));
-
+                const auto currentLockID = indUpdate[LocksType::lockID()].OID();
                 // If we override this lock in any way, grab and protect it.
                 // We assume/ensure that if a process does not have all lock documents, it is no
                 // longer holding the lock.
                 // Note - finalized locks may compete too, but we know they've won already if
                 // competing in this round.  Cleanup of crashes during finalizing may take a few
                 // tries.
-                if (indUpdate[LocksType::lockID()] < lockDetails[LocksType::lockID()] ||
+                if (currentLockID < lockID ||
                     indUpdate[LocksType::state()].numberInt() == LocksType::UNLOCKED) {
                     BSONObj grabQuery =
-                        BSON(LocksType::name(_name)
-                             << LocksType::lockID(indUpdate[LocksType::lockID()].OID()));
+                        BSON(LocksType::name(_name) << LocksType::lockID(currentLockID));
 
                     // Change ts so we won't be forced, state so we won't be relocked
                     BSONObj grabChanges =
-                        BSON(LocksType::lockID(lockDetails[LocksType::lockID()].OID())
-                             << LocksType::state(LocksType::LOCK_PREP));
+                        BSON(LocksType::lockID(lockID) << LocksType::state(LocksType::LOCK_PREP));
 
                     // Either our update will succeed, and we'll grab the lock, or it will fail b/c
                     // some other process grabbed the lock (which will change the ts), but the lock
@@ -670,7 +671,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
                 string msg(str::stream() << "distributed lock " << lockName
                                          << " had errors communicating with individual server "
                                          << up[1].first << causedBy(e));
-                throw LockException(msg, 13661);
+                throw LockException(msg, 13661, lockID);
             }
 
             verify(!indUpdate.isEmpty());
@@ -686,7 +687,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
 
         // Locks on all servers are now set and safe until forcing
 
-        if (currLock[LocksType::lockID()] == lockDetails[LocksType::lockID()]) {
+        if (currLock[LocksType::lockID()].OID() == lockID) {
             LOG(logLvl - 1) << "lock update won, completing lock propagation for '" << lockName
                             << "'" << endl;
             gotLock = true;
@@ -699,7 +700,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
         conn.done();
         string msg(str::stream() << "exception creating distributed lock " << lockName
                                  << causedBy(e));
-        throw LockException(msg, 13663);
+        throw LockException(msg, 13663, lockID);
     }
 
     // Complete lock propagation
@@ -744,7 +745,7 @@ bool DistributedLock::lock_try(const string& why, BSONObj* other, double timeout
             conn.done();
             string msg(str::stream() << "exception finalizing winning lock" << causedBy(e));
             // Inform caller about the potential orphan lock.
-            throw LockException(msg, 13662, lockDetails[LocksType::lockID()].OID());
+            throw LockException(msg, 13662, lockID);
         }
     }
 
