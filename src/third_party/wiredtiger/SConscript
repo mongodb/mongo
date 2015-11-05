@@ -44,6 +44,7 @@ if env.TargetOSIs('windows'):
     if get_option('allocator') == 'tcmalloc':
         env.InjectThirdPartyIncludePaths(libraries=['gperftools'])
         env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC'])
+        env.Append(CPPDEFINES=['HAVE_POSIX_MEMALIGN'])
 elif env.TargetOSIs('osx'):
     env.Append(CPPPATH=["build_darwin"])
 elif env.TargetOSIs('solaris'):
