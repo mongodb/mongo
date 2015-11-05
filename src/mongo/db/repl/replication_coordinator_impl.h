@@ -363,11 +363,12 @@ public:
 
     /**
      * Non-blocking version of updateTerm.
-     * Returns event handle that we can use to wait for the operation to complete.
-     * When the operation is complete (waitForEvent() returns), 'updated' will be set to true
-     * if the term increased and potential stepdown has finished.
+     * Returns callback handle that we can use to wait for the operation to complete.
+     * When the operation is complete (wait() returns), 'updated' will be set to true
+     * if the term increased.
      */
-    ReplicationExecutor::EventHandle updateTerm_forTest(long long term, bool* updated);
+    StatusWith<ReplicationExecutor::CallbackHandle> updateTerm_nonBlocking(long long term,
+                                                                           bool* updated);
 
     /**
      * If called after _startElectSelfV1(), blocks until all asynchronous
@@ -381,6 +382,12 @@ public:
      * last vote and scheduling the real election.
      */
     void waitForElectionDryRunFinish_forTest();
+
+    /**
+     * If called after a stepdown starts, blocks until all asynchronous activities associated with
+     * stepdown complete.
+     */
+    void waitForStepDownFinish_forTest();
 
 private:
     using CallbackFn = executor::TaskExecutor::CallbackFn;
@@ -961,7 +968,7 @@ private:
      */
     void _requestRemotePrimaryStepdown(const HostAndPort& target);
 
-    ReplicationExecutor::EventHandle _stepDownStart();
+    void _stepDownStart();
 
     /**
      * Completes a step-down of the current node.  Must be run with a global
@@ -1043,19 +1050,16 @@ private:
     /**
      * Callback that attempts to set the current term in topology coordinator and
      * relinquishes primary if the term actually changes and we are primary.
-     * *updated will be true if the term increased.
-     * Returns the finish event if it does not finish in this function, for example,
-     * due to stepdown, otherwise the returned EventHandle is invalid.
+     * Returns true if the term increased.
      */
-    EventHandle _updateTerm_incallback(long long term, bool* updated = nullptr);
+    bool _updateTerm_incallback(long long term);
 
     /**
      * Callback that processes the ReplSetMetadata returned from a command run against another
      * replica set member and updates protocol version 1 information (most recent optime that is
      * committed, member id of the current PRIMARY, the current config version and the current term)
-     * Returns the finish event which is invalid if the process has already finished.
      */
-    EventHandle _processReplSetMetadata_incallback(const rpc::ReplSetMetadata& replMetadata);
+    void _processReplSetMetadata_incallback(const rpc::ReplSetMetadata& replMetadata);
 
     /**
      * Blesses a snapshot to be used for new committed reads.

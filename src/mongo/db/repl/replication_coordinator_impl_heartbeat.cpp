@@ -132,8 +132,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         StatusWith<rpc::ReplSetMetadata> replMetadata =
             rpc::ReplSetMetadata::readFromMetadata(cbData.response.getValue().metadata);
         if (replMetadata.isOK()) {
-            // Asynchronous stepdown could happen, but it will be queued in executor after
-            // this function, so we cannot and don't need to wait for it to finish.
             _processReplSetMetadata_incallback(replMetadata.getValue());
         }
     }
@@ -144,8 +142,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
 
     if (responseStatus.isOK()) {
         networkTime = cbData.response.getValue().elapsedMillis;
-        // TODO(sz) Because the term is duplicated in ReplSetMetaData, we can get rid of this
-        // and update tests.
         _updateTerm_incallback(hbStatusResponse.getValue().getTerm());
         // Postpone election timeout if we have a successful heartbeat response from the primary.
         const auto& hbResponse = hbStatusResponse.getValue();
@@ -222,7 +218,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
             invariant(action.getPrimaryConfigIndex() == _selfIndex);
             log() << "Stepping down from primary in response to heartbeat";
             _topCoord->prepareForStepDown();
-            // Don't need to wait for stepdown to finish.
             _stepDownStart();
             break;
         case HeartbeatResponseAction::StepDownRemotePrimary: {
@@ -276,17 +271,17 @@ void ReplicationCoordinatorImpl::_requestRemotePrimaryStepdown(const HostAndPort
     }
 }
 
-ReplicationExecutor::EventHandle ReplicationCoordinatorImpl::_stepDownStart() {
-    auto finishEvent = _makeEvent();
-    if (!finishEvent) {
-        return finishEvent;
+void ReplicationCoordinatorImpl::_stepDownStart() {
+    auto event = _makeEvent();
+    if (!event) {
+        return;
     }
+    _stepDownFinishedEvent = event;
     _replExecutor.scheduleWorkWithGlobalExclusiveLock(
         stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish,
                    this,
                    stdx::placeholders::_1,
-                   finishEvent));
-    return finishEvent;
+                   _stepDownFinishedEvent));
 }
 
 void ReplicationCoordinatorImpl::_stepDownFinish(
@@ -583,8 +578,6 @@ void ReplicationCoordinatorImpl::_handleLivenessTimeout(
                 // downstream.
                 HeartbeatResponseAction action =
                     _topCoord->setMemberAsDown(now, memberIndex, _getMyLastOptime_inlock());
-                // Don't mind potential asynchronous stepdown as this is the last step of
-                // liveness check.
                 _handleHeartbeatResponseAction(action, makeStatusWith<ReplSetHeartbeatResponse>());
             }
         }
