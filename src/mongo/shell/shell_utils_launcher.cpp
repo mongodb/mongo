@@ -163,6 +163,33 @@ void ProgramRegistry::getRegisteredPids(vector<ProcessId>& pids) {
     }
 }
 
+#ifdef _WIN32
+HANDLE ProgramRegistry::getHandleForPid(ProcessId pid) {
+    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+
+    return _handles[pid];
+}
+
+void ProgramRegistry::eraseHandleForPid(ProcessId pid) {
+    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+
+    _handles.erase(pid);
+}
+
+std::size_t ProgramRegistry::countHandleForPid(ProcessId pid) {
+    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+
+    return _handles.count(pid);
+}
+
+void ProgramRegistry::insertHandleForPid(ProcessId pid, HANDLE handle) {
+    stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
+
+    _handles.insert(make_pair(pid, handle));
+}
+
+#endif
+
 ProgramRegistry& registry = *(new ProgramRegistry());
 
 void goingAwaySoon() {
@@ -451,7 +478,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
     CloseHandle(pi.hThread);
 
     _pid = ProcessId::fromNative(pi.dwProcessId);
-    registry._handles.insert(make_pair(_pid, pi.hProcess));
+    registry.insertHandleForPid(_pid, pi.hProcess);
 
 #else
 
@@ -502,8 +529,8 @@ void ProgramRunner::launchProcess(int child_stdout) {
 // returns true if process exited
 bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = NULL) {
 #ifdef _WIN32
-    verify(registry._handles.count(pid));
-    HANDLE h = registry._handles[pid];
+    verify(registry.countHandleForPid(pid));
+    HANDLE h = registry.getHandleForPid(pid);
 
     if (block) {
         if (WaitForSingleObject(h, INFINITE)) {
@@ -519,7 +546,7 @@ bool wait_for_pid(ProcessId pid, bool block = true, int* exit_code = NULL) {
             return false;
         }
         CloseHandle(h);
-        registry._handles.erase(pid);
+        registry.eraseHandleForPid(pid);
         if (exit_code)
             *exit_code = tmp;
         return true;
@@ -654,8 +681,9 @@ BSONObj CopyDbpath(const BSONObj& a, void* data) {
 inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
 #ifdef _WIN32
     if (sig == SIGKILL || port == 0) {
-        verify(registry._handles.count(pid));
-        TerminateProcess(registry._handles[pid], 1);  // returns failure for "zombie" processes.
+        verify(registry.countHandleForPid(pid));
+        TerminateProcess(registry.getHandleForPid(pid),
+                         1);  // returns failure for "zombie" processes.
         return;
     }
 

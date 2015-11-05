@@ -97,8 +97,15 @@ private:
     mutable stdx::recursive_mutex _mutex;
 
 #ifdef _WIN32
-public:
+private:
     std::map<ProcessId, HANDLE> _handles;
+
+public:
+    HANDLE getHandleForPid(ProcessId pid);
+    void eraseHandleForPid(ProcessId pid);
+    std::size_t countHandleForPid(ProcessId pid);
+    void insertHandleForPid(ProcessId pid, HANDLE handle);
+
 #endif
 };
 
