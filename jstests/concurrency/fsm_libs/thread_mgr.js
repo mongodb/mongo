@@ -7,9 +7,9 @@ load('jstests/concurrency/fsm_libs/worker_thread.js'); // for workerThread
  * Helper for spawning and joining worker threads.
  */
 
-var ThreadManager = function(clusterOptions, executionMode) {
+var ThreadManager = function(clusterOptions, executionMode, executionOptions) {
     if (!(this instanceof ThreadManager)) {
-        return new ThreadManager(clusterOptions, executionMode);
+        return new ThreadManager(clusterOptions, executionMode, executionOptions);
     }
 
     function makeThread(workloads, args, options) {
@@ -59,7 +59,7 @@ var ThreadManager = function(clusterOptions, executionMode) {
 
         workloads.forEach(function(workload) {
             var config = context[workload].config;
-            threadCounts[workload] = config.threadCount;
+            threadCounts[workload] = config.threadCount * executionOptions.threadMultiplier;
         });
 
         var requestedNumThreads = computeNumThreads();
@@ -106,8 +106,6 @@ var ThreadManager = function(clusterOptions, executionMode) {
                 workloads = _workloads; // worker thread needs to load all workloads
             }
 
-            var config = _context[workload].config;
-
             for (var i = 0; i < threadCounts[workload]; ++i) {
                 var args = {
                     tid: tid++,
@@ -118,6 +116,7 @@ var ThreadManager = function(clusterOptions, executionMode) {
                     collName: _context[workload].collName,
                     cluster: cluster.getSerializedCluster(),
                     clusterOptions: clusterOptions,
+                    iterationMultiplier: executionOptions.iterationMultiplier,
                     seed: Random.randInt(1e13), // contains range of Date.getTime()
                     globalAssertLevel: globalAssertLevel
                 };

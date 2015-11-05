@@ -15,6 +15,7 @@ var workerThread = (function() {
     // args.collName = the collection name
     // args.cluster = connection strings for all cluster nodes (see cluster.js for format)
     // args.clusterOptions = the configuration of the cluster
+    // args.iterationMultiplier = number to multiply the number of iterations by
     // args.seed = seed for the random number generator
     // args.globalAssertLevel = the global assertion level to use
     // run = callback that takes a map of workloads to their associated $config
@@ -67,7 +68,7 @@ var workerThread = (function() {
                     startState: config.startState,
                     states: config.states,
                     transitions: config.transitions,
-                    iterations: config.iterations
+                    iterations: config.iterations * args.iterationMultiplier
                 };
             });
 

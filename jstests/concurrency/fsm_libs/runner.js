@@ -33,7 +33,12 @@ var runner = (function() {
     }
 
     function validateExecutionOptions(mode, options) {
-        var allowedKeys = ['dbNamePrefix'];
+        var allowedKeys = [
+            'dbNamePrefix',
+            'iterationMultiplier',
+            'threadMultiplier'
+        ];
+
         if (mode.parallel || mode.composed) {
             allowedKeys.push('numSubsets');
             allowedKeys.push('subsetSize');
@@ -50,24 +55,21 @@ var runner = (function() {
         });
 
         if (typeof options.subsetSize !== 'undefined') {
-            assert.eq('number', typeof options.subsetSize);
+            assert(Number.isInteger(options.subsetSize),
+                   'expected subset size to be an integer');
             assert.gt(options.subsetSize, 1);
-            assert.eq(options.subsetSize, Math.floor(options.subsetSize),
-                      'expected subset size to be an integer');
         }
 
         if (typeof options.numSubsets !== 'undefined') {
-            assert.eq('number', typeof options.numSubsets);
+            assert(Number.isInteger(options.numSubsets),
+                   'expected number of subsets to be an integer');
             assert.gt(options.numSubsets, 0);
-            assert.eq(options.numSubsets, Math.floor(options.numSubsets),
-                      'expected number of subsets to be an integer');
         }
 
         if (typeof options.iterations !== 'undefined') {
-            assert.eq('number', typeof options.iterations);
+            assert(Number.isInteger(options.iterations),
+                   'expected number of iterations to be an integer');
             assert.gt(options.iterations, 0);
-            assert.eq(options.iterations, Math.floor(options.iterations),
-                      'expected number of iterations to be an integer');
         }
 
         if (typeof options.composeProb !== 'undefined') {
@@ -80,6 +82,18 @@ var runner = (function() {
             assert.eq('string', typeof options.dbNamePrefix,
                       'expected dbNamePrefix to be a string');
         }
+
+        options.iterationMultiplier = options.iterationMultiplier || 1;
+        assert(Number.isInteger(options.iterationMultiplier),
+               'expected iterationMultiplier to be an integer');
+        assert.gte(options.iterationMultiplier, 1,
+                   'expected iterationMultiplier to be greater than or equal to 1');
+
+        options.threadMultiplier = options.threadMultiplier || 1;
+        assert(Number.isInteger(options.threadMultiplier),
+               'expected threadMultiplier to be an integer');
+        assert.gte(options.threadMultiplier, 1,
+                   'expected threadMultiplier to be greater than or equal to 1');
 
         return options;
     }
@@ -340,8 +354,8 @@ var runner = (function() {
         executionMode = validateExecutionMode(executionMode);
         Object.freeze(executionMode); // immutable after validation (and normalization)
 
-        Object.freeze(executionOptions); // immutable prior to validation
         validateExecutionOptions(executionMode, executionOptions);
+        Object.freeze(executionOptions); // immutable after validation (and normalization)
 
         Object.freeze(cleanupOptions); // immutable prior to validation
         validateCleanupOptions(cleanupOptions);
@@ -373,7 +387,7 @@ var runner = (function() {
             context[workload] = { config: parseConfig($config) };
         });
 
-        var threadMgr = new ThreadManager(clusterOptions, executionMode);
+        var threadMgr = new ThreadManager(clusterOptions, executionMode, executionOptions);
 
         var cluster = new Cluster(clusterOptions);
         cluster.setup();
@@ -390,7 +404,7 @@ var runner = (function() {
             dropAllDatabases(cluster.getDB('test'), dbBlacklist);
         }
 
-        var maxAllowedConnections = 100;
+        var maxAllowedThreads = 100 * executionOptions.threadMultiplier;
         Random.setRandomSeed(clusterOptions.seed);
 
         try {
@@ -424,7 +438,7 @@ var runner = (function() {
                     });
 
                     startTime = new Date();
-                    threadMgr.init(workloads, context, maxAllowedConnections);
+                    threadMgr.init(workloads, context, maxAllowedThreads);
 
                     try {
                         threadMgr.spawnAll(cluster, executionOptions);
