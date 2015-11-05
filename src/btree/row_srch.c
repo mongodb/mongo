@@ -144,7 +144,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_PAGE *page;
-	WT_PAGE_INDEX *pindex;
+	WT_PAGE_INDEX *pindex, *parent_pindex;
 	WT_REF *current, *descent;
 	WT_ROW *rip;
 	size_t match, skiphigh, skiplow;
@@ -155,6 +155,7 @@ __wt_row_search(WT_SESSION_IMPL *session,
 	btree = S2BT(session);
 	collator = btree->collator;
 	item = cbt->tmp;
+	current = NULL;
 
 	__cursor_pos_clear(cbt);
 
@@ -185,11 +186,13 @@ __wt_row_search(WT_SESSION_IMPL *session,
 		goto leaf_only;
 	}
 
+restart_root:
 	/* Search the internal pages of the tree. */
 	cmp = -1;
 	current = &btree->root;
-	for (depth = 2;; ++depth) {
-restart:	page = current->page;
+	for (depth = 2, pindex = NULL;; ++depth) {
+		parent_pindex = pindex;
+restart_page:	page = current->page;
 		if (page->type != WT_PAGE_ROW_INT)
 			break;
 
@@ -211,7 +214,7 @@ restart:	page = current->page;
 			WT_ERR(__wt_compare(
 			    session, collator, srch_key, item, &cmp));
 			if (cmp >= 0)
-				goto descend;
+				goto append;
 
 			/* A failed append check turns off append checks. */
 			append_check = false;
@@ -301,6 +304,21 @@ restart:	page = current->page;
 		if (pindex->entries != base - 1)
 			descend_right = false;
 
+		/*
+		 * If on the last slot (the key is larger than any key on the
+		 * page), check for an internal page split race.
+		 */
+		if (pindex->entries == base - 1) {
+append:			if (parent_pindex != NULL &&
+			    __wt_split_intl_race(
+			    session, current->home, parent_pindex)) {
+				ret = __wt_page_release(session, current, 0);
+				current = NULL;
+				WT_ERR(ret);
+				goto restart_root;
+			}
+		}
+
 descend:	/*
 		 * Swap the current page for the child page. If the page splits
 		 * while we're retrieving it, restart the search in the current
@@ -313,7 +331,7 @@ descend:	/*
 			break;
 		case WT_RESTART:
 			skiphigh = skiplow = 0;
-			goto restart;
+			goto restart_page;
 		default:
 			return (ret);
 		}
@@ -487,7 +505,7 @@ leaf_match:	cbt->compare = 0;
 
 	return (0);
 
-err:	if (leaf != NULL)
+err:	if (current != NULL && leaf == NULL)
 		WT_TRET(__wt_page_release(session, current, 0));
 	return (ret);
 }
@@ -511,7 +529,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	__cursor_pos_clear(cbt);
 
-restart:
+restart_root:
 	/* Walk the internal pages of the tree. */
 	current = &btree->root;
 	for (;;) {
@@ -538,7 +556,7 @@ restart:
 		 */
 		if (ret == WT_RESTART &&
 		    (ret = __wt_page_release(session, current, 0)) == 0)
-			goto restart;
+			goto restart_root;
 		return (ret);
 	}
 

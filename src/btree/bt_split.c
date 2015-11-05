@@ -791,6 +791,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	}
 
 	/*
+	 * Push out the changes: not required for correctness, but don't let
+	 * threads spin on incorrect page references longer than necessary.
+	 */
+	WT_FULL_BARRIER();
+
+	/*
 	 * A note on error handling: failures before we swapped the new page
 	 * index into the parent can be resolved by freeing allocated memory
 	 * because the original page is unchanged, we can continue to use it
