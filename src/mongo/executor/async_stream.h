@@ -49,6 +49,8 @@ public:
 
     void cancel() override;
 
+    bool isOpen() override;
+
 private:
     asio::io_service::strand* const _strand;
     asio::ip::tcp::socket _stream;

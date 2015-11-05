@@ -125,11 +125,6 @@ env.Library(target='network_test_env',
 env.Library(
     target='network_interface_asio',
     source=[
-        'async_secure_stream.cpp',
-        'async_secure_stream_factory.cpp',
-        'async_stream.cpp',
-        'async_stream_common.cpp',
-        'async_stream_factory.cpp',
         'connection_pool_asio.cpp',
         'network_interface_asio.cpp',
         'network_interface_asio_auth.cpp',
@@ -138,18 +133,46 @@ env.Library(
         'network_interface_asio_operation.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/system_error',
-        '$BUILD_DIR/mongo/client/authentication',
         '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/third_party/shim_asio',
+        'async_stream',
         'async_timer_asio',
         'connection_pool',
         'downconvert_find_and_getmore_commands',
         'network_interface',
         'task_executor_interface',
     ])
+
+env.Library(
+    target='async_stream',
+    source=[
+        'async_secure_stream.cpp',
+        'async_secure_stream_factory.cpp',
+        'async_stream.cpp',
+        'async_stream_common.cpp',
+        'async_stream_factory.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/system_error',
+        '$BUILD_DIR/mongo/client/authentication',
+        '$BUILD_DIR/third_party/shim_asio',
+        'task_executor_interface',
+    ]
+)
+
+env.CppUnitTest(
+    target='async_stream_test',
+    source=[
+        'async_stream_test.cpp',
+    ],
+    LIBDEPS=[
+        'async_stream',
+    ]
+)
 
 env.CppUnitTest(
     target='network_interface_asio_test',

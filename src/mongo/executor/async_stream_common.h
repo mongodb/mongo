@@ -80,5 +80,45 @@ void cancelStream(ASIOStream* stream, bool connected) {
     stream->cancel();
 }
 
+void logFailureInSetStreamNonBlocking(std::error_code ec);
+
+template <typename ASIOStream>
+void setStreamNonBlocking(ASIOStream* stream, bool connected) {
+    invariant(connected);
+    std::error_code ec;
+    stream->non_blocking(true, ec);
+    if (ec) {
+        logFailureInSetStreamNonBlocking(ec);
+    }
+    invariant(!ec);
+}
+
+void logUnexpectedErrorInCheckOpen(std::error_code ec);
+
+template <typename ASIOStream>
+bool checkIfStreamIsOpen(ASIOStream* stream, bool connected) {
+    if (!connected) {
+        return false;
+    };
+    std::error_code ec;
+    std::array<char, 1> buf;
+    // Although we call the blocking form of receive, we ensure the socket is in non-blocking mode.
+    // ASIO implements receive on POSIX using the 'recvmsg' system call, which returns immediately
+    // if the socket is non-blocking and in a valid state, but there is no data to receive. On
+    // windows, receive is implemented with WSARecv, which has the same semantics.
+    invariant(stream->non_blocking());
+    stream->receive(asio::buffer(buf), asio::socket_base::message_peek, ec);
+    if (!ec || ec == asio::error::would_block || ec == asio::error::try_again) {
+        // If the read worked or we got EWOULDBLOCK or EAGAIN (since we are in non-blocking mode),
+        // we assume the socket is still open.
+        return true;
+    } else if (ec == asio::error::eof) {
+        return false;
+    }
+    // We got a different error. Log it and return false so we throw the connection away.
+    logUnexpectedErrorInCheckOpen(ec);
+    return false;
+}
+
 }  // namespace executor
 }  // namespace mongo

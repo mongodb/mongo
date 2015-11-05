@@ -58,6 +58,7 @@ void AsyncStream::connect(tcp::resolver::iterator iter, ConnectHandler&& connect
                 // We assume that our owner is responsible for keeping us alive until we call
                 // connectHandler, so _connected should always be a valid memory location.
                 _connected = true;
+                setStreamNonBlocking(&_stream, _connected);
             }
             return connectHandler(ec);
         }));
@@ -73,6 +74,10 @@ void AsyncStream::read(asio::mutable_buffer buffer, StreamHandler&& streamHandle
 
 void AsyncStream::cancel() {
     cancelStream(&_stream, _connected);
+}
+
+bool AsyncStream::isOpen() {
+    return checkIfStreamIsOpen(&_stream, _connected);
 }
 
 }  // namespace executor

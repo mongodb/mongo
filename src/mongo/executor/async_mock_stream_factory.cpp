@@ -330,5 +330,9 @@ void AsyncMockStreamFactory::MockStream::simulateServer(
     }
 }
 
+bool AsyncMockStreamFactory::MockStream::isOpen() {
+    return true;
+}
+
 }  // namespace executor
 }  // namespace mongo

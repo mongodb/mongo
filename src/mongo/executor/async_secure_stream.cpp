@@ -64,6 +64,7 @@ void AsyncSecureStream::connect(const asio::ip::tcp::resolver::iterator endpoint
                 return _userHandler(ec);
             }
             _connected = true;
+            setStreamNonBlocking(&_stream.next_layer(), _connected);
             return _handleConnect(std::move(iter));
         }));
 }
@@ -98,6 +99,10 @@ void AsyncSecureStream::_handleHandshake(std::error_code ec, const std::string& 
 
 void AsyncSecureStream::cancel() {
     cancelStream(&_stream.lowest_layer(), _connected);
+}
+
+bool AsyncSecureStream::isOpen() {
+    return checkIfStreamIsOpen(&_stream.next_layer(), _connected);
 }
 
 }  // namespace executor

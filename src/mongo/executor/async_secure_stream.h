@@ -55,6 +55,8 @@ public:
 
     void cancel() override;
 
+    bool isOpen() override;
+
 private:
     void _handleConnect(asio::ip::tcp::resolver::iterator iter);
 

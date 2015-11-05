@@ -79,6 +79,8 @@ public:
         void write(asio::const_buffer buf, StreamHandler&& writeHandler) override;
         void read(asio::mutable_buffer buf, StreamHandler&& readHandler) override;
 
+        bool isOpen() override;
+
         HostAndPort target();
 
         StreamState waitUntilBlocked();

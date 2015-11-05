@@ -60,6 +60,8 @@ public:
 
     virtual void cancel() = 0;
 
+    virtual bool isOpen() = 0;
+
 protected:
     AsyncStreamInterface() = default;
 };
