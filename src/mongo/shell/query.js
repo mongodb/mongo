@@ -105,6 +105,10 @@ DBQuery.prototype._exec = function(){
             this._cursor = new DBCommandCursor(this._mongo, cmdRes, this._batchSize);
         }
         else {
+            if (this._special && this._query.readConcern) {
+                throw new Error("readConcern requires use of read commands");
+            }
+
             this._cursor = this._mongo.find(this._ns,
                                             this._query,
                                             this._fields,
