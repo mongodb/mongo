@@ -1056,9 +1056,6 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 */
 	complete = true;
 
-	/* We copied/moved the current page's WT_REF, update our reference. */
-	page->pg_intl_parent_ref = alloc_index->index[0];
-
 	/* Confirm the page's index hasn't moved, then update it. */
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(page) == pindex);
 	WT_INTL_INDEX_SET(page, replace_index);
