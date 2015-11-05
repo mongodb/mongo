@@ -48,7 +48,7 @@ functions:
           cd ./clusters/${cluster}
           # stage aws credential for terraform
           cp ../../terraform/* .
-          ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/dsi/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
+          ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/dsi/${version_id}/${revision}/mongod-${version_id}.tar.gz
           # generate aws private key file
           echo "${ec2_pem}" > ../../keys/aws.pem
           chmod 400 ../../keys/aws.pem
@@ -216,6 +216,9 @@ functions:
           set -o verbose
           python ../dsi/bin/post_run_check.py --rev ${revision} -f history.json -t tags.json --refTag 3.0.6-Baseline --overrideFile ../dsi/bin/override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
 
+#######################################
+#               Tasks                 #
+#######################################
 
 tasks:
 - name: compile
@@ -244,7 +247,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongodb.tar.gz
-        remote_file: dsi/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
+        remote_file: dsi/${version_id}/${revision}/mongod-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -260,6 +263,7 @@ tasks:
 - name: industry_benchmarks_WT
   depends_on:
     - name: compile
+      variant: linux-standalone
   commands:
     - func: "prepare environment"
     - func: "bring up cluster"
@@ -279,7 +283,8 @@ tasks:
 
 - name: industry_benchmarks_MMAPv1
   depends_on:
-    - name: compile
+    - name: core_workloads_WT
+      status : "*"
   commands:
     - func: "prepare environment"
     - func: "restore cluster"
@@ -299,7 +304,8 @@ tasks:
 
 - name: core_workloads_WT
   depends_on:
-    - name: compile
+    - name: industry_benchmarks_WT
+      status : "*"
   commands:
     - func: "prepare environment"
     - func: "restore cluster"
@@ -315,7 +321,8 @@ tasks:
 
 - name: core_workloads_MMAPv1
   depends_on:
-    - name: compile
+    - name: industry_benchmarks_MMAPv1
+      status : "*"
   commands:
     - func: "prepare environment"
     - func: "restore cluster"
@@ -330,6 +337,9 @@ tasks:
     - func: "analyze"
     - func: "destroy cluster"      
 
+#######################################
+#            Buildvariants            #
+#######################################
 
 buildvariants:
 - name: linux-1-node-replSet
@@ -340,23 +350,13 @@ buildvariants:
     setup: single-replica
     cluster: single
     numShard: 0
-
   run_on:
       - "linux-64-amzn-perf-standalone"
   tasks:
-    - name: compile
-      distros:
-      - rhel55
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
-      depends_on:
-        - name: industry_benchmarks_WT
     - name: industry_benchmarks_MMAPv1
-      depends_on:
-        - name: core_workloads_WT
     - name: core_workloads_MMAPv1
-      depends_on:
-      - name: industry_benchmarks_MMAPv1
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -366,7 +366,6 @@ buildvariants:
     setup: standalone
     cluster: single
     numShard: 0
-
   run_on:
       - "linux-64-amzn-perf-standalone"
   tasks:
@@ -375,14 +374,8 @@ buildvariants:
       - rhel55
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
-      depends_on:
-        - name: industry_benchmarks_WT
     - name: industry_benchmarks_MMAPv1
-      depends_on:
-        - name: core_workloads_WT
     - name: core_workloads_MMAPv1
-      depends_on:
-      - name: industry_benchmarks_MMAPv1
 
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
@@ -392,46 +385,26 @@ buildvariants:
     setup: shard
     cluster: shard
     numShard: 3
-
   run_on:
       - "linux-64-amzn-perf-shard"
   tasks:
-    - name: compile
-      distros:
-      - rhel55
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
-      depends_on:
-        - name: industry_benchmarks_WT
     - name: industry_benchmarks_MMAPv1
-      depends_on:
-        - name: core_workloads_WT
     - name: core_workloads_MMAPv1
-      depends_on:
-      - name: industry_benchmarks_MMAPv1
 
 - name: linux-3-node-replSet
-  display_name: Linux 3-Node ReplSet Cluster
+  display_name: Linux 3-Node ReplSet
   batchtime: 1440 # 24 hours
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ --release
     setup: replica
     cluster: replica
     numMember: 3
-
   run_on:
       - "linux-64-amzn-perf-replset"
   tasks:
-    - name: compile
-      distros:
-      - rhel55
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
-      depends_on:
-        - name: industry_benchmarks_WT
     - name: industry_benchmarks_MMAPv1
-      depends_on:
-        - name: core_workloads_WT
     - name: core_workloads_MMAPv1
-      depends_on:
-      - name: industry_benchmarks_MMAPv1
