@@ -32,16 +32,19 @@ env.Library(
         'expression_leaf.cpp',
         'expression_parser.cpp',
         'expression_parser_tree.cpp',
+        'expression_text_base.cpp',
+        'expression_text_noop.cpp',
         'expression_tree.cpp',
         'expression_where_base.cpp',
         'expression_where_noop.cpp',
         'extensions_callback_noop.cpp',
         'match_details.cpp',
         'matchable.cpp',
-        "matcher.cpp",
+        'matcher.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/third_party/shim_pcrecpp',
         'path',
@@ -122,21 +125,10 @@ env.Library(
     target='expressions_text',
     source=[
         'expression_text.cpp',
-        'expression_parser_text.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/fts/base',
         'expressions',
-    ],
-)
-
-env.CppUnitTest(
-    target='expression_text_test',
-    source=[
-        'expression_parser_text_test.cpp',
-    ],
-    LIBDEPS=[
-        'expressions_text',
     ],
 )
 
@@ -150,5 +142,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/scripting/scripting_server',
         'expressions',
+        'expressions_text',
     ],
 )

@@ -89,9 +89,6 @@ public:
 
     BSONObj toBSON() const;
 
-    static const bool caseSensitiveDefault;
-    static const bool diacriticSensitiveDefault;
-
 private:
     void _addTerms(FTSTokenizer* tokenizer, const std::string& tokens, bool negated);
 

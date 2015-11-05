@@ -28,43 +28,31 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/matcher/expression_text_noop.h"
 
-#include "mongo/db/matcher/expression_text.h"
-#include "mongo/db/matcher/expression_where.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-ExtensionsCallbackReal::ExtensionsCallbackReal(OperationContext* txn, const NamespaceString* nss)
-    : _txn(txn), _nss(nss) {}
+TextNoOpMatchExpression::TextNoOpMatchExpression(TextParams params)
+    : TextMatchExpressionBase(std::move(params)) {}
 
-StatusWithMatchExpression ExtensionsCallbackReal::parseText(BSONElement text) const {
-    auto textParams = extractTextMatchExpressionParams(text);
-    if (!textParams.isOK()) {
-        return textParams.getStatus();
-    }
-
-    auto exp = stdx::make_unique<TextMatchExpression>(std::move(textParams.getValue()));
-    Status status = exp->init();
-    if (!status.isOK()) {
-        return status;
-    }
-    return {std::move(exp)};
+Status TextNoOpMatchExpression::init() {
+    return initPath("_fts");
 }
 
-StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(BSONElement where) const {
-    auto whereParams = extractWhereMatchExpressionParams(where);
-    if (!whereParams.isOK()) {
-        return whereParams.getStatus();
+std::unique_ptr<MatchExpression> TextNoOpMatchExpression::shallowClone() const {
+    TextParams params;
+    params.query = getQuery();
+    params.language = getLanguage();
+    params.caseSensitive = getCaseSensitive();
+    params.diacriticSensitive = getDiacriticSensitive();
+    auto expr = stdx::make_unique<TextNoOpMatchExpression>(std::move(params));
+    expr->init();
+    if (getTag()) {
+        expr->setTag(getTag()->clone());
     }
-
-    auto exp = stdx::make_unique<WhereMatchExpression>(_txn, std::move(whereParams.getValue()));
-    Status status = exp->init(_nss->db());
-    if (!status.isOK()) {
-        return status;
-    }
-    return {std::move(exp)};
+    return std::move(expr);
 }
 
 }  // namespace mongo

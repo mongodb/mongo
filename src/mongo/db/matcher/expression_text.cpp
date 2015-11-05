@@ -29,82 +29,41 @@
  */
 
 #include "mongo/platform/basic.h"
+
 #include "mongo/db/matcher/expression_text.h"
+
+#include "mongo/db/fts/fts_language.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-using std::string;
-using std::unique_ptr;
-using stdx::make_unique;
+TextMatchExpression::TextMatchExpression(TextParams params)
+    : TextMatchExpressionBase(std::move(params)) {}
 
-Status TextMatchExpression::init(const string& query,
-                                 const string& language,
-                                 bool caseSensitive,
-                                 bool diacriticSensitive) {
-    _query = query;
-    _language = language;
-    _caseSensitive = caseSensitive;
-    _diacriticSensitive = diacriticSensitive;
+Status TextMatchExpression::init() {
+    // Validate language, but defer construction of FTSQuery (which requires access to the target
+    // namespace) until stage building time.
+    if (!getLanguage().empty()) {
+        if (!fts::FTSLanguage::make(getLanguage(), fts::TEXT_INDEX_VERSION_2).isOK()) {
+            return {ErrorCodes::BadValue, "$language specifies unsupported language"};
+        }
+    }
+
     return initPath("_fts");
 }
 
-bool TextMatchExpression::matchesSingleElement(const BSONElement& e) const {
-    // See ops/update.cpp.
-    // This node is removed by the query planner.  It's only ever called if we're getting an
-    // elemMatchKey.
-    return true;
-}
-
-void TextMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
-    debug << "TEXT : query=" << _query << ", language=" << _language
-          << ", caseSensitive=" << _caseSensitive << ", diacriticSensitive=" << _diacriticSensitive
-          << ", tag=";
-    MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
-        td->debugString(&debug);
-    } else {
-        debug << "NULL";
-    }
-    debug << "\n";
-}
-
-void TextMatchExpression::toBSON(BSONObjBuilder* out) const {
-    out->append("$text",
-                BSON("$search" << _query << "$language" << _language << "$caseSensitive"
-                               << _caseSensitive << "$diacriticSensitive" << _diacriticSensitive));
-}
-
-bool TextMatchExpression::equivalent(const MatchExpression* other) const {
-    if (matchType() != other->matchType()) {
-        return false;
-    }
-    const TextMatchExpression* realOther = static_cast<const TextMatchExpression*>(other);
-
-    // TODO This is way too crude.  It looks for string equality, but it should be looking for
-    // common parsed form
-    if (realOther->getQuery() != _query) {
-        return false;
-    }
-    if (realOther->getLanguage() != _language) {
-        return false;
-    }
-    if (realOther->getCaseSensitive() != _caseSensitive) {
-        return false;
-    }
-    if (realOther->getDiacriticSensitive() != _diacriticSensitive) {
-        return false;
-    }
-    return true;
-}
-
-unique_ptr<MatchExpression> TextMatchExpression::shallowClone() const {
-    unique_ptr<TextMatchExpression> next = make_unique<TextMatchExpression>();
-    next->init(_query, _language, _caseSensitive, _diacriticSensitive);
+std::unique_ptr<MatchExpression> TextMatchExpression::shallowClone() const {
+    TextParams params;
+    params.query = getQuery();
+    params.language = getLanguage();
+    params.caseSensitive = getCaseSensitive();
+    params.diacriticSensitive = getDiacriticSensitive();
+    auto expr = stdx::make_unique<TextMatchExpression>(std::move(params));
+    expr->init();
     if (getTag()) {
-        next->setTag(getTag()->clone());
+        expr->setTag(getTag()->clone());
     }
-    return std::move(next);
+    return std::move(expr);
 }
-}
+
+}  // namespace mongo

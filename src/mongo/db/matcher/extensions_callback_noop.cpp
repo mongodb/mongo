@@ -30,9 +30,25 @@
 
 #include "mongo/db/matcher/extensions_callback_noop.h"
 
+#include "mongo/db/matcher/expression_text_noop.h"
 #include "mongo/db/matcher/expression_where_noop.h"
 
 namespace mongo {
+
+StatusWithMatchExpression ExtensionsCallbackNoop::parseText(BSONElement text) const {
+    auto textParams = extractTextMatchExpressionParams(text);
+    if (!textParams.isOK()) {
+        return textParams.getStatus();
+    }
+
+    auto expr = stdx::make_unique<TextNoOpMatchExpression>(std::move(textParams.getValue()));
+    Status initStatus = expr->init();
+    if (!initStatus.isOK()) {
+        return initStatus;
+    }
+
+    return {std::move(expr)};
+}
 
 StatusWithMatchExpression ExtensionsCallbackNoop::parseWhere(BSONElement where) const {
     auto whereParams = extractWhereMatchExpressionParams(where);

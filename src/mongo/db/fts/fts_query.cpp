@@ -49,9 +49,6 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-const bool FTSQuery::caseSensitiveDefault = false;
-const bool FTSQuery::diacriticSensitiveDefault = false;
-
 Status FTSQuery::parse(const string& query,
                        StringData language,
                        bool caseSensitive,

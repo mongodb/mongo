@@ -30,50 +30,17 @@
 
 #pragma once
 
-#include "mongo/db/fts/fts_query.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_text_base.h"
 
 namespace mongo {
 
-class TextMatchExpression : public LeafMatchExpression {
+class TextMatchExpression : public TextMatchExpressionBase {
 public:
-    TextMatchExpression() : LeafMatchExpression(TEXT) {}
-    virtual ~TextMatchExpression() {}
+    TextMatchExpression(TextParams params);
 
-    Status init(const std::string& query,
-                const std::string& language,
-                bool caseSensitive,
-                bool diacriticSensitive);
+    Status init();
 
-    virtual bool matchesSingleElement(const BSONElement& e) const;
-
-    virtual void debugString(StringBuilder& debug, int level = 0) const;
-
-    virtual void toBSON(BSONObjBuilder* out) const;
-
-    virtual bool equivalent(const MatchExpression* other) const;
-
-    virtual std::unique_ptr<MatchExpression> shallowClone() const;
-
-    const std::string& getQuery() const {
-        return _query;
-    }
-    const std::string& getLanguage() const {
-        return _language;
-    }
-    bool getCaseSensitive() const {
-        return _caseSensitive;
-    }
-    bool getDiacriticSensitive() const {
-        return _diacriticSensitive;
-    }
-
-private:
-    std::string _query;
-    std::string _language;
-    bool _caseSensitive;
-    bool _diacriticSensitive;
+    std::unique_ptr<MatchExpression> shallowClone() const final;
 };
 
 }  // namespace mongo

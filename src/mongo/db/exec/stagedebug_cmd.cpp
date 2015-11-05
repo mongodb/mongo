@@ -54,6 +54,7 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/stdx/memory.h"
@@ -460,8 +461,8 @@ public:
 
             if (!params.query.parse(search,
                                     fam->getSpec().defaultLanguage().str().c_str(),
-                                    fts::FTSQuery::caseSensitiveDefault,
-                                    fts::FTSQuery::diacriticSensitiveDefault,
+                                    TextMatchExpressionBase::kCaseSensitiveDefault,
+                                    TextMatchExpressionBase::kDiacriticSensitiveDefault,
                                     fam->getSpec().getTextIndexVersion()).isOK()) {
                 return NULL;
             }

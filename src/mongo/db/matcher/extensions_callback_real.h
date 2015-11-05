@@ -35,7 +35,8 @@ namespace mongo {
 class NamespaceString;
 
 /**
- * This implementation is used for the server-side code.
+ * ExtensionsCallbackReal uses the provided OperationContext and namespace to capture context
+ * necessary for parsing $text and $where clauses.
  */
 class ExtensionsCallbackReal : public MatchExpressionParser::ExtensionsCallback {
 public:
@@ -48,6 +49,14 @@ public:
      */
     ExtensionsCallbackReal(OperationContext* txn, const NamespaceString* nss);
 
+    /**
+     * Returns a TextMatchExpression, or an error Status if parsing fails.
+     */
+    StatusWithMatchExpression parseText(BSONElement text) const final;
+
+    /**
+     * Returns a WhereMatchExpression, or an error Status if parsing fails.
+     */
     StatusWithMatchExpression parseWhere(BSONElement where) const final;
 
 private:

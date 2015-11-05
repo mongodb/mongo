@@ -37,6 +37,7 @@
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_executor.h"
@@ -74,7 +75,8 @@ protected:
         auto lpq =
             unittest::assertGet(LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain));
 
-        auto cq = unittest::assertGet(CanonicalQuery::canonicalize(lpq.release()));
+        auto cq = unittest::assertGet(
+            CanonicalQuery::canonicalize(lpq.release(), ExtensionsCallbackNoop()));
         return cq;
     }
 

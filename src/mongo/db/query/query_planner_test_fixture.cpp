@@ -176,7 +176,8 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
                                                      minObj,
                                                      maxObj,
                                                      snapshot,
-                                                     false);  // explain
+                                                     false,  // explain
+                                                     ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
 
     ASSERT_OK(QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns.mutableVector()));
@@ -241,7 +242,8 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                                      minObj,
                                                      maxObj,
                                                      snapshot,
-                                                     false);  // explain
+                                                     false,  // explain
+                                                     ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
 
     Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns.mutableVector());
@@ -257,8 +259,7 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     std::unique_ptr<LiteParsedQuery> lpq(
         assertGet(LiteParsedQuery::makeFromFindCommand(nss, cmdObj, isExplain)));
 
-    ExtensionsCallbackNoop extensionsCallback;
-    auto statusWithCQ = CanonicalQuery::canonicalize(lpq.release(), extensionsCallback);
+    auto statusWithCQ = CanonicalQuery::canonicalize(lpq.release(), ExtensionsCallbackNoop());
     ASSERT_OK(statusWithCQ.getStatus());
 
     Status s = QueryPlanner::plan(*statusWithCQ.getValue(), params, &solns.mutableVector());

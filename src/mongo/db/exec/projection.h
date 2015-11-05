@@ -66,7 +66,7 @@ struct ProjectionStageParams {
     // from.  Otherwise, this field is ignored.
     BSONObj coveredKeyObj;
 
-    // Used for creating context for the $where clause processing. Not owned.
+    // Used for creating context for the match extensions processing. Not owned.
     const MatchExpressionParser::ExtensionsCallback* extensionsCallback;
 };
 

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -332,10 +333,7 @@ StatusWithMatchExpression MatchExpressionParser::_parse(const BSONObj& obj, int 
                     return s;
                 root->add(s.getValue().release());
             } else if (mongoutils::str::equals("text", rest)) {
-                if (e.type() != Object) {
-                    return {Status(ErrorCodes::BadValue, "$text expects an object")};
-                }
-                StatusWithMatchExpression s = expressionParserTextCallback(e.Obj());
+                StatusWithMatchExpression s = _extensionsCallback->parseText(e);
                 if (!s.isOK()) {
                     return s;
                 }
@@ -957,7 +955,12 @@ StatusWith<std::vector<uint32_t>> MatchExpressionParser::_parseBitPositionsArray
 
 StatusWithMatchExpression MatchExpressionParser::ExtensionsCallback::parseWhere(
     BSONElement where) const {
-    return {Status(ErrorCodes::NoWhereParseContext, "no context for parsing $where")};
+    return {Status(ErrorCodes::NoMatchParseContext, "no context for parsing $where")};
+}
+
+StatusWithMatchExpression MatchExpressionParser::ExtensionsCallback::parseText(
+    BSONElement text) const {
+    return {Status(ErrorCodes::NoMatchParseContext, "no context for parsing $text")};
 }
 
 StatusWith<WhereMatchExpressionBase::WhereParams>
@@ -985,6 +988,68 @@ MatchExpressionParser::ExtensionsCallback::extractWhereMatchExpressionParams(BSO
     return params;
 }
 
+StatusWith<TextMatchExpressionBase::TextParams>
+MatchExpressionParser::ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
+    TextMatchExpressionBase::TextParams params;
+    if (text.type() != Object) {
+        return {ErrorCodes::BadValue, "$text expects an object"};
+    }
+    BSONObj queryObj = text.Obj();
+
+    //
+    // Parse required fields.
+    //
+
+    Status queryStatus = bsonExtractStringField(queryObj, "$search", &params.query);
+    if (!queryStatus.isOK()) {
+        return queryStatus;
+    }
+
+    //
+    // Parse optional fields.
+    //
+
+    int expectedFieldCount = 1;
+
+    Status languageStatus = bsonExtractStringField(queryObj, "$language", &params.language);
+    if (languageStatus == ErrorCodes::TypeMismatch) {
+        return languageStatus;
+    } else if (languageStatus == ErrorCodes::NoSuchKey) {
+        params.language = string();
+    } else {
+        invariantOK(languageStatus);
+        expectedFieldCount++;
+    }
+
+    Status caseSensitiveStatus =
+        bsonExtractBooleanField(queryObj, "$caseSensitive", &params.caseSensitive);
+    if (caseSensitiveStatus == ErrorCodes::TypeMismatch) {
+        return caseSensitiveStatus;
+    } else if (caseSensitiveStatus == ErrorCodes::NoSuchKey) {
+        params.caseSensitive = TextMatchExpressionBase::kCaseSensitiveDefault;
+    } else {
+        invariantOK(caseSensitiveStatus);
+        expectedFieldCount++;
+    }
+
+    Status diacriticSensitiveStatus =
+        bsonExtractBooleanField(queryObj, "$diacriticSensitive", &params.diacriticSensitive);
+    if (diacriticSensitiveStatus == ErrorCodes::TypeMismatch) {
+        return diacriticSensitiveStatus;
+    } else if (diacriticSensitiveStatus == ErrorCodes::NoSuchKey) {
+        params.diacriticSensitive = TextMatchExpressionBase::kDiacriticSensitiveDefault;
+    } else {
+        invariantOK(diacriticSensitiveStatus);
+        expectedFieldCount++;
+    }
+
+    if (queryObj.nFields() != expectedFieldCount) {
+        return {ErrorCodes::BadValue, "extra fields in $text"};
+    }
+
+    return {std::move(params)};
+}
+
 // Geo
 StatusWithMatchExpression expressionParserGeoCallbackDefault(const char* name,
                                                              int type,
@@ -993,12 +1058,4 @@ StatusWithMatchExpression expressionParserGeoCallbackDefault(const char* name,
 }
 
 MatchExpressionParserGeoCallback expressionParserGeoCallback = expressionParserGeoCallbackDefault;
-
-// Text
-StatusWithMatchExpression expressionParserTextCallbackDefault(const BSONObj& queryObj) {
-    return {Status(ErrorCodes::BadValue, "$text not linked in")};
-}
-
-MatchExpressionParserTextCallback expressionParserTextCallback =
-    expressionParserTextCallbackDefault;
 }

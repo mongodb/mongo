@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_where_base.h"
 #include "mongo/stdx/functional.h"
 
@@ -47,20 +48,29 @@ typedef StatusWith<std::unique_ptr<MatchExpression>> StatusWithMatchExpression;
 class MatchExpressionParser {
 public:
     /**
-     * In general, expression parsing and matching should not require context, but the $where
-     * clause is an exception in that it needs to read the sys.js collection.
+     * Certain match clauses (the "extension" clauses, namely $text and $where) require context in
+     * order to perform parsing. This context is captured inside of an ExtensionsCallback object.
      *
-     * The default behaviour is to return an error status that $where context is not present.
-     *
-     * Do not use this class to pass-in generic context as it should only be used for $where.
+     * The default implementations of parseText() and parseWhere() simply return an error Status.
+     * Instead of constructing an ExtensionsCallback object directly, an instance of one of the
+     * derived classes (ExtensionsCallbackReal or ExtensionsCallbackNoop) should generally be used
+     * instead.
      */
     class ExtensionsCallback {
     public:
+        virtual StatusWithMatchExpression parseText(BSONElement text) const;
+
         virtual StatusWithMatchExpression parseWhere(BSONElement where) const;
 
         virtual ~ExtensionsCallback() {}
 
     protected:
+        /**
+         * Helper method which extracts parameters from the given $text element.
+         */
+        static StatusWith<TextMatchExpressionBase::TextParams> extractTextMatchExpressionParams(
+            BSONElement text);
+
         /**
          * Helper method which extracts parameters from the given $where element.
          */
@@ -170,7 +180,7 @@ private:
     // The maximum allowed depth of a query tree. Just to guard against stack overflow.
     static const int kMaximumTreeDepth;
 
-    // Performs parsing for the $where clause. We do not own this pointer - it has to live
+    // Performs parsing for the match extensions. We do not own this pointer - it has to live
     // as long as the parser is active.
     const ExtensionsCallback* _extensionsCallback;
 };
@@ -178,8 +188,4 @@ private:
 typedef stdx::function<StatusWithMatchExpression(
     const char* name, int type, const BSONObj& section)> MatchExpressionParserGeoCallback;
 extern MatchExpressionParserGeoCallback expressionParserGeoCallback;
-
-typedef stdx::function<StatusWithMatchExpression(const BSONObj& queryObj)>
-    MatchExpressionParserTextCallback;
-extern MatchExpressionParserTextCallback expressionParserTextCallback;
 }

@@ -31,6 +31,7 @@
 #include <cctype>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -96,7 +97,7 @@ bool DocumentSourceMatch::coalesce(const intrusive_ptr<DocumentSource>& nextSour
 
     // Replace our matcher with the $and of ours and theirs.
     matcher.reset(new Matcher(BSON("$and" << BSON_ARRAY(getQuery() << otherMatch->getQuery())),
-                              MatchExpressionParser::ExtensionsCallback()));
+                              ExtensionsCallbackNoop()));
 
     return true;
 }
@@ -359,6 +360,6 @@ BSONObj DocumentSourceMatch::getQuery() const {
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
                                          const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(pExpCtx),
-      matcher(new Matcher(query.getOwned(), MatchExpressionParser::ExtensionsCallback())),
+      matcher(new Matcher(query.getOwned(), ExtensionsCallbackNoop())),
       _isTextQuery(isTextQuery(query)) {}
 }

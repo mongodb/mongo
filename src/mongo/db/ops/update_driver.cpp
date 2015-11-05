@@ -170,9 +170,9 @@ inline Status UpdateDriver::addAndParse(const modifiertable::ModifierType type,
 Status UpdateDriver::populateDocumentWithQueryFields(const BSONObj& query,
                                                      const vector<FieldRef*>* immutablePaths,
                                                      mutablebson::Document& doc) const {
-    // We canonicalize the query to collapse $and/$or, and the first arg (ns) is not needed
-    // Also, because this is for the upsert case, where we insert a new document if one was
-    // not found, the $where clause does not make sense, hence empty ExtensionsCallback.
+    // We canonicalize the query to collapse $and/$or, and the first arg (ns) is not needed.  Also,
+    // because this is for the upsert case, where we insert a new document if one was not found, the
+    // $where/$text clauses do not make sense, hence empty ExtensionsCallback.
     auto statusWithCQ =
         CanonicalQuery::canonicalize(NamespaceString(""), query, ExtensionsCallbackNoop());
     if (!statusWithCQ.isOK()) {

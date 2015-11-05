@@ -33,10 +33,20 @@
 namespace mongo {
 
 /**
- * This is just a pass-through implementation, used by sharding only.
+ * ExtensionsCallbackNoop does not capture any context, and produces "no op" expressions that can't
+ * be used for matching.  It should be used when parsing context is not available (for example, when
+ * the relevant namespace does not exist, or in mongos).
  */
 class ExtensionsCallbackNoop : public MatchExpressionParser::ExtensionsCallback {
 public:
+    /**
+     * Returns a TextNoOpMatchExpression, or an error Status if parsing fails.
+     */
+    StatusWithMatchExpression parseText(BSONElement text) const final;
+
+    /**
+     * Returns a WhereNoOpMatchExpression, or an error Status if parsing fails.
+     */
     StatusWithMatchExpression parseWhere(BSONElement where) const final;
 };
 
