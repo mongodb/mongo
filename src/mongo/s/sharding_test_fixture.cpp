@@ -87,19 +87,27 @@ void ShardingTestFixture::setUp() {
     auto targeterFactory(stdx::make_unique<RemoteCommandTargeterFactoryMock>());
     _targeterFactory = targeterFactory.get();
 
-    // Set up first executor used for most operations
-    auto network(stdx::make_unique<executor::NetworkInterfaceMock>());
-    _mockNetwork = network.get();
-    auto executor = makeThreadPoolTestExecutor(std::move(network));
-    _networkTestEnv = stdx::make_unique<NetworkTestEnv>(executor.get(), _mockNetwork);
-    _executor = executor.get();
+    // Set up executor pool used for most operations.
+    auto fixedNet = stdx::make_unique<executor::NetworkInterfaceMock>();
+    _mockNetwork = fixedNet.get();
+    auto fixedExec = makeThreadPoolTestExecutor(std::move(fixedNet));
+    _networkTestEnv = stdx::make_unique<NetworkTestEnv>(fixedExec.get(), _mockNetwork);
+    _executor = fixedExec.get();
 
-    // Set up second executor used for a few special operations during addShard
-    auto network2(stdx::make_unique<executor::NetworkInterfaceMock>());
-    auto mockNetwork2 = network2.get();
-    auto executor2 = makeThreadPoolTestExecutor(std::move(network2));
-    _addShardNetworkTestEnv = stdx::make_unique<NetworkTestEnv>(executor2.get(), mockNetwork2);
-    _executorForAddShard = executor2.get();
+    auto netForPool = stdx::make_unique<executor::NetworkInterfaceMock>();
+    auto execForPool = makeThreadPoolTestExecutor(std::move(netForPool));
+    std::vector<std::unique_ptr<executor::TaskExecutor>> executorsForPool;
+    executorsForPool.emplace_back(std::move(execForPool));
+
+    auto executorPool = stdx::make_unique<executor::TaskExecutorPool>();
+    executorPool->addExecutors(std::move(executorsForPool), std::move(fixedExec));
+
+    // Set up executor used for a few special operations during addShard.
+    auto specialNet(stdx::make_unique<executor::NetworkInterfaceMock>());
+    auto specialMockNet = specialNet.get();
+    auto specialExec = makeThreadPoolTestExecutor(std::move(specialNet));
+    _addShardNetworkTestEnv = stdx::make_unique<NetworkTestEnv>(specialExec.get(), specialMockNet);
+    _executorForAddShard = specialExec.get();
 
     auto uniqueDistLockManager = stdx::make_unique<DistLockManagerMock>();
     _distLockManager = uniqueDistLockManager.get();
@@ -114,9 +122,9 @@ void ShardingTestFixture::setUp() {
     _targeterFactory->addTargeterToReturn(configCS, std::move(configTargeter));
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(targeterFactory),
-                                                        std::move(executor),
+                                                        std::move(executorPool),
                                                         _mockNetwork,
-                                                        std::move(executor2),
+                                                        std::move(specialExec),
                                                         configCS));
     shardRegistry->startup();
 

@@ -121,12 +121,12 @@ BSONObj appendMaxTimeToCmdObj(long long maxTimeMicros, const BSONObj& cmdObj) {
 }  // unnamed namespace
 
 ShardRegistry::ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
-                             std::unique_ptr<executor::TaskExecutor> executor,
+                             std::unique_ptr<executor::TaskExecutorPool> executorPool,
                              executor::NetworkInterface* network,
                              std::unique_ptr<executor::TaskExecutor> addShardExecutor,
                              ConnectionString configServerCS)
     : _targeterFactory(std::move(targeterFactory)),
-      _executor(std::move(executor)),
+      _executorPool(std::move(executorPool)),
       _network(network),
       _executorForAddShard(std::move(addShardExecutor)) {
     updateConfigServerConnectionString(configServerCS);
@@ -144,14 +144,13 @@ void ShardRegistry::updateConfigServerConnectionString(ConnectionString configSe
 
 void ShardRegistry::startup() {
     _executorForAddShard->startup();
-    _executor->startup();
+    _executorPool->startup();
 }
 
 void ShardRegistry::shutdown() {
-    _executor->shutdown();
     _executorForAddShard->shutdown();
-    _executor->join();
     _executorForAddShard->join();
+    _executorPool->shutdownAndJoin();
 }
 
 void ShardRegistry::reload(OperationContext* txn) {
@@ -468,7 +467,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
     findCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
                           durationCount<Milliseconds>(maxTime));
 
-    QueryFetcher fetcher(_executor.get(),
+    QueryFetcher fetcher(_executorPool->getFixedExecutor(),
                          host.getValue(),
                          nss,
                          findCmdBuilder.done(),
@@ -528,7 +527,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,
                                                      const std::string& dbName,
                                                      const BSONObj& cmdObj) {
     auto response = _runCommandWithNotMasterRetries(txn,
-                                                    _executor.get(),
+                                                    _executorPool->getFixedExecutor(),
                                                     shard,
                                                     readPref,
                                                     dbName,
@@ -583,7 +582,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfig(OperationContext* txn,
                                                       const BSONObj& cmdObj) {
     auto response = _runCommandWithNotMasterRetries(
         txn,
-        _executor.get(),
+        _executorPool->getFixedExecutor(),
         getConfigShard(),
         readPref,
         dbName,
@@ -603,7 +602,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandOnConfigWithNotMasterRetries(Operat
                                                                           const BSONObj& cmdObj) {
     auto response =
         _runCommandWithNotMasterRetries(txn,
-                                        _executor.get(),
+                                        _executorPool->getFixedExecutor(),
                                         getConfigShard(),
                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                         dbname,
@@ -626,7 +625,7 @@ StatusWith<BSONObj> ShardRegistry::runCommandWithNotMasterRetries(OperationConte
 
     auto response =
         _runCommandWithNotMasterRetries(txn,
-                                        _executor.get(),
+                                        _executorPool->getFixedExecutor(),
                                         shard,
                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                         dbname,

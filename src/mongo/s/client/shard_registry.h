@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/mutex.h"
 
@@ -91,7 +92,7 @@ public:
      * @param configServerCS ConnectionString used for communicating with the config servers
      */
     ShardRegistry(std::unique_ptr<RemoteCommandTargeterFactory> targeterFactory,
-                  std::unique_ptr<executor::TaskExecutor> executor,
+                  std::unique_ptr<executor::TaskExecutorPool> executorPool,
                   executor::NetworkInterface* network,
                   std::unique_ptr<executor::TaskExecutor> addShardExecutor,
                   ConnectionString configServerCS);
@@ -116,7 +117,11 @@ public:
     void shutdown();
 
     executor::TaskExecutor* getExecutor() const {
-        return _executor.get();
+        return _executorPool->getFixedExecutor();
+    }
+
+    executor::TaskExecutorPool* getExecutorPool() const {
+        return _executorPool.get();
     }
 
     executor::NetworkInterface* getNetwork() const {
@@ -329,10 +334,10 @@ private:
     // Factory to obtain remote command targeters for shards
     const std::unique_ptr<RemoteCommandTargeterFactory> _targeterFactory;
 
-    // Executor for scheduling work and remote commands to shards and config servers.  Has a
-    // connection hook set on it for initialization sharding data on shards and detecting if
-    // the catalog manager needs swapping.
-    const std::unique_ptr<executor::TaskExecutor> _executor;
+    // Executor pool for scheduling work and remote commands to shards and config servers. Each
+    // contained executor has a connection hook set on it for initialization sharding data on shards
+    // and detecting if the catalog manager needs swapping.
+    const std::unique_ptr<executor::TaskExecutorPool> _executorPool;
 
     // Network interface being used by _executor.  Used for asking questions about the network
     // configuration, such as getting the current server's hostname.

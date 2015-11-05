@@ -171,9 +171,10 @@ StatusWith<CursorId> runConfigServerQuerySCCC(const CanonicalQuery& query,
         throw RecvStaleConfigException("find command failed because of stale config", result);
     }
 
+    auto executorPool = grid.shardRegistry()->getExecutorPool();
     auto transformedResult = storePossibleCursor(HostAndPort(cursor->originalHost()),
                                                  result,
-                                                 grid.shardRegistry()->getExecutor(),
+                                                 executorPool->getArbitraryExecutor(),
                                                  grid.getCursorManager());
     if (!transformedResult.isOK()) {
         return transformedResult.getStatus();
@@ -267,7 +268,8 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         params.remotes.emplace_back(shard->getId(), cmdBuilder.obj());
     }
 
-    auto ccc = ClusterClientCursorImpl::make(shardRegistry->getExecutor(), std::move(params));
+    auto ccc = ClusterClientCursorImpl::make(
+        shardRegistry->getExecutorPool()->getArbitraryExecutor(), std::move(params));
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     int bytesBuffered = 0;

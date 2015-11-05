@@ -110,18 +110,25 @@ public:
 
 private:
     void setUp() override {
+        std::vector<std::unique_ptr<executor::TaskExecutor>> executorsForPool;
+        executorsForPool.emplace_back(executor::makeThreadPoolTestExecutor(
+            stdx::make_unique<executor::NetworkInterfaceMock>()));
+
         auto networkUniquePtr = stdx::make_unique<executor::NetworkInterfaceMock>();
         executor::NetworkInterfaceMock* network = networkUniquePtr.get();
-        auto executor = executor::makeThreadPoolTestExecutor(std::move(networkUniquePtr));
+        auto fixedExecutor = executor::makeThreadPoolTestExecutor(std::move(networkUniquePtr));
+        _networkTestEnv = stdx::make_unique<NetworkTestEnv>(fixedExecutor.get(), network);
+
+        auto executorPool = stdx::make_unique<executor::TaskExecutorPool>();
+        executorPool->addExecutors(std::move(executorsForPool), std::move(fixedExecutor));
+
         auto addShardExecutor = executor::makeThreadPoolTestExecutor(
             stdx::make_unique<executor::NetworkInterfaceMock>());
-
-        _networkTestEnv = stdx::make_unique<NetworkTestEnv>(executor.get(), network);
 
         ConnectionString configCS(HostAndPort("dummy:1234"));
         _shardRegistry =
             stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryMock>(),
-                                             std::move(executor),
+                                             std::move(executorPool),
                                              network,
                                              std::move(addShardExecutor),
                                              configCS);

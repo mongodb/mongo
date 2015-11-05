@@ -110,7 +110,7 @@ bool cursorCommandPassthrough(OperationContext* txn,
     StatusWith<BSONObj> transformedResponse =
         storePossibleCursor(HostAndPort(cursor->originalHost()),
                             response,
-                            grid.shardRegistry()->getExecutor(),
+                            grid.shardRegistry()->getExecutorPool()->getArbitraryExecutor(),
                             grid.getCursorManager());
     if (!transformedResponse.isOK()) {
         return Command::appendCommandStatus(*out, transformedResponse.getStatus());

@@ -259,3 +259,14 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/protocol',
     ],
 )
+
+env.Library(
+    target='task_executor_pool',
+    source=[
+        'task_executor_pool.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/processinfo',
+        'task_executor_interface',
+    ],
+)

@@ -42,6 +42,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
@@ -61,14 +62,8 @@ namespace mongo {
 namespace {
 
 using executor::NetworkInterface;
+using executor::TaskExecutorPool;
 using executor::ThreadPoolTaskExecutor;
-
-std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
-    ThreadPool::Options tpOptions;
-    tpOptions.poolName = "ShardWork";
-    return stdx::make_unique<ThreadPoolTaskExecutor>(stdx::make_unique<ThreadPool>(tpOptions),
-                                                     std::move(net));
-}
 
 // Same logic as sharding_connection_hook.cpp.
 class ShardingEgressMetadataHook final : public rpc::EgressMetadataHook {
@@ -121,6 +116,38 @@ public:
     }
 };
 
+std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<NetworkInterface> net) {
+    ThreadPool::Options tpOptions;
+    tpOptions.poolName = "ShardWork";
+    return stdx::make_unique<ThreadPoolTaskExecutor>(stdx::make_unique<ThreadPool>(tpOptions),
+                                                     std::move(net));
+}
+
+std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkInterface> fixedNet) {
+    std::vector<std::unique_ptr<executor::TaskExecutor>> executors;
+    for (size_t i = 0; i < TaskExecutorPool::getSuggestedPoolSize(); ++i) {
+        auto net =
+            executor::makeNetworkInterface(stdx::make_unique<ShardingNetworkConnectionHook>(),
+                                           stdx::make_unique<ShardingEgressMetadataHook>());
+        ThreadPool::Options tpOptions;
+        tpOptions.poolName = (str::stream() << "ShardQueryWork" << i);
+        auto exec = stdx::make_unique<ThreadPoolTaskExecutor>(
+            stdx::make_unique<ThreadPool>(tpOptions), std::move(net));
+
+        executors.emplace_back(std::move(exec));
+    }
+
+    // Add executor used to perform non-performance critical work.
+    ThreadPool::Options tpOptions;
+    tpOptions.poolName = "ShardWorkFixed";
+    auto fixedExec = stdx::make_unique<ThreadPoolTaskExecutor>(
+        stdx::make_unique<ThreadPool>(tpOptions), std::move(fixedNet));
+
+    auto executorPool = stdx::make_unique<TaskExecutorPool>();
+    executorPool->addExecutors(std::move(executors), std::move(fixedExec));
+    return executorPool;
+}
+
 }  // namespace
 
 Status initializeGlobalShardingState(OperationContext* txn,
@@ -136,7 +163,7 @@ Status initializeGlobalShardingState(OperationContext* txn,
     auto networkPtr = network.get();
     auto shardRegistry(
         stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
-                                         makeTaskExecutor(std::move(network)),
+                                         makeTaskExecutorPool(std::move(network)),
                                          networkPtr,
                                          makeTaskExecutor(executor::makeNetworkInterface()),
                                          configCS));

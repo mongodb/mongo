@@ -66,6 +66,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/executor/network_test_env',
+        '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
@@ -167,6 +168,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
+        '$BUILD_DIR/mongo/executor/task_executor_pool',
         'catalog/forwarding_catalog_manager',
         'catalog/catalog_types',
         'client/sharding_client',

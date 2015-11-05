@@ -202,10 +202,11 @@ public:
         if (!needSplit) {
             invariant(shardResults.size() == 1);
             invariant(shardResults[0].target.getServers().size() == 1);
+            auto executorPool = grid.shardRegistry()->getExecutorPool();
             const BSONObj reply =
                 uassertStatusOK(storePossibleCursor(shardResults[0].target.getServers()[0],
                                                     shardResults[0].result,
-                                                    grid.shardRegistry()->getExecutor(),
+                                                    executorPool->getArbitraryExecutor(),
                                                     grid.getCursorManager()));
             result.appendElements(reply);
             return reply["ok"].trueValue();
@@ -400,9 +401,10 @@ BSONObj PipelineCommand::aggRunCommand(DBClientBase* conn,
         throw RecvStaleConfigException("command failed because of stale config", result);
     }
 
+    auto executorPool = grid.shardRegistry()->getExecutorPool();
     result = uassertStatusOK(storePossibleCursor(HostAndPort(cursor->originalHost()),
                                                  result,
-                                                 grid.shardRegistry()->getExecutor(),
+                                                 executorPool->getArbitraryExecutor(),
                                                  grid.getCursorManager()));
     return result;
 }
