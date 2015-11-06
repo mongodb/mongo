@@ -487,7 +487,7 @@ leaf_match:	cbt->compare = 0;
 
 	return (0);
 
-err:	if (leaf != NULL)
+err:	if (current != leaf)
 		WT_TRET(__wt_page_release(session, current, 0));
 	return (ret);
 }
