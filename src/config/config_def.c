@@ -553,7 +553,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	    "\"write\"]",
 	    NULL, 0 },
 	{ "write_through", "list",
-	    NULL, "choices=[\"checkpoint\",\"data\",\"log\"]",
+	    NULL, "choices=[\"data\",\"log\"]",
 	    NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -633,7 +633,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
 	    NULL, 0 },
 	{ "version", "string", NULL, NULL, NULL, 0 },
 	{ "write_through", "list",
-	    NULL, "choices=[\"checkpoint\",\"data\",\"log\"]",
+	    NULL, "choices=[\"data\",\"log\"]",
 	    NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -708,7 +708,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
 	    NULL, 0 },
 	{ "version", "string", NULL, NULL, NULL, 0 },
 	{ "write_through", "list",
-	    NULL, "choices=[\"checkpoint\",\"data\",\"log\"]",
+	    NULL, "choices=[\"data\",\"log\"]",
 	    NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -782,7 +782,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
 	    "\"write\"]",
 	    NULL, 0 },
 	{ "write_through", "list",
-	    NULL, "choices=[\"checkpoint\",\"data\",\"log\"]",
+	    NULL, "choices=[\"data\",\"log\"]",
 	    NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
