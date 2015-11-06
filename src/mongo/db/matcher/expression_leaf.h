@@ -436,7 +436,7 @@ public:
 
     /**
      * Whether or not to match against all number types (NumberDouble, NumberLong, and NumberInt).
-     * Defaults to false. If this is true, _type is undefined.
+     * Defaults to false. If this is true, _type is EOO.
      */
     bool matchesAllNumbers() const {
         return _matchesAllNumbers;
@@ -452,7 +452,7 @@ private:
     StringData _path;
     ElementPath _elementPath;
     bool _matchesAllNumbers = false;
-    BSONType _type;
+    BSONType _type = BSONType::EOO;
 };
 
 /**
