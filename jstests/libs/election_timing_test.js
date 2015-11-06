@@ -86,7 +86,8 @@ ElectionTimingTest.prototype._runTimingTest = function() {
                                         arbitraryStr: "this is a string"}));
         }
 
-        // Await replication.
+        // Make sure the secondaries are up then await replication.
+        this.rst.awaitSecondaryNodes();
         this.rst.awaitReplication();
 
         // Run the election tests on this ReplSetTest instance.
@@ -161,6 +162,7 @@ ElectionTimingTest.prototype._runTimingTest = function() {
             // Wait for replication. When there are only two nodes in the set,
             // the previous primary should be given a chance to catch up or
             // else there will be rollbacks after the next election cycle.
+            this.rst.awaitSecondaryNodes();
             this.rst.awaitReplication();
             primary = newPrimary;
             secondary = this.rst.getSecondary();

@@ -67,8 +67,8 @@
             // Dump available information for debugging.
             jsTestLog("Errors from: " + tc.name);
             printjson(tc);
-            printjson(testRun);
-            throw new Error(testRun.testErrors);
+            printjson(testRun.testErrors);
+            throw new Error(testRun.testErrors[0].status);
         }
         // Print results of current test in case
         // we need to analyze a failed test later.
