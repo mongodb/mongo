@@ -391,7 +391,7 @@ DBClientConnection& DBClientReplicaSet::slaveConn() {
 bool DBClientReplicaSet::connect() {
     // Returns true if there are any up hosts.
     const ReadPreferenceSetting anyUpHost(ReadPreference::Nearest, TagSet());
-    return !_getMonitor()->getHostOrRefresh(anyUpHost).empty();
+    return _getMonitor()->getHostOrRefresh(anyUpHost).isOK();
 }
 
 static bool isAuthenticationException(const DBException& ex) {
@@ -657,19 +657,21 @@ void DBClientReplicaSet::isntSecondary() {
 DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
     shared_ptr<ReadPreferenceSetting> readPref) {
     if (checkLastHost(readPref.get())) {
-        LOG(3) << "dbclient_rs selecting compatible last used node " << _lastSlaveOkHost << endl;
+        LOG(3) << "dbclient_rs selecting compatible last used node " << _lastSlaveOkHost;
 
         return _lastSlaveOkConn.get();
     }
 
     ReplicaSetMonitorPtr monitor = _getMonitor();
-    HostAndPort selectedNode = monitor->getHostOrRefresh(*readPref);
 
-    if (selectedNode.empty()) {
-        LOG(3) << "dbclient_rs no compatible node found" << endl;
-
-        return NULL;
+    auto selectedNodeStatus = monitor->getHostOrRefresh(*readPref);
+    if (!selectedNodeStatus.isOK()) {
+        LOG(3) << "dbclient_rs no compatible node found"
+               << causedBy(selectedNodeStatus.getStatus());
+        return nullptr;
     }
+
+    const HostAndPort selectedNode = std::move(selectedNodeStatus.getValue());
 
     // We are now about to get a new connection from the pool, so cleanup
     // the current one and release it back to the pool.

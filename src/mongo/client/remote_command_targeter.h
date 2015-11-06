@@ -58,11 +58,9 @@ public:
     /**
      * Obtains a host, which matches the read preferences specified by readPref.
      *
-     * Returns OK and a host and port to use for the specified read preference or any
-     * ErrorCode. Known error codes are:
-     *      NotMaster if readPref is PrimaryOnly and there is no primary in the set
-     *      FailedToSatisfyReadPreference if it cannot find a node to match the read preference
-     *          and the readPref is anything other than PrimaryOnly
+     * Returns OK and a host and port to use for the specified read preference or an ErrorCode.
+     * Known error codes are:
+     *   All error codes which can be returned by ReplicaSetMonitor::getHostOrRefresh.
      */
     virtual StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) = 0;
 

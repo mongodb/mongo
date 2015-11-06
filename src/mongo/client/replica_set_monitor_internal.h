@@ -129,6 +129,8 @@ public:
      */
     SetState(StringData name, const std::set<HostAndPort>& seedNodes);
 
+    bool isUsable() const;
+
     /**
      * Returns a host matching criteria or an empty host if no known host matches.
      *

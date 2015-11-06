@@ -10,16 +10,13 @@ var st = new ShardingTest({ shards : 1, mongos : 1 })
 var mongos = st.s
 var coll = mongos.getCollection( "foo.bar" )
 
-// Make sure mongos has no database info currently loaded
-mongos.getDB( "admin" ).runCommand({ flushRouterConfig : 1 })
-
-jsTestLog( "Setup complete!" )
-st.printShardingStatus()
-
 jsTestLog( "Stopping config servers" );
 for (var i = 0; i < st._configServers.length; i++) {
     MongoRunner.stopMongod(st._configServers[i]);
 }
+
+// Make sure mongos has no database info currently loaded
+mongos.getDB( "admin" ).runCommand({ flushRouterConfig : 1 });
 
 jsTestLog( "Config flushed and config servers down!" )
 
@@ -30,22 +27,20 @@ for( var i = 0; i < 2; i++ ){
         // Should always throw
         assert( false )
     }
-    catch( e ){
-        
+    catch( e ) {
         printjson( e )
-        
+
         // Make sure we get a transport error, and not a no-primary error
         assert(e.code == 8002  ||       // All servers down/unreachable in SyncClusterConnection
                e.code == 10276 ||       // Transport error
                e.code == 13328 ||       // Connect error
                e.code == 13639 ||       // Connect error to replSet primary
                e.code == ErrorCodes.HostUnreachable ||
-               e.code == ErrorCodes.NotMaster ||
-               e.code == ErrorCodes.FailedToSatisfyReadPreference);
+               e.code == ErrorCodes.FailedToSatisfyReadPreference ||
+               e.code == ErrorCodes.ReplicaSetNotFound);
     }
 }
 
-jsTestLog( "Done!" )
+st.stop();
 
-st.stop()
 }());

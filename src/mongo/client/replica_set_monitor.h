@@ -64,13 +64,21 @@ public:
     ReplicaSetMonitor(StringData name, const std::set<HostAndPort>& seeds);
 
     /**
-     * Returns a host matching criteria or an empty HostAndPort if no host matches.
+     * Returns a host matching the given read preference or an error, if no host matches.
      *
-     * If no host matches initially, will then attempt to refresh our view of the set by
-     * contacting other hosts. May still return no result if no host matches following a
-     * refresh.
+     * @param readPref Read preference to match against
+     * @param maxWait If no host is readily available, which matches the specified read preference,
+     *   wait for one to become available for up to the specified time and periodically refresh
+     *   the view of the set. The call may return with an error earlier than the specified value,
+     *   if none of the known hosts for the set are reachable within some number of attempts.
+     *
+     * Known errors are:
+     *  FailedToSatisfyReadPreference, if node cannot be found, which matches the read preference.
+     *  ReplicaSetNotFound, if none of the known hosts for the replica set are reachable within
+     *      maxConsecutiveFailedChecks number of attempts.
      */
-    HostAndPort getHostOrRefresh(const ReadPreferenceSetting& criteria);
+    StatusWith<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
+                                             Milliseconds maxWait = kDefaultFindHostTimeout);
 
     /**
      * Returns the host we think is the current master or uasserts.
@@ -119,10 +127,11 @@ public:
     int getMaxWireVersion() const;
 
     /**
-     * How may times in a row have we tried to refresh without successfully contacting any hosts
-     * who claim to be members of this set?
+     * This call will return false if this monitor ever enters a state where none of the nodes could
+     * be contacted for some amount of attempts. Such monitors will be removed from the periodic
+     * refresh thread.
      */
-    int getConsecutiveFailedScans() const;
+    bool isSetUsable() const;
 
     /**
      * The name of the set.
@@ -194,13 +203,6 @@ public:
      */
     static void cleanup();
 
-    /**
-     * If a ReplicaSetMonitor has been refreshed more than this many times in a row without
-     * finding any live nodes claiming to be in the set, the ReplicaSetMonitorWatcher will stop
-     * periodic background refreshes of this set.
-     */
-    static std::atomic<int> maxConsecutiveFailedChecks;  // NOLINT
-
     //
     // internal types (defined in replica_set_monitor_internal.h)
     //
@@ -211,24 +213,35 @@ public:
     typedef std::shared_ptr<ScanState> ScanStatePtr;
     typedef std::shared_ptr<SetState> SetStatePtr;
 
-    //
-    // FOR TESTING ONLY
-    //
-
     /**
      * Allows tests to set initial conditions and introspect the current state.
      */
     explicit ReplicaSetMonitor(const SetStatePtr& initialState) : _state(initialState) {}
 
     /**
+     * If a ReplicaSetMonitor has been refreshed more than this many times in a row without
+     * finding any live nodes claiming to be in the set, the ReplicaSetMonitorWatcher will stop
+     * periodic background refreshes of this set.
+     */
+    static std::atomic<int> maxConsecutiveFailedChecks;  // NOLINT
+
+    /**
+     * The default timeout, which will be used for finding a replica set host if the caller does
+     * not explicitly specify it.
+     */
+    static const Seconds kDefaultFindHostTimeout;
+
+    /**
      * Defaults to false, meaning that if multiple hosts meet a criteria we pick one at random.
      * This is required by the replica set driver spec. Set this to true in tests that need host
      * selection to be deterministic.
+     *
+     * NOTE: Used by unit-tests only.
      */
     static bool useDeterministicHostSelection;
 
 private:
-    const SetStatePtr _state;  // never NULL
+    const SetStatePtr _state;
 };
 
 
