@@ -2,8 +2,7 @@
 
 var s = new ShardingTest({ name: "auto2",
                            shards: 2,
-                           mongos: 2,
-                           verbose: 1 });
+                           mongos: 2 });
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'shard0001');

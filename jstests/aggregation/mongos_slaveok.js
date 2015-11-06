@@ -33,7 +33,7 @@ var doTest = function(st, doSharded) {
     testDB.dropDatabase();
 };
 
-var st = new ShardingTest({ shards: { rs0: { oplogSize: 10, verbose: 1, nodes: NODES } } });
+var st = new ShardingTest({ shards: { rs0: { oplogSize: 10, nodes: NODES } } });
 
 doTest(st, false);
 doTest(st, true);

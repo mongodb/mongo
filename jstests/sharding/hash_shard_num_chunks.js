@@ -3,7 +3,7 @@
 
 (function() {
 
-var s = new ShardingTest({ shards: 3, mongos: 1, verbose: 1 });
+var s = new ShardingTest({ shards: 3, mongos: 1 });
 s.stopBalancer();
 
 var dbname = "test";

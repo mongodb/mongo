@@ -432,7 +432,7 @@ load("jstests/aggregation/extras/utils.js");
     runTest(db.lookUp, db.from);
 
     // Run tests in a sharded environment.
-    var sharded = new ShardingTest({shards: 2, verbose: 0, mongos: 1});
+    var sharded = new ShardingTest({shards: 2, mongos: 1});
     assert(sharded.adminCommand({enableSharding : "test"}));
     sharded.getDB('test').lookUp.drop();
     sharded.getDB('test').from.drop();

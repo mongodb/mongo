@@ -1,7 +1,7 @@
 // SERVER-6179: support for two $groups in sharded agg
 (function() {
 
-var s = new ShardingTest({ name: "aggregation_multiple_group", shards: 2, mongos: 1, verbose: 0 });
+var s = new ShardingTest({ name: "aggregation_multiple_group", shards: 2, mongos: 1 });
 s.stopBalancer();
 
 s.adminCommand({ enablesharding:"test" });

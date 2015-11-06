@@ -5,7 +5,6 @@
 // Note that early splitting will start with a 1/4 of max size currently.  
 var s = new ShardingTest({ name: 'large_chunk',
                            shards: 2,
-                           verbose: 2,
                            other: { chunkSize: 1024 } });
 
 // take the balancer out of the equation

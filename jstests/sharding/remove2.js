@@ -72,7 +72,6 @@ var st = new ShardingTest({ shards: {
                                 rs0: { nodes: 2 },
                                 rs1: { nodes: 2 }
                             },
-                            verbose: 0,
                             other: {
                                 chunkSize: 1,
                                 enableBalancer: true

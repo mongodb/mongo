@@ -13,8 +13,9 @@ var SEC_TAGS = [
 var NODES = SEC_TAGS.length + 1;
 
 var doTest = function(useDollarQuerySyntax) {
-    var st = new ShardingTest({ shards: { rs0: { nodes: NODES, oplogSize: 10, verbose: 2,
-                    useHostName: true }}});
+    var st = new ShardingTest({ shards: {
+                                    rs0: { nodes: NODES, oplogSize: 10, useHostName: true }
+                                }});
     var replTest = st.rs0;
     var primaryNode = replTest.getMaster();
 

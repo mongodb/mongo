@@ -3,7 +3,6 @@
 var s = new ShardingTest({ name: "stats",
                            shards: 2,
                            mongos: 1,
-                           verbose: 1,
                            other: { enableBalancer: true } });
 
 s.adminCommand( { enablesharding : "test" } );

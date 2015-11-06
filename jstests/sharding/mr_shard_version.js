@@ -1,6 +1,7 @@
 // Test for SERVER-4158 (version changes during mapreduce)
+(function() {
 
-var st = new ShardingTest({ shards : 2, mongos : 1, verbose : 2 })
+var st = new ShardingTest({ shards : 2, mongos : 1 });
 
 //Stop balancer, since it'll just get in the way of these
 st.stopBalancer()
@@ -83,4 +84,6 @@ jsTest.log( "Finishing parallel migrations..." )
 
 printjson( benchFinish( bid ) )
 
-st.stop()
+st.stop();
+
+})();

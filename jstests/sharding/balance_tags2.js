@@ -2,7 +2,6 @@
 var s = new ShardingTest({ name: "balance_tags2",
                            shards: 3,
                            mongos: 1,
-                           verbose: 1,
                            other: { chunkSize: 1,
                                     enableBalancer : true } });
 

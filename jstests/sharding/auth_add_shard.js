@@ -15,7 +15,7 @@ adminUser = { db : "admin", username : "foo", password : "bar" };
 
 //set up a 2 shard cluster with keyfile
 var st = new ShardingTest( { name : "auth_add_shard1", shards : 1,
-                            mongos : 1, verbose : 1, keyFile : "jstests/libs/key1" } )
+                            mongos : 1, keyFile : "jstests/libs/key1" } )
 
 var mongos = st.s0
 var admin = mongos.getDB("admin")

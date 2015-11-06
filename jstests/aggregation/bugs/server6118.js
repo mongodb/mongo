@@ -1,7 +1,7 @@
 // SERVER-6118: support for sharded sorts
 (function() {
 
-var s = new ShardingTest({ name: "aggregation_sort1", shards: 2, mongos: 1, verbose: 0 });
+var s = new ShardingTest({ name: "aggregation_sort1", shards: 2, mongos: 1 });
 s.stopBalancer();
 
 s.adminCommand({ enablesharding:"test" });

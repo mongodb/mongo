@@ -1,8 +1,7 @@
 /**
  * @tags : [ hashed ] 
  */
-var st = new ShardingTest({ shards: 2, chunkSize: 1, other: { shardOptions: { verbose: 1 }} });
-st.stopBalancer();
+var st = new ShardingTest({ shards: 2, chunkSize: 1 });
 
 var testDB = st.s.getDB('test');
 testDB.adminCommand({ enableSharding: 'test' });

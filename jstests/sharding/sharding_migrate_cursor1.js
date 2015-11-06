@@ -6,7 +6,6 @@ var chunkSize = 25
 var s = new ShardingTest({ name: "migrate_cursor1",
                            shards: 2,
                            mongos: 1,
-                           verbose: 1,
                            other: { chunkSize : chunkSize } });
 
 s.adminCommand( { enablesharding : "test" } );

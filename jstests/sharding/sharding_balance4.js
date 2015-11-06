@@ -4,7 +4,6 @@
 var s = new ShardingTest({ name: "slow_sharding_balance4",
                            shards: 2,
                            mongos: 1,
-                           verbose: 1,
                            other: { chunkSize: 1 } });
 
 s.adminCommand( { enablesharding : "test" } );

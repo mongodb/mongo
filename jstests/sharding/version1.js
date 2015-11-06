@@ -1,6 +1,6 @@
 (function() {
 
-var s = new ShardingTest({ name: "version1", shards: 1, verbose: 2 });
+var s = new ShardingTest({ name: "version1", shards: 1 });
 
 s.adminCommand( { enablesharding : "alleyinsider" } );
 s.adminCommand( { shardcollection : "alleyinsider.foo" , key : { num : 1 } } );

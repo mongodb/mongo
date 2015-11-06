@@ -3,7 +3,6 @@
 var s = new ShardingTest({ name: "slow_sharding_balance1",
                            shards: 2,
                            mongos: 1,
-                           verbose: 1,
                            other: { chunkSize: 1, enableBalancer : true } });
 
 s.adminCommand( { enablesharding : "test" } );

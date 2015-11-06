@@ -47,7 +47,6 @@ function getShardName(rsTest) {
 var s = new ShardingTest({ name: "auth",
                            mongos: 1,
                            shards: 0,
-                           verbose: 0,
                            other: {
                                 extraOptions: { "keyFile": "jstests/libs/key1" },
                                 noChunkSize: true, }
@@ -84,7 +83,7 @@ s.restartMongos(0, { v: 2,
 login(adminUser);
 
 var d1 = new ReplSetTest({ name : "d1", nodes : 3, useHostName : true });
-d1.startSet({keyFile : "jstests/libs/key2", verbose : 0});
+d1.startSet({keyFile : "jstests/libs/key2" });
 d1.initiate();
 
 print("d1 initiated");
@@ -116,7 +115,7 @@ assert(thrown);
 print("start rs w/correct key");
 
 d1.stopSet();
-d1.startSet({keyFile : "jstests/libs/key1", verbose : 0});
+d1.startSet({keyFile : "jstests/libs/key1" });
 d1.initiate();
 
 var master = d1.getMaster();
@@ -162,7 +161,7 @@ assert.eq( 1 , s.getDB( "test" ).foo.find().itcount() , tojson(result) );
 logout(testUser);
 
 var d2 = new ReplSetTest({name : "d2", nodes : 3, useHostName : true });
-d2.startSet({keyFile : "jstests/libs/key1", verbose : 0});
+d2.startSet({keyFile : "jstests/libs/key1" });
 d2.initiate();
 d2.awaitSecondaryNodes();
 

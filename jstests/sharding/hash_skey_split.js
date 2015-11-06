@@ -1,7 +1,6 @@
 (function() {
 
-var st = new ShardingTest({ shards: 2, other: { shardOptions: { verbose: 1 }} });
-st.stopBalancer();
+var st = new ShardingTest({ shards: 2 });
 
 var configDB = st.s.getDB('config');
 assert.commandWorked(configDB.adminCommand({ enableSharding: 'test' }));

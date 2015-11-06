@@ -2,11 +2,10 @@
 (function() {
 
 var s = new ShardingTest({ shards: { rs0: { nodes: 2 }, rs1: { nodes: 2 } },
-                           verbose: 1,
                            chunkSize: 1 });
 
-db = s.getDB( "test" )
-t = db.foo
+var db = s.getDB("test");
+var t = db.foo;
 
 s.adminCommand( { enablesharding : "test" } );
 s.ensurePrimaryShard('test', 'test-rs0');

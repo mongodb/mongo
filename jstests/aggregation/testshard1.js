@@ -19,7 +19,6 @@ jsTestLog("Creating sharded cluster");
 var shardedAggTest = new ShardingTest({
         shards: 2,
         mongos: 1,
-        verbose: 2,
         other: { chunkSize: 1, enableBalancer: true }
     });
 

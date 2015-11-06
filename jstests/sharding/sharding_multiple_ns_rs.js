@@ -3,7 +3,6 @@
 var s = new ShardingTest({ name: "Sharding multiple ns",
                            shards: 1,
                            mongos: 1,
-                           verbose: 1,
                            other: { rs : true , chunkSize: 1 } });
 
 s.adminCommand( { enablesharding : "test" } );
