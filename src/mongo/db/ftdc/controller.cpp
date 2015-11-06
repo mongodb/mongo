@@ -139,7 +139,7 @@ void FTDCController::stop() {
     _thread.join();
 
     _state = State::kDone;
-    
+
     if (_mgr) {
         auto s = _mgr->close();
         if (!s.isOK()) {
