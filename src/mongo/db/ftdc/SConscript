@@ -21,6 +21,7 @@ ftdcEnv.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/third_party/s2/s2', # For VarInt
         '$BUILD_DIR/third_party/shim_zlib',

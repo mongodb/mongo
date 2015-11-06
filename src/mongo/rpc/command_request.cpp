@@ -68,7 +68,9 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
 
     ConstDataRangeCursor cur(begin, messageEnd);
 
-    _database = uassertStatusOK(cur.readAndAdvance<Terminated<'\0', StringData>>());
+    Terminated<'\0', StringData> str;
+    uassertStatusOK(cur.readAndAdvance<>(&str));
+    _database = std::move(str.value);
 
     uassert(28636,
             str::stream() << "Database parsed in OP_COMMAND message must be between"
@@ -80,7 +82,8 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
             str::stream() << "Invalid database name: '" << _database << "'",
             NamespaceString::validDBName(_database));
 
-    _commandName = uassertStatusOK(cur.readAndAdvance<Terminated<'\0', StringData>>());
+    uassertStatusOK(cur.readAndAdvance<>(&str));
+    _commandName = std::move(str.value);
 
     uassert(28637,
             str::stream() << "Command name parsed in OP_COMMAND message must be between"
@@ -89,8 +92,12 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
             (_commandName.size() >= kMinCommandNameLength) &&
                 (_commandName.size() <= kMaxCommandNameLength));
 
-    _metadata = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
-    _commandArgs = uassertStatusOK(cur.readAndAdvance<Validated<BSONObj>>()).val;
+    Validated<BSONObj> obj;
+    uassertStatusOK(cur.readAndAdvance<>(&obj));
+    _metadata = std::move(obj.val);
+    uassertStatusOK(cur.readAndAdvance<>(&obj));
+    _commandArgs = std::move(obj.val);
+
     _inputDocs = DocumentRange{cur.data(), messageEnd};
 }
 

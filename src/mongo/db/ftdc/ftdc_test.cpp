@@ -107,11 +107,6 @@ void createDirectoryClean(const boost::filesystem::path& dir) {
     boost::filesystem::create_directory(dir);
 }
 
-template <>
-Status Validator<BSONObj>::validateLoad(const char* ptr, size_t length) {
-    return validateBSON(ptr, length);
-}
-
 class FTDCClockSourceMock : public ClockSource {
     Date_t now() final {
         return Date_t::fromMillisSinceEpoch(37);

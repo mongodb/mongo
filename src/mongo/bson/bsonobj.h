@@ -36,13 +36,13 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/bson/timestamp.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/bsonelement.h"
 #include "mongo/base/data_type.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/bufreader.h"
@@ -801,7 +801,17 @@ struct DataType::Handler<BSONObj> {
                        const char* ptr,
                        size_t length,
                        size_t* advanced,
-                       std::ptrdiff_t debug_offset);
+                       std::ptrdiff_t debug_offset) {
+        auto temp = BSONObj(ptr);
+        auto len = temp.objsize();
+        if (bson) {
+            *bson = std::move(temp);
+        }
+        if (advanced) {
+            *advanced = len;
+        }
+        return Status::OK();
+    }
 
     static Status store(const BSONObj& bson,
                         char* ptr,
