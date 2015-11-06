@@ -58,8 +58,9 @@ ConnectionString RemoteCommandTargeterRS::connectionString() {
     return fassertStatusOK(28712, ConnectionString::parse(_rsMonitor->getServerAddress()));
 }
 
-StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(const ReadPreferenceSetting& readPref) {
-    return _rsMonitor->getHostOrRefresh(readPref);
+StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(const ReadPreferenceSetting& readPref,
+                                                          Milliseconds maxWait) {
+    return _rsMonitor->getHostOrRefresh(readPref, maxWait);
 }
 
 void RemoteCommandTargeterRS::markHostNotMaster(const HostAndPort& host) {

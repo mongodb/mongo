@@ -149,13 +149,13 @@ private:
                                          int cappedSize) override;
 
     /**
-     * Helper method for running a read command against the config server.
+     * Helper method for running a read command against the config server. Automatically retries on
+     * NotMaster and network errors, so these will never be returned.
      */
-    bool _runReadCommand(OperationContext* txn,
-                         const std::string& dbname,
-                         const BSONObj& cmdObj,
-                         const ReadPreferenceSetting& settings,
-                         BSONObjBuilder* result);
+    StatusWith<BSONObj> _runReadCommand(OperationContext* txn,
+                                        const std::string& dbname,
+                                        const BSONObj& cmdObj,
+                                        const ReadPreferenceSetting& settings);
 
     /**
      * Helper method for running a count command against the config server with appropriate

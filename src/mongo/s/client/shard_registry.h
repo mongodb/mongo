@@ -305,10 +305,12 @@ private:
     std::shared_ptr<Shard> _findUsingLookUp(const ShardId& shardId);
 
     /**
-     * Runs a command against the specified host and returns the result.  It is the responsibility
+     * Runs a command against the specified host, checks the returned reply (if any) for NotMaster
+     * class of errors and returns the result. If the command succeeds, it is the responsibility
      * of the caller to check the returned BSON for command-specific failures.
      */
-    StatusWith<CommandResponse> _runCommandWithMetadata(executor::TaskExecutor* executor,
+    StatusWith<CommandResponse> _runCommandWithMetadata(OperationContext* txn,
+                                                        executor::TaskExecutor* executor,
                                                         const std::shared_ptr<Shard>& shard,
                                                         const ReadPreferenceSetting& readPref,
                                                         const std::string& dbName,

@@ -74,7 +74,6 @@ namespace {
 
 const Seconds kConfigCommandTimeout{30};
 const int kNotMasterNumRetries = 3;
-const Milliseconds kNotMasterRetryInterval{500};
 const BSONObj kReplMetadata(BSON(rpc::kReplSetMetadataFieldName << 1));
 const BSONObj kSecondaryOkMetadata{rpc::ServerSelectionMetadata(true, boost::none).toBSON()};
 
@@ -397,7 +396,8 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
     const BSONObj& sort,
     boost::optional<long long> limit) {
     const auto targeter = getConfigShard()->getTargeter();
-    const auto host = targeter->findHost(readPref);
+    const auto host =
+        targeter->findHost(readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
     if (!host.isOK()) {
         return host.getStatus();
     }
@@ -464,6 +464,7 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
     if (remainingTxnMaxTime != Microseconds::zero()) {
         maxTime = duration_cast<Seconds>(remainingTxnMaxTime);
     }
+
     findCmdBuilder.append(LiteParsedQuery::cmdOptionMaxTimeMS,
                           durationCount<Milliseconds>(maxTime));
 
@@ -474,7 +475,6 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::_exhaustiveFindOnConfig(
                          fetcherCallback,
                          readPref.pref == ReadPreference::PrimaryOnly ? kReplMetadata
                                                                       : kReplSecondaryOkMetadata);
-
     Status scheduleStatus = fetcher.schedule();
     if (!scheduleStatus.isOK()) {
         return scheduleStatus;
@@ -500,25 +500,22 @@ StatusWith<ShardRegistry::QueryResponse> ShardRegistry::exhaustiveFindOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    Status lastStatus = Status(ErrorCodes::InternalError, "Uninitialized");
-
-    for (int retry = 0; retry < kNotMasterNumRetries; retry++) {
+    for (int retry = 1; retry <= kNotMasterNumRetries; retry++) {
         auto result = _exhaustiveFindOnConfig(txn, readPref, nss, query, sort, limit);
+        if (result.isOK()) {
+            return {std::move(result)};
+        }
 
-        if (ErrorCodes::isNetworkError(result.getStatus().code()) ||
-            ErrorCodes::isNotMasterError(result.getStatus().code())) {
-            lastStatus = std::move(result.getStatus());
+        if ((ErrorCodes::isNetworkError(result.getStatus().code()) ||
+             ErrorCodes::isNotMasterError(result.getStatus().code())) &&
+            retry < kNotMasterNumRetries) {
             continue;
         }
 
-        if (!result.isOK()) {
-            return result.getStatus();
-        }
-
-        return {std::move(result.getValue())};
+        return result.getStatus();
     }
 
-    return lastStatus;
+    MONGO_UNREACHABLE;
 }
 
 StatusWith<BSONObj> ShardRegistry::runCommandOnShard(OperationContext* txn,
@@ -647,35 +644,30 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithNotMast
     const BSONObj& cmdObj,
     const BSONObj& metadata) {
     const bool isConfigShard = shard->isConfig();
-    for (int retry = 0; retry < kNotMasterNumRetries; ++retry) {
+    for (int retry = 1; retry <= kNotMasterNumRetries; ++retry) {
         const BSONObj cmdWithMaxTimeMS =
             (isConfigShard ? appendMaxTimeToCmdObj(txn->getRemainingMaxTimeMicros(), cmdObj)
                            : cmdObj);
 
-        auto response =
-            _runCommandWithMetadata(executor, shard, readPref, dbname, cmdWithMaxTimeMS, metadata);
-        if (!response.isOK()) {
-            return response.getStatus();
+        auto response = _runCommandWithMetadata(
+            txn, executor, shard, readPref, dbname, cmdWithMaxTimeMS, metadata);
+        if (response.isOK()) {
+            return {std::move(response)};
         }
 
-        Status commandStatus = getStatusFromCommandResult(response.getValue().response);
-        if (ErrorCodes::isNotMasterError(commandStatus.code())) {
-            if (retry == kNotMasterNumRetries - 1) {
-                // If we're out of retries don't bother sleeping, just return.
-                return commandStatus;
-            }
-
-            sleepmillis(durationCount<Milliseconds>(kNotMasterRetryInterval));
+        if (ErrorCodes::isNotMasterError(response.getStatus().code()) &&
+            retry < kNotMasterNumRetries) {
             continue;
         }
 
-        return response.getValue();
+        return response.getStatus();
     }
 
     MONGO_UNREACHABLE;
 }
 
 StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadata(
+    OperationContext* txn,
     TaskExecutor* executor,
     const std::shared_ptr<Shard>& shard,
     const ReadPreferenceSetting& readPref,
@@ -683,7 +675,7 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
     const BSONObj& cmdObj,
     const BSONObj& metadata) {
     auto targeter = shard->getTargeter();
-    auto host = targeter->findHost(readPref);
+    auto host = targeter->findHost(readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
     if (!host.isOK()) {
         return host.getStatus();
     }
@@ -713,7 +705,12 @@ StatusWith<ShardRegistry::CommandResponse> ShardRegistry::_runCommandWithMetadat
 
     auto response = std::move(responseStatus.getValue());
 
-    updateReplSetMonitor(targeter, host.getValue(), getStatusFromCommandResult(response.data));
+    Status commandSpecificStatus = getStatusFromCommandResult(response.data);
+    updateReplSetMonitor(targeter, host.getValue(), commandSpecificStatus);
+
+    if (ErrorCodes::isNotMasterError(commandSpecificStatus.code())) {
+        return commandSpecificStatus;
+    }
 
     CommandResponse cmdResponse;
     cmdResponse.response = response.data;

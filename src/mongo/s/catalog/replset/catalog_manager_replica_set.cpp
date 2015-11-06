@@ -92,7 +92,7 @@ namespace {
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::PrimaryPreferred,
                                                             TagSet{});
-const int kInitialSSVRetries = 3;
+
 const int kMaxConfigVersionInitRetry = 3;
 const int kMaxReadRetry = 3;
 
@@ -839,14 +839,26 @@ bool CatalogManagerReplicaSet::runReadCommand(OperationContext* txn,
     cmdBuilder.appendElements(cmdObj);
     _appendReadConcern(&cmdBuilder);
 
-    return _runReadCommand(txn, dbname, cmdBuilder.done(), kConfigReadSelector, result);
+    auto resultStatus = _runReadCommand(txn, dbname, cmdBuilder.done(), kConfigReadSelector);
+    if (resultStatus.isOK()) {
+        result->appendElements(resultStatus.getValue());
+        return Command::getStatusFromCommandResult(resultStatus.getValue()).isOK();
+    }
+
+    return Command::appendCommandStatus(*result, resultStatus.getStatus());
 }
 
 bool CatalogManagerReplicaSet::runUserManagementReadCommand(OperationContext* txn,
                                                             const std::string& dbname,
                                                             const BSONObj& cmdObj,
                                                             BSONObjBuilder* result) {
-    return _runReadCommand(txn, dbname, cmdObj, kConfigPrimaryPreferredSelector, result);
+    auto resultStatus = _runReadCommand(txn, dbname, cmdObj, kConfigPrimaryPreferredSelector);
+    if (resultStatus.isOK()) {
+        result->appendElements(resultStatus.getValue());
+        return Command::getStatusFromCommandResult(resultStatus.getValue()).isOK();
+    }
+
+    return Command::appendCommandStatus(*result, resultStatus.getStatus());
 }
 
 Status CatalogManagerReplicaSet::applyChunkOpsDeprecated(OperationContext* txn,
@@ -1019,13 +1031,13 @@ StatusWith<long long> CatalogManagerReplicaSet::_runCountCommandOnConfig(Operati
     countBuilder.append("query", query);
     _appendReadConcern(&countBuilder);
 
-    BSONObjBuilder resultBuilder;
-    if (!_runReadCommand(
-            txn, ns.db().toString(), countBuilder.done(), kConfigReadSelector, &resultBuilder)) {
-        return Command::getStatusFromCommandResult(resultBuilder.obj());
+    auto resultStatus =
+        _runReadCommand(txn, ns.db().toString(), countBuilder.done(), kConfigReadSelector);
+    if (!resultStatus.isOK()) {
+        return resultStatus.getStatus();
     }
 
-    auto responseObj = resultBuilder.obj();
+    auto responseObj = std::move(resultStatus.getValue());
 
     long long result;
     auto status = bsonExtractIntegerField(responseObj, "n", &result);
@@ -1177,31 +1189,25 @@ void CatalogManagerReplicaSet::_appendReadConcern(BSONObjBuilder* builder) {
     readConcern.appendInfo(builder);
 }
 
-bool CatalogManagerReplicaSet::_runReadCommand(OperationContext* txn,
-                                               const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               const ReadPreferenceSetting& settings,
-                                               BSONObjBuilder* result) {
-    Status lastStatus = Status(ErrorCodes::InternalError, "Uninitialized");
+StatusWith<BSONObj> CatalogManagerReplicaSet::_runReadCommand(
+    OperationContext* txn,
+    const std::string& dbname,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& settings) {
+    for (int retry = 1; retry <= kMaxReadRetry; ++retry) {
+        auto response = grid.shardRegistry()->runCommandOnConfig(txn, settings, dbname, cmdObj);
+        if (response.isOK()) {
+            return response;
+        }
 
-    for (int retry = 0; retry < kMaxReadRetry; retry++) {
-        auto resultStatus = grid.shardRegistry()->runCommandOnConfig(txn, settings, dbname, cmdObj);
-
-        if (ErrorCodes::isNetworkError(resultStatus.getStatus().code())) {
-            lastStatus = std::move(resultStatus.getStatus());
+        if (ErrorCodes::isNetworkError(response.getStatus().code()) && retry < kMaxReadRetry) {
             continue;
         }
 
-        if (!resultStatus.isOK()) {
-            return Command::appendCommandStatus(*result, resultStatus.getStatus());
-        }
-
-        result->appendElements(resultStatus.getValue());
-
-        return Command::getStatusFromCommandResult(resultStatus.getValue()).isOK();
+        return response.getStatus();
     }
 
-    return Command::appendCommandStatus(*result, lastStatus);
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mongo

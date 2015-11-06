@@ -26,45 +26,32 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <memory>
-#include <string>
-#include <vector>
+#include "mongo/platform/basic.h"
 
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
+namespace {
 
-class ReplicaSetMonitor;
+// If the operation doesn't have a user-specified max wait time, use this value.
+const Seconds kDefaultFindHostMaxWaitTime(15);
 
-/**
- * Implements a replica-set backed remote command targeter, which monitors the specified
- * replica set and responds to state changes.
- */
-class RemoteCommandTargeterRS final : public RemoteCommandTargeter {
-public:
-    /**
-     * Instantiates a new targeter for the specified replica set and seed hosts. The RS name
-     * and the seed hosts must match.
-     */
-    RemoteCommandTargeterRS(const std::string& rsName, const std::vector<HostAndPort>& seedHosts);
+// When calculating the findHost max wait time and the operation has a user-specified max wait time,
+// pessimistially assume that the findHost would take this much time so that when it returns, there
+// is still time left to complete the actual operation.
+const Seconds kFindHostTimeoutPad(1);
 
-    ConnectionString connectionString() override;
+}  // namespace
 
-    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     Milliseconds maxWait) override;
+Milliseconds RemoteCommandTargeter::selectFindHostMaxWaitTime(OperationContext* txn) {
+    Milliseconds remainingMaxTime(txn->getRemainingMaxTimeMicros());
+    if (remainingMaxTime > Milliseconds::zero()) {
+        return std::min(remainingMaxTime - kFindHostTimeoutPad,
+                        Milliseconds(kDefaultFindHostMaxWaitTime));
+    }
 
-    void markHostNotMaster(const HostAndPort& host) override;
-
-    void markHostUnreachable(const HostAndPort& host) override;
-
-private:
-    // Name of the replica set which this targeter maintains
-    const std::string _rsName;
-
-    // Monitor for this replica set
-    std::shared_ptr<ReplicaSetMonitor> _rsMonitor;
-};
+    return kDefaultFindHostMaxWaitTime;
+}
 
 }  // namespace mongo

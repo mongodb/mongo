@@ -647,7 +647,8 @@ Status AsyncResultsMerger::RemoteCursorData::resolveShardIdToHostAndPort(
                       str::stream() << "Could not find shard " << *shardId);
     }
 
-    auto findHostStatus = shard->getTargeter()->findHost(readPref);
+    auto findHostStatus = shard->getTargeter()->findHost(
+        readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(txn));
     if (!findHostStatus.isOK()) {
         return findHostStatus.getStatus();
     }

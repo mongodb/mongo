@@ -43,7 +43,8 @@ public:
 
     ConnectionString connectionString() override;
 
-    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref) override;
+    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
+                                     Milliseconds maxWait) override;
 
     void markHostNotMaster(const HostAndPort& host) override;
 
