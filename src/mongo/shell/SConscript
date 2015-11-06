@@ -42,7 +42,7 @@ env.JSHeader(
         "shardingtest.js",
         "servers_misc.js",
         "replsettest.js",
-        "replsetbridge.js"
+        "bridge.js"
     ],
 )
 

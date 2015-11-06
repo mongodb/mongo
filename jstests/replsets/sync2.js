@@ -1,4 +1,4 @@
-var replTest = new ReplSetTest({name: 'sync2', nodes: 5});
+var replTest = new ReplSetTest({name: 'sync2', nodes: 5, useBridge: true});
 var nodes = replTest.nodeList();
 var conns = replTest.startSet({oplogSize: "2"});
 replTest.initiate({"_id": "sync2",
@@ -17,17 +17,14 @@ jsTestLog("Replica set test initialized");
 master.getDB("foo").bar.insert({x:1});
 replTest.awaitReplication();
 
-jsTestLog("Bridging replica set");
-master = replTest.bridge();
-
-replTest.partition(0,4);
-replTest.partition(1,2);
-replTest.partition(2,3);
-replTest.partition(3,1);
+conns[0].disconnect(conns[4]);
+conns[1].disconnect(conns[2]);
+conns[2].disconnect(conns[3]);
+conns[3].disconnect(conns[1]);
 
 // 4 is connected to 2
-replTest.partition(4,1);
-replTest.partition(4,3);
+conns[4].disconnect(conns[1]);
+conns[4].disconnect(conns[3]);
 
 assert.soon(function() {
     master = replTest.getMaster();
@@ -40,8 +37,8 @@ var option = { writeConcern: { w: 5, wtimeout: 30000 }};
 assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, option));
 
 // 4 is connected to 3
-replTest.partition(4,2);
-replTest.unPartition(4,3);
+conns[4].disconnect(conns[2]);
+conns[4].reconnect(conns[3]);
 
 option = { writeConcern: { w: 5, wtimeout: 30000 }};
 assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }, option));

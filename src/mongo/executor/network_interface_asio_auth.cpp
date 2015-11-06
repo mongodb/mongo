@@ -32,15 +32,18 @@
 
 #include "mongo/executor/network_interface_asio.h"
 
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
@@ -55,7 +58,20 @@ void NetworkInterfaceASIO::_runIsMaster(AsyncOp* op) {
     requestBuilder.setDatabase("admin");
     requestBuilder.setCommandName("isMaster");
     requestBuilder.setMetadata(rpc::makeEmptyMetadata());
-    requestBuilder.setCommandArgs(BSON("isMaster" << 1));
+
+    BSONObjBuilder bob;
+    bob.append("isMaster", 1);
+
+    if (Command::testCommandsEnabled) {
+        // Only include the host:port of this process in the isMaster command request if test
+        // commands are enabled. mongobridge uses this field to identify the process opening a
+        // connection to it.
+        StringBuilder sb;
+        sb << getHostName() << ':' << serverGlobalParams.port;
+        bob.append("hostInfo", sb.str());
+    }
+
+    requestBuilder.setCommandArgs(bob.done());
 
     // Set current command to ismaster request and run
     auto beginStatus = op->beginCommand(

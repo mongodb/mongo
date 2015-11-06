@@ -1,5 +1,5 @@
-/*
- *    Copyright (C) 2013 10gen Inc.
+/**
+ * Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,41 +28,38 @@
 
 #pragma once
 
-#include <iosfwd>
-#include <string>
-#include <vector>
+#include <unordered_map>
 
-#include "mongo/base/status.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
-namespace optionenvironment {
-class OptionSection;
-class Environment;
-}  // namespace optionenvironment
+class BSONObj;
+struct HostAndPort;
+class Status;
+template <typename T>
+class StatusWith;
+class StringData;
 
-namespace moe = mongo::optionenvironment;
+struct HostSettings {
+    enum class State { kForward, kHangUp };
 
-struct MongoBridgeGlobalParams {
-    int port = 0;
-    std::string destUri;
-
-    MongoBridgeGlobalParams() = default;
+    State state = State::kForward;
+    Milliseconds delay{0};
 };
 
-extern MongoBridgeGlobalParams mongoBridgeGlobalParams;
+using HostSettingsMap = std::unordered_map<HostAndPort, HostSettings>;
 
-Status addMongoBridgeOptions(moe::OptionSection* options);
+class Command {
+public:
+    static StatusWith<Command*> findCommand(StringData cmdName);
 
-void printMongoBridgeHelp(std::ostream* out);
+    virtual ~Command() = default;
 
-/**
- * Handle options that should come before validation, such as "help".
- *
- * Returns false if an option was found that implies we should prematurely exit with success.
- */
-bool handlePreValidationMongoBridgeOptions(const moe::Environment& params);
+    virtual Status run(const BSONObj& cmdObj,
+                       stdx::mutex* settingsMutex,
+                       HostSettingsMap* settings) = 0;
+};
 
-Status storeMongoBridgeOptions(const moe::Environment& params,
-                               const std::vector<std::string>& args);
-}
+}  // namespace mongo

@@ -113,9 +113,9 @@ print("\nget a master");
 replTest.getMaster();
 
 assert.soon(function() {
-        var secondMaster = replTest.getMaster();
-        return firstMaster+"" != secondMaster+"";
-    }, 'making sure '+firstMaster+' isn\'t still master', 60000);
+    var secondMaster = replTest.getMaster();
+    return firstMaster.host !== secondMaster.host;
+}, "making sure " + firstMaster.host + " isn't still master", 60000);
 
 // Add arbiter for shutdown tests
 replTest.add();

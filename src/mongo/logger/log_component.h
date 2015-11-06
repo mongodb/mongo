@@ -59,6 +59,7 @@ public:
         kWrite,
         kFTDC,
         kASIO,
+        kBridge,
         kNumLogComponents
     };
 

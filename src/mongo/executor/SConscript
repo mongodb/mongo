@@ -141,6 +141,7 @@ env.Library(
         '$BUILD_DIR/mongo/base/system_error',
         '$BUILD_DIR/mongo/client/authentication',
         '$BUILD_DIR/mongo/db/auth/authcommon',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/third_party/shim_asio',
         'async_timer_asio',

@@ -3,7 +3,7 @@ function myprint( x ) {
     print( "chaining output: " + x );
 }
 
-var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
+var replTest = new ReplSetTest({name: 'testSet', nodes: 3, useBridge: true});
 var nodes = replTest.startSet();
 var hostnames = replTest.nodeList();
 replTest.initiate(
@@ -25,8 +25,7 @@ replTest.awaitReplication();
 
 
 var breakNetwork = function() {
-    replTest.bridge();
-    replTest.partition(0, 2);
+    nodes[0].disconnect(nodes[2]);
     master = replTest.getMaster();
 };
 

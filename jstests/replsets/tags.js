@@ -5,9 +5,9 @@
     var host = getHostName();
     var name = 'tags';
 
-    var replTest = new ReplSetTest({name: name, nodes: num});
+    var replTest = new ReplSetTest({name: name, nodes: num, useBridge: true});
     var nodes = replTest.nodeList();
-    replTest.startSet();
+    var conns = replTest.startSet();
     var port = replTest.ports;
     replTest.initiate({
         _id: name,
@@ -111,23 +111,15 @@
     var config = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
     jsTestLog('test configuration = ' + tojson(config));
 
-    jsTestLog('bridging started');
-    replTest.bridge();
-    jsTestLog('bridge 1 of 7');
-    replTest.partition(0, 3);
-    jsTestLog('bridge 2 of 7');
-    replTest.partition(0, 4);
-    jsTestLog('bridge 3 of 7');
-    replTest.partition(1, 3);
-    jsTestLog('bridge 4 of 7');
-    replTest.partition(1, 4);
-    jsTestLog('bridge 5 of 7');
-    replTest.partition(2, 3);
-    jsTestLog('bridge 6 of 7');
-    replTest.partition(2, 4);
-    jsTestLog('bridge 7 of 7');
-    replTest.partition(3, 4);
-    jsTestLog('bridging finished');
+    jsTestLog('Setting up partitions: [0-1-2] [3] [4]');
+    conns[0].disconnect(conns[3]);
+    conns[0].disconnect(conns[4]);
+    conns[1].disconnect(conns[3]);
+    conns[1].disconnect(conns[4]);
+    conns[2].disconnect(conns[3]);
+    conns[2].disconnect(conns[4]);
+    conns[3].disconnect(conns[4]);
+    jsTestLog('Done setting up partitions');
 
     jsTestLog('partitions: nodes with each set of brackets [N1, N2, N3] form a complete network.');
     jsTestLog('partitions: [0-1-2] [3] [4] (only nodes 0 and 1 can replicate from primary node 2');
@@ -159,7 +151,7 @@
     assert.neq(null, result.getWriteConcernError());
     assert(result.getWriteConcernError().errInfo.wtimeout);
 
-    replTest.unPartition(1,4);
+    conns[1].reconnect(conns[4]);
     jsTestLog('partitions: [0-1-2] [1-4] [3] ' +
               '(all nodes besides node 3 can replicate from primary node 2)');
     primary = ensurePrimary(2, 4);
@@ -177,7 +169,7 @@
     assert.neq(null, result.getWriteConcernError());
     assert(result.getWriteConcernError().errInfo.wtimeout, tojson(result.getWriteConcernError()));
 
-    replTest.unPartition(3,4);
+    conns[3].reconnect(conns[4]);
     jsTestLog('partitions: [0-1-2] [1-4] [3-4] ' +
               '(all secondaries can replicate from primary node 2)');
     primary = ensurePrimary(2, 5);
@@ -211,10 +203,10 @@
               ' to become primary.');
 
     // Is this necessary since 3 will be connected to the new primary via node 4?
-    replTest.unPartition(1,3);
+    conns[1].reconnect(conns[3]);
 
-    replTest.partition(2, 0);
-    replTest.partition(2, 1);
+    conns[2].disconnect(conns[0]);
+    conns[2].disconnect(conns[1]);
 
     // Is this necessary when we partition node 2 off from the rest of the nodes?
     replTest.stop(2);

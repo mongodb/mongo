@@ -43,6 +43,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"
@@ -62,6 +63,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password_digest.h"
@@ -861,9 +863,21 @@ StatusWith<executor::RemoteCommandResponse> initWireVersion(DBClientConnection* 
         // where we reconnect to an older version of MongoDB running at the same host/port.
         ScopedForceOpQuery forceOpQuery{conn};
 
+        BSONObjBuilder bob;
+        bob.append("isMaster", 1);
+
+        if (Command::testCommandsEnabled) {
+            // Only include the host:port of this process in the isMaster command request if test
+            // commands are enabled. mongobridge uses this field to identify the process opening a
+            // connection to it.
+            StringBuilder sb;
+            sb << getHostName() << ':' << serverGlobalParams.port;
+            bob.append("hostInfo", sb.str());
+        }
+
         Date_t start{Date_t::now()};
-        auto result = conn->runCommandWithMetadata(
-            "admin", "isMaster", rpc::makeEmptyMetadata(), BSON("isMaster" << 1));
+        auto result =
+            conn->runCommandWithMetadata("admin", "isMaster", rpc::makeEmptyMetadata(), bob.done());
         Date_t finish{Date_t::now()};
 
         BSONObj isMasterObj = result->getCommandReply().getOwned();

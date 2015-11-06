@@ -57,7 +57,7 @@ extern const JSFile servers;
 extern const JSFile shardingtest;
 extern const JSFile servers_misc;
 extern const JSFile replsettest;
-extern const JSFile replsetbridge;
+extern const JSFile bridge;
 }
 
 namespace shell_utils {
@@ -251,7 +251,7 @@ void initScope(Scope& scope) {
     scope.execSetup(JSFiles::shardingtest);
     scope.execSetup(JSFiles::servers_misc);
     scope.execSetup(JSFiles::replsettest);
-    scope.execSetup(JSFiles::replsetbridge);
+    scope.execSetup(JSFiles::bridge);
 
     scope.injectNative("benchRun", BenchRunner::benchRunSync);
     scope.injectNative("benchRunSync", BenchRunner::benchRunSync);

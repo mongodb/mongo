@@ -6,13 +6,18 @@ mongobridge = env.Program(
     target="mongobridge",
     source=[
         "bridge.cpp",
+        "bridge_commands.cpp",
         "mongobridge_options.cpp",
         "mongobridge_options_init.cpp"
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/client/clientdriver",
+        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
+        "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/util/net/network",
         "$BUILD_DIR/mongo/util/ntservice_mock",
+        "$BUILD_DIR/mongo/util/signal_handlers",
         "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
     ],
 )

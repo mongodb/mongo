@@ -42,6 +42,10 @@
  *     keyFile {string}
  *     shardSvr {boolean}: Whether this replica set serves as a shard in a cluster. Default: false.
  *     protocolVersion {number}: protocol version of replset used by the replset initiation.
+ *
+ *     useBridge {boolean}: If true, then a mongobridge process is started for each node in the
+ *        replica set. Both the replica set configuration and the connections returned by startSet()
+ *        will be references to the proxied connections. Defaults to false.
  *   }
  * 
  * Member variables:
@@ -57,6 +61,7 @@ ReplSetTest = function(opts) {
     this.keyFile = opts.keyFile;
     this.shardSvr = opts.shardSvr || false;
     this.protocolVersion = opts.protocolVersion;
+    this.useBridge = opts.useBridge || false;
 
     this.nodeOptions = {};
 
@@ -89,6 +94,11 @@ ReplSetTest = function(opts) {
 
     this.ports = allocatePorts(this.numNodes);
     this.nodes = [];
+
+    if (this.useBridge) {
+        this._unbridgedPorts = allocatePorts(this.numNodes);
+        this._unbridgedNodes = [];
+    }
 
     this.initLiveNodes()
 
@@ -378,6 +388,10 @@ ReplSetTest.prototype.add = function(config) {
     this.ports.push(nextPort);
     printjson(this.ports);
 
+    if (this.useBridge) {
+        this._unbridgedPorts.push(allocatePort());
+    }
+
     var nextId = this.nodes.length;
     printjson(this.nodes);
 
@@ -389,6 +403,11 @@ ReplSetTest.prototype.remove = function( nodeId ) {
     nodeId = this.getNodeId( nodeId )
     this.nodes.splice( nodeId, 1 );
     this.ports.splice( nodeId, 1 );
+
+    if (this.useBridge) {
+        this._unbridgedNodes.splice(nodeId, 1);
+        this._unbridgedPorts.splice(nodeId, 1);
+    }
 }
 
 ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
@@ -666,22 +685,22 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ) {
         
         return started
     }
+
+    // TODO: should we do something special if we don't currently know about this node?
+    n = this.getNodeId(n);
     
     print( "ReplSetTest n is : " + n )
     
     defaults = { useHostName : this.useHostName,
                  oplogSize : this.oplogSize, 
                  keyFile : this.keyFile, 
-                 port : this.getPort( n ),
+                 port : this.useBridge ? this._unbridgedPorts[n] : this.ports[n],
                  noprealloc : "",
                  smallfiles : "",
                  replSet : this.useSeedList ? this.getURL() : this.name,
                  dbpath : "$set-$node" }
     
     defaults = Object.merge( defaults, ReplSetTest.nodeOptions || {} )
-
-    // TODO : should we do something special if we don't currently know about this node?
-    n = this.getNodeId( n )
     
     //
     // Note : this replaces the binVersion of the shared startSet() options the first time 
@@ -709,12 +728,30 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ) {
     this.getPath(n);
 
     print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
-    
-    var rval = this.nodes[n] = MongoRunner.runMongod( options )
 
-    if(!rval) throw Error("Failed to start node " + n);
+    if (this.useBridge) {
+        this.nodes[n] = new MongoBridge({
+            hostName: this.host,
+            port: this.ports[n],
+            // The mongod processes identify themselves to mongobridge as host:port, where the host
+            // is the actual hostname of the machine and not localhost.
+            dest: getHostName() + ":" + this._unbridgedPorts[n],
+        });
+    }
+
+    var conn = MongoRunner.runMongod(options);
+    if (!conn) {
+        throw new Error("Failed to start node " + n);
+    }
+
+    if (this.useBridge) {
+        this.nodes[n].connectToBridge();
+        this._unbridgedNodes[n] = conn;
+    } else {
+        this.nodes[n] = conn;
+    }
     
-    // Add replica set specific attributes
+    // Add replica set specific attributes.
     this.nodes[n].nodeId = n
             
     printjson( this.nodes )
@@ -725,12 +762,12 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ) {
         else wait = -1
     }
 
-    if( wait < 0 ) return rval;
+    if (wait >= 0) {
+        // Wait for node to start up.
+        this.waitForHealth(this.nodes[n], this.UP, wait);
+    }
 
-    // Wait for startup
-    this.waitForHealth( rval, this.UP, wait )
-
-    return rval;
+    return this.nodes[n];
 }
 
 
@@ -800,12 +837,17 @@ ReplSetTest.prototype.stop = function(n, signal, opts) {
         signal = undefined
     }
     
-    var port = this.getPort( n );
+    n = this.getNodeId(n);
+    var port = this.useBridge ? this._unbridgedPorts[n] : this.ports[n];
     print('ReplSetTest stop *** Shutting down mongod in port ' + port + ' ***');
     var ret = MongoRunner.stopMongod( port , signal, opts );
 
     print('ReplSetTest stop *** Mongod in port ' + port +
           ' shutdown with code (' + ret + ') ***');
+
+    if (this.useBridge) {
+        this.nodes[n].stop();
+    }
 
     return ret;
 };
@@ -814,8 +856,7 @@ ReplSetTest.prototype.stop = function(n, signal, opts) {
  * Kill all members of this replica set.
  *
  * @param {number} signal The signal number to use for killing the members
- * @param {boolean} forRestart will not cleanup data directory or teardown
- *   bridges if set to true.
+ * @param {boolean} forRestart will not cleanup data directory
  * @param {Object} opts @see MongoRunner.stopMongod
  */
 ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
@@ -828,15 +869,6 @@ ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
         for( var i=0; i<this._alldbpaths.length; i++ ){
             resetDbpath( this._alldbpaths[i] );
         }
-    }
-    if (this.bridges) {
-        for (var i = 0; i < this.bridges.length; i++) {
-            for (var j = 0; j < this.bridges[i].length; j++) {
-                if (this.bridges[i][j] && this.bridges[i][j].port) {
-                    this.bridges[i][j].stop();
-                }
-            }
-        }   
     }
     _forgetReplSet(this.name);
 
@@ -1131,154 +1163,3 @@ ReplSetTest.prototype.overflow = function( secondaries ) {
     this.start( secondaries, { remember : true }, true, true )
     this.waitForState( secondaries, this.RECOVERING, 5 * 60 * 1000 )
 }
-
-
-
-
-/**
- * Bridging allows you to test network partitioning.  For example, you can set
- * up a replica set, run bridge(), then kill the connection between any two
- * nodes x and y with partition(x, y).
- *
- * Once you have called bridging, you cannot reconfigure the replica set.
- */
-ReplSetTest.prototype.bridge = function( opts ) {
-    if (this.bridges) {
-        print("ReplSetTest bridge bridges have already been created!");
-        return;
-    }
-    
-    var n = this.nodes.length;
-
-    // create bridges
-    this.bridges = [];
-    for (var i=0; i<n; i++) {
-        var nodeBridges = [];
-        for (var j=0; j<n; j++) {
-            if (i == j) {
-                continue;
-            }
-            nodeBridges[j] = new ReplSetBridge(this, i, j);
-        }
-        this.bridges.push(nodeBridges);
-    }
-    print("ReplSetTest bridge bridges: " + this.bridges);
-    
-    // restart everyone independently
-    this.stopSet(null, true, opts );
-    for (var i=0; i<n; i++) {
-        this.restart(i, {noReplSet : true});
-    }
-    
-    // create new configs
-    for (var i=0; i<n; i++) {
-        config = this.nodes[i].getDB("local").system.replset.findOne();
-        
-        if (!config) {
-            print("ReplSetTest bridge couldn't find config for "+this.nodes[i]);
-            assert(false);
-        }
-
-        var updateMod = {"$set" : {}};
-        for (var j = 0; j<config.members.length; j++) {
-            if (config.members[j].host == this.host+":"+this.ports[i]) {
-                continue;
-            }
-
-            updateMod['$set']["members."+j+".host"] = this.bridges[i][j].host;
-        }
-        print("ReplSetTest bridge for node " + i + ":");
-        printjson(updateMod);
-        this.nodes[i].getDB("local").system.replset.update({},updateMod);
-	var err = this.nodes[i].getDB("local").getLastErrorObj();
-        if (err.err) {
-           print("Error updating replset config: " + tojson(err));
-           throw err;
-        }
-    }
-
-    this.stopSet( null, true, opts );
-    
-    // start set
-    for (var i=0; i<n; i++) {
-        this.restart(i);
-    }
-    this.reconfig = function() {
-        throw notImplemented;
-    }
-
-    return this.getMaster();
-};
-
-/**
- * This kills the bridge between two nodes.  As parameters, specify the from and
- * to node numbers.
- *
- * For example, with a three-member replica set, we'd have nodes 0, 1, and 2,
- * with the following bridges: 0->1, 0->2, 1->0, 1->2, 2->0, 2->1.  We can kill
- * the connection between nodes 0 and 2 by calling replTest.partition(0,2) or
- * replTest.partition(2,0) (either way is identical). Then the replica set would
- * have the following bridges: 0->1, 1->0, 1->2, 2->1.
- *
- * The bidirectional parameter, which defaults to true, determines whether
- * replTest.partition(0,2) will stop the bridges for 0->2 and 2->0 (true), or
- * just 0->2 (false).
- */
-ReplSetTest.prototype.partition = function(from, to, bidirectional) {
-    bidirectional = typeof bidirectional !== 'undefined' ? bidirectional : true;
-
-    this.bridges[from][to].stop();
-
-    if (bidirectional) {
-        this.bridges[to][from].stop();
-    }
-};
-
-/**
- * This reverses a partition created by partition() above.
- */
-ReplSetTest.prototype.unPartition = function(from, to, bidirectional) {
-    bidirectional = typeof bidirectional !== 'undefined' ? bidirectional : true;
-
-    this.bridges[from][to].start();
-
-    if (bidirectional) {
-        this.bridges[to][from].start();
-    }
-};
-
-/**
- * Helpers for partitioning in only one direction so that the test files are more clear to readers.
- */
-ReplSetTest.prototype.partitionOneWay = function(from, to) {
-    this.partition(from, to, false);
-};
-
-ReplSetTest.prototype.unPartitionOneWay = function(from, to) {
-    this.unPartition(from, to, false);
-};
-
-/**
- * Helpers for adding/removing delays from a partition.
- */
-ReplSetTest.prototype.addPartitionDelay = function(from, to, delay, bidirectional) {
-    bidirectional = typeof bidirectional !== 'undefined' ? bidirectional : true;
-
-    this.bridges[from][to].setDelay(delay);
-
-    if (bidirectional) {
-        this.bridges[to][from].setDelay(delay);
-    }
-};
-
-ReplSetTest.prototype.removePartitionDelay = function(from, to, bidirectional) {
-    this.addPartitionDelay(from, to, 0, bidirectional);
-};
-
-ReplSetTest.prototype.addOneWayPartitionDelay = function(from, to, delay) {
-    this.addPartitionDelay(from, to, delay, false);
-};
-
-ReplSetTest.prototype.removeOneWayPartitionDelay = function(from, to) {
-    this.addPartitionDelay(from, to, 0, false);
-};
