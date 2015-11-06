@@ -143,8 +143,8 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	WT_RAND_STATE rnd;
 	uint64_t key;
-	uint32_t absent, count;
-	int ch, status, ret, timeout;
+	uint32_t absent, count, timeout;
+	int ch, status, ret;
 	pid_t pid;
 	char *working_dir;
 
@@ -161,7 +161,7 @@ main(int argc, char *argv[])
 			working_dir = __wt_optarg;
 			break;
 		case 't':
-			timeout = atoi(__wt_optarg);
+			timeout = (uint32_t)atoi(__wt_optarg);
 			break;
 		default:
 			usage();
