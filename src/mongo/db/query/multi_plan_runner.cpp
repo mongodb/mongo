@@ -149,35 +149,19 @@ namespace mongo {
         if (NULL != _bestPlan) {
             _bestPlan->invalidate(dl, type);
             for (list<WorkingSetID>::iterator it = _alreadyProduced.begin();
-                 it != _alreadyProduced.end();) {
+                 it != _alreadyProduced.end(); ++it) {
                 WorkingSetMember* member = _bestPlan->getWorkingSet()->get(*it);
                 if (member->hasLoc() && member->loc == dl) {
-                    list<WorkingSetID>::iterator next = it;
-                    next++;
                     WorkingSetCommon::fetchAndInvalidateLoc(member);
-                    _bestPlan->getWorkingSet()->flagForReview(*it);
-                    _alreadyProduced.erase(it);
-                    it = next;
-                }
-                else {
-                    it++;
                 }
             }
             if (NULL != _backupPlan) {
                 _backupPlan->invalidate(dl, type);
                 for (list<WorkingSetID>::iterator it = _backupAlreadyProduced.begin();
-                        it != _backupAlreadyProduced.end();) {
+                        it != _backupAlreadyProduced.end(); ++it) {
                     WorkingSetMember* member = _backupPlan->getWorkingSet()->get(*it);
                     if (member->hasLoc() && member->loc == dl) {
-                        list<WorkingSetID>::iterator next = it;
-                        next++;
                         WorkingSetCommon::fetchAndInvalidateLoc(member);
-                        _backupPlan->getWorkingSet()->flagForReview(*it);
-                        _backupAlreadyProduced.erase(it);
-                        it = next;
-                    }
-                    else {
-                        it++;
                     }
                 }
             }
@@ -186,18 +170,10 @@ namespace mongo {
             for (size_t i = 0; i < _candidates.size(); ++i) {
                 _candidates[i].root->invalidate(dl, type);
                 for (list<WorkingSetID>::iterator it = _candidates[i].results.begin();
-                     it != _candidates[i].results.end();) {
+                     it != _candidates[i].results.end(); ++it) {
                     WorkingSetMember* member = _candidates[i].ws->get(*it);
                     if (member->hasLoc() && member->loc == dl) {
-                        list<WorkingSetID>::iterator next = it;
-                        next++;
                         WorkingSetCommon::fetchAndInvalidateLoc(member);
-                        _candidates[i].ws->flagForReview(*it);
-                        _candidates[i].results.erase(it);
-                        it = next;
-                    }
-                    else {
-                        it++;
                     }
                 }
             }
