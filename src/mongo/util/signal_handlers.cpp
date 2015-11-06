@@ -198,9 +198,7 @@ void setupSignalHandlers() {
     // interrupt thread, once it is started via startSignalProcessingThread().
     sigemptyset(&asyncSignals);
     sigaddset(&asyncSignals, SIGHUP);
-    if (!handleControlC) {
-        sigaddset(&asyncSignals, SIGINT);
-    }
+    sigaddset(&asyncSignals, SIGINT);
     sigaddset(&asyncSignals, SIGTERM);
     sigaddset(&asyncSignals, SIGUSR1);
     sigaddset(&asyncSignals, SIGXCPU);
