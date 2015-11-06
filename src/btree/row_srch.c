@@ -312,9 +312,10 @@ restart_page:	page = current->page;
 append:			if (parent_pindex != NULL &&
 			    __wt_split_intl_race(
 			    session, current->home, parent_pindex)) {
-				ret = __wt_page_release(session, current, 0);
-				current = NULL;
-				WT_ERR(ret);
+				if ((ret = __wt_page_release(
+				    session, current, 0)) != 0)
+					return (ret);
+
 				goto restart_root;
 			}
 		}
@@ -505,7 +506,7 @@ leaf_match:	cbt->compare = 0;
 
 	return (0);
 
-err:	if (current != NULL && leaf == NULL)
+err:	if (leaf != NULL)
 		WT_TRET(__wt_page_release(session, current, 0));
 	return (ret);
 }
