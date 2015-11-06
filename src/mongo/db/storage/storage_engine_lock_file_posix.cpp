@@ -96,7 +96,9 @@ Status StorageEngineLockFile::open() {
                                     << ": " << ex.what());
     }
 
-    int lockFile = ::open(_filespec.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+    // Use file permissions 644
+    int lockFile =
+        ::open(_filespec.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (lockFile < 0) {
         int errorcode = errno;
         return Status(ErrorCodes::DBPathInUse,
