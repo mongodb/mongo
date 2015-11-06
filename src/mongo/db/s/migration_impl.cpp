@@ -287,8 +287,9 @@ Status ChunkMoveOperationState::commitMigration() {
     ShardingState* const shardingState = ShardingState::get(_txn);
 
     Status startStatus = ShardingStateRecovery::startMetadataOp(_txn);
-    if (!startStatus.isOK())
+    if (!startStatus.isOK()) {
         return startStatus;
+    }
 
     shardingState->migrationSourceManager()->setInCriticalSection(true);
 

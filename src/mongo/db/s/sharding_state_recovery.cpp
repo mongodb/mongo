@@ -219,6 +219,10 @@ Status modifyRecoveryDocument(OperationContext* txn,
 }  // namespace
 
 Status ShardingStateRecovery::startMetadataOp(OperationContext* txn) {
+    if (grid.catalogManager(txn)->getMode() != CatalogManager::ConfigServerMode::CSRS) {
+        return Status::OK();
+    }
+
     Status upsertStatus =
         modifyRecoveryDocument(txn, RecoveryDocument::Increment, kMajorityWriteConcern);
 
@@ -233,6 +237,10 @@ Status ShardingStateRecovery::startMetadataOp(OperationContext* txn) {
 }
 
 void ShardingStateRecovery::endMetadataOp(OperationContext* txn) {
+    if (grid.catalogManager(txn)->getMode() != CatalogManager::ConfigServerMode::CSRS) {
+        return;
+    }
+
     Status status = modifyRecoveryDocument(txn, RecoveryDocument::Decrement, WriteConcernOptions());
     if (!status.isOK()) {
         warning() << "Failed to decrement minOpTimeUpdaters due to " << status;

@@ -50,11 +50,17 @@ var restartPrimaries = function() {
 restartPrimaries();
 
 // Sharding data gets initialized either when shards are hit by an unsharded query or if some
-// metadata operation was run before the step down, which wrote a minOpTime recovery record. In
-// this case we did a moveChunk above from shard0 to shard1, so we will have this record on
-// shard0.
-assert.neq("",
-           st.rs0.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
+// metadata operation was run before the step down, which wrote a minOpTime recovery record (CSRS
+// only). In this case we did a moveChunk above from shard0 to shard1, so we will have this record
+// on shard0.
+if (st.configRS) {
+    assert.neq("",
+               st.rs0.getPrimary().adminCommand({ getShardVersion: coll.toString() }).configServer);
+}
+else {
+    assert.eq("",
+              st.rs0.getPrimary().adminCommand({ getShardVersion: coll.toString() }).configServer);
+}
 assert.eq("",
           st.rs1.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
 
