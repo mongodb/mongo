@@ -781,6 +781,10 @@ __split_multi_inmem(
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt, true));
 
+	/* On error, discard the allocated page. */
+	if (ret != 0)
+		WT_TRET(__wt_ref_out(session, ref));
+
 	__wt_scr_free(session, &key);
 	return (ret);
 }
