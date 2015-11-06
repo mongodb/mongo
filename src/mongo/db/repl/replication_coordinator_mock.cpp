@@ -372,7 +372,7 @@ long long ReplicationCoordinatorMock::getTerm() {
     return OpTime::kInitialTerm;
 }
 
-Status ReplicationCoordinatorMock::updateTerm(long long term) {
+Status ReplicationCoordinatorMock::updateTerm(OperationContext* txn, long long term) {
     return Status::OK();
 }
 

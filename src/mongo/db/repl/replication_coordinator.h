@@ -668,7 +668,7 @@ public:
      * the rest of the work, because the term is still the same).
      * Returns StaleTerm if the supplied term was higher than the current term.
      */
-    virtual Status updateTerm(long long term) = 0;
+    virtual Status updateTerm(OperationContext* txn, long long term) = 0;
 
     /**
      * Reserves a unique SnapshotName.

@@ -155,6 +155,16 @@ public:
         // Disable shard version checking - getmore commands are always unversioned
         OperationShardVersion::get(txn).setShardVersion(request.nss, ChunkVersion::IGNORED());
 
+        // Validate term before acquiring locks, if provided.
+        if (request.term) {
+            auto replCoord = repl::ReplicationCoordinator::get(txn);
+            Status status = replCoord->updateTerm(txn, *request.term);
+            // Note: updateTerm returns ok if term stayed the same.
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+        }
+
         // Depending on the type of cursor being operated on, we hold locks for the whole
         // getMore, or none of the getMore, or part of the getMore.  The three cases in detail:
         //
@@ -232,16 +242,6 @@ public:
             Status status(ErrorCodes::BadValue,
                           "cannot set maxTimeMS on getMore command for a non-awaitData cursor");
             return appendCommandStatus(result, status);
-        }
-
-        // Validate term, if provided.
-        if (request.term) {
-            auto replCoord = repl::ReplicationCoordinator::get(txn);
-            Status status = replCoord->updateTerm(*request.term);
-            // Note: updateTerm returns ok if term stayed the same.
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
         }
 
         // On early return, get rid of the cursor.

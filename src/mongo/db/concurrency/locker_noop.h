@@ -137,7 +137,7 @@ public:
     }
 
     virtual bool isLocked() const {
-        invariant(false);
+        return false;
     }
 
     virtual bool isWriteLocked() const {

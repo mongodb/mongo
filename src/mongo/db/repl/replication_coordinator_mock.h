@@ -215,7 +215,7 @@ public:
 
     virtual long long getTerm();
 
-    virtual Status updateTerm(long long term);
+    virtual Status updateTerm(OperationContext* txn, long long term);
 
     virtual SnapshotName reserveSnapshotName(OperationContext* txn);
 

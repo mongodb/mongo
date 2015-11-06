@@ -210,10 +210,10 @@ public:
 
         auto& lpq = lpqStatus.getValue();
 
-        // Validate term, if provided.
+        // Validate term before acquiring locks, if provided.
         if (auto term = lpq->getReplicationTerm()) {
             auto replCoord = repl::ReplicationCoordinator::get(txn);
-            Status status = replCoord->updateTerm(*term);
+            Status status = replCoord->updateTerm(txn, *term);
             // Note: updateTerm returns ok if term stayed the same.
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);

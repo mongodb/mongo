@@ -1244,7 +1244,8 @@ private:
 TEST_F(ReplCoordTest, UpdateTermNotReplMode) {
     init(ReplSettings());
     ASSERT_TRUE(ReplicationCoordinator::modeNone == getReplCoord()->getReplicationMode());
-    ASSERT_EQUALS(ErrorCodes::BadValue, getReplCoord()->updateTerm(0).code());
+    OperationContextNoop txn;
+    ASSERT_EQUALS(ErrorCodes::BadValue, getReplCoord()->updateTerm(&txn, 0).code());
 }
 
 TEST_F(ReplCoordTest, UpdateTerm) {
@@ -1266,25 +1267,25 @@ TEST_F(ReplCoordTest, UpdateTerm) {
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
     simulateSuccessfulV1Election();
+    OperationContextNoop txn;
 
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // lower term, no change
-    ASSERT_OK(getReplCoord()->updateTerm(0));
+    ASSERT_OK(getReplCoord()->updateTerm(&txn, 0));
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // same term, no change
-    ASSERT_OK(getReplCoord()->updateTerm(1));
+    ASSERT_OK(getReplCoord()->updateTerm(&txn, 1));
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // higher term, step down and change term
     Handle cbHandle;
-    ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(2).code());
+    ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(&txn, 2).code());
     ASSERT_EQUALS(2, getReplCoord()->getTerm());
-    getReplCoord()->waitForStepDownFinish_forTest();
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
 
@@ -1322,33 +1323,25 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
     replExec->scheduleWorkWithGlobalExclusiveLock(stepDownFinishBlocker);
 
     bool termUpdated2 = false;
-    auto updateTermResult2 = getReplCoord()->updateTerm_nonBlocking(2, &termUpdated2);
-    ASSERT_OK(updateTermResult2.getStatus());
+    auto updateTermEvh2 = getReplCoord()->updateTerm_forTest(2, &termUpdated2);
+    ASSERT(updateTermEvh2.isValid());
 
     bool termUpdated3 = false;
-    auto updateTermResult3 = getReplCoord()->updateTerm_nonBlocking(3, &termUpdated3);
-    ASSERT_OK(updateTermResult3.getStatus());
+    auto updateTermEvh3 = getReplCoord()->updateTerm_forTest(3, &termUpdated3);
+    ASSERT(updateTermEvh3.isValid());
 
     // Unblock 'stepDownFinishBlocker'. Tasks for updateTerm and _stepDownFinish should proceed.
     barrier.countDownAndWait();
 
     // Both _updateTerm_incallback tasks should be scheduled.
-    auto handle2 = updateTermResult2.getValue();
-    ASSERT_TRUE(handle2.isValid());
-    replExec->wait(handle2);
+    replExec->waitForEvent(updateTermEvh2);
     ASSERT_TRUE(termUpdated2);
-
-    auto handle3 = updateTermResult3.getValue();
-    ASSERT_TRUE(handle3.isValid());
-    replExec->wait(handle3);
+    replExec->waitForEvent(updateTermEvh3);
     ASSERT_TRUE(termUpdated3);
 
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
 
-    // Ensure all global exclusive lock tasks (eg. _stepDownFinish) run to completion.
-    auto work = [](const executor::TaskExecutor::CallbackArgs&) {};
-    replExec->wait(unittest::assertGet(replExec->scheduleWorkWithGlobalExclusiveLock(work)));
-    getReplCoord()->waitForStepDownFinish_forTest();
+    // Update term event handles will wait for potential stepdown.
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
 
@@ -1813,7 +1806,7 @@ TEST_F(ReplCoordTest, SetMaintenanceMode) {
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // Step down from primary.
-    getReplCoord()->updateTerm(getReplCoord()->getTerm() + 1);
+    getReplCoord()->updateTerm(&txn, getReplCoord()->getTerm() + 1);
     ASSERT_OK(getReplCoord()->waitForMemberState(MemberState::RS_SECONDARY, Seconds(1)));
 
     status = getReplCoord()->setMaintenanceMode(false);
@@ -2718,7 +2711,8 @@ TEST_F(ReplCoordTest, MetadataUpdatesLastCommittedOpTime) {
                        HostAndPort("node1", 12345));
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
-    getReplCoord()->updateTerm(1);
+    OperationContextNoop txn;
+    getReplCoord()->updateTerm(&txn, 1);
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
 
     OpTime time(Timestamp(10, 0), 1);
@@ -2761,7 +2755,8 @@ TEST_F(ReplCoordTest, MetadataUpdatesTermAndPrimaryId) {
                             << "protocolVersion" << 1),
                        HostAndPort("node1", 12345));
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
-    getReplCoord()->updateTerm(1);
+    OperationContextNoop txn;
+    getReplCoord()->updateTerm(&txn, 1);
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
 
     // higher term, should change
@@ -2812,7 +2807,8 @@ TEST_F(ReplCoordTest,
                             << "protocolVersion" << 1),
                        HostAndPort("node1", 12345));
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
-    getReplCoord()->updateTerm(1);
+    OperationContextNoop txn;
+    getReplCoord()->updateTerm(&txn, 1);
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
 
     auto replCoord = getReplCoord();
@@ -3310,7 +3306,11 @@ TEST_F(ReplCoordTest, LivenessElectionTimeout) {
         }
     }
     getNet()->exitNetwork();
-    getReplCoord()->waitForStepDownFinish_forTest();
+
+    // Ensure all global exclusive lock tasks (eg. _stepDownFinish) run to completion.
+    auto exec = getReplExec();
+    auto work = [](const executor::TaskExecutor::CallbackArgs&) {};
+    exec->wait(unittest::assertGet(exec->scheduleWorkWithGlobalExclusiveLock(work)));
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getReplCoord()->getMemberState().s);
 }
 

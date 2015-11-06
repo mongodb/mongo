@@ -669,7 +669,7 @@ TEST_F(ReplCoordElectV1Test, ElectionFailsWhenTermChangesDuringActualElection) {
     simulateEnoughHeartbeatsForElectability();
     simulateSuccessfulDryRun();
     // update to a future term before the election completes
-    getReplCoord()->updateTerm(1000);
+    getReplCoord()->updateTerm(&txn, 1000);
 
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
@@ -756,7 +756,7 @@ TEST_F(ReplCoordElectV1Test, SchedulesPriorityTakeoverIfNodeHasHigherPriorityTha
                   replCoord->getPriorityTakeover_forTest());
 
     // Updating term cancels priority takeover callback.
-    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(replCoord->getTerm() + 1));
+    ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&txn, replCoord->getTerm() + 1));
     ASSERT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
 }
 
