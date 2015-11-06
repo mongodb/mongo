@@ -529,6 +529,7 @@ tasks:
           set -o verbose
 
           git clone --depth 1 git@github.com:10gen/mongo-enterprise-modules.git jstests/enterprise_tests
+          git clone --depth 1 git@github.com:10gen/QA.git jstests/qa_tests
     - command: shell.exec
       params:
         working_dir: src/jstestfuzz
