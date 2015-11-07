@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_yield.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -61,8 +62,10 @@ bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
     invariant(_planYielding);
     invariant(allowedToYield());
 
-    // Reset the yield timer in order to prevent from yielding again right away.
-    resetTimer();
+    // After we finish yielding (or in any early return), call resetTimer() to prevent yielding
+    // again right away. We delay the resetTimer() call so that the clock doesn't start ticking
+    // until after we return from the yield.
+    ON_BLOCK_EXIT([this]() { resetTimer(); });
 
     _forceYield = false;
 
