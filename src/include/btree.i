@@ -1389,13 +1389,18 @@ __wt_split_intl_race(
 	 * A place to hang this comment...
 	 *
 	 * There's a page-split race when we walk the tree: if we're splitting
-	 * an internal page into its parent we update the parent's page index
+	 * an internal page into its parent, we update the parent's page index
 	 * and then update the page being split, and it's not an atomic update.
 	 * A thread could read the parent page's original page index, and then
 	 * read the page's replacement index. Because internal page splits work
 	 * by replacing the original page with the initial part of the original
-	 * page, the result of the race is we will have a key that's past the
+	 * page, the result of this race is we will have a key that's past the
 	 * end of the current page, and the parent's page index will have moved.
+	 *
+	 * It's also possible a thread could read the parent page's replacement
+	 * page index, and then read the page's original index. Because internal
+	 * splits work by truncating the original page, the original page's old
+	 * content is compatible, this isn't a problem and we ignore this race.
 	 */
 	WT_INTL_INDEX_GET(session, parent, pindex);
 	return (pindex != saved_pindex);
