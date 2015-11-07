@@ -69,7 +69,8 @@ __wt_metadata_cursor_open(
 
 /*
  * __wt_metadata_cursor --
- *	Opens the session's cached metadata cursor.
+ *	Returns the session's cached metadata cursor, unless it's in use, in
+ * which case it opens and returns another metadata cursor.
  */
 int
 __wt_metadata_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
@@ -92,27 +93,29 @@ __wt_metadata_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 
 	/*
 	 * If there's no cursor return, we're done, our caller should have just
-	 * been triggering the creation of the session's cached cursor. There's
-	 * no opened local cursor in that case, but caution costs nothing.
+	 * been triggering the creation of the session's cached cursor. There
+	 * should not be an open local cursor in that case, but caution doesn't
+	 * cost anything.
 	 */
 	if (cursorp == NULL)
 		return (cursor == NULL ? 0 : cursor->close(cursor));
 
-	/* If the cached cursor is in use, return the newly opened cursor. */
-	if (F_ISSET(session->meta_cursor, WT_CURSTD_META_INUSE)) {
+	/*
+	 * If the cached cursor is in use, return (the newly opened cursor); else
+	 * mark the cached cursor in use and return it.
+	 */
+	if (F_ISSET(session->meta_cursor, WT_CURSTD_META_INUSE))
 		*cursorp = cursor;
-		return (0);
+	else {
+		*cursorp = session->meta_cursor;
+		F_SET(session->meta_cursor, WT_CURSTD_META_INUSE);
 	}
-
-	/* Mark the cached cursor as in use, and return it. */
-	F_SET(session->meta_cursor, WT_CURSTD_META_INUSE);
-	*cursorp = session->meta_cursor;
 	return (0);
 }
 
 /*
  * __wt_metadata_cursor_release --
- *	Release the session's cached metadata cursor.
+ *	Release a metadata cursor.
  */
 int
 __wt_metadata_cursor_release(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
@@ -125,6 +128,10 @@ __wt_metadata_cursor_release(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 		return (0);
 	*cursorp = NULL;
 
+	/*
+	 * If using the session's cached metadata cursor, clear the in-use flag
+	 * and reset it, otherwise, discard the cursor.
+	 */
 	if (F_ISSET(cursor, WT_CURSTD_META_INUSE)) {
 		F_CLR(cursor, WT_CURSTD_META_INUSE);
 		return (cursor->reset(cursor));
@@ -219,7 +226,6 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 	WT_ERR(cursor->search(cursor));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_update(session, key));
-	cursor->set_key(cursor, key);
 	WT_ERR(cursor->remove(cursor));
 err:	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
 	return (ret);
