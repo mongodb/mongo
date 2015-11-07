@@ -101,7 +101,7 @@ __wt_metadata_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 		return (cursor == NULL ? 0 : cursor->close(cursor));
 
 	/*
-	 * If the cached cursor is in use, return (the newly opened cursor); else
+	 * If the cached cursor is in use, return the newly opened cursor, else
 	 * mark the cached cursor in use and return it.
 	 */
 	if (F_ISSET(session->meta_cursor, WT_CURSTD_META_INUSE))
