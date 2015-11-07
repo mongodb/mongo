@@ -280,6 +280,7 @@ __schema_open_index(WT_SESSION_IMPL *session,
 	if (idxname == NULL && table->idx_complete)
 		return (0);
 
+	cursor = NULL;
 	idx = NULL;
 	match = false;
 
@@ -378,8 +379,10 @@ __schema_open_index(WT_SESSION_IMPL *session,
 		table->idx_complete = true;
 	}
 
-err:	__wt_scr_free(session, &tmp);
+err:	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
 	WT_TRET(__wt_schema_destroy_index(session, &idx));
+
+	__wt_scr_free(session, &tmp);
 	return (ret);
 }
 
@@ -425,6 +428,7 @@ __schema_open_table(WT_SESSION_IMPL *session,
 	const char *tconfig;
 	char *tablename;
 
+	cursor = NULL;
 	table = NULL;
 	tablename = NULL;
 
@@ -502,7 +506,8 @@ __schema_open_table(WT_SESSION_IMPL *session,
 	*tablep = table;
 
 	if (0) {
-err:		WT_TRET(__wt_schema_destroy_table(session, &table));
+err:		WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+		WT_TRET(__wt_schema_destroy_table(session, &table));
 	}
 
 	__wt_free(session, tablename);

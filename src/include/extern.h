@@ -441,6 +441,7 @@ extern int __wt_metadata_get_ckptlist( WT_SESSION *session, const char *name, WT
 extern void __wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase);
 extern int __wt_metadata_cursor_open( WT_SESSION_IMPL *session, const char *config, WT_CURSOR **cursorp);
 extern int __wt_metadata_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
+extern int __wt_metadata_cursor_release(WT_SESSION_IMPL *session, WT_CURSOR **cursorp);
 extern int __wt_metadata_insert( WT_SESSION_IMPL *session, const char *key, const char *value);
 extern int __wt_metadata_update( WT_SESSION_IMPL *session, const char *key, const char *value);
 extern int __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key);

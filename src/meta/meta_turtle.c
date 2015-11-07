@@ -122,12 +122,12 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 	 */
 	WT_RET(__wt_metadata_cursor(session, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
-		WT_RET(cursor->get_key(cursor, &key));
+		WT_ERR(cursor->get_key(cursor, &key));
 		if (!WT_PREFIX_SKIP(key, "file:"))
 			continue;
 
 		/* If the file exists, it's all good. */
-		WT_RET(__wt_exist(session, key, &exist));
+		WT_ERR(__wt_exist(session, key, &exist));
 		if (exist)
 			continue;
 
@@ -135,13 +135,14 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 		 * If the file doesn't exist, assume it's a bulk-loaded file;
 		 * retrieve the allocation size and re-create the file.
 		 */
-		WT_RET(__wt_direct_io_size_check(
+		WT_ERR(__wt_direct_io_size_check(
 		    session, filecfg, "allocation_size", &allocsize));
-		WT_RET(__wt_block_manager_create(session, key, allocsize));
+		WT_ERR(__wt_block_manager_create(session, key, allocsize));
 	}
-	WT_RET_NOTFOUND_OK(ret);
+	WT_ERR_NOTFOUND_OK(ret);
 
-	return (0);
+err:	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+	return (ret);
 }
 
 /*

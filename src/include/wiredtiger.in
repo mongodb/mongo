@@ -566,20 +566,22 @@ struct __wt_cursor {
 	 */
 	const char *internal_uri;
 
-#define	WT_CURSTD_APPEND	0x0001
-#define	WT_CURSTD_BULK		0x0002
-#define	WT_CURSTD_DUMP_HEX	0x0004
-#define	WT_CURSTD_DUMP_JSON	0x0008
-#define	WT_CURSTD_DUMP_PRINT	0x0010
-#define	WT_CURSTD_KEY_EXT	0x0020	/* Key points out of the tree. */
-#define	WT_CURSTD_KEY_INT	0x0040	/* Key points into the tree. */
+#define	WT_CURSTD_APPEND	0x00001
+#define	WT_CURSTD_BULK		0x00002
+#define	WT_CURSTD_DUMP_HEX	0x00004
+#define	WT_CURSTD_DUMP_JSON	0x00008
+#define	WT_CURSTD_DUMP_PRINT	0x00010
+#define	WT_CURSTD_KEY_EXT	0x00020	/* Key points out of the tree. */
+#define	WT_CURSTD_KEY_INT	0x00040	/* Key points into the tree. */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
-#define	WT_CURSTD_OPEN		0x0080
-#define	WT_CURSTD_OVERWRITE	0x0100
-#define	WT_CURSTD_RAW		0x0200
-#define	WT_CURSTD_VALUE_EXT	0x0400	/* Value points out of the tree. */
-#define	WT_CURSTD_VALUE_INT	0x0800	/* Value points into the tree. */
+#define	WT_CURSTD_META_INUSE	0x00080
+#define	WT_CURSTD_OPEN		0x00100
+#define	WT_CURSTD_OVERWRITE	0x00200
+#define	WT_CURSTD_RAW		0x00400
+#define	WT_CURSTD_VALUE_EXT	0x00800	/* Value points out of the tree. */
+#define	WT_CURSTD_VALUE_INT	0x01000	/* Value points into the tree. */
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
+
 	uint32_t flags;
 #endif
 };

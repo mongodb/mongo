@@ -287,7 +287,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 		F_SET(ckpt_session, WT_SESSION_LOCKED_SCHEMA);
 		WT_WITH_DHANDLE(ckpt_session,
 		    WT_CURSOR_DHANDLE(session->meta_cursor),
-		    ret = __wt_checkpoint(session, NULL));
+		    ret = __wt_checkpoint(ckpt_session, NULL));
 		F_CLR(ckpt_session, WT_SESSION_LOCKED_SCHEMA);
 		ckpt_session->txn.id = WT_TXN_NONE;
 		WT_RET(ret);

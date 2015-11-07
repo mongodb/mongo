@@ -67,17 +67,10 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
-	/*
-	 * Use a new cursor rather than the cached session cursor, because the
-	 * loop calls code that repositions the cursor and our loop walking the
-	 * metadata table will fail.
-	 */
-	WT_RET(__wt_metadata_cursor_open(session, NULL, &cursor));
-
+	WT_RET(__wt_metadata_cursor(session, &cursor));
 	WT_SAVE_DHANDLE(session,
 	    ret = __meta_btree_apply(session, cursor, func, cfg));
-
-	WT_TRET(cursor->close(cursor));
+	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
 
 	return (ret);
 }
