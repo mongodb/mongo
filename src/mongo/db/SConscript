@@ -424,6 +424,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/curop",
+        "$BUILD_DIR/mongo/db/dbdirectclient",
         "$BUILD_DIR/mongo/util/net/miniwebserver",
         "mongodandmongos",
         'repl/repl_coordinator_global',
@@ -540,6 +541,20 @@ env.Library(
     ],
 )
 
+# TODO: This library should probably be folded into catalog/catalog,
+# with which it is currently circular.
+env.Library(
+    target='db_raii',
+    source=[
+        'db_raii.cpp',
+    ],
+    LIBDEPS=[
+        'catalog/catalog',
+        'stats/top',
+        'views/views',
+    ],
+)
+
 env.Library(
     target='run_commands',
     source=[
@@ -556,86 +571,41 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='dbdirectclient',
+    source=[
+        'dbdirectclient.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        'curop',
+        'lasterror',
+    ],
+    LIBDEPS_TAGS=[
+        # Depends on assembleResponse, defined in instance.cpp below.
+        'incomplete',
+    ],
+)
+
+env.Library(
+    target='dbhelpers',
+    source=[
+        'dbhelpers.cpp',
+    ],
+    LIBDEPS=[
+        'db_raii',
+        'index/index_access_methods',
+        'ops/write_ops',
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
     "background.cpp",
-    "catalog/apply_ops.cpp",
-    "catalog/capped_utils.cpp",
-    "catalog/coll_mod.cpp",
-    "catalog/collection.cpp",
-    "catalog/collection_compact.cpp",
-    "catalog/collection_info_cache.cpp",
-    "catalog/create_collection.cpp",
-    "catalog/cursor_manager.cpp",
-    "catalog/database.cpp",
-    "catalog/database_holder.cpp",
-    "catalog/drop_collection.cpp",
-    "catalog/drop_database.cpp",
-    "catalog/drop_indexes.cpp",
-    "catalog/index_catalog.cpp",
-    "catalog/index_catalog_entry.cpp",
-    "catalog/index_create.cpp",
-    "catalog/rename_collection.cpp",
     "clientcursor.cpp",
     "cloner.cpp",
-    "commands/apply_ops_cmd.cpp",
-    "commands/clone.cpp",
-    "commands/clone_collection.cpp",
-    "commands/collection_to_capped.cpp",
-    "commands/compact.cpp",
-    "commands/copydb.cpp",
-    "commands/copydb_start_commands.cpp",
-    "commands/count_cmd.cpp",
-    "commands/create_indexes.cpp",
-    "commands/current_op.cpp",
-    "commands/dbhash.cpp",
-    "commands/distinct.cpp",
-    "commands/drop_indexes.cpp",
-    "commands/explain_cmd.cpp",
-    "commands/find_and_modify.cpp",
-    "commands/find_cmd.cpp",
-    "commands/fsync.cpp",
-    "commands/geo_near_cmd.cpp",
-    "commands/get_last_error.cpp",
-    "commands/getmore_cmd.cpp",
-    "commands/group_cmd.cpp",
-    "commands/index_filter_commands.cpp",
-    "commands/kill_op.cpp",
-    "commands/killcursors_cmd.cpp",
-    "commands/list_collections.cpp",
-    "commands/list_databases.cpp",
-    "commands/list_indexes.cpp",
-    "commands/lock_info.cpp",
-    "commands/mr.cpp",
-    "commands/oplog_note.cpp",
-    "commands/parallel_collection_scan.cpp",
-    "commands/pipeline_command.cpp",
-    "commands/plan_cache_commands.cpp",
-    "commands/rename_collection_cmd.cpp",
-    "commands/repair_cursor.cpp",
-    "commands/snapshot_management.cpp",
-    "commands/test_commands.cpp",
-    "commands/top_command.cpp",
-    "commands/touch.cpp",
-    "commands/user_management_commands.cpp",
-    "commands/validate.cpp",
-    "commands/write_commands/write_commands.cpp",
     "curop_metrics.cpp",
-    "db_raii.cpp",
-    "dbcommands.cpp",
-    "dbdirectclient.cpp",
-    "dbeval.cpp",
-    "dbhelpers.cpp",
-    "driverHelpers.cpp",
-    "geo/haystack.cpp",
-    "index/2d_access_method.cpp",
-    "index/btree_access_method.cpp",
-    "index/fts_access_method.cpp",
-    "index/hash_access_method.cpp",
-    "index/haystack_access_method.cpp",
-    "index/index_access_method.cpp",
-    "index/s2_access_method.cpp",
     "index_builder.cpp",
     "index_legacy.cpp",
     "index_rebuilder.cpp",
@@ -643,57 +613,18 @@ serverOnlyFiles = [
     "introspect.cpp",
     "op_observer.cpp",
     "operation_context_impl.cpp",
-    "ops/delete.cpp",
-    "ops/insert.cpp",
-    "ops/parsed_delete.cpp",
-    "ops/parsed_update.cpp",
-    "ops/update.cpp",
-    "ops/update_lifecycle_impl.cpp",
-    "ops/update_result.cpp",
-    "ops/write_ops_exec.cpp",
-    "pipeline/document_source_cursor.cpp",
-    "pipeline/pipeline_d.cpp",
     "prefetch.cpp",
     "range_deleter_db_env.cpp",
     "range_deleter_service.cpp",
     "read_concern.cpp",
     "repair_database.cpp",
-    "repl/initial_sync.cpp",
-    "repl/master_slave.cpp",
-    "repl/oplog.cpp",
-    "repl/oplogreader.cpp",
-    "repl/sync_source_resolver.cpp", # TODO(dannenberg) move this into DataReplicator in repl/SConscript.
-    "repl/replication_coordinator_external_state_impl.cpp",
-    "repl/replication_info.cpp",
-    "repl/resync.cpp",
-    "repl/rs_initialsync.cpp",
-    "repl/rs_sync.cpp",
-    "repl/sync_source_feedback.cpp",
     "s/sharding_connection_hook_for_mongod.cpp",
     "service_context_d.cpp",
-    "stats/fill_locker_info.cpp",
-    "stats/lock_server_status_section.cpp",
-    "stats/range_deleter_server_status.cpp",
-    "stats/snapshots.cpp",
     "storage/storage_init.cpp",
     "ttl.cpp",
     "write_concern.cpp",
 ]
 
-if has_option('use-cpu-profiler'):
-    profEnv = env.Clone()
-    profEnv.Library('cpuprofiler',
-        source=[
-            'commands/cpuprofile.cpp',
-        ],
-        LIBDEPS=[
-            'serveronly',
-        ]
-    )
-    profEnv.InjectThirdPartyIncludePaths('gperftools')
-
-serveronlyEnv = env.Clone()
-serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 serveronlyLibdeps = [
     "$BUILD_DIR/mongo/client/parallel",
     "$BUILD_DIR/mongo/db/bson/dotted_path_support",
@@ -711,25 +642,33 @@ serveronlyLibdeps = [
     "$BUILD_DIR/mongo/db/storage/mmap_v1/file_allocator",
     "$BUILD_DIR/third_party/shim_snappy",
     "auth/authmongod",
+    "catalog/catalog",
     "catalog/collection_options",
     "catalog/document_validation",
     "catalog/index_key_validate",
     "commands/killcursors_common",
+    "commands/dcommands",
     "collection_index_usage_tracker",
     "common",
     "concurrency/lock_manager",
     "concurrency/write_conflict_exception",
     "curop",
+    "dbdirectclient",
+    "dbhelpers",
+    "db_raii",
     "exec/exec",
     "exec/working_set",
     "fts/ftsmongod",
     "ftdc/ftdc_mongod",
     "global_timestamp",
     "index/index_descriptor",
+    "index/index_access_methods",
     "matcher/expressions_mongod_only",
+    "ops/write_ops",
     "ops/update_driver",
     "ops/write_ops_parsers",
     "pipeline/aggregation",
+    "pipeline/serveronly",
     "query/query",
     "range_deleter",
     "repl/bgsync",
@@ -741,6 +680,7 @@ serveronlyLibdeps = [
     "repl/replset_commands",
     "repl/rs_rollback",
     "repl/rslog",
+    "repl/serveronly",
     "repl/storage_interface",
     "repl/sync_tail",
     "repl/topology_coordinator_impl",
@@ -750,6 +690,7 @@ serveronlyLibdeps = [
     "s/sharding",
     "startup_warnings_mongod",
     "stats/counters",
+    "stats/serveronly",
     "stats/top",
     "storage/devnull/storage_devnull",
     "storage/ephemeral_for_test/storage_ephemeral_for_test",
@@ -766,7 +707,7 @@ if wiredtiger:
     serveronlyLibdeps.append('storage/wiredtiger/storage_wiredtiger')
     serveronlyLibdeps.append('$BUILD_DIR/third_party/shim_wiredtiger')
 
-serveronlyEnv.Library(
+env.Library(
     target="serveronly",
     source=serverOnlyFiles,
     LIBDEPS=serveronlyLibdeps,

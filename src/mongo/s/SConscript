@@ -102,10 +102,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/message_port_mock',
         'mongoscore',
     ],
-    LIBDEPS_TAGS=[
-        # Depends on coreshard, but that would be circular
-        'incomplete',
-    ],
 )
 
 env.Library(
@@ -195,13 +191,10 @@ env.Library(
     ],
     LIBDEPS=[
         'client/sharding_client',
+        'mongoscore',
         'write_ops/cluster_write_op',
         'write_ops/cluster_write_op_conversion',
         '$BUILD_DIR/mongo/base',
-    ],
-    LIBDEPS_TAGS=[
-        # Circular with coreshard, below
-        'incomplete',
     ],
 )
 
@@ -269,14 +262,12 @@ env.Library(
         'sharding_uptime_reporter.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/lasterror',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
         'catalog/replset/sharding_catalog_client_impl',
         'client/sharding_client',
         'common',
-    ],
-    LIBDEPS_TAGS=[
-        'incomplete',
     ],
 )
 
@@ -384,9 +375,5 @@ env.Library(
         "$BUILD_DIR/mongo/db/s/sharding",
         "$BUILD_DIR/mongo/executor/network_interface_factory",
         "$BUILD_DIR/mongo/s/client/shard_local",
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on symbols from files in serverOnlyFiles
-        'incomplete',
     ],
 )

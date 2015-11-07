@@ -259,7 +259,7 @@ mongodLibDeps = [
 ]
 
 if has_option('use-cpu-profiler'):
-    mongodLibDeps.append('db/cpuprofiler')
+    mongodLibDeps.append('db/commands/cpuprofiler')
 
 mongod = env.Program(
     target="mongod",

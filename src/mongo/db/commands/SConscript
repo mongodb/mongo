@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 Import("env")
+Import("has_option")
 
 env.Library(
     target="test_commands_enabled",
@@ -78,7 +79,81 @@ env.Library(
     ],
 )
 
-
+# Commands that should only be present in mongod
+env.Library(
+    target="dcommands",
+    source=[
+        "apply_ops_cmd.cpp",
+        "clone.cpp",
+        "clone_collection.cpp",
+        "collection_to_capped.cpp",
+        "dbcommands.cpp",
+        "compact.cpp",
+        "copydb.cpp",
+        "copydb_start_commands.cpp",
+        "count_cmd.cpp",
+        "create_indexes.cpp",
+        "current_op.cpp",
+        "dbhash.cpp",
+        "distinct.cpp",
+        "driverHelpers.cpp",
+        "drop_indexes.cpp",
+        "eval.cpp",
+        "explain_cmd.cpp",
+        "find_and_modify.cpp",
+        "find_cmd.cpp",
+        "fsync.cpp",
+        "geo_near_cmd.cpp",
+        "get_last_error.cpp",
+        "getmore_cmd.cpp",
+        "group_cmd.cpp",
+        "haystack.cpp",
+        "index_filter_commands.cpp",
+        "kill_op.cpp",
+        "killcursors_cmd.cpp",
+        "list_collections.cpp",
+        "list_databases.cpp",
+        "list_indexes.cpp",
+        "lock_info.cpp",
+        "mr.cpp",
+        "oplog_note.cpp",
+        "parallel_collection_scan.cpp",
+        "pipeline_command.cpp",
+        "plan_cache_commands.cpp",
+        "rename_collection_cmd.cpp",
+        "repair_cursor.cpp",
+        "snapshot_management.cpp",
+        "test_commands.cpp",
+        "top_command.cpp",
+        "touch.cpp",
+        "user_management_commands.cpp",
+        "validate.cpp",
+        "write_commands/write_commands.cpp",
+    ],
+    LIBDEPS=[
+        'core',
+        'killcursors_common',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/client/parallel',
+        '$BUILD_DIR/mongo/db/auth/authmongod',
+        '$BUILD_DIR/mongo/db/catalog/index_key_validate',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        '$BUILD_DIR/mongo/db/lasterror',
+        '$BUILD_DIR/mongo/db/ops/write_ops',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/pipeline/serveronly',
+        '$BUILD_DIR/mongo/db/repl/isself',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
+        '$BUILD_DIR/mongo/db/stats/serveronly',
+        '$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1',
+    ],
+    LIBDEPS_TAGS=[
+        # TODO: There are many libraries missing from LIBDEPS
+        'incomplete'
+    ]
+)
 
 env.Library(
     target='killcursors_common',
@@ -124,3 +199,17 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/serveronly",
     ],
 )
+
+if has_option('use-cpu-profiler'):
+    profEnv = env.Clone()
+    profEnv.InjectThirdPartyIncludePaths('gperftools')
+    profEnv.Library('cpuprofiler',
+        source=[
+            'cpuprofile.cpp',
+        ],
+        LIBDEPS=[
+        ],
+        LIBDEPS_TAGS=[
+            'incomplete'
+        ],
+    )

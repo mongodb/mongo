@@ -39,3 +39,41 @@ env.CppUnitTest(
         'index_key_validate',
     ]
 )
+
+env.Library(
+    target='catalog',
+    source=[
+        "apply_ops.cpp",
+        "capped_utils.cpp",
+        "coll_mod.cpp",
+        "collection.cpp",
+        "collection_compact.cpp",
+        "collection_info_cache.cpp",
+        "create_collection.cpp",
+        "cursor_manager.cpp",
+        "database.cpp",
+        "database_holder.cpp",
+        "drop_collection.cpp",
+        "drop_database.cpp",
+        "drop_indexes.cpp",
+        "index_catalog.cpp",
+        "index_catalog_entry.cpp",
+        "index_create.cpp",
+        "rename_collection.cpp",
+    ],
+    LIBDEPS=[
+        'collection_options',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/query/query',
+        '$BUILD_DIR/mongo/db/repl/serveronly',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1',
+        '$BUILD_DIR/mongo/db/storage/key_string',
+    ],
+    LIBDEPS_TAGS=[
+        # TODO: Many missing libdeps above
+        'incomplete'
+    ],
+)

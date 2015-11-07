@@ -103,13 +103,15 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/s/serveronly',
         'metadata',
         'sharding',
     ],
     LIBDEPS_TAGS=[
-        # Depends on getDeleter, defined in s/serveronly, which would be circular.
+        # Depends on getDeleter from db/serveronly
         'incomplete',
     ],
 )

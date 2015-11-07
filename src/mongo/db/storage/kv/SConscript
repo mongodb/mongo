@@ -48,21 +48,16 @@ env.Library(
     ],
 )
 
-# KVDatabaseCatalogEntry::getIndex() depends on index access methods
-# in $BUILD_DIR/mongo/serveronly.
 env.Library(
     target='kv_engine',
     source=[
         'kv_database_catalog_entry_get_index.cpp',
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
         'kv_database_catalog_entry_core',
         'kv_engine_core',
         'kv_storage_engine',
-        ],
-    LIBDEPS_TAGS=[
-        # Depends on symbols from serverOnlyFiles
-        'incomplete',
         ],
     )
 

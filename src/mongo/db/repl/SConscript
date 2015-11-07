@@ -151,6 +151,8 @@ env.Library(
     LIBDEPS=[
         'storage_interface',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/service_context',
     ],
 )
@@ -181,7 +183,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query',
     ],
     LIBDEPS_TAGS=[
-        # Depends on files like db_raii.cpp from serverOnlyFiles
+        # Depends on OldClientContext from db/serveronly
+        # Circular with catalog via db_raii
         'incomplete',
     ],
 )
@@ -262,7 +265,7 @@ env.Library(
         'oplog_interface_remote',
     ],
     LIBDEPS_TAGS=[
-        # Depends on symbols that are not in a library, only in the serverOnlyFiles list.
+        # Depends on Cloner from db/serveronly
         'incomplete'
     ],
 
@@ -1032,6 +1035,7 @@ env.CppUnitTest(
     ],
 )
 
+
 env.CppUnitTest(
     target='freshness_scanner_test',
     source=[
@@ -1044,5 +1048,44 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/commands_test_crutch',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+    ],
+)
+
+env.Library(
+    target="serveronly",
+    source=[
+        "initial_sync.cpp",
+        "master_slave.cpp",
+        "oplog.cpp",
+        "oplogreader.cpp",
+        "replication_coordinator_external_state_impl.cpp",
+        "replication_info.cpp",
+        "resync.cpp",
+        "rs_initialsync.cpp",
+        "rs_sync.cpp",
+        "sync_source_feedback.cpp",
+        "sync_source_resolver.cpp", # TODO(dannenberg) move this into DataReplicator in repl/SConscript.
+    ],
+    LIBDEPS=[
+        'bgsync',
+        'optime',
+        'repl_coordinator_interface',
+        'repl_coordinator_impl',
+        'repl_settings',
+        'sync_tail',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/lasterror',
+        '$BUILD_DIR/mongo/db/query/query',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/stats/counters',
+    ],
+    LIBDEPS_TAGS=[
+        # TODO: Many missing libdeps above
+        'incomplete',
     ],
 )

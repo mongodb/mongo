@@ -74,3 +74,30 @@ env.CppUnitTest(
             '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         ],
 )
+
+serveronlyEnv = env.Clone()
+serveronlyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+serveronlyEnv.Library(
+    target="index_access_methods",
+    source=[
+        "2d_access_method.cpp",
+        "btree_access_method.cpp",
+        "fts_access_method.cpp",
+        "hash_access_method.cpp",
+        "haystack_access_method.cpp",
+        "index_access_method.cpp",
+        "s2_access_method.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/catalog',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/db/storage/mmap_v1/btree',
+        '$BUILD_DIR/mongo/db/query/query',
+        '$BUILD_DIR/third_party/shim_snappy',
+        'expression_params',
+        'index_descriptor',
+        'key_generator',
+    ],
+)

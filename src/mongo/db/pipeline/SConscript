@@ -333,3 +333,18 @@ env.CppUnitTest(
         'parsed_aggregation_projection',
     ],
 )
+
+env.Library(
+    target='serveronly',
+    source=[
+        'document_source_cursor.cpp',
+        'pipeline_d.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
+    ],
+)

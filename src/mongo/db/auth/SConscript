@@ -130,12 +130,11 @@ env.Library('authmongod',
             ],
             LIBDEPS=[
                 'authservercommon',
+                '$BUILD_DIR/mongo/db/db_raii',
+                '$BUILD_DIR/mongo/db/dbdirectclient',
+                '$BUILD_DIR/mongo/db/dbhelpers',
                 '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
                 '$BUILD_DIR/mongo/db/server_parameters',
-            ],
-            LIBDEPS_TAGS=[
-                # Depends on files db_raii.cpp and catalog support files from serverOnlyFiles
-                'incomplete',
             ],
 )
 
