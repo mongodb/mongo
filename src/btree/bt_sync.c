@@ -128,11 +128,8 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			if (walk == NULL)
 				break;
 
-			page = walk->page;
-			mod = page->modify;
-
 			/* Skip clean pages. */
-			if (!__wt_page_is_modified(page))
+			if (!__wt_page_is_modified(walk->page))
 				continue;
 
 			/*
@@ -152,6 +149,8 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			 * and we can't skip future checkpoints until this page
 			 * is written.
 			 */
+			page = walk->page;
+			mod = page->modify;
 			if (!WT_PAGE_IS_INTERNAL(page) &&
 			    F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) &&
 			    WT_TXNID_LT(txn->snap_max, mod->first_dirty_txn)) {
