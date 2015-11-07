@@ -37,20 +37,24 @@ from helper import complex_populate, complex_populate_lsm, simple_populate
 class test_stat_cursor_config(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_config'
     uri = [
-        ('1',  dict(uri='file:' + pfx, pop=simple_populate)),
-        ('2', dict(uri='table:' + pfx, pop=simple_populate)),
-        ('3', dict(uri='table:' + pfx, pop=complex_populate)),
-        ('4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
+        ('file',  dict(uri='file:' + pfx, pop=simple_populate, cfg='')),
+        ('table', dict(uri='table:' + pfx, pop=simple_populate, cfg='')),
+        ('table-lsm',
+            dict(uri='table:' + pfx, pop=simple_populate, cfg=',type=lsm')),
+        ('complex', dict(uri='table:' + pfx, pop=complex_populate, cfg='')),
+        ('complex-lsm',
+            dict(uri='table:' + pfx, pop=complex_populate_lsm, cfg=''))
     ]
     data_config = [
         ('none', dict(data_config='none', ok=[])),
-        ( 'all',  dict(data_config='all', ok=['empty', 'fast', 'all'])),
-        ('fast', dict(data_config='fast', ok=['empty', 'fast']))
+        ( 'all',  dict(data_config='all', ok=['empty', 'fast', 'all', 'size'])),
+        ('fast', dict(data_config='fast', ok=['empty', 'fast', 'size']))
     ]
     cursor_config = [
         ('empty', dict(cursor_config='empty')),
         ( 'all', dict(cursor_config='all')),
-        ('fast', dict(cursor_config='fast'))
+        ('fast', dict(cursor_config='fast')),
+        ('size', dict(cursor_config='size'))
     ]
 
     scenarios = number_scenarios(
@@ -67,7 +71,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     # For each database/cursor configuration, confirm the right combinations
     # succeed or fail.
     def test_stat_cursor_config(self):
-        self.pop(self, self.uri, 'key_format=S', 100)
+        self.pop(self, self.uri, 'key_format=S' + self.cfg, 100)
         config = 'statistics=('
         if self.cursor_config != 'empty':
             config = config + self.cursor_config

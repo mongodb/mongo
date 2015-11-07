@@ -429,6 +429,8 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		WT_STAT_FAST_CONN_INCR(session, log_slot_joins);
 	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC))
 		F_SET(slot, WT_SLOT_SYNC_DIR);
+	if (LF_ISSET(WT_LOG_FLUSH))
+		F_SET(slot, WT_SLOT_FLUSH);
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(slot, WT_SLOT_SYNC);
 	if (F_ISSET(myslot, WT_MYSLOT_UNBUFFERED)) {

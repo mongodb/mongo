@@ -582,7 +582,7 @@ session_config = [
         choices=['read-uncommitted', 'read-committed', 'snapshot']),
 ]
 
-common_wiredtiger_open = [
+wiredtiger_open_common = connection_runtime_config + [
     Config('buffer_alignment', '-1', r'''
         in-memory alignment (in bytes) for buffers used for I/O.  The
         default value of -1 indicates a platform-specific alignment value
@@ -674,6 +674,30 @@ common_wiredtiger_open = [
             @ref tune_durability for more information''',
             choices=['dsync', 'fsync', 'none']),
         ]),
+]
+
+wiredtiger_open = wiredtiger_open_common + [
+   Config('config_base', 'true', r'''
+        write the base configuration file if creating the database.  If
+        \c false in the config passed directly to ::wiredtiger_open, will
+        ignore any existing base configuration file in addition to not creating
+        one.  See @ref config_base for more information''',
+        type='boolean'),
+    Config('create', 'false', r'''
+        create the database if it does not exist''',
+        type='boolean'),
+    Config('exclusive', 'false', r'''
+        fail if the database already exists, generally used with the
+        \c create option''',
+        type='boolean'),
+    Config('in_memory', 'false', r'''
+        keep data in-memory only, minimize disk I/O''',
+        type='boolean', undoc=True),
+    Config('use_environment_priv', 'false', r'''
+        use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
+        variables regardless of whether or not the process is running
+        with special privileges.  See @ref home for more information''',
+        type='boolean'),
 ]
 
 cursor_runtime_config = [
@@ -1003,59 +1027,13 @@ methods = {
 # creation-specific configuration strings).
 # wiredtiger_open_all:
 #    All of the above configuration values combined
-'wiredtiger_open' : Method(
-    connection_runtime_config +
-    common_wiredtiger_open + [
-    Config('config_base', 'true', r'''
-        write the base configuration file if creating the database.  If
-        \c false in the config passed directly to ::wiredtiger_open, will
-        ignore any existing base configuration file in addition to not creating
-        one.  See @ref config_base for more information''',
-        type='boolean'),
-    Config('create', 'false', r'''
-        create the database if it does not exist''',
-        type='boolean'),
-    Config('exclusive', 'false', r'''
-        fail if the database already exists, generally used with the
-        \c create option''',
-        type='boolean'),
-    Config('use_environment_priv', 'false', r'''
-        use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
-        variables regardless of whether or not the process is running
-        with special privileges.  See @ref home for more information''',
-        type='boolean'),
-]),
-'wiredtiger_open_basecfg' : Method(
-    connection_runtime_config +
-    common_wiredtiger_open + [
+'wiredtiger_open' : Method(wiredtiger_open),
+'wiredtiger_open_basecfg' : Method(wiredtiger_open_common + [
     Config('version', '(major=0,minor=0)', r'''
         the file version'''),
 ]),
-'wiredtiger_open_usercfg' : Method(
-    connection_runtime_config +
-    common_wiredtiger_open
-),
-'wiredtiger_open_all' : Method(
-    connection_runtime_config +
-    common_wiredtiger_open + [
-    Config('config_base', 'true', r'''
-        write the base configuration file if creating the database.  If
-        \c false in the config passed directly to ::wiredtiger_open, will
-        ignore any existing base configuration file in addition to not creating
-        one.  See @ref config_base for more information''',
-        type='boolean'),
-    Config('create', 'false', r'''
-        create the database if it does not exist''',
-        type='boolean'),
-    Config('exclusive', 'false', r'''
-        fail if the database already exists, generally used with the
-        \c create option''',
-        type='boolean'),
-    Config('use_environment_priv', 'false', r'''
-        use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
-        variables regardless of whether or not the process is running
-        with special privileges.  See @ref home for more information''',
-        type='boolean'),
+'wiredtiger_open_usercfg' : Method(wiredtiger_open_common),
+'wiredtiger_open_all' : Method(wiredtiger_open + [
     Config('version', '(major=0,minor=0)', r'''
         the file version'''),
 ]),

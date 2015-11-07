@@ -179,6 +179,7 @@ int
 __wt_metadata_search(WT_SESSION_IMPL *session, const char *key, char **valuep)
 {
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	const char *value;
 
 	*valuep = NULL;
@@ -191,9 +192,20 @@ __wt_metadata_search(WT_SESSION_IMPL *session, const char *key, char **valuep)
 	if (__metadata_turtle(key))
 		return (__wt_turtle_read(session, key, valuep));
 
+	/*
+	 * All metadata reads are at read-uncommitted isolation.  That's
+	 * because once a schema-level operation completes, subsequent
+	 * operations must see the current version of checkpoint metadata, or
+	 * they may try to read blocks that may have been freed from a file.
+	 * Metadata updates use non-transactional techniques (such as the
+	 * schema and metadata locks) to protect access to in-flight updates.
+	 */
 	WT_RET(__wt_metadata_cursor(session, &cursor));
 	cursor->set_key(cursor, key);
-	WT_RET(cursor->search(cursor));
+	WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+	    ret = cursor->search(cursor));
+	WT_RET(ret);
+
 	WT_RET(cursor->get_value(cursor, &value));
 	WT_RET(__wt_strdup(session, value, valuep));
 	return (cursor->reset(cursor));

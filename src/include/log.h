@@ -152,8 +152,9 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_logslot {
 	WT_ITEM  slot_buf;		/* Buffer for grouped writes */
 
 #define	WT_SLOT_CLOSEFH		0x01		/* Close old fh on release */
-#define	WT_SLOT_SYNC		0x02		/* Needs sync on release */
-#define	WT_SLOT_SYNC_DIR	0x04		/* Directory sync on release */
+#define	WT_SLOT_FLUSH		0x02		/* Wait for write */
+#define	WT_SLOT_SYNC		0x04		/* Needs sync on release */
+#define	WT_SLOT_SYNC_DIR	0x08		/* Directory sync on release */
 	uint32_t flags;			/* Flags */
 };
 

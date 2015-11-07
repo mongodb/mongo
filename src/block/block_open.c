@@ -424,7 +424,7 @@ __wt_block_manager_size(
 {
 	wt_off_t filesize;
 
-	WT_RET(__wt_filesize_name(session, filename, &filesize));
+	WT_RET(__wt_filesize_name(session, filename, false, &filesize));
 	stats->block_size = filesize;
 
 	return (0);

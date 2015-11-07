@@ -363,6 +363,8 @@ struct __wt_connection_impl {
 	uint32_t	 log_prealloc;	/* Log file pre-allocation */
 	uint32_t	 txn_logsync;	/* Log sync configuration */
 
+	WT_SESSION_IMPL *meta_ckpt_session;/* Metadata checkpoint session */
+
 	WT_SESSION_IMPL *sweep_session;	/* Handle sweep session */
 	wt_thread_t	 sweep_tid;	/* Handle sweep thread */
 	int		 sweep_tid_set;	/* Handle sweep thread set */

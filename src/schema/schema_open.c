@@ -260,11 +260,11 @@ err:	__wt_scr_free(session, &buf);
 }
 
 /*
- * __wt_schema_open_index --
- *	Open one or more indices for a table.
+ * __schema_open_index --
+ *	Open one or more indices for a table (internal version).
  */
-int
-__wt_schema_open_index(WT_SESSION_IMPL *session,
+static int
+__schema_open_index(WT_SESSION_IMPL *session,
     WT_TABLE *table, const char *idxname, size_t len, WT_INDEX **indexp)
 {
 	WT_CURSOR *cursor;
@@ -384,6 +384,21 @@ err:	__wt_scr_free(session, &tmp);
 }
 
 /*
+ * __wt_schema_open_index --
+ *	Open one or more indices for a table.
+ */
+int
+__wt_schema_open_index(WT_SESSION_IMPL *session,
+    WT_TABLE *table, const char *idxname, size_t len, WT_INDEX **indexp)
+{
+	WT_DECL_RET;
+
+	WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+	    ret = __schema_open_index(session, table, idxname, len, indexp));
+	return (ret);
+}
+
+/*
  * __wt_schema_open_indices --
  *	Open the indices for a table.
  */
@@ -394,11 +409,11 @@ __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table)
 }
 
 /*
- * __wt_schema_open_table --
- *	Open a named table.
+ * __schema_open_table --
+ *	Open a named table (internal version).
  */
-int
-__wt_schema_open_table(WT_SESSION_IMPL *session,
+static int
+__schema_open_table(WT_SESSION_IMPL *session,
     const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep)
 {
 	WT_CONFIG cparser;
@@ -590,4 +605,20 @@ err:	__wt_schema_release_table(session, table);
 	if (quiet)
 		WT_RET(ENOENT);
 	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
+}
+
+/*
+ * __wt_schema_open_table --
+ *	Open a named table.
+ */
+int
+__wt_schema_open_table(WT_SESSION_IMPL *session,
+    const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep)
+{
+	WT_DECL_RET;
+
+	WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+	    ret = __schema_open_table(
+	    session, name, namelen, ok_incomplete, tablep));
+	return (ret);
 }
