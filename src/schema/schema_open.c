@@ -506,9 +506,9 @@ __schema_open_table(WT_SESSION_IMPL *session,
 	*tablep = table;
 
 	if (0) {
-err:		WT_TRET(__wt_metadata_cursor_release(session, &cursor));
-		WT_TRET(__wt_schema_destroy_table(session, &table));
+err:		WT_TRET(__wt_schema_destroy_table(session, &table));
 	}
+	WT_TRET(__wt_metadata_cursor_release(session, &cursor));
 
 	__wt_free(session, tablename);
 	__wt_scr_free(session, &buf);
