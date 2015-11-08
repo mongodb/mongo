@@ -389,9 +389,6 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	 */
 	pindex = WT_INTL_INDEX_GET_SAFE(root);
 
-	/* Acquire a new split generation. */
-	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
-
 	/*
 	 * A prepending/appending workload will repeatedly deepen parts of the
 	 * tree that aren't changing, and appending workloads are not uncommon.
@@ -626,6 +623,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	 * fails, we don't roll back that change, because threads may already
 	 * be using the new index.
 	 */
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	WT_TRET(__split_safe_free(session, split_gen, false, pindex, size));
 	root_decr += size;
@@ -686,9 +684,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 */
 	pindex = WT_INTL_INDEX_GET_SAFE(parent);
 	parent_entries = pindex->entries;
-
-	/* Acquire a new split generation. */
-	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
 
 	/*
 	 * Remove any refs to deleted pages while we are splitting, we have
@@ -814,10 +809,12 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	    parent_entries, result_entries, result_entries - parent_entries));
 
 	/*
-	 * The new page index is in place, free the WT_REF we were splitting
-	 * and any deleted WT_REFs we found, modulo the usual safe free
-	 * semantics.
+	 * The new page index is in place, free the WT_REF we were splitting and
+	 * any deleted WT_REFs we found, modulo the usual safe free semantics.
+	 *
+	 * Acquire a new split generation.
 	 */
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
 	for (i = 0; deleted_entries > 0 && i < parent_entries; ++i) {
 		next_ref = pindex->index[i];
 		if (next_ref->state != WT_REF_SPLIT)
@@ -937,9 +934,6 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 * generation.
 	 */
 	pindex = WT_INTL_INDEX_GET_SAFE(page);
-
-	/* Acquire a new split generation. */
-	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
 
 	/* Figure out how many child pages we're creating. */
 	moved_entries = pindex->entries;
@@ -1148,6 +1142,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	 * back that change, because threads may already be using the new parent
 	 * page.
 	 */
+	split_gen = __wt_atomic_addv64(&S2C(session)->split_gen, 1);
 	size = sizeof(WT_PAGE_INDEX) + pindex->entries * sizeof(WT_REF *);
 	WT_TRET(__split_safe_free(session, split_gen, false, pindex, size));
 	page_decr += size;
