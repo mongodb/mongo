@@ -41,8 +41,12 @@ func (restore *MongoRestore) RestoreOplog() error {
 	if err != nil {
 		return fmt.Errorf("error reading oplog file: %v", err)
 	}
+	defer oplogFile.Close()
 
-	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(oplogFile))
+	// NewBufferlessBSONSource reads each bson document into its own buffer
+	// because bson.Unmarshal currently can't unmarshal binary types without
+	// them referencing the source buffer
+	bsonSource := db.NewDecodedBSONSource(db.NewBufferlessBSONSource(oplogFile))
 	defer bsonSource.Close()
 
 	entryArray := make([]interface{}, 0, 1024)

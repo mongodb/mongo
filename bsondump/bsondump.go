@@ -120,14 +120,13 @@ func (bd *BSONDump) Debug() (int, error) {
 
 	defer bd.bsonSource.Close()
 
-	reusableBuf := make([]byte, db.MaxBSONSize)
 	var result bson.Raw
 	for {
-		hasDoc, docSize := bd.bsonSource.LoadNextInto(reusableBuf)
-		if !hasDoc {
+		doc := bd.bsonSource.LoadNext()
+		if doc == nil {
 			break
 		}
-		result.Data = reusableBuf[0:docSize]
+		result.Data = doc
 
 		if bd.BSONDumpOptions.ObjCheck {
 			validated := bson.M{}
