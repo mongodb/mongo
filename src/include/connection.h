@@ -412,7 +412,9 @@ struct __wt_connection_impl {
 	wt_off_t data_extend_len;	/* file_extend data length */
 	wt_off_t log_extend_len;	/* file_extend log length */
 
-	uint32_t direct_io;		/* O_DIRECT file type flags */
+	/* O_DIRECT/FILE_FLAG_NO_BUFFERING file type flags */
+	uint32_t direct_io;
+	uint32_t write_through;		/* FILE_FLAG_WRITE_THROUGH type flags */
 	bool	 mmap;			/* mmap configuration */
 	uint32_t verbose;
 

@@ -167,6 +167,7 @@ if useTcmalloc:
     if conf.CheckCHeader('gperftools/tcmalloc.h'):
         wtlibs.append("libtcmalloc_minimal")
         conf.env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC'])
+        conf.env.Append(CPPDEFINES=['HAVE_POSIX_MEMALIGN'])
     else:
         print 'tcmalloc.h must be installed!'
         Exit(1)
