@@ -382,6 +382,9 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	root_decr = root_incr = 0;
 	complete = false;
 
+	/* The root page will be marked dirty, make sure that will succeed. */
+	WT_RET(__wt_page_modify_init(session, root));
+
 	/*
 	 * Our caller is holding the root page locked to single-thread splits,
 	 * which means we can safely look at the page's index without setting a
@@ -679,6 +682,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	parent_entries = 0;
 	complete = false;
 
+	/* The parent page will be marked dirty, make sure that will succeed. */
+	WT_RET(__wt_page_modify_init(session, parent));
+
 	/*
 	 * We've locked the parent, which means it cannot split (which is the
 	 * only reason to worry about split generation values).
@@ -923,6 +929,9 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 
 	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_internal);
 	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_internal);
+
+	/* The page will be marked dirty, make sure that will succeed. */
+	WT_RET(__wt_page_modify_init(session, page));
 
 	btree = S2BT(session);
 	alloc_index = replace_index = NULL;
