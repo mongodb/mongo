@@ -77,8 +77,7 @@ assert.writeOK(s.getDB( "config" ).settings.update(
 printjson(s.getDB("config").settings.find().toArray());
 
 print("Restart mongos with different auth options");
-s.restartMongos(0, { port: s.port,
-                     v: 2,
+s.restartMongos(0, { v: 2,
                      configdb: s._configDB,
                      keyFile: "jstests/libs/key1",
                      chunkSize: 1 });

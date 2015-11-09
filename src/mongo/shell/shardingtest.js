@@ -61,6 +61,9 @@
  *       enableBalancer {boolean} : if true, enable the balancer
  *       manualAddShard {boolean}: shards will not be added if true.
  *
+ *       useBridge {boolean}: If true, then a mongobridge process is started for each node in the
+ *          sharded cluster. Defaults to false.
+ *
  *       // replica Set only:
  *       rsOptions {Object}: same as the rs property above. Can be used to
  *         specify options that are common all replica members.
@@ -215,14 +218,14 @@ var ShardingTest = function(params) {
 
     this.stop = function() {
         for (var i = 0; i < this._mongos.length; i++) {
-            MongoRunner.stopMongos(this._mongos[i].port);
+            this.stopMongos(i);
         }
 
         for (var i = 0; i < this._connections.length; i++) {
             if (this._rs[i]) {
                 this._rs[i].test.stopSet(15);
             } else {
-                MongoRunner.stopMongod(this._connections[i].port);
+                this.stopMongod(i);
             }
         }
 
@@ -231,7 +234,12 @@ var ShardingTest = function(params) {
         } else {
             // Old style config triplet
             for (var i = 0; i < this._configServers.length; i++) {
-                MongoRunner.stopMongod(this._configServers[i]);
+                if (otherParams.useBridge) {
+                    MongoRunner.stopMongod(unbridgedConfigServers[i]);
+                    this._configServers[i].stop();
+                } else {
+                    MongoRunner.stopMongod(this._configServers[i]);
+                }
             }
         }
 
@@ -548,14 +556,24 @@ var ShardingTest = function(params) {
      * Kills the mongos with index n.
      */
     this.stopMongos = function(n) {
-        MongoRunner.stopMongos(this['s' + n].port);
+        if (otherParams.useBridge) {
+            MongoRunner.stopMongos(unbridgedMongos[n]);
+            this["s" + n].stop();
+        } else {
+            MongoRunner.stopMongos(this["s" + n]);
+        }
     };
 
     /**
      * Kills the mongod with index n.
      */
     this.stopMongod = function(n) {
-        MongoRunner.stopMongod(this['d' + n].port);
+        if (otherParams.useBridge) {
+            MongoRunner.stopMongod(unbridgedConnections[n]);
+            this["d" + n].stop();
+        } else {
+            MongoRunner.stopMongod(this["d" + n]);
+        }
     };
 
     /**
@@ -567,22 +585,46 @@ var ShardingTest = function(params) {
      * Warning: Overwrites the old s (if n = 0) admin, config, and sn member variables.
      */
     this.restartMongos = function(n, opts) {
-        var mongos = this['s' + n];
+        var mongos;
 
-        if (opts === undefined) {
-            opts = this['s' + n];
-            opts.restart = true;
+        if (otherParams.useBridge) {
+            mongos = unbridgedMongos[n];
+        } else {
+            mongos = this["s" + n];
         }
 
-        MongoRunner.stopMongos(mongos);
+        opts = opts || mongos;
+        opts.port = opts.port || mongos.port;
+
+        this.stopMongos(n);
+
+        if (otherParams.useBridge) {
+            this._mongos[n] = new MongoBridge({
+                hostName: otherParams.useHostname ? hostName : "localhost",
+                port: this._mongos[n].port,
+                // The mongos processes identify themselves to mongobridge as host:port, where the
+                // host is the actual hostname of the machine and not localhost.
+                dest: hostName + ":" + opts.port,
+            });
+        }
 
         var newConn = MongoRunner.runMongos(opts);
+        if (!newConn) {
+            throw new Error("Failed to restart mongos " + n);
+        }
 
-        this['s' + n] = newConn;
+        if (otherParams.useBridge) {
+            this._mongos[n].connectToBridge();
+            unbridgedMongos[n] = newConn;
+        } else {
+            this._mongos[n] = newConn;
+        }
+
+        this['s' + n] = this._mongos[n];
         if (n == 0) {
-            this.s = newConn;
-            this.admin = newConn.getDB('admin');
-            this.config = newConn.getDB('config');
+            this.s = this._mongos[n];
+            this.admin = this._mongos[n].getDB('admin');
+            this.config = this._mongos[n].getDB('config');
         }
     };
 
@@ -592,13 +634,41 @@ var ShardingTest = function(params) {
      * Warning: Overwrites the old dn member variables.
      */
     this.restartMongod = function(n) {
-        var mongod = this['d' + n];
-        MongoRunner.stopMongod(mongod);
+        var mongod;
+
+        if (otherParams.useBridge) {
+            mongod = unbridgedConnections[n];
+        } else {
+            mongod = this["d" + n];
+        }
+
+        this.stopMongod(n);
+
+        if (otherParams.useBridge) {
+            this._connections[n] = new MongoBridge({
+                hostName: otherParams.useHostname ? hostName : "localhost",
+                port: this._connections[n].port,
+                // The mongod processes identify themselves to mongobridge as host:port, where the
+                // host is the actual hostname of the machine and not localhost.
+                dest: hostName + ":" + mongod.port,
+            });
+        }
+
         mongod.restart = true;
-
         var newConn = MongoRunner.runMongod(mongod);
+        if (!newConn) {
+            throw new Error("Failed to restart shard " + n);
+        }
 
-        this['d' + n] = newConn;
+        if (otherParams.useBridge) {
+            this._connections[n].connectToBridge();
+            unbridgedConnections[n] = newConn;
+        } else {
+            this._connections[n] = newConn;
+        }
+
+        this["shard" + n] = this._connections[n];
+        this["d" + n] = this._connections[n];
     };
 
     /**
@@ -679,7 +749,9 @@ var ShardingTest = function(params) {
     otherParams.extraOptions = otherParams.extraOptions || {};
     otherParams.useHostname = otherParams.useHostname == undefined ?
         true : otherParams.useHostname;
+    otherParams.useBridge = otherParams.useBridge || false;
     var keyFile = otherParams.keyFile || otherParams.extraOptions.keyFile
+    var hostName = getHostName();
 
     this._testName = testName
     this._otherParams = otherParams
@@ -699,6 +771,12 @@ var ShardingTest = function(params) {
     this._shardServers = this._connections
     this._rs = []
     this._rsObjects = []
+
+    if (otherParams.useBridge) {
+        var unbridgedConnections = [];
+        var unbridgedConfigServers = [];
+        var unbridgedMongos = [];
+    }
 
     // Start the MongoD servers (shards)
     for (var i = 0; i < numShards; i++) {
@@ -726,6 +804,7 @@ var ShardingTest = function(params) {
             var rs = new ReplSetTest({ name : setName,
                                        nodes : numReplicas,
                                        useHostName : otherParams.useHostname,
+                                       useBridge: otherParams.useBridge,
                                        keyFile : keyFile,
                                        protocolVersion: protocolVersion,
                                        shardSvr : true });
@@ -740,8 +819,12 @@ var ShardingTest = function(params) {
 
             this._rsObjects[i] = rs
 
-            this._alldbpaths.push(null)
-            this._connections.push(null)
+            this._alldbpaths.push(null);
+            this._connections.push(null);
+
+            if (otherParams.useBridge) {
+                unbridgedConnections.push(null);
+            }
         }
         else {
             var options = {
@@ -762,15 +845,36 @@ var ShardingTest = function(params) {
             options = Object.merge(options, otherParams.shardOptions)
             options = Object.merge(options, otherParams["d" + i])
 
+            options.port = options.port || allocatePort();
+
+            if (otherParams.useBridge) {
+                var bridge = new MongoBridge({
+                    hostName: otherParams.useHostname ? hostName : "localhost",
+                    // The mongod processes identify themselves to mongobridge as host:port, where
+                    // the host is the actual hostname of the machine and not localhost.
+                    dest: hostName + ":" + options.port,
+                });
+            }
+
             var conn = MongoRunner.runMongod(options);
+            if (!conn) {
+                throw new Error("Failed to start shard " + i);
+            }
 
-            this._alldbpaths.push(testName +i)
-            this._connections.push(conn);
-            this["shard" + i] = conn
-            this["d" + i] = conn
+            if (otherParams.useBridge) {
+                bridge.connectToBridge();
+                this._connections.push(bridge);
+                unbridgedConnections.push(conn)
+            } else {
+                this._connections.push(conn);
+            }
 
-            this._rs[i] = null
-            this._rsObjects[i] = null
+            this._alldbpaths.push(testName + i);
+            this["shard" + i] = this._connections[i];
+            this["d" + i] = this._connections[i];
+
+            this._rs[i] = null;
+            this._rsObjects[i] = null;
         }
     }
 
@@ -832,15 +936,35 @@ var ShardingTest = function(params) {
             options = Object.merge(options, otherParams.configOptions)
             options = Object.merge(options, otherParams["c" + i])
 
-            var conn = MongoRunner.runMongod(options)
+            options.port = options.port || allocatePort();
 
-            this._alldbpaths.push(testName + "-config" + i)
+            if (otherParams.useBridge) {
+                var bridge = new MongoBridge({
+                    hostName: otherParams.useHostname ? hostName : "localhost",
+                    // The mongod processes identify themselves to mongobridge as host:port, where
+                    // the host is the actual hostname of the machine and not localhost.
+                    dest: hostName + ":" + options.port,
+                });
+            }
 
-            this._configServers.push(conn);
-            configNames.push(conn.name);
+            var conn = MongoRunner.runMongod(options);
+            if (!conn) {
+                throw new Error("Failed to start config server " + i);
+            }
 
-            this["config" + i] = conn
-            this["c" + i] = conn
+            if (otherParams.useBridge) {
+                bridge.connectToBridge();
+                this._configServers.push(bridge);
+                unbridgedConfigServers.push(conn);
+                configNames.push(bridge.host);
+            } else {
+                this._configServers.push(conn);
+                configNames.push(conn.name);
+            }
+
+            this._alldbpaths.push(testName + "-config" + i);
+            this["config" + i] = this._configServers[i];
+            this["c" + i] = this._configServers[i];
         }
 
         this._configDB = configNames.join(',');
@@ -848,6 +972,7 @@ var ShardingTest = function(params) {
     else {
         // Using replica set for config servers
         var rstOptions = { useHostName : otherParams.useHostname,
+                           useBridge : otherParams.useBridge,
                            keyFile : keyFile,
                            name: testName + "-configRS",
                          };
@@ -936,17 +1061,37 @@ var ShardingTest = function(params) {
         options = Object.merge(options, otherParams.extraOptions)
         options = Object.merge(options, otherParams["s" + i])
 
-        conn = MongoRunner.runMongos(options);
+        options.port = options.port || allocatePort();
 
-        this._mongos.push(conn);
-
-        if (i === 0) {
-            this.s = conn;
-            this.admin = conn.getDB('admin');
-            this.config = conn.getDB('config');
+        if (otherParams.useBridge) {
+            var bridge = new MongoBridge({
+                hostName: otherParams.useHostname ? hostName : "localhost",
+                // The mongos processes identify themselves to mongobridge as host:port, where the
+                // host is the actual hostname of the machine and not localhost.
+                dest: hostName + ":" + options.port,
+            });
         }
 
-        this["s" + i] = conn;
+        var conn = MongoRunner.runMongos(options);
+        if (!conn) {
+            throw new Error("Failed to start mongos " + i);
+        }
+
+        if (otherParams.useBridge) {
+            bridge.connectToBridge();
+            this._mongos.push(bridge);
+            unbridgedMongos.push(conn);
+        } else {
+            this._mongos.push(conn);
+        }
+
+        if (i === 0) {
+            this.s = this._mongos[i];
+            this.admin = this._mongos[i].getDB('admin');
+            this.config = this._mongos[i].getDB('config');
+        }
+
+        this["s" + i] = this._mongos[i];
     }
 
     // Disable the balancer unless it is explicitly turned on
