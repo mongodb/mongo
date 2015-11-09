@@ -32,7 +32,10 @@ func (restore *MongoRestore) RestoreOplog() error {
 		return err
 	}
 	defer intent.BSONFile.Close()
-	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(intent.BSONFile))
+	// NewBufferlessBSONSource reads each bson document into its own buffer
+	// because bson.Unmarshal currently can't unmarshal binary types without
+	// them referencing the source buffer
+	bsonSource := db.NewDecodedBSONSource(db.NewBufferlessBSONSource(intent.BSONFile))
 	defer bsonSource.Close()
 
 	entryArray := make([]interface{}, 0, 1024)
