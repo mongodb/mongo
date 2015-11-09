@@ -55,8 +55,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -384,18 +382,12 @@ Status CatalogManagerCommon::updateCollection(OperationContext* txn,
                                               const CollectionType& coll) {
     fassert(28634, coll.validate());
 
-    BatchedCommandResponse response;
-    Status status = update(txn,
-                           CollectionType::ConfigNS,
-                           BSON(CollectionType::fullNs(collNs)),
-                           coll.toBSON(),
-                           true,   // upsert
-                           false,  // multi
-                           &response);
+    auto status = updateConfigDocument(
+        txn, CollectionType::ConfigNS, BSON(CollectionType::fullNs(collNs)), coll.toBSON(), true);
     if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "collection metadata write failed: " << response.toBSON()
-                                    << "; status: " << status.toString());
+        return Status(status.getStatus().code(),
+                      str::stream() << "collection metadata write failed"
+                                    << causedBy(status.getStatus()));
     }
 
     return Status::OK();
@@ -406,18 +398,12 @@ Status CatalogManagerCommon::updateDatabase(OperationContext* txn,
                                             const DatabaseType& db) {
     fassert(28616, db.validate());
 
-    BatchedCommandResponse response;
-    Status status = update(txn,
-                           DatabaseType::ConfigNS,
-                           BSON(DatabaseType::name(dbName)),
-                           db.toBSON(),
-                           true,   // upsert
-                           false,  // multi
-                           &response);
+    auto status = updateConfigDocument(
+        txn, DatabaseType::ConfigNS, BSON(DatabaseType::name(dbName)), db.toBSON(), true);
     if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "database metadata write failed: " << response.toBSON()
-                                    << "; status: " << status.toString());
+        return Status(status.getStatus().code(),
+                      str::stream() << "database metadata write failed"
+                                    << causedBy(status.getStatus()));
     }
 
     return Status::OK();

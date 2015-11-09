@@ -46,7 +46,6 @@ env.Library(
     target='catalog_manager',
     source=[
         'catalog_cache.cpp',
-        'catalog_manager.cpp',
         'catalog_manager_common.cpp',
     ],
     LIBDEPS=[

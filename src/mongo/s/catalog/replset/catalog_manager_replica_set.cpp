@@ -251,19 +251,18 @@ StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationC
     if (!countStatus.isOK()) {
         return countStatus.getStatus();
     }
+
     if (countStatus.getValue() == 0) {
         log() << "going to start draining shard: " << name;
 
-        Status status = update(txn,
-                               ShardType::ConfigNS,
-                               BSON(ShardType::name() << name),
-                               BSON("$set" << BSON(ShardType::draining(true))),
-                               false,  // upsert
-                               false,  // multi
-                               NULL);
-        if (!status.isOK()) {
-            log() << "error starting removeShard: " << name << "; err: " << status.reason();
-            return status;
+        auto updateStatus = updateConfigDocument(txn,
+                                                 ShardType::ConfigNS,
+                                                 BSON(ShardType::name() << name),
+                                                 BSON("$set" << BSON(ShardType::draining(true))),
+                                                 false);
+        if (!updateStatus.isOK()) {
+            log() << "error starting removeShard: " << name << causedBy(updateStatus.getStatus());
+            return updateStatus.getStatus();
         }
 
         grid.shardRegistry()->reload(txn);
@@ -972,6 +971,43 @@ Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
     MONGO_UNREACHABLE;
 }
 
+StatusWith<bool> CatalogManagerReplicaSet::updateConfigDocument(OperationContext* txn,
+                                                                const string& ns,
+                                                                const BSONObj& query,
+                                                                const BSONObj& update,
+                                                                bool upsert) {
+    const NamespaceString nss(ns);
+    invariant(nss.db() == "config");
+
+    const BSONElement idField = query.getField("_id");
+    invariant(!idField.eoo());
+
+    unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
+    updateDoc->setQuery(query);
+    updateDoc->setUpdateExpr(update);
+    updateDoc->setUpsert(upsert);
+    updateDoc->setMulti(false);
+
+    unique_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
+    updateRequest->addToUpdates(updateDoc.release());
+
+    BatchedCommandRequest request(updateRequest.release());
+    request.setNS(nss);
+    request.setWriteConcern(WriteConcernOptions::Majority);
+
+    BatchedCommandResponse response;
+    writeConfigServerDirect(txn, request, &response);
+
+    Status status = response.toStatus();
+    if (!status.isOK()) {
+        return status;
+    }
+
+    const auto nSelected = response.getN();
+    invariant(nSelected == 0 || nSelected == 1);
+    return (nSelected == 1);
+}
+
 Status CatalogManagerReplicaSet::removeConfigDocuments(OperationContext* txn,
                                                        const string& ns,
                                                        const BSONObj& query) {
@@ -1146,16 +1182,10 @@ Status CatalogManagerReplicaSet::initConfigVersion(OperationContext* txn) {
             newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
 
             BSONObj versionObj(newVersion.toBSON());
-            BatchedCommandResponse response;
-            auto upsertStatus = update(txn,
-                                       VersionType::ConfigNS,
-                                       versionObj,
-                                       versionObj,
-                                       true /* upsert*/,
-                                       false /* multi */,
-                                       &response);
+            auto upsertStatus =
+                updateConfigDocument(txn, VersionType::ConfigNS, versionObj, versionObj, true);
 
-            if ((upsertStatus.isOK() && response.getN() < 1) ||
+            if ((upsertStatus.isOK() && !upsertStatus.getValue()) ||
                 upsertStatus == ErrorCodes::DuplicateKey) {
                 // Do the check again as someone inserted a new config version document
                 // and the upsert neither inserted nor updated a config version document.
@@ -1163,7 +1193,7 @@ Status CatalogManagerReplicaSet::initConfigVersion(OperationContext* txn) {
                 continue;
             }
 
-            return upsertStatus;
+            return upsertStatus.getStatus();
         }
 
         if (versionInfo.getCurrentVersion() == UpgradeHistory_UnreportedVersion) {

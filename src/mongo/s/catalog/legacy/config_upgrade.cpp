@@ -86,13 +86,9 @@ Status makeConfigVersionDocument(OperationContext* txn, CatalogManager* catalogM
     // If the cluster has not previously been initialized, we need to set the version before
     // using so subsequent mongoses use the config data the same way.  This requires all three
     // config servers online initially.
-    return catalogManager->update(txn,
-                                  VersionType::ConfigNS,
-                                  BSON("_id" << 1),
-                                  versionInfo.toBSON(),
-                                  true,   // upsert
-                                  false,  // multi
-                                  NULL);
+    auto status = catalogManager->updateConfigDocument(
+        txn, VersionType::ConfigNS, BSON("_id" << 1), versionInfo.toBSON(), true);
+    return status.getStatus();
 }
 
 struct VersionRange {

@@ -391,21 +391,21 @@ public:
                                         const BSONObj& doc) = 0;
 
     /**
-     * Updates a document in the specified namespace on the config server (only the config or
-     * admin databases).
+     * Updates a single document in the specified namespace on the config server. The document must
+     * have an _id index. Must only be used for updates to the 'config' database.
      *
-     * This is a thin wrapper around writeConfigServerDirect.
+     * Returns non-OK status if the command failed to run for some reason. If the command was
+     * successful, returns true if a document was actually modified (that is, it did not exist and
+     * was upserted or it existed and any of the fields changed) and false otherwise (basically
+     * returns whether the update command's response update.n value is > 0).
      *
-     * NOTE: Should not be used in new code. Instead add a new metadata operation to the
-     *       interface.
+     * NOTE: Should not be used in new code. Instead add a new metadata operation to the interface.
      */
-    Status update(OperationContext* txn,
-                  const std::string& ns,
-                  const BSONObj& query,
-                  const BSONObj& update,
-                  bool upsert,
-                  bool multi,
-                  BatchedCommandResponse* response);
+    virtual StatusWith<bool> updateConfigDocument(OperationContext* txn,
+                                                  const std::string& ns,
+                                                  const BSONObj& query,
+                                                  const BSONObj& update,
+                                                  bool upsert) = 0;
 
     /**
      * Removes documents matching a particular query predicate from the specified namespace on the

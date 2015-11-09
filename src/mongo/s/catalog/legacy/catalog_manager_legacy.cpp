@@ -388,19 +388,20 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
         return Status(ErrorCodes::IllegalOperation, "Can't remove last shard");
     }
 
-    BSONObj searchDoc = BSON(ShardType::name() << name);
-
     // Case 1: start draining chunks
-    BSONObj drainingDoc = BSON(ShardType::name() << name << ShardType::draining(true));
-    BSONObj shardDoc = conn->findOne(ShardType::ConfigNS, drainingDoc);
+    BSONObj shardDoc = conn->findOne(ShardType::ConfigNS,
+                                     BSON(ShardType::name() << name << ShardType::draining(true)));
     if (shardDoc.isEmpty()) {
         log() << "going to start draining shard: " << name;
-        BSONObj newStatus = BSON("$set" << BSON(ShardType::draining(true)));
 
-        Status status = update(txn, ShardType::ConfigNS, searchDoc, newStatus, false, false, NULL);
-        if (!status.isOK()) {
-            log() << "error starting removeShard: " << name << "; err: " << status.reason();
-            return status;
+        auto updateStatus = updateConfigDocument(txn,
+                                                 ShardType::ConfigNS,
+                                                 BSON(ShardType::name() << name),
+                                                 BSON("$set" << BSON(ShardType::draining(true))),
+                                                 false);
+        if (!updateStatus.isOK()) {
+            log() << "error starting removeShard: " << name << causedBy(updateStatus.getStatus());
+            return updateStatus.getStatus();
         }
 
         grid.shardRegistry()->reload(txn);
@@ -421,7 +422,8 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
         log() << "going to remove shard: " << name;
         audit::logRemoveShard(txn->getClient(), name);
 
-        Status status = removeConfigDocuments(txn, ShardType::ConfigNS, searchDoc);
+        Status status =
+            removeConfigDocuments(txn, ShardType::ConfigNS, BSON(ShardType::name() << name));
         if (!status.isOK()) {
             log() << "Error concluding removeShard operation on: " << name
                   << "; err: " << status.reason();
@@ -1060,6 +1062,42 @@ Status CatalogManagerLegacy::insertConfigDocument(OperationContext* txn,
     writeConfigServerDirect(txn, request, &response);
 
     return response.toStatus();
+}
+
+StatusWith<bool> CatalogManagerLegacy::updateConfigDocument(OperationContext* txn,
+                                                            const string& ns,
+                                                            const BSONObj& query,
+                                                            const BSONObj& update,
+                                                            bool upsert) {
+    const NamespaceString nss(ns);
+    invariant(nss.db() == "config");
+
+    const BSONElement idField = query.getField("_id");
+    invariant(!idField.eoo());
+
+    unique_ptr<BatchedUpdateDocument> updateDoc(new BatchedUpdateDocument());
+    updateDoc->setQuery(query);
+    updateDoc->setUpdateExpr(update);
+    updateDoc->setUpsert(upsert);
+    updateDoc->setMulti(false);
+
+    unique_ptr<BatchedUpdateRequest> updateRequest(new BatchedUpdateRequest());
+    updateRequest->addToUpdates(updateDoc.release());
+
+    BatchedCommandRequest request(updateRequest.release());
+    request.setNS(nss);
+
+    BatchedCommandResponse response;
+    writeConfigServerDirect(txn, request, &response);
+
+    Status status = response.toStatus();
+    if (!status.isOK()) {
+        return status;
+    }
+
+    const auto nSelected = response.getN();
+    invariant(nSelected == 0 || nSelected == 1);
+    return (nSelected == 1);
 }
 
 Status CatalogManagerLegacy::removeConfigDocuments(OperationContext* txn,

@@ -672,15 +672,14 @@ void Chunk::markAsJumbo(OperationContext* txn) const {
 
     const string chunkName = genID(_manager->getns(), _min);
 
-    Status result = grid.catalogManager(txn)->update(txn,
-                                                     ChunkType::ConfigNS,
-                                                     BSON(ChunkType::name(chunkName)),
-                                                     BSON("$set" << BSON(ChunkType::jumbo(true))),
-                                                     false,  // upsert
-                                                     false,  // multi
-                                                     NULL);
-    if (!result.isOK()) {
-        warning() << "couldn't set jumbo for chunk: " << chunkName << result.reason();
+    auto status =
+        grid.catalogManager(txn)->updateConfigDocument(txn,
+                                                       ChunkType::ConfigNS,
+                                                       BSON(ChunkType::name(chunkName)),
+                                                       BSON("$set" << BSON(ChunkType::jumbo(true))),
+                                                       false);
+    if (!status.isOK()) {
+        warning() << "couldn't set jumbo for chunk: " << chunkName << causedBy(status.getStatus());
     }
 }
 

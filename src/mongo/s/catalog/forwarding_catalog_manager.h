@@ -217,6 +217,12 @@ private:
                                 const std::string& ns,
                                 const BSONObj& doc) override;
 
+    StatusWith<bool> updateConfigDocument(OperationContext* txn,
+                                          const std::string& ns,
+                                          const BSONObj& query,
+                                          const BSONObj& update,
+                                          bool upsert) override;
+
     Status removeConfigDocuments(OperationContext* txn,
                                  const std::string& ns,
                                  const BSONObj& query) override;

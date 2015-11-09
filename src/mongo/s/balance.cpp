@@ -256,13 +256,11 @@ void Balancer::_ping(OperationContext* txn, bool waiting) {
     mType.setWaiting(waiting);
     mType.setMongoVersion(versionString);
 
-    grid.catalogManager(txn)->update(txn,
-                                     MongosType::ConfigNS,
-                                     BSON(MongosType::name(_myid)),
-                                     BSON("$set" << mType.toBSON()),
-                                     true,
-                                     false,
-                                     NULL);
+    grid.catalogManager(txn)->updateConfigDocument(txn,
+                                                   MongosType::ConfigNS,
+                                                   BSON(MongosType::name(_myid)),
+                                                   BSON("$set" << mType.toBSON()),
+                                                   true);
 }
 
 bool Balancer::_checkOIDs(OperationContext* txn) {

@@ -551,6 +551,15 @@ Status ForwardingCatalogManager::insertConfigDocument(OperationContext* txn,
     return retry(txn, [&] { return _actual->insertConfigDocument(txn, ns, doc); });
 }
 
+StatusWith<bool> ForwardingCatalogManager::updateConfigDocument(OperationContext* txn,
+                                                                const std::string& ns,
+                                                                const BSONObj& query,
+                                                                const BSONObj& update,
+                                                                bool upsert) {
+    return retry(txn,
+                 [&] { return _actual->updateConfigDocument(txn, ns, query, update, upsert); });
+}
+
 Status ForwardingCatalogManager::removeConfigDocuments(OperationContext* txn,
                                                        const std::string& ns,
                                                        const BSONObj& query) {
