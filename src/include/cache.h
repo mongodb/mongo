@@ -39,6 +39,14 @@ struct __wt_evict_worker {
 	uint32_t flags;
 };
 
+/* Cache operations. */
+typedef enum __wt_cache_op {
+	WT_SYNC_CHECKPOINT,
+	WT_SYNC_CLOSE,
+	WT_SYNC_DISCARD,
+	WT_SYNC_WRITE_LEAVES
+} WT_CACHE_OP;
+
 /*
  * WiredTiger cache structure.
  */
