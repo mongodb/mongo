@@ -23,7 +23,7 @@ assert("numAScopedConnection" in dbclient);
 assert("totalInUse" in dbclient);
 assert("totalAvailable" in dbclient);
 assert("totalCreated" in dbclient);
-assert.eq(dbclient["totalInUse"] + dbclient["totalAvailable"], dbclient["totalCreated"]);
+assert.lte(dbclient["totalInUse"] + dbclient["totalAvailable"], dbclient["totalCreated"], tojson(dbclient));
 
 // Stats from ASIO pool
 assert("NetworkInterfaceASIO (Sharding)" in pools);
@@ -32,4 +32,4 @@ assert("hosts" in asio);
 assert("totalInUse" in asio);
 assert("totalAvailable" in asio);
 assert("totalCreated" in asio);
-assert.eq(asio["totalInUse"] + asio["totalAvailable"], asio["totalCreated"]);
+assert.lte(asio["totalInUse"] + asio["totalAvailable"], asio["totalCreated"], tojson(asio));
