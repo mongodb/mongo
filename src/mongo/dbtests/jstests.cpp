@@ -1505,17 +1505,8 @@ class Undefined : public TestRoundTrip {
         return b.obj();
     }
 
-    // Don't need to return anything because we are overriding both jsonOut and jsonIn
     virtual string json() const {
-        return "";
-    }
-
-    // undefined values come out as null in the shell.  See SERVER-6102.
-    virtual string jsonIn() const {
         return "{ \"a\" : undefined }";
-    }
-    virtual string jsonOut() const {
-        return "{ \"a\" : null }";
     }
 };
 

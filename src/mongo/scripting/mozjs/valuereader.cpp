@@ -103,10 +103,12 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
         case mongo::Bool:
             _value.setBoolean(elem.Bool());
             return;
-        case mongo::EOO:
         case mongo::jstNULL:
-        case mongo::Undefined:
             _value.setNull();
+            return;
+        case mongo::EOO:
+        case mongo::Undefined:
+            _value.setUndefined();
             return;
         case mongo::RegEx: {
             // TODO parse into a custom type that can support any patterns and flags SERVER-9803
