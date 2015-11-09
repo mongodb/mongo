@@ -822,7 +822,7 @@ protected:
     KeyString _key;
     KeyString::TypeBits _typeBits;
     RecordId _id;
-    bool _eof = false;
+    bool _eof = true;
 
     // This differs from _eof in that it always reflects the result of the most recent call to
     // reposition _cursor.
