@@ -36,8 +36,6 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/s/write_ops/batched_delete_document.h"
-#include "mongo/s/write_ops/batched_delete_request.h"
 #include "mongo/s/write_ops/batched_update_document.h"
 
 namespace mongo {
@@ -64,31 +62,6 @@ Status CatalogManager::update(OperationContext* txn,
     updateRequest->setWriteConcern(WriteConcernOptions::Majority);
 
     BatchedCommandRequest request(updateRequest.release());
-    request.setNS(NamespaceString(ns));
-
-    BatchedCommandResponse dummyResponse;
-    if (response == NULL) {
-        response = &dummyResponse;
-    }
-
-    writeConfigServerDirect(txn, request, response);
-    return response->toStatus();
-}
-
-Status CatalogManager::remove(OperationContext* txn,
-                              const string& ns,
-                              const BSONObj& query,
-                              int limit,
-                              BatchedCommandResponse* response) {
-    unique_ptr<BatchedDeleteDocument> deleteDoc(new BatchedDeleteDocument);
-    deleteDoc->setQuery(query);
-    deleteDoc->setLimit(limit);
-
-    unique_ptr<BatchedDeleteRequest> deleteRequest(new BatchedDeleteRequest());
-    deleteRequest->addToDeletes(deleteDoc.release());
-    deleteRequest->setWriteConcern(WriteConcernOptions::Majority);
-
-    BatchedCommandRequest request(deleteRequest.release());
     request.setNS(NamespaceString(ns));
 
     BatchedCommandResponse dummyResponse;

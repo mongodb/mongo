@@ -217,6 +217,10 @@ private:
                                 const std::string& ns,
                                 const BSONObj& doc) override;
 
+    Status removeConfigDocuments(OperationContext* txn,
+                                 const std::string& ns,
+                                 const BSONObj& query) override;
+
     Status createDatabase(OperationContext* txn, const std::string& dbName) override;
 
     Status initConfigVersion(OperationContext* txn) override;

@@ -408,19 +408,14 @@ public:
                   BatchedCommandResponse* response);
 
     /**
-     * Removes a document from the specified namespace on the config server (only the config
-     * or admin databases).
+     * Removes documents matching a particular query predicate from the specified namespace on the
+     * config server. Must only be used for deletions from the 'config' database.
      *
-     * This is a thin wrapper around writeConfigServerDirect.
-     *
-     * NOTE: Should not be used in new code. Instead add a new metadata operation to the
-     *       interface.
+     * NOTE: Should not be used in new code. Instead add a new metadata operation to the interface.
      */
-    Status remove(OperationContext* txn,
-                  const std::string& ns,
-                  const BSONObj& query,
-                  int limit,
-                  BatchedCommandResponse* response);
+    virtual Status removeConfigDocuments(OperationContext* txn,
+                                         const std::string& ns,
+                                         const BSONObj& query) = 0;
 
     /**
      * Performs the necessary checks for version compatibility and creates a new version document

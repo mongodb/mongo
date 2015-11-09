@@ -195,6 +195,12 @@ Status CatalogManagerMock::insertConfigDocument(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
+Status CatalogManagerMock::removeConfigDocuments(OperationContext* txn,
+                                                 const std::string& ns,
+                                                 const BSONObj& query) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
 Status CatalogManagerMock::createDatabase(OperationContext* txn, const std::string& dbName) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }

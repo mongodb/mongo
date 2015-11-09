@@ -551,6 +551,12 @@ Status ForwardingCatalogManager::insertConfigDocument(OperationContext* txn,
     return retry(txn, [&] { return _actual->insertConfigDocument(txn, ns, doc); });
 }
 
+Status ForwardingCatalogManager::removeConfigDocuments(OperationContext* txn,
+                                                       const std::string& ns,
+                                                       const BSONObj& query) {
+    return retry(txn, [&] { return _actual->removeConfigDocuments(txn, ns, query); });
+}
+
 Status ForwardingCatalogManager::createDatabase(OperationContext* txn, const std::string& dbName) {
     return retry(txn, [&] { return _actual->createDatabase(txn, dbName); });
 }

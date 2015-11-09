@@ -144,6 +144,10 @@ public:
                                 const std::string& ns,
                                 const BSONObj& doc) override;
 
+    Status removeConfigDocuments(OperationContext* txn,
+                                 const std::string& ns,
+                                 const BSONObj& query) override;
+
     Status createDatabase(OperationContext* txn, const std::string& dbName);
 
     DistLockManager* getDistLockManager() override;

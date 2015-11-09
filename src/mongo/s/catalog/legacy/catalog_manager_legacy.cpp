@@ -421,7 +421,7 @@ StatusWith<ShardDrainingStatus> CatalogManagerLegacy::removeShard(OperationConte
         log() << "going to remove shard: " << name;
         audit::logRemoveShard(txn->getClient(), name);
 
-        Status status = remove(txn, ShardType::ConfigNS, searchDoc, 0, NULL);
+        Status status = removeConfigDocuments(txn, ShardType::ConfigNS, searchDoc);
         if (!status.isOK()) {
             log() << "Error concluding removeShard operation on: " << name
                   << "; err: " << status.reason();
@@ -597,7 +597,7 @@ Status CatalogManagerLegacy::dropCollection(OperationContext* txn, const Namespa
     LOG(1) << "dropCollection " << ns << " shard data deleted";
 
     // Remove chunk data
-    Status result = remove(txn, ChunkType::ConfigNS, BSON(ChunkType::ns(ns.ns())), 0, nullptr);
+    Status result = removeConfigDocuments(txn, ChunkType::ConfigNS, BSON(ChunkType::ns(ns.ns())));
     if (!result.isOK()) {
         return result;
     }
@@ -1054,6 +1054,28 @@ Status CatalogManagerLegacy::insertConfigDocument(OperationContext* txn,
     insert->addToDocuments(doc);
 
     BatchedCommandRequest request(insert.release());
+    request.setNS(nss);
+
+    BatchedCommandResponse response;
+    writeConfigServerDirect(txn, request, &response);
+
+    return response.toStatus();
+}
+
+Status CatalogManagerLegacy::removeConfigDocuments(OperationContext* txn,
+                                                   const string& ns,
+                                                   const BSONObj& query) {
+    const NamespaceString nss(ns);
+    invariant(nss.db() == "config");
+
+    auto deleteDoc(stdx::make_unique<BatchedDeleteDocument>());
+    deleteDoc->setQuery(query);
+    deleteDoc->setLimit(0);
+
+    auto deleteRequest(stdx::make_unique<BatchedDeleteRequest>());
+    deleteRequest->addToDeletes(deleteDoc.release());
+
+    BatchedCommandRequest request(deleteRequest.release());
     request.setNS(nss);
 
     BatchedCommandResponse response;

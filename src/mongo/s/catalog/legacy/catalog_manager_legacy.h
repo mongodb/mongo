@@ -134,6 +134,10 @@ public:
                                 const std::string& ns,
                                 const BSONObj& doc) override;
 
+    Status removeConfigDocuments(OperationContext* txn,
+                                 const std::string& ns,
+                                 const BSONObj& query) override;
+
     DistLockManager* getDistLockManager() override;
 
     Status initConfigVersion(OperationContext* txn) override;

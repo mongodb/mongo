@@ -298,7 +298,8 @@ StatusWith<ShardDrainingStatus> CatalogManagerReplicaSet::removeShard(OperationC
     log() << "going to remove shard: " << name;
     audit::logRemoveShard(txn->getClient(), name);
 
-    Status status = remove(txn, ShardType::ConfigNS, BSON(ShardType::name() << name), 0, NULL);
+    Status status =
+        removeConfigDocuments(txn, ShardType::ConfigNS, BSON(ShardType::name() << name));
     if (!status.isOK()) {
         log() << "Error concluding removeShard operation on: " << name
               << "; err: " << status.reason();
@@ -516,7 +517,7 @@ Status CatalogManagerReplicaSet::dropCollection(OperationContext* txn, const Nam
     LOG(1) << "dropCollection " << ns << " shard data deleted";
 
     // Remove chunk data
-    Status result = remove(txn, ChunkType::ConfigNS, BSON(ChunkType::ns(ns.ns())), 0, nullptr);
+    Status result = removeConfigDocuments(txn, ChunkType::ConfigNS, BSON(ChunkType::ns(ns.ns())));
     if (!result.isOK()) {
         return result;
     }
@@ -960,6 +961,39 @@ Status CatalogManagerReplicaSet::insertConfigDocument(OperationContext* txn,
                 status = Status::OK();
             }
         }
+
+        if (ErrorCodes::isNetworkError(status.code()) && (retry < kMaxWriteRetry)) {
+            continue;
+        }
+
+        return status;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+Status CatalogManagerReplicaSet::removeConfigDocuments(OperationContext* txn,
+                                                       const string& ns,
+                                                       const BSONObj& query) {
+    const NamespaceString nss(ns);
+    invariant(nss.db() == "config");
+
+    auto deleteDoc(stdx::make_unique<BatchedDeleteDocument>());
+    deleteDoc->setQuery(query);
+    deleteDoc->setLimit(0);
+
+    auto deleteRequest(stdx::make_unique<BatchedDeleteRequest>());
+    deleteRequest->addToDeletes(deleteDoc.release());
+
+    BatchedCommandRequest request(deleteRequest.release());
+    request.setNS(nss);
+    request.setWriteConcern(WriteConcernOptions::Majority);
+
+    for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
+        BatchedCommandResponse response;
+        writeConfigServerDirect(txn, request, &response);
+
+        Status status = response.toStatus();
 
         if (ErrorCodes::isNetworkError(status.code()) && (retry < kMaxWriteRetry)) {
             continue;

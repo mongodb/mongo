@@ -544,8 +544,8 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
     // 1
     grid.catalogCache()->invalidate(_name);
 
-    Status result = grid.catalogManager(txn)->remove(
-        txn, DatabaseType::ConfigNS, BSON(DatabaseType::name(_name)), 0, NULL);
+    Status result = grid.catalogManager(txn)->removeConfigDocuments(
+        txn, DatabaseType::ConfigNS, BSON(DatabaseType::name(_name)));
     if (!result.isOK()) {
         errmsg = result.reason();
         log() << "could not drop '" << _name << "': " << errmsg;
