@@ -156,6 +156,8 @@ functions:
           cd ./clusters/${cluster}
           # destroy the EC2 cluster
           yes yes | ./terraform destroy
+          # make sure we destroy the cluster in case of AWS API timing issue
+          yes yes | ./terraform destroy
           echo "Cluster DESTROYED."
           echo "All perf results"
           cd ..
@@ -334,8 +336,8 @@ tasks:
     - func: "upload log file"
       vars:
         test: "core_workloads_MMAPv1"
-    - func: "analyze"
     - func: "destroy cluster"      
+    - func: "analyze"
 
 #######################################
 #            Buildvariants            #
