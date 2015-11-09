@@ -538,7 +538,9 @@ public:
     OpQueue getNextBatch(Seconds maxWaitTime) {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         if (_ops.empty()) {
-            _cv.wait_for(lk, maxWaitTime);
+            // We intentionally don't care about whether this returns due to signaling or timeout
+            // since we do the same thing either way: return whatever is in _ops.
+            (void)_cv.wait_for(lk, maxWaitTime);
         }
 
         OpQueue ops = std::move(_ops);
