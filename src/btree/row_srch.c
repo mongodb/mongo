@@ -487,7 +487,13 @@ leaf_match:	cbt->compare = 0;
 
 	return (0);
 
-err:	if (leaf != NULL)
+err:	/*
+	 * Release the current page if the search started at the root. If the
+	 * search didn't start at the root we should never have gone looking
+	 * beyond the start page.
+	 */
+	WT_ASSERT(session, leaf == NULL || leaf == current);
+	if (leaf == NULL)
 		WT_TRET(__wt_page_release(session, current, 0));
 	return (ret);
 }
