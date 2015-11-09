@@ -326,16 +326,15 @@ descend:	/*
 		 * page; otherwise return on error, the swap call ensures we're
 		 * holding nothing on failure.
 		 */
-		switch (ret = __wt_page_swap(session, current, descent, 0)) {
-		case 0:
+		if ((ret = __wt_page_swap(session, current, descent, 0)) == 0) {
 			current = descent;
-			break;
-		case WT_RESTART:
+			continue;
+		}
+		if (ret == WT_RESTART) {
 			skiphigh = skiplow = 0;
 			goto restart_page;
-		default:
-			return (ret);
 		}
+		return (ret);
 	}
 
 	/* Track how deep the tree gets. */
