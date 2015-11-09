@@ -181,7 +181,7 @@ __evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 */
 		if (ndeleted > pindex->entries / 10 && pindex->entries > 1) {
 			if ((ret = __wt_split_reverse(session, ref)) == 0)
-				return (ret);
+				return (0);
 			WT_RET_BUSY_OK(ret);
 
 			/* If a reverse split fails, unlock the child. */
