@@ -628,9 +628,10 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_TRET(__split_safe_free(session, split_gen, false, pindex, size));
 	root_decr += size;
 
-	/* Adjust the root's memory footprint. */
+	/* Adjust the root's memory footprint and mark it dirty. */
 	__wt_cache_page_inmem_incr(session, root, root_incr);
 	__wt_cache_page_inmem_decr(session, root, root_decr);
+	__wt_page_modify_set(session, root);
 
 err:	/*
 	 * If complete is true, we saw an error after opening up the tree to
@@ -874,9 +875,10 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_TRET(__split_safe_free(session, split_gen, exclusive, pindex, size));
 	parent_decr += size;
 
-	/* Adjust the parent's memory footprint. */
+	/* Adjust the parent's memory footprint and mark it dirty. */
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
+	__wt_page_modify_set(session, parent);
 
 err:	/*
 	 * A note on error handling: if we completed the split, return success,
@@ -1147,9 +1149,10 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_TRET(__split_safe_free(session, split_gen, false, pindex, size));
 	page_decr += size;
 
-	/* Adjust the page's memory footprint. */
+	/* Adjust the page's memory footprint, and mark it dirty. */
 	__wt_cache_page_inmem_incr(session, page, page_incr);
 	__wt_cache_page_inmem_decr(session, page, page_decr);
+	__wt_page_modify_set(session, page);
 
 err:	/*
 	 * If complete is true, we saw an error after opening up the tree to
