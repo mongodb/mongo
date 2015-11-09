@@ -241,6 +241,9 @@ if get_option('allocator') == 'tcmalloc':
         # Add in the include path for our vendored tcmalloc.
         tcmspEnv.InjectThirdPartyIncludePaths('gperftools')
 
+        # Include valgrind since tcmalloc disables itself while running under valgrind
+        tcmspEnv.InjectThirdPartyIncludePaths('valgrind')
+
         # If our changes to tcmalloc are ever upstreamed, this should become set based on a top
         # level configure check, though its effects should still be scoped just to these files.
         tcmspEnv.Append(

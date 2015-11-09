@@ -31,10 +31,15 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#ifdef _WIN32
+#define NVALGRIND
+#endif
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <valgrind/valgrind.h>
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/client.h"
@@ -235,11 +240,23 @@ void WiredTigerKVEngine::cleanShutdown() {
             _journalFlusher->shutdown();
         _sessionCache->shuttingDown();
 
+// We want WiredTiger to leak memory for faster shutdown except when we are running tools to
+// look for memory leaks.
 #if !__has_feature(address_sanitizer)
-        const char* config = "leak_memory=true";
+        bool leak_memory = true;
 #else
-        const char* config = NULL;
+        bool leak_memory = false;
 #endif
+        const char* config = nullptr;
+
+        if (RUNNING_ON_VALGRIND) {
+            leak_memory = false;
+        }
+
+        if (leak_memory) {
+            config = "leak_memory=true";
+        }
+
         invariantWTOK(_conn->close(_conn, config));
         _conn = NULL;
     }

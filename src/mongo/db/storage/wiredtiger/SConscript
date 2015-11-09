@@ -16,6 +16,7 @@ if wiredtiger:
     wtEnv = env.Clone()
     wtEnv.InjectThirdPartyIncludePaths(libraries=['wiredtiger'])
     wtEnv.InjectThirdPartyIncludePaths(libraries=['zlib'])
+    wtEnv.InjectThirdPartyIncludePaths(libraries=['valgrind'])
 
     # This is the smallest possible set of files that wraps WT
     wtEnv.Library(

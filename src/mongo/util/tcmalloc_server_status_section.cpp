@@ -27,9 +27,14 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#ifdef _WIN32
+#define NVALGRIND
+#endif
+
 #include "mongo/platform/basic.h"
 
 #include <gperftools/malloc_extension.h>
+#include <valgrind/valgrind.h>
 
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"
@@ -63,9 +68,11 @@ void threadStateChange() {
 
 // Register threadStateChange callback
 MONGO_INITIALIZER(TCMallocThreadIdleListener)(InitializerContext*) {
-    registerThreadIdleCallback(&threadStateChange);
-    invariant(MallocExtension::instance()->GetNumericProperty(
-        "tcmalloc.max_total_thread_cache_bytes", &tcmallocPoolSize));
+    if (!RUNNING_ON_VALGRIND) {
+        registerThreadIdleCallback(&threadStateChange);
+        invariant(MallocExtension::instance()->GetNumericProperty(
+            "tcmalloc.max_total_thread_cache_bytes", &tcmallocPoolSize));
+    }
     LOG(1) << "tcmallocPoolSize: " << tcmallocPoolSize << "\n";
     return Status::OK();
 }
