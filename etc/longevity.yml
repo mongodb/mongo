@@ -221,6 +221,7 @@ tasks:
 - name: shard_cluster_test
   depends_on:
     - name: compile
+  exec_timeout_secs: 216000 
   commands:
     - func: "prepare environment"
     - func: "bring up 3 shard cluster"
@@ -240,6 +241,7 @@ tasks:
 - name: shard_cluster_CSRS_test
   depends_on:
     - name: compile
+  exec_timeout_secs: 28800
   commands:
     - func: "prepare environment"
     - func: "bring up 3 shard cluster"
