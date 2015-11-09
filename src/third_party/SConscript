@@ -29,6 +29,11 @@ if not use_system_version_of_library('snappy'):
     thirdPartyIncludePathList.append(
         ('snappy', '#/src/third_party/snappy' + snappySuffix))
 
+# Valgrind is a header only include as valgrind.h includes everything we need
+if not use_system_version_of_library('valgrind'):
+    thirdPartyIncludePathList.append(
+        ('valgrind', '#/src/third_party/valgrind-3.11.0/include'))
+
 if not use_system_version_of_library('zlib'):
     thirdPartyIncludePathList.append(
         ('zlib', '#/src/third_party/zlib' + zlibSuffix))

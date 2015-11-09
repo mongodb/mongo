@@ -330,6 +330,11 @@ add_option('use-system-snappy',
     nargs=0,
 )
 
+add_option('use-system-valgrind',
+    help='use system version of valgrind library',
+    nargs=0,
+)
+
 add_option('use-system-zlib',
     help='use system version of zlib library',
     nargs=0,
