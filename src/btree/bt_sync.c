@@ -128,12 +128,19 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			if (walk == NULL)
 				break;
 
+			/* Skip clean pages. */
+			if (!__wt_page_is_modified(walk->page))
+				continue;
+
+			/*
+			 * Take a local reference to the page modify structure
+			 * now that we know the page is dirty. It needs to be
+			 * done in this order otherwise the page modify
+			 * structure could have been created between taking the
+			 * reference and checking modified.
+			 */
 			page = walk->page;
 			mod = page->modify;
-
-			/* Skip clean pages. */
-			if (!__wt_page_is_modified(page))
-				continue;
 
 			/*
 			 * Write dirty pages, unless we can be sure they only
