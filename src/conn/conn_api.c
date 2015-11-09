@@ -1947,6 +1947,16 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 			goto err;
 	}
 
+	WT_ERR(__wt_config_gets(session, cfg, "write_through", &cval));
+	for (ft = file_types; ft->name != NULL; ft++) {
+		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
+		if (ret == 0) {
+			if (sval.val)
+				FLD_SET(conn->write_through, ft->flag);
+		} else if (ret != WT_NOTFOUND)
+			goto err;
+	}
+
 	/*
 	 * If buffer alignment is not configured, use zero unless direct I/O is
 	 * also configured, in which case use the build-time default.

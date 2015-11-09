@@ -31,5 +31,6 @@ test/fops
 test/format
 test/huge
 test/packing
+test/recovery
 test/salvage
 test/thread

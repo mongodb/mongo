@@ -2130,15 +2130,17 @@ struct __wt_connection {
  * true.}
  * @config{create, create the database if it does not exist., a boolean flag;
  * default \c false.}
- * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
+ * @config{direct_io, Use \c O_DIRECT on POSIX systems\, and \c
+ * FILE_FLAG_NO_BUFFERING on Windows to access files.  Options are given as a
  * list\, such as <code>"direct_io=[data]"</code>. Configuring \c direct_io
  * requires care\, see @ref tuning_system_buffer_cache_direct_io for important
- * warnings.  Including \c "data" will cause WiredTiger data files to use \c
- * O_DIRECT\, including \c "log" will cause WiredTiger log files to use \c
- * O_DIRECT\, and including \c "checkpoint" will cause WiredTiger data files
- * opened at a checkpoint (i.e: read only) to use \c O_DIRECT., a list\, with
- * values chosen from the following options: \c "checkpoint"\, \c "data"\, \c
- * "log"; default empty.}
+ * warnings.  Including \c "data" will cause WiredTiger data files to use direct
+ * I/O\, including \c "log" will cause WiredTiger log files to use direct I/O\,
+ * and including \c "checkpoint" will cause WiredTiger data files opened at a
+ * checkpoint (i.e: read only) to use direct I/O. \c direct_io should be
+ * combined with \c write_through to get the equivalent of \c O_DIRECT on
+ * Windows., a list\, with values chosen from the following options: \c
+ * "checkpoint"\, \c "data"\, \c "log"; default empty.}
  * @config{encryption = (, configure an encryptor for system wide metadata and
  * logs.  If a system wide encryptor is set\, it is also used for encrypting
  * data files and tables\, unless encryption configuration is explicitly set for
@@ -2339,6 +2341,15 @@ struct __wt_connection {
  * "overflow"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c
  * "shared_cache"\, \c "split"\, \c "temporary"\, \c "transaction"\, \c
  * "verify"\, \c "version"\, \c "write"; default empty.}
+ * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to
+ * files.  Ignored on non-Windows systems.  Options are given as a list\, such
+ * as <code>"write_through=[data]"</code>. Configuring \c write_through requires
+ * care\, see @ref tuning_system_buffer_cache_direct_io for important warnings.
+ * Including \c "data" will cause WiredTiger data files to write through cache\,
+ * including \c "log" will cause WiredTiger log files to write through cache.
+ * \c write_through should be combined with \c direct_io to get the equivalent
+ * of POSIX \c O_DIRECT on Windows., a list\, with values chosen from the
+ * following options: \c "data"\, \c "log"; default empty.}
  * @configend
  * Additionally, if files named \c WiredTiger.config or \c WiredTiger.basecfg
  * appear in the WiredTiger home directory, they are read for configuration

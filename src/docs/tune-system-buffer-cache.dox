@@ -17,6 +17,17 @@ for WiredTiger's data files:
 
 @snippet ex_all.c Configure direct_io for data files
 
+On Windows, the "direct_io" configuration string controls whether the operating
+system cache is used to buffer reads, and writes to disk, i.e.,
+FILE_FLAG_NO_BUFFERING. When "direct_io" is off, Windows will use free RAM to
+cache access to files. This may had adverse effects because Windows may page out
+the WiredTiger buffer cache instead of its file cache. An additional
+configuration string "write_through" controls whether the disk is allowed to
+cache the writes. Enabling this flag increases write latency as the drive must
+ensure all writes are persisted to disk, but it ensures write durability. To get
+the equivalent of \c O_DIRECT on Windows, "direct_io", and "write_through" must
+be both set.
+
 Direct I/O implies a writing thread waits for the write to complete
 (which is a slower operation than writing into the system buffer cache),
 and configuring direct I/O is likely to decrease overall application
@@ -36,11 +47,11 @@ should also specify \c O_DIRECT when configuring their file access.  A
 standard Linux system utility that supports \c O_DIRECT is the \c dd
 utility, when using the \c iflag=direct command-line option.
 
-Additionally, many Linux systems require specific alignment for buffers
-used for I/O when direct I/O is configured, and using the wrong
+Additionally, Windows, and many Linux systems require specific alignment for
+buffers used for I/O when direct I/O is configured, and using the wrong
 alignment can cause data loss or corruption.  When direct I/O is
-configured on Linux systems, WiredTiger aligns I/O buffers to 4KB; if
-different alignment is required by your system, the \c buffer_alignment
+configured on Windows, and Linux systems, WiredTiger aligns I/O buffers to 4KB;
+if different alignment is required by your system, the \c buffer_alignment
 configuration to the wiredtiger_open call should be configured to the
 correct value.
 
