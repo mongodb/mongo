@@ -238,19 +238,20 @@ public:
     virtual void appendConnectionStats(BSONObjBuilder* b) = 0;
 
 protected:
-    TaskExecutor();
-
     // Retrieves the Callback from a given CallbackHandle
-    CallbackState* getCallbackFromHandle(const CallbackHandle& cbHandle);
+    static CallbackState* getCallbackFromHandle(const CallbackHandle& cbHandle);
 
     // Retrieves the Event from a given EventHandle
-    EventState* getEventFromHandle(const EventHandle& eventHandle);
+    static EventState* getEventFromHandle(const EventHandle& eventHandle);
 
     // Sets the given CallbackHandle to point to the given callback.
-    void setCallbackForHandle(CallbackHandle* cbHandle, std::shared_ptr<CallbackState> callback);
+    static void setCallbackForHandle(CallbackHandle* cbHandle,
+                                     std::shared_ptr<CallbackState> callback);
 
     // Sets the given EventHandle to point to the given event.
-    void setEventForHandle(EventHandle* eventHandle, std::shared_ptr<EventState> event);
+    static void setEventForHandle(EventHandle* eventHandle, std::shared_ptr<EventState> event);
+
+    TaskExecutor();
 };
 
 /**

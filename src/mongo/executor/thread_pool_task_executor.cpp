@@ -49,8 +49,8 @@ class ThreadPoolTaskExecutor::CallbackState : public TaskExecutor::CallbackState
     MONGO_DISALLOW_COPYING(CallbackState);
 
 public:
-    static std::shared_ptr<CallbackState> make(CallbackFn cb,
-                                               EventHandle finishedEvent,
+    static std::shared_ptr<CallbackState> make(CallbackFn&& cb,
+                                               EventHandle&& finishedEvent,
                                                Date_t readyDate) {
         return std::make_shared<CallbackState>(std::move(cb), std::move(finishedEvent), readyDate);
     }
@@ -58,7 +58,7 @@ public:
     /**
      * Do not call directly. Use make.
      */
-    CallbackState(CallbackFn cb, EventHandle theFinishedEvent, Date_t theReadyDate)
+    CallbackState(CallbackFn&& cb, EventHandle&& theFinishedEvent, Date_t theReadyDate)
         : callback(std::move(cb)),
           finishedEvent(std::move(theFinishedEvent)),
           readyDate(theReadyDate) {}
@@ -115,6 +115,11 @@ public:
     stdx::condition_variable isSignaledCondition;
     EventList::iterator iter;
     WorkQueue waiters;
+};
+
+struct ThreadPoolTaskExecutor::WQEL {
+    WorkQueue workQueue;
+    EventList eventList;
 };
 
 ThreadPoolTaskExecutor::ThreadPoolTaskExecutor(std::unique_ptr<ThreadPoolInterface> pool,
@@ -180,8 +185,15 @@ Date_t ThreadPoolTaskExecutor::now() {
 }
 
 StatusWith<TaskExecutor::EventHandle> ThreadPoolTaskExecutor::makeEvent() {
+    auto el = makeSingletonEventList();
+    EventHandle event;
+    setEventForHandle(&event, el.front());
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return makeEvent_inlock();
+    if (_inShutdown) {
+        return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
+    }
+    _unsignaledEvents.splice(_unsignaledEvents.end(), el);
+    return event;
 }
 
 void ThreadPoolTaskExecutor::signalEvent(const EventHandle& event) {
@@ -191,12 +203,13 @@ void ThreadPoolTaskExecutor::signalEvent(const EventHandle& event) {
 
 StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::onEvent(const EventHandle& event,
                                                                          const CallbackFn& work) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (!event.isValid()) {
         return {ErrorCodes::BadValue, "Passed invalid event handle to onEvent"};
     }
+    auto wqel = makeSingletonWork(work);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto eventState = checked_cast<EventState*>(getEventFromHandle(event));
-    auto cbHandle = enqueueCallbackState_inlock(&eventState->waiters, work);
+    auto cbHandle = enqueueCallbackState_inlock(&eventState->waiters, std::move(wqel));
     if (!cbHandle.isOK()) {
         return cbHandle;
     }
@@ -217,9 +230,10 @@ void ThreadPoolTaskExecutor::waitForEvent(const EventHandle& event) {
 
 StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWork(
     const CallbackFn& work) {
+    auto wqel = makeSingletonWork(work);
     WorkQueue temp;
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    auto cbHandle = enqueueCallbackState_inlock(&temp, work);
+    auto cbHandle = enqueueCallbackState_inlock(&temp, std::move(wqel));
     if (!cbHandle.isOK()) {
         return cbHandle;
     }
@@ -232,11 +246,13 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
     if (when <= now()) {
         return scheduleWork(work);
     }
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    auto cbHandle = enqueueCallbackState_inlock(&_sleepersQueue, work, when);
+    auto wqel = makeSingletonWork(work, when);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    auto cbHandle = enqueueCallbackState_inlock(&_sleepersQueue, std::move(wqel));
     if (!cbHandle.isOK()) {
         return cbHandle;
     }
+    lk.unlock();
     _net->setAlarm(when,
                    [this, when, cbHandle] {
                        auto cbState =
@@ -285,32 +301,35 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
     } else {
         scheduledRequest.expirationDate = _net->now() + scheduledRequest.timeout;
     }
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    auto cbHandle =
-        enqueueCallbackState_inlock(&_networkInProgressQueue,
-                                    [scheduledRequest, cb](const CallbackArgs& cbData) {
-                                        remoteCommandFailedEarly(cbData, cb, scheduledRequest);
-                                    });
+    auto wqel = makeSingletonWork([scheduledRequest, cb](const CallbackArgs& cbData) {
+        remoteCommandFailedEarly(cbData, cb, scheduledRequest);
+    });
+    wqel.workQueue.front()->isNetworkOperation = true;
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    auto cbHandle = enqueueCallbackState_inlock(&_networkInProgressQueue, std::move(wqel));
     if (!cbHandle.isOK())
         return cbHandle;
-    const auto& cbState = _networkInProgressQueue.back();
-    cbState->isNetworkOperation = true;
+    const auto cbState = _networkInProgressQueue.back();
     LOG(4) << "Scheduling remote command request: " << scheduledRequest.toString();
+    lk.unlock();
     _net->startCommand(cbHandle.getValue(),
                        scheduledRequest,
                        [this, scheduledRequest, cbState, cb](const ResponseStatus& response) {
-                           stdx::lock_guard<stdx::mutex> lk(_mutex);
+                           using std::swap;
+                           CallbackFn newCb =
+                               [cb, scheduledRequest, response](const CallbackArgs& cbData) {
+                                   remoteCommandFinished(cbData, cb, scheduledRequest, response);
+                               };
+                           stdx::unique_lock<stdx::mutex> lk(_mutex);
                            if (_inShutdown) {
                                return;
                            }
                            LOG(3) << "Received remote response: "
                                   << (response.isOK() ? response.getValue().toString()
                                                       : response.getStatus().toString());
-                           cbState->callback =
-                               [cb, scheduledRequest, response](const CallbackArgs& cbData) {
-                                   remoteCommandFinished(cbData, cb, scheduledRequest, response);
-                               };
+                           swap(cbState->callback, newCb);
                            scheduleIntoPool_inlock(&_networkInProgressQueue, cbState->iter);
+                           lk.unlock();  // Lets newCb's destructor run outside _mutex.
                        });
     return cbHandle;
 }
@@ -355,27 +374,37 @@ void ThreadPoolTaskExecutor::cancelAllCommands() {
 }
 
 StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::enqueueCallbackState_inlock(
-    WorkQueue* queue, CallbackFn work, Date_t when) {
-    auto event = makeEvent_inlock();
-    if (!event.isOK()) {
-        return event.getStatus();
+    WorkQueue* queue, WQEL&& wqel) {
+    if (_inShutdown) {
+        return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
     }
-    queue->emplace_back(CallbackState::make(std::move(work), std::move(event.getValue()), when));
-    queue->back()->iter = std::prev(queue->end());
+    invariant(!wqel.eventList.empty());
+    _unsignaledEvents.splice(_unsignaledEvents.end(), wqel.eventList, wqel.eventList.begin());
+    invariant(wqel.eventList.empty());
+    invariant(!wqel.workQueue.empty());
+    queue->splice(queue->end(), wqel.workQueue, wqel.workQueue.begin());
+    invariant(wqel.workQueue.empty());
     CallbackHandle cbHandle;
     setCallbackForHandle(&cbHandle, queue->back());
     return cbHandle;
 }
 
-StatusWith<ThreadPoolTaskExecutor::EventHandle> ThreadPoolTaskExecutor::makeEvent_inlock() {
-    if (_inShutdown) {
-        return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
-    }
-    _unsignaledEvents.emplace_front(EventState::make());
-    _unsignaledEvents.front()->iter = _unsignaledEvents.begin();
+ThreadPoolTaskExecutor::WQEL ThreadPoolTaskExecutor::makeSingletonWork(CallbackFn work,
+                                                                       Date_t when) {
+    WQEL result;
+    result.eventList = makeSingletonEventList();
     EventHandle event;
-    setEventForHandle(&event, _unsignaledEvents.front());
-    return event;
+    setEventForHandle(&event, result.eventList.front());
+    result.workQueue.emplace_front(CallbackState::make(std::move(work), std::move(event), when));
+    result.workQueue.front()->iter = result.workQueue.begin();
+    return result;
+}
+
+ThreadPoolTaskExecutor::EventList ThreadPoolTaskExecutor::makeSingletonEventList() {
+    EventList result;
+    result.emplace_front(EventState::make());
+    result.front()->iter = result.begin();
+    return result;
 }
 
 void ThreadPoolTaskExecutor::signalEvent_inlock(const EventHandle& event) {

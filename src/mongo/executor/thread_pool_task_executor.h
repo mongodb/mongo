@@ -94,17 +94,29 @@ private:
     using EventList = stdx::list<std::shared_ptr<EventState>>;
 
     /**
-     * Creates a new callback on "queue" with the "work" function. If "when" is
-     * not Date_t{}, the new callback's readyDate is set to "when".
+     * Structure returned by makeSingletonWork, for passing into enqueueCallbackState_inlock.
      */
-    StatusWith<CallbackHandle> enqueueCallbackState_inlock(WorkQueue* queue,
-                                                           CallbackFn work,
-                                                           Date_t when = {});
+    struct WQEL;
 
     /**
-     * Makes a new event object.
+     * Returns an EventList containing one unsignaled EventState. This is a helper function for
+     * performing allocations outside of _mutex, and should only be called by makeSingletonWork and
+     * makeEvent().
      */
-    StatusWith<EventHandle> makeEvent_inlock();
+    static EventList makeSingletonEventList();
+
+    /**
+     * Returns an object suitable for passing to enqueueCallbackState_inlock that represents
+     * executing "work" no sooner than "when" (defaults to ASAP). This function may and should be
+     * called outside of _mutex.
+     */
+    static WQEL makeSingletonWork(CallbackFn work, Date_t when = {});
+
+    /**
+     * Creates a new callback on "queue" to do the work described by "wqel", which was
+     * itself produced via makeSingletonWork().
+     */
+    StatusWith<CallbackHandle> enqueueCallbackState_inlock(WorkQueue* queue, WQEL&& wqel);
 
     /**
      * Signals the given event.
