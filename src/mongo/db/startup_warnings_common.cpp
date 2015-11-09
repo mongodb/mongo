@@ -70,7 +70,7 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
             << startupWarningsLog;
         log() << "**          The web interfaces (rest, httpinterface and/or jsonp) are insecure "
               << startupWarningsLog;
-        log() << "**          and should be disabled unless required for backward compatability."
+        log() << "**          and should be disabled unless required for backward compatibility."
               << startupWarningsLog;
         warned = true;
     }
