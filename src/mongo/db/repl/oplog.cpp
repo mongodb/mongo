@@ -77,6 +77,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/snapshot_thread.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -684,8 +685,9 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
 Status applyOperation_inlock(OperationContext* txn,
                              Database* db,
                              const BSONObj& op,
-                             bool convertUpdateToUpsert) {
-    LOG(3) << "applying op: " << op << endl;
+                             bool convertUpdateToUpsert,
+                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
+    LOG(3) << "applying op: " << op;
 
     OpCounters* opCounters = txn->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
 
@@ -729,9 +731,8 @@ Status applyOperation_inlock(OperationContext* txn,
     invariant(*opType != 'c');  // commands are processed in applyCommand_inlock()
 
     if (*opType == 'i') {
-        opCounters->gotInsert();
-
         if (nsToCollectionSubstring(ns) == "system.indexes") {
+            opCounters->gotInsert();
             if (o["background"].trueValue()) {
                 IndexBuilder* builder = new IndexBuilder(o);
                 // This spawns a new thread and returns immediately.
@@ -745,65 +746,96 @@ Status applyOperation_inlock(OperationContext* txn,
                 uassertStatusOK(status);
             }
             // Since this is an index operation we can return without falling through.
+            if (incrementOpsAppliedStats) {
+                incrementOpsAppliedStats();
+            }
             return Status::OK();
         }
-
         uassert(
             ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to apply insert due to missing collection: " << op.toString(),
             collection);
 
-        // No _id.
-        // This indicates an issue with the upstream server:
-        //     The oplog entry is corrupted; or
-        //     The version of the upstream server is obsolete.
-        uassert(ErrorCodes::NoSuchKey,
-                str::stream() << "Failed to apply insert due to missing _id: " << op.toString(),
-                o.hasField("_id"));
+        if (fieldO.type() == Array) {
+            // Batched inserts.
+            Status status{ErrorCodes::NotYetInitialized, ""};
 
-        // 1. Try insert first
-        // 2. If okay, commit
-        // 3. If not, do update (and commit)
-        // 4. If both !Ok, return status
-        Status status{ErrorCodes::NotYetInitialized, ""};
-        {
+            std::vector<BSONObj> insertObjs;
+            for (auto elem : fieldO.Array()) {
+                insertObjs.push_back(elem.Obj());
+            }
+
             WriteUnitOfWork wuow(txn);
-            try {
-                status = collection->insertDocument(txn, o, true);
-            } catch (DBException dbe) {
-                status = dbe.toStatus();
-            }
-            if (status.isOK()) {
-                wuow.commit();
-            }
-        }
-        // Now see if we need to do an update, based on duplicate _id index key
-        if (!status.isOK()) {
-            if (status.code() != ErrorCodes::DuplicateKey) {
+            status = collection->insertDocuments(txn, insertObjs.begin(), insertObjs.end(), true);
+            if (!status.isOK()) {
                 return status;
             }
+            wuow.commit();
+            for (auto entry : insertObjs) {
+                opCounters->gotInsert();
+                if (incrementOpsAppliedStats) {
+                    incrementOpsAppliedStats();
+                }
+            }
+        } else {
+            // Single insert.
+            opCounters->gotInsert();
 
-            // Do update on DuplicateKey errors.
-            // This will only be on the _id field in replication,
-            // since we disable non-_id unique constraint violations.
-            OpDebug debug;
-            BSONObjBuilder b;
-            b.append(o.getField("_id"));
+            // No _id.
+            // This indicates an issue with the upstream server:
+            //     The oplog entry is corrupted; or
+            //     The version of the upstream server is obsolete.
+            uassert(ErrorCodes::NoSuchKey,
+                    str::stream() << "Failed to apply insert due to missing _id: " << op.toString(),
+                    o.hasField("_id"));
 
-            const NamespaceString requestNs(ns);
-            UpdateRequest request(requestNs);
+            // 1. Try insert first
+            // 2. If okay, commit
+            // 3. If not, do update (and commit)
+            // 4. If both !Ok, return status
+            Status status{ErrorCodes::NotYetInitialized, ""};
+            {
+                WriteUnitOfWork wuow(txn);
+                try {
+                    status = collection->insertDocument(txn, o, true);
+                } catch (DBException dbe) {
+                    status = dbe.toStatus();
+                }
+                if (status.isOK()) {
+                    wuow.commit();
+                }
+            }
+            // Now see if we need to do an update, based on duplicate _id index key
+            if (!status.isOK()) {
+                if (status.code() != ErrorCodes::DuplicateKey) {
+                    return status;
+                }
 
-            request.setQuery(b.done());
-            request.setUpdates(o);
-            request.setUpsert();
-            UpdateLifecycleImpl updateLifecycle(true, requestNs);
-            request.setLifecycle(&updateLifecycle);
+                // Do update on DuplicateKey errors.
+                // This will only be on the _id field in replication,
+                // since we disable non-_id unique constraint violations.
+                OpDebug debug;
+                BSONObjBuilder b;
+                b.append(o.getField("_id"));
 
-            UpdateResult res = update(txn, db, request, &debug);
-            if (res.numMatched == 0) {
-                error() << "No document was updated even though we got a DuplicateKey error when"
-                           " inserting";
-                fassertFailedNoTrace(28750);
+                const NamespaceString requestNs(ns);
+                UpdateRequest request(requestNs);
+
+                request.setQuery(b.done());
+                request.setUpdates(o);
+                request.setUpsert();
+                UpdateLifecycleImpl updateLifecycle(true, requestNs);
+                request.setLifecycle(&updateLifecycle);
+
+                UpdateResult res = update(txn, db, request, &debug);
+                if (res.numMatched == 0) {
+                    error() << "No document was updated even though we got a DuplicateKey "
+                               "error when inserting";
+                    fassertFailedNoTrace(28750);
+                }
+            }
+            if (incrementOpsAppliedStats) {
+                incrementOpsAppliedStats();
             }
         }
     } else if (*opType == 'u') {
@@ -866,6 +898,9 @@ Status applyOperation_inlock(OperationContext* txn,
                 }
             }
         }
+        if (incrementOpsAppliedStats) {
+            incrementOpsAppliedStats();
+        }
     } else if (*opType == 'd') {
         opCounters->gotDelete();
 
@@ -877,8 +912,14 @@ Status applyOperation_inlock(OperationContext* txn,
             deleteObjects(txn, collection, ns, o, PlanExecutor::YIELD_MANUAL, /*justOne*/ valueB);
         } else
             verify(opType[1] == 'b');  // "db" advertisement
+        if (incrementOpsAppliedStats) {
+            incrementOpsAppliedStats();
+        }
     } else if (*opType == 'n') {
         // no op
+        if (incrementOpsAppliedStats) {
+            incrementOpsAppliedStats();
+        }
     } else {
         throw MsgAssertionException(
             14825, str::stream() << "error in applyOperation : unknown opType " << *opType);

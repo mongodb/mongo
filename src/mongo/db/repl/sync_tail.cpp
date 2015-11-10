@@ -53,6 +53,7 @@
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/prefetch.h"
+#include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
@@ -323,11 +324,11 @@ Status SyncTail::syncApply(OperationContext* txn,
         txn->setReplicatedWrites(false);
         DisableDocumentValidation validationDisabler(txn);
 
-        Status status = applyOperationInLock(txn, db, op, convertUpdateToUpsert);
+        Status status =
+            applyOperationInLock(txn, db, op, convertUpdateToUpsert, incrementOpsAppliedStats);
         if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
             throw WriteConflictException();
         }
-        incrementOpsAppliedStats();
         return status;
     };
 
@@ -385,12 +386,12 @@ Status SyncTail::syncApply(OperationContext* txn,
 }
 
 Status SyncTail::syncApply(OperationContext* txn, const BSONObj& op, bool convertUpdateToUpsert) {
-    return syncApply(txn,
-                     op,
-                     convertUpdateToUpsert,
-                     applyOperation_inlock,
-                     applyCommand_inlock,
-                     stdx::bind(&Counter64::increment, &opsAppliedStats, 1ULL));
+    return SyncTail::syncApply(txn,
+                               op,
+                               convertUpdateToUpsert,
+                               applyOperation_inlock,
+                               applyCommand_inlock,
+                               stdx::bind(&Counter64::increment, &opsAppliedStats, 1ULL));
 }
 
 
@@ -1005,6 +1006,19 @@ static void initializeWriterThread() {
 
 // This free function is used by the writer threads to apply each op
 void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
+    using OplogEntry = SyncTail::OplogEntry;
+
+    std::vector<OplogEntry> oplogEntries(ops.begin(), ops.end());
+    std::vector<OplogEntry*> oplogEntryPointers(oplogEntries.size());
+    for (size_t i = 0; i < oplogEntries.size(); i++) {
+        oplogEntryPointers[i] = &oplogEntries[i];
+    }
+
+    if (oplogEntryPointers.size() > 1) {
+        std::stable_sort(oplogEntryPointers.begin(),
+                         oplogEntryPointers.end(),
+                         [](OplogEntry* l, OplogEntry* r) { return l->ns < r->ns; });
+    }
     initializeWriterThread();
 
     OperationContextImpl txn;
@@ -1015,17 +1029,86 @@ void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
     txn.lockState()->setIsBatchWriter(true);
 
     bool convertUpdatesToUpserts = true;
+    // doNotGroupBeforePoint is used to prevent retrying bad group inserts by marking the final op
+    // of a failed group and not allowing further group inserts until that op has been processed.
+    std::vector<OplogEntry*>::iterator doNotGroupBeforePoint = oplogEntryPointers.begin();
 
-    for (std::vector<BSONObj>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
+    for (std::vector<OplogEntry*>::iterator oplogEntriesIterator = oplogEntryPointers.begin();
+         oplogEntriesIterator != oplogEntryPointers.end();
+         ++oplogEntriesIterator) {
+        OplogEntry* entry = *oplogEntriesIterator;
+        if (entry->opType[0] == 'i' && oplogEntriesIterator > doNotGroupBeforePoint) {
+            // Attempt to group inserts if possible.
+            std::vector<BSONObj> toInsert;
+            int batchSize = 0;
+            int batchCount = 0;
+            auto endOfGroupableOpsIterator = std::find_if(
+                oplogEntriesIterator + 1,
+                oplogEntryPointers.end(),
+                [&](OplogEntry* nextEntry) {
+                    return nextEntry->opType[0] != 'i' ||  // Must be an insert.
+                        nextEntry->ns != entry->ns ||      // Must be the same namespace.
+                        // Must not create too large an object.
+                        (batchSize += nextEntry->o.Obj().objsize()) > insertVectorMaxBytes ||
+                        ++batchCount >= 64;  // Or have too many entries.
+                });
+
+            if (endOfGroupableOpsIterator != oplogEntriesIterator + 1) {
+                // Since we found more than one document, create grouped insert of many docs.
+                BSONObjBuilder groupedInsertBuilder;
+                // Generate an op object of all elements except for "o", since we need to
+                // make the "o" field an array of all the o's.
+                for (auto elem : entry->raw) {
+                    if (elem.fieldNameStringData() != "o") {
+                        groupedInsertBuilder.append(elem);
+                    }
+                }
+
+                // Populate the "o" field with all the groupable inserts.
+                BSONArrayBuilder insertArrayBuilder(groupedInsertBuilder.subarrayStart("o"));
+                for (std::vector<OplogEntry*>::iterator groupingIterator = oplogEntriesIterator;
+                     groupingIterator != endOfGroupableOpsIterator;
+                     ++groupingIterator) {
+                    insertArrayBuilder.append((*groupingIterator)->o.Obj());
+                }
+                insertArrayBuilder.done();
+
+                try {
+                    // Apply the group of inserts.
+                    uassertStatusOK(SyncTail::syncApply(
+                        &txn, groupedInsertBuilder.done(), convertUpdatesToUpserts));
+                    // It succeeded, advance the oplogEntriesIterator to the end of the
+                    // group of inserts.
+                    oplogEntriesIterator = endOfGroupableOpsIterator - 1;
+                    continue;
+                } catch (const DBException& e) {
+                    // The group insert failed, log an error and fall through to the
+                    // application of an individual op.
+                    error() << "Error applying inserts in bulk " << causedBy(e)
+                            << " trying first insert as a lone insert";
+
+                    if (inShutdown()) {
+                        return;
+                    }
+
+                    // Avoid quadratic run time from failed insert by not retrying until we
+                    // are beyond this group of ops.
+                    doNotGroupBeforePoint = endOfGroupableOpsIterator - 1;
+                }
+            }
+        }
+
         try {
-            const Status s = SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts);
+            // Apply an individual (non-grouped) op.
+            const Status s = SyncTail::syncApply(&txn, entry->raw, convertUpdatesToUpserts);
+
             if (!s.isOK()) {
-                severe() << "Error applying operation (" << it->toString() << "): " << s;
+                severe() << "Error applying operation (" << entry->raw.toString() << "): " << s;
                 fassertFailedNoTrace(16359);
             }
         } catch (const DBException& e) {
             severe() << "writer worker caught exception: " << causedBy(e)
-                     << " on: " << it->toString();
+                     << " on: " << entry->raw.toString();
 
             if (inShutdown()) {
                 return;
