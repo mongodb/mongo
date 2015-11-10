@@ -70,8 +70,10 @@ TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
     ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
     ASSERT_EQUALS(ReplicaSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
-    ASSERT_EQUALS(Seconds(10), config.getHeartbeatTimeoutPeriod());
-    ASSERT_EQUALS(Seconds(5), config.getElectionTimeoutPeriod());
+    ASSERT_EQUALS(ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod,
+                  config.getHeartbeatTimeoutPeriod());
+    ASSERT_EQUALS(ReplicaSetConfig::kDefaultElectionTimeoutPeriod,
+                  config.getElectionTimeoutPeriod());
     ASSERT_TRUE(config.isChainingAllowed());
     ASSERT_FALSE(config.isConfigServer());
     ASSERT_EQUALS(0, config.getProtocolVersion());
