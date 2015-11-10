@@ -83,7 +83,7 @@ Status storeMongoBridgeOptions(const moe::Environment& params,
         std::unique_ptr<SecureRandom> seedSource{SecureRandom::create()};
         mongoBridgeGlobalParams.seed = seedSource->nextInt64();
     } else {
-        mongoBridgeGlobalParams.seed = params["seed"].as<int64_t>();
+        mongoBridgeGlobalParams.seed = static_cast<int64_t>(params["seed"].as<long>());
     }
 
     return Status::OK();
