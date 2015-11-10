@@ -190,6 +190,7 @@ public:
     }
 
     static Deferred<Status> runTimeoutOp(Fixture* fixture, Pool* pool) {
+        // Timeout is 5 seconds.
         return StressTestOp(BSON("sleep" << 1 << "lock"
                                          << "none"
                                          << "secs" << 10),
@@ -249,7 +250,7 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
                     [&rng, &pool, this] {
 
                         // stagger operations slightly to mitigate connection pool contention
-                        sleepmillis(1);
+                        sleepmillis(10);
 
                         switch (rng.nextInt32(3)) {
                             case 0:
@@ -257,10 +258,7 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
                             case 1:
                                 return StressTestOp::runCompleteOp(this, &pool);
                             case 2:
-                                // TODO: Reenable runTimeoutOp after we fix whatever bug causes it
-                                // to hang.
-                                // return StressTestOp::runTimeoutOp(this, &pool);
-                                return StressTestOp::runCompleteOp(this, &pool);
+                                return StressTestOp::runTimeoutOp(this, &pool);
                             default:
 
                                 MONGO_UNREACHABLE;
