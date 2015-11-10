@@ -315,9 +315,9 @@ func (restore *MongoRestore) RestoreUsersOrRoles(users, roles *intents.Intent) e
 		if arg.intent.Size == 0 {
 			// MongoDB complains if we try and remove a non-existent collection, so we should
 			// just skip auth collections with empty .bson files to avoid gnarly logic later on.
-			log.Logf(log.Always, "%v file '%v' is empty; skipping %v restoration", arg.intentType, arg.intent.BSONPath, arg.intentType)
+			log.Logf(log.Always, "%v file '%v' is empty; skipping %v restoration", arg.intentType, arg.intent.Location, arg.intentType)
 		}
-		log.Logf(log.Always, "restoring %v from %v", arg.intentType, arg.intent.BSONPath)
+		log.Logf(log.Always, "restoring %v from %v", arg.intentType, arg.intent.Location)
 		mergeArgs = append(mergeArgs, bson.DocElem{arg.mergeParamName, "admin." + arg.tempCollectionName})
 
 		err := arg.intent.BSONFile.Open()
@@ -437,7 +437,7 @@ func (restore *MongoRestore) GetDumpAuthVersion() (int, error) {
 	}{}
 	bsonSource.Next(&versionDoc)
 	if err := bsonSource.Err(); err != nil {
-		return 0, fmt.Errorf("error reading version bson file %v: %v", intent.BSONPath, err)
+		return 0, fmt.Errorf("error reading version bson file %v: %v", intent.Location, err)
 	}
 	authVersion := versionDoc.CurrentVersion
 	if authVersion == 0 {

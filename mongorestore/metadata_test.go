@@ -100,9 +100,9 @@ func TestGetDumpAuthVersion(t *testing.T) {
 				intent := &intents.Intent{
 					DB:       "admin",
 					C:        "system.version",
-					BSONPath: "testdata/auth_version_3.bson",
+					Location: "testdata/auth_version_3.bson",
 				}
-				intent.BSONFile = &realBSONFile{intent: intent}
+				intent.BSONFile = &realBSONFile{path: "testdata/auth_version_3.bson", intent: intent}
 				restore.manager.Put(intent)
 				version, err := restore.GetDumpAuthVersion()
 				So(err, ShouldBeNil)
@@ -114,9 +114,9 @@ func TestGetDumpAuthVersion(t *testing.T) {
 				intent := &intents.Intent{
 					DB:       "admin",
 					C:        "system.version",
-					BSONPath: "testdata/auth_version_5.bson",
+					Location: "testdata/auth_version_5.bson",
 				}
-				intent.BSONFile = &realBSONFile{intent: intent}
+				intent.BSONFile = &realBSONFile{path: "testdata/auth_version_5.bson", intent: intent}
 				restore.manager.Put(intent)
 				version, err := restore.GetDumpAuthVersion()
 				So(err, ShouldBeNil)
@@ -148,9 +148,9 @@ func TestGetDumpAuthVersion(t *testing.T) {
 				intent := &intents.Intent{
 					DB:       "admin",
 					C:        "system.version",
-					BSONPath: "testdata/auth_version_3.bson",
+					Location: "testdata/auth_version_3.bson",
 				}
-				intent.BSONFile = &realBSONFile{intent: intent}
+				intent.BSONFile = &realBSONFile{path: "testdata/auth_version_3.bson", intent: intent}
 				restore.manager.Put(intent)
 				version, err := restore.GetDumpAuthVersion()
 				So(err, ShouldBeNil)
@@ -162,9 +162,9 @@ func TestGetDumpAuthVersion(t *testing.T) {
 				intent := &intents.Intent{
 					DB:       "admin",
 					C:        "system.version",
-					BSONPath: "testdata/auth_version_5.bson",
+					Location: "testdata/auth_version_5.bson",
 				}
-				intent.BSONFile = &realBSONFile{intent: intent}
+				intent.BSONFile = &realBSONFile{path: "testdata/auth_version_5.bson", intent: intent}
 				restore.manager.Put(intent)
 				version, err := restore.GetDumpAuthVersion()
 				So(err, ShouldBeNil)

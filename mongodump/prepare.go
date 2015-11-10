@@ -63,6 +63,7 @@ func (bwc writeFlushCloser) Close() error {
 // ok disk via an embedded bufio.Writer
 type realBSONFile struct {
 	io.WriteCloser
+	path string
 	// errorWrite adds a Read() method to this object allowing it to be an
 	// intent.file ( a ReadWriteOpenCloser )
 	errorReader
@@ -73,18 +74,18 @@ type realBSONFile struct {
 // Open is part of the intents.file interface. realBSONFiles need to have Open called before
 // Read can be called
 func (f *realBSONFile) Open() (err error) {
-	if f.intent.BSONPath == "" {
-		// This should not occur normally. All intents should have a BSONPath.
+	if f.path == "" {
+		// This should not occur normally. All realBSONFile's should have a path
 		return fmt.Errorf("error creating BSON file without a path, namespace: %v",
 			f.intent.Namespace())
 	}
-	err = os.MkdirAll(filepath.Dir(f.intent.BSONPath), os.ModeDir|os.ModePerm)
+	err = os.MkdirAll(filepath.Dir(f.path), os.ModeDir|os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("error creating directory for BSON file %v: %v",
-			filepath.Dir(f.intent.BSONPath), err)
+			filepath.Dir(f.path), err)
 	}
 
-	fileName := f.intent.BSONPath
+	fileName := f.path
 	file, err := os.Create(fileName)
 	if err != nil {
 		return fmt.Errorf("error creating BSON file %v: %v", fileName, err)
@@ -126,6 +127,7 @@ func (f atomicFlusher) Write(buf []byte) (int, error) {
 // realMetadataFile implements intent.file, and corresponds to a Metadata file on disk
 type realMetadataFile struct {
 	io.WriteCloser
+	path string
 	errorReader
 	// errorWrite adds a Read() method to this object allowing it to be an
 	// intent.file ( a ReadWriteOpenCloser )
@@ -136,16 +138,16 @@ type realMetadataFile struct {
 // Open opens the file on disk that the intent indicates. Any directories needed are created.
 // If compression is needed, the File gets wrapped in a gzip.Writer
 func (f *realMetadataFile) Open() (err error) {
-	if f.intent.MetadataPath == "" {
+	if f.path == "" {
 		return fmt.Errorf("No metadata path for %v.%v", f.intent.DB, f.intent.C)
 	}
-	err = os.MkdirAll(filepath.Dir(f.intent.MetadataPath), os.ModeDir|os.ModePerm)
+	err = os.MkdirAll(filepath.Dir(f.path), os.ModeDir|os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("error creating directory for metadata file %v: %v",
-			filepath.Dir(f.intent.MetadataPath), err)
+			filepath.Dir(f.path), err)
 	}
 
-	fileName := f.intent.MetadataPath
+	fileName := f.path
 	f.WriteCloser, err = os.Create(fileName)
 	if err != nil {
 		return fmt.Errorf("error creating metadata file %v: %v", fileName, err)
@@ -221,12 +223,8 @@ func checkStringForPathSeparator(s string, c *rune) bool {
 // NewIntent creates a bare intent without populating the options.
 func (dump *MongoDump) NewIntent(dbName, colName string) (*intents.Intent, error) {
 	intent := &intents.Intent{
-		DB:       dbName,
-		C:        colName,
-		BSONPath: dump.outputPath(dbName, colName) + ".bson",
-	}
-	if dump.OutputOptions.Gzip {
-		intent.BSONPath += ".gz"
+		DB: dbName,
+		C:  colName,
 	}
 	if dump.OutputOptions.Out == "-" {
 		intent.BSONFile = &stdoutFile{Writer: dump.stdout}
@@ -239,20 +237,24 @@ func (dump *MongoDump) NewIntent(dbName, colName string) (*intents.Intent, error
 				return nil, fmt.Errorf(`"%v.%v" contains a path separator '%c' `+
 					`and can't be dumped to the filesystem`, dbName, colName, c)
 			}
-			intent.BSONFile = &realBSONFile{intent: intent, gzip: dump.OutputOptions.Gzip}
+			path := dump.outputPath(dbName, colName) + ".bson"
+			if dump.OutputOptions.Gzip {
+				path += ".gz"
+			}
+			intent.BSONFile = &realBSONFile{path: path, intent: intent, gzip: dump.OutputOptions.Gzip}
 		}
 		if !intent.IsSystemIndexes() {
-			intent.MetadataPath = dump.outputPath(dbName, colName+".metadata.json")
-			if dump.OutputOptions.Gzip {
-				intent.MetadataPath += ".gz"
-			}
 			if dump.OutputOptions.Archive != "" {
 				intent.MetadataFile = &archive.MetadataFile{
 					Intent: intent,
 					Buffer: &bytes.Buffer{},
 				}
 			} else {
-				intent.MetadataFile = &realMetadataFile{intent: intent, gzip: dump.OutputOptions.Gzip}
+				path := dump.outputPath(dbName, colName+".metadata.json")
+				if dump.OutputOptions.Gzip {
+					path += ".gz"
+				}
+				intent.MetadataFile = &realMetadataFile{path: path, intent: intent, gzip: dump.OutputOptions.Gzip}
 			}
 		}
 	}
@@ -279,16 +281,14 @@ func (dump *MongoDump) CreateOplogIntents() error {
 	if err != nil {
 		return err
 	}
-
 	oplogIntent := &intents.Intent{
-		DB:       "",
-		C:        "oplog",
-		BSONPath: dump.outputPath("oplog.bson", ""),
+		DB: "",
+		C:  "oplog",
 	}
 	if dump.OutputOptions.Archive != "" {
 		oplogIntent.BSONFile = &archive.MuxIn{Mux: dump.archive.Mux, Intent: oplogIntent}
 	} else {
-		oplogIntent.BSONFile = &realBSONFile{intent: oplogIntent, gzip: dump.OutputOptions.Gzip}
+		oplogIntent.BSONFile = &realBSONFile{path: dump.outputPath("oplog.bson", ""), intent: oplogIntent, gzip: dump.OutputOptions.Gzip}
 	}
 	dump.manager.Put(oplogIntent)
 	return nil
@@ -302,28 +302,25 @@ func (dump *MongoDump) CreateUsersRolesVersionIntentsForDB(db string) error {
 	outDir := dump.outputPath(db, "")
 
 	usersIntent := &intents.Intent{
-		DB:       db,
-		C:        "$admin.system.users",
-		BSONPath: filepath.Join(outDir, "$admin.system.users.bson"),
+		DB: db,
+		C:  "$admin.system.users",
 	}
 	rolesIntent := &intents.Intent{
-		DB:       db,
-		C:        "$admin.system.roles",
-		BSONPath: filepath.Join(outDir, "$admin.system.roles.bson"),
+		DB: db,
+		C:  "$admin.system.roles",
 	}
 	versionIntent := &intents.Intent{
-		DB:       db,
-		C:        "$admin.system.version",
-		BSONPath: filepath.Join(outDir, "$admin.system.version.bson"),
+		DB: db,
+		C:  "$admin.system.version",
 	}
 	if dump.OutputOptions.Archive != "" {
 		usersIntent.BSONFile = &archive.MuxIn{Intent: usersIntent, Mux: dump.archive.Mux}
 		rolesIntent.BSONFile = &archive.MuxIn{Intent: rolesIntent, Mux: dump.archive.Mux}
 		versionIntent.BSONFile = &archive.MuxIn{Intent: versionIntent, Mux: dump.archive.Mux}
 	} else {
-		usersIntent.BSONFile = &realBSONFile{intent: usersIntent, gzip: dump.OutputOptions.Gzip}
-		rolesIntent.BSONFile = &realBSONFile{intent: rolesIntent, gzip: dump.OutputOptions.Gzip}
-		versionIntent.BSONFile = &realBSONFile{intent: versionIntent, gzip: dump.OutputOptions.Gzip}
+		usersIntent.BSONFile = &realBSONFile{path: filepath.Join(outDir, "$admin.system.users.bson"), intent: usersIntent, gzip: dump.OutputOptions.Gzip}
+		rolesIntent.BSONFile = &realBSONFile{path: filepath.Join(outDir, "$admin.system.roles.bson"), intent: rolesIntent, gzip: dump.OutputOptions.Gzip}
+		versionIntent.BSONFile = &realBSONFile{path: filepath.Join(outDir, "$admin.system.version.bson"), intent: versionIntent, gzip: dump.OutputOptions.Gzip}
 	}
 	dump.manager.Put(usersIntent)
 	dump.manager.Put(rolesIntent)

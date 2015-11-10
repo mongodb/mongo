@@ -16,10 +16,10 @@ func TestIntentManager(t *testing.T) {
 		So(manager, ShouldNotBeNil)
 
 		Convey("putting  a series of added bson intents", func() {
-			manager.Put(&Intent{DB: "1", C: "1", BSONPath: "/b1/"})
-			manager.Put(&Intent{DB: "1", C: "2", BSONPath: "/b2/"})
-			manager.Put(&Intent{DB: "1", C: "3", BSONPath: "/b3/"})
-			manager.Put(&Intent{DB: "2", C: "1", BSONPath: "/b4/"})
+			manager.Put(&Intent{DB: "1", C: "1", Location: "/b1/"})
+			manager.Put(&Intent{DB: "1", C: "2", Location: "/b2/"})
+			manager.Put(&Intent{DB: "1", C: "3", Location: "/b3/"})
+			manager.Put(&Intent{DB: "2", C: "1", Location: "/b4/"})
 			So(len(manager.intentsByDiscoveryOrder), ShouldEqual, 4)
 			So(len(manager.intents), ShouldEqual, 4)
 
@@ -45,13 +45,13 @@ func TestIntentManager(t *testing.T) {
 
 					Convey("should return them in insert order", func() {
 						So(*it0, ShouldResemble,
-							Intent{DB: "1", C: "1", BSONPath: "/b1/", MetadataPath: "/1m/"})
+							Intent{DB: "1", C: "1", Location: "/b1/", MetadataPath: "/1m/"})
 						So(*it1, ShouldResemble,
-							Intent{DB: "1", C: "2", BSONPath: "/b2/", MetadataPath: "/2m/"})
+							Intent{DB: "1", C: "2", Location: "/b2/", MetadataPath: "/2m/"})
 						So(*it2, ShouldResemble,
-							Intent{DB: "1", C: "3", BSONPath: "/b3/", MetadataPath: "/3m/"})
+							Intent{DB: "1", C: "3", Location: "/b3/", MetadataPath: "/3m/"})
 						So(*it3, ShouldResemble,
-							Intent{DB: "2", C: "1", BSONPath: "/b4/", MetadataPath: "/4m/"})
+							Intent{DB: "2", C: "1", Location: "/b4/", MetadataPath: "/4m/"})
 					})
 				})
 			})

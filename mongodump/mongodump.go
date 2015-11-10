@@ -387,7 +387,7 @@ func (dump *MongoDump) Dump() (err error) {
 		}
 		log.Logf(log.DebugHigh, "oplog entry %v still exists", dump.oplogStart)
 
-		log.Logf(log.Always, "writing captured oplog to %v", dump.manager.Oplog().BSONPath)
+		log.Logf(log.Always, "writing captured oplog to %v", dump.manager.Oplog().Location)
 		err = dump.DumpOplogAfterTimestamp(dump.oplogStart)
 		if err != nil {
 			return fmt.Errorf("error dumping oplog: %v", err)
@@ -505,7 +505,6 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	}
 
 	// set where the intent will be written to
-	intent.Location = intent.BSONPath
 	if dump.OutputOptions.Archive != "" {
 		if dump.OutputOptions.Archive == "-" {
 			intent.Location = "archive on stdout"

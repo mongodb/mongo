@@ -18,22 +18,22 @@ var testIntents = []*intents.Intent{
 	&intents.Intent{
 		DB:       "foo",
 		C:        "bar",
-		BSONPath: "foo.bar",
+		Location: "foo.bar",
 	},
 	&intents.Intent{
 		DB:       "ding",
 		C:        "bats",
-		BSONPath: "ding.bats",
+		Location: "ding.bats",
 	},
 	&intents.Intent{
 		DB:       "flim",
 		C:        "flam.fooey",
-		BSONPath: "flim.flam.fooey",
+		Location: "flim.flam.fooey",
 	},
 	&intents.Intent{
 		DB:       "crow",
 		C:        "bar",
-		BSONPath: "crow.bar",
+		Location: "crow.bar",
 	},
 }
 

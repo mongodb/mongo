@@ -374,7 +374,7 @@ func (prioritizer *Prioritizer) Get() *intents.Intent {
 	if intent == nil {
 		prioritizer.NamespaceErrorChan <- fmt.Errorf("no intent for namespace %v", namespace)
 	} else {
-		if intent.BSONPath != "" {
+		if intent.BSONFile != nil {
 			intent.BSONFile.Open()
 		}
 		if intent.IsOplog() {
