@@ -50,7 +50,7 @@ func (prelude *Prelude) Read(in io.Reader) error {
 	readMagicNumberBuf := make([]byte, 4)
 	_, err := io.ReadAtLeast(in, readMagicNumberBuf, 4)
 	if err != nil {
-		return fmt.Errorf("IO failure reading begining of archive: %v", err)
+		return fmt.Errorf("I/O failure reading beginning of archive: %v", err)
 	}
 	readMagicNumber := uint32(
 		(uint32(readMagicNumberBuf[0]) << 0) |
@@ -60,7 +60,7 @@ func (prelude *Prelude) Read(in io.Reader) error {
 	)
 
 	if readMagicNumber != MagicNumber {
-		return fmt.Errorf("stream or file does not apear to be a mongodump archive")
+		return fmt.Errorf("stream or file does not appear to be a mongodump archive")
 	}
 
 	if prelude.NamespaceMetadatasByDB != nil {
