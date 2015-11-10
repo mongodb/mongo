@@ -138,40 +138,20 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, Ping) {
 }
 
 TEST_F(NetworkInterfaceASIOIntegrationTest, Timeouts) {
-    // Insert 1 document in collection foo.bar. If we don't do this our queries will return
-    // immediately.
-    assertCommandOK("foo",
-                    BSON("insert"
-                         << "bar"
-                         << "documents" << BSON_ARRAY(BSON("foo" << 1))));
-
-    // Run a find command with a $where with an infinite loop. The remote server should time this
-    // out in 30 seconds, so we should time out client side first given our timeout of 100
-    // milliseconds.
-    assertCommandFailsOnClient("foo",
-                               BSON("find"
-                                    << "bar"
-                                    << "filter" << BSON("$where"
-                                                        << "while(true) { sleep(1); }")),
+    // This sleep command will take 10 seconds, so we should time out client side first given
+    // our timeout of 100 milliseconds.
+    assertCommandFailsOnClient("admin",
+                               BSON("sleep" << 1 << "lock"
+                                            << "none"
+                                            << "secs" << 10),
                                Milliseconds(100),
                                ErrorCodes::ExceededTimeLimit);
 
-    // Run a find command with a $where with an infinite loop. The server should time out the
-    // command.
-    assertCommandFailsOnServer("foo",
-                               BSON("find"
-                                    << "bar"
-                                    << "filter" << BSON("$where"
-                                                        << "while(true) { sleep(1); };")),
-                               Milliseconds(10000000000),  // big, big timeout.
-                               ErrorCodes::JSInterpreterFailure);
-
-    // Run a find command with a big timeout.It should return before we hit the ASIO
-    // timeout
-    assertCommandOK("foo",
-                    BSON("find"
-                         << "bar"
-                         << "limit" << 1),
+    // Run a sleep command that should return before we hit the ASIO timeout.
+    assertCommandOK("admin",
+                    BSON("sleep" << 1 << "lock"
+                                 << "none"
+                                 << "secs" << 1),
                     Milliseconds(10000000));
 }
 
@@ -186,7 +166,7 @@ public:
         auto out =
             fixture->runCommand(cb,
                                 {unittest::getFixtureConnectionString().getServers()[0],
-                                 "foo",
+                                 "admin",
                                  _command,
                                  Seconds(5)})
                 .then(pool,
@@ -210,27 +190,25 @@ public:
     }
 
     static Deferred<Status> runTimeoutOp(Fixture* fixture, Pool* pool) {
-        return StressTestOp(BSON("find"
-                                 << "bar"
-                                 << "filter" << BSON("$where"
-                                                     << "while(true) { sleep(1); }")),
+        return StressTestOp(BSON("sleep" << 1 << "lock"
+                                         << "none"
+                                         << "secs" << 10),
                             ErrorCodes::ExceededTimeLimit,
                             false).run(fixture, pool);
     }
 
     static Deferred<Status> runCompleteOp(Fixture* fixture, Pool* pool) {
-        return StressTestOp(BSON("find"
-                                 << "baz"
-                                 << "limit" << 1),
+        return StressTestOp(BSON("sleep" << 1 << "lock"
+                                         << "none"
+                                         << "millis" << 100),
                             ErrorCodes::OK,
                             false).run(fixture, pool);
     }
 
     static Deferred<Status> runCancelOp(Fixture* fixture, Pool* pool) {
-        return StressTestOp(BSON("find"
-                                 << "bar"
-                                 << "filter" << BSON("$where"
-                                                     << "while(true) { sleep(1); }")),
+        return StressTestOp(BSON("sleep" << 1 << "lock"
+                                         << "none"
+                                         << "secs" << 10),
                             ErrorCodes::CallbackCanceled,
                             true).run(fixture, pool);
     }
@@ -269,12 +247,15 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
     std::generate_n(std::back_inserter(ops),
                     numOps,
                     [&rng, &pool, this] {
+
+                        // stagger operations slightly to mitigate connection pool contention
+                        sleepmillis(1);
+
                         switch (rng.nextInt32(3)) {
                             case 0:
                                 return StressTestOp::runCancelOp(this, &pool);
                             case 1:
                                 return StressTestOp::runCompleteOp(this, &pool);
-
                             case 2:
                                 // TODO: Reenable runTimeoutOp after we fix whatever bug causes it
                                 // to hang.
