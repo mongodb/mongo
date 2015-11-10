@@ -75,14 +75,14 @@
         if (forceWriteConcern) {
             if (obj.hasOwnProperty("writeConcern")) {
                 jsTestLog("Warning: overriding existing writeConcern of: " +
-                           obj.writeConcern);
+                           tojson(obj.writeConcern));
             }
             obj.writeConcern = defaultWriteConcern;
 
         } else if (forceReadConcern) {
             if (obj.hasOwnProperty("readConcern")) {
                 jsTestLog("Warning: overriding existing readConcern of: " +
-                           obj.readConcern);
+                           tojson(obj.readConcern));
             }
             obj.readConcern = {level: "majority"};
         }
