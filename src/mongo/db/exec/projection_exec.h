@@ -66,8 +66,7 @@ public:
 
     ProjectionExec(const BSONObj& spec,
                    const MatchExpression* queryExpression,
-                   const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-                       MatchExpressionParser::ExtensionsCallback());
+                   const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
     ~ProjectionExec();
 
     /**

@@ -1159,7 +1159,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* txn,
     unique_ptr<CanonicalQuery> cq;
     if (!request.getQuery().isEmpty() || !request.getHint().isEmpty()) {
         // If query or hint is not empty, canonicalize the query before working with collection.
-        typedef MatchExpressionParser::ExtensionsCallback ExtensionsCallback;
+        typedef ExtensionsCallback ExtensionsCallback;
         auto statusWithCQ = CanonicalQuery::canonicalize(
             request.getNs(),
             request.getQuery(),

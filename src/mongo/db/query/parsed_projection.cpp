@@ -48,7 +48,7 @@ using std::string;
 Status ParsedProjection::make(const BSONObj& spec,
                               const MatchExpression* const query,
                               ParsedProjection** out,
-                              const MatchExpressionParser::ExtensionsCallback& extensionsCallback) {
+                              const ExtensionsCallback& extensionsCallback) {
     // Whether we're including or excluding fields.
     enum class IncludeExclude { kUninitialized, kInclude, kExclude };
     IncludeExclude includeExclude = IncludeExclude::kUninitialized;

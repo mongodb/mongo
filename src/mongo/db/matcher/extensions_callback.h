@@ -28,26 +28,41 @@
 
 #pragma once
 
-#include "mongo/db/matcher/extensions_callback.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_text_base.h"
+#include "mongo/db/matcher/expression_where_base.h"
 
 namespace mongo {
 
 /**
- * ExtensionsCallbackNoop does not capture any context, and produces "no op" expressions that can't
- * be used for matching.  It should be used when parsing context is not available (for example, when
- * the relevant namespace does not exist, or in mongos).
+ * Certain match clauses (the "extension" clauses, namely $text and $where) require context in
+ * order to perform parsing. This context is captured inside of an ExtensionsCallback object.
+ *
+ * The default implementations of parseText() and parseWhere() simply return an error Status.
+ * Instead of constructing an ExtensionsCallback object directly, an instance of one of the
+ * derived classes (ExtensionsCallbackReal or ExtensionsCallbackNoop) should generally be used
+ * instead.
  */
-class ExtensionsCallbackNoop : public ExtensionsCallback {
+class ExtensionsCallback {
 public:
+    virtual StatusWithMatchExpression parseText(BSONElement text) const;
+
+    virtual StatusWithMatchExpression parseWhere(BSONElement where) const;
+
+    virtual ~ExtensionsCallback() {}
+
+protected:
     /**
-     * Returns a TextNoOpMatchExpression, or an error Status if parsing fails.
+     * Helper method which extracts parameters from the given $text element.
      */
-    StatusWithMatchExpression parseText(BSONElement text) const final;
+    static StatusWith<TextMatchExpressionBase::TextParams> extractTextMatchExpressionParams(
+        BSONElement text);
 
     /**
-     * Returns a WhereNoOpMatchExpression, or an error Status if parsing fails.
+     * Helper method which extracts parameters from the given $where element.
      */
-    StatusWithMatchExpression parseWhere(BSONElement where) const final;
+    static StatusWith<WhereMatchExpressionBase::WhereParams> extractWhereMatchExpressionParams(
+        BSONElement where);
 };
 
 }  // namespace mongo

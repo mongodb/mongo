@@ -49,8 +49,7 @@ class Matcher {
 
 public:
     explicit Matcher(const BSONObj& pattern,
-                     const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-                         MatchExpressionParser::ExtensionsCallback());
+                     const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     bool matches(const BSONObj& doc, MatchDetails* details = NULL) const;
 

@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+class ExtensionsCallback;
+
 struct ProjectionStageParams {
     enum ProjectionImplementation {
         // The default case.  Will handle every projection.
@@ -49,7 +51,7 @@ struct ProjectionStageParams {
         SIMPLE_DOC
     };
 
-    ProjectionStageParams(const MatchExpressionParser::ExtensionsCallback& wc)
+    ProjectionStageParams(const ExtensionsCallback& wc)
         : projImpl(NO_FAST_PATH), fullExpression(NULL), extensionsCallback(&wc) {}
 
     ProjectionImplementation projImpl;
@@ -67,7 +69,7 @@ struct ProjectionStageParams {
     BSONObj coveredKeyObj;
 
     // Used for creating context for the match extensions processing. Not owned.
-    const MatchExpressionParser::ExtensionsCallback* extensionsCallback;
+    const ExtensionsCallback* extensionsCallback;
 };
 
 /**

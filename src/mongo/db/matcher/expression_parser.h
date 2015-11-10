@@ -35,49 +35,15 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/expression_text_base.h"
-#include "mongo/db/matcher/expression_where_base.h"
+#include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
 
 class OperationContext;
 
-typedef StatusWith<std::unique_ptr<MatchExpression>> StatusWithMatchExpression;
-
 class MatchExpressionParser {
 public:
-    /**
-     * Certain match clauses (the "extension" clauses, namely $text and $where) require context in
-     * order to perform parsing. This context is captured inside of an ExtensionsCallback object.
-     *
-     * The default implementations of parseText() and parseWhere() simply return an error Status.
-     * Instead of constructing an ExtensionsCallback object directly, an instance of one of the
-     * derived classes (ExtensionsCallbackReal or ExtensionsCallbackNoop) should generally be used
-     * instead.
-     */
-    class ExtensionsCallback {
-    public:
-        virtual StatusWithMatchExpression parseText(BSONElement text) const;
-
-        virtual StatusWithMatchExpression parseWhere(BSONElement where) const;
-
-        virtual ~ExtensionsCallback() {}
-
-    protected:
-        /**
-         * Helper method which extracts parameters from the given $text element.
-         */
-        static StatusWith<TextMatchExpressionBase::TextParams> extractTextMatchExpressionParams(
-            BSONElement text);
-
-        /**
-         * Helper method which extracts parameters from the given $where element.
-         */
-        static StatusWith<WhereMatchExpressionBase::WhereParams> extractWhereMatchExpressionParams(
-            BSONElement where);
-    };
-
     /**
      * caller has to maintain ownership obj
      * the tree has views (BSONElement) into obj

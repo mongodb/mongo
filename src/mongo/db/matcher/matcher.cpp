@@ -41,8 +41,7 @@
 
 namespace mongo {
 
-Matcher::Matcher(const BSONObj& pattern,
-                 const MatchExpressionParser::ExtensionsCallback& extensionsCallback)
+Matcher::Matcher(const BSONObj& pattern, const ExtensionsCallback& extensionsCallback)
     : _pattern(pattern) {
     StatusWithMatchExpression statusWithMatcher =
         MatchExpressionParser::parse(pattern, extensionsCallback);

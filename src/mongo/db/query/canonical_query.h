@@ -48,8 +48,7 @@ public:
      */
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         const QueryMessage& qm,
-        const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-            MatchExpressionParser::ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     /**
      * Takes ownership of 'lpq'.
@@ -60,9 +59,7 @@ public:
      * Used for finds using the find command path.
      */
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
-        LiteParsedQuery* lpq,
-        const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-            MatchExpressionParser::ExtensionsCallback());
+        LiteParsedQuery* lpq, const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     /**
      * For testing or for internal clients to use.
@@ -78,37 +75,32 @@ public:
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         const CanonicalQuery& baseQuery,
         MatchExpression* root,
-        const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-            MatchExpressionParser::ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
         const BSONObj& query,
-        const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-            MatchExpressionParser::ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
         const BSONObj& query,
         bool explain,
-        const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-            MatchExpressionParser::ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
         const BSONObj& query,
         long long skip,
         long long limit,
-        const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-            MatchExpressionParser::ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
         const BSONObj& query,
         const BSONObj& sort,
         const BSONObj& proj,
-        const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-            MatchExpressionParser::ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
@@ -117,8 +109,7 @@ public:
         const BSONObj& proj,
         long long skip,
         long long limit,
-        const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-            MatchExpressionParser::ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
@@ -128,8 +119,7 @@ public:
         long long skip,
         long long limit,
         const BSONObj& hint,
-        const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-            MatchExpressionParser::ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         NamespaceString nss,
@@ -143,8 +133,7 @@ public:
         const BSONObj& maxObj,
         bool snapshot,
         bool explain,
-        const MatchExpressionParser::ExtensionsCallback& extensionsCallback =
-            MatchExpressionParser::ExtensionsCallback());
+        const ExtensionsCallback& extensionsCallback = ExtensionsCallback());
 
     /**
      * Returns true if "query" describes an exact-match query on _id, possibly with
@@ -216,7 +205,7 @@ private:
      * Takes ownership of 'root' and 'lpq'.
      */
     Status init(LiteParsedQuery* lpq,
-                const MatchExpressionParser::ExtensionsCallback& extensionsCallback,
+                const ExtensionsCallback& extensionsCallback,
                 MatchExpression* root);
 
     std::unique_ptr<LiteParsedQuery> _pq;

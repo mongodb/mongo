@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -951,103 +950,6 @@ StatusWith<std::vector<uint32_t>> MatchExpressionParser::_parseBitPositionsArray
     }
 
     return bitPositions;
-}
-
-StatusWithMatchExpression MatchExpressionParser::ExtensionsCallback::parseWhere(
-    BSONElement where) const {
-    return {Status(ErrorCodes::NoMatchParseContext, "no context for parsing $where")};
-}
-
-StatusWithMatchExpression MatchExpressionParser::ExtensionsCallback::parseText(
-    BSONElement text) const {
-    return {Status(ErrorCodes::NoMatchParseContext, "no context for parsing $text")};
-}
-
-StatusWith<WhereMatchExpressionBase::WhereParams>
-MatchExpressionParser::ExtensionsCallback::extractWhereMatchExpressionParams(BSONElement where) {
-    WhereMatchExpressionBase::WhereParams params;
-
-    switch (where.type()) {
-        case mongo::String:
-        case mongo::Code:
-            params.code = where._asCode();
-            params.scope = BSONObj();
-            break;
-        case mongo::CodeWScope:
-            params.code = where._asCode();
-            params.scope = where.codeWScopeObject().getOwned();
-            break;
-        default:
-            return {ErrorCodes::BadValue, "$where got bad type"};
-    }
-
-    if (params.code.empty()) {
-        return {ErrorCodes::BadValue, "code for $where cannot be empty"};
-    }
-
-    return params;
-}
-
-StatusWith<TextMatchExpressionBase::TextParams>
-MatchExpressionParser::ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
-    TextMatchExpressionBase::TextParams params;
-    if (text.type() != Object) {
-        return {ErrorCodes::BadValue, "$text expects an object"};
-    }
-    BSONObj queryObj = text.Obj();
-
-    //
-    // Parse required fields.
-    //
-
-    Status queryStatus = bsonExtractStringField(queryObj, "$search", &params.query);
-    if (!queryStatus.isOK()) {
-        return queryStatus;
-    }
-
-    //
-    // Parse optional fields.
-    //
-
-    int expectedFieldCount = 1;
-
-    Status languageStatus = bsonExtractStringField(queryObj, "$language", &params.language);
-    if (languageStatus == ErrorCodes::TypeMismatch) {
-        return languageStatus;
-    } else if (languageStatus == ErrorCodes::NoSuchKey) {
-        params.language = string();
-    } else {
-        invariantOK(languageStatus);
-        expectedFieldCount++;
-    }
-
-    Status caseSensitiveStatus =
-        bsonExtractBooleanField(queryObj, "$caseSensitive", &params.caseSensitive);
-    if (caseSensitiveStatus == ErrorCodes::TypeMismatch) {
-        return caseSensitiveStatus;
-    } else if (caseSensitiveStatus == ErrorCodes::NoSuchKey) {
-        params.caseSensitive = TextMatchExpressionBase::kCaseSensitiveDefault;
-    } else {
-        invariantOK(caseSensitiveStatus);
-        expectedFieldCount++;
-    }
-
-    Status diacriticSensitiveStatus =
-        bsonExtractBooleanField(queryObj, "$diacriticSensitive", &params.diacriticSensitive);
-    if (diacriticSensitiveStatus == ErrorCodes::TypeMismatch) {
-        return diacriticSensitiveStatus;
-    } else if (diacriticSensitiveStatus == ErrorCodes::NoSuchKey) {
-        params.diacriticSensitive = TextMatchExpressionBase::kDiacriticSensitiveDefault;
-    } else {
-        invariantOK(diacriticSensitiveStatus);
-        expectedFieldCount++;
-    }
-
-    if (queryObj.nFields() != expectedFieldCount) {
-        return {ErrorCodes::BadValue, "extra fields in $text"};
-    }
-
-    return {std::move(params)};
 }
 
 // Geo

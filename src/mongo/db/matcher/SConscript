@@ -37,6 +37,7 @@ env.Library(
         'expression_tree.cpp',
         'expression_where_base.cpp',
         'expression_where_noop.cpp',
+        'extensions_callback.cpp',
         'extensions_callback_noop.cpp',
         'match_details.cpp',
         'matchable.cpp',

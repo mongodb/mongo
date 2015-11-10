@@ -28,17 +28,18 @@
 
 #pragma once
 
-#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback.h"
 
 namespace mongo {
 
 class NamespaceString;
+class OperationContext;
 
 /**
  * ExtensionsCallbackReal uses the provided OperationContext and namespace to capture context
  * necessary for parsing $text and $where clauses.
  */
-class ExtensionsCallbackReal : public MatchExpressionParser::ExtensionsCallback {
+class ExtensionsCallbackReal : public ExtensionsCallback {
 public:
     /**
      * Does not take ownership of 'nss' or 'txn'.
