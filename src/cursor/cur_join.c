@@ -201,7 +201,7 @@ __curjoin_get_key(WT_CURSOR *cursor, ...)
 	va_start(ap, cursor);
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
-	if (!F_ISSET(cjoin, WT_CJ_INITIALIZED) ||
+	if (!F_ISSET(cjoin, WT_CURJOIN_INITIALIZED) ||
 	    !__curjoin_entry_iter_ready(cjoin->iter)) {
 		__wt_errx(session, "join cursor must be advanced with next()");
 		WT_ERR(EINVAL);
@@ -231,15 +231,15 @@ __curjoin_get_value(WT_CURSOR *cursor, ...)
 	va_start(ap, cursor);
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
-	if (!F_ISSET(cjoin, WT_CJ_INITIALIZED) ||
+	if (!F_ISSET(cjoin, WT_CURJOIN_INITIALIZED) ||
 	    !__curjoin_entry_iter_ready(iter)) {
 		__wt_errx(session, "join cursor must be advanced with next()");
 		WT_ERR(EINVAL);
 	}
 	if (iter->entry->index != NULL)
-		WT_ERR(__wt_curindex_get_value_ap(iter->cursor, ap));
+		WT_ERR(__wt_curindex_get_valuev(iter->cursor, ap));
 	else
-		WT_ERR(__wt_curtable_get_value_ap(iter->cursor, ap));
+		WT_ERR(__wt_curtable_get_valuev(iter->cursor, ap));
 
 err:	va_end(ap);
 	API_END_RET(session, ret);
@@ -304,7 +304,7 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		WT_ERR(__wt_cursor_dup_position(entry->ends[0].cursor, c));
 
 	skip_left = (entry->ends[0].cursor == NULL) ||
-	    entry->ends[0].flags == (WT_CJE_ENDPOINT_GT | WT_CJE_ENDPOINT_EQ);
+	    entry->ends[0].flags == (WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ);
 	collator = (entry->index == NULL) ? NULL : entry->index->collator;
 	while (ret == 0) {
 		c->get_key(c, &curkey);
@@ -327,11 +327,11 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			WT_ERR(__wt_compare(session, collator, &curkey,
 			    &entry->ends[0].key, &cmp));
 			if (cmp < 0 || (cmp == 0 &&
-			    !F_ISSET(&entry->ends[0], WT_CJE_ENDPOINT_EQ)))
+			    !F_ISSET(&entry->ends[0], WT_CURJOIN_END_EQ)))
 				goto advance;
 			if (cmp > 0) {
 				if (F_ISSET(&entry->ends[0],
-				    WT_CJE_ENDPOINT_GT))
+				    WT_CURJOIN_END_GT))
 					skip_left = true;
 				else
 					break;
@@ -341,7 +341,7 @@ __curjoin_init_bloom(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			WT_ERR(__wt_compare(session, collator, &curkey,
 			    &entry->ends[1].key, &cmp));
 			if (cmp > 0 || (cmp == 0 &&
-			    !F_ISSET(&entry->ends[1], WT_CJE_ENDPOINT_EQ)))
+			    !F_ISSET(&entry->ends[1], WT_CURJOIN_END_EQ)))
 				break;
 		}
 		if (entry->index != NULL)
@@ -387,7 +387,7 @@ __curjoin_endpoint_init_key(WT_SESSION_IMPL *session,
 				    &cindex->child->key, &endpoint->key,
 				    &allocbuf));
 				if (allocbuf != NULL)
-					F_SET(endpoint, WT_CJE_ENDPOINT_OWNKEY);
+					F_SET(endpoint, WT_CURJOIN_END_OWNKEY);
 			} else
 				endpoint->key = cindex->child->key;
 		} else {
@@ -442,10 +442,10 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 		 * the btree is ordered.
 		 */
 		if (je == cjoin->entries && je->ends[0].flags ==
-		    (WT_CJE_ENDPOINT_GT | WT_CJE_ENDPOINT_EQ))
-			F_SET(cjoin, WT_CJ_SKIP_FIRST_LEFT);
+		    (WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ))
+			F_SET(cjoin, WT_CURJOIN_SKIP_FIRST_LEFT);
 
-		if (F_ISSET(je, WT_CJE_BLOOM)) {
+		if (F_ISSET(je, WT_CURJOIN_ENTRY_BLOOM)) {
 			if (je->bloom == NULL) {
 				/*
 				 * Look for compatible filters to be shared,
@@ -455,7 +455,8 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 				m = je->bloom_bit_count;
 				k = je->bloom_hash_count;
 				for (je2 = je + 1; je2 < jeend; je2++)
-					if (F_ISSET(je2, WT_CJE_BLOOM) &&
+					if (F_ISSET(je2,
+					    WT_CURJOIN_ENTRY_BLOOM) &&
 					    je2->count == je->count) {
 						m = WT_MAX(
 						    je2->bloom_bit_count, m);
@@ -466,7 +467,7 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 				je->bloom_hash_count = k;
 				WT_ERR(__wt_bloom_create(session, NULL,
 				    NULL, je->count, m, k, &je->bloom));
-				F_SET(je, WT_CJE_OWN_BLOOM);
+				F_SET(je, WT_CURJOIN_ENTRY_OWN_BLOOM);
 				WT_ERR(__curjoin_init_bloom(session, cjoin,
 				    je, je->bloom));
 				/*
@@ -474,7 +475,8 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 				 * config info consistent.
 				 */
 				for (je2 = je + 1; je2 < jeend; je2++)
-					if (F_ISSET(je2, WT_CJE_BLOOM) &&
+					if (F_ISSET(je2,
+					    WT_CURJOIN_ENTRY_BLOOM) &&
 					    je2->count == je->count) {
 						WT_ASSERT(session,
 						    je2->bloom == NULL);
@@ -499,7 +501,7 @@ __curjoin_init_iter(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin)
 			}
 		}
 	}
-	F_SET(cjoin, WT_CJ_INITIALIZED);
+	F_SET(cjoin, WT_CURJOIN_INITIALIZED);
 
 err:
 	return (ret);
@@ -524,8 +526,8 @@ __curjoin_entry_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 		    &entry->ends[0].key, &cmp));
 		if (cmp < 0 ||
 		    (cmp == 0 &&
-		    !F_ISSET(&entry->ends[0], WT_CJE_ENDPOINT_EQ)) ||
-		    (cmp > 0 && !F_ISSET(&entry->ends[0], WT_CJE_ENDPOINT_GT)))
+		    !F_ISSET(&entry->ends[0], WT_CURJOIN_END_EQ)) ||
+		    (cmp > 0 && !F_ISSET(&entry->ends[0], WT_CURJOIN_END_GT)))
 			WT_ERR(WT_NOTFOUND);
 	}
 	if (entry->ends[1].cursor != NULL) {
@@ -533,8 +535,8 @@ __curjoin_entry_in_range(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 		    &entry->ends[1].key, &cmp));
 		if (cmp > 0 ||
 		    (cmp == 0 &&
-		    !F_ISSET(&entry->ends[1], WT_CJE_ENDPOINT_EQ)) ||
-		    (cmp < 0 && !F_ISSET(&entry->ends[1], WT_CJE_ENDPOINT_LT)))
+		    !F_ISSET(&entry->ends[1], WT_CURJOIN_END_EQ)) ||
+		    (cmp < 0 && !F_ISSET(&entry->ends[1], WT_CURJOIN_END_LT)))
 			WT_ERR(WT_NOTFOUND);
 	}
 
@@ -626,7 +628,7 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		 * in a previous entry. So the shared filter has already
 		 * been checked and passed.
 		 */
-		if (!F_ISSET(entry, WT_CJE_OWN_BLOOM))
+		if (!F_ISSET(entry, WT_CURJOIN_ENTRY_OWN_BLOOM))
 			return (0);
 
 		/*
@@ -682,11 +684,11 @@ __curjoin_next(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, next, NULL);
 
-	if (F_ISSET(cjoin, WT_CJ_ERROR)) {
+	if (F_ISSET(cjoin, WT_CURJOIN_ERROR)) {
 		__wt_errx(session, "join cursor encountered previous error");
 		WT_ERR(WT_ERROR);
 	}
-	if (!F_ISSET(cjoin, WT_CJ_INITIALIZED))
+	if (!F_ISSET(cjoin, WT_CURJOIN_INITIALIZED))
 		WT_ERR(__curjoin_init_iter(session, cjoin));
 
 nextkey:
@@ -699,7 +701,7 @@ nextkey:
 		 * 'left' case for the first entry, since we're
 		 * using that in our iteration.
 		 */
-		skip_left = F_ISSET(cjoin, WT_CJ_SKIP_FIRST_LEFT);
+		skip_left = F_ISSET(cjoin, WT_CURJOIN_SKIP_FIRST_LEFT);
 		for (count = 0; count < cjoin->entries_next; count++) {
 			ret = __curjoin_entry_member(session, cjoin,
 			    &cjoin->entries[count], skip_left);
@@ -711,7 +713,7 @@ nextkey:
 	}
 
 	if (0) {
-err:		F_SET(cjoin, WT_CJ_ERROR);
+err:		F_SET(cjoin, WT_CURJOIN_ERROR);
 	}
 	API_END_RET(session, ret);
 }
@@ -731,7 +733,7 @@ __curjoin_reset(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 
-	if (F_ISSET(cjoin, WT_CJ_INITIALIZED))
+	if (F_ISSET(cjoin, WT_CURJOIN_INITIALIZED))
 		WT_ERR(__curjoin_entry_iter_reset(cjoin->iter));
 
 err:	API_END_RET(session, ret);
@@ -771,11 +773,11 @@ __curjoin_close(WT_CURSOR *cursor)
 			F_CLR(entry->ends[0].cursor, WT_CURSTD_JOINED);
 		if (entry->ends[1].cursor != NULL)
 			F_CLR(entry->ends[1].cursor, WT_CURSTD_JOINED);
-		if (F_ISSET(&entry->ends[0], WT_CJE_ENDPOINT_OWNKEY))
+		if (F_ISSET(&entry->ends[0], WT_CURJOIN_END_OWNKEY))
 			__wt_free(session, entry->ends[0].key.data);
-		if (F_ISSET(&entry->ends[1], WT_CJE_ENDPOINT_OWNKEY))
+		if (F_ISSET(&entry->ends[1], WT_CURJOIN_END_OWNKEY))
 			__wt_free(session, entry->ends[1].key.data);
-		if (F_ISSET(entry, WT_CJE_OWN_BLOOM))
+		if (F_ISSET(entry, WT_CURJOIN_ENTRY_OWN_BLOOM))
 			WT_TRET(__wt_bloom_close(entry->bloom));
 	}
 
@@ -899,13 +901,13 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			break;
 		}
 		if (nonbloom == -1 && i > 0 &&
-		    !F_ISSET(&cjoin->entries[i], WT_CJE_BLOOM))
+		    !F_ISSET(&cjoin->entries[i], WT_CURJOIN_ENTRY_BLOOM))
 			nonbloom = i;
 	}
 	if (entry == NULL) {
 		WT_ERR(__wt_realloc_def(session, &cjoin->entries_allocated,
 		    cjoin->entries_next + 1, &cjoin->entries));
-		if (LF_ISSET(WT_CJE_BLOOM) && nonbloom != -1) {
+		if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM) && nonbloom != -1) {
 			/*
 			 * Reorder the list so that after the first entry,
 			 * the Bloom filtered entries come next, followed by
@@ -937,19 +939,20 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 			    count, entry->count);
 			WT_ERR(EINVAL);
 		}
-		if (LF_ISSET(WT_CJE_BLOOM) != F_ISSET(entry, WT_CJE_BLOOM)) {
+		if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM) !=
+		    F_ISSET(entry, WT_CURJOIN_ENTRY_BLOOM)) {
 			__wt_errx(session, "join has incompatible strategy "
 			    "values for the same index");
 			WT_ERR(EINVAL);
 		}
 		/* Check flag combinations */
-		if ((F_ISSET(&entry->ends[0], WT_CJE_ENDPOINT_GT) &&
-		    (range & WT_CJE_ENDPOINT_GT) != 0) ||
-		    (F_ISSET(&entry->ends[1], WT_CJE_ENDPOINT_LT) &&
-		    (range & WT_CJE_ENDPOINT_LT) != 0) ||
-		    ((F_ISSET(&entry->ends[0], WT_CJE_ENDPOINT_EQ) ||
-		    F_ISSET(&entry->ends[1], WT_CJE_ENDPOINT_EQ)) &&
-		    (range == WT_CJE_ENDPOINT_EQ))) {
+		if ((F_ISSET(&entry->ends[0], WT_CURJOIN_END_GT) &&
+		    (range & WT_CURJOIN_END_GT) != 0) ||
+		    (F_ISSET(&entry->ends[1], WT_CURJOIN_END_LT) &&
+		    (range & WT_CURJOIN_END_LT) != 0) ||
+		    ((F_ISSET(&entry->ends[0], WT_CURJOIN_END_EQ) ||
+		    F_ISSET(&entry->ends[1], WT_CURJOIN_END_EQ)) &&
+		    (range == WT_CURJOIN_END_EQ))) {
 			__wt_errx(session, "join has overlapping ranges");
 			WT_ERR(EINVAL);
 		}
@@ -960,7 +963,7 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		entry->bloom_hash_count =
 		    WT_MAX(entry->bloom_hash_count, bloom_hash_count);
 	}
-	if (range & WT_CJE_ENDPOINT_LT)
+	if (range & WT_CURJOIN_END_LT)
 		endpoint = &entry->ends[1];
 	else
 		endpoint = &entry->ends[0];

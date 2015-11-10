@@ -192,7 +192,7 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	JOINABLE_CURSOR_API_CALL(cursor, session, get_value, NULL);
-	WT_ERR(__wt_curtable_get_value_ap(cursor, ap));
+	WT_ERR(__wt_curtable_get_valuev(cursor, ap));
 
 err:	va_end(ap);
 	API_END_RET(session, ret);
@@ -483,8 +483,7 @@ __curtable_insert(WT_CURSOR *cursor)
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
-	JOINABLE_CURSOR_CALL_CHECK(cursor);
+	JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
 	WT_ERR(__curtable_open_indices(ctable));
 
 	/*
@@ -542,8 +541,7 @@ __curtable_update(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
-	JOINABLE_CURSOR_CALL_CHECK(cursor);
+	JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
 	WT_ERR(__curtable_open_indices(ctable));
 
 	/*
@@ -594,8 +592,7 @@ __curtable_remove(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_REMOVE_API_CALL(cursor, session, NULL);
-	JOINABLE_CURSOR_CALL_CHECK(cursor);
+	JOINABLE_CURSOR_REMOVE_API_CALL(cursor, session, NULL);
 	WT_ERR(__curtable_open_indices(ctable));
 
 	/* Find the old record so it can be removed from indices */

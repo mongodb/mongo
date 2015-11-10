@@ -139,11 +139,11 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __wt_curindex_get_value_ap --
+ * __wt_curindex_get_valuev --
  *	Internal implementation of WT_CURSOR->get_value for index cursors
  */
 static inline int
-__wt_curindex_get_value_ap(WT_CURSOR *cursor, va_list ap)
+__wt_curindex_get_valuev(WT_CURSOR *cursor, va_list ap)
 {
 	WT_CURSOR_INDEX *cindex;
 	WT_DECL_RET;
@@ -170,11 +170,11 @@ err:	return (ret);
 }
 
 /*
- * __wt_curtable_get_value_ap --
+ * __wt_curtable_get_valuev --
  *	Internal implementation of WT_CURSOR->get_value for table cursors.
  */
 static inline int
-__wt_curtable_get_value_ap(WT_CURSOR *cursor, va_list ap)
+__wt_curtable_get_valuev(WT_CURSOR *cursor, va_list ap)
 {
 	WT_CURSOR *primary;
 	WT_CURSOR_TABLE *ctable;

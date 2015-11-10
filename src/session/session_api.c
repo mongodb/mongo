@@ -676,18 +676,18 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	}
 
 	/* "ge" is the default */
-	range = WT_CJE_ENDPOINT_GT | WT_CJE_ENDPOINT_EQ;
+	range = WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ;
 	flags = 0;
 	WT_ERR(__wt_config_gets(session, cfg, "compare", &cval));
 	if (cval.len != 0) {
 		if (WT_STRING_MATCH("gt", cval.str, cval.len))
-			range = WT_CJE_ENDPOINT_GT;
+			range = WT_CURJOIN_END_GT;
 		else if (WT_STRING_MATCH("lt", cval.str, cval.len))
-			range = WT_CJE_ENDPOINT_LT;
+			range = WT_CURJOIN_END_LT;
 		else if (WT_STRING_MATCH("le", cval.str, cval.len))
-			range = WT_CJE_ENDPOINT_LT | WT_CJE_ENDPOINT_EQ;
+			range = WT_CURJOIN_END_LT | WT_CURJOIN_END_EQ;
 		else if (WT_STRING_MATCH("eq", cval.str, cval.len))
-			range = WT_CJE_ENDPOINT_EQ;
+			range = WT_CURJOIN_END_EQ;
 		else if (!WT_STRING_MATCH("ge", cval.str, cval.len))
 			WT_ERR(EINVAL);
 	}
@@ -698,7 +698,7 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	WT_ERR(__wt_config_gets(session, cfg, "strategy", &cval));
 	if (cval.len != 0) {
 		if (WT_STRING_MATCH("bloom", cval.str, cval.len))
-			LF_SET(WT_CJE_BLOOM);
+			LF_SET(WT_CURJOIN_ENTRY_BLOOM);
 		else if (!WT_STRING_MATCH("default", cval.str, cval.len))
 			WT_ERR(EINVAL);
 	}
@@ -706,7 +706,7 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	bloom_bit_count = (uint64_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "bloom_hash_count", &cval));
 	bloom_hash_count = (uint64_t)cval.val;
-	if (LF_ISSET(WT_CJE_BLOOM)) {
+	if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM)) {
 	    if (count == 0) {
 		    __wt_errx(session, "count must be nonzero when "
 			"strategy=bloom");
