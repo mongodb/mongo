@@ -72,14 +72,14 @@ func TestCreateAllIntents(t *testing.T) {
 				So(i4, ShouldBeNil)
 
 				Convey("with all the proper metadata + bson merges", func() {
-					So(i0.BSONPath, ShouldNotEqual, "")
-					So(i0.MetadataPath, ShouldNotEqual, "")
-					So(i1.BSONPath, ShouldNotEqual, "")
-					So(i1.MetadataPath, ShouldEqual, "") //no metadata for this file
-					So(i2.BSONPath, ShouldNotEqual, "")
-					So(i2.MetadataPath, ShouldNotEqual, "")
-					So(i3.BSONPath, ShouldNotEqual, "")
-					So(i3.MetadataPath, ShouldEqual, "") //no metadata for this file
+					So(i0.Location, ShouldNotEqual, "")
+					So(i0.MetadataLocation, ShouldNotEqual, "")
+					So(i1.Location, ShouldNotEqual, "")
+					So(i1.MetadataLocation, ShouldEqual, "") //no metadata for this file
+					So(i2.Location, ShouldNotEqual, "")
+					So(i2.MetadataLocation, ShouldNotEqual, "")
+					So(i3.Location, ShouldNotEqual, "")
+					So(i3.MetadataLocation, ShouldEqual, "") //no metadata for this file
 
 					Convey("and skipped files all present in the logs", func() {
 						logs := buff.String()
@@ -141,12 +141,12 @@ func TestCreateIntentsForDB(t *testing.T) {
 				})
 
 				Convey("with all the proper metadata + bson merges", func() {
-					So(i0.BSONPath, ShouldNotEqual, "")
-					So(i0.MetadataPath, ShouldNotEqual, "")
-					So(i1.BSONPath, ShouldNotEqual, "")
-					So(i1.MetadataPath, ShouldEqual, "") //no metadata for this file
-					So(i2.BSONPath, ShouldNotEqual, "")
-					So(i2.MetadataPath, ShouldNotEqual, "")
+					So(i0.Location, ShouldNotEqual, "")
+					So(i0.MetadataLocation, ShouldNotEqual, "")
+					So(i1.Location, ShouldNotEqual, "")
+					So(i1.MetadataLocation, ShouldEqual, "") //no metadata for this file
+					So(i2.Location, ShouldNotEqual, "")
+					So(i2.MetadataLocation, ShouldNotEqual, "")
 
 					Convey("and skipped files all present in the logs", func() {
 						logs := buff.String()
@@ -229,12 +229,12 @@ func TestCreateIntentsForCollection(t *testing.T) {
 				So(i0.C, ShouldEqual, "myC")
 				ddl, err := newActualPath(util.ToUniversalPath("testdata/testdirs/db1/c2.bson"))
 				So(err, ShouldBeNil)
-				So(i0.BSONPath, ShouldEqual, ddl.Path())
+				So(i0.Location, ShouldEqual, ddl.Path())
 				i1 := mr.manager.Pop()
 				So(i1, ShouldBeNil)
 
 				Convey("and no Metadata path", func() {
-					So(i0.MetadataPath, ShouldEqual, "")
+					So(i0.MetadataLocation, ShouldEqual, "")
 					logs := buff.String()
 					So(strings.Contains(logs, "without metadata"), ShouldEqual, true)
 				})
@@ -253,12 +253,12 @@ func TestCreateIntentsForCollection(t *testing.T) {
 				So(i0, ShouldNotBeNil)
 				So(i0.DB, ShouldEqual, "myDB")
 				So(i0.C, ShouldEqual, "myC")
-				So(i0.BSONPath, ShouldEqual, util.ToUniversalPath("testdata/testdirs/db1/c1.bson"))
+				So(i0.Location, ShouldEqual, util.ToUniversalPath("testdata/testdirs/db1/c1.bson"))
 				i1 := mr.manager.Pop()
 				So(i1, ShouldBeNil)
 
 				Convey("and a set Metadata path", func() {
-					So(i0.MetadataPath, ShouldEqual, util.ToUniversalPath("testdata/testdirs/db1/c1.metadata.json"))
+					So(i0.MetadataLocation, ShouldEqual, util.ToUniversalPath("testdata/testdirs/db1/c1.metadata.json"))
 					logs := buff.String()
 					So(strings.Contains(logs, "found metadata"), ShouldEqual, true)
 				})
