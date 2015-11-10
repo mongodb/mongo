@@ -207,6 +207,11 @@ __wt_session_lock_dhandle(
 
 			/* We have an exclusive lock, we're done. */
 			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
+			WT_ASSERT(session,
+			    dhandle->excl_session == NULL &&
+			    dhandle->excl_ref == 0);
+			dhandle->excl_session = session;
+			dhandle->excl_ref = 1;
 			WT_ASSERT(session, !F_ISSET(dhandle, WT_DHANDLE_DEAD));
 			return (0);
 		}
