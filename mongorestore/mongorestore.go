@@ -187,12 +187,12 @@ func (restore *MongoRestore) Restore() error {
 			Prelude: &archive.Prelude{},
 		}
 		err = restore.archive.Prelude.Read(restore.archive.In)
-		log.Logf(log.DebugLow, `archive format version "%v"`, restore.archive.Prelude.Header.FormatVersion)
-		log.Logf(log.DebugLow, `archive server version "%v"`, restore.archive.Prelude.Header.ServerVersion)
-		log.Logf(log.DebugLow, `archive tool version "%v"`, restore.archive.Prelude.Header.ToolVersion)
 		if err != nil {
 			return err
 		}
+		log.Logf(log.DebugLow, `archive format version "%v"`, restore.archive.Prelude.Header.FormatVersion)
+		log.Logf(log.DebugLow, `archive server version "%v"`, restore.archive.Prelude.Header.ServerVersion)
+		log.Logf(log.DebugLow, `archive tool version "%v"`, restore.archive.Prelude.Header.ToolVersion)
 		target, err = restore.archive.Prelude.NewPreludeExplorer()
 		if err != nil {
 			return err
