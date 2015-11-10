@@ -35,6 +35,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/index/external_key_generator.h"
+#include "mongo/platform/random.h"
 #include "mongo/shell/bench.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_options.h"
@@ -113,16 +114,21 @@ ThreadLocalValue<unsigned int> _randomSeed;
 #endif
 
 BSONObj JSSrand(const BSONObj& a, void* data) {
-    uassert(12518,
-            "srand requires a single numeric argument",
-            a.nFields() == 1 && a.firstElement().isNumber());
+    unsigned int seed;
+    // grab the least significant bits of either the supplied argument or
+    // a random number from SecureRandom.
+    if (a.nFields() == 1 && a.firstElement().isNumber())
+        seed = static_cast<unsigned int>(a.firstElement().numberLong());
+    else {
+        std::unique_ptr<SecureRandom> rand(SecureRandom::create());
+        seed = static_cast<unsigned int>(rand->nextInt64());
+    }
 #if !defined(_WIN32)
-    _randomSeed.set(
-        static_cast<unsigned int>(a.firstElement().numberLong()));  // grab least significant digits
+    _randomSeed.set(seed);
 #else
-    srand(static_cast<unsigned int>(a.firstElement().numberLong()));
+    srand(seed);
 #endif
-    return undefinedReturn;
+    return BSON("" << static_cast<double>(seed));
 }
 
 BSONObj JSRand(const BSONObj& a, void* data) {

@@ -812,7 +812,7 @@ Math.sigFig = function( x , N ){
 Random = function() {}
 
 // set random seed
-Random.srand = function( s ) { _srand( s ); }
+Random.srand = function( s ) { return _srand( s ); }
 
 // random number 0 <= r < 1
 Random.rand = function() { return _rand(); }
@@ -821,9 +821,8 @@ Random.rand = function() { return _rand(); }
 Random.randInt = function( n ) { return Math.floor( Random.rand() * n ); }
 
 Random.setRandomSeed = function( s ) {
-    s = s || new Date().getTime();
-    print( "setting random seed: " + s );
-    Random.srand( s );
+    var seed = Random.srand( s );
+    print("setting random seed: " + seed);
 }
 
 // generate a random value from the exponential distribution with the specified mean
