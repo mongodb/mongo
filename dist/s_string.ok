@@ -589,6 +589,7 @@ fopen
 fp
 fprintf
 free'd
+fscanf
 fstat
 fsync
 fsyncs
