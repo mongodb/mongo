@@ -82,9 +82,10 @@ const char meCollectionName[] = "local.me";
 const char meDatabaseName[] = "local";
 const char tsFieldName[] = "ts";
 
-// Set this to false to disable the background creation of snapshots. This can be used for A-B
-// benchmarking to find how much overhead repl::SnapshotThread introduces.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableReplSnapshotThread, bool, true);
+// Set this to true to force background creation of snapshots even if --enableMajorityReadConcern
+// isn't specified. This can be used for A-B benchmarking to find how much overhead
+// repl::SnapshotThread introduces.
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableReplSnapshotThread, bool, false);
 
 }  // namespace
 
