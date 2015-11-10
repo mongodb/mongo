@@ -47,6 +47,10 @@ var $config = (function() {
             assertAlways.commandWorked(db[collName].ensureIndex(indexSpec));
         });
 
+        // numDocs should be much less than threadCount, to make more threads use the same docs.
+        this.numDocs = Math.floor(this.threadCount / 5);
+        assertAlways.gt(this.numDocs, 0, 'numDocs should be a positive number');
+
         for (var i = 0; i < this.numDocs; ++i) {
             var fieldName = fieldNames[i % fieldNames.length];
             var doc = {};
@@ -57,17 +61,12 @@ var $config = (function() {
         }
     }
 
-    var threadCount = 20;
     return {
-        threadCount: threadCount,
+        threadCount: 20,
         iterations: 20,
         startState: 'update',
         states: states,
         transitions: transitions,
-        data: {
-            // numDocs should be much less than threadCount, to make more threads use the same docs
-            numDocs: Math.floor(threadCount / 5)
-        },
         setup: setup
     };
 

@@ -24,13 +24,15 @@ function parseConfig(config) {
                        '; valid parameters are: ' + tojson(allowedKeys));
     });
 
-    assert.eq('number', typeof config.threadCount);
-    // TODO: assert that the thread count is positive
-    // TODO: assert that the thread count is an integer
+    assert(Number.isInteger(config.threadCount),
+           'expected number of threads to be an integer');
+    assert.gt(config.threadCount, 0,
+              'expected number of threads to be positive');
 
-    assert.eq('number', typeof config.iterations);
-    // TODO: assert that the number of iterations is positive
-    // TODO: assert that the number of iterations is an integer
+    assert(Number.isInteger(config.iterations),
+           'expected number of iterations to be an integer');
+    assert.gt(config.iterations, 0,
+              'expected number of iterations to be positive');
 
     config.startState = config.startState || 'init';
     assert.eq('string', typeof config.startState);
@@ -78,7 +80,12 @@ function parseConfig(config) {
 
     config.data = config.data || {};
     assert.eq('object', typeof config.data);
-    // TODO: assert that 'tid' is not a key of 'config.data'
+    assert.eq(false, config.data.hasOwnProperty('tid'),
+              'data object cannot redefine "tid"');
+    assert.eq(false, config.data.hasOwnProperty('iterations'),
+              'data object cannot redefine "iterations"');
+    assert.eq(false, config.data.hasOwnProperty('threadCount'),
+              'data object cannot redefine "threadCount"');
 
     config.passConnectionCache = config.passConnectionCache || false;
     assert.eq('boolean', typeof config.passConnectionCache);

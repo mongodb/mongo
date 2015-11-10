@@ -8,8 +8,6 @@
  */
 var $config = (function() {
 
-    var threadCount = 10;
-
     var states = (function() {
         // Picks a random index to drop and recreate.
         function modifyIndices(db, collName) {
@@ -42,7 +40,7 @@ var $config = (function() {
 
     function setup(db, collName) {
         // Create indices {fooi: 1}.
-        for (var i = 0; i < threadCount; ++i) {
+        for (var i = 0; i < this.threadCount; ++i) {
             var spec = {};
             spec['foo' + i] = 1;
             assertAlways.commandWorked(db[collName].ensureIndex(spec));
@@ -50,7 +48,7 @@ var $config = (function() {
     }
 
     return {
-        threadCount: threadCount,
+        threadCount: 10,
         iterations: 20,
         states: states,
         startState: 'modifyIndices',

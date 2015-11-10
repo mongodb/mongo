@@ -12,12 +12,9 @@
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');
 
 var $config = (function() {
-    var iter = 20;
+    // TODO: This workload may fail if an iteration multiplier is specified.
     var data = {
-        prefix: 'convert_to_capped_collection',
-
-        // initial size should not be a power of 256
-        size: Math.pow(2, iter + 5) + 1
+        prefix: 'convert_to_capped_collection'
     };
 
     var states = (function() {
@@ -76,6 +73,11 @@ var $config = (function() {
         convertToCapped: { convertToCapped: 1 }
     };
 
+    function setup(db, collName, cluster) {
+        // Initial size should not be a power of 256.
+        this.size = Math.pow(2, this.iterations + 5) + 1;
+    }
+
     function teardown(db, collName, cluster) {
         var pattern = new RegExp('^' + this.prefix + '_\\d+$');
         dropCollections(db, pattern);
@@ -83,10 +85,11 @@ var $config = (function() {
 
     return {
         threadCount: 10,
-        iterations: iter,
+        iterations: 20,
         data: data,
         states: states,
         transitions: transitions,
+        setup: setup,
         teardown: teardown
     };
 

@@ -7,9 +7,9 @@ load('jstests/concurrency/fsm_libs/worker_thread.js'); // for workerThread
  * Helper for spawning and joining worker threads.
  */
 
-var ThreadManager = function(clusterOptions, executionMode, executionOptions) {
+var ThreadManager = function(clusterOptions, executionMode) {
     if (!(this instanceof ThreadManager)) {
-        return new ThreadManager(clusterOptions, executionMode, executionOptions);
+        return new ThreadManager(clusterOptions, executionMode);
     }
 
     function makeThread(workloads, args, options) {
@@ -59,7 +59,7 @@ var ThreadManager = function(clusterOptions, executionMode, executionOptions) {
 
         workloads.forEach(function(workload) {
             var config = context[workload].config;
-            threadCounts[workload] = config.threadCount * executionOptions.threadMultiplier;
+            threadCounts[workload] = config.threadCount;
         });
 
         var requestedNumThreads = computeNumThreads();
@@ -95,12 +95,9 @@ var ThreadManager = function(clusterOptions, executionMode, executionOptions) {
         }
 
         var workloadData = {};
-        _workloads.forEach(function(workload) {
-            workloadData[workload] = _context[workload].config.data;
-        });
-
         var tid = 0;
         _workloads.forEach(function(workload) {
+            workloadData[workload] = _context[workload].config.data;
             var workloads = [workload]; // worker thread only needs to load 'workload'
             if (executionMode.composed) {
                 workloads = _workloads; // worker thread needs to load all workloads
@@ -116,7 +113,6 @@ var ThreadManager = function(clusterOptions, executionMode, executionOptions) {
                     collName: _context[workload].collName,
                     cluster: cluster.getSerializedCluster(),
                     clusterOptions: clusterOptions,
-                    iterationMultiplier: executionOptions.iterationMultiplier,
                     seed: Random.randInt(1e13), // contains range of Date.getTime()
                     globalAssertLevel: globalAssertLevel
                 };

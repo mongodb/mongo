@@ -344,6 +344,30 @@ var runner = (function() {
         config.teardown.call(config.data, myDB, collName, cluster);
     }
 
+    function setIterations(config, iterationMultiplier) {
+        config.iterations = config.iterations * iterationMultiplier;
+
+        // This property must be enumerable because of SERVER-21338, which prevents
+        // objects with non-enumerable properties from being serialized properly in
+        // ScopedThreads.
+        Object.defineProperty(config.data, 'iterations', {
+            enumerable: true,
+            value: config.iterations
+        });
+    }
+
+    function setThreadCount(config, threadMultiplier) {
+        config.threadCount = config.threadCount * threadMultiplier;
+
+        // This property must be enumerable because of SERVER-21338, which prevents
+        // objects with non-enumerable properties from being serialized properly in
+        // ScopedThreads.
+        Object.defineProperty(config.data, 'threadCount', {
+            enumerable: true,
+            value: config.threadCount
+        });
+    }
+
     function runWorkloads(workloads,
                           clusterOptions,
                           executionMode,
@@ -385,9 +409,11 @@ var runner = (function() {
             load(workload); // for $config
             assert.neq('undefined', typeof $config, '$config was not defined by ' + workload);
             context[workload] = { config: parseConfig($config) };
+            setIterations(context[workload].config, executionOptions.iterationMultiplier);
+            setThreadCount(context[workload].config, executionOptions.threadMultiplier);
         });
 
-        var threadMgr = new ThreadManager(clusterOptions, executionMode, executionOptions);
+        var threadMgr = new ThreadManager(clusterOptions, executionMode);
 
         var cluster = new Cluster(clusterOptions);
         cluster.setup();

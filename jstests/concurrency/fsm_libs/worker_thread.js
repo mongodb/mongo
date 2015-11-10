@@ -15,7 +15,6 @@ var workerThread = (function() {
     // args.collName = the collection name
     // args.cluster = connection strings for all cluster nodes (see cluster.js for format)
     // args.clusterOptions = the configuration of the cluster
-    // args.iterationMultiplier = number to multiply the number of iterations by
     // args.seed = seed for the random number generator
     // args.globalAssertLevel = the global assertion level to use
     // run = callback that takes a map of workloads to their associated $config
@@ -58,17 +57,36 @@ var workerThread = (function() {
                 var data = Object.extend({}, args.data[workload], true);
                 data = Object.extend(data, config.data, true);
 
+                // Object.extend() defines all properties added to the destination object as
+                // configurable, enumerable, and writable. To prevent workloads from changing
+                // the iterations and threadCount properties in their state functions, we redefine
+                // them here as non-configurable, non-enumerable, and non-writable.
+                Object.defineProperties(data, {
+                    'iterations': {
+                        configurable: false,
+                        enumerable: false,
+                        writable: false,
+                        value: data.iterations
+                    },
+                    'threadCount': {
+                        configurable: false,
+                        enumerable: false,
+                        writable: false,
+                        value: data.threadCount
+                    }
+                });
+
                 data.tid = args.tid;
                 configs[workload] = {
                     data: data,
                     db: myDB,
                     collName: args.collName,
                     cluster: args.cluster,
+                    iterations: data.iterations,
                     passConnectionCache: config.passConnectionCache,
                     startState: config.startState,
                     states: config.states,
-                    transitions: config.transitions,
-                    iterations: config.iterations * args.iterationMultiplier
+                    transitions: config.transitions
                 };
             });
 

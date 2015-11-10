@@ -68,20 +68,18 @@ var $config = (function() {
         find: { update: 1 }
     };
 
-    var threadCount = 5;
-
     function setup(db, collName, cluster) {
         var doc = { _id: this.id };
 
         // Pre-populate the fields we need to avoid size change for capped collections.
-        for (var i = 0; i < threadCount; ++i) {
+        for (var i = 0; i < this.threadCount; ++i) {
             doc['t' + i] = 0;
         }
         db[collName].insert(doc);
     }
 
     return {
-        threadCount: threadCount,
+        threadCount: 5,
         iterations: 10,
         data: data,
         states: states,
