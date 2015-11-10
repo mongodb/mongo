@@ -73,11 +73,10 @@ public:
             audit::writeImpersonatedUsersToMetadata(metadataBob);
 
             // Add config server optime to metadata sent to shards.
-            std::string targetStr = target.toString();
-            auto shard = grid.shardRegistry()->getShardNoReload(targetStr);
+            auto shard = grid.shardRegistry()->getShardNoReload(target);
             if (!shard) {
                 return Status(ErrorCodes::ShardNotFound,
-                              str::stream() << "Shard not found for server: " << targetStr);
+                              str::stream() << "Shard not found for server: " << target.toString());
             }
             if (shard->isConfig()) {
                 return Status::OK();
@@ -95,7 +94,7 @@ public:
         try {
             saveGLEStats(metadataObj, replySource.toString());
 
-            auto shard = grid.shardRegistry()->getShardNoReload(replySource.toString());
+            auto shard = grid.shardRegistry()->getShardNoReload(replySource);
             if (!shard) {
                 return Status::OK();
             }

@@ -150,16 +150,25 @@ public:
 
     /**
      * Returns a shared pointer to the shard object with the given shard id.
-     * May refresh the shard registry if there's no cached information about the shard.
+     * May refresh the shard registry if there's no cached information about the shard. The shardId
+     * parameter can actually be the shard name or the HostAndPort for any
+     * server in the shard.
      */
     std::shared_ptr<Shard> getShard(OperationContext* txn, const ShardId& shardId);
 
     /**
-     * Returns a shared pointer to the shard object with the given shard id.
-     * Will not refresh the shard registry or otherwise perform any network traffic.  This means
-     * that if the shard was recently added it may not be found.  USE WITH CAUTION.
+     * Returns a shared pointer to the shard object with the given shard id. The shardId parameter
+     * can actually be the shard name or the HostAndPort for any server in the shard. Will not
+     * refresh the shard registry or otherwise perform any network traffic. This means that if the
+     * shard was recently added it may not be found.  USE WITH CAUTION.
      */
     std::shared_ptr<Shard> getShardNoReload(const ShardId& shardId);
+
+    /**
+     * Finds the Shard that the mongod listening at this HostAndPort is a member of. Will not
+     * refresh the shard registry of otherwise perform any network traffic.
+     */
+    std::shared_ptr<Shard> getShardNoReload(const HostAndPort& shardHost);
 
     /**
      * Returns shared pointer to the shard object representing the config servers.
@@ -395,6 +404,8 @@ private:
 
     // Map from replica set name to shard corresponding to this replica set
     ShardMap _rsLookup;
+
+    std::unordered_map<HostAndPort, std::shared_ptr<Shard>> _hostLookup;
 };
 
 }  // namespace mongo

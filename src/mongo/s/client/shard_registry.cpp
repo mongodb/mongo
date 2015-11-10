@@ -55,6 +55,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
+#include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
 
@@ -181,6 +182,7 @@ void ShardRegistry::reload(OperationContext* txn) {
 
     _lookup.clear();
     _rsLookup.clear();
+    _hostLookup.clear();
 
     _addConfigShard_inlock();
 
@@ -211,6 +213,11 @@ shared_ptr<Shard> ShardRegistry::getShardNoReload(const ShardId& shardId) {
     return _findUsingLookUp(shardId);
 }
 
+shared_ptr<Shard> ShardRegistry::getShardNoReload(const HostAndPort& host) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return mapFindWithDefault(_hostLookup, host);
+}
+
 shared_ptr<Shard> ShardRegistry::getConfigShard() {
     shared_ptr<Shard> shard = _findUsingLookUp("config");
     invariant(shard);
@@ -239,6 +246,7 @@ void ShardRegistry::remove(const ShardId& id) {
             ConnectionString connStr = s->getConnString();
             for (const auto& host : connStr.getServers()) {
                 entriesToRemove.insert(host.toString());
+                _hostLookup.erase(host);
             }
         }
     }
@@ -344,6 +352,7 @@ void ShardRegistry::_updateLookupMapsForShard_inlock(shared_ptr<Shard> shard,
     auto oldConnString = shard->getConnString();
     for (const auto& host : oldConnString.getServers()) {
         _lookup.erase(host.toString());
+        _hostLookup.erase(host);
     }
 
     _lookup[shard->getId()] = shard;
@@ -355,6 +364,7 @@ void ShardRegistry::_updateLookupMapsForShard_inlock(shared_ptr<Shard> shard,
         // always return "localhost" as their resposne to getServerAddress().  This is just for
         // making dbtest work.
         _lookup["localhost"] = shard;
+        _hostLookup[HostAndPort{"localhost"}] = shard;
     }
 
     // TODO: The only reason to have the shard host names in the lookup table is for the
@@ -365,6 +375,7 @@ void ShardRegistry::_updateLookupMapsForShard_inlock(shared_ptr<Shard> shard,
 
     for (const HostAndPort& hostAndPort : newConnString.getServers()) {
         _lookup[hostAndPort.toString()] = shard;
+        _hostLookup[hostAndPort] = shard;
     }
 }
 

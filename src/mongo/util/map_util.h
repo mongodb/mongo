@@ -34,8 +34,8 @@ namespace mongo {
 /*
  *  If "myMap" contains "key", returns "myMap[key]".  Otherwise, returns "defaultValue."
  */
-template <typename M, typename K, typename V>
-V mapFindWithDefault(const M& myMap, const K& key, const V& defaultValue) {
+template <typename M, typename K, typename V = typename M::mapped_type>
+V mapFindWithDefault(const M& myMap, const K& key, const V& defaultValue = V()) {
     typename M::const_iterator it = myMap.find(key);
     if (it == myMap.end())
         return defaultValue;
