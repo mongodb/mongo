@@ -167,11 +167,7 @@ public:
 
                 // Get the message handling settings for 'host' if the source of _mp's connection is
                 // known. By default, messages are forwarded to 'dest' without any additional delay.
-                HostSettings hostSettings;
-                if (host) {
-                    stdx::lock_guard<stdx::mutex> lk(*_settingsMutex);
-                    hostSettings = (*_settings)[*host];
-                }
+                HostSettings hostSettings = getHostSettings(host);
 
                 switch (hostSettings.state) {
                     // Forward the message to 'dest' after waiting for 'hostSettings.delay'
@@ -200,6 +196,20 @@ public:
                     if (response.empty()) {
                         log() << "Received an empty response, end connection "
                               << _mp->psock->remoteString();
+                        _mp->shutdown();
+                        break;
+                    }
+
+                    // Reload the message handling settings for 'host' in case they were changed
+                    // while waiting for a response from 'dest'.
+                    hostSettings = getHostSettings(host);
+
+                    // It's possible that sending 'request' blocked until 'dest' had something to
+                    // reply with. If the message handling settings were since changed to close
+                    // connections from 'host', then do so now.
+                    if (hostSettings.state == HostSettings::State::kHangUp) {
+                        log() << "Closing connection from " << host->toString()
+                              << ", end connection " << _mp->psock->remoteString();
                         _mp->shutdown();
                         break;
                     }
@@ -264,6 +274,14 @@ private:
         }
 
         return boost::none;
+    }
+
+    HostSettings getHostSettings(boost::optional<HostAndPort> host) {
+        if (host) {
+            stdx::lock_guard<stdx::mutex> lk(*_settingsMutex);
+            return (*_settings)[*host];
+        }
+        return {};
     }
 
     MessagingPort* _mp;
