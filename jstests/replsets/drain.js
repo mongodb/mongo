@@ -57,7 +57,7 @@
     // Kill primary; secondary will enter drain mode to catch up
     primary.getDB("admin").shutdownServer({force:true});
 
-    var electionTimeout = (isPV0 ? 60 : 10 ) * 1000; // Timeout in milliseconds
+    var electionTimeout = (isPV0 ? 60 : 20 ) * 1000; // Timeout in milliseconds
     replSet.waitForState(secondary, replSet.PRIMARY, electionTimeout);
 
     // Ensure new primary is not yet writable
