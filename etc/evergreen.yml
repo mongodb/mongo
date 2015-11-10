@@ -627,6 +627,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: aggregation_WT_ese
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=aggregation_ese --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: aggregation_auth
   depends_on:
   - name: aggregation_WT
@@ -3532,6 +3543,7 @@ buildvariants:
   - name: lint
   - name: aggregation
   - name: aggregation_WT
+  - name: aggregation_WT_ese
   - name: aggregation_auth
   - name: audit
   - name: audit_WT
