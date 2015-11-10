@@ -269,21 +269,20 @@ namespace mongo {
             // to getNext(...) might just return EOF).
             bool saveClientCursor = false;
 
-            if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
-                // Propagate this error to caller.
-                if (Runner::RUNNER_ERROR == state) {
-                    // Stats are helpful when errors occur.
-                    TypeExplain* bareExplain;
-                    Status res = runner->getInfo(&bareExplain, NULL);
-                    if (res.isOK()) {
-                        boost::scoped_ptr<TypeExplain> errorExplain(bareExplain);
-                        error() << "getMore runner error, stats:\n"
-                                << errorExplain->stats.jsonString(Strict, true);
-                    }
+            if (Runner::RUNNER_ERROR == state) {
+                // Stats are helpful when errors occur.
+                TypeExplain* bareExplain;
+                Status res = runner->getInfo(&bareExplain, NULL);
+                if (res.isOK()) {
+                    boost::scoped_ptr<TypeExplain> errorExplain(bareExplain);
+                    error() << "getMore runner error, stats:\n"
+                            << errorExplain->stats.jsonString(Strict, true);
                 }
-
                 uasserted(17406, "getMore runner error: " +
-                              WorkingSetCommon::toStatusString(obj));
+                          WorkingSetCommon::toStatusString(obj));
+            }
+            else if (Runner::RUNNER_DEAD == state) {
+                uasserted(28617, "Runner killed during getMore");
             }
             else if (Runner::RUNNER_EOF == state) {
                 // EOF is also end of the line unless it's tailable.
@@ -652,17 +651,18 @@ namespace mongo {
         safety.reset();
 
         // Caller expects exceptions thrown in certain cases.
-        if (Runner::RUNNER_ERROR == state || Runner::RUNNER_DEAD == state) {
-            if (Runner::RUNNER_ERROR == state) {
-                TypeExplain* bareExplain;
-                Status res = runner->getInfo(&bareExplain, NULL);
-                if (res.isOK()) {
-                    boost::scoped_ptr<TypeExplain> errorExplain(bareExplain);
-                    error() << "Runner error during find, stats:\n"
-                            << errorExplain->stats.jsonString(Strict, true);
-                }
+        if (Runner::RUNNER_ERROR == state) {
+            TypeExplain* bareExplain;
+            Status res = runner->getInfo(&bareExplain, NULL);
+            if (res.isOK()) {
+                boost::scoped_ptr<TypeExplain> errorExplain(bareExplain);
+                error() << "Runner error during find, stats:\n"
+                        << errorExplain->stats.jsonString(Strict, true);
             }
             uasserted(17144, "Runner error during find: " + WorkingSetCommon::toStatusString(obj));
+        }
+        else if (Runner::RUNNER_DEAD == state) {
+            uasserted(28616, "Runner killed during find");
         }
 
         if (pq.hasOption(QueryOption_CursorTailable)) {
