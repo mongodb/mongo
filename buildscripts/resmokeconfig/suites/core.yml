@@ -2,6 +2,8 @@ selector:
   js_test:
     roots:
     - jstests/core/*.js
+    exclude_files:
+    - jstests/core/bench_test_crud_commands.js  # Temporarily disabled; see SERVER-21387.
 
 executor:
   js_test:

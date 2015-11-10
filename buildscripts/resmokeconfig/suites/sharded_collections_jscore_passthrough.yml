@@ -66,6 +66,8 @@ selector:
     - jstests/core/eval0.js
     - jstests/core/eval7.js
     - jstests/core/eval9.js
+    # bench_test_crud_commands.js is temporarily disabled; see SERVER-21387.
+    - jstests/core/bench_test_crud_commands.js
 
 executor:
   js_test:
