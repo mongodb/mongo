@@ -239,7 +239,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
                 log() << "Scheduling priority takeover at " << _priorityTakeoverWhen;
                 _priorityTakeoverCbh = _scheduleWorkAt(
                     _priorityTakeoverWhen,
-                    stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this));
+                    stdx::bind(
+                        &ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this, true));
             }
             break;
         }
@@ -701,10 +702,10 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
     LOG(4) << "Scheduling election timeout callback at " << when;
     _handleElectionTimeoutWhen = when;
     _handleElectionTimeoutCbh = _scheduleWorkAt(
-        when, stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this));
+        when, stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this, false));
 }
 
-void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1() {
+void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTakeOver) {
     if (!isV1ElectionProtocol()) {
         return;
     }
@@ -717,7 +718,19 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1() {
     }
 
     if (!_topCoord->becomeCandidateIfElectable(_replExecutor.now(), getMyLastOptime())) {
+        if (isPriorityTakeOver) {
+            log() << "Not starting an election for a priority takeover, since we are not electable";
+        } else {
+            log() << "Not starting an election, since we are not electable";
+        }
         return;
+    }
+    if (isPriorityTakeOver) {
+        log() << "Starting an election for a priority takeover";
+    } else {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        log() << "Starting an election, since we've seen no PRIMARY in the past "
+              << _rsConfig.getElectionTimeoutPeriod();
     }
     _startElectSelfV1();
 }
