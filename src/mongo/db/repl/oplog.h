@@ -36,6 +36,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/time_support.h"
 
@@ -125,16 +126,19 @@ void logOp(OperationContext* txn,
 // Used by the closeDatabase command to ensure we don't cache closed things.
 void oplogCheckCloseDatabase(OperationContext* txn, Database* db);
 
+using IncrementOpsAppliedStatsFn = stdx::function<void()>;
 /**
  * Take a non-command op and apply it locally
  * Used for applying from an oplog
  * @param convertUpdateToUpsert convert some updates to upserts for idempotency reasons
+ * @param incrementOpsAppliedState is called whenever an op is applied.
  * Returns failure status if the op was an update that could not be applied.
  */
 Status applyOperation_inlock(OperationContext* txn,
                              Database* db,
                              const BSONObj& op,
-                             bool convertUpdateToUpsert = false);
+                             bool convertUpdateToUpsert = false,
+                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats = {});
 
 /**
  * Take a command op and apply it locally
