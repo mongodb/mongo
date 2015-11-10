@@ -46,6 +46,7 @@ assert.commandWorked( a2.runCommand({ setShardVersion: "alleyinsider.bar",
                                       configdb: s._configDB,
                                       version: new Timestamp(1, 0),
                                       versionEpoch: barEpoch,
+                                      shard: 'shard0000',
                                       authoritative: true }),
                       "setShardVersion bar temp" );
 
