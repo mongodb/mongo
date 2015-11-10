@@ -52,7 +52,7 @@ using asio::ip::tcp;
 class Server {
 public:
     void startup() {
-        _thread = std::thread([this] {
+        _thread = stdx::thread([this] {
             try {
                 tcp::acceptor acceptor{_io_service,
                                        // Let the OS choose the accepting port.
@@ -104,7 +104,7 @@ private:
 TEST(AsyncStreamTest, IsOpen) {
     Server server;
     asio::io_service io_service;
-    std::thread clientWorker([&io_service] {
+    stdx::thread clientWorker([&io_service] {
         log() << "starting clientWorker";
         asio::io_service::work work(io_service);
         io_service.run();
