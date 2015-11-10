@@ -222,6 +222,7 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
 
     auto cbStatus = _replExecutor.scheduleWork(
         [this, lastVote](const ReplicationExecutor::CallbackArgs& cbData) {
+            _replExecutor.signalEvent(_electionDryRunFinishedEvent);
             _startVoteRequester(lastVote.getTerm());
         });
     if (cbStatus.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -229,7 +230,6 @@ void ReplicationCoordinatorImpl::_writeLastVoteForMyElection(
     }
     fassert(28768, cbStatus.getStatus());
 
-    _replExecutor.signalEvent(_electionDryRunFinishedEvent);
     lossGuard.dismiss();
 }
 
