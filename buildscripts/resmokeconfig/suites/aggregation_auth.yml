@@ -8,7 +8,6 @@ selector:
     roots:
     - jstests/aggregation/*.js
     - jstests/aggregation/bugs/*.js
-    - src/mongo/db/modules/*/jstests/aggregation/*.js
     exclude_files:
     # Skip any tests that run with auth explicitly.
     - jstests/aggregation/*[aA]uth*.js

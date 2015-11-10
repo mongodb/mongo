@@ -1,0 +1,30 @@
+selector:
+  js_test:
+    roots:
+    - jstests/aggregation/*.js
+    - jstests/aggregation/bugs/*.js
+    exclude_files:
+    # mongod needs to start with the enableMajorityReadConcern flag. Tests that
+    # start their own mongods will fail (ShardingTest, ReplSetTest, MongoRunner).
+    - jstests/aggregation/bugs/server6118.js # Uses ShardingTest.
+    - jstests/aggregation/bugs/server6179.js # Uses ShardingTest.
+    - jstests/aggregation/bugs/server7781.js # Uses ShardingTest.
+    - jstests/aggregation/bugs/server18198.js # Uses a mocked mongo client to test read preference.
+    - jstests/aggregation/bugs/server19095.js # Uses ShardingTest.
+    - jstests/aggregation/mongos_slaveok.js # Uses ShardingTest.
+    - jstests/aggregation/testshard1.js # Uses ShardingTest.
+    - jstests/aggregation/testSlave.js # Starts ReplSetTest.
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        eval: "var testingReplication = true; load('jstests/libs/override_methods/set_majority_read_and_write_concerns.js');"
+        readMode: commands
+    fixture:
+      class: ReplicaSetFixture
+      mongod_options:
+        enableMajorityReadConcern: ''
+        set_parameters:
+          enableTestCommands: 1
+      num_nodes: 2
