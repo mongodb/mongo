@@ -214,6 +214,30 @@ function MongoBridge(options) {
         });
     };
 
+    /**
+     * Configures 'this' bridge to uniformly discard requests from the 'dest' of each of the
+     * 'bridges' to 'this.dest' with probability 'lossProbability'.
+     *
+     * @param {(MongoBridge|MongoBridge[])} bridges
+     * @param {number} lossProbability
+     */
+    this.discardMessagesFrom = function discardMessagesFrom(bridges, lossProbability) {
+        if (!Array.isArray(bridges)) {
+            bridges = [bridges];
+        }
+        bridges.forEach(throwErrorIfNotMongoBridgeInstance);
+
+        bridges.forEach(bridge => {
+            var res = runBridgeCommand(controlConn, 'discardMessagesFrom', {
+                host: bridge.dest,
+                loss: lossProbability,
+            });
+            assert.commandWorked(res, 'failed to configure the mongobridge listening on port ' +
+                                 this.port + ' to discard messages from ' + bridge.dest +
+                                 ' with probability ' + lossProbability);
+        });
+    };
+
     // Use a Proxy to "extend" the underlying connection object. The C++ functions, e.g.
     // runCommand(), require that they are called on the Mongo instance itself and so typical
     // prototypical inheritance isn't possible.

@@ -121,12 +121,51 @@ public:
     }
 };
 
+class CmdDiscardMessagesFrom final : public Command {
+public:
+    Status run(const BSONObj& cmdObj, stdx::mutex* settingsMutex, HostSettingsMap* settings) final {
+        invariant(settingsMutex);
+        invariant(settings);
+
+        std::string hostName;
+        auto status = bsonExtractStringField(cmdObj, kHostFieldName, &hostName);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        double newLoss;
+        auto lossElem = cmdObj["loss"];
+        if (lossElem) {
+            if (!lossElem.isNumber()) {
+                return {ErrorCodes::TypeMismatch, "'loss' field must be a number"};
+            }
+
+            newLoss = lossElem.numberDouble();
+            if (newLoss < 0.0 || newLoss > 1.0) {
+                return {ErrorCodes::BadValue, "'loss' field must be a number between 0 and 1"};
+            }
+        } else {
+            return {ErrorCodes::NoSuchKey, "Missing required field 'loss'"};
+        }
+
+        HostAndPort host(hostName);
+        {
+            stdx::lock_guard<stdx::mutex> lk(*settingsMutex);
+            auto& hostSettings = (*settings)[host];
+            hostSettings.state = HostSettings::State::kDiscard;
+            hostSettings.loss = newLoss;
+        }
+        return Status::OK();
+    }
+};
+
 StringMap<Command*> commandMap;
 
 MONGO_INITIALIZER(RegisterBridgeCommands)(InitializerContext* context) {
     commandMap["delayMessagesFrom"] = new CmdDelayMessagesFrom();
     commandMap["acceptConnectionsFrom"] = new CmdAcceptConnectionsFrom();
     commandMap["rejectConnectionsFrom"] = new CmdRejectConnectionsFrom();
+    commandMap["discardMessagesFrom"] = new CmdDiscardMessagesFrom();
     return Status::OK();
 }
 

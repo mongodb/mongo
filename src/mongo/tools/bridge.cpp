@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/optional.hpp>
+#include <cstdint>
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/random.h"
 #include "mongo/rpc/command_request.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -84,8 +86,11 @@ boost::optional<HostAndPort> extractHostInfo(const rpc::RequestInterface& reques
 
 class Forwarder {
 public:
-    Forwarder(MessagingPort* mp, stdx::mutex* settingsMutex, HostSettingsMap* settings)
-        : _mp(mp), _settingsMutex(settingsMutex), _settings(settings) {}
+    Forwarder(MessagingPort* mp,
+              stdx::mutex* settingsMutex,
+              HostSettingsMap* settings,
+              int64_t seed)
+        : _mp(mp), _settingsMutex(settingsMutex), _settings(settings), _prng(seed) {}
 
     void operator()() {
         DBClientConnection dest;
@@ -181,6 +186,20 @@ public:
                               << ", end connection " << _mp->psock->remoteString();
                         _mp->shutdown();
                         return;
+                    // Forward the message to 'dest' with probability '1 - hostSettings.loss'.
+                    case HostSettings::State::kDiscard:
+                        if (_prng.nextCanonicalDouble() < hostSettings.loss) {
+                            std::string hostName = host ? (host->toString()) : "<unknown>";
+                            if (cmdRequest) {
+                                log() << "Discarding \"" << cmdRequest->getCommandName()
+                                      << "\" command with arguments "
+                                      << cmdRequest->getCommandArgs() << " from " << hostName;
+                            } else {
+                                log() << "Discarding message " << request << " from " << hostName;
+                            }
+                            continue;
+                        }
+                        break;
                 }
 
                 // Send the message we received from '_mp' to 'dest'. 'dest' returns a response for
@@ -288,11 +307,17 @@ private:
 
     stdx::mutex* _settingsMutex;
     HostSettingsMap* _settings;
+
+    PseudoRandom _prng;
 };
 
 class BridgeListener final : public Listener {
 public:
-    BridgeListener() : Listener("bridge", "", mongoBridgeGlobalParams.port) {}
+    BridgeListener()
+        : Listener("bridge", "", mongoBridgeGlobalParams.port),
+          _seedSource(mongoBridgeGlobalParams.seed) {
+        log() << "Setting random seed: " << mongoBridgeGlobalParams.seed;
+    }
 
     void acceptedMP(MessagingPort* mp) final {
         {
@@ -304,7 +329,7 @@ public:
             _ports.insert(mp);
         }
 
-        Forwarder f(mp, &_settingsMutex, &_settings);
+        Forwarder f(mp, &_settingsMutex, &_settings, _seedSource.nextInt64());
         stdx::thread t(f);
         t.detach();
     }
@@ -329,6 +354,8 @@ private:
 
     stdx::mutex _settingsMutex;
     HostSettingsMap _settings;
+
+    PseudoRandom _seedSource;
 };
 
 std::unique_ptr<mongo::BridgeListener> listener;

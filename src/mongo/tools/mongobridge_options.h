@@ -45,6 +45,7 @@ namespace moe = mongo::optionenvironment;
 
 struct MongoBridgeGlobalParams {
     int port = 0;
+    std::int64_t seed = 0;
     std::string destUri;
 
     MongoBridgeGlobalParams() = default;

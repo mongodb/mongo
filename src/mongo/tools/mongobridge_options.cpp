@@ -28,9 +28,11 @@
 
 #include "mongo/tools/mongobridge_options.h"
 
+#include <cstdint>
 #include <iostream>
 
 #include "mongo/base/status.h"
+#include "mongo/platform/random.h"
 #include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
@@ -38,19 +40,20 @@ namespace mongo {
 MongoBridgeGlobalParams mongoBridgeGlobalParams;
 
 Status addMongoBridgeOptions(moe::OptionSection* options) {
-    options->addOptionChaining("help", "help", moe::Switch, "produce help message");
+    options->addOptionChaining("help", "help", moe::Switch, "show this usage information");
 
+    options->addOptionChaining("port", "port", moe::Int, "port to listen on for MongoDB messages");
 
-    options->addOptionChaining("port", "port", moe::Int, "port to listen for mongo messages");
+    options->addOptionChaining("seed", "seed", moe::Long, "random seed to use");
 
-
-    options->addOptionChaining("dest", "dest", moe::String, "uri of remote mongod instance");
+    options->addOptionChaining("dest", "dest", moe::String, "URI of remote MongoDB process");
 
     return Status::OK();
 }
 
 void printMongoBridgeHelp(std::ostream* out) {
-    *out << "Usage: mongobridge --port <port> --dest <dest> [ --help ]" << std::endl;
+    *out << "Usage: mongobridge --port <port> --dest <dest> [ --seed <seed> ] [ --help ]"
+         << std::endl;
     *out << moe::startupOptions.helpString();
     *out << std::flush;
 }
@@ -75,6 +78,13 @@ Status storeMongoBridgeOptions(const moe::Environment& params,
 
     mongoBridgeGlobalParams.port = params["port"].as<int>();
     mongoBridgeGlobalParams.destUri = params["dest"].as<std::string>();
+
+    if (!params.count("seed")) {
+        std::unique_ptr<SecureRandom> seedSource{SecureRandom::create()};
+        mongoBridgeGlobalParams.seed = seedSource->nextInt64();
+    } else {
+        mongoBridgeGlobalParams.seed = params["seed"].as<int64_t>();
+    }
 
     return Status::OK();
 }

@@ -43,10 +43,11 @@ class StatusWith;
 class StringData;
 
 struct HostSettings {
-    enum class State { kForward, kHangUp };
+    enum class State { kForward, kHangUp, kDiscard };
 
     State state = State::kForward;
     Milliseconds delay{0};
+    double loss = 0.0;
 };
 
 using HostSettingsMap = std::unordered_map<HostAndPort, HostSettings>;
