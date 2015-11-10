@@ -80,6 +80,14 @@ public:
         return unittest::getFixtureConnectionString();
     }
 
+    void randomNumberGenerator(PseudoRandom* generator) {
+        _rng = generator;
+    }
+
+    PseudoRandom* randomNumberGenerator() {
+        return _rng;
+    }
+
     Deferred<StatusWith<RemoteCommandResponse>> runCommand(
         const TaskExecutor::CallbackHandle& cbHandle, const RemoteCommandRequest& request) {
         Deferred<StatusWith<RemoteCommandResponse>> deferred;
@@ -131,6 +139,7 @@ public:
 
 private:
     std::unique_ptr<NetworkInterfaceASIO> _net;
+    PseudoRandom* _rng = nullptr;
 };
 
 TEST_F(NetworkInterfaceASIOIntegrationTest, Ping) {
@@ -183,7 +192,8 @@ public:
                                                      << " but got " << status.toString()};
                       });
         if (_cancel) {
-            // TODO: have this happen at some random time in the future.
+            invariant(fixture->randomNumberGenerator());
+            sleepmillis(fixture->randomNumberGenerator()->nextInt32(10));
             fixture->net().cancelCommand(cb);
         }
         return out;
@@ -239,6 +249,7 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
 
     log() << "Random seed is " << seed;
     auto rng = PseudoRandom(seed);  // TODO: read from command line
+    randomNumberGenerator(&rng);
     log() << "Starting stress test...";
 
     ThreadPool::Options threadPoolOpts;
@@ -257,7 +268,7 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
                     [&rng, &pool, this] {
 
                         // stagger operations slightly to mitigate connection pool contention
-                        sleepmillis(10);
+                        sleepmillis(rng.nextInt32(10));
 
                         auto i = rng.nextCanonicalDouble();
 
