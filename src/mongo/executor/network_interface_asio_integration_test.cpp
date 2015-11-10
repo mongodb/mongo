@@ -160,7 +160,7 @@ public:
     using Fixture = NetworkInterfaceASIOIntegrationTest;
     using Pool = ThreadPoolInterface;
 
-    Deferred<Status> run(Fixture* fixture, Pool* pool) {
+    Deferred<Status> run(Fixture* fixture, Pool* pool, Milliseconds timeout = Milliseconds(5000)) {
         auto cb = makeCallbackHandle();
         auto self = *this;
         auto out =
@@ -168,7 +168,7 @@ public:
                                 {unittest::getFixtureConnectionString().getServers()[0],
                                  "admin",
                                  _command,
-                                 Seconds(5)})
+                                 timeout})
                 .then(pool,
                       [self](StatusWith<RemoteCommandResponse> resp) -> Status {
                           auto status = resp.isOK()
@@ -190,12 +190,11 @@ public:
     }
 
     static Deferred<Status> runTimeoutOp(Fixture* fixture, Pool* pool) {
-        // Timeout is 5 seconds.
         return StressTestOp(BSON("sleep" << 1 << "lock"
                                          << "none"
-                                         << "secs" << 10),
+                                         << "secs" << 1),
                             ErrorCodes::ExceededTimeLimit,
-                            false).run(fixture, pool);
+                            false).run(fixture, pool, Milliseconds(100));
     }
 
     static Deferred<Status> runCompleteOp(Fixture* fixture, Pool* pool) {
@@ -212,6 +211,14 @@ public:
                                          << "secs" << 10),
                             ErrorCodes::CallbackCanceled,
                             true).run(fixture, pool);
+    }
+
+    static Deferred<Status> runLongOp(Fixture* fixture, Pool* pool) {
+        return StressTestOp(BSON("sleep" << 1 << "lock"
+                                         << "none"
+                                         << "secs" << 30),
+                            ErrorCodes::OK,
+                            false).run(fixture, pool, RemoteCommandRequest::kNoTimeout);
     }
 
 private:
@@ -252,16 +259,17 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
                         // stagger operations slightly to mitigate connection pool contention
                         sleepmillis(10);
 
-                        switch (rng.nextInt32(3)) {
-                            case 0:
-                                return StressTestOp::runCancelOp(this, &pool);
-                            case 1:
-                                return StressTestOp::runCompleteOp(this, &pool);
-                            case 2:
-                                return StressTestOp::runTimeoutOp(this, &pool);
-                            default:
+                        auto i = rng.nextCanonicalDouble();
 
-                                MONGO_UNREACHABLE;
+                        if (i < .3) {
+                            return StressTestOp::runCancelOp(this, &pool);
+                        } else if (i < .7) {
+                            return StressTestOp::runCompleteOp(this, &pool);
+                        } else if (i < .99) {
+                            return StressTestOp::runTimeoutOp(this, &pool);
+                        } else {
+                            // Just a sprinkling of long ops, to mitigate connection pool contention
+                            return StressTestOp::runLongOp(this, &pool);
                         }
                     });
 
