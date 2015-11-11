@@ -1000,10 +1000,10 @@ HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
                    << alreadyElapsed << " have already elapsed";
         }
     } else {
-        ReplSetHeartbeatResponse hbr = hbResponse.getValue();
+        ReplSetHeartbeatResponse hbr = std::move(hbResponse.getValue());
         LOG(3) << "setUpValues: heartbeat response good for member _id:" << member.getId()
                << ", msg:  " << hbr.getHbMsg();
-        hbData.setUpValues(now, member.getHostAndPort(), hbr);
+        hbData.setUpValues(now, member.getHostAndPort(), std::move(hbr));
     }
 
     HeartbeatResponseAction nextAction;
@@ -1464,7 +1464,7 @@ void TopologyCoordinatorImpl::_setCurrentPrimaryForTest(int primaryIndex) {
             hbResponse.setHbMsg("");
             _hbdata[primaryIndex].setUpValues(_hbdata[primaryIndex].getLastHeartbeat(),
                                               _rsConfig.getMemberAt(primaryIndex).getHostAndPort(),
-                                              hbResponse);
+                                              std::move(hbResponse));
         }
         _currentPrimaryIndex = primaryIndex;
     }

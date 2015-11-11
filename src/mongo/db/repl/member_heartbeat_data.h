@@ -105,7 +105,7 @@ public:
     /**
      * Sets values in this object from the results of a successful heartbeat command.
      */
-    void setUpValues(Date_t now, const HostAndPort& host, ReplSetHeartbeatResponse hbResponse);
+    void setUpValues(Date_t now, const HostAndPort& host, ReplSetHeartbeatResponse&& hbResponse);
 
     /**
      * Sets values in this object from the results of a erroring/failed heartbeat command.
