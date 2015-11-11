@@ -1,11 +1,9 @@
 (function() {
 
+    load('jstests/common/check_version.js');
+
     if (typeof getToolTest === 'undefined') {
         load('jstests/configs/plain_28.config.js');
-    }
-
-    if (TestData && TestData.storageEngine === 'wiredTiger'){
-      return
     }
 
     // Tests that running mongorestore with --keepIndexVersion does not 
@@ -24,6 +22,16 @@
     // the db and collection we will use
     var testDB = toolTest.db.getSiblingDB('test');
     var testColl = testDB.coll;
+
+    if (isAtLeastVersion(testDB.version(), '3.1.0')) {
+          jsTest.log("skipping test on "+testDB.version());
+          return;
+    } else {
+      if (TestData && TestData.storageEngine === 'wiredTiger') {
+          jsTest.log("skipping test on "+testDB.version()+" when storage engine is wiredTiger");
+          return;
+      }
+    }
 
     // create a version 0 index on the collection
     testColl.ensureIndex({num: 1}, {v: 0});

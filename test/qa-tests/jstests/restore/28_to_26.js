@@ -43,6 +43,7 @@
     toolTest.db = null;
     toolTest.options = toolTest.options || {};
     toolTest.options.binVersion = '2.6';
+    resetDbpath(toolTest.dbpath);
     toolTest.startDB('foo');
 
     // refresh the db and coll reference

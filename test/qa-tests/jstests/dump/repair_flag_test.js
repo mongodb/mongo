@@ -6,14 +6,22 @@ load('jstests/common/check_version.js');
 
 (function() {
   // skip tests requiring wiredTiger storage engine, since repair is not supported
-  if (TestData && TestData.storageEngine === 'wiredTiger') {
-    return;
-  }
-
   resetDbpath('dump');
   var toolTest = getToolTest('repairFlagTest');
   var commonToolArgs = getCommonToolArguments();
   var db = toolTest.db.getSiblingDB('foo');
+
+  if (isAtLeastVersion(db.version(), '3.1.0')) {
+    if (TestData && TestData.storageEngine != 'mmapv1') {
+        jsTest.log("skipping test on "+db.version()+" when storage engine is not mmapv1");
+        return;
+    }
+  } else {
+    if (TestData && TestData.storageEngine === 'wiredTiger') {
+        jsTest.log("skipping test on "+db.version()+" when storage engine is wiredTiger");
+        return;
+    }
+  }
 
   db.dropDatabase();
   db.bar.insert({ x: 1 });
