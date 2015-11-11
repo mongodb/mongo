@@ -628,7 +628,7 @@ void Explain::explainStages(PlanExecutor* exec,
 
     // Get stats for the rejected plans, if more than one plan was considered.
     vector<unique_ptr<PlanStageStats>> allPlansStats;
-    if (mps && verbosity >= ExplainCommon::EXEC_ALL_PLANS) {
+    if (mps) {
         auto mpsStats = mps->getStats();
         for (size_t i = 0; i < mpsStats->children.size(); ++i) {
             if (i != static_cast<size_t>(mps->bestPlanIdx())) {
