@@ -281,7 +281,9 @@ struct __wt_cursor_join_endpoint {
 #define	WT_CURJOIN_END_LT	0x01		/* include values <  cursor */
 #define	WT_CURJOIN_END_EQ	0x02		/* include values == cursor */
 #define	WT_CURJOIN_END_GT	0x04		/* include values >  cursor */
-#define	WT_CURJOIN_END_OWNKEY	0x08		/* must free key's data */
+#define	WT_CURJOIN_END_GE	(WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ)
+#define	WT_CURJOIN_END_LE	(WT_CURJOIN_END_LT | WT_CURJOIN_END_EQ)
+#define	WT_CURJOIN_END_OWN_KEY	0x08		/* must free key's data */
 	uint8_t			 flags;		/* range for this endpoint */
 };
 
@@ -294,10 +296,13 @@ struct __wt_cursor_join_entry {
 	uint64_t		 count;		/* approx number of matches */
 
 #define	WT_CURJOIN_ENTRY_BLOOM		0x01	/* use a bloom filter */
-#define	WT_CURJOIN_ENTRY_OWN_BLOOM	0x02	/* this entry owns the bloom */
+#define	WT_CURJOIN_ENTRY_DISJUNCTION	0x02	/* endpoints are or-ed */
+#define	WT_CURJOIN_ENTRY_OWN_BLOOM	0x04	/* this entry owns the bloom */
 	uint8_t			 flags;
 
-	WT_CURSOR_JOIN_ENDPOINT	 ends[2];	 /* reference endpoints */
+	WT_CURSOR_JOIN_ENDPOINT	*ends;		 /* reference endpoints */
+	size_t			 ends_allocated;
+	size_t			 ends_next;
 };
 
 struct __wt_cursor_join {
