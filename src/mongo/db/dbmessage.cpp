@@ -39,7 +39,7 @@ using std::stringstream;
 
 string Message::toString() const {
     stringstream ss;
-    ss << "op: " << opToString(operation()) << " len: " << size();
+    ss << "op: " << networkOpToString(operation()) << " len: " << size();
     if (operation() >= 2000 && operation() < 2100) {
         DbMessage d(*this);
         ss << " ns: " << d.getns();

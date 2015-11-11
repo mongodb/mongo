@@ -160,7 +160,7 @@ void noteInCriticalSection(WriteErrorDetail* staleError) {
  * Translates write item type to wire protocol op code. Helper for
  * WriteBatchExecutor::applyWriteItem().
  */
-Operation getOpCode(const BatchItemRef& currWrite) {
+NetworkOp getOpCode(const BatchItemRef& currWrite) {
     switch (currWrite.getRequest()->getBatchType()) {
         case BatchedCommandRequest::BatchType_Insert:
             return dbInsert;
@@ -486,7 +486,7 @@ static void beginCurrentOp(OperationContext* txn, const BatchItemRef& currWrite)
     stdx::lock_guard<Client> lk(*txn->getClient());
     CurOp* const currentOp = CurOp::get(txn);
     currentOp->setNetworkOp_inlock(getOpCode(currWrite));
-    currentOp->setLogicalOp_inlock(getOpCode(currWrite));
+    currentOp->setLogicalOp_inlock(networkOpToLogicalOp(getOpCode(currWrite)));
     currentOp->ensureStarted();
     currentOp->setNS_inlock(currWrite.getRequest()->getNS().ns());
 
@@ -541,8 +541,8 @@ static void logCurOpError(CurOp* currentOp, WriteErrorDetail* opError) {
     currentOp->debug().exceptionInfo =
         ExceptionInfo(opError->getErrMessage(), opError->getErrCode());
 
-    LOG(3) << " Caught Assertion in " << opToString(currentOp->getNetworkOp()) << ", continuing "
-           << causedBy(opError->getErrMessage());
+    LOG(3) << " Caught Assertion in " << networkOpToString(currentOp->getNetworkOp())
+           << ", continuing " << causedBy(opError->getErrMessage());
 }
 
 static void finishCurrentOp(OperationContext* txn, WriteErrorDetail* opError) {
@@ -552,7 +552,7 @@ static void finishCurrentOp(OperationContext* txn, WriteErrorDetail* opError) {
     recordCurOpMetrics(txn);
     Top::get(txn->getClient()->getServiceContext())
         .record(currentOp->getNS(),
-                currentOp->getNetworkOp(),
+                currentOp->getLogicalOp(),
                 1,  // "write locked"
                 currentOp->totalTimeMicros(),
                 currentOp->isCommand());
@@ -811,7 +811,7 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
     {
         stdx::lock_guard<Client> lk(*_txn->getClient());
         currentOp = CurOp::get(_txn);
-        currentOp->setLogicalOp_inlock(dbInsert);
+        currentOp->setLogicalOp_inlock(LogicalOp::opInsert);
         currentOp->ensureStarted();
         currentOp->setNS_inlock(request.getNS().ns());
         currentOp->debug().ninserted = 0;
@@ -852,6 +852,16 @@ void WriteBatchExecutor::execInserts(const BatchedCommandRequest& request,
                 break;
         }
     }
+
+    // TODO: Move Top and CurOp metrics management into an RAII object.
+    currentOp->done();
+    recordCurOpMetrics(_txn);
+    Top::get(_txn->getClient()->getServiceContext())
+        .record(currentOp->getNS(),
+                currentOp->getLogicalOp(),
+                1,  // "write locked"
+                currentOp->totalTimeMicros(),
+                currentOp->isCommand());
 }
 
 void WriteBatchExecutor::execUpdate(const BatchItemRef& updateItem,

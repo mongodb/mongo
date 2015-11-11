@@ -59,10 +59,10 @@ namespace {
 StatusWith<std::tuple<CursorId, BSONArray>> getBatchFromReply(std::uint32_t requestId,
                                                               const Message& response) {
     auto header = response.header();
-    if (header.getOperation() != mongo::opReply) {
+    if (header.getNetworkOp() != mongo::opReply) {
         return {ErrorCodes::ProtocolError,
                 str::stream() << "Expected to be decoding an OP_REPLY but got "
-                              << mongo::opToString(header.getOperation())};
+                              << mongo::networkOpToString(header.getNetworkOp())};
     }
 
     if (header.getResponseTo() != requestId) {

@@ -36,7 +36,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 
@@ -73,7 +72,7 @@ Top& Top::get(ServiceContext* service) {
     return getTop(service);
 }
 
-void Top::record(StringData ns, int op, int lockType, long long micros, bool command) {
+void Top::record(StringData ns, LogicalOp logicalOp, int lockType, long long micros, bool command) {
     if (ns[0] == '?')
         return;
 
@@ -82,16 +81,16 @@ void Top::record(StringData ns, int op, int lockType, long long micros, bool com
     // cout << "record: " << ns << "\t" << op << "\t" << command << endl;
     stdx::lock_guard<SimpleMutex> lk(_lock);
 
-    if ((command || op == dbQuery) && ns == _lastDropped) {
+    if ((command || logicalOp == LogicalOp::opQuery) && ns == _lastDropped) {
         _lastDropped = "";
         return;
     }
 
     CollectionData& coll = _usage[hashedNs];
-    _record(coll, op, lockType, micros, command);
+    _record(coll, logicalOp, lockType, micros);
 }
 
-void Top::_record(CollectionData& c, int op, int lockType, long long micros, bool command) {
+void Top::_record(CollectionData& c, LogicalOp logicalOp, int lockType, long long micros) {
     c.total.inc(micros);
 
     if (lockType > 0)
@@ -99,40 +98,32 @@ void Top::_record(CollectionData& c, int op, int lockType, long long micros, boo
     else if (lockType < 0)
         c.readLock.inc(micros);
 
-    switch (op) {
-        case 0:
+    switch (logicalOp) {
+        case LogicalOp::opInvalid:
             // use 0 for unknown, non-specific
             break;
-        case dbUpdate:
+        case LogicalOp::opUpdate:
             c.update.inc(micros);
             break;
-        case dbInsert:
+        case LogicalOp::opInsert:
             c.insert.inc(micros);
             break;
-        case dbQuery:
-            if (command)
-                c.commands.inc(micros);
-            else
-                c.queries.inc(micros);
+        case LogicalOp::opQuery:
+            c.queries.inc(micros);
             break;
-        case dbGetMore:
+        case LogicalOp::opGetMore:
             c.getmore.inc(micros);
             break;
-        case dbDelete:
+        case LogicalOp::opDelete:
             c.remove.inc(micros);
             break;
-        case dbKillCursors:
+        case LogicalOp::opKillCursors:
             break;
-        case opReply:
-        case dbMsg:
-        case dbCommandReply:
-            log() << "unexpected op in Top::record: " << op << endl;
-            break;
-        case dbCommand:
+        case LogicalOp::opCommand:
             c.commands.inc(micros);
             break;
         default:
-            log() << "unknown op in Top::record: " << op << endl;
+            MONGO_UNREACHABLE;
     }
 }
 

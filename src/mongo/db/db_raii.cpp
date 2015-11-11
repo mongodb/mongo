@@ -103,7 +103,7 @@ AutoGetCollectionForRead::~AutoGetCollectionForRead() {
     auto currentOp = CurOp::get(_txn);
     Top::get(_txn->getClient()->getServiceContext())
         .record(currentOp->getNS(),
-                currentOp->getNetworkOp(),
+                currentOp->getLogicalOp(),
                 -1,  // "read locked"
                 _timer.micros(),
                 currentOp->isCommand());
@@ -197,7 +197,7 @@ OldClientContext::~OldClientContext() {
     auto currentOp = CurOp::get(_txn);
     Top::get(_txn->getClient()->getServiceContext())
         .record(currentOp->getNS(),
-                currentOp->getNetworkOp(),
+                currentOp->getLogicalOp(),
                 _txn->lockState()->isWriteLocked() ? 1 : -1,
                 _timer.micros(),
                 currentOp->isCommand());

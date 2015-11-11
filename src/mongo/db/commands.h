@@ -245,8 +245,8 @@ public:
         return false;
     }
 
-    virtual Operation getLogicalOp() const {
-        return dbCommand;
+    virtual LogicalOp getLogicalOp() const {
+        return LogicalOp::opCommand;
     }
 
     /** @param webUI expose the command in the web ui as localhost:28017/<name>

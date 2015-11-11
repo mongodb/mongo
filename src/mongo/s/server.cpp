@@ -140,8 +140,8 @@ public:
             r.process(txn.get());
         } catch (const AssertionException& ex) {
             LOG(ex.isUserAssertion() ? 1 : 0) << "Assertion failed"
-                                              << " while processing " << opToString(m.operation())
-                                              << " op"
+                                              << " while processing "
+                                              << networkOpToString(m.operation()) << " op"
                                               << " for " << r.getnsIfPresent() << causedBy(ex);
 
             if (r.expectResponse()) {
@@ -153,7 +153,7 @@ public:
             LastError::get(cc()).setLastError(ex.getCode(), ex.what());
         } catch (const DBException& ex) {
             log() << "Exception thrown"
-                  << " while processing " << opToString(m.operation()) << " op"
+                  << " while processing " << networkOpToString(m.operation()) << " op"
                   << " for " << r.getnsIfPresent() << causedBy(ex);
 
             if (r.expectResponse()) {

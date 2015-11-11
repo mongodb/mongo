@@ -101,8 +101,8 @@ public:
         help << "query for documents";
     }
 
-    Operation getLogicalOp() const override {
-        return dbQuery;
+    LogicalOp getLogicalOp() const override {
+        return LogicalOp::opQuery;
     }
 
     /**

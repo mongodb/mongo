@@ -47,7 +47,7 @@ LegacyReply::LegacyReply(const Message* message) : _message(std::move(message)) 
     QueryResult::View qr = _message->singleData().view2ptr();
 
     // should be checked by caller.
-    invariant(qr.msgdata().getOperation() == opReply);
+    invariant(qr.msgdata().getNetworkOp() == opReply);
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Got legacy command reply with a bad cursorId field,"

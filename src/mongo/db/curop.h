@@ -147,11 +147,11 @@ public:
 
     // basic options
     // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_COMMAND, etc.
-    Operation networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
+    NetworkOp networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
     // _logicalOp is the logical operation type, ie 'dbQuery' regardless of whether this is an
     // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_COMMAND.
     // Similarly, the return value will be dbGetMore for both OP_GET_MORE and getMore command.
-    Operation logicalOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
+    LogicalOp logicalOp{LogicalOp::opInvalid};  // only set this through setNetworkOp_inlock()
     bool iscommand{false};
     BSONObj query{};
     BSONObj updateobj{};
@@ -259,7 +259,7 @@ public:
     /**
      * Sets the type of the current network operation.
      */
-    void setNetworkOp_inlock(Operation op) {
+    void setNetworkOp_inlock(NetworkOp op) {
         _networkOp = op;
         _debug.networkOp = op;
     }
@@ -267,7 +267,7 @@ public:
     /**
      * Sets the type of the current logical operation.
      */
-    void setLogicalOp_inlock(Operation op) {
+    void setLogicalOp_inlock(LogicalOp op) {
         _logicalOp = op;
         _debug.logicalOp = op;
     }
@@ -317,7 +317,7 @@ public:
      * Gets the network operation type. No lock is required if called by the thread executing
      * the operation, but the lock must be held if called from another thread.
      */
-    Operation getNetworkOp() const {
+    NetworkOp getNetworkOp() const {
         return _networkOp;
     }
 
@@ -325,7 +325,7 @@ public:
      * Gets the logical operation type. No lock is required if called by the thread executing
      * the operation, but the lock must be held if called from another thread.
      */
-    Operation getLogicalOp() const {
+    LogicalOp getLogicalOp() const {
         return _logicalOp;
     }
 
@@ -499,11 +499,11 @@ private:
     long long _end{0};
 
     // _networkOp represents the network-level op code: OP_QUERY, OP_GET_MORE, OP_COMMAND, etc.
-    Operation _networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
+    NetworkOp _networkOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
     // _logicalOp is the logical operation type, ie 'dbQuery' regardless of whether this is an
     // OP_QUERY find, a find command using OP_QUERY, or a find command using OP_COMMAND.
     // Similarly, the return value will be dbGetMore for both OP_GET_MORE and getMore command.
-    Operation _logicalOp{opInvalid};  // only set this through setNetworkOp_inlock() to keep synced
+    LogicalOp _logicalOp{LogicalOp::opInvalid};  // only set this through setNetworkOp_inlock()
 
     bool _isCommand{false};
     int _dbprofile{0};  // 0=off, 1=slow, 2=all

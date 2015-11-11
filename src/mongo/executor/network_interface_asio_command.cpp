@@ -145,8 +145,8 @@ ResponseStatus decodeRPC(Message* received,
             return Status(ErrorCodes::RPCProtocolNegotiationFailed,
                           str::stream() << "Mismatched RPC protocols - request was '"
                                         << requestProtocol.getValue().toString() << "' '"
-                                        << " but reply was '" << opToString(received->operation())
-                                        << "'");
+                                        << " but reply was '"
+                                        << networkOpToString(received->operation()) << "'");
         }
         auto ownedCommandReply = reply->getCommandReply().getOwned();
         auto ownedReplyMetadata = reply->getMetadata().getOwned();

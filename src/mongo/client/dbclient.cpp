@@ -326,8 +326,8 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
 
     uassert(ErrorCodes::RPCProtocolNegotiationFailed,
             str::stream() << "Mismatched RPC protocols - request was '"
-                          << opToString(requestMsg.operation()) << "' '"
-                          << " but reply was '" << opToString(replyMsg.operation()) << "' ",
+                          << networkOpToString(requestMsg.operation()) << "' '"
+                          << " but reply was '" << networkOpToString(replyMsg.operation()) << "' ",
             requestBuilder->getProtocol() == commandReply->getProtocol());
 
     if (ErrorCodes::SendStaleConfig ==

@@ -293,7 +293,7 @@ void CurOp::reportState(BSONObjBuilder* builder) {
         builder->append("microsecs_running", static_cast<long long int>(elapsedMicros()));
     }
 
-    builder->append("op", opToString(_logicalOp));
+    builder->append("op", logicalOpToString(_logicalOp));
     builder->append("ns", _ns);
 
     if (_networkOp == dbInsert) {
@@ -452,7 +452,7 @@ string OpDebug::report(const CurOp& curop, const SingleThreadedLockStats& lockSt
     if (iscommand)
         s << "command ";
     else
-        s << opToString(networkOp) << ' ';
+        s << networkOpToString(networkOp) << ' ';
 
     s << curop.getNS();
 
@@ -578,7 +578,7 @@ void OpDebug::append(const CurOp& curop,
                      BSONObjBuilder& b) const {
     const size_t maxElementSize = 50 * 1024;
 
-    b.append("op", opToString(logicalOp));
+    b.append("op", logicalOpToString(logicalOp));
 
     NamespaceString nss = NamespaceString(curop.getNS());
     b.append("ns", nss.ns());
@@ -587,7 +587,7 @@ void OpDebug::append(const CurOp& curop,
         appendAsObjOrString(
             "query", upconvertQueryEntry(query, nss, ntoreturn, ntoskip), maxElementSize, &b);
     } else if (!query.isEmpty()) {
-        const char* fieldName = (logicalOp == dbCommand) ? "command" : "query";
+        const char* fieldName = (logicalOp == LogicalOp::opCommand) ? "command" : "query";
         appendAsObjOrString(fieldName, query, maxElementSize, &b);
     } else if (!iscommand && curop.haveQuery()) {
         appendAsObjOrString("query", curop.query(), maxElementSize, &b);

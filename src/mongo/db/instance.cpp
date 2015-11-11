@@ -413,7 +413,7 @@ void assembleResponse(OperationContext* txn,
                       DbResponse& dbresponse,
                       const HostAndPort& remote) {
     // before we lock...
-    Operation op = m.operation();
+    NetworkOp op = m.operation();
     bool isCommand = false;
 
     DbMessage dbmsg(m);
@@ -496,7 +496,7 @@ void assembleResponse(OperationContext* txn,
         // Commands handling code will reset this if the operation is a command
         // which is logically a basic CRUD operation like query, insert, etc.
         currentOp.setNetworkOp_inlock(op);
-        currentOp.setLogicalOp_inlock(op);
+        currentOp.setLogicalOp_inlock(networkOpToLogicalOp(op));
     }
 
     OpDebug& debug = currentOp.debug();
@@ -558,7 +558,7 @@ void assembleResponse(OperationContext* txn,
                     uassert(18663,
                             str::stream() << "legacy writeOps not longer supported for "
                                           << "versioned connections, ns: " << nsString.ns()
-                                          << ", op: " << opToString(op)
+                                          << ", op: " << networkOpToString(op)
                                           << ", remote: " << remote.toString(),
                             connInfo == NULL);
                 }
@@ -577,13 +577,15 @@ void assembleResponse(OperationContext* txn,
             }
         } catch (const UserException& ue) {
             LastError::get(c).setLastError(ue.getCode(), ue.getInfo().msg);
-            MONGO_LOG_COMPONENT(3, responseComponent) << " Caught Assertion in " << opToString(op)
-                                                      << ", continuing " << ue.toString() << endl;
+            MONGO_LOG_COMPONENT(3, responseComponent) << " Caught Assertion in "
+                                                      << networkOpToString(op) << ", continuing "
+                                                      << ue.toString() << endl;
             debug.exceptionInfo = ue.getInfo();
         } catch (const AssertionException& e) {
             LastError::get(c).setLastError(e.getCode(), e.getInfo().msg);
-            MONGO_LOG_COMPONENT(3, responseComponent) << " Caught Assertion in " << opToString(op)
-                                                      << ", continuing " << e.toString() << endl;
+            MONGO_LOG_COMPONENT(3, responseComponent) << " Caught Assertion in "
+                                                      << networkOpToString(op) << ", continuing "
+                                                      << e.toString() << endl;
             debug.exceptionInfo = e.getInfo();
             shouldLog = true;
         }

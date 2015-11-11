@@ -55,7 +55,7 @@ class MessagingPort;
 
 typedef uint32_t MSGID;
 
-enum Operation {
+enum NetworkOp {
     opInvalid = 0,
     opReply = 1,     /* reply. responseTo is set. */
     dbMsg = 1000,    /* generic msg command followed by a std::string */
@@ -70,11 +70,48 @@ enum Operation {
     dbCommandReply = 2009,
 };
 
+enum class LogicalOp {
+    opInvalid,
+    opMsg,
+    opUpdate,
+    opInsert,
+    opQuery,
+    opGetMore,
+    opDelete,
+    opKillCursors,
+    opCommand,
+};
+
+static inline LogicalOp networkOpToLogicalOp(NetworkOp networkOp) {
+    switch (networkOp) {
+        case dbMsg:
+            return LogicalOp::opMsg;
+        case dbUpdate:
+            return LogicalOp::opUpdate;
+        case dbInsert:
+            return LogicalOp::opInsert;
+        case dbQuery:
+            return LogicalOp::opQuery;
+        case dbGetMore:
+            return LogicalOp::opGetMore;
+        case dbDelete:
+            return LogicalOp::opDelete;
+        case dbKillCursors:
+            return LogicalOp::opKillCursors;
+        case dbCommand:
+            return LogicalOp::opCommand;
+        default:
+            int op = int(networkOp);
+            massert(34348, str::stream() << "cannot translate opcode " << op, !op);
+            return LogicalOp::opInvalid;
+    }
+}
+
 bool doesOpGetAResponse(int op);
 
-inline const char* opToString(int op) {
-    switch (op) {
-        case 0:
+inline const char* networkOpToString(NetworkOp networkOp) {
+    switch (networkOp) {
+        case opInvalid:
             return "none";
         case opReply:
             return "reply";
@@ -97,8 +134,34 @@ inline const char* opToString(int op) {
         case dbCommandReply:
             return "commandReply";
         default:
+            int op = static_cast<int>(networkOp);
             massert(16141, str::stream() << "cannot translate opcode " << op, !op);
             return "";
+    }
+}
+
+inline const char* logicalOpToString(LogicalOp logicalOp) {
+    switch (logicalOp) {
+        case LogicalOp::opInvalid:
+            return "none";
+        case LogicalOp::opMsg:
+            return "msg";
+        case LogicalOp::opUpdate:
+            return "update";
+        case LogicalOp::opInsert:
+            return "insert";
+        case LogicalOp::opQuery:
+            return "query";
+        case LogicalOp::opGetMore:
+            return "getmore";
+        case LogicalOp::opDelete:
+            return "remove";
+        case LogicalOp::opKillCursors:
+            return "killcursors";
+        case LogicalOp::opCommand:
+            return "command";
+        default:
+            MONGO_UNREACHABLE;
     }
 }
 
@@ -244,8 +307,8 @@ public:
         return header().getResponseTo();
     }
 
-    Operation getOperation() const {
-        return Operation(header().getOpCode());
+    NetworkOp getNetworkOp() const {
+        return NetworkOp(header().getOpCode());
     }
 
     const char* data() const {
@@ -255,14 +318,14 @@ public:
     bool valid() const {
         if (getLen() <= 0 || getLen() > (4 * BSONObjMaxInternalSize))
             return false;
-        if (getOperation() < 0 || getOperation() > 30000)
+        if (getNetworkOp() < 0 || getNetworkOp() > 30000)
             return false;
         return true;
     }
 
     int64_t getCursor() const {
         verify(getResponseTo() > 0);
-        verify(getOperation() == opReply);
+        verify(getNetworkOp() == opReply);
         return ConstDataView(data() + sizeof(int32_t)).read<LittleEndian<int64_t>>();
     }
 
@@ -362,8 +425,8 @@ public:
         return _buf ? _buf : _data[0].first;
     }
 
-    Operation operation() const {
-        return header().getOperation();
+    NetworkOp operation() const {
+        return header().getNetworkOp();
     }
 
     MsgData::View singleData() const {

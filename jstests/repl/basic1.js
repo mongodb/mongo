@@ -139,7 +139,7 @@ x = { _id : 1 , x : 1 }
 assert.eq( x , am.mu1.findOne() , "mu1" );
 assert.soon( function(){ z = as.mu1.findOne(); printjson( z ); return friendlyEqual( x , z ); } , "mu2" )
 
-// profiling - this sould be last
+// profiling - this should be last
 
 am.setProfilingLevel( 2 )
 am.foo.insert({ x: 1 }, writeOption);
