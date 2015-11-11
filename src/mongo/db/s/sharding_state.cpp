@@ -559,7 +559,7 @@ Status ShardingState::_waitForInitialization() {
                        "Sharding state initialization has reached an invalid state."));
             break;
         case InitializationState::kInitialized:
-            fassertStatusOK(28842, _initializationStatus);
+            fassertStatusOK(34349, _initializationStatus);
             return Status::OK();
         case InitializationState::kError:
             return Status(ErrorCodes::ManualInterventionRequired,
