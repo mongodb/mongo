@@ -28,7 +28,6 @@
 
 #include "mongo/tools/mongobridge_options.h"
 
-#include <cstdint>
 #include <iostream>
 
 #include "mongo/base/status.h"
