@@ -59,9 +59,9 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
 #include "mongo/s/catalog/forwarding_catalog_manager.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/config.h"
-#include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/mongos_options.h"
 #include "mongo/s/query/cluster_cursor_cleanup_job.h"
@@ -248,7 +248,6 @@ static ExitCode runMongosServer() {
     }
 
     balancer.go();
-    cursorCache.startTimeoutThread();
     clusterCursorCleanupJob.go();
 
     UserCacheInvalidator cacheInvalidatorThread(getGlobalAuthorizationManager());

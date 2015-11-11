@@ -32,9 +32,10 @@
 
 #include "mongo/s/commands/cluster_commands_common.h"
 
+#include "mongo/client/parallel.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/s/cursors.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/stale_exception.h"

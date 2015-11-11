@@ -65,8 +65,6 @@ public:
         return _id;
     }
 
-    void reply(Message& response, const std::string& fromServer);
-
     Message& m() {
         return _m;
     }

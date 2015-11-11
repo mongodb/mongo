@@ -567,7 +567,7 @@ std::string runQuery(OperationContext* txn,
     // bb is used to hold query results
     // this buffer should contain either requested documents per query or
     // explain information, but not both
-    BufBuilder bb(32768);
+    BufBuilder bb(FindCommon::kInitReplyBufferSize);
     bb.skip(sizeof(QueryResult::Value));
 
     // How many results have we obtained from the executor?

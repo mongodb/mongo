@@ -39,6 +39,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/parallel.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -47,18 +48,19 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/bson_serializable.h"
 #include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_explain.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
-#include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/request.h"
@@ -78,73 +80,6 @@ using std::set;
 using std::string;
 using std::stringstream;
 using std::vector;
-
-static bool _isSystemIndexes(const char* ns) {
-    return nsToCollectionSubstring(ns) == "system.indexes";
-}
-
-/**
- * Returns true if request is a query for sharded indexes.
- */
-static bool doShardedIndexQuery(OperationContext* txn, Request& request, const QuerySpec& qSpec) {
-    // Extract the ns field from the query, which may be embedded within the "query" or
-    // "$query" field.
-    auto nsField = qSpec.filter()["ns"];
-    if (nsField.eoo()) {
-        return false;
-    }
-    const NamespaceString indexNSSQuery(nsField.str());
-
-    auto status = grid.catalogCache()->getDatabase(txn, indexNSSQuery.db().toString());
-    if (!status.isOK()) {
-        return false;
-    }
-
-    shared_ptr<DBConfig> config = status.getValue();
-    if (!config->isSharded(indexNSSQuery.ns())) {
-        return false;
-    }
-
-    // if you are querying on system.indexes, we need to make sure we go to a shard
-    // that actually has chunks. This is not a perfect solution (what if you just
-    // look at all indexes), but better than doing nothing.
-
-    ShardPtr shard;
-    ChunkManagerPtr cm;
-    config->getChunkManagerOrPrimary(txn, indexNSSQuery.ns(), cm, shard);
-    if (cm) {
-        set<ShardId> shardIds;
-        cm->getAllShardIds(&shardIds);
-        verify(shardIds.size() > 0);
-        shard = grid.shardRegistry()->getShard(txn, *shardIds.begin());
-    }
-
-    ShardConnection dbcon(shard->getConnString(), request.getns());
-    DBClientBase& c = dbcon.conn();
-
-    string actualServer;
-
-    Message response;
-    bool ok = c.call(request.m(), response, true, &actualServer);
-    uassert(10200, "mongos: error calling db", ok);
-
-    {
-        QueryResult::View qr = response.singleData().view2ptr();
-        if (qr.getResultFlags() & ResultFlag_ShardConfigStale) {
-            dbcon.done();
-            // Version is zero b/c this is deprecated codepath
-            throw RecvStaleConfigException(request.getns(),
-                                           "Strategy::doQuery",
-                                           ChunkVersion(0, 0, OID()),
-                                           ChunkVersion(0, 0, OID()));
-        }
-    }
-
-    request.reply(response, actualServer.size() ? actualServer : c.getServerAddress());
-    dbcon.done();
-
-    return true;
-}
 
 void Strategy::queryOp(OperationContext* txn, Request& request) {
     verify(!NamespaceString(request.getns()).isCommand());
@@ -230,9 +165,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
     auto cursorId = ClusterFind::runQuery(txn, *canonicalQuery.getValue(), readPreference, &batch);
     uassertStatusOK(cursorId.getStatus());
 
-    // TODO: this constant should be shared between mongos and mongod, and should not be inside
-    // ShardedClientCursor.
-    BufBuilder buffer(ShardedClientCursor::INIT_REPLY_BUFFER_SIZE);
+    BufBuilder buffer(FindCommon::kInitReplyBufferSize);
 
     // Fill out the response buffer.
     int numResults = 0;
@@ -462,7 +395,6 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
     const NamespaceString nss(ns);
     auto statusGetDb = grid.catalogCache()->getDatabase(txn, nss.db().toString());
     if (statusGetDb == ErrorCodes::NamespaceNotFound) {
-        cursorCache.remove(id);
         replyToQuery(ResultFlag_CursorNotFound, request.p(), request.m(), 0, 0, 0);
         return;
     }
@@ -484,10 +416,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
     uassertStatusOK(cursorResponse.getStatus());
 
     // Build the response document.
-    //
-    // TODO: this constant should be shared between mongos and mongod, and should not be inside
-    // ShardedClientCursor.
-    BufBuilder buffer(ShardedClientCursor::INIT_REPLY_BUFFER_SIZE);
+    BufBuilder buffer(FindCommon::kInitReplyBufferSize);
 
     int numResults = 0;
     for (const auto& obj : cursorResponse.getValue().getBatch()) {
