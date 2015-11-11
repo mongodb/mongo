@@ -43,9 +43,7 @@ class TaskExecutor;
 /**
  * Utility function to create a cursor based on existing cursor on a remote instance.  'cmdResult'
  * must be the response object generated upon creation of the cursor. The newly created cursor will
- * use 'executor' to retrieve batches of results from the shards and is stored with 'cursorManager'
- * (unless 'useClusterClientCursor' is set to false, in which case the cursor is stored with the
- * 'cursorCache' singleton).
+ * use 'executor' to retrieve batches of results from the shards and is stored with 'cursorManager'.
  *
  * If 'cmdResult' does not describe a command cursor response document or no cursor is specified,
  * returns 'cmdResult'. If a parsing error occurs, returns an error Status. Otherwise, returns a

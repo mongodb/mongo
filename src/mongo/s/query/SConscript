@@ -104,11 +104,6 @@ env.Library(
         "cluster_client_cursor",
         "cluster_cursor_manager",
     ],
-    LIBDEPS_TAGS=[
-        # Circular with libmongoscore.  TODO: This tag should be removed as part of the work for
-        # SERVER-20758.
-        'incomplete',
-    ],
 )
 
 env.Library(
