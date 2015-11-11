@@ -27,7 +27,7 @@ func TestBufferlessBSONSource(t *testing.T) {
 				NewBufferlessBSONSource(ioutil.NopCloser(writeBuf)))
 			docs := []bson.M{}
 			count := 0
-			var doc *bson.M = &bson.M{}
+			doc := &bson.M{}
 			for bsonSource.Next(doc) {
 				count++
 				docs = append(docs, *doc)
