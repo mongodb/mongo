@@ -179,7 +179,7 @@ void BackgroundSync::shutdown() {
 
     // Clear the buffer in case the producerThread is waiting in push() due to a full queue.
     invariant(inShutdown());
-    _buffer.clear();
+    clearBuffer();
     _pause = true;
 
     // Wake up producerThread so it notices that we're in shutdown
@@ -234,7 +234,10 @@ void BackgroundSync::_producerThread() {
             // in the queue.
             const boost::optional<BSONObj> lastObjectPushed = _buffer.lastObjectPushed();
             if (!lastObjectPushed || !lastObjectPushed->isEmpty()) {
-                _buffer.pushEvenIfFull(BSONObj());
+                const BSONObj sentinelDoc;
+                _buffer.pushEvenIfFull(sentinelDoc);
+                bufferCountGauge.increment();
+                bufferSizeGauge.increment(sentinelDoc.objsize());
             }
         }
         sleepsecs(1);
@@ -676,6 +679,10 @@ void BackgroundSync::waitUntilPaused() {
 
 void BackgroundSync::clearBuffer() {
     _buffer.clear();
+    const auto count = bufferCountGauge.get();
+    bufferCountGauge.decrement(count);
+    const auto size = bufferSizeGauge.get();
+    bufferSizeGauge.decrement(size);
 }
 
 long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
@@ -721,8 +728,9 @@ void BackgroundSync::setInitialSyncRequestedFlag(bool value) {
 }
 
 void BackgroundSync::pushTestOpToBuffer(const BSONObj& op) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _buffer.push(op);
+    bufferCountGauge.increment();
+    bufferSizeGauge.increment(op.objsize());
 }
 
 
