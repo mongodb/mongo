@@ -437,7 +437,8 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	remain = moved_entries - chunk * (children - 1);
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
+	    "%p: %" PRIu32 " root page elements, splitting into %" PRIu32
+	    " children",
 	    root, pindex->entries, children));
 
 	/*
@@ -955,7 +956,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	remain = moved_entries - chunk * (children - 1);
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
-	    "%p: %" PRIu32 " elements, splitting into %" PRIu32 " children",
+	    "%p: %" PRIu32 " internal page elements, splitting into %" PRIu32
+	    " children",
 	    page, pindex->entries, children));
 
 	/*
