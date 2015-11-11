@@ -85,6 +85,10 @@ Status validateKeyPattern(const BSONObj& key) {
             keyElement.valuestrsafe() == IndexNames::TEXT)
             continue;
 
+        if (mongoutils::str::equals(keyElement.fieldName(), "_fts") &&
+            keyElement.valuestrsafe() != IndexNames::TEXT) {
+            return Status(code, "Index key contains an illegal field name: '_fts'");
+        }
 
         for (size_t i = 0; i != numParts; ++i) {
             const StringData part = keyField.getPart(i);

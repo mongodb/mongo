@@ -72,6 +72,17 @@ TEST(IndexKeyValidateTest, KeyElementBooleanValueSucceeds) {
     ASSERT_OK(validateKeyPattern(BSON("x" << false)));
 }
 
+TEST(IndexKeyValidateTest, KeyElementNameTextFailsOnNonTextIndex) {
+    auto status = validateKeyPattern(BSON("_fts" << 1));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+}
+
+TEST(IndexKeyValidateTest, KeyElementNameTextSucceedsOnTextIndex) {
+    ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "_fts"
+                                          << "text")));
+}
+
 }  // namespace
 
 }  // namespace mongo

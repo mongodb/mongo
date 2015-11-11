@@ -34,6 +34,14 @@ assert.commandFailed(coll.ensureIndex({"a.$**": "text"}, {name: indexName}));
 assert.eq( 0, coll.getIndexes().filter( function(z){ return z.name == indexName; } ).length );
 coll.dropIndexes();
 
+// SERVER-19519 Spec fails if '_fts' is specified on a non-text index.
+assert.commandFailed(coll.ensureIndex({_fts: 1}, {name: indexName}));
+assert.eq( 0, coll.getIndexes().filter( function(z){ return z.name == indexName; } ).length );
+coll.dropIndexes();
+assert.commandFailed(coll.ensureIndex({_fts: "text"}, {name: indexName}));
+assert.eq( 0, coll.getIndexes().filter( function(z){ return z.name == indexName; } ).length );
+coll.dropIndexes();
+
 //
 // 2. Text indexes properly enforce a schema on the language_override field.
 //
