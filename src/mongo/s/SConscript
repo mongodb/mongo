@@ -189,7 +189,6 @@ env.Library(
         'balance.cpp',
         'cluster_cursor_stats.cpp',
         'cluster_last_error_info.cpp',
-        'cursors.cpp',
         'request.cpp',
         's_only.cpp',
         's_sharding_server_status.cpp',

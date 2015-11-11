@@ -44,15 +44,6 @@ namespace mongo {
  */
 class ClusterCursorCleanupJob final : public BackgroundJob {
 public:
-    /**
-     * Period of time after which mortal cursors are killed for inactivity. Configurable with
-     * server parameter "cursorTimeoutMillis".
-     *
-     * TODO: Move declaration to cpp file once CursorCache class is deleted. See SERVER-20758 for
-     * more details.
-     */
-    static std::atomic<long long> cursorTimeoutMillis;  // NOLINT
-
     std::string name() const final;
     void run() final;
 };
